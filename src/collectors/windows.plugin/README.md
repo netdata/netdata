@@ -90,7 +90,7 @@ Once the user is created, it must also be granted access to the databases.
 
 ```tsql
 USE master;
-CREATE LOGIN netdata_user WITH PASSWORD = 'AReallyStrongPasswordShouldBeInsertedHere';
+CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
 CREATE USER netdata_user FOR LOGIN netdata_user;
 GRANT CONNECT SQL TO netdata_user;
 GRANT VIEW SERVER STATE TO netdata_user;
@@ -128,7 +128,7 @@ Now that the user has been created inside your server, update `netdata.conf` by 
         server = 127.0.0.1\\Dev, 1433
         #address = [protocol:]Address[,port |\pipe\pipename]
         uid = netdata_user
-        pwd = AReallyStrongPasswordShouldBeInsertedHere
+        pwd = 1ReallyStrongPasswordShouldBeInsertedHere
         # additional instances = 0
         #windows authentication = no
 ```
@@ -161,7 +161,7 @@ and `Dev` instances, you’ll need to add the following configuration section:
         driver = SQL Server
         server = 127.0.0.1\\Production, 1434
         uid = netdata_user
-        pwd = AnotherReallyStrongPasswordShouldBeInsertedHere
+        pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2$
 ```
 
 You must also update the main section to indicate how many additional instances you want to monitor:
@@ -198,3 +198,14 @@ To resolve this, follow these steps:
 2. Right-click the database for which you want to enable statistics and select `Properties`.
 3. In the left pane, select `Options`.
 4. Set `Auto Create Statistics` to `True`.
+
+#### Login Failed
+
+Another possible reason for the lack of available data is that an incorrect username or password was provided
+in your configuration file. You can verify this by checking the `ERRORLOG` in the SQL Server log located at:
+
+```text
+C:\Program Files\Microsoft SQL Server\VERSION\MSSQL\Log,
+```
+
+where `VERSION` corresponds to the Microsoft SQL Server version installed on the host.
