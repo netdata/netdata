@@ -33,7 +33,7 @@ typedef struct {
     RRDDIM *rd;
     size_t normal_dimensions;
     size_t anomalous_dimensions;
-} ml_type_anomaly_rate_t;
+} ml_context_anomaly_rate_t;
 
 typedef struct {
     RRDHOST *rh;
@@ -81,9 +81,9 @@ typedef struct {
     RRDDIM *detector_events_above_threshold_rd;
     RRDDIM *detector_events_new_anomaly_event_rd;
 
-    RRDSET *type_anomaly_rate_rs;
-    SPINLOCK type_anomaly_rate_spinlock;
-    std::unordered_map<STRING *, ml_type_anomaly_rate_t> type_anomaly_rate;
+    RRDSET *context_anomaly_rate_rs;
+    SPINLOCK context_anomaly_rate_spinlock;
+    std::unordered_map<STRING *, ml_context_anomaly_rate_t> context_anomaly_rate;
 } ml_host_t;
 
 #endif /* NETDATA_ML_HOST_H */
