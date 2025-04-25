@@ -638,6 +638,9 @@ static ALWAYS_INLINE void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_qu
         int64_t mem_delta = 0;
 
         Pvoid_t *section_pages_pptr = JudyLIns(&q->sections_judy, page->section, PJE0);
+        if(section_pages_pptr == NULL || section_pages_pptr == PJERR)
+            fatal("DBENGINE CACHE: JudyLIns(q->sections_judy, 0x%lx) failed, q->sections_judy = %p, result = %p",
+                  (long unsigned)page->section, q->sections_judy, section_pages_pptr);
 
         struct section_pages *sp = *section_pages_pptr;
         if(!sp) {
@@ -714,7 +717,9 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
 
     if(q->linked_list_in_sections_judy) {
         Pvoid_t *section_pages_pptr = JudyLGet(q->sections_judy, page->section, PJE0);
-        internal_fatal(!section_pages_pptr, "DBENGINE CACHE: page should be in Judy LL, but it is not");
+        if(section_pages_pptr == NULL || section_pages_pptr == PJERR)
+            fatal("DBENGINE CACHE: JudyLGet(q->sections_judy, 0x%lx) failed, q->sections_judy = %p",
+                  (long unsigned)page->section, q->sections_judy);
 
         struct section_pages *sp = *section_pages_pptr;
         sp->entries--;
@@ -1418,15 +1423,18 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
         Pvoid_t *metrics_judy_pptr = JudyLIns(&cache->index[partition].sections_judy, entry->section, PJE0);
         if(unlikely(!metrics_judy_pptr || metrics_judy_pptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted sections judy array");
+            fatal("DBENGINE CACHE: JudyLIns(sections_judy, 0x%lx) failed, sections_judy = %p, result = %p",
+                  (long unsigned)entry->section, cache->index[partition].sections_judy, metrics_judy_pptr);
 
         Pvoid_t *pages_judy_pptr = JudyLIns(metrics_judy_pptr, entry->metric_id, PJE0);
         if(unlikely(!pages_judy_pptr || pages_judy_pptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted pages judy array");
+            fatal("DBENGINE CACHE: JudyLIns(metrics_judy, 0x%lx) failed, metrics_judy = %p, result = %p",
+                  (long unsigned)entry->metric_id, metrics_judy_pptr, pages_judy_pptr);
 
         Pvoid_t *page_ptr = JudyLIns(pages_judy_pptr, entry->start_time_s, PJE0);
         if(unlikely(!page_ptr || page_ptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted page in judy array");
+            fatal("DBENGINE CACHE: JudyLIns(pages_judy, %ld) failed, pages_judy = %p, result = %p",
+                  (long)entry->start_time_s, pages_judy_pptr, page_ptr);
 
         pgc_stats_index_judy_change(cache, JudyAllocThreadPulseGetAndReset());
 
@@ -2471,7 +2479,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         size_t current_extent_index_id;
         Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("Corrupted JudyL extents pos");
+            fatal("CACHE: JudyLIns(JudyL_extents_pos, %" PRIu64 ") failed, JudyL_extents_pos = %p, result = %p",
+                  xio->pos, JudyL_extents_pos, PValue);
 
         struct jv2_extents_info *ei;
         if(!*PValue) {
@@ -2495,7 +2504,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
         PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("Corrupted JudyL metrics");
+            fatal("CACHE: JudyLIns(JudyL_metrics, 0x%lx) failed, JudyL_metrics = %p, result = %p",
+                  (long unsigned)page->metric_id, JudyL_metrics, PValue);
 
         struct jv2_metrics_info *mi;
         if(!*PValue) {
@@ -2521,7 +2531,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
         PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_s, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("Corrupted JudyL metric pages");
+            fatal("CACHE: JudyLIns(JudyL_pages_by_start_time, %ld) failed, JudyL_pages_by_start_time = %p, result = %p",
+                  (long)page->start_time_s, mi->JudyL_pages_by_start_time, PValue);
 
         if(!*PValue) {
             struct jv2_page_info *pi = aral_mallocz(ar_pi); // callocz(1, (sizeof(struct jv2_page_info)));
