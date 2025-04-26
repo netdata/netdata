@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- improve pgc fatal errors [\#20181](https://github.com/netdata/netdata/pull/20181) ([ktsaou](https://github.com/ktsaou))
+- Group anomaly rate per chart context instead of type. [\#20180](https://github.com/netdata/netdata/pull/20180) ([vkalintiris](https://github.com/vkalintiris))
+- bump go mod 1.24.0 [\#20179](https://github.com/netdata/netdata/pull/20179) ([ilyam8](https://github.com/ilyam8))
+- Retry nightly changelog generation. [\#20178](https://github.com/netdata/netdata/pull/20178) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): update go toolchain to v1.24.2 [\#20176](https://github.com/netdata/netdata/pull/20176) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump k8s.io/client-go from 0.32.3 to 0.33.0 in /src/go [\#20175](https://github.com/netdata/netdata/pull/20175) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.49.0 to 0.50.0 in /src/go [\#20173](https://github.com/netdata/netdata/pull/20173) ([dependabot[bot]](https://github.com/apps/dependabot))
 - chore\(otel/netdataexporter\): add exporter module skeleton [\#20171](https://github.com/netdata/netdata/pull/20171) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20170](https://github.com/netdata/netdata/pull/20170) ([netdatabot](https://github.com/netdatabot))
@@ -27,6 +32,7 @@
 - build\(deps\): bump github.com/invopop/jsonschema from 0.12.0 to 0.13.0 in /src/go [\#20152](https://github.com/netdata/netdata/pull/20152) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.10 to 3.4.11 in /src/go [\#20151](https://github.com/netdata/netdata/pull/20151) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.39.0 to 1.40.0 in /src/go [\#20149](https://github.com/netdata/netdata/pull/20149) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Some fixes for macOS \< 11 [\#20145](https://github.com/netdata/netdata/pull/20145) ([barracuda156](https://github.com/barracuda156))
 - docs: cleanup language and fix minor grammar issues [\#20144](https://github.com/netdata/netdata/pull/20144) ([luiizaferreirafonseca](https://github.com/luiizaferreirafonseca))
 - chore\(otel/journaldexporter\): improve remote tests [\#20143](https://github.com/netdata/netdata/pull/20143) ([ilyam8](https://github.com/ilyam8))
 - Install fix admonition docs [\#20136](https://github.com/netdata/netdata/pull/20136) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -459,13 +465,6 @@
 - Revert "fix windows logs" [\#19639](https://github.com/netdata/netdata/pull/19639) ([ktsaou](https://github.com/ktsaou))
 - add Group=netdata to systemd unit file [\#19638](https://github.com/netdata/netdata/pull/19638) ([ilyam8](https://github.com/ilyam8))
 - docs: add missing prop to graphite meta [\#19637](https://github.com/netdata/netdata/pull/19637) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19636](https://github.com/netdata/netdata/pull/19636) ([netdatabot](https://github.com/netdatabot))
-- docs\(exporting\): clarify graphite exporters [\#19635](https://github.com/netdata/netdata/pull/19635) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19634](https://github.com/netdata/netdata/pull/19634) ([netdatabot](https://github.com/netdatabot))
-- docs\(exporting\): remove influxdb \(via graphite\) exporter [\#19633](https://github.com/netdata/netdata/pull/19633) ([ilyam8](https://github.com/ilyam8))
-- fix windows logs [\#19632](https://github.com/netdata/netdata/pull/19632) ([ktsaou](https://github.com/ktsaou))
-- more perflib error checking [\#19631](https://github.com/netdata/netdata/pull/19631) ([ktsaou](https://github.com/ktsaou))
-- Revert "HyperV Adjusts \(windows.plugin\)" [\#19630](https://github.com/netdata/netdata/pull/19630) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
