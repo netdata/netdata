@@ -299,8 +299,6 @@ void send_internal_metrics(struct instance *instance);
 void clean_instance(struct instance *ptr);
 void simple_connector_cleanup(struct instance *instance);
 
-bool exporting_exit(void);
-
 /**
  * Free exporting configuration
  * 
