@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- ensure atomicity when logging pending message [\#20185](https://github.com/netdata/netdata/pull/20185) ([ktsaou](https://github.com/ktsaou))
 - improve pgc fatal errors [\#20181](https://github.com/netdata/netdata/pull/20181) ([ktsaou](https://github.com/ktsaou))
 - Group anomaly rate per chart context instead of type. [\#20180](https://github.com/netdata/netdata/pull/20180) ([vkalintiris](https://github.com/vkalintiris))
 - bump go mod 1.24.0 [\#20179](https://github.com/netdata/netdata/pull/20179) ([ilyam8](https://github.com/ilyam8))
@@ -464,7 +465,6 @@
 - fix windows logs 2 - do not renumber - append fields [\#19640](https://github.com/netdata/netdata/pull/19640) ([ktsaou](https://github.com/ktsaou))
 - Revert "fix windows logs" [\#19639](https://github.com/netdata/netdata/pull/19639) ([ktsaou](https://github.com/ktsaou))
 - add Group=netdata to systemd unit file [\#19638](https://github.com/netdata/netdata/pull/19638) ([ilyam8](https://github.com/ilyam8))
-- docs: add missing prop to graphite meta [\#19637](https://github.com/netdata/netdata/pull/19637) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
