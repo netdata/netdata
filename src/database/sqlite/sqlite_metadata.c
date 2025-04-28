@@ -797,6 +797,8 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         goto close_database;
 
     netdata_log_info("SQLite database initialization completed");
+    if (sqlite3_busy_timeout(db_meta, SQLITE_BUSY_DELAY_MS) != SQLITE_OK)
+        nd_log_daemon(NDLP_WARNING, "SQLITE: Failed to set busy timeout to %d ms", SQLITE_BUSY_DELAY_MS);
 
     return 0;
 
