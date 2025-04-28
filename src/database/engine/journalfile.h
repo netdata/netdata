@@ -23,17 +23,15 @@ typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_FLAG_METRIC_CRC_CHECK      = (1 << 3),
 } JOURNALFILE_FLAGS;
 
-/* only one event loop is supported for now */
 struct rrdengine_journalfile {
+    SPINLOCK data_spinlock;
     struct {
-        SPINLOCK spinlock;
         void *data;                    // MMAPed file of journal v2
         uint32_t size;                 // Total file size mapped
         int fd;
     } mmap;
 
     struct {
-        SPINLOCK spinlock;
         JOURNALFILE_FLAGS flags;
         int32_t refcount;
         time_t first_time_s;
