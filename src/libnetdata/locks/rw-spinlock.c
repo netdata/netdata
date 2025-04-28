@@ -35,6 +35,7 @@ ALWAYS_INLINE bool rw_spinlock_tryread_lock_with_trace(RW_SPINLOCK *rw_spinlock,
 ALWAYS_INLINE void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
     usec_t usec = 1;
+    usec_t deadlock_timestamp = 0;
 
     while (true) {
         // Optimistically increment reader count
@@ -52,6 +53,12 @@ ALWAYS_INLINE void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, co
         __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
 
         spins++;
+        
+        // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
+        if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
+            spinlock_deadlock_detect(&deadlock_timestamp);
+        }
+        
         microsleep(usec);
         usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
     }
@@ -88,6 +95,7 @@ ALWAYS_INLINE bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock
 ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func) {
     size_t spins = 0;
     usec_t usec = 1;
+    usec_t deadlock_timestamp = 0;
 
     while (1) {
         // Optimistically set writer bit
@@ -111,6 +119,12 @@ ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, c
         }
 
         spins++;
+        
+        // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
+        if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
+            spinlock_deadlock_detect(&deadlock_timestamp);
+        }
+        
         microsleep(usec);
         usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
     }

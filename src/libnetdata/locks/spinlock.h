@@ -35,6 +35,12 @@ typedef struct netdata_spinlock
 #define SPINLOCK_INITIALIZER { .locked = false }
 #endif
 
+#define SPINLOCK_DEADLOCK_TIMEOUT_SEC 600 // Number of seconds to wait before declaring a deadlock
+#define SPINS_BEFORE_DEADLOCK_CHECK 20000 // Check for deadlock every 20000 spins (approx. once per second)
+
+// Helper function to detect deadlocks
+void spinlock_deadlock_detect(usec_t *timestamp);
+
 void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func);
 #define spinlock_init(spinlock) spinlock_init_with_trace(spinlock, __FUNCTION__)
 
