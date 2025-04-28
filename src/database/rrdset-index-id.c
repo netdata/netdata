@@ -338,7 +338,7 @@ RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     RRDSET *st = rrdset_index_find(host, id);
 
     if(st) {
-        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+        if(!rrdset_is_discoverable(st))
             return NULL;
 
         st->last_accessed_time_s = now_realtime_sec();
@@ -366,7 +366,7 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
     if(sta) {
         RRDSET *st = (RRDSET *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)sta);
         if(st) {
-            if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) {
+            if(!rrdset_is_discoverable(st)) {
                 dictionary_acquired_item_release(host->rrdset_root_index, (const DICTIONARY_ITEM *)sta);
                 return NULL;
             }
