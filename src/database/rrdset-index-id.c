@@ -337,8 +337,12 @@ RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
 
-    if(st)
+    if(st) {
+        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+            return NULL;
+
         st->last_accessed_time_s = now_realtime_sec();
+    }
 
     return(st);
 }
@@ -358,7 +362,20 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id) {
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
 
-    return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+    RRDSET_ACQUIRED *sta = (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+    if(sta) {
+        RRDSET *st = (RRDSET *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)sta);
+        if(st) {
+            if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)) {
+                dictionary_acquired_item_release(host->rrdset_root_index, (const DICTIONARY_ITEM *)sta);
+                return NULL;
+            }
+
+            st->last_accessed_time_s = now_realtime_sec();
+        }
+    }
+
+    return sta;
 }
 
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa) {
