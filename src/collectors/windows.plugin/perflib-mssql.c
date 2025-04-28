@@ -138,6 +138,8 @@ struct mssql_instance {
 };
 
 struct mssql_lock_instance {
+    struct mssql_instance *parent;
+
     char *resourceID;
 
     COUNTER_DATA lockWait;
@@ -1358,6 +1360,8 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks))
             dict_mssql_deadlocks_dimension(mi, mli);
+
+        mli->parent = mi;
     }
 
     if (mi->st_lockWait)
