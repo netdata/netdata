@@ -93,6 +93,8 @@ int init_connectors(struct engine *engine)
         int error = uv_thread_create(&instance->thread, instance->worker, instance);
         if (error) {
             netdata_log_error("EXPORTING: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
+            instance->exited = 1;
+            instance->thread = 0;
             return 1;
         }
 
