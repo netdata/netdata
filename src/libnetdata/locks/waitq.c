@@ -58,6 +58,14 @@ static ALWAYS_INLINE bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {
 }
 
 ALWAYS_INLINE bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func __maybe_unused) {
+    // Fast path for no contention - try to get the lock immediately without a sequence number
+    if (__atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED) == NO_PRIORITY && 
+        spinlock_trylock(&waitq->spinlock)) {
+        waitq->writer = gettid_cached();
+        return true;
+    }
+
+    // Normal path with queuing if contention exists
     uint64_t our_order = get_our_order(waitq, priority);
 
     bool rc = write_our_priority(waitq, our_order) && spinlock_trylock(&waitq->spinlock);
@@ -70,6 +78,14 @@ ALWAYS_INLINE bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY pri
 }
 
 ALWAYS_INLINE void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func) {
+    // Fast path for no contention - try to get the lock immediately without a sequence number
+    if (__atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED) == NO_PRIORITY && 
+        spinlock_trylock(&waitq->spinlock)) {
+        waitq->writer = gettid_cached();
+        return;
+    }
+
+    // Normal path with queuing if contention exists
     uint64_t our_order = get_our_order(waitq, priority);
 
     size_t spins = 0;
