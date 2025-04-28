@@ -84,6 +84,8 @@ typedef struct {
     RRDSET *context_anomaly_rate_rs;
     SPINLOCK context_anomaly_rate_spinlock;
     std::unordered_map<STRING *, ml_context_anomaly_rate_t> context_anomaly_rate;
+
+    bool reset_pointers;
 } ml_host_t;
 
 #endif /* NETDATA_ML_HOST_H */

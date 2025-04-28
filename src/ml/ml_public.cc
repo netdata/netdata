@@ -503,3 +503,11 @@ bool ml_model_received_from_child(RRDHOST *host, const char *json)
 
     return ok;
 }
+
+void ml_host_disconnected(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host)
+        return;
+
+    __atomic_store_n(&host->reset_pointers, true, __ATOMIC_RELAXED);
+}

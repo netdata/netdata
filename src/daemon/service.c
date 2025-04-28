@@ -160,6 +160,8 @@ static inline void svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
 }
 
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host) {
+    ml_host_disconnected(host);
+
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_is_obsolete___safe_from_collector_thread(st);
@@ -190,7 +192,8 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         time_t now = now_realtime_sec();
 
-        if (host->stream.rcv.status.last_connected == 0 &&
+        if (!host->receiver &&
+            host->stream.rcv.status.last_connected == 0 &&
             (host->stream.rcv.status.last_disconnected + rrdset_free_obsolete_time_s < now)) {
             svc_rrdhost_obsolete_all_charts(host);
         }
