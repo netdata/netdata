@@ -83,6 +83,7 @@ void analytics_set_data_str(char **name, const char *value);
 
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
+#define SQLITE_BUSY_DELAY_MS (30)          // Busy timeout delay
 
 SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt);
 SQLITE_API int sqlite3_exec_monitored(

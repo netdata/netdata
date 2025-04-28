@@ -797,6 +797,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         goto close_database;
 
     netdata_log_info("SQLite database initialization completed");
+    sqlite3_busy_timeout(db_meta, SQLITE_BUSY_DELAY_MS);
 
     return 0;
 

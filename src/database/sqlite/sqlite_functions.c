@@ -272,7 +272,7 @@ int db_execute(sqlite3 *db, const char *cmd)
             break;
 
         ++cnt;
-        error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg ? err_msg : "unknown", cnt);
+        nd_log_daemon(NDLP_WARNING, "Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg ? err_msg : "unknown", cnt);
         if (err_msg) {
             sqlite3_free(err_msg);
         }
