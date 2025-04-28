@@ -7,7 +7,7 @@ Dynamic Configuration (DynCfg) is a system in Netdata that enables both internal
 DynCfg provides a centralized mechanism for:
 
 1. Registering configuration objects from any plugin or module
-2. Providing a unified interface for users to view and modify these configurations 
+2. Providing a unified interface for users to view and modify these configurations
 3. Persisting configurations between Netdata agent restarts
 4. Validating configuration changes through the originating plugin/module
 5. Standardizing configuration UI using JSON Schema
@@ -16,7 +16,7 @@ Key features:
 
 - Plugins can expose multiple configuration objects
 - Each configuration object has a unique ID
-- Configuration changes are validated by the owning plugin before being committed
+- The owning plugin validates configuration changes before being committed
 - The DynCfg manager maintains the state of all dynamic configurations
 - JSON Schema is used to define the structure of configuration objects
 - The UI is based on adaptations of the react-jsonschema-form project
@@ -33,7 +33,7 @@ DynCfg consists of several API layers:
 
 There are two main ways to integrate with DynCfg:
 
-1. **High-level API for Internal Plugins**: Used by health alerts system (documented here)
+1. **High-level API for Internal Plugins**: Used by the health alerts system (documented here)
 2. **External Plugin API**: Used by go.d.plugin (see [src/plugins.d/DYNCFG.md](/src/plugins.d/DYNCFG.md) for detailed documentation)
 
 ### Core Concepts
@@ -51,11 +51,13 @@ component:category:name
 ```
 
 Where:
+
 - **component**: The main module or plugin (e.g., "health", "go.d", "systemd-journal")
-- **category**: Optional sub-category (e.g., "alert", "job")
+- **category**: Optional subcategory (e.g., "alert", "job")
 - **name**: Specific configuration name
 
 For example:
+
 - `health:alert:prototype`: Health alert prototype template
 - `health:alert:prototype:ram_usage`: Specific health alert prototype
 - `go.d:nginx`: Nginx collector template
@@ -76,6 +78,7 @@ The part before the last colon in a job ID must match an existing template ID.
 The first component of the ID is used to organize configurations in the UI, creating separate tabs or sections. This allows for logical grouping of related configurations.
 
 When choosing an ID, consider:
+
 - UI organization (first component)
 - Logical grouping (middle components)
 - Uniqueness (complete ID)
@@ -136,7 +139,7 @@ Here's how to implement DynCfg for an internal plugin/module:
 
 For internal plugins, the Netdata daemon already handles initialization and shutdown of the DynCfg system. You don't need to call `dyncfg_init()` or `dyncfg_shutdown()` in your plugin code.
 
-Simply register your configurations when your plugin initializes:
+Register your configurations when your plugin initializes:
 
 ```c
 bool dyncfg_add(
@@ -236,13 +239,13 @@ int your_dyncfg_callback(
 
 ### 4. Configuration Lifecycle Management
 
-You only need to unregister configurations when they conceptually no longer apply (e.g., when a feature is no longer available), not when your plugin or module is shutting down:
+Unregister configurations only when they’re no longer conceptually relevant (such as when a feature becomes unavailable), not during plugin or module shutdown:
 
 ```c
 dyncfg_del(host, id);  // Remove a specific configuration that no longer applies
 ```
 
-When a plugin or module exits, the Netdata Functions manager automatically stops accepting requests for its functions. The configurations will remain in the DynCfg system, and will become active again when the plugin restarts.
+When a plugin or module exits, the Netdata Functions manager automatically stops accepting requests for its functions. The configurations will remain in the DynCfg system and will become active again when the plugin restarts.
 
 The Netdata daemon also handles shutting down the entire DynCfg system, so you don't need to call `dyncfg_shutdown()` in your plugin code.
 
@@ -251,6 +254,7 @@ The Netdata daemon also handles shutting down the entire DynCfg system, so you d
 External plugins like go.d.plugin use a different approach based on the plugins.d protocol. For detailed information on implementing DynCfg for external plugins, please refer to the [External Plugins DynCfg documentation](/src/plugins.d/DYNCFG.md).
 
 This documentation covers:
+
 - How to register configurations using the CONFIG command
 - How to respond to configuration commands
 - How to update configuration status
@@ -263,11 +267,13 @@ The UI for modifying configurations is generated from JSON Schema. Netdata suppo
 
 ### 1. Static Schema Files
 
-Netdata first attempts to load schema files from disk before calling the plugin or module. Schema files should be placed in:
+Netdata first attempts to load schema files from the disk before calling the plugin or module. Schema files should be placed in:
+
 - `CONFIG_DIR/schema.d/` (user-provided schemas, typically `/etc/netdata/schema.d/`)
 - `LIBCONFIG_DIR/schema.d/` (stock schemas, typically `/usr/lib/netdata/conf.d/schema.d/`)
 
 Schema files should be named after the configuration ID with `.json` extension, for example:
+
 - `health:alert:prototype.json`
 - `go.d:nginx.json`
 
@@ -279,6 +285,7 @@ If no static schema file is found, Netdata will call the plugin or module with t
 2. For external plugins, the plugin should respond to the schema command with a JSON Schema document
 
 This gives you flexibility to either:
+
 - Use static schema files for simple, fixed configurations
 - Generate schemas dynamically for more complex configurations that may change based on runtime conditions
 
@@ -317,7 +324,9 @@ Example JSON Schema:
       }
     }
   },
-  "required": ["url"]
+  "required": [
+    "url"
+  ]
 }
 ```
 
@@ -325,22 +334,23 @@ Example JSON Schema:
 
 Different actions behave differently depending on the configuration type. The following table explains what happens when each action is applied to different configuration types:
 
-| Action | SINGLE | TEMPLATE | JOB |
-|--------|--------|----------|-----|
-| **SCHEMA** | Returns schema from file or plugin | Returns schema from file or plugin | Uses template's schema |
-| **GET** | Returns current configuration | Not supported (templates don't maintain data) | Returns current configuration |
-| **UPDATE** | Updates single configuration | Not supported (templates don't maintain data) | Updates job configuration |
-| **ADD** | Not supported | Creates a new job based on template | Not supported |
-| **REMOVE** | Not supported | Not supported | Removes job (only for DYNCFG_SOURCE_TYPE_DYNCFG jobs) |
-| **ENABLE** | Enables single configuration | Enables template AND all its jobs | Enables job (fails if its template is disabled) |
-| **DISABLE** | Disables single configuration | Disables template AND all its jobs | Disables job |
-| **RESTART** | Sends restart command to plugin | Restarts all template's jobs | Restarts specific job |
-| **TEST** | Tests configuration without applying | Tests a new job configuration | Tests updated job configuration |
-| **USERCONFIG** | Returns user-friendly configuration | Returns template for user-friendly configuration | Returns user-friendly configuration |
+| Action         | SINGLE                               | TEMPLATE                                         | JOB                                                   |
+|----------------|--------------------------------------|--------------------------------------------------|-------------------------------------------------------|
+| **SCHEMA**     | Returns schema from file or plugin   | Returns schema from file or plugin               | Uses template's schema                                |
+| **GET**        | Returns current configuration        | Not supported (templates don't maintain data)    | Returns current configuration                         |
+| **UPDATE**     | Updates single configuration         | Not supported (templates don't maintain data)    | Updates job configuration                             |
+| **ADD**        | Not supported                        | Creates a new job based on template              | Not supported                                         |
+| **REMOVE**     | Not supported                        | Not supported                                    | Removes job (only for DYNCFG_SOURCE_TYPE_DYNCFG jobs) |
+| **ENABLE**     | Enables single configuration         | Enables template AND all its jobs                | Enables job (fails if its template is disabled)       |
+| **DISABLE**    | Disables single configuration        | Disables template AND all its jobs               | Disables job                                          |
+| **RESTART**    | Sends restart command to plugin      | Restarts all template's jobs                     | Restarts specific job                                 |
+| **TEST**       | Tests configuration without applying | Tests a new job configuration                    | Tests updated job configuration                       |
+| **USERCONFIG** | Returns user-friendly configuration  | Returns template for user-friendly configuration | Returns user-friendly configuration                   |
 
 **Important Notes:**
+
 - When a template is disabled, all its jobs are automatically disabled regardless of their individual settings
-- Jobs cannot be enabled if their parent template is disabled
+- Jobs can’t be enabled if their parent template is disabled
 - Template schemas are used for all jobs created from that template
 - The REMOVE action is only available for jobs created via DynCfg (with source type DYNCFG_SOURCE_TYPE_DYNCFG)
 - RESTART on a template recursively restarts all jobs associated with that template
@@ -358,6 +368,7 @@ Netdata provides a tree API that returns the entire DynCfg tree or a specific su
 ```
 
 Parameters:
+
 - `action`: Set to "tree" to get the configuration tree
 - `path`: The configuration path to start from (e.g., "/collectors", "/health/alerts")
 - `id` (optional): Return only a specific configuration ID
@@ -373,6 +384,7 @@ Individual configurations can be managed via:
 ```
 
 Where:
+
 - `action`: One of the supported commands (get, update, add, remove, etc.)
 - `id`: The configuration ID to act upon
 - `name`: Required for add/test actions (new job name)
@@ -394,10 +406,12 @@ The API automatically routes commands to the appropriate plugin or module that r
 ### Health Alerts System (Internal Plugin)
 
 Health alerts use DynCfg to manage alert definitions. Key files:
+
 - `src/health/health_dyncfg.c`: Implements DynCfg integration for health alerts
 - Handles alert prototype templates and individual alert configurations
 
 The health module uses the high-level API with IDs like:
+
 - `health:alert:prototype` for the alert template
 - `health:alert:prototype:ram_usage` for specific alert prototypes
 
@@ -406,6 +420,7 @@ It supports multiple configuration objects, validation of alert definitions, and
 ### systemd-journal.plugin (External Plugin)
 
 The systemd-journal.plugin is an external plugin written in C that uses DynCfg to manage journal directory configurations:
+
 - `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`: Implements DynCfg integration
 - Registers as `systemd-journal:monitored-directories` ID
 - Uses a SINGLE configuration type for its directory list
@@ -417,11 +432,13 @@ This is a good example of an external plugin using the DynCfg system for a singl
 ### go.d.plugin (External Plugin)
 
 go.d.plugin uses DynCfg to manage job configurations. It:
+
 1. Registers configurations through the plugins.d protocol
 2. Generates dynamic JSON Schema based on Go struct tags
 3. Handles configuration updates for collecting jobs
 
 It uses IDs like:
+
 - `go.d:nginx` for the Nginx collector template
 - `go.d:nginx:local_server` for a specific Nginx collector job
 

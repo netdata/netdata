@@ -7,7 +7,7 @@ Dynamic Configuration (DynCfg) is a system in Netdata that enables both internal
 DynCfg provides a centralized mechanism for:
 
 1. Registering configuration objects from any plugin or module
-2. Providing a unified interface for users to view and modify these configurations 
+2. Providing a unified interface for users to view and modify these configurations
 3. Persisting configurations between Netdata agent restarts
 4. Validating configuration changes through the originating plugin/module
 5. Standardizing configuration UI using JSON Schema
@@ -16,7 +16,7 @@ Key features:
 
 - Plugins can expose multiple configuration objects
 - Each configuration object has a unique ID
-- Configuration changes are validated by the owning plugin before being committed
+- The owning plugin validates configuration changes before being committed
 - The DynCfg manager maintains the state of all dynamic configurations
 - JSON Schema is used to define the structure of configuration objects
 - The UI is based on adaptations of the react-jsonschema-form project
@@ -49,6 +49,7 @@ If you're developing an internal Netdata module or plugin, see:
 👉 [**Internal DynCfg Implementation Guide**](/src/daemon/dyncfg/README.md)
 
 This document covers:
+
 - Low-level and high-level APIs
 - Configuration ID structure
 - Response codes and status handling
@@ -64,6 +65,7 @@ If you're developing an external plugin that communicates with Netdata using the
 👉 [**External Plugin DynCfg Implementation Guide**](/src/plugins.d/DYNCFG.md)
 
 This document covers:
+
 - Plugin protocol commands and responses
 - Registering configurations
 - Handling configuration commands
@@ -78,17 +80,20 @@ For reference, you can study these existing implementations:
 ### Health Alerts System (Internal)
 
 The health module uses DynCfg to manage alert definitions. Key files:
+
 - `src/health/health_dyncfg.c`: Implements DynCfg integration for health alerts
 - Uses the high-level API for internal plugins
 
 ### systemd-journal.plugin (External)
 
 The systemd-journal.plugin is a C-based external plugin that uses DynCfg. Key files:
+
 - `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`: Implements a SINGLE configuration for journal directories
 
 ### go.d.plugin (External)
 
 go.d.plugin is a Go-based external plugin that uses DynCfg to manage job configurations:
+
 - Implements templates and jobs for various data collectors
 - Dynamically generates JSON Schema based on Go struct tags
 

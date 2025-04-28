@@ -5,6 +5,7 @@ External plugins in Netdata can expose dynamic configuration capabilities throug
 ## Overview
 
 The DynCfg system allows external plugins to:
+
 1. Register configurable entities (both single configurations and templates for creating jobs)
 2. Receive configuration commands from users
 3. Validate and apply configurations
@@ -29,38 +30,40 @@ CONFIG <id> CREATE <status> <type> <path> <source_type> <source> <cmds> <view_ac
 ```
 
 Where:
+
 - `id` is a unique identifier for the configurable entity (e.g., "go.d:nginx")
 - `status` can be:
-  - `accepted`: Configuration is accepted but not running
-  - `running`: Configuration is accepted and running
-  - `failed`: Plugin fails to run the configuration
-  - `incomplete`: Plugin needs additional settings
-  - `disabled`: Configuration is disabled by a user
+    - `accepted`: Configuration is accepted but not running
+    - `running`: Configuration is accepted and running
+    - `failed`: Plugin fails to run the configuration
+    - `incomplete`: Plugin needs additional settings
+    - `disabled`: Configuration is disabled by a user
 - `type` can be:
-  - `single`: A single configuration object (not addable or removable by users)
-  - `template`: A template for creating multiple job configurations
-  - `job`: A specific job configuration (derived from a template)
+    - `single`: A single configuration object (not addable or removable by users)
+    - `template`: A template for creating multiple job configurations
+    - `job`: A specific job configuration (derived from a template)
 - `path` is the UI organization path (usually "/collectors") that determines where in the configuration tree the item will appear in the UI. This is separate from the ID and controls the hierarchical navigation structure.
 - `source_type` can be:
-  - `internal`: Based on internal code settings
-  - `stock`: Default configurations
-  - `user`: User configurations via a file
-  - `dyncfg`: Configuration received via this mechanism
-  - `discovered`: Dynamically discovered by the plugin
+    - `internal`: Based on internal code settings
+    - `stock`: Default configurations
+    - `user`: User configurations via a file
+    - `dyncfg`: Configuration received via this mechanism
+    - `discovered`: Dynamically discovered by the plugin
 - `source` provides more details about the exact source
 - `cmds` is a space or pipe (|) separated list of supported commands:
-  - `schema`: Get JSON schema for the configuration
-  - `get`: Get current configuration values
-  - `update`: Receive configuration updates
-  - `add`: Receive job creation commands (templates only)
-  - `remove`: Remove a configuration (jobs only)
-  - `enable`/`disable`: Enable or disable the configuration
-  - `test`: Test a configuration without applying it
-  - `restart`: Restart the configuration
-  - `userconfig`: Get user-friendly configuration format
+    - `schema`: Get JSON schema for the configuration
+    - `get`: Get current configuration values
+    - `update`: Receive configuration updates
+    - `add`: Receive job creation commands (templates only)
+    - `remove`: Remove a configuration (jobs only)
+    - `enable`/`disable`: Enable or disable the configuration
+    - `test`: Test a configuration without applying it
+    - `restart`: Restart the configuration
+    - `userconfig`: Get user-friendly configuration format
 - `view_access` and `edit_access` are permission bitmaps (use 0 for default permissions)
 
 Example:
+
 ```
 CONFIG go.d:nginx CREATE accepted template /collectors internal internal schema|add|enable|disable 0 0
 CONFIG go.d:nginx:local_server CREATE running job /collectors dyncfg user schema|get|update|remove|enable|disable|restart 0 0
@@ -79,6 +82,7 @@ FUNCTION <transaction_id> <timeout_ms> "config <id> <command>" "<http_access>" "
 Used for commands like: `schema`, `get`, `remove`, `enable`, `disable`, `restart`
 
 Example:
+
 ```
 FUNCTION abcd1234 60 "config go.d:nginx:local_server get" "member" "netdata-cli"
 ```
@@ -94,6 +98,7 @@ FUNCTION_PAYLOAD_END
 Used for commands like: `update`, `add`, `test` that require additional data.
 
 Example:
+
 ```
 FUNCTION_PAYLOAD_BEGIN abcd1234 60 "config go.d:nginx:local_server update" "member" "netdata-cli" "application/json"
 {
@@ -115,24 +120,27 @@ FUNCTION_RESULT_END
 ```
 
 Where:
+
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
-  - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
-  - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running yet
-  - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
-  - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
-  - `400`: Bad request - Invalid configuration
-  - `404`: Not found - Configuration not found
-  - `500`: Internal server error
+    - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
+    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running yet
+    - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
+    - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+    - `400`: Bad request - Invalid configuration
+    - `404`: Not found - Configuration not found
+    - `500`: Internal server error
 - `content_type` is typically "application/json"
 - `expiration` is the absolute timestamp (unix epoch) for result expiration
 
 The result data depends on the command:
+
 - `schema`: Return JSON Schema document
 - `get`: Return current configuration values
-- Other commands: Return success or error message
+- Other commands: Return a success or error message
 
 Success response example:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
 {
@@ -143,6 +151,7 @@ FUNCTION_RESULT_END
 ```
 
 Error response example:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 400 application/json 0
 {
@@ -161,6 +170,7 @@ CONFIG <id> STATUS <new_status>
 ```
 
 Example:
+
 ```
 CONFIG go.d:nginx:local_server STATUS running
 ```
@@ -176,6 +186,7 @@ CONFIG <id> DELETE
 ```
 
 Example:
+
 ```
 CONFIG go.d:nginx:local_server DELETE
 ```
@@ -187,10 +198,12 @@ DynCfg uses JSON Schema to define the structure of configuration objects, which 
 ### Static Schema Files (Optional)
 
 Before calling the plugin, Netdata will first attempt to find a static schema file. You can provide static schema files in:
+
 - `CONFIG_DIR/schema.d/` (user-provided schemas, typically `/etc/netdata/schema.d/`)
 - `LIBCONFIG_DIR/schema.d/` (stock schemas, typically `/usr/lib/netdata/conf.d/schema.d/`)
 
 Schema files should be named after the configuration ID with `.json` extension:
+
 ```
 /etc/netdata/schema.d/go.d:nginx.json
 ```
@@ -225,7 +238,9 @@ If no static schema file is found, Netdata will send a `schema` command to the p
       "description": "Data collection frequency in seconds"
     }
   },
-  "required": ["url"]
+  "required": [
+    "url"
+  ]
 }
 ```
 
@@ -233,22 +248,23 @@ For templates, the schema will be used when users add new jobs based on the temp
 
 ## Action Behavior Reference
 
-When implementing DynCfg in your external plugin, be aware of how actions should behave based on configuration type:
+When implementing DynCfg in your external plugin, be aware of how actions should behave based on the configuration type:
 
-| Action | TEMPLATE | JOB |
-|--------|----------|-----|
-| **SCHEMA** | Return schema for creating new jobs | Use template's schema |
-| **GET** | Not applicable | Return current configuration |
-| **UPDATE** | Not applicable | Update configuration and apply if valid |
-| **ADD** | Create new job from template | Not applicable |
-| **REMOVE** | Not supported | Remove job (only for user-created jobs) |
-| **ENABLE** | Enable template and all its jobs | Enable specific job |
-| **DISABLE** | Disable template and all its jobs | Disable specific job |
-| **RESTART** | Restart all jobs based on template | Restart specific job |
-| **TEST** | Test a potential job configuration | Test configuration changes |
-| **USERCONFIG** | Return template in user-friendly format | Return job in user-friendly format |
+| Action         | TEMPLATE                                | JOB                                     |
+|----------------|-----------------------------------------|-----------------------------------------|
+| **SCHEMA**     | Return schema for creating new jobs     | Use template's schema                   |
+| **GET**        | Not applicable                          | Return current configuration            |
+| **UPDATE**     | Not applicable                          | Update configuration and apply if valid |
+| **ADD**        | Create new job from template            | Not applicable                          |
+| **REMOVE**     | Not supported                           | Remove job (only for user-created jobs) |
+| **ENABLE**     | Enable template and all its jobs        | Enable specific job                     |
+| **DISABLE**    | Disable template and all its jobs       | Disable specific job                    |
+| **RESTART**    | Restart all jobs based on template      | Restart specific job                    |
+| **TEST**       | Test a potential job configuration      | Test configuration changes              |
+| **USERCONFIG** | Return template in user-friendly format | Return job in user-friendly format      |
 
 **Important Implementation Notes:**
+
 - When a template is disabled, send DISABLE commands to all jobs of that template
 - Reject ENABLE commands for jobs if their template is disabled
 - For job SCHEMA requests, return the same schema as the template
@@ -280,6 +296,7 @@ functions_evloop_dyncfg_add(
 ```
 
 Key points about its implementation:
+
 - Uses a single, non-removable configuration object
 - Supports schema, get, and update commands
 - Validates directory paths for security
@@ -303,11 +320,13 @@ CONFIG go.d:nginx:production CREATE running job /collectors user /etc/netdata/go
 ### 2. Handle Schema Command
 
 When receiving:
+
 ```
 FUNCTION abcd1234 60 "config go.d:nginx schema" "member" "netdata-cli"
 ```
 
 Respond with:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
 {
@@ -341,11 +360,13 @@ FUNCTION_RESULT_END
 ### 3. Handle Get Command
 
 When receiving:
+
 ```
 FUNCTION abcd1234 60 "config go.d:nginx:local_server get" "member" "netdata-cli"
 ```
 
 Respond with:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
 {
@@ -359,6 +380,7 @@ FUNCTION_RESULT_END
 ### 4. Handle Update Command
 
 When receiving:
+
 ```
 FUNCTION_PAYLOAD_BEGIN abcd1234 60 "config go.d:nginx:local_server update" "member" "netdata-cli" "application/json"
 {
@@ -370,6 +392,7 @@ FUNCTION_PAYLOAD_END
 ```
 
 Process the update and respond:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
 {
@@ -380,6 +403,7 @@ FUNCTION_RESULT_END
 ```
 
 If a restart is required:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 299 application/json 0
 {
@@ -392,6 +416,7 @@ FUNCTION_RESULT_END
 ### 5. Handle Add Command (for templates)
 
 When receiving:
+
 ```
 FUNCTION_PAYLOAD_BEGIN abcd1234 60 "config go.d:nginx add" "member" "netdata-cli" "application/json"
 {
@@ -404,6 +429,7 @@ FUNCTION_PAYLOAD_END
 ```
 
 Process the new job and respond:
+
 ```
 FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
 {
@@ -414,6 +440,7 @@ FUNCTION_RESULT_END
 ```
 
 Then register the new job:
+
 ```
 CONFIG go.d:nginx:staging CREATE running job /collectors dyncfg netdata-cli schema|get|update|remove|enable|disable|restart 0 0
 ```
@@ -421,7 +448,7 @@ CONFIG go.d:nginx:staging CREATE running job /collectors dyncfg netdata-cli sche
 ## Best Practices
 
 1. **Use Consistent IDs**: Follow the pattern `component:template_name` for templates and `component:template_name:job_name` for jobs
-2. **Validate Thoroughly**: Always validate configuration changes before accepting them 
+2. **Validate Thoroughly**: Always validate configuration changes before accepting them
 3. **Include Descriptive Messages**: Provide helpful error messages when rejections occur
 4. **Document Your Schema**: Include clear titles and descriptions for all properties in your JSON Schema
 5. **Handle Errors Gracefully**: Return appropriate HTTP status codes and error messages
