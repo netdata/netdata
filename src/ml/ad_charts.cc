@@ -4,6 +4,35 @@
 #include "ml_config.h"
 
 void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats_t &mls) {
+
+    if(__atomic_load_n(&host->reset_pointers, __ATOMIC_RELAXED)) {
+        __atomic_store_n(&host->reset_pointers, false, __ATOMIC_RELAXED);
+
+        host->ml_running_rs = nullptr;
+        host->ml_running_rd = nullptr;
+        host->machine_learning_status_rs = nullptr;
+        host->machine_learning_status_enabled_rd = nullptr;
+        host->machine_learning_status_disabled_sp_rd = nullptr;
+        host->metric_type_rs = nullptr;
+        host->metric_type_constant_rd = nullptr;
+        host->metric_type_variable_rd = nullptr;
+        host->training_status_rs = nullptr;
+        host->training_status_untrained_rd = nullptr;
+        host->training_status_pending_without_model_rd = nullptr;
+        host->training_status_trained_rd = nullptr;
+        host->training_status_pending_with_model_rd = nullptr;
+        host->training_status_silenced_rd = nullptr;
+        host->dimensions_rs = nullptr;
+        host->dimensions_anomalous_rd = nullptr;
+        host->dimensions_normal_rd = nullptr;
+        host->anomaly_rate_rs = nullptr;
+        host->anomaly_rate_rd = nullptr;
+        host->detector_events_rs = nullptr;
+        host->detector_events_above_threshold_rd = nullptr;
+        host->detector_events_new_anomaly_event_rd = nullptr;
+        host->context_anomaly_rate_rs = nullptr;
+    }
+
     /*
      * Machine learning status
     */
