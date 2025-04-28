@@ -13,6 +13,7 @@ size_t netdata_conf_cpus(void);
 void libuv_initialize(void);
 
 void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold);
+void netdata_conf_reset_stack_size(void);
 
 #include "netdata-conf.h"
 
