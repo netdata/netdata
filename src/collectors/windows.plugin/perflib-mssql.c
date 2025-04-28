@@ -177,6 +177,8 @@ struct mssql_db_instance {
     COUNTER_DATA MSSQLDatabaseLogFlushes;
     COUNTER_DATA MSSQLDatabaseTransactions;
     COUNTER_DATA MSSQLDatabaseWriteTransactions;
+    COUNTER_DATA MSSQLDatabaseLockWaitSec;
+    COUNTER_DATA MSSQLDatabaseDeadLockSec;
 
     uint32_t updated;
 };
@@ -283,7 +285,7 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 // SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
 // https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
 #define NETDATA_QUERY_TRANSACTIONS_MASK                                                                                \
-    "select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec');"
+"select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec');"
 
 #define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
 #define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
@@ -291,6 +293,8 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 #define NETDATA_MSSQL_BACKUP_RESTORE_METRIC "Backup/Restore Throughput/sec"
 #define NETDATA_MSSQL_LOG_FLUSHED_METRIC "Log Bytes Flushed/sec"
 #define NETDATA_MSSQL_LOG_FLUSHES_METRIC "Log Flushes/sec"
+#define NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC "Number of Deadlocks/sec"
+#define NETDATA_MSSQL_LOCK_WAITS_METRIC "Lock Waits/sec"
 
 void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
 {
@@ -365,6 +369,11 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
             mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
         else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHES_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHES_METRIC) - 1))
             mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC, sizeof(NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC) - 1))
+            mdi->MSSQLDatabaseDeadLockSec.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_LOCK_WAITS_METRIC, sizeof(NETDATA_MSSQL_LOCK_WAITS_METRIC) - 1))
+            mdi->MSSQLDatabaseLockWaitSec.current.Data = (ULONGLONG)value;
+
     } while (true);
 
 endtransactions:
