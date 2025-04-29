@@ -6,67 +6,67 @@ metrics:
   symbol:
     OID: 1.3.6.1.2.1.6.5.0
     name: tcpActiveOpens
-  description: number of times TCP connections have made active opens
-  unit: "{access_point}"
+  description: The number of times that TCP connections have made a direct transition to the SYN-SENT state from the CLOSED state. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
+  unit: "{connection}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.6.0
     name: tcpPassiveOpens
-  description: number of times TCP connections have made passive opens
-  unit: "{access_point}"
+  description: The number of times TCP connections have made a direct transition to the SYN-RCVD state from the LISTEN state. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
+  unit: "{connection}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.7.0
     name: tcpAttemptFails
-  description: number of failed attempts to open TCP connections
-  unit: "{access_point}"
+  description: The number of times that TCP connections have made a direct transition to the CLOSED state from either the SYN-SENT state or the SYN-RCVD state, plus the number of times that TCP connections have made a direct transition to the LISTEN state from the SYN-RCVD state. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
+  unit: "{connection}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.8.0
     name: tcpEstabResets
-  description: number of established TCP connections that have been reset
-  unit: "{access_point}"
+  description: The number of times that TCP connections have made a direct transition to the CLOSED state from either the ESTABLISHED state or the CLOSE-WAIT state. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
+  unit: "{connection}"
 - MIB: TCP-MIB
   symbol:
     OID: 1.3.6.1.2.1.6.9.0
     name: tcpCurrEstab
-  description: current number of established TCP connections
-  unit: "{access_point}"
+  description: The number of TCP connections for which the current state is either ESTABLISHED or CLOSE-WAIT.
+  unit: "{connection}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.17.0
     name: tcpHCInSegs
-  description: number of TCP segments received including those received in error
+  description: The total number of segments received, including those received in error. This count includes segments received on currently established connections. This object is the 64-bit equivalent of tcpInSegs. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
   unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.18.0
     name: tcpHCOutSegs
-  description: number of TCP segments sent including those retransmitted
+  description: The total number of segments sent, including those on current connections but excluding those containing only retransmitted octets. This object is the 64-bit equivalent of tcpOutSegs. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
   unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.12.0
     name: tcpRetransSegs
-  description: number of TCP segments retransmitted
+  description: The total number of segments retransmitted; that is, the number of TCP segments transmitted containing one or more previously transmitted octets. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
   unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.14.0
     name: tcpInErrs
-  description: number of TCP segments received in error
+  description: The total number of segments received in error (e.g., bad TCP checksums). Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
   unit: "{segment}"
 - MIB: TCP-MIB
   metric_type: monotonic_count
   symbol:
     OID: 1.3.6.1.2.1.6.15.0
     name: tcpOutRsts
-  description: number of TCP segments sent containing reset flag
+  description: The number of TCP segments sent containing the RST flag. Discontinuities in the value of this counter are indicated via discontinuities in the value of sysUpTime.
   unit: "{segment}"

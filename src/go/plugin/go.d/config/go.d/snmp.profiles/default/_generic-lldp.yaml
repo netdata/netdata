@@ -6,12 +6,15 @@ metrics:
     symbols:
       - name: lldpRem
         constant_value_one: true
+        description: "Information about a particular physical network connection"
+        unit: "{access_point}"
     metric_tags:
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.6
           name: lldpRemPortIdSubtype
         tag: lldp_rem_port_id_subtype
-        description: subtype of the remote port identifier
+        description: "The type of port identifier encoding used in the associated port identifier object"
+        unit: "TBD"
         mapping:
           1: interface_alias
           2: port_component
@@ -24,9 +27,11 @@ metrics:
           OID: 1.0.8802.1.1.2.1.4.1.1.7
           name: lldpRemPortId
         tag: lldp_rem_port_id
-        description: identifier of the remote port
+        description: "The string value used to identify the port component associated with the remote system"
+        unit: "TBD"
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.9
           name: lldpRemSysName
         tag: lldp_rem_sys_name
-        description: system name of the remote device
+        description: "The string value used to identify the system name of the remote system"
+        unit: "TBD"

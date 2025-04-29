@@ -8,56 +8,56 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.4
         name: systemStateChassisStatus
-        description: chassis status of the system state
-        unit: "TBD"
+        description: Chassis status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
-        description: power unit status redundancy of the system state
-        unit: "TBD"
+        description: Power unit status redundancy of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
-        description: combined power supply status of the system state
-        unit: "TBD"
+        description: Combined power supply status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
         name: systemStateAmperageStatusCombined
-        description: combined amperage status of the system state
-        unit: "TBD"
+        description: Combined amperage status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
-        description: cooling unit status redundancy of the system state
-        unit: "TBD"
+        description: Cooling unit status redundancy of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
-        description: combined cooling device status of the system state
-        unit: "TBD"
+        description: Combined cooling device status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
         name: systemStateTemperatureStatusCombined
-        description: combined temperature status of the system state
-        unit: "TBD"
+        description: Combined temperature status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
-        description: combined memory device status of the system state
-        unit: "TBD"
+        description: Combined memory device status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
-        description: combined chassis intrusion status of the system state
-        unit: "TBD"
+        description: Combined chassis intrusion status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
         name: systemStatePowerUnitStatusCombined
-        description: combined power unit status of the system state
-        unit: "TBD"
+        description: Combined power unit status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
-        description: combined cooling unit status of the system state
-        unit: "TBD"
+        description: Combined cooling unit status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
-        description: combined processor device status of the system state
-        unit: "TBD"
+        description: Combined processor device status of the system state
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
         name: systemStateTemperatureStatisticsStatusCombined
-        description: combined temperature statistics status of the system state
-        unit: "TBD"
+        description: Combined temperature statistics status of the system state
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -86,6 +86,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Chassis status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
           name: systemStatePowerUnitStatusRedundancy
@@ -98,6 +100,8 @@ metrics:
           5: lost
           6: not_redundant
           7: redundancy_offline
+        description: Power unit status redundancy of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
           name: systemStatePowerSupplyStatusCombined
@@ -109,6 +113,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined power supply status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
           name: systemStateAmperageStatusCombined
@@ -120,6 +126,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined amperage status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
           name: systemStateCoolingUnitStatusRedundancy
@@ -132,6 +140,8 @@ metrics:
           5: lost
           6: not_redundant
           7: redundancy_offline
+        description: Cooling unit status redundancy of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
           name: systemStateCoolingDeviceStatusCombined
@@ -143,6 +153,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined cooling device status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
           name: systemStateTemperatureStatusCombined
@@ -154,6 +166,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined temperature status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
           name: systemStateMemoryDeviceStatusCombined
@@ -165,6 +179,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined memory device status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
           name: systemStateChassisIntrusionStatusCombined
@@ -176,6 +192,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined chassis intrusion status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
           name: systemStatePowerUnitStatusCombined
@@ -187,6 +205,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined power unit status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
           name: systemStateCoolingUnitStatusCombined
@@ -198,6 +218,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined cooling unit status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
           name: systemStateProcessorDeviceStatusCombined
@@ -209,6 +231,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined processor device status of the system state
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
           name: systemStateTemperatureStatisticsStatusCombined
@@ -220,6 +244,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Combined temperature statistics status of the system state
+        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4
@@ -227,19 +253,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
         name: physicalDiskState
-        description: state of the physical disk
-        unit: "TBD"
+        description: State of the physical disk
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
         name: physicalDiskCapacityInMB
-        description: capacity of the physical disk in megabytes
+        description: Capacity of the physical disk in megabytes
         unit: "MB"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
         name: physicalDiskUsedSpaceInMB
-        description: used space of the physical disk in megabytes
+        description: Used space of the physical disk in megabytes
         unit: "MB"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
         name: physicalDiskFreeSpaceInMB
-        description: free space of the physical disk in megabytes
+        description: Free space of the physical disk in megabytes
         unit: "MB"
     metric_tags:
       - symbol:
@@ -269,6 +295,8 @@ metrics:
           8: nonraid
           9: removed
           10: readonly
+        description: State of the physical disk
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
           name: physicalDiskName
@@ -277,6 +305,8 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.1
           name: physicalDiskNumber
         tag: disk_number
+        description: Number of the physical disk
+        unit: "{disk}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9
@@ -284,8 +314,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
         name: enclosurePowerSupplyState
-        description: state of the enclosure power supply
-        unit: "TBD"
+        description: State of the enclosure power supply
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
@@ -317,6 +347,8 @@ metrics:
           3: failed
           4: missing
           5: degraded
+        description: State of the enclosure power supply
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
           name: enclosurePowerSupplyName
@@ -336,8 +368,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
         name: batteryState
-        description: state of the battery
-        unit: "TBD"
+        description: State of the battery
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
@@ -367,6 +399,8 @@ metrics:
           5: missing
           6: charging
           7: below_threshold
+        description: State of the battery
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
           name: batteryFQDD
@@ -382,25 +416,33 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
         name: controllerRollUpStatus
-        description: roll up status of the controller
-        unit: "TBD"
+        description: Roll up status of the controller
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
           name: controllerNumber
         tag: controller_number
+        description: Number of the controller
+        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.2
           name: controllerName
         tag: controller_name
+        description: Name of the controller
+        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.42
           name: controllerPCISlot
         tag: controller_pci_slot
+        description: PCI slot of the controller
+        unit: "{pci_slot}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.78
           name: controllerFQDD
         tag: controller_fqdd
+        description: Fully qualified device descriptor of the controller
+        unit: "{controller}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1
@@ -420,22 +462,32 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Roll up status of the controller
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
           name: controllerNumber
         tag: controller_number
+        description: Number of the controller
+        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.2
           name: controllerName
         tag: controller_name
+        description: Name of the controller
+        unit: "{controller}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.42
           name: controllerPCISlot
         tag: controller_pci_slot
+        description: PCI slot of the controller
+        unit: "{pci_slot}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.78
           name: controllerFQDD
         tag: controller_fqdd
+        description: Fully qualified device descriptor of the controller
+        unit: "{controller}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.1100.80
@@ -443,8 +495,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
         name: pCIDeviceStatus
-        description: status of the PCI device
-        unit: "TBD"
+        description: Status of the PCI device
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
@@ -473,6 +525,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Status of the PCI device
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
           name: pCIDeviceDescriptionName
@@ -488,8 +542,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
         name: systemSlotStatus
-        description: status of the system slot
-        unit: "TBD"
+        description: Status of the system slot
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
@@ -518,6 +572,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Status of the system slot
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
           name: systemSlotSlotExternalSlotName
@@ -533,8 +589,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
         name: networkDeviceStatus
-        description: status of the network device
-        unit: "TBD"
+        description: Status of the network device
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
@@ -567,6 +623,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Status of the network device
+        unit: "{state}"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
           name: networkDeviceChassisIndex
@@ -590,8 +648,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.5
         name: systemBIOSStatus
-        description: status of the system BIOS
-        unit: "TBD"
+        description: Status of the system BIOS
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
@@ -628,6 +686,8 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        description: Status of the system BIOS
+        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.300.70
@@ -635,11 +695,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.5
         name: intrusionStatus
-        description: status of the intrusion
-        unit: "TBD"
+        description: Status of the intrusion
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.6
         name: intrusionReading
-        description: reading of the intrusion
+        description: Reading of the intrusion
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -661,15 +721,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.6
         name: powerSupplyOutputWatts
-        description: output power of the power supply in watts
+        description: Output power of the power supply in watts
         unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.9
         name: powerSupplyMaximumInputVoltage
-        description: maximum input voltage of the power supply
+        description: Maximum input voltage of the power supply
         unit: "V"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.16
         name: powerSupplyCurrentInputVoltage
-        description: current input voltage of the power supply
+        description: Current input voltage of the power supply
         unit: "V"
     metric_tags:
       - symbol:
@@ -691,11 +751,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.5
         name: amperageProbeStatus
-        description: status of the amperage probe
-        unit: "TBD"
+        description: Status of the amperage probe
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
         name: amperageProbeReading
-        description: reading of the amperage probe in amperes
+        description: Reading of the amperage probe in amperes
         unit: "A"
     metric_tags:
       - symbol:
@@ -787,6 +847,8 @@ metrics:
           8: critical_lower
           9: non_recoverable_lower
           10: failed
+        description: Status of the amperage probe
+        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.60
@@ -794,8 +856,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.5
         name: powerUsageStatus
-        description: status of the power usage
-        unit: "TBD"
+        description: Status of the power usage
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.1
@@ -816,11 +878,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.5
         name: voltageProbeStatus
-        description: status of the voltage probe
-        unit: "TBD"
+        description: Status of the voltage probe
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
         name: voltageProbeReading
-        description: reading of the voltage probe in volts
+        description: Reading of the voltage probe in volts
         unit: "V"
     metric_tags:
       - symbol:
@@ -910,6 +972,8 @@ metrics:
           8: critical_lower
           9: non_recoverable_lower
           10: failed
+        description: Status of the voltage probe
+        unit: "{state}"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.50
@@ -917,11 +981,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.5
         name: systemBatteryStatus
-        description: status of the system battery
-        unit: "TBD"
+        description: Status of the system battery
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.6
         name: systemBatteryReading
-        description: reading of the system battery
+        description: Reading of the system battery
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -943,12 +1007,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.5
         name: coolingUnitRedundancyStatus
-        description: redundancy status of the cooling unit
-        unit: "TBD"
+        description: Redundancy status of the cooling unit
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.8
         name: coolingUnitStatus
-        description: status of the cooling unit
-        unit: "TBD"
+        description: Status of the cooling unit
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.1
@@ -969,15 +1033,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.5
         name: coolingDeviceStatus
-        description: status of the cooling device
-        unit: "TBD"
+        description: Status of the cooling device
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.6
         name: coolingDeviceReading
-        description: reading of the cooling device
+        description: Reading of the cooling device
         unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
         name: coolingDeviceDiscreteReading
-        description: discrete reading of the cooling device
+        description: Discrete reading of the cooling device
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -1019,15 +1083,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.5
         name: temperatureProbeStatus
-        description: status of the temperature probe
-        unit: "TBD"
+        description: Status of the temperature probe
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.6
         name: temperatureProbeReading
-        description: reading of the temperature probe in degrees Celsius
+        description: Reading of the temperature probe in degrees Celsius
         unit: "Cel"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.16
         name: temperatureProbeDiscreteReading
-        description: discrete reading of the temperature probe
+        description: Discrete reading of the temperature probe
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -1058,19 +1122,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.5
         name: processorDeviceStatus
-        description: status of the processor device
-        unit: "TBD"
+        description: Status of the processor device
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.11
         name: processorDeviceMaximumSpeed
-        description: maximum speed of the processor device in megahertz
+        description: Maximum speed of the processor device in megahertz
         unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.12
         name: processorDeviceCurrentSpeed
-        description: current speed of the processor device in megahertz
+        description: Current speed of the processor device in megahertz
         unit: "MHz"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.14
         name: processorDeviceVoltage
-        description: voltage of the processor device in volts
+        description: Voltage of the processor device in volts
         unit: "V"
     metric_tags:
       - symbol:
@@ -1096,11 +1160,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.5
         name: processorDeviceStatusStatus
-        description: status of the processor device status
-        unit: "TBD"
+        description: Status of the processor device status
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.6
         name: processorDeviceStatusReading
-        description: reading of the processor device status
+        description: Reading of the processor device status
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -1122,8 +1186,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.5
         name: memoryDeviceStatus
-        description: status of the memory device
-        unit: "TBD"
+        description: Status of the memory device
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
@@ -1199,8 +1263,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.3
         name: fruInformationStatus
-        description: status of the FRU information
-        unit: "TBD"
+        description: Status of the FRU information
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.1
@@ -1221,20 +1285,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.4
         name: virtualDiskState
-        description: state of the virtual disk
-        unit: "TBD"
+        description: State of the virtual disk
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.6
         name: virtualDiskSizeInMB
-        description: size of the virtual disk in megabytes
+        description: Size of the virtual disk in megabytes
         unit: "MB"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
         name: virtualDiskComponentStatus
-        description: component status of the virtual disk
-        unit: "TBD"
+        description: Component status of the virtual disk
+        unit: "{state}"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.37
         name: virtualDiskT10PIStatus
         description: T10 PI status of the virtual disk
-        unit: "TBD"
+        unit: "{state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.1
@@ -1252,22 +1316,32 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.9.0
       name: drsCMCCurrStatus
+      description: CMC health status being monitored by the chassis management card
+      unit: "{state}"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.1.0
       name: drsGlobalCurrStatus
+      description: Overall chassis status being monitored by the chassis management card
+      unit: "{state}"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.5.0
       name: drsPowerCurrStatus
+      description: Power subsystem health status being monitored by the chassis management card
+      unit: "{state}"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.4.0
       name: drsRedCurrStatus
+      description: Redundancy status being monitored by the chassis management card
+      unit: "{state}"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.2.1.0
       name: drsGlobalSystemStatus
+      description: Overall chassis status being monitored by the chassis management card
+      unit: "{state}"
   - MIB: DELL-RAC-MIB
     table:
       OID: 1.3.6.1.4.1.674.10892.2.4.1
@@ -1275,11 +1349,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.13
         name: drsWattsReading
-        description: watts reading of the DRS CMC power
+        description: Instantaneous chassis power usage in watts
         unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.14
         name: drsAmpsReading
-        description: amps reading of the DRS CMC power
+        description: Instantaneous chassis current usage in amperes
         unit: "A"
     metric_tags:
       - symbol:
@@ -1298,7 +1372,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.6
         name: drsKWhCumulative
-        description: cumulative kilowatt hours of the DRS CMC power
+        description: Cumulative chassis power usage in kilowatt hours since last reset
         unit: "kW.h"
     metric_tags:
       - symbol:

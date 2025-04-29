@@ -18,15 +18,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
         name: cefcFRUPowerAdminStatus
-        description: administrative power status of the FRU
-        unit: "TBD"
+        description: Administratively desired FRU power state
+        unit: "{power_state}"
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
         name: cefcFRUPowerOperStatus
-        description: operational power status of the FRU
-        unit: "TBD"
+        description: Operational FRU power state
+        unit: "{power_state}"
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.3
         name: cefcFRUCurrent
-        description: current drawn by the FRU
+        description: Current supplied by the FRU or current required to operate the FRU
         unit: "A"
     metric_tags:
       - index: 1
@@ -38,7 +38,7 @@ metrics:
     symbols:
       - name: cefcFRUPowerStatus
         constant_value_one: true
-        description: power status indicator for the FRU
+        description: FRU power status constant value one
         unit: "TBD"
     metric_tags:
       - index: 1
@@ -46,6 +46,8 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
           name: cefcFRUPowerAdminStatus
+          description: Administratively desired FRU power state
+          unit: "{power_state}"
         tag: power_admin_status
         mapping:
           1: on
@@ -56,6 +58,8 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
           name: cefcFRUPowerOperStatus
+          description: Operational FRU power state
+          unit: "{power_state}"
         tag: power_oper_status
         mapping:
           1: off_env_other
@@ -77,19 +81,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.10
         name: cpmCPUTotalMonIntervalValue
-        description: CPU total monitoring interval value
-        unit: "s"
+        description: Overall CPU busy percentage in the last monitoring interval
+        unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.12
         name: cpmCPUMemoryUsed
-        description: amount of CPU memory used
+        description: Overall CPU wide system memory which is currently under use
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.13
         name: cpmCPUMemoryFree
-        description: amount of CPU memory free
+        description: Overall CPU wide system memory which is currently free
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7
         name: cpmCPUTotal1minRev
-        description: CPU total 1 minute average utilization
+        description: Overall CPU busy percentage in the last 1 minute period
         unit: "%"
     metric_tags:
       - index: 1
@@ -102,7 +106,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.2.1.1
         name: cieIfResetCount
-        description: count of interface resets
+        description: Number of times the interface was internally reset and brought up
         unit: "{reset}"
     metric_tags:
       - MIB: IF-MIB
@@ -118,7 +122,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.3
         name: ciscoEnvMonTemperatureStatusValue
-        description: temperature status value
+        description: Current measurement of the testpoint being instrumented
         unit: "Cel"
     metric_tags:
       - tag: temp_state
@@ -141,8 +145,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
         name: ciscoEnvMonSupplyState
-        description: supply state status
-        unit: "TBD"
+        description: Current state of the power supply being instrumented
+        unit: "{power_state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.5.1.4
@@ -166,12 +170,14 @@ metrics:
     symbols:
       - name: ciscoEnvMonSupplyStatus
         constant_value_one: true
-        description: supply status indicator
+        description: Power supply status constant value one
         unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
           name: ciscoEnvMonSupplyState
+          description: Current state of the power supply being instrumented
+          unit: "{power_state}"
         tag: cisco_env_mon_supply_state
         mapping:
           1: normal
@@ -202,8 +208,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
         name: ciscoEnvMonFanState
-        description: fan state status
-        unit: "TBD"
+        description: Current state of the fan being instrumented
+        unit: "{fan_state}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.4.1.1
@@ -217,12 +223,14 @@ metrics:
     symbols:
       - name: ciscoEnvMonFanStatus
         constant_value_one: true
-        description: fan status indicator
+        description: Fan status constant value one
         unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
           name: ciscoEnvMonFanState
+          description: Current state of the fan being instrumented
+          unit: "{fan_state}"
         tag: fan_state
         mapping:
           1: normal
@@ -248,8 +256,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.2.1.1
         name: cswStackPortOperStatus
-        description: operational status of the stack port
-        unit: "TBD"
+        description: State of the stackport
+        unit: "{stackport_state}"
     metric_tags:
       - MIB: IF-MIB
         symbol:
@@ -266,8 +274,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
         name: cswSwitchState
-        description: state of the switch
-        unit: "TBD"
+        description: Current state of a switch
+        unit: "{switch_state}"
     metric_tags:
       - tag: mac_addr
         symbol:
@@ -288,7 +296,7 @@ metrics:
     symbols:
       - name: cswSwitchInfo
         constant_value_one: true
-        description: switch info indicator
+        description: Switch info constant value one
         unit: "TBD"
     metric_tags:
       - tag: mac_addr
@@ -305,6 +313,8 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
           name: cswSwitchState
+          description: Current state of a switch
+          unit: "{switch_state}"
         tag: switch_state
         mapping:
           1: waiting
@@ -325,8 +335,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
         name: cefcFanTrayOperStatus
-        description: operational status of the fan tray
-        unit: "TBD"
+        description: Operational state of the fan or fan tray
+        unit: "{fan_state}"
     metric_tags:
       - index: 1
         tag: fru
@@ -338,7 +348,7 @@ metrics:
     symbols:
       - name: cefcFanTrayStatus
         constant_value_one: true
-        description: fan tray status indicator
+        description: Fan tray status constant value one
         unit: "TBD"
     metric_tags:
       - index: 1
@@ -346,6 +356,8 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
           name: cefcFanTrayOperStatus
+          description: Operational state of the fan or fan tray
+          unit: "{fan_state}"
         tag: cefc_fan_tray_oper_status
         mapping:
           1: unknown
@@ -367,15 +379,15 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5
         name: ciscoMemoryPoolUsed
-        description: amount of memory pool used
+        description: Number of bytes from the memory pool currently in use
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
-        description: amount of memory pool free
+        description: Number of bytes from the memory pool currently unused
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
-        description: largest free block in memory pool
+        description: Largest number of contiguous bytes from the memory pool currently unused
         unit: "By"
     metric_tags:
       - symbol:
@@ -390,8 +402,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.4
         name: cfwConnectionStatCount
-        description: count of firewall connections
-        unit: "{connection}"
+        description: Integer value containing the resource statistic count
+        unit: "{connection_statistic}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.2
@@ -412,8 +424,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.1.1.1.3
         name: cfwHardwareStatusValue
-        description: hardware status value
-        unit: "TBD"
+        description: Current status of the resource
+        unit: "{hardware_status}"
     metric_tags:
       - index: 1
         tag: hardware_type
@@ -429,8 +441,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.3
         name: cvsChassisUpTime
-        description: chassis uptime
-        unit: "s"
+        description: Up time for the chassis since last re-initialization
+        unit: "cs"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.1
@@ -445,12 +457,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.1
         name: rttMonLatestRttOperCompletionTime
-        description: latest RTT operation completion time
-        unit: "s"
+        description: Completion time of the latest RTT operation successfully completed
+        unit: "us"
       - OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.2
         name: rttMonLatestRttOperSense
-        description: latest RTT operation sense
-        unit: "TBD"
+        description: Sense code for the completion status of the latest RTT operation
+        unit: "{sense_code}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
@@ -542,8 +554,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.6
         name: rttMonCtrlOperTimeoutOccurred
-        description: occurrence of RTT operation timeout
-        unit: "{timeout}"
+        description: Indicates if a timeout occurred for the RTT operation
+        unit: "{boolean}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10

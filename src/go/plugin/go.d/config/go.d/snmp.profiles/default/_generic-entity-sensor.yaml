@@ -6,7 +6,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.99.1.1.1.4
         name: entPhySensorValue
-        description: sensor value measurement
+        description: The most recent measurement obtained by the agent for this sensor
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -26,8 +26,8 @@ metrics:
           10: rpm
           11: cmm
           12: truthvalue
-        description: type of physical sensor
-        unit: "{access_point}"
+        description: The type of data returned by the associated entPhySensorValue object
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.2
           name: entPhySensorScale
@@ -50,26 +50,24 @@ metrics:
           15: peta
           16: zetta
           17: yotta
-        description: scale of physical sensor measurement
-        unit: "{access_point}"
+        description: The exponent to apply to values returned by the associated entPhySensorValue object
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.3
           name: entPhySensorPrecision
         tag: ent_phy_sensor_precision
-        description: precision of physical sensor measurement
-        unit: "{access_point}"
+        description: The number of decimal places of precision in fixed-point sensor values returned by the associated entPhySensorValue object
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.6
           name: entPhySensorUnitsDisplay
         tag: ent_phy_sensor_units_display
-        description: units display for physical sensor
-        unit: "{access_point}"
+        description: A textual description of the data units that should be used in the display of entPhySensorValue
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.2
           name: entPhysicalDescr
         tag: ent_physical_descr
-        description: physical entity description
-        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
           name: entPhysicalClass
@@ -90,26 +88,18 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
-        description: class of physical entity
-        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: entPhysicalName
         tag: ent_physical_name
-        description: name of physical entity
-        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
           name: entPhysicalSerialNum
         tag: ent_physical_serial_num
-        description: serial number of physical entity
-        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
           name: entPhysicalModelName
         tag: ent_physical_model_name
-        description: model name of physical entity
-        unit: "{access_point}"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.5
           name: entPhySensorOperStatus
@@ -118,5 +108,5 @@ metrics:
           1: ok
           2: unavailable
           3: nonoperational
-        description: operational status of physical sensor
-        unit: "{access_point}"
+        description: The operational status of the sensor
+        unit: "TBD"

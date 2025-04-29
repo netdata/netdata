@@ -10,15 +10,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.8.1.0
       name: cpqHeSysUtilLifeTime
-    description: total time the system has been in full operation
-    unit: "s"
+    description: Total time the system has been in full operation in minutes
+    unit: "min"
 
   - # EISA bus utilization as percentage of theoretical maximum during last minute.
     MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.8.2.0
       name: cpqHeSysUtilEisaBusMin
-    description: eisa bus utilization as percentage of theoretical maximum during last minute
+    description: EISA bus utilization as a percentage of the theoretical maximum during the last minute
     unit: "%"
 
   # Critical errors.
@@ -29,8 +29,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.2.2.0
       name: cpqHeCritLogCondition
-    description: overall condition of the critical error log feature
-    unit: "{access_point}"
+    description: Overall condition of the critical error log feature
+    unit: "{instance}"
 
   # Correctable memory errors tracking.
 
@@ -40,8 +40,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.3.1.0
       name: cpqHeCorrMemLogStatus
-    description: overall status of the correctable memory error log feature
-    unit: "{access_point}"
+    description: Overall status of the correctable memory error log feature
+    unit: "{instance}"
 
   - # Overall condition of the correctable memory error log feature.
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -49,8 +49,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.3.2.0
       name: cpqHeCorrMemLogCondition
-    description: overall condition of the correctable memory error log feature
-    unit: "{access_point}"
+    description: Overall condition of the correctable memory error log feature
+    unit: "{instance}"
 
   - # Number of correctable memory errors that have occurred.
     MIB: CPQHLTH-MIB
@@ -58,7 +58,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.3.3.0
       name: cpqHeCorrMemTotalErrs
     metric_type: monotonic_count
-    description: number of correctable memory errors that have occurred
+    description: Number of correctable memory errors that have occurred
     unit: "{error}"
 
   # ASR (Automatic Server Recovery)
@@ -69,8 +69,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.1.0
       name: cpqHeAsrStatus
-    description: overall status of the asr feature
-    unit: "{access_point}"
+    description: Overall status of the ASR feature
+    unit: "{instance}"
 
   - # Whether the ASR timer passed the server Power-On Self-Test (POST).
     # NOTE: other(1), failed(2), ok(3)
@@ -78,8 +78,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.6.0
       name: cpqHeAsrPost
-    description: whether the asr timer passed the server power-on self-test
-    unit: "{access_point}"
+    description: Whether the ASR timer passed the server Power-On Self-Test
+    unit: "{instance}"
 
   - # Number of ASR reboots that occurred on the server since last manual reboot.
     # NOTE: -1 if not supported.
@@ -88,7 +88,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.6.2.5.10.0
       name: cpqHeAsrRebootCount
     metric_type: monotonic_count
-    description: number of asr reboots that occurred on the server since last manual reboot
+    description: Number of ASR reboots that have occurred on the server since last manual reboot
     unit: "{reboot}"
 
   - # Overall condition of the ASR feature.
@@ -97,8 +97,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.17.0
       name: cpqHeAsrCondition
-    description: overall condition of the asr feature
-    unit: "{access_point}"
+    description: Overall condition of the ASR feature
+    unit: "{instance}"
 
   - # Status of the ASR network access feature.
     # NOTE: other(1), disabled(2), enabled(3)
@@ -106,8 +106,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.5.21.0
       name: cpqHeAsrNetworkAccessStatus
-    description: status of the asr network access feature
-    unit: "{access_point}"
+    description: Status of the ASR network access feature
+    unit: "{instance}"
 
   # Temperature and fans.
 
@@ -117,8 +117,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.3.0
       name: cpqHeThermalTempStatus
-    description: status of temperature sensors
-    unit: "{sensor}"
+    description: Status of the system's temperature sensors
+    unit: "{instance}"
 
   - # Status of fan(s).
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -126,8 +126,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.4.0
       name: cpqHeThermalSystemFanStatus
-    description: status of fans
-    unit: "{fan}"
+    description: Status of the fan(s) in the system
+    unit: "{instance}"
 
   - # Status of processor fan(s).
     # NOTE: other(1), ok(2), failed(4)
@@ -135,8 +135,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.5.0
       name: cpqHeThermalCpuFanStatus
-    description: status of processor fans
-    unit: "{fan}"
+    description: Status of the processor fan(s) in the system
+    unit: "{instance}"
 
   - # Temperator sensors.
     MIB: CPQHLTH-MIB
@@ -146,13 +146,13 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.4
         name: cpqHeTemperatureCelsius
-        description: temperature in celsius
+        description: Current temperature sensor reading in degrees celsius
         unit: "Cel"
       - # NOTE: other(1), ok(2), degraded(3), failed(4)
         OID: 1.3.6.1.4.1.232.6.2.6.8.1.6
         name: cpqHeTemperatureCondition
-        description: condition of the temperature sensor
-        unit: "{sensor}"
+        description: Temperature sensor condition
+        unit: "{instance}"
     metric_tags:
       - tag: temperature_index
         symbol:
@@ -166,7 +166,7 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.15.3.0
       name: cpqHePowerMeterCurrReading
-    description: current power meter reading in watts
+    description: Current power meter reading in watts
     unit: "W"
 
   - # A table of battery entries.
@@ -178,13 +178,13 @@ metrics:
       - # NOTE: other(1), ok(2), degraded(3), failed(4)
         OID: 1.3.6.1.4.1.232.6.2.17.2.1.4
         name: cpqHeSysBatteryCondition
-        description: overall condition of the battery
-        unit: "{battery}"
+        description: Overall condition of the battery
+        unit: "{instance}"
       - # NOTE: 15 different statuses are possible -- not listed here, see MIB.
         OID: 1.3.6.1.4.1.232.6.2.17.2.1.5
         name: cpqHeSysBatteryStatus
-        description: status of the battery
-        unit: "{battery}"
+        description: Status of the battery
+        unit: "{instance}"
     metric_tags:
       - tag: battery_index
         symbol:
@@ -197,15 +197,15 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.6.1.0
       name: cpqHeThermalCondition
-    description: overall condition of the thermal environment
-    unit: "{environment}"
+    description: Overall condition of the system's thermal environment
+    unit: "{instance}"
   - # NOTE: other(1), notSupported(2), notInstalled(3), installed(4)
     MIB: CPQHLTH-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.6.2.9.2.0
       name: cpqHeFltTolPwrSupplyStatus
-    description: status of the fault tolerant power supply
-    unit: "{power_supply}"
+    description: Status of the fault tolerant power supply
+    unit: "{instance}"
 
   - MIB: CPQHLTH-MIB
     table:
@@ -214,8 +214,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.14.13.1.20
         name: cpqHeResMem2ModuleCondition
-        description: condition of the reserved memory module
-        unit: "{memory_module}"
+        description: Current status of the correctable memory errors for this memory module
+        unit: "{instance}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.14.13.1.15
@@ -230,8 +230,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.5
         name: cpqHeFltTolPowerSupplyStatus
-        description: status of the fault tolerant power supply
-        unit: "{power_supply}"
+        description: Status of the fault tolerant power supply
+        unit: "{instance}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
@@ -245,15 +245,13 @@ metrics:
     symbols:
       - name: cpqHeFltTolPowerSupply
         constant_value_one: true
-        description: constant value one for fault tolerant power supply
-        unit: "TBD"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.7
         name: cpqHeFltTolPowerSupplyCapacityUsed
-        description: capacity used of the fault tolerant power supply
+        description: Currently used capacity of the power supply in watts
         unit: "W"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
         name: cpqHeFltTolPowerSupplyCapacityMaximum
-        description: maximum capacity of the fault tolerant power supply
+        description: Maximum capacity of the power supply in watts
         unit: "W"
     metric_tags:
       - symbol:

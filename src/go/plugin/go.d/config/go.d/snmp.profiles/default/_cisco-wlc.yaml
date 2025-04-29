@@ -116,8 +116,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.15
         name: bsnApIfNoOfUsers
-        description: number of users connected to the access point interface
-        unit: "{access_point}"
+        description: "number of users associated with this radio"
+        unit: "{user}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
@@ -165,19 +165,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.1
         name: bsnAPIfLoadRxUtilization
-        description: receive utilization of the access point interface
+        description: "percentage of time the Airespace AP receiver is busy operating on packets"
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.2
         name: bsnAPIfLoadTxUtilization
-        description: transmit utilization of the access point interface
+        description: "percentage of time the Airespace AP transmitter is busy operating on packets"
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.24
         name: bsnAPIfPoorSNRClients
-        description: number of clients with poor signal-to-noise ratio on the access point interface
+        description: "number of clients with poor SNR attached to this Airespace AP at the last measurement interval"
         unit: "{client}"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.3
         name: bsnAPIfLoadChannelUtilization
-        description: channel utilization of the access point interface
+        description: "channel utilization"
         unit: "%"
     metric_tags:
       - symbol:
@@ -263,8 +263,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.38
         name: bsnDot11EssNumberOfMobileStations
-        description: number of mobile stations connected to the WLAN
-        unit: "{mobile_station}"
+        description: "number of mobile stations currently associated with the WLAN"
+        unit: "{station}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.1

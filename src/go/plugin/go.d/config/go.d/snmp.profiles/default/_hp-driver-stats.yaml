@@ -8,35 +8,35 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.8
         name: cpqDaPhyDrvUsedReallocs
-        description: number of used reallocations on the physical drive
-        unit: "{reallocation}"
+        description: Number of sectors of the reallocation area that have been used by the physical drive
+        unit: "{sector}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.9
         name: cpqDaPhyDrvRefHours
-        description: number of reference hours for the physical drive
+        description: Total number of hours that a physical drive has been in operation since it was stamped
         unit: "h"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.16
         name: cpqDaPhyDrvHardReadErrs
-        description: number of hard read errors on the physical drive
+        description: Number of read errors that could not be recovered by a physical drive's ECC algorithm or retries
         unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.17
         name: cpqDaPhyDrvRecvReadErrs
-        description: number of recovered read errors on the physical drive
+        description: Number of read errors corrected through physical drive retries
         unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.18
         name: cpqDaPhyDrvHardWriteErrs
-        description: number of hard write errors on the physical drive
+        description: Number of write errors that could not be recovered by a physical drive
         unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.19
         name: cpqDaPhyDrvRecvWriteErrs
-        description: number of recovered write errors on the physical drive
+        description: Number of write errors corrected through physical drive retries or recovered by a physical drive
         unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.20
         name: cpqDaPhyDrvHSeekErrs
-        description: number of hard seek errors on the physical drive
+        description: Total number of times the physical disk drive detected a seek error (high)
         unit: "{error}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.21
         name: cpqDaPhyDrvSeekErrs
-        description: number of seek errors on the physical drive
+        description: Total number of times the physical disk drive detected a seek error (low)
         unit: "{error}"
     metric_tags:
       - symbol:
@@ -54,27 +54,27 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.6
         name: cpqDaPhyDrvStatus
-        description: status of the physical drive
+        description: Status of the physical drive
         unit: "TBD"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.7
         name: cpqDaPhyDrvFactReallocs
-        description: number of factory reallocations on the physical drive
-        unit: "{reallocation}"
+        description: Number of spare sectors available for remapping at the time the physical drive was shipped
+        unit: "{sector}"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.22
         name: cpqDaPhyDrvSpinupTime
-        description: spinup time of the physical drive
-        unit: "s"
+        description: Time it takes for a physical drive to spin up to full speed in tenths of seconds
+        unit: "0.1s"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
         name: cpqDaPhyDrvSize
-        description: size of the physical drive
-        unit: "By"
+        description: Size of the physical drive in megabytes
+        unit: "MB"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.57
         name: cpqDaPhyDrvSmartStatus
-        description: SMART status of the physical drive
+        description: S.M.A.R.T status of the physical drive
         unit: "TBD"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.70
         name: cpqDaPhyDrvCurrentTemperature
-        description: current temperature of the physical drive
+        description: Temperature of the physical drive in degrees Celsius
         unit: "Cel"
     metric_tags:
       - symbol:
