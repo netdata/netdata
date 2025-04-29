@@ -6,10 +6,22 @@
 
 **Merged pull requests:**
 
+- Add a default busy timeout [\#20201](https://github.com/netdata/netdata/pull/20201) ([stelfrag](https://github.com/stelfrag))
+- rrd metadata needs to be discoverable while replication is running [\#20200](https://github.com/netdata/netdata/pull/20200) ([ktsaou](https://github.com/ktsaou))
+- add fast path to waitq [\#20198](https://github.com/netdata/netdata/pull/20198) ([ktsaou](https://github.com/ktsaou))
+- spinlocks now timeout at 10 minutes, to reveal deadlocks [\#20197](https://github.com/netdata/netdata/pull/20197) ([ktsaou](https://github.com/ktsaou))
+- rrdset/rrddim find function do not return obsolete metadata [\#20196](https://github.com/netdata/netdata/pull/20196) ([ktsaou](https://github.com/ktsaou))
+- cleanup ML cached pointers on child disconnection [\#20195](https://github.com/netdata/netdata/pull/20195) ([ktsaou](https://github.com/ktsaou))
+- limit the max number of threads based on memory too [\#20192](https://github.com/netdata/netdata/pull/20192) ([ktsaou](https://github.com/ktsaou))
+- Exporting exit fix [\#20191](https://github.com/netdata/netdata/pull/20191) ([ktsaou](https://github.com/ktsaou))
+- ignore maintenance signals on exit [\#20190](https://github.com/netdata/netdata/pull/20190) ([ktsaou](https://github.com/ktsaou))
 - ensure atomicity when logging pending message 3/3 [\#20189](https://github.com/netdata/netdata/pull/20189) ([ktsaou](https://github.com/ktsaou))
 - ensure atomicity when logging pending message 2/3 [\#20188](https://github.com/netdata/netdata/pull/20188) ([ktsaou](https://github.com/ktsaou))
+- added dyncfg docs [\#20187](https://github.com/netdata/netdata/pull/20187) ([ktsaou](https://github.com/ktsaou))
 - Fix repeating alert crash [\#20186](https://github.com/netdata/netdata/pull/20186) ([stelfrag](https://github.com/stelfrag))
 - ensure atomicity when logging pending message 1/3 [\#20185](https://github.com/netdata/netdata/pull/20185) ([ktsaou](https://github.com/ktsaou))
+- Improve systemd journal logs documentation [\#20184](https://github.com/netdata/netdata/pull/20184) ([kanelatechnical](https://github.com/kanelatechnical))
+- Reorganize code \(IIS\) [\#20182](https://github.com/netdata/netdata/pull/20182) ([thiagoftsm](https://github.com/thiagoftsm))
 - improve pgc fatal errors [\#20181](https://github.com/netdata/netdata/pull/20181) ([ktsaou](https://github.com/ktsaou))
 - Group anomaly rate per chart context instead of type. [\#20180](https://github.com/netdata/netdata/pull/20180) ([vkalintiris](https://github.com/vkalintiris))
 - bump go mod 1.24.0 [\#20179](https://github.com/netdata/netdata/pull/20179) ([ilyam8](https://github.com/ilyam8))
@@ -459,12 +471,6 @@
 - speed up aral when a single item is allocated and freed repeateadly [\#19660](https://github.com/netdata/netdata/pull/19660) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#19658](https://github.com/netdata/netdata/pull/19658) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/k8sstate\): collect deployments [\#19657](https://github.com/netdata/netdata/pull/19657) ([ilyam8](https://github.com/ilyam8))
-- add agent timezones as host labels [\#19656](https://github.com/netdata/netdata/pull/19656) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump k8s.io/client-go from 0.32.1 to 0.32.2 in /src/go [\#19652](https://github.com/netdata/netdata/pull/19652) ([dependabot[bot]](https://github.com/apps/dependabot))
-- make onewayalloc fallback to malloc [\#19646](https://github.com/netdata/netdata/pull/19646) ([ktsaou](https://github.com/ktsaou))
-- docs: move /run/dbus mount to Docker recommended way [\#19645](https://github.com/netdata/netdata/pull/19645) ([ilyam8](https://github.com/ilyam8))
-- Fix native package installation on RHEL. [\#19643](https://github.com/netdata/netdata/pull/19643) ([Ferroin](https://github.com/Ferroin))
-- ci: fix win build [\#19642](https://github.com/netdata/netdata/pull/19642) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
