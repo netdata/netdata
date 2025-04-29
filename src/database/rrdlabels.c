@@ -81,6 +81,7 @@ __attribute__((constructor)) void initialize_label_stats(void) {
 RRDLABELS *rrdlabels_create(void)
 {
     RRDLABELS *labels = callocz(1, sizeof(*labels));
+    spinlock_init(&labels->spinlock);
     RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS));
     return labels;
 }
