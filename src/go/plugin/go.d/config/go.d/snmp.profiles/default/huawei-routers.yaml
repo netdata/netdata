@@ -15,12 +15,20 @@ metrics:
     symbols:
       - name: huawei.hwBgpPeerNegotiatedVersion
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1
+        description: The version negotiated with the remote BGP peer.
+        unit: "{version}"
       - name: huawei.hwBgpPeerRemoteAs
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
+        description: The AS number of the remote BGP peer.
+        unit: "{AS}"
       - name: huawei.hwBgpPeerFsmEstablishedCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.6
+        description: The counter that records the times the remote BGP peer is correctly connected.
+        unit: "{connection}"
       - name: huawei.hwBgpPeerFsmEstablishedTime
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.7
+        description: The counter that records the times the remote BGP peer is correctly connected.
+        unit: "s"
     metric_tags:
       - symbol:
           name: huawei.hwBgpPeerVrfName
@@ -63,12 +71,18 @@ metrics:
       - name: huawei.hwBgpPeerPrefixRcvCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.1
         metric_type: monotonic_count
+        description: The number of prefixes received from the remote BGP peer.
+        unit: "{prefix}"
       - name: huawei.hwBgpPeerPrefixActiveCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.2
         metric_type: monotonic_count
+        description: The number of active prefixes received from the remote BGP peer.
+        unit: "{prefix}"
       - name: huawei.hwBgpPeerPrefixAdvCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.3.1.3
         metric_type: monotonic_count
+        description: The number of prefixes sent to the remote BGP peer.
+        unit: "{prefix}"
     metric_tags:
       - symbol:
           name: huawei.hwBgpPeerVrfName
@@ -87,39 +101,63 @@ metrics:
       - name: huawei.hwBgpPeerInTotalMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.1
         metric_type: monotonic_count
+        description: The total number of protocol packets received from the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerOutTotalMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.2
         metric_type: monotonic_count
+        description: The total number of protocol packets sent to the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerInOpenMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.3
         metric_type: monotonic_count
+        description: The total number of Open packets received from the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerInUpdateMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.4
         metric_type: monotonic_count
+        description: The total number of Update packets received from the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerInNotificationMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.5
         metric_type: monotonic_count
+        description: The total number of Notification packets received from the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerInKeepAliveMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.6
         metric_type: monotonic_count
+        description: The total number of Keepalive packets received from the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerInRouteFreshMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.7
         metric_type: monotonic_count
+        description: The total number of Route-Refresh packets received from the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerOutOpenMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.8
         metric_type: monotonic_count
+        description: The total number of Open packets sent to the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerOutUpdateMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.9
         metric_type: monotonic_count
+        description: The total number of Update packets sent to the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerOutNotificationMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.10
         metric_type: monotonic_count
+        description: The total number of Notification packets sent to the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerOutKeepAliveMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.11
         metric_type: monotonic_count
+        description: The total number of Keepalive packets sent to the remote BGP peer.
+        unit: "{packet}"
       - name: huawei.hwBgpPeerOutRouteFreshMsgCounter
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.4.1.12
         metric_type: monotonic_count
+        description: The total number of Route-Refresh packets sent to the remote BGP peer.
+        unit: "{packet}"
     metric_tags:
       - symbol:
           name: huawei.hwBgpPeerVrfName
@@ -137,6 +175,8 @@ metrics:
     symbols:
       - name: huawei.hwDnsTtl
         OID: 1.3.6.1.4.1.2011.5.25.194.1.1.1.3
+        description: DnsTtl indicates the TTL of a mapping entry, which is a 32-bit integer,in seconds.
+        unit: "s"
     metric_tags:
       - symbol:
           name: huawei.hwDnsDomainName
@@ -213,6 +253,8 @@ metrics:
     symbols:
       - name: huawei.hwFwConnectionStatCount
         OID: 1.3.6.1.4.1.2011.5.25.222.1.2.2.2.1.4
+        description: This is an integer that contains the value of the resource statistic.
+        unit: "{statistic}"
     metric_tags:
       - symbol:
           name: huawei.hwFwConnectionStatDescription
@@ -225,6 +267,8 @@ metrics:
     symbols:
       - name: huawei.hwNatAddrPoolRefTimes
         OID: 1.3.6.1.4.1.2011.5.25.226.2.3.2.1.4
+        description: Number of times the NAT address pool is referenced.
+        unit: "{reference}"
     metric_tags:
       - symbol:
           name: huawei.hwNatAddrPoolStartAddr

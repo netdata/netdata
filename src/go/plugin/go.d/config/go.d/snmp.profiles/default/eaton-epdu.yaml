@@ -46,6 +46,8 @@ metrics:
     symbols:
       - name: eaton.epdu.inputFrequency
         OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.3
+        description: Units are 0.1 Hz; divide by ten to get Hz
+        unit: "Hz"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.10
@@ -65,6 +67,8 @@ metrics:
     symbols:
       - name: eaton.epdu.inputVoltage
         OID: 1.3.6.1.4.1.534.6.6.7.3.2.1.3
+        description: An input voltage measurement value
+        unit: "mV"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
@@ -87,8 +91,12 @@ metrics:
     symbols:
       - name: eaton.epdu.inputCurrent
         OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.4
+        description: An input current measurement value
+        unit: "mA"
       - name: eaton.epdu.inputCurrentPercentLoad
         OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.11
+        description: Current percent load based on the rated current capacity
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
@@ -111,8 +119,12 @@ metrics:
     symbols:
       - name: eaton.epdu.inputVA
         OID: 1.3.6.1.4.1.534.6.6.7.3.4.1.3
+        description: An input VA value
+        unit: "VA"
       - name: eaton.epdu.inputWatts
         OID: 1.3.6.1.4.1.534.6.6.7.3.4.1.4
+        description: An input Watts value
+        unit: "W"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
@@ -156,6 +168,8 @@ metrics:
     symbols:
       - name: eaton.epdu.groupVoltage
         OID: 1.3.6.1.4.1.534.6.6.7.5.3.1.3
+        description: Units are millivolts
+        unit: "mV"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -189,8 +203,12 @@ metrics:
     symbols:
       - name: eaton.epdu.groupCurrent
         OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.3
+        description: A group current measurement value
+        unit: "mA"
       - name: eaton.epdu.groupCurrentPercentLoad
         OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.10
+        description: Current percent load based on the rated current capacity
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -224,8 +242,12 @@ metrics:
     symbols:
       - name: eaton.epdu.groupVA
         OID: 1.3.6.1.4.1.534.6.6.7.5.5.1.2
+        description: A group VA value
+        unit: "VA"
       - name: eaton.epdu.groupWatts
         OID: 1.3.6.1.4.1.534.6.6.7.5.5.1.3
+        description: A group Watts value
+        unit: "W"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -281,6 +303,8 @@ metrics:
     symbols:
       - name: eaton.epdu.outletVoltage
         OID: 1.3.6.1.4.1.534.6.6.7.6.3.1.2
+        description: Units are millivolts
+        unit: "mV"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
@@ -303,8 +327,12 @@ metrics:
     symbols:
       - name: eaton.epdu.outletCurrent
         OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.3
+        description: An outlet current measurement value
+        unit: "mA"
       - name: eaton.epdu.outletCurrentPercentLoad
         OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.10
+        description: Current percent load based on the rated current capacity
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
@@ -327,8 +355,12 @@ metrics:
     symbols:
       - name: eaton.epdu.outletVA
         OID: 1.3.6.1.4.1.534.6.6.7.6.5.1.2
+        description: An outlet VA value
+        unit: "VA"
       - name: eaton.epdu.outletWatts
         OID: 1.3.6.1.4.1.534.6.6.7.6.5.1.3
+        description: An outlet Watts value
+        unit: "W"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
@@ -341,6 +373,8 @@ metrics:
     symbols:
       - name: eaton.epdu.temperatureValue
         OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.4
+        description: Units are in tenths of a degree according to the scale specified by temperatureScale either Fahrenheit or Celsius Divide by ten to get degrees
+        unit: "Cel"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.2
@@ -371,6 +405,8 @@ metrics:
     symbols:
       - name: eaton.epdu.humidityValue
         OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.4
+        description: Units are tenths of a percent relative humidity Divide the value by 10 to get %RH
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.2

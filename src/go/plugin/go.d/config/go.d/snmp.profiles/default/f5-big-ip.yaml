@@ -61,41 +61,57 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
       name: sysStatMemoryTotal
+    description: The total memory available in bytes for TMM (Traffic Management Module)
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
       name: sysStatMemoryUsed
+    description: The memory in use in bytes for TMM (Traffic Management Module)
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.28.0
       name: sysGlobalTmmStatMemoryTotal
+    description: The total memory available in bytes for TMM (Traffic Management Module)
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.29.0
       name: sysGlobalTmmStatMemoryUsed
+    description: The memory in use in bytes for TMM (Traffic Management Module)
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.44.0
       name: sysGlobalHostOtherMemoryTotal
+    description: The total other non-TMM memory in bytes for the system
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.45.0
       name: sysGlobalHostOtherMemoryUsed
+    description: The other non-TMM memory in bytes currently in use for the system
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.46.0
       name: sysGlobalHostSwapTotal
+    description: The total swap in bytes for the system
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.47.0
       name: sysGlobalHostSwapUsed
+    description: The swap in bytes currently in use for the system
+    unit: "By"
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
@@ -105,6 +121,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.11
         name: sysMultiHostCpuUsageRatio
+        description: This is usage ratio of CPU for the associated host
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
@@ -118,18 +136,32 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.4
         name: sysMultiHostCpuUser
+        description: The average time spent by the specified processor in user context for the associated host
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.5
         name: sysMultiHostCpuNice
+        description: The average time spent by the specified processor running niced processes for the associated host
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.6
         name: sysMultiHostCpuSystem
+        description: The average time spent by the specified processor servicing system calls for the associated host
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.7
         name: sysMultiHostCpuIdle
+        description: The average time spent by the specified processor doing nothing for the associated host
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.8
         name: sysMultiHostCpuIrq
+        description: The average time spent by the specified processor servicing hardware interrupts for the associated host
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.9
         name: sysMultiHostCpuSoftirq
+        description: The average time spent by the specified processor servicing soft interrupts for the associated host
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.10
         name: sysMultiHostCpuIowait
+        description: The average time spent by the specified processor waiting for external I/O to complete for the associated host
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
@@ -141,92 +173,130 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.2.0
       name: sysTcpStatOpen
+    description: The number of current open connections
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.3.0
       name: sysTcpStatCloseWait
+    description: The number of current connections in CLOSE-WAIT/LAST-ACK
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.4.0
       name: sysTcpStatFinWait
+    description: The number of current connections in FIN-WAIT/CLOSING
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.5.0
       name: sysTcpStatTimeWait
+    description: The number of current connections in TIME-WAIT
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.6.0
       name: sysTcpStatAccepts
+    description: The number of connections accepted
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.7.0
       name: sysTcpStatAcceptfails
+    description: The number of connections not accepted
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.8.0
       name: sysTcpStatConnects
+    description: The number of connections established
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.9.0
       name: sysTcpStatConnfails
+    description: The number of connections failures
+    unit: "{connection}"
   # UDP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.2.0
       name: sysUdpStatOpen
+    description: The number of current open connections
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.3.0
       name: sysUdpStatAccepts
+    description: The number of connections accepted
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.4.0
       name: sysUdpStatAcceptfails
+    description: The number of connections not accepted
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.5.0
       name: sysUdpStatConnects
+    description: The number of connections established
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.13.6.0
       name: sysUdpStatConnfails
+    description: The number of connections failures
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.2.0
       name: sysClientsslStatCurConns
+    description: The current number of concurrent connections with established SSL sessions being maintained by the filter
+    unit: "{connection}"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.10.0
       name: sysClientsslStatEncryptedBytesIn
+    description: The total encrypted bytes received
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.11.0
       name: sysClientsslStatEncryptedBytesOut
+    description: The total encrypted bytes sent
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.12.0
       name: sysClientsslStatDecryptedBytesIn
+    description: The total decrypted bytes received
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.13.0
       name: sysClientsslStatDecryptedBytesOut
+    description: The total decrypted bytes sent
+    unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.29.0
       name: sysClientsslStatHandshakeFailures
+    description: The total number of handshake failures
+    unit: "{connection}"
 
   # Metrics from F5-BIGIP-LOCAL-MIB provide monitoring information about virtual servers, nodes, and pools.
   # These concepts are related to the LTM (Local Traffic Management) features of BIG IP devices.
@@ -241,6 +311,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.10.1.1
       name: ltmVirtualServNumber
+    description: The number of ltmVirtualServ entries in the table
+    unit: "{virtual_server}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -250,8 +322,12 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.9
         name: ltmVirtualServEnabled
+        description: The state indicating whether the specified virtual server is enabled or not
+        unit: "{virtual_server}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.10
         name: ltmVirtualServConnLimit
+        description: The maximum number of connections the specified virtual server is allowed to have open at one time
+        unit: "{connection}"
     metric_tags:
       - tag: server
         symbol:
@@ -271,13 +347,6 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.2
           name: ltmVsStatusAvailState
-        mapping:
-          0: none
-          1: green
-          2: yellow
-          3: red
-          4: blue
-          5: gray
       - tag: ltm_vs_status_name
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.1
@@ -299,25 +368,45 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.6
         name: ltmVirtualServStatClientPktsIn
+        description: The number of packets received by the specified virtual server from client-side
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.7
         name: ltmVirtualServStatClientBytesIn
+        description: The number of bytes received by the specified virtual server from client-side
+        unit: "By"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.8
         name: ltmVirtualServStatClientPktsOut
+        description: The number of packets sent to client-side from the specified virtual server
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.9
         name: ltmVirtualServStatClientBytesOut
+        description: The number of bytes sent to client-side from the specified virtual server
+        unit: "By"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.12
         name: ltmVirtualServStatClientCurConns
+        description: The current connections from client-side to the specified virtual server
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.31
         name: ltmVirtualServStatVsUsageRatio5s
+        description: The percentage of time Virtual Server was busy over the last 5 seconds
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.32
         name: ltmVirtualServStatVsUsageRatio1m
+        description: The percentage of time Virtual Server was busy over the last 1 minute
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.33
         name: ltmVirtualServStatVsUsageRatio5m
+        description: The percentage of time Virtual Server was busy over the last 5 minutes
+        unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.34
         name: ltmVirtualServStatCurrentConnsPerSec
+        description: The number of current connections per second to the specified virtual server
+        unit: "1/s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.35
         name: ltmVirtualServStatDurationRateExceeded
+        description: Duration of time in seconds the specified virtual server has exceeded the configured connection rate limit
+        unit: "s"
     metric_tags:
       - tag: server
         symbol:
@@ -331,14 +420,24 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.5
         name: ltmVirtualServStatNoNodesErrors
+        description: The number of no-node errors
+        unit: "{error}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.11
         name: ltmVirtualServStatClientTotConns
+        description: The total connections from client-side to the specified virtual server
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.27
         name: ltmVirtualServStatTotRequests
+        description: The total number of requests going through the specified virtual server
+        unit: "{request}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.40
         name: ltmVirtualServStatClientEvictedConns
+        description: The number of client-side connections that have been evicted on the specified virtual server
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.41
         name: ltmVirtualServStatClientSlowKilled
+        description: The number of slow client-side connections that have been killed on the specified virtual server
+        unit: "{connection}"
     metric_type: monotonic_count
     metric_tags:
       - tag: server
@@ -352,6 +451,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.4.1.1
       name: ltmNodeAddrNumber
+    description: The number of ltmNodeAddr entries in the table
+    unit: "{node}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -361,16 +462,28 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.3
         name: ltmNodeAddrConnLimit
+        description: The maximum number of connections the specified node address is allowed to have open at one time
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.4
         name: ltmNodeAddrRatio
+        description: The ratio of the specified node address used in load balance algorithm
+        unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.5
         name: ltmNodeAddrDynamicRatio
+        description: The dynamic ratio of the specified node address used in load balance algorithm
+        unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
         name: ltmNodeAddrMonitorState
+        description: The internal tmm monitor state for the specified node address
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
         name: ltmNodeAddrMonitorStatus
+        description: The hierarchical load balance state for the specified node address including parent status
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.10
         name: ltmNodeAddrSessionStatus
+        description: The hierarchical status of the session including parent status for the specified node address
+        unit: "TBD"
     metric_tags:
       - tag: node
         symbol:
@@ -439,21 +552,37 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.3
         name: ltmNodeAddrStatServerPktsIn
+        description: The number of packets received by the specified node address from server-side
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.4
         name: ltmNodeAddrStatServerBytesIn
+        description: The number of bytes received by the specified node address from server-side
+        unit: "By"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.5
         name: ltmNodeAddrStatServerPktsOut
+        description: The number of packets sent to server-side from the specified node address
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.6
         name: ltmNodeAddrStatServerBytesOut
+        description: The number of bytes sent to server-side from the specified node address
+        unit: "By"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.9
         name: ltmNodeAddrStatServerCurConns
+        description: The current connections from server-side to the specified node address
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.21
         name: ltmNodeAddrStatCurSessions
+        description: The number of current sessions going through the specified node address
+        unit: "{session}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.22
         name: ltmNodeAddrStatCurrentConnsPerSec
+        description: The number of current connections per second to the specified node address
+        unit: "1/s"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.23
         name: ltmNodeAddrStatDurationRateExceeded
+        description: Duration of time in seconds the specified node address has exceeded the configured connection rate limit
+        unit: "s"
     metric_tags:
       - tag: node
         symbol:
@@ -467,8 +596,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.8
         name: ltmNodeAddrStatServerTotConns
+        description: The total connections from server-side to the specified node address
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.17
         name: ltmNodeAddrStatTotRequests
+        description: The total number of requests going through the specified node address
+        unit: "{request}"
     metric_type: monotonic_count
     metric_tags:
       - tag: node
@@ -482,6 +615,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.5.1.1
       name: ltmPoolNumber
+    description: The number of ltmPool entries in the table
+    unit: "{pool}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -491,10 +626,16 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.8
         name: ltmPoolActiveMemberCnt
+        description: The number of the current active members in the specified pool
+        unit: "{member}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.16
         name: ltmPoolDynamicRatioSum
+        description: The sum of the dynamic ratio from all the members of the specified pool
+        unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.23
         name: ltmPoolMemberCnt
+        description: The total number of members in the specified pool
+        unit: "{member}"
     metric_tags:
       - tag: pool
         symbol:
@@ -509,21 +650,37 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.2
         name: ltmPoolStatServerPktsIn
+        description: The number of packets received by the specified pool from server-side
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.3
         name: ltmPoolStatServerBytesIn
+        description: The number of bytes received by the specified pool from server-side
+        unit: "By"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.4
         name: ltmPoolStatServerPktsOut
+        description: The number of packets sent to server-side from the specified pool
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.5
         name: ltmPoolStatServerBytesOut
+        description: The number of bytes sent to server-side from the specified pool
+        unit: "By"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.8
         name: ltmPoolStatServerCurConns
+        description: The current connections from server-side to the specified pool
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.18
         name: ltmPoolStatConnqDepth
+        description: Number of connections currently in queue, sum
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.19
         name: ltmPoolStatConnqAgeHead
+        description: Age in milliseconds of the oldest queue entry, max
+        unit: "ms"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.31
         name: ltmPoolStatCurSessions
+        description: The current number of sessions to the specified pool
+        unit: "{session}"
     metric_tags:
       - tag: pool
         symbol:
@@ -537,10 +694,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.7
         name: ltmPoolStatServerTotConns
+        description: The total connections from server-side to the specified pool
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.23
         name: ltmPoolStatConnqServiced
+        description: Number of entries that have been removed from the queue, sum
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.30
         name: ltmPoolStatTotRequests
+        description: The total number of requests to the specified pool
+        unit: "{request}"
     metric_type: monotonic_count
     metric_tags:
       - tag: pool
@@ -554,6 +717,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3375.2.2.5.3.1
       name: ltmPoolMemberNumber
+    description: The number of ltmPoolMember entries in the table
+    unit: "{member}"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -563,16 +728,28 @@ metrics:
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.5
         name: ltmPoolMemberConnLimit
+        description: The maximum connections allowed to the specified pool member
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.6
         name: ltmPoolMemberRatio
+        description: The load balancing ratio of the specified pool member used in pool member ratio load balancing mode
+        unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.9
         name: ltmPoolMemberDynamicRatio
+        description: The dynamic ratio for the specified pool member used in load balance algorithm
+        unit: "{ratio}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
         name: ltmPoolMemberMonitorState
+        description: The internal tmm monitor state for the specified node address
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.11
         name: ltmPoolMemberMonitorStatus
+        description: The hierarchical load balance state for the specified node address including parent status
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.13
         name: ltmPoolMemberSessionStatus
+        description: The hierarchical status of the session including parent status for the specified pool member
+        unit: "TBD"
     metric_tags:
       - tag: pool
         symbol:
@@ -624,25 +801,45 @@ metrics:
       # Counters (= rates)
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.5
         name: ltmPoolMemberStatServerPktsIn
+        description: The number of packets received by the specified pool member from server-side
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.6
         name: ltmPoolMemberStatServerBytesIn
+        description: The number of bytes received by the specified pool member from server-side
+        unit: "By"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.7
         name: ltmPoolMemberStatServerPktsOut
+        description: The number of packets sent to server-side from the specified pool member
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.8
         name: ltmPoolMemberStatServerBytesOut
+        description: The number of bytes sent to server-side from the specified pool member
+        unit: "By"
       # Gauges
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.11
         name: ltmPoolMemberStatServerCurConns
+        description: The current connections from server-side to the pool member
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.22
         name: ltmPoolMemberStatConnqDepth
+        description: Number of connections currently in queue, sum
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.23
         name: ltmPoolMemberStatConnqAgeHead
+        description: Age in milliseconds of the oldest queue entry, max
+        unit: "ms"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.29
         name: ltmPoolMemberStatCurSessions
+        description: The number of current sessions going through the specified pool member
+        unit: "{session}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.30
         name: ltmPoolMemberStatCurrentConnsPerSec
+        description: The number of current connections per second to the specified pool member
+        unit: "1/s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.31
         name: ltmPoolMemberStatDurationRateExceeded
+        description: Duration of time in seconds the specified pool member has exceeded the configured connection rate limit
+        unit: "s"
     metric_tags:
       - tag: pool
         symbol:
@@ -660,10 +857,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.10
         name: ltmPoolMemberStatServerTotConns
+        description: The total connections from server-side to the specified pool member
+        unit: "{connection}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.19
         name: ltmPoolMemberStatTotRequests
+        description: The total number of requests going through the specified pool member
+        unit: "{request}"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.27
         name: ltmPoolMemberStatConnqServiced
+        description: Number of entries that have been removed from the queue, sum
+        unit: "{connection}"
     metric_type: monotonic_count
     metric_tags:
       - tag: pool

@@ -16,6 +16,8 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.11.2.14.11.5.1.9.6.1.0
+      description: The CPU utilization in percent(%).
+      unit: "%"
   - MIB: NETSWITCH-MIB
     table:
       name: hpLocalMemTable
@@ -23,8 +25,12 @@ metrics:
     symbols:
       - name: memory.total
         OID: 1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.5
+        description: The number of currently installed bytes.
+        unit: "By"
       - name: memory.free
         OID: 1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.6
+        description: The number of available (unallocated) bytes.
+        unit: "By"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.1

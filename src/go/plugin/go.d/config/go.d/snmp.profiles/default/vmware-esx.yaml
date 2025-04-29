@@ -22,6 +22,8 @@ metrics:
     symbols:
       - name: vmwHostBusAdapter
         constant_value_one: true
+        description: "hardware host bus adapter"
+        unit: "{hardware_host_bus_adapter}"
     metric_tags:
       - symbol:
           name: vmwHbaDeviceName
@@ -37,6 +39,8 @@ metrics:
           3: marginal
           4: critical
           5: failed
+        description: "status of the hardware host bus adapter"
+        unit: "{status}"
   - MIB: VMWARE-ENV-MIB
     table:
       OID: 1.3.6.1.4.1.6876.4.20.3
@@ -44,6 +48,8 @@ metrics:
     symbols:
       - name: vmwEnv
         constant_value_one: true
+        description: "hardware environment"
+        unit: "{hardware_environment}"
     metric_tags:
       - symbol:
           name: vmwSubsystemType
@@ -60,6 +66,8 @@ metrics:
           8: temperature_sensor
           9: raid_controller
           10: voltage
+        description: "hardware component reporting environmental state"
+        unit: "{hardware_component}"
       - symbol:
           OID: 1.3.6.1.4.1.6876.4.20.3.1.3
           name: vmwHardwareStatus
@@ -70,3 +78,5 @@ metrics:
           3: marginal
           4: critical
           5: failed
+        description: "last reported state of this component"
+        unit: "{status}"

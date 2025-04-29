@@ -19,8 +19,12 @@ metrics:
 # TODO : Handle conditional metric collection NDM-2232
       - name: huawei.hwEntityTemperature
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.11
+        description: The temperature for the entity
+        unit: "Cel"
       - name: huawei.hwEntityVoltage
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.13
+        description: The voltage for the entity
+        unit: "V"
     metric_tags:
       - symbol:
           name: huawei.hwEntityBoardName
@@ -79,6 +83,8 @@ metrics:
     symbols:
       - name: huawei.hwEntityFanSpeed
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.10.1.5
+        description: This object indicates the rotation speed in percentage of the full speed of the fan
+        unit: "%"
     metric_tags:
       - symbol:
           name: huawei.hwEntityFanSlot
@@ -125,10 +131,16 @@ metrics:
     symbols:
       - name: huawei.hwSystemPowerTotalPower
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.2
+        description: Device total power
+        unit: "W"
       - name: huawei.hwSystemPowerUsedPower
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.3
+        description: Device used power
+        unit: "W"
       - name: huawei.hwSystemPowerRemainPower
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.14.1.4
+        description: Device remaining power
+        unit: "W"
     metric_tags:
       - symbol:
           name: huawei.hwSystemPowerDeviceID
@@ -141,10 +153,16 @@ metrics:
     symbols:
       - name: huawei.hwOspfv2NbrPriority
         OID: 1.3.6.1.4.1.2011.5.25.155.6.1.12
+        description: Priority of this neighbor in the designated router election algorithm
+        unit: "{neighbor}"
       - name: huawei.hwOspfv2NbrUpTime
         OID: 1.3.6.1.4.1.2011.5.25.155.6.1.13
+        description: Time in seconds since the state of this neighbor has been full
+        unit: "s"
       - name: huawei.hwOspfv2NbrDeadTimeLeft
         OID: 1.3.6.1.4.1.2011.5.25.155.6.1.15
+        description: Period in seconds after which this neighbor is declared dead
+        unit: "s"
     metric_tags:
       - symbol:
           name: huawei.hwOspfv2SelfRouterId
@@ -206,6 +224,8 @@ metrics:
     symbols:
       - name: huawei.hwAvgDuty1min
         OID: 1.3.6.1.4.1.2011.6.3.4.1.3
+        description: The overall CPU duty percentage in the last 1 minute period
+        unit: "%"
     metric_tags:
       - tag: cpu
         index: 1
@@ -217,9 +237,13 @@ metrics:
       - name: huawei.hwMemoryDevSize
         OID: 1.3.6.1.4.1.2011.6.3.5.1.1.2
         metric_type: monotonic_count
+        description: Indicates the total size of the memory module which is on the managed object
+        unit: "By"
       - name: huawei.hwMemoryDevFree
         OID: 1.3.6.1.4.1.2011.6.3.5.1.1.3
         metric_type: monotonic_count
+        description: Indicates the free size of the memory
+        unit: "By"
     metric_tags:
       - tag: mem
         index: 1

@@ -18,6 +18,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.1347.43.18.2.1.3
         name: kcprtAlertStateCode
+        description: "alert state code"
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.1347.43.18.2.1.2
@@ -30,8 +32,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.1347.43.20.1.1.4
         name: kcprtMemoryDeviceTotalSize
+        description: "total size of the memory device"
+        unit: "By"
       - OID: 1.3.6.1.4.1.1347.43.20.1.1.5
         name: kcprtMemoryDeviceUsedSize
+        description: "used size of the memory device"
+        unit: "By"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.1347.43.20.1.1.2

@@ -79,34 +79,50 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.1.0
       name: panSessionUtilization
+    description: Session table utilization percentage
+    unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.2.0
       name: panSessionMax
+    description: Total number of sessions supported
+    unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.3.0
       name: panSessionActive
+    description: Total number of active sessions
+    unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.4.0
       name: panSessionActiveTcp
+    description: Total number of active TCP sessions
+    unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.5.0
       name: panSessionActiveUdp
+    description: Total number of active UDP sessions
+    unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.6.0
       name: panSessionActiveICMP
+    description: Total number of active ICMP sessions
+    unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.7.0
       name: panSessionActiveSslProxy
+    description: Total number of active SSL proxy sessions
+    unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.8.0
       name: panSessionSslProxyUtilization
+    description: SSL proxy session utilization percentage
+    unit: "%"
 
   #
   # GlobalProtect gateway utilization
@@ -115,22 +131,32 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.1.0
       name: panGPGWUtilizationPct
+    description: GlobalProtect Gateway utilization percentage
+    unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.2.0
       name: panGPGWUtilizationMaxTunnels
+    description: Max tunnels allowed
+    unit: "{tunnel}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.3.0
       name: panGPGWUtilizationActiveTunnels
+    description: Number of active tunnels
+    unit: "{tunnel}"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.1.2.0
       name: panEntityTotalPowerUsed
+    description: Total power used on the system in watts
+    unit: "W"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.1.1.0
       name: panEntityTotalPowerAvail
+    description: Total power available on the system in watts
+    unit: "W"
   - MIB: PAN-ENTITY-EXT-MIB
     table:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1
@@ -138,8 +164,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1
         name: panEntryFRUModulePowerUsed
+        description: Power used by the FRU Module in watts
+        unit: "W"
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.2
         name: panEntryFRUModuleNumPorts
+        description: Number of ports on the FRU Module
+        unit: "{port}"
     metric_tags:
       - MIB: ENTITY-MIB
         symbol:
@@ -155,6 +185,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.3.1.1.1
         name: panEntryFanTrayPowerUsed
+        description: Power used by the Fan Tray in watts
+        unit: "W"
     metric_tags:
       - MIB: ENTITY-MIB
         symbol:

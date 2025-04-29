@@ -36,28 +36,52 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.4
         name: systemStateChassisStatus
+        description: Status of the chassis
+        unit: "{chassis}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
+        description: Redundancy status of the power unit
+        unit: "{power_unit}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
+        description: Combined status of the power supply
+        unit: "{power_supply}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.15
         name: systemStateAmperageStatusCombined
+        description: Combined status of amperage
+        unit: "A"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
+        description: Redundancy status of the cooling unit
+        unit: "{cooling_unit}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
+        description: Combined status of the cooling device
+        unit: "{cooling_device}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.24
         name: systemStateTemperatureStatusCombined
+        description: Combined status of temperature
+        unit: "Cel"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
+        description: Combined status of the memory device
+        unit: "{memory_device}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
+        description: Combined status of chassis intrusion
+        unit: "{intrusion}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.42
         name: systemStatePowerUnitStatusCombined
+        description: Combined status of the power unit
+        unit: "{power_unit}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
+        description: Combined status of the cooling unit
+        unit: "{cooling_unit}"
       - OID: 1.3.6.1.4.1.674.10892.1.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
+        description: Combined status of the processor device
+        unit: "{processor_device}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.200.10.1.1
@@ -70,6 +94,8 @@ metrics:
     symbols:
       - name: systemState
         constant_value_one: true
+        description: Constant value one for system state
+        unit: "1"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
@@ -93,14 +119,24 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.6
         name: operatingSystemMemoryAvailablePhysicalSize
+        description: Available physical memory size
+        unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.7
         name: operatingSystemMemoryTotalPageFileSize
+        description: Total page file size of operating system memory
+        unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.8
         name: operatingSystemMemoryAvailablePageFileSize
+        description: Available page file size of operating system memory
+        unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.9
         name: operatingSystemMemoryTotalVirtualSize
+        description: Total virtual memory size
+        unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.1.400.20.1.10
         name: operatingSystemMemoryAvailableVirtualSize
+        description: Available virtual memory size
+        unit: "By"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.400.20.1.1
@@ -113,8 +149,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.600.50.1.5
         name: batteryStatus
+        description: Status of the battery
+        unit: "{battery}"
       - OID: 1.3.6.1.4.1.674.10892.1.600.50.1.6
         name: batteryReading
+        description: Reading value of the battery
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.1
@@ -135,6 +175,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.80.1.5
         name: pCIDeviceStatus
+        description: Status of the PCI device
+        unit: "{pci_device}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.80.1.9
@@ -151,6 +193,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.300.50.1.5
         name: systemBIOSStatus
+        description: Status of the system BIOS
+        unit: "{bios}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.300.50.1.1
@@ -167,8 +211,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.300.70.1.5
         name: intrusionStatus
+        description: Status of the intrusion
+        unit: "{intrusion}"
       - OID: 1.3.6.1.4.1.674.10892.1.300.70.1.6
         name: intrusionReading
+        description: Reading value of the intrusion
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.300.70.1.1
@@ -189,8 +237,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.600.20.1.5
         name: voltageProbeStatus
+        description: Status of the voltage probe
+        unit: "{voltage_probe}"
       - OID: 1.3.6.1.4.1.674.10892.1.600.20.1.6
         name: voltageProbeReading
+        description: Reading value of the voltage probe
+        unit: "V"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.20.1.1
@@ -231,8 +283,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.600.30.1.5
         name: amperageProbeStatus
+        description: Status of the amperage probe
+        unit: "{amperage_probe}"
       - OID: 1.3.6.1.4.1.674.10892.1.600.30.1.6
         name: amperageProbeReading
+        description: Reading value of the amperage probe
+        unit: "A"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.30.1.7
@@ -275,12 +331,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.5
         name: powerSupplyStatus
+        description: Status of the power supply
+        unit: "{power_supply}"
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.6
         name: powerSupplyOutputWatts
+        description: Output power in watts of the power supply
+        unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.9
         name: powerSupplyMaximumInputVoltage
+        description: Maximum input voltage of the power supply
+        unit: "V"
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.16
         name: powerSupplyCurrentInputVoltage
+        description: Current input voltage of the power supply
+        unit: "V"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.12.1.1
@@ -297,6 +361,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.600.60.1.5
         name: powerUsageStatus
+        description: Status of the power usage
+        unit: "{power_usage}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.60.1.1
@@ -317,8 +383,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.700.10.1.5
         name: coolingUnitRedundancyStatus
+        description: Redundancy status of the cooling unit
+        unit: "{cooling_unit}"
       - OID: 1.3.6.1.4.1.674.10892.1.700.10.1.8
         name: coolingUnitStatus
+        description: Status of the cooling unit
+        unit: "{cooling_unit}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.700.10.1.1
@@ -339,10 +409,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.700.12.1.5
         name: coolingDeviceStatus
+        description: Status of the cooling device
+        unit: "{cooling_device}"
       - OID: 1.3.6.1.4.1.674.10892.1.700.12.1.6
         name: coolingDeviceReading
+        description: Reading value of the cooling device
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.674.10892.1.700.12.1.18
         name: coolingDeviceDiscreteReading
+        description: Discrete reading of the cooling device
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.700.12.1.1
@@ -380,8 +456,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.700.20.1.5
         name: temperatureProbeStatus
+        description: Status of the temperature probe
+        unit: "{temperature_probe}"
       - OID: 1.3.6.1.4.1.674.10892.1.700.20.1.6
         name: temperatureProbeReading
+        description: Reading value of the temperature probe
+        unit: "Cel"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.700.20.1.1
@@ -412,8 +492,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.5
         name: processorDeviceStatus
+        description: Status of the processor device
+        unit: "{processor_device}"
       - OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.19
         name: processorDeviceThreadCount
+        description: Number of threads in the processor device
+        unit: "{thread}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.1
@@ -430,8 +514,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.5
         name: processorDeviceStatusStatus
+        description: Status of the processor device status
+        unit: "{processor_device_status}"
       - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.6
         name: processorDeviceStatusReading
+        description: Reading value of the processor device status
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.1
@@ -453,10 +541,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.5
         name: cacheDeviceStatus
+        description: Status of the cache device
+        unit: "{cache_device}"
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.12
         name: cacheDeviceMaximumSize
+        description: Maximum size of the cache device
+        unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.13
         name: cacheDeviceCurrentSize
+        description: Current size of the cache device
+        unit: "By"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.1
@@ -474,8 +568,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.5
         name: memoryDeviceStatus
+        description: Status of the memory device
+        unit: "{memory_device}"
       - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.20
         name: memoryDeviceFailureModes
+        description: Failure modes of the memory device
+        unit: "TBD"
         # Sent as bit masks:
         # (0) -- memory device has no faults.
         # (1) -- ECC single bit correction warning rate exceeded
@@ -504,6 +602,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.90.1.3
         name: networkDeviceStatus
+        description: Status of the network device
+        unit: "{network_device}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.90.1.11
@@ -516,6 +616,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1200.10.1.5
         name: systemSlotStatus
+        description: Status of the system slot
+        unit: "{system_slot}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1200.10.1.8
@@ -532,6 +634,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.2000.10.1.3
         name: fruInformationStatus
+        description: Status of the field replaceable unit information
+        unit: "{fru_information}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.2000.10.1.1

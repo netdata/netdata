@@ -16,22 +16,38 @@ metrics:
     symbols:
       - name: nimble.volSizeLow
         OID: 1.3.6.1.4.1.37447.1.2.1.4
+        description: Maximum defined size of a volume in bytes - low order bytes.
+        unit: "By"
       - name: nimble.volSizeHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.5
+        description: Maximum defined size of a volume in bytes - high order bytes.
+        unit: "By"
       - name: nimble.volUsageLow
         OID: 1.3.6.1.4.1.37447.1.2.1.6
+        description: Current number of bytes a volume is using - low order bytes.
+        unit: "By"
       - name: nimble.volUsageHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.7
+        description: Current number of bytes a volume is using - high order bytes.
+        unit: "By"
       - name: nimble.volReserveLow
         OID: 1.3.6.1.4.1.37447.1.2.1.8
+        description: Number of bytes reserved for a volume - low order bytes.
+        unit: "By"
       - name: nimble.volReserveHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.9
+        description: Number of bytes reserved for a volume - high order bytes.
+        unit: "By"
       - name: nimble.volIoReads
         OID: 1.3.6.1.4.1.37447.1.2.1.13
         metric_type: monotonic_count
+        description: Total cumulative number of Read I/Os (sequential and random).
+        unit: "{read_io}"
       - name: nimble.volIoWrites
         OID: 1.3.6.1.4.1.37447.1.2.1.34
         metric_type: monotonic_count
+        description: Total cumulative number of Write I/Os.
+        unit: "{write_io}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.37447.1.2.1.3
@@ -48,60 +64,86 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.2.0
       name: nimble.ioReads
+      description: Total cumulative number of Read I/Os (sequential and random).
+      unit: "{read_io}"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.4.0
       name: nimble.ioWrites
+      description: Total cumulative number of Write I/Os.
+      unit: "{write_io}"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.6.0
       name: nimble.ioReadTimeMicrosec
+      description: Total cumulative microseconds the system has spent processing Read I/Os. This includes system and disk latency, but not any network latency back to the initiator.
+      unit: "us"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.7.0
       name: nimble.ioWriteTimeMicrosec
+      description: Total cumulative microseconds the system has spent processing Write I/Os. This includes system and disk latency, but not any network latency back to the initiator.
+      unit: "us"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.8.0
       name: nimble.ioReadBytes
+      description: Total cumulative number of Read I/O bytes (sequential and random).
+      unit: "By"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.9.0
       name: nimble.ioSeqReadBytes
+      description: Total cumulative number of Sequential Read I/O bytes.
+      unit: "By"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.10.0
       name: nimble.ioWriteBytes
+      description: Total cumulative number of Write I/O bytes (sequential and random).
+      unit: "By"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.11.0
       name: nimble.ioSeqWriteBytes
+      description: Total cumulative number of Sequential Write I/O bytes.
+      unit: "By"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.12.0
       name: nimble.diskVolBytesUsedLow
+      description: Total number of bytes used on disk for volumes - low order bytes.
+      unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.13.0
       name: nimble.diskVolBytesUsedHigh
+      description: Total number of bytes used on disk for volumes - high order bytes.
+      unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.14.0
       name: nimble.diskSnapBytesUsedLow
+      description: Total number of bytes used on disk for snapshots - low order bytes.
+      unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.15.0
       name: nimble.diskSnapBytesUsedHigh
+      description: Total number of bytes used on disk for snapshots - high order bytes.
+      unit: "By"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.16.0
       name: nimble.ioNonseqReadHits
+      description: Total cumulative number of cache hits for Non-Sequential Read I/Os.
+      unit: "{cache_hit}"
     metric_type: monotonic_count
