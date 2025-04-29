@@ -8,156 +8,230 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.22610.2.4.1.2.1.0
+    description: The total memory(KB)
+    unit: "{kilobyte}"
   - MIB: A10-AX-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.4.1.22610.2.4.1.2.2.0
+    description: The usage memory(KB)
+    unit: "{kilobyte}"
   - MIB: A10-AX-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.22610.2.4.1.3.3.0
+    description: The average CPU usage in last 5 seconds
+    unit: "%"
   - MIB: A10-AX-MIB
     symbol:
       name: axSysDiskTotalSpace
       OID: 1.3.6.1.4.1.22610.2.4.1.4.1.0
+    description: The total space of the disk in MB
+    unit: "MB"
   - MIB: A10-AX-MIB
     symbol:
       name: axSysDiskFreeSpace
       OID: 1.3.6.1.4.1.22610.2.4.1.4.2.0
+    description: The free space of the disk in MB
+    unit: "MB"
   - MIB: A10-AX-MIB
     symbol:
       name: axSysHwPhySystemTemp
       OID: 1.3.6.1.4.1.22610.2.4.1.5.1.0
+    description: The physical system temperature in Celsius
+    unit: "Cel"
   - MIB: A10-AX-MIB
     symbol:
       name: axPowerSupplyVoltageTotal
       OID: 1.3.6.1.4.1.22610.2.4.1.5.10.0
+    description: TBD
+    unit: "TBD"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalCurrentConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.1.0
+    description: Total current connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.2.0
     metric_type: monotonic_count
+    description: Total new connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewL4Connections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.3.0
     metric_type: monotonic_count
+    description: Total new L4 connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewL7Connections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.4.0
     metric_type: monotonic_count
+    description: Total new L7 connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalNewIPNatConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.5.0
     metric_type: monotonic_count
+    description: Total new IP-NAT connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalSSLConnections
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.6.0
     metric_type: monotonic_count
+    description: Total new SSL connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalTotalL7Requests
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.7.0
     metric_type: monotonic_count
+    description: Total L7 requests
+    unit: "{request}"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalAppPacketDrop
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.8.0
+    description: Total number of buffer drops in the last 10 seconds
+    unit: "{packet}"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalTotalAppPacketDrop
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.9.0
+    description: Total number of accumulative buffer drops
+    unit: "{packet}"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalTotalL4Session
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.10.0
+    description: Total number of L4 sessions
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axGlobalTotalThroughput
       OID: 1.3.6.1.4.1.22610.2.4.3.1.2.13.0
+    description: TBD
+    unit: "TBD"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalBufferConfigLimit
       OID: 1.3.6.1.4.1.22610.2.4.3.1.3.1.0
+    description: Application buffer configured limit
+    unit: "{buffer}"
   - MIB: A10-AX-MIB
     symbol:
       name: axAppGlobalBufferCurrentUsage
       OID: 1.3.6.1.4.1.22610.2.4.3.1.3.2.0
+    description: Application buffer current usage
+    unit: "{buffer}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalOpenPersist
       OID: 1.3.6.1.4.1.22610.2.4.3.5.1.0
+    description: The total count of open persistent connection-reuse sessions
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalActivePersist
       OID: 1.3.6.1.4.1.22610.2.4.3.5.2.0
+    description: The total count of active persistent connection-reuse sessions
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalEstablished
       OID: 1.3.6.1.4.1.22610.2.4.3.5.3.0
+    description: The total count of established connection-reuse sessions
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axConnReuseStatTotalTerminated
       OID: 1.3.6.1.4.1.22610.2.4.3.5.4.0
+    description: The total count of terminated connection-reuse sessions
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatTCPEstablished
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.1.0
+    description: The count of TCP established
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatTCPHalfOpen
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.2.0
+    description: The count of TCP half open
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatUDP
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.3.0
+    description: The count of UDP connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatNonTcpUdpIPSession
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.4.0
+    description: The count of non TCP/UDP IP sessions
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatOther
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.5.0
+    description: The count of others
+    unit: "{session}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatReverseNATTCP
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.6.0
+    description: The count of reverse NAT TCP
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatReverseNATUDP
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.7.0
+    description: The count of reverse NAT UDP
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatFreeCurrentConns
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.9.0
+    description: The count of free current connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnCount
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.10.0
+    description: The count of current connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnFree
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.11.0
+    description: The count of freed connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatTCPSynHalfOpen
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.12.0
+    description: The count of TCP SYN half open
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnSMPAllocated
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.13.0
+    description: The count of allocated SMP connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     symbol:
       name: axSessionGlobalStatConnSMPFree
       OID: 1.3.6.1.4.1.22610.2.4.3.19.1.14.0
+    description: The count of free SMP connections
+    unit: "{connection}"
   - MIB: A10-AX-MIB
     table:
       name: axSysFanStatusTable
@@ -165,6 +239,8 @@ metrics:
     symbols:
       - name: axFanSpeed
         OID: 1.3.6.1.4.1.22610.2.4.1.5.9.1.4
+        description: The fan1's speed
+        unit: "1/s"
     metric_tags:
       - symbol:
           name: axFanName
@@ -189,6 +265,8 @@ metrics:
     symbols:
       - name: axPowerSupplyVoltage
         constant_value_one: true
+        description: TBD
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: axPowerSupplyVoltageDescription
@@ -209,6 +287,8 @@ metrics:
     symbols:
       - name: axSysPowerSupplyStatus
         constant_value_one: true
+        description: TBD
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: axPowerSupplyName
@@ -230,8 +310,12 @@ metrics:
     symbols:
       - name: axAppGlobalAllowedCurrentValue
         OID: 1.3.6.1.4.1.22610.2.4.3.1.1.1.1.3
+        description: The current value for the allowed system resource
+        unit: "{resource}"
       - name: axAppGlobalAllowedMaxValue
         OID: 1.3.6.1.4.1.22610.2.4.3.1.1.1.1.6
+        description: The maximum value for the allowed system resource
+        unit: "{resource}"
     metric_tags:
       - symbol:
           name: axAppGlobalSystemResourceName
@@ -244,6 +328,8 @@ metrics:
     symbols:
       - name: axServer
         constant_value_one: true
+        description: TBD
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: axServerName
@@ -271,9 +357,13 @@ metrics:
     symbols:
       - name: axServerStatServerCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.8
+        description: The current connections from server side
+        unit: "{connection}"
       - name: axServerStatServerTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.2.2.2.1.12
         metric_type: monotonic_count
+        description: The number of current L7 requests if applicable
+        unit: "{request}"
     metric_tags:
       - symbol:
           name: axServerStatName
@@ -294,6 +384,8 @@ metrics:
     symbols:
       - name: axServiceGroup
         constant_value_one: true
+        description: TBD
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: axServiceGroupName
@@ -337,6 +429,8 @@ metrics:
     symbols:
       - name: axVirtualServer
         constant_value_one: true
+        description: TBD
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: axVirtualServerName
@@ -371,31 +465,51 @@ metrics:
       - name: axVirtualServerStatPktsIn
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.3
         metric_type: monotonic_count
+        description: The number of packets received from client to server
+        unit: "{packet}"
       - name: axVirtualServerStatBytesIn
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.4
         metric_type: monotonic_count
+        description: The number of bytes received from client to server
+        unit: "By"
       - name: axVirtualServerStatPktsOut
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.5
         metric_type: monotonic_count
+        description: The number of packets sent from server to client
+        unit: "{packet}"
       - name: axVirtualServerStatBytesOut
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.6
         metric_type: monotonic_count
+        description: The number of bytes sent from server to client
+        unit: "By"
       - name: axVirtualServerStatPersistConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.7
+        description: The persistent connections from client side
+        unit: "{connection}"
       - name: axVirtualServerStatTotConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.8
         metric_type: monotonic_count
+        description: The total connections from client side
+        unit: "{connection}"
       - name: axVirtualServerStatCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.9
+        description: The current connections from client side
+        unit: "{connection}"
       - name: axVirtualServerStatTotalL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.12
         metric_type: monotonic_count
+        description: The total number of L7 requests if applicable
+        unit: "{request}"
       - name: axVirtualServerStatTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.13
         metric_type: monotonic_count
+        description: The number of current L7 requests if applicable
+        unit: "{request}"
       - name: axVirtualServerStatTotalSuccL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.14
         metric_type: monotonic_count
+        description: The number of successful L7 requests if applicable
+        unit: "{request}"
     metric_tags:
       - symbol:
           name: axVirtualServerStatAddress
@@ -428,6 +542,8 @@ metrics:
     symbols:
       - name: axVirtualServerPortStatCurConns
         OID: 1.3.6.1.4.1.22610.2.4.3.4.4.1.1.12
+        description: Current connections from client side
+        unit: "{connection}"
     metric_tags:
       - symbol:
           name: axVirtualServerPortStatAddress

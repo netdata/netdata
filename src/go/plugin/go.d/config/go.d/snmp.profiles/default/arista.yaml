@@ -40,8 +40,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.99.1.1.1.4
         name: entPhySensorValue
+        description: The most recent measurement obtained by the agent for this sensor
+        unit: "TBD"
       - OID: 1.3.6.1.2.1.99.1.1.1.5
         name: entPhySensorOperStatus
+        description: The operational status of the sensor
+        unit: "{sensor}"
     metric_tags:
       - tag: sensor_type
         symbol:

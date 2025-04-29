@@ -54,14 +54,20 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.30.0
+      description: Cpu usage percentage
+      unit: "%"
   - MIB: WLSX-SYSTEMEXT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.31.0
+      description: Memory usage percentage
+      unit: "%"
   - MIB: WLSX-SYSTEMEXT-MIB
     symbol:
       name: wlsxSysExtPacketLossPercent
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.32.0
+      description: Packet loss percentage
+      unit: "%"
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSysXStorageTable
@@ -69,8 +75,12 @@ metrics:
     symbols:
       - name: sysXStorageSize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
+        description: Size of the storage filesystem in MB
+        unit: "MB"
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
+        description: Size of the storage filesystem in MB
+        unit: "MB"
     metric_tags:
       - symbol:
           name: sysXStorageType
@@ -90,8 +100,12 @@ metrics:
     symbols:
       - name: apChannelNoise
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.13
+        description: Noise on the channel
+        unit: "dB"
       - name: apSignalToNoiseRatio
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.14
+        description: Signal to noise ratio for the BSSID
+        unit: "dB"
     metric_tags:
       - symbol:
           name: apESSID
@@ -130,40 +144,72 @@ metrics:
     symbols:
       - name: apChannelBwRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.2
+        description: Bandwidth rate in Kbps of the apChannel
+        unit: "kbit/s"
       - name: apChannelFrameRetryRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.3
+        description: Number of retry packets as a percentage of the total packets transmitted and received on this channel
+        unit: "%"
       - name: apChannelFrameLowSpeedRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.4
+        description: Number of low data rate packets as a percentage of the total packets transmitted and received on this channel
+        unit: "%"
       - name: apChannelFrameNonUnicastRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.5
+        description: Number of broadcast and multicast packets as a percentage of the total packets transmitted on this channel
+        unit: "%"
       - name: apChannelFrameFragmentationRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.6
+        description: Number of fragments as a percentage of the total packets transmitted on this channel
+        unit: "%"
       - name: apChannelFrameReceiveErrorRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.7
+        description: Number of error packets as a percentage of the total packets received on this channel
+        unit: "%"
       - name: apBSSTxPackets
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.8
         metric_type: monotonic_count
+        description: Total packets transmitted by the ap on this BSSID
+        unit: "{packet}"
       - name: apBSSTxBytes
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.9
         metric_type: monotonic_count
+        description: Total bytes transmitted by the ap on this BSSID
+        unit: "By"
       - name: apBSSRxPackets
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.10
         metric_type: monotonic_count
+        description: Total packets received by the ap on this BSSID
+        unit: "{packet}"
       - name: apBSSRxBytes
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.11
         metric_type: monotonic_count
+        description: Total bytes received by the ap on this BSSID
+        unit: "By"
       - name: apBSSBwRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.12
+        description: Bandwidth rate in Kbps of the ap on this BSSID
+        unit: "kbit/s"
       - name: apBSSFrameRetryRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.13
+        description: Frame retry rate on this BSSID
+        unit: "%"
       - name: apBSSFrameLowSpeedRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.14
+        description: Frame low speed rate on this BSSID
+        unit: "%"
       - name: apBSSFrameNonUnicastRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.15
+        description: Frame non unicast packet rate on this BSSID
+        unit: "%"
       - name: apBSSFrameFragmentationRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.16
+        description: Frame fragmentation rate on this BSSID
+        unit: "%"
       - name: apBSSFrameReceiveErrorRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.17
+        description: Frame receive error rate on this BSSID
+        unit: "%"
     metric_tags:
       - symbol:
           name: apStatsChannel
@@ -173,34 +219,50 @@ metrics:
     symbol:
       name: wlsxNumOfUsers8021x
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.1.0
+      description: Number of 802.1x users
+      unit: "{user}"
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersVPN
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.2.0
+      description: Number of VPN users
+      unit: "{user}"
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersCP
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.3.0
+      description: Number of Captive Portal users
+      unit: "{user}"
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersMAC
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.4.0
+      description: Number of MAC users
+      unit: "{user}"
   - MIB: WLSX-USER-MIB
     symbol:
       name: wlsxNumOfUsersStateful8021x
       OID: 1.3.6.1.4.1.14823.2.2.1.4.1.4.5.0
+      description: Number of stateful 802.1x users
+      unit: "{user}"
   - MIB: WLSX-HA-MIB
     symbol:
       name: haActiveAPs
       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.1.0
+      description: Number of active APs
+      unit: "{access_point}"
   - MIB: WLSX-HA-MIB
     symbol:
       name: haStandbyAPs
       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.2.0
+      description: Number of standby APs
+      unit: "{access_point}"
   - MIB: WLSX-HA-MIB
     symbol:
       name: haTotalAPs
       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.2.1.3.0
+      description: Total number of APs
+      unit: "{access_point}"
   - MIB: WLSX-HA-MIB
     table:
       name: wlsxHighAvalabilityTunnelTable
@@ -208,12 +270,20 @@ metrics:
     symbols:
       - name: haActiveVapTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.1
+        description: Number of active per VAP GRE tunnels
+        unit: "{tunnel}"
       - name: haStandbyVapTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.2
+        description: Number of standby per VAP GRE tunnels
+        unit: "{tunnel}"
       - name: haTotalVapTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.3
+        description: Total number of per VAP GRE tunnels
+        unit: "{tunnel}"
       - name: haAPHbtTunnels
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.4
+        description: Number of AP hbt GRE tunnels
+        unit: "{tunnel}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.20.1.1.1.2
@@ -229,12 +299,20 @@ metrics:
     symbols:
       - name: wlanStaTransmitRate
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.10
+        description: Transmit rate with which the station is associated with this system
+        unit: "bit/s"
       - name: wlanStaRSSI
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.14
+        description: Signal to noise ratio for the station
+        unit: "dB"
       - name: wlanStaUpTime
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.15
+        description: Time since the station associated to the current BSSID
+        unit: "c/s"
       - name: wlanStaTransmitRateCode
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.17
+        description: Transmit rate code of the station
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: wlanStaPhyType
@@ -297,34 +375,17 @@ metrics:
     symbols:
       - name: wlanStaTxBytes64
         OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.25
+        description: Number of bytes transmitted by this station, 64-bit value
+        unit: "By"
       - name: wlanStaRxBytes64
         OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.26
+        description: Number of bytes received by this station, 64-bit value
+        unit: "By"
     metric_tags:
       - symbol:
           name: wlanStaChannelNum
           OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.1
         tag: wlan_sta_channel_num
-  # - MIB: WLSX-WLAN-MIB
-  #   table:
-  #     name: wlsxWlanESSIDStatsTable
-  #     OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1
-  #   symbols:
-  #     - name: wlanESSIDRxRate
-  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.8
-  #     - name: wlanESSIDTxRate
-  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.9
-  #     - name: wlanESSIDWiredRxBytes
-  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.11
-  #     - name: wlanESSIDWiredTxBytes
-  #       OID: 1.3.6.1.4.1.14823.2.2.1.5.3.3.1.1.12
-  #   metric_tags:
-  #     - symbol:
-  #         OID:
-  #         name:
-  #       table:
-  #       tag:
-  # The index wlanESSID is not accessible
-  # TODO: Requires feature to convert full index into a metric tag
 metric_tags:
   - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.27.0
     symbol: wlsxSysExtHwVersion

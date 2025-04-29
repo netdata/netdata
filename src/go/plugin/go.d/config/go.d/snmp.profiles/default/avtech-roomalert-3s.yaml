@@ -12,38 +12,56 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.1.1.1.0
       name: roomalert.3s.internal_tempf
+    description: Internal temperature in degrees Fahrenheit
+    unit: "degF"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.1.1.2.0
       name: roomalert.3s.internal_tempc
+    description: Internal temperature in degrees Celsius
+    unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.1.0
       name: roomalert.3s.digital_sen1_1
+    description: Digital sensor 1 state 1
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.2.0
       name: roomalert.3s.digital_sen1_2
+    description: Digital sensor 1 state 2
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.3.0
       name: roomalert.3s.digital_sen1_3
+    description: Digital sensor 1 state 3
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.4.0
       name: roomalert.3s.digital_sen1_4
+    description: Digital sensor 1 state 4
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.5.0
       name: roomalert.3s.digital_sen1_5
+    description: Digital sensor 1 state 5
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.6.0
       name: roomalert.3s.digital_sen1_6
+    description: Digital sensor 1 state 6
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.7.0
       name: roomalert.3s.digital_sen1_7
+    description: Digital sensor 1 state 7
+    unit: "TBD"
 #  - MIB: ROOMALERT3S-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.20916.1.13.1.3.1.0
@@ -57,31 +75,47 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.1.0
       name: roomalert.3s.externalrelay1_element_one
+    description: External relay 1 element one state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.2.0
       name: roomalert.3s.externalrelay1_element_two
+    description: External relay 1 element two state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.3.0
       name: roomalert.3s.externalrelay1_element_three
+    description: External relay 1 element three state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.4.0
       name: roomalert.3s.externalrelay1_element_four
+    description: External relay 1 element four state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.5.0
       name: roomalert.3s.externalrelay1_element_five
+    description: External relay 1 element five state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.6.0
       name: roomalert.3s.externalrelay1_element_six
+    description: External relay 1 element six state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.7.0
       name: roomalert.3s.externalrelay1_element_seven
+    description: External relay 1 element seven state
+    unit: "TBD"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.3.1.8.0
       name: roomalert.3s.externalrelay1_element_eight
+    description: External relay 1 element eight state
+    unit: "TBD"
