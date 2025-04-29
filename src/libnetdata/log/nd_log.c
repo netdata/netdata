@@ -480,12 +480,14 @@ static void recursive_fatal_abort(void) {
     _exit(1);
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
 NEVER_INLINE NORETURN
 static void fatal_abort_internal_checks(void) {
     // keep this as a separate function, to have it logged like this in sentry
     abort();
     _exit(1);
 }
+#endif
 
 NEVER_INLINE
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {

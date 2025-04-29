@@ -108,7 +108,7 @@ ALWAYS_INLINE void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priorit
         
         // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
         if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
-            spinlock_deadlock_detect(&deadlock_timestamp);
+            spinlock_deadlock_detect(&deadlock_timestamp, "waitq", func);
         }
         
         microsleep(usec);

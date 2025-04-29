@@ -6,7 +6,7 @@
 
 // ----------------------------------------------------------------------------
 // Deadlock detection function
-void spinlock_deadlock_detect(usec_t *timestamp) {
+void spinlock_deadlock_detect(usec_t *timestamp, const char *type, const char *func) {
     if (!*timestamp) {
         // First time checking - initialize the timestamp
         *timestamp = now_monotonic_high_precision_usec();
@@ -17,8 +17,8 @@ void spinlock_deadlock_detect(usec_t *timestamp) {
     usec_t now = now_monotonic_high_precision_usec();
     if (now - *timestamp >= SPINLOCK_DEADLOCK_TIMEOUT_SEC * USEC_PER_SEC) {
         // We've been spinning for too long - likely deadlock
-        fatal("DEADLOCK DETECTED: spinlock could not be acquired for %d seconds", 
-              SPINLOCK_DEADLOCK_TIMEOUT_SEC);
+        fatal("DEADLOCK DETECTED: %s in function '%s' could not be acquired for %"PRIi64" seconds",
+              type, func, (int64_t)((now - *timestamp) / USEC_PER_SEC));
     }
 }
 
@@ -49,7 +49,7 @@ ALWAYS_INLINE void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func
         
         // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
         if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
-            spinlock_deadlock_detect(&deadlock_timestamp);
+            spinlock_deadlock_detect(&deadlock_timestamp, "spinlock", func);
         }
         
         microsleep(usec);
