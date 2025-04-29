@@ -39,7 +39,7 @@ typedef struct netdata_spinlock
 #define SPINS_BEFORE_DEADLOCK_CHECK 20000 // Check for deadlock every 20000 spins (approx. once per second)
 
 // Helper function to detect deadlocks
-void spinlock_deadlock_detect(usec_t *timestamp);
+void spinlock_deadlock_detect(usec_t *timestamp, const char *type, const char *func);
 
 void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func);
 #define spinlock_init(spinlock) spinlock_init_with_trace(spinlock, __FUNCTION__)

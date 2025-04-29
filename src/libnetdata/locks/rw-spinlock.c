@@ -56,7 +56,7 @@ ALWAYS_INLINE void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, co
         
         // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
         if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
-            spinlock_deadlock_detect(&deadlock_timestamp);
+            spinlock_deadlock_detect(&deadlock_timestamp, "rw-spinlock read lock", func);
         }
         
         microsleep(usec);
@@ -122,7 +122,7 @@ ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, c
         
         // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
         if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
-            spinlock_deadlock_detect(&deadlock_timestamp);
+            spinlock_deadlock_detect(&deadlock_timestamp, "rw-spinlock write lock", func);
         }
         
         microsleep(usec);

@@ -376,9 +376,9 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
             else dictionaries_waiting_to_be_destroyed = next;
         }
         else {
-            size_t ref_items = dictionary_referenced_items(dict);
-            
 #ifdef FSANITIZE_ADDRESS
+            size_t ref_items = dictionary_referenced_items(dict);
+
             // Track this dictionary for deduplication reporting
             if (shutdown) {
                 // Process all stacktraces from this dictionary
