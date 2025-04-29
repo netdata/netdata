@@ -46,7 +46,6 @@ ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
 static DAEMON_STATUS_FILE last_session_status = {
     .v = 0,
-    .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
     },
@@ -54,7 +53,6 @@ static DAEMON_STATUS_FILE last_session_status = {
 
 static DAEMON_STATUS_FILE session_status = {
     .v = STATUS_FILE_VERSION,
-    .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
     },
@@ -721,7 +719,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
     dsf_acquire(session_status);
-    spinlock_lock(&session_status.spinlock);
 
 #if defined(OS_LINUX)
     session_status.os_type = DAEMON_OS_TYPE_LINUX;
@@ -839,7 +836,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         simple_pattern_free(sqlite_pattern);
     }
 
-    spinlock_unlock(&session_status.spinlock);
     dsf_release(session_status);
 }
 
