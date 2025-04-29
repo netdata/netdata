@@ -258,7 +258,6 @@ int netdata_main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     bool close_open_fds = true; (void)close_open_fds;
-    size_t default_stacksize;
     const char *user = NULL;
 
 #ifdef OS_WINDOWS
@@ -833,18 +832,6 @@ int netdata_main(int argc, char **argv) {
     nd_profile_setup();
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("stack size");
-
-    // initialize thread - this is required before the first nd_thread_create()
-    default_stacksize = netdata_threads_init();
-
-    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-    if (default_stacksize < 1 * 1024 * 1024)
-        default_stacksize = 1 * 1024 * 1024;
-
-    netdata_threads_set_stack_size(default_stacksize);
-
-    // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("crash reports");
 
     daemon_status_file_check_crash();
@@ -1021,8 +1008,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("threads after fork");
 
-    netdata_threads_set_stack_size(
-        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    netdata_conf_reset_stack_size();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("registry");
@@ -1146,7 +1132,9 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("mrg cleanup");
 
+#ifdef ENABLE_DBENGINE
     mrg_metric_prepopulate_cleanup(main_mrg);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");

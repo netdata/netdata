@@ -962,7 +962,7 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
 
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
-    st = rrdset_find(host, chart);
+    st = rrdset_find(host, chart, false);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);

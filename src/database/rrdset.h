@@ -76,6 +76,8 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 #define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) \
     && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
 
+#define rrdset_is_discoverable(st) (rrdset_is_replicating(st) || !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+
 // --------------------------------------------------------------------------------------------------------------------
 
 struct rrdset {
@@ -111,9 +113,11 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // operational state members
 
-    RRDSET_FLAGS flags;                             // flags
     RRD_DB_MODE rrd_memory_mode;                    // the db mode of this rrdset
     uint16_t collection_modulo;                     // tier1/2 spread over time
+    RRDSET_FLAGS flags;                             // flags
+
+    pid_t collector_tid;
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
@@ -223,6 +227,8 @@ struct rrdset {
         time_t before;
     } replay;
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
+
+    SPINLOCK destroy_lock;
 };
 
 // --------------------------------------------------------------------------------------------------------------------

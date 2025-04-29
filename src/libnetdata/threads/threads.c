@@ -9,6 +9,12 @@
 
 typedef void (*nd_thread_canceller)(void *data);
 
+typedef enum __attribute__((packed)) {
+    ND_THREAD_LIST_NONE = 0,
+    ND_THREAD_LIST_RUNNING,
+    ND_THREAD_LIST_EXITED,
+} ND_THREAD_LIST;
+
 struct nd_thread {
     void *arg;
     pid_t tid;
@@ -36,6 +42,7 @@ struct nd_thread {
         void *data;
     } canceller;
 
+    ND_THREAD_LIST list;
     struct nd_thread *prev, *next;
 };
 
@@ -262,8 +269,10 @@ static void nd_thread_join_exited_detached_threads(void) {
         while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
             nti = nti->next;
 
-        if(nti)
+        if(nti) {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
 
         spinlock_unlock(&threads_globals.exited.spinlock);
 
@@ -276,8 +285,7 @@ static void nd_thread_join_exited_detached_threads(void) {
     }
 }
 
-static void nd_thread_exit(void *pptr) {
-    ND_THREAD *nti = CLEANUP_FUNCTION_GET_PTR(pptr);
+static void nd_thread_exit(ND_THREAD *nti) {
 
     if(nti != _nd_thread_info || !nti || !_nd_thread_info) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -328,12 +336,16 @@ static void nd_thread_exit(void *pptr) {
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 
     spinlock_lock(&threads_globals.running.spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+    if(nti->list == ND_THREAD_LIST_RUNNING) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_NONE;
+    }
     spinlock_unlock(&threads_globals.running.spinlock);
 
     if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
         spinlock_lock(&threads_globals.exited.spinlock);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_EXITED;
         spinlock_unlock(&threads_globals.exited.spinlock);
     }
 }
@@ -354,13 +366,17 @@ static void *nd_thread_starting_point(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
-    CLEANUP_FUNCTION_REGISTER(nd_thread_exit) cleanup_ptr = nti;
-
     signals_block_all_except_deadly();
+
+    spinlock_lock(&threads_globals.running.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+    nti->list = ND_THREAD_LIST_RUNNING;
+    spinlock_unlock(&threads_globals.running.spinlock);
 
     // run the thread code
     nti->ret = nti->start_routine(nti->arg);
 
+    nd_thread_exit(nti);
     return nti;
 }
 
@@ -382,19 +398,12 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     nti->options = options & NETDATA_THREAD_OPTIONS_ALL;
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
 
-    spinlock_lock(&threads_globals.running.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
-    spinlock_unlock(&threads_globals.running.spinlock);
-
     int ret = pthread_create(&nti->thread, &threads_globals.attr, nd_thread_starting_point, nti);
     if(ret != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "failed to create new thread for %s. pthread_create() failed with code %d",
                tag, ret);
 
-        spinlock_lock(&threads_globals.running.spinlock);
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
-        spinlock_unlock(&threads_globals.running.spinlock);
         freez(nti);
         return NULL;
     }
@@ -440,16 +449,29 @@ int nd_thread_join(ND_THREAD *nti) {
 
     int ret = pthread_join(nti->thread, NULL);
     if(ret != 0) {
+        // we can't join the thread
+
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "cannot join thread. pthread_join() failed with code %d. (tag=%s)",
                ret, nti->tag);
     }
     else {
+        // we successfully joined the thread
+
         nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
 
+        spinlock_lock(&threads_globals.running.spinlock);
+        if(nti->list == ND_THREAD_LIST_RUNNING) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
+        spinlock_unlock(&threads_globals.running.spinlock);
+
         spinlock_lock(&threads_globals.exited.spinlock);
-        if(nti->prev)
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        if(nti->list == ND_THREAD_LIST_EXITED) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
         freez(nti);

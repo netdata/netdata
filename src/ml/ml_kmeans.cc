@@ -4,6 +4,14 @@
 #include "libnetdata/libnetdata.h"
 #include <dlib/clustering.h>
 
+// gcc with libstdc++ may require this,
+// but with libc++ it does not work correctly.
+#if !defined(_LIBCPP_VERSION)
+#include <cmath>
+using std::isinf;
+using std::isnan;
+#endif
+
 void
 ml_kmeans_init(ml_kmeans_t *kmeans)
 {

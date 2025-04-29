@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 
 inline const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -95,6 +95,9 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
     // update the count of contexts
     __atomic_sub_fetch(&rc->rrdhost->rrdctx.contexts_count, 1, __ATOMIC_RELAXED);
+
+    rrdcontext_del_from_hub_queue(rc, false);
+    rrdcontext_del_from_pp_queue(rc, false);
 
     rrdinstances_destroy_from_rrdcontext(rc);
     rrdcontext_freez(rc);
@@ -229,64 +232,6 @@ void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function) {
         rrdcontext_queue_for_post_processing(rc, function, rc->flags);
 }
 
-static void rrdcontext_hub_queue_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
-    RRDCONTEXT *rc = context;
-    rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_HUB);
-    rc->queue.queued_ut = now_realtime_usec();
-    rc->queue.queued_flags = rrd_flags_get(rc);
-}
-
-static void rrdcontext_hub_queue_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
-    RRDCONTEXT *rc = context;
-    rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_HUB);
-}
-
-static bool rrdcontext_hub_queue_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *new_context __maybe_unused, void *nothing __maybe_unused) {
-    // context and new_context are the same
-    // we just need to update the timings
-    RRDCONTEXT *rc = context;
-    rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_HUB);
-    rc->queue.queued_ut = now_realtime_usec();
-    rc->queue.queued_flags |= rrd_flags_get(rc);
-
-    return true;
-}
-
-static void rrdcontext_post_processing_queue_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
-    RRDCONTEXT *rc = context;
-    rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_PP);
-    rc->pp.queued_flags = rc->flags;
-    rc->pp.queued_ut = now_realtime_usec();
-}
-
-static void rrdcontext_post_processing_queue_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
-    RRDCONTEXT *rc = context;
-
-    // IMPORTANT:
-    // Do not rely on this flag being absent, because the dictionaries have delayed deletions (garbage collect)
-    // so, this flag may not be deleted immediately from the context.
-    rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_PP);
-    rc->pp.dequeued_ut = now_realtime_usec();
-}
-
-static bool rrdcontext_post_processing_queue_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *new_context __maybe_unused, void *nothing __maybe_unused) {
-    RRDCONTEXT *rc = context;
-    bool changed = false;
-
-    if(!(rc->flags & RRD_FLAG_QUEUED_FOR_PP)) {
-        rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_PP);
-        changed = true;
-    }
-
-    if(rc->pp.queued_flags != rc->flags) {
-        rc->pp.queued_flags |= rc->flags;
-        changed = true;
-    }
-
-    return changed;
-}
-
-
 void rrdhost_create_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(likely(host->rrdctx.contexts)) return;
@@ -300,49 +245,22 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
     dictionary_register_conflict_callback(host->rrdctx.contexts, rrdcontext_conflict_callback, host);
     dictionary_register_react_callback(host->rrdctx.contexts, rrdcontext_react_callback, host);
 
-    host->rrdctx.hub_queue = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
-    dictionary_register_insert_callback(host->rrdctx.hub_queue, rrdcontext_hub_queue_insert_callback, NULL);
-    dictionary_register_delete_callback(host->rrdctx.hub_queue, rrdcontext_hub_queue_delete_callback, NULL);
-    dictionary_register_conflict_callback(host->rrdctx.hub_queue, rrdcontext_hub_queue_conflict_callback, NULL);
+    memset(&host->rrdctx.pp_queue, 0, sizeof(host->rrdctx.pp_queue));
+    RRDCONTEXT_QUEUE_INIT(&host->rrdctx.pp_queue);
+    spinlock_init(&host->rrdctx.pp_queue.spinlock);
 
-    host->rrdctx.pp_queue = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
-    dictionary_register_insert_callback(host->rrdctx.pp_queue, rrdcontext_post_processing_queue_insert_callback, NULL);
-    dictionary_register_delete_callback(host->rrdctx.pp_queue, rrdcontext_post_processing_queue_delete_callback, NULL);
-    dictionary_register_conflict_callback(host->rrdctx.pp_queue, rrdcontext_post_processing_queue_conflict_callback, NULL);
+    memset(&host->rrdctx.hub_queue, 0, sizeof(host->rrdctx.hub_queue));
+    RRDCONTEXT_QUEUE_INIT(&host->rrdctx.hub_queue);
+    spinlock_init(&host->rrdctx.hub_queue.spinlock);
 }
 
 void rrdhost_destroy_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(unlikely(!host->rrdctx.contexts)) return;
 
-    DICTIONARY *old;
-
-    if(host->rrdctx.hub_queue) {
-        old = host->rrdctx.hub_queue;
-        host->rrdctx.hub_queue = NULL;
-
-        RRDCONTEXT *rc;
-        dfe_start_write(old, rc) {
-                    dictionary_del(old, string2str(rc->id));
-                }
-        dfe_done(rc);
-        dictionary_destroy(old);
-    }
-
-    if(host->rrdctx.pp_queue) {
-        old = host->rrdctx.pp_queue;
-        host->rrdctx.pp_queue = NULL;
-
-        RRDCONTEXT *rc;
-        dfe_start_write(old, rc) {
-                    dictionary_del(old, string2str(rc->id));
-                }
-        dfe_done(rc);
-        dictionary_destroy(old);
-    }
-
-    old = host->rrdctx.contexts;
+    dictionary_destroy(host->rrdctx.contexts);
     host->rrdctx.contexts = NULL;
-    dictionary_destroy(old);
-}
 
+    RRDCONTEXT_QUEUE_FREE(&host->rrdctx.pp_queue, NULL, NULL);
+    RRDCONTEXT_QUEUE_FREE(&host->rrdctx.hub_queue, NULL, NULL);
+}

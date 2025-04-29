@@ -6,6 +6,8 @@
 #include "web/server/h2o/http_server.h"
 #include "stream-replication-sender.h"
 
+void svc_rrdhost_obsolete_all_charts(RRDHOST *host);
+
 // --------------------------------------------------------------------------------------------------------------------
 
 static void stream_receiver_connected_msg(RRDHOST *host, char *dst, size_t len) {
@@ -702,6 +704,9 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
+
+        // mark all charts as obsolete
+        svc_rrdhost_obsolete_all_charts(rpt->host);
 
         char msg[256];
         stream_receiver_connected_msg(rpt->host, msg, sizeof(msg));

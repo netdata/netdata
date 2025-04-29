@@ -149,7 +149,7 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
         struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
 
         if(prd->rd != rd) {
-            prd->rda = rrddim_find_and_acquire(st, string2str(rd->id));
+            prd->rda = rrddim_find_and_acquire(st, string2str(rd->id), true);
             prd->rd = rrddim_acquired_to_rrddim(prd->rda);
             prd->id = string2str(prd->rd->id);
         }
@@ -235,7 +235,7 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
 
     // we need to find the dimension and set it to prd
 
-    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension, true);
     if (unlikely(!rda)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s but dimension does not exist.",
                           rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
@@ -257,7 +257,7 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
         return NULL;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
+    RRDSET *st = rrdset_find(host, chart, true);
     if (unlikely(!st))
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s but chart does not exist.",
                           rrdhost_hostname(host), chart, cmd);

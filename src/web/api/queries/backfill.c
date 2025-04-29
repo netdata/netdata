@@ -52,7 +52,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
         struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
         br->data = *data;
         br->host_state_id = object_state_id(&st->rrdhost->state_id);
-        br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
+        br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id), true);
         if(br->rsa) {
             br->cb = cb;
 

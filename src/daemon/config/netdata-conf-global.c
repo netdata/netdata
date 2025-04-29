@@ -75,8 +75,50 @@ void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_thre
 #endif
 }
 
+static size_t default_stacksize = 8ULL * 1024 * 1024; // default is 8MiB
+
+static void netdata_conf_stack_size(void) {
+    FUNCTION_RUN_ONCE();
+
+    // initialize thread - this is required before the first nd_thread_create()
+    default_stacksize = netdata_threads_init();
+
+    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+    if (default_stacksize < 1 * 1024 * 1024)
+        default_stacksize = 1 * 1024 * 1024;
+
+    netdata_threads_set_stack_size(
+        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+}
+
+void netdata_conf_reset_stack_size(void) {
+    netdata_threads_set_stack_size(default_stacksize);
+}
+
 void libuv_initialize(void) {
+    netdata_conf_stack_size();
+
+    // libuv worker threads need to limited by the amount of memory the system has,
+    // otherwise the system may refuse to create that many threads.
+
+    // our original target
     libuv_worker_threads = (int)netdata_conf_cpus() * 6;
+
+    OS_SYSTEM_MEMORY mem = os_system_memory(true);
+    if(OS_SYSTEM_MEMORY_OK(mem)) {
+        // we have memory information
+        uint64_t mem_for_threads1 = mem.ram_total_bytes / 20;
+        uint64_t mem_for_threads2 = mem.ram_available_bytes / 10;
+        uint64_t mem_for_threads = MIN(mem_for_threads1, mem_for_threads2);
+
+        int max_allowed_threads = (int)HOWMANY(mem_for_threads, default_stacksize);
+        if(max_allowed_threads < MIN_LIBUV_WORKER_THREADS)
+            max_allowed_threads = MIN_LIBUV_WORKER_THREADS;
+
+        if(libuv_worker_threads > max_allowed_threads)
+            libuv_worker_threads = max_allowed_threads;
+    }
+
     libuv_worker_threads = MIN(MAX_LIBUV_WORKER_THREADS, MAX(MIN_LIBUV_WORKER_THREADS, libuv_worker_threads));
 
     libuv_worker_threads = (int)inicfg_get_number_range(

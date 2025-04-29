@@ -128,7 +128,7 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
+    RRDSET *st = rrdset_find(host, chart, false);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");

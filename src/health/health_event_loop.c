@@ -271,16 +271,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         host->health.delay_up_to = 0;
     }
 
-    // wait until cleanup of obsolete charts on children is complete
-    if (host != localhost) {
-        if (unlikely(host->stream.rcv.status.check_obsolete)) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "[%s]: Waiting for chart obsoletion check.",
-                   rrdhost_hostname(host));
-            return;
-        }
-    }
-
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);

@@ -81,6 +81,7 @@ __attribute__((constructor)) void initialize_label_stats(void) {
 RRDLABELS *rrdlabels_create(void)
 {
     RRDLABELS *labels = callocz(1, sizeof(*labels));
+    spinlock_init(&labels->spinlock);
     RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS));
     return labels;
 }
@@ -178,7 +179,7 @@ void rrdlabels_flush(RRDLABELS *labels) {
     JudyAllocThreadPulseReset();
     JudyLFreeArray(&labels->JudyL, PJE0);
     int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, -(int64_t)sizeof(RRDLABELS));
+    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
     spinlock_unlock(&labels->spinlock);
 }
 
@@ -226,10 +227,14 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
     RRDLABEL_SRC new_ls = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
 
     JudyAllocThreadPulseReset();
+    int64_t judy_mem;
 
     Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t)new_label, PJE0);
     if (!PValue || PValue == PJERR)
         fatal("RRDLABELS: corrupted labels JudyL array");
+
+    judy_mem = JudyAllocThreadPulseGetAndReset();
+    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
     if(*PValue) {
         new_ls |= RRDLABEL_FLAG_OLD;
@@ -244,14 +249,16 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(labels, new_label, false);
         if (old_label_with_same_key) {
             (void) JudyLDel(&labels->JudyL, (Word_t) old_label_with_same_key, PJE0);
+            judy_mem = JudyAllocThreadPulseGetAndReset();
+            RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             delete_label(old_label_with_same_key);
         }
     }
 
     labels->version++;
 
-    int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
+//    judy_mem = JudyAllocThreadPulseGetAndReset();
+//    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
     spinlock_unlock(&labels->spinlock);
 }
@@ -655,7 +662,9 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             dst->version++;
             update_statistics = true;
             if (old_label_with_key) {
+                int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
                 (void)JudyLDel(&dst->JudyL, (Word_t)old_label_with_key, PJE0);
+                RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
                 delete_label((RRDLABEL *)old_label_with_key);
             }
         }

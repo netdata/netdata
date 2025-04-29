@@ -93,8 +93,8 @@ static size_t report_allocated_dictionaries(void) {
                     Pvoid_t PDictList;
                     PDictList = JudyLGet(stacktrace_dictionaries, st_key, PJE0);
                     if (!PDictList) {
-                        // Create a new array (starting with size 16)
-                        DICTIONARY **dict_list = (DICTIONARY **)calloc(16, sizeof(DICTIONARY*));
+                        // Create a new array (starting with size 1024)
+                        DICTIONARY **dict_list = (DICTIONARY **)callocz(1024, sizeof(DICTIONARY*));
                         if (dict_list) {
                             dict_list[0] = dict;
                             JudyLIns(&stacktrace_dictionaries, st_key, PJE0);
@@ -110,7 +110,7 @@ static size_t report_allocated_dictionaries(void) {
                         size_t i = 0;
                         
                         // Check if dictionary is already in this list
-                        while (dict_list[i] && i < 1024) {
+                        while (i < 1024 && dict_list[i]) {
                             if (dict_list[i] == dict) {
                                 already_added = true;
                                 break;
@@ -147,7 +147,7 @@ static size_t report_allocated_dictionaries(void) {
         }
         
         if (num_stacktraces > 0) {
-            StacktraceInfo *stacktraces = (StacktraceInfo *)calloc(num_stacktraces, sizeof(StacktraceInfo));
+            StacktraceInfo *stacktraces = (StacktraceInfo *)callocz(num_stacktraces, sizeof(StacktraceInfo));
             if (stacktraces) {
                 // Fill array
                 Word_t i = 0;
@@ -199,14 +199,14 @@ static size_t report_allocated_dictionaries(void) {
                     }
                 }
                 
-                free(stacktraces);
+                freez(stacktraces);
             }
             
             // Clean up
             index = 0;
             PValue = JudyLFirst(stacktrace_dictionaries, &index, PJE0);
             while (PValue != NULL) {
-                free(*(void**)PValue);
+                freez(*(void**)PValue);
                 PValue = JudyLNext(stacktrace_dictionaries, &index, PJE0);
             }
             

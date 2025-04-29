@@ -6,7 +6,7 @@
 
 #include "schema_wrapper_utils.h"
 
-#include "context.h"
+#include "rrdcontext-context.h"
 
 using namespace context::v1;
 

@@ -32,7 +32,6 @@ typedef enum {
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
 
 typedef struct daemon_status_file {
-    SPINLOCK spinlock;
     uint32_t v;                 // the version of the status file
 
     char version[32];           // the netdata version

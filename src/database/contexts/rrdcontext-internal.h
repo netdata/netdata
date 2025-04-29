@@ -5,7 +5,7 @@
 
 #include "rrdcontext.h"
 #include "../sqlite/sqlite_context.h"
-#include "../../aclk/schema-wrappers/context.h"
+#include "../../aclk/schema-wrappers/rrdcontext-context.h"
 #include "../../aclk/aclk_contexts_api.h"
 #include "../../aclk/aclk.h"
 #include "../storage-engine.h"
@@ -279,6 +279,7 @@ typedef struct rrdcontext {
     RRDHOST *rrdhost;
 
     struct {
+        Word_t idx;
         RRD_FLAGS queued_flags;         // the last flags that triggered the post-processing
         size_t executions;              // how many times this context has been processed
         usec_t queued_ut;               // the last time this was queued
@@ -286,6 +287,7 @@ typedef struct rrdcontext {
     } pp;
 
     struct {
+        Word_t idx;
         RRD_FLAGS queued_flags;         // the last flags that triggered the queueing
         size_t dispatches;              // the number of times this has been dispatched to hub
         usec_t queued_ut;               // the last time this was queued
@@ -294,6 +296,11 @@ typedef struct rrdcontext {
         usec_t dequeued_ut;             // the last time we sent (or deduplicated) this context
     } queue;
 } RRDCONTEXT;
+
+void rrdcontext_add_to_pp_queue(RRDCONTEXT *rc);
+void rrdcontext_add_to_hub_queue(RRDCONTEXT *rc);
+void rrdcontext_del_from_hub_queue(RRDCONTEXT *rc, bool having_lock);
+void rrdcontext_del_from_pp_queue(RRDCONTEXT *rc, bool having_lock);
 
 // ----------------------------------------------------------------------------
 // helpers for counting collected metrics, instances and contexts
@@ -483,5 +490,16 @@ void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
 
 RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
+
+bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reason, bool worker_jobs);
+void rrdcontext_post_process_queued_contexts(RRDHOST *host);
+void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut);
+usec_t rrdcontext_calculate_queued_dispatch_time_ut(RRDCONTEXT *rc, usec_t now_ut);
+bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending);
+bool rrdcontext_should_be_deleted(RRDCONTEXT *rc);
+void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc);
+static inline void rrdcontext_dequeue_from_post_processing(RRDCONTEXT *rc) {
+    rrdcontext_del_from_pp_queue(rc, false);
+}
 
 #endif //NETDATA_RRDCONTEXT_INTERNAL_H
