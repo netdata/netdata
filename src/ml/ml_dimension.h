@@ -83,11 +83,11 @@ public:
         if (AcqRH) {
             RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
             if (RH && !rrdhost_flag_check(RH, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_ARCHIVED)) {
-                AcqRS = rrdset_find_and_acquire(RH, DLI.chartId());
+                AcqRS = rrdset_find_and_acquire(RH, DLI.chartId(), false);
                 if (AcqRS) {
                     RRDSET *RS = rrdset_acquired_to_rrdset(AcqRS);
                     if (RS && !rrdset_flag_check(RS, RRDSET_FLAG_OBSOLETE)) {
-                        AcqRD = rrddim_find_and_acquire(RS, DLI.dimensionId());
+                        AcqRD = rrddim_find_and_acquire(RS, DLI.dimensionId(), false);
                         if (AcqRD) {
                             RRDDIM *RD = rrddim_acquired_to_rrddim(AcqRD);
                             if (RD) {

@@ -31,7 +31,7 @@ int api_v1_single_chart_helper(RRDHOST *host, struct web_client *w, char *url, v
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart);
+    RRDSET *st = rrdset_find(host, chart, false);
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");

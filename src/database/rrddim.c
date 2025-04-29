@@ -331,12 +331,12 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDDIM - find a dimension
 
-inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
+inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDDIM *rd = rrddim_index_find(st, id);
     if(rd) {
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
+        if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
             return NULL;
 
         rd->rrdset->last_accessed_time_s = now_realtime_sec();
@@ -345,13 +345,13 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
     return rd;
 }
 
-inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id) {
+inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_find_and_acquire() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDDIM_ACQUIRED *rda = (RRDDIM_ACQUIRED *)dictionary_get_and_acquire_item(st->rrddim_root_index, id);
     if(rda) {
-        RRDDIM *rd = (RRDDIM *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)rda);
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st)) {
+        RRDDIM *rd = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rda);
+        if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st)) {
             dictionary_acquired_item_release(st->rrddim_root_index, (const DICTIONARY_ITEM *)rda);
             return NULL;
         }
@@ -375,11 +375,6 @@ void rrddim_acquired_release(RRDDIM_ACQUIRED *rda) {
 
     RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     dictionary_acquired_item_release(rd->rrdset->rrddim_root_index, (const DICTIONARY_ITEM *)rda);
-}
-
-// This will not return dimensions that are archived
-RRDDIM *rrddim_find_active(RRDSET *st, const char *id) {
-    return rrddim_find(st, id);
 }
 
 // ----------------------------------------------------------------------------
@@ -550,7 +545,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     RRDHOST *host = st->rrdhost;
 
-    RRDDIM *rd = rrddim_find(st, id);
+    RRDDIM *rd = rrddim_find(st, id, true);
     if(unlikely(!rd)) {
         netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;
@@ -570,7 +565,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
-    RRDDIM *rd = rrddim_find(st, id);
+    RRDDIM *rd = rrddim_find(st, id, true);
     if(unlikely(!rd)) {
         netdata_log_error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, rrdset_name(st), rrdset_id(st), rrdhost_hostname(host));
         return 1;

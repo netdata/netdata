@@ -333,12 +333,12 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
     return dictionary_get(host->rrdset_root_index, id);
 }
 
-RRDSET *rrdset_find(RRDHOST *host, const char *id) {
+RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
     RRDSET *st = rrdset_index_find(host, id);
 
     if(st) {
-        if(!rrdset_is_discoverable(st))
+        if(!include_obsolete && !rrdset_is_discoverable(st))
             return NULL;
 
         st->last_accessed_time_s = now_realtime_sec();
@@ -347,7 +347,7 @@ RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     return(st);
 }
 
-RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id) {
+RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, rrdhost_hostname(host));
 
     char buf[RRD_ID_LENGTH_MAX + 1];
@@ -356,17 +356,17 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id) {
     int len = (int) strlen(buf);
     strncpyz(&buf[len], id, (size_t) (RRD_ID_LENGTH_MAX - len));
 
-    return(rrdset_find(host, buf));
+    return rrdset_find(host, buf, include_obsolete);
 }
 
-RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id) {
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
 
     RRDSET_ACQUIRED *sta = (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
     if(sta) {
-        RRDSET *st = (RRDSET *) dictionary_acquired_item_value((const DICTIONARY_ITEM *)sta);
+        RRDSET *st = dictionary_acquired_item_value((const DICTIONARY_ITEM *)sta);
         if(st) {
-            if(!rrdset_is_discoverable(st)) {
+            if(!include_obsolete && !rrdset_is_discoverable(st)) {
                 dictionary_acquired_item_release(host->rrdset_root_index, (const DICTIONARY_ITEM *)sta);
                 return NULL;
             }
