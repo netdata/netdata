@@ -1751,8 +1751,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: benefit
-            - name: mssql.instance_locks_deadlocks
-              description: Lock requests that resulted in deadlock
+            - name: mssql.instance_resource_deadlocks
+              description: Active lock requests that resulted in deadlock per resource
               unit: deadlocks/s
               chart_type: line
               dimensions:
@@ -1770,8 +1770,8 @@ modules:
                 - name: rid
                 - name: row_group
                 - name: xact
-            - name: mssql.instance_locks_lock_wait
-              description: Lock requests that required the caller to wait
+            - name: mssql.instance_resource_lock_wait
+              description: Active lock requests that required the caller to wait
               unit: locks/s
               chart_type: line
               dimensions:
@@ -1821,6 +1821,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: write
+            - name: mssql.database_lockwait
+              description: Lock requests that required the caller to wait.
+              unit: locks/s
+              chart_type: line
+              dimensions:
+                - name: lock
+            - name: mssql.database_deadlocks
+              description: Lock requests that resulted in deadlock.
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: deadlock
             - name: mssql.database_backup_restore_operations
               description: Backup IO per database
               unit: operations/s

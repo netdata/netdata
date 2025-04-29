@@ -161,6 +161,8 @@ struct mssql_db_instance {
     RRDSET *st_db_log_flushes;
     RRDSET *st_db_transactions;
     RRDSET *st_db_write_transactions;
+    RRDSET *st_db_lockwait;
+    RRDSET *st_db_deadlock;
 
     RRDDIM *rd_db_data_file_size;
     RRDDIM *rd_db_active_transactions;
@@ -169,6 +171,8 @@ struct mssql_db_instance {
     RRDDIM *rd_db_log_flushes;
     RRDDIM *rd_db_transactions;
     RRDDIM *rd_db_write_transactions;
+    RRDDIM *rd_db_lockwait;
+    RRDDIM *rd_db_deadlock;
 
     COUNTER_DATA MSSQLDatabaseActiveTransactions;
     COUNTER_DATA MSSQLDatabaseBackupRestoreOperations;
@@ -1267,15 +1271,15 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, int update_every)
     if (!mi->st_lockWait) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_lock_wait", mi->instanceID);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_lock_wait", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_lockWait = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
             "locks",
-            "mssql.instance_locks_lock_wait",
-            "Lock requests that required the caller to wait.",
+            "mssql.instance_resource_lock_wait",
+            "Lock requests that required the caller to wait per resource.",
             "locks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
@@ -1304,19 +1308,19 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
     if (!mi->st_deadLocks) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_deadlocks", mi->instanceID);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_deadlocks", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_deadLocks = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
             "locks",
-            "mssql.instance_locks_deadlocks",
-            "Lock requests that resulted in deadlock.",
+            "mssql.instance_resource_deadlocks",
+            "Active lock requests that resulted in deadlock per resource.",
             "deadlocks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
-            PRIO_MSSQL_LOCKS_DEADLOCK,
+            PRIO_MSSQL_LOCKS_DEADLOCK_PER_RESOURCE,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1584,6 +1588,86 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
     rrdset_done(mli->st_db_write_transactions);
 }
 
+static void mssql_lockwait_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+        return;
+
+    char id[RRD_ID_LENGTH_MAX + 1];
+
+    if (!mli->st_db_lockwait) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lockwait", db, mli->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mli->st_db_lockwait = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.database_lockwait",
+            "Lock requests that required the caller to wait.",
+            "locks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_DATABASE_LOCKWAIT_PER_SECOND,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(
+            mli->st_db_lockwait->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mli->st_db_lockwait->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mli->rd_db_lockwait =
+            rrddim_add(mli->st_db_lockwait, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        mli->st_db_lockwait,
+        mli->rd_db_lockwait,
+        (collected_number)mli->MSSQLDatabaseLockWaitSec.current.Data);
+
+    rrdset_done(mli->st_db_lockwait);
+}
+
+static void mssql_deadlock_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+        return;
+
+    char id[RRD_ID_LENGTH_MAX + 1];
+
+    if (!mli->st_db_deadlock) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_deadlocks", db, mli->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mli->st_db_deadlock = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.database_deadlocks",
+            "Lock requests that resulted in deadlock.",
+            "deadlocks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(
+            mli->st_db_deadlock->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mli->st_db_deadlock->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mli->rd_db_deadlock =
+            rrddim_add(mli->st_db_deadlock, "deadlock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        mli->st_db_deadlock,
+        mli->rd_db_deadlock,
+        (collected_number)mli->MSSQLDatabaseDeadLockSec.current.Data);
+
+    rrdset_done(mli->st_db_deadlock);
+}
+
 static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
     if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
@@ -1680,6 +1764,8 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
         mssql_database_log_flushes_chart,
         mssql_active_transactions_chart,
         mssql_write_transactions_chart,
+        mssql_lockwait_chart,
+        mssql_deadlock_chart,
 
         // Last function pointer must be NULL
         NULL};
