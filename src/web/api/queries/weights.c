@@ -1298,9 +1298,14 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     for(size_t tr = 0; tr < nd_profile.storage_tiers; tr++)
         stats->db_points_per_tier[tr] += r->internal.qt->db.tiers[tr].points;
 
+    if(!r->d || !r->internal.qt->query.used) {
+        // the result is empty - no data to query for this metric
+        goto cleanup;
+    }
+    
     if(r->d != 1 || r->internal.qt->query.used != 1) {
         netdata_log_error("WEIGHTS: on query '%s' expected 1 dimension in RRDR but got %zu r->d and %zu qt->query.used",
-              r->internal.qt->id, r->d, (size_t)r->internal.qt->query.used);
+                          r->internal.qt->id, r->d, (size_t)r->internal.qt->query.used);
         goto cleanup;
     }
 
