@@ -1500,6 +1500,7 @@ int eval_unittest(void) {
         return 1;
     } else {
         printf("SUCCESS: All %d runs passed\n", total_runs);
-        return 0;
+        
+        return eval_hardcode_unittest();
     }
 }

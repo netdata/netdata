@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- added more annotations in spinlock deadlock detection [\#20207](https://github.com/netdata/netdata/pull/20207) ([ktsaou](https://github.com/ktsaou))
+- call spinlock\_init\(\) when initializing rrdlabels spinlock [\#20206](https://github.com/netdata/netdata/pull/20206) ([ktsaou](https://github.com/ktsaou))
+- remove the status file spinlock to avoid deadlocks [\#20205](https://github.com/netdata/netdata/pull/20205) ([ktsaou](https://github.com/ktsaou))
+- Avoid indexing journal files when db rotation is running [\#20204](https://github.com/netdata/netdata/pull/20204) ([stelfrag](https://github.com/stelfrag))
+- rrd metadata search fix [\#20203](https://github.com/netdata/netdata/pull/20203) ([ktsaou](https://github.com/ktsaou))
+- Use one spinlock to access v2 and mmap related data [\#20202](https://github.com/netdata/netdata/pull/20202) ([stelfrag](https://github.com/stelfrag))
 - Add a default busy timeout [\#20201](https://github.com/netdata/netdata/pull/20201) ([stelfrag](https://github.com/stelfrag))
 - rrd metadata needs to be discoverable while replication is running [\#20200](https://github.com/netdata/netdata/pull/20200) ([ktsaou](https://github.com/ktsaou))
 - add fast path to waitq [\#20198](https://github.com/netdata/netdata/pull/20198) ([ktsaou](https://github.com/ktsaou))
@@ -465,12 +471,6 @@
 - chore\(go.d/sensors\): disable by default [\#19667](https://github.com/netdata/netdata/pull/19667) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d dyncfg\): add user to source [\#19666](https://github.com/netdata/netdata/pull/19666) ([ilyam8](https://github.com/ilyam8))
 - add k8s\_state\_deployment\_condition\_available alert [\#19664](https://github.com/netdata/netdata/pull/19664) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#19663](https://github.com/netdata/netdata/pull/19663) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/k8sstate\): add deployment conditions [\#19662](https://github.com/netdata/netdata/pull/19662) ([ilyam8](https://github.com/ilyam8))
-- avoid dbengine event loop starvation by running uv\_run periodically [\#19661](https://github.com/netdata/netdata/pull/19661) ([ktsaou](https://github.com/ktsaou))
-- speed up aral when a single item is allocated and freed repeateadly [\#19660](https://github.com/netdata/netdata/pull/19660) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19658](https://github.com/netdata/netdata/pull/19658) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/k8sstate\): collect deployments [\#19657](https://github.com/netdata/netdata/pull/19657) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 

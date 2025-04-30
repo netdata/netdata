@@ -1673,18 +1673,9 @@ NOT_INLINE_HOT void pdc_route_synchronously_first(struct rrdengine_instance *ctx
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_asynchronously);
 }
 
-#define MAX_RETRIES_TO_START_INDEX (100)
 static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT);
-
-    while (__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) && count++ < MAX_RETRIES_TO_START_INDEX)
-        sleep_usec(100 * USEC_PER_MS);
-
-    if (count == MAX_RETRIES_TO_START_INDEX) {
-        worker_is_idle();
-        return data;
-    }
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
@@ -2040,6 +2031,10 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
     }
 }
 
+#define NOT_INDEXING_OR_DELETING_FILES(ctx)                                                                                 \
+    (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&                                     \
+     !__atomic_load_n(&(ctx)->atomic.now_deleting_files, __ATOMIC_RELAXED))
+
 void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np("DBENGINE");
@@ -2183,8 +2178,7 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_JOURNAL_INDEX: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
-                    if(!__atomic_load_n(&ctx->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&
-                        ctx_is_available_for_queries(ctx)) {
+                    if (NOT_INDEXING_OR_DELETING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
                         __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
                     }
@@ -2193,11 +2187,8 @@ void dbengine_event_loop(void* arg) {
 
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
-                    if (!__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) &&
-                        !__atomic_load_n(&ctx->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&
-                        ctx->datafiles.first->next != NULL && ctx->datafiles.first->next->next != NULL &&
-                        rrdeng_ctx_tier_cap_exceeded(ctx)) {
-
+                    if (NOT_INDEXING_OR_DELETING_FILES(ctx) && ctx->datafiles.first->next != NULL &&
+                        ctx->datafiles.first->next->next != NULL && rrdeng_ctx_tier_cap_exceeded(ctx)) {
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate);
                     }

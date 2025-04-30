@@ -94,15 +94,11 @@ int init_aws_kinesis_instance(struct instance *instance)
  *
  * @param instance_p an instance data structure.
  */
-void aws_kinesis_connector_worker(void *instance_p)
+void *aws_kinesis_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
     struct aws_kinesis_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct aws_kinesis_specific_data *connector_specific_data = instance->connector_specific_data;
-
-    char threadname[ND_THREAD_TAG_MAX + 1];
-    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPKNSS[%zu]", instance->index);
-    uv_thread_set_name_np(threadname);
 
     while (!instance->engine->exit) {
         unsigned long long partition_key_seq = 0;
@@ -220,4 +216,5 @@ void aws_kinesis_connector_worker(void *instance_p)
     }
 
     aws_kinesis_cleanup(instance);
+    return NULL;
 }
