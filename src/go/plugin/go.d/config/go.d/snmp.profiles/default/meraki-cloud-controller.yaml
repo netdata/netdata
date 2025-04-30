@@ -28,7 +28,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.29671.1.1.4.1.3
         name: devStatus
-        description: The status of the device's connection to the Meraki Cloud Controller Enumeration: 'offline': 0, 'online': 1.
+        description: "The status of the device's connection to the Meraki Cloud Controller Enumeration: 'offline': 0, 'online': 1."
         unit: "TBD"
       - OID: 1.3.6.1.4.1.29671.1.1.4.1.5
         name: devClientCount

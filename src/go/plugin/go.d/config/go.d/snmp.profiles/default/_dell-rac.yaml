@@ -258,15 +258,15 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
         name: physicalDiskCapacityInMB
         description: Capacity of the physical disk in megabytes
-        unit: "MB"
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
         name: physicalDiskUsedSpaceInMB
         description: Used space of the physical disk in megabytes
-        unit: "MB"
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
         name: physicalDiskFreeSpaceInMB
         description: Free space of the physical disk in megabytes
-        unit: "MB"
+        unit: "MBy"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
@@ -1290,7 +1290,7 @@ metrics:
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.6
         name: virtualDiskSizeInMB
         description: Size of the virtual disk in megabytes
-        unit: "MB"
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
         name: virtualDiskComponentStatus
         description: Component status of the virtual disk

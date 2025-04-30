@@ -443,15 +443,15 @@ metrics:
       - name: netscaler.sysHealthDiskSize
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.2
         description: Total disk space in MBytes
-        unit: "MB"
+        unit: "MBy"
       - name: netscaler.sysHealthDiskAvail
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.3
         description: Total disk space available in MBytes
-        unit: "MB"
+        unit: "MBy"
       - name: netscaler.sysHealthDiskUsed
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.4
         description: Total disk space used in MBytes
-        unit: "MB"
+        unit: "MBy"
       - name: netscaler.sysHealthDiskPerusage
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.5
         description: Percentage of disk space used

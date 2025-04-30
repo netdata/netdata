@@ -268,7 +268,7 @@ metrics:
       - name: datadomain.nfsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.4
         description: Number of NFS operations performed per second
-        unit: "{ops_per_s}"
+        unit: "{operation}/s"
       - name: datadomain.nfsIdlePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.5
         description: Percentage of time NFS was idle
@@ -288,7 +288,7 @@ metrics:
       - name: datadomain.cifsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.9
         description: Number of CIFS operations performed per second
-        unit: "{ops_per_s}"
+        unit: "{operation}/s"
       - name: datadomain.diskReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.10
         description: Number of kilobytes per second read from disk

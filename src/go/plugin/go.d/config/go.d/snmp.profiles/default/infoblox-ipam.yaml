@@ -151,7 +151,7 @@ metrics:
       name: ibDnsQueryRate
       OID: 1.3.6.1.4.1.7779.3.1.1.3.1.6.0
     description: DNS query rate
-    unit: "c/s"
+    unit: "cs"
   - MIB: IB-PLATFORMONE-MIB
     table:
       name: ibClusterReplicationStatusTable

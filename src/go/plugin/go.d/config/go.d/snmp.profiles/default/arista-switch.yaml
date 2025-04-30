@@ -191,7 +191,7 @@ metrics:
       - name: aristaBgp4V2PeerLocalPort
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
         description: "The local port for the TCP connection between the BGP peers."
-        unit: "\"{port}\""
+        unit: "{port}"
       - name: aristaBgp4V2PeerLocalAs
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
         description: "The AS that this peering session is representing itself as to the remote peer."
@@ -199,7 +199,7 @@ metrics:
       - name: aristaBgp4V2PeerRemotePort
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
         description: "The remote port for the TCP connection between the BGP peers."
-        unit: "\"{port}\""
+        unit: "{port}"
       - name: aristaBgp4V2PeerRemoteAs
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
         description: "The remote autonomous system number received in the BGP OPEN message."
@@ -261,11 +261,11 @@ metrics:
       - name: aristaIfInPktRate
         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.3
         description: "The rate, in packets per second, of packets inbound on this interface, averaged over aristaIfRateInterval."
-        unit: "\"{packet}/s\""
+        unit: "{packet}"
       - name: aristaIfOutPktRate
         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.4
         description: "The rate, in packets per second, of packets outbound on this interface, averaged over aristaIfRateInterval."
-        unit: "\"{packet}/s\""
+        unit: "{packet}"
       - name: aristaIfInOctetRate
         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.5
         description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."

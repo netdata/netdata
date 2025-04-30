@@ -59,7 +59,7 @@ metrics:
       name: avaya.cmgRemoteSigDscp
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.2.0
       description: DiffServ code point for signaling traffic on the H.248 link received from the controller
-      unit: "{code_point}"
+      unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSig802Priority
@@ -71,7 +71,7 @@ metrics:
       name: avaya.cmgLocalSigDscp
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.4.0
       description: DiffServ code point for signaling traffic on the H.248 link locally administered
-      unit: "{code_point}"
+      unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSig802Priority

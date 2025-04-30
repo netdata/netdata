@@ -195,11 +195,11 @@ metrics:
       - name: netscaler.sdx.nsNsTx
         OID: 1.3.6.1.4.1.5951.6.3.2.1.36
         description: "out throughput of netscaler instance in megabits per second"
-        unit: "Mbps"
+        unit: "Mbit/s"
       - name: netscaler.sdx.nsNsRx
         OID: 1.3.6.1.4.1.5951.6.3.2.1.37
         description: "in throughput of netscaler instance in megabits per second"
-        unit: "Mbps"
+        unit: "Mbit/s"
       - name: netscaler.sdx.nsHttpReq
         OID: 1.3.6.1.4.1.5951.6.3.2.1.38
         description: "http requests per second"

@@ -150,11 +150,11 @@ metrics:
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.3
         name: multiDiskSize
         description: "disk size"
-        unit: "GB"
+        unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
         name: multiDiskUsed
         description: "disk used"
-        unit: "GB"
+        unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
         name: multiDiskFreeTotalBytes
         description: "disk free total bytes"

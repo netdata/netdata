@@ -9,13 +9,13 @@ metrics:
       name: memory.total
       OID: 1.3.6.1.4.1.22610.2.4.1.2.1.0
     description: The total memory(KB)
-    unit: "{kilobyte}"
+    unit: "kBy"
   - MIB: A10-AX-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.4.1.22610.2.4.1.2.2.0
     description: The usage memory(KB)
-    unit: "{kilobyte}"
+    unit: "kBy"
   - MIB: A10-AX-MIB
     symbol:
       name: cpu.usage
@@ -27,13 +27,13 @@ metrics:
       name: axSysDiskTotalSpace
       OID: 1.3.6.1.4.1.22610.2.4.1.4.1.0
     description: The total space of the disk in MB
-    unit: "MB"
+    unit: "MBy"
   - MIB: A10-AX-MIB
     symbol:
       name: axSysDiskFreeSpace
       OID: 1.3.6.1.4.1.22610.2.4.1.4.2.0
     description: The free space of the disk in MB
-    unit: "MB"
+    unit: "MBy"
   - MIB: A10-AX-MIB
     symbol:
       name: axSysHwPhySystemTemp

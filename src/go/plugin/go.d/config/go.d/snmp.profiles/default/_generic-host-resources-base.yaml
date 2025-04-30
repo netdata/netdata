@@ -12,7 +12,7 @@ metrics:
       OID: 1.3.6.1.2.1.25.1.1.0
       name: hrSystemUptime
     description: The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
-    unit: "c/s"
+    unit: "cs"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.5.0

@@ -71,7 +71,7 @@ metrics:
     OID: 1.3.6.1.4.1.789.1.8.3.6.36.0
     name: ncHttpActiveCliConns  # Number of currently active TCP/IP connections to HTTP clients
     description: Number of currently active TCP/IP connections to HTTP clients
-    unit: "{connections}"
+    unit: "{connection}"
 
   - MIB: NETAPP-MIB
     OID: 1.3.6.1.4.1.789.1.26.8.0
@@ -126,7 +126,7 @@ metrics:
           OID: 1.3.6.1.4.1.789.1.9.20.1.5
           name: snapmirrorState
     description: How far behind from the source the destination is
-    unit: "c100s"
+    unit: "cs"
 
   - MIB: NETAPP-MIB
     table:
@@ -167,11 +167,11 @@ metrics:
       - OID: 1.3.6.1.4.1.789.1.5.4.1.7
         name: dfInodesUsed
         description: Total number of inodes in use on the referenced file system
-        unit: "{inodes}"
+        unit: "{inode}"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.8
         name: dfInodesFree
         description: Total number of inodes that are available for use on the referenced file system
-        unit: "{inodes}"
+        unit: "{inode}"
     metric_tags:
       - tag: index
         symbol:

@@ -54,7 +54,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.9.2.2.9.0
       name: cpqSm2CntlrSelfTestErrors
     description: Bitmap of self-test errors
-    unit: "{errors}"
+    unit: "{error}"
 
   - # Whether a remote session is active.
     # NOTE: other(1), active(2), inactive(3)
@@ -82,7 +82,7 @@ metrics:
       OID: 1.3.6.1.4.1.232.9.2.3.1.0
       name: cpqSm2EventTotalEntries
     description: Number of entries in the event log
-    unit: "{entries}"
+    unit: "{entry}"
 
   # Network interfaces and traffic.
 

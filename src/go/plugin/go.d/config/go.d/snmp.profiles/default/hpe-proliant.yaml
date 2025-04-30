@@ -99,11 +99,11 @@ metrics:
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.3
         name: cpqHoFileSysSpaceTotal
         description: File system size in megabytes
-        unit: "MB"
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.4
         name: cpqHoFileSysSpaceUsed
         description: Megabytes of file system space currently in use
-        unit: "MB"
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.5
         name: cpqHoFileSysPercentSpaceUsed
         description: Percent of file system space currently in use

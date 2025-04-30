@@ -35,8 +35,6 @@ metrics:
     symbols:
       - name: hawk.i2.ipCont
         constant_value_one: true
-        description: Contact input constant value one.
-        unit: "{contact_input}"
     metric_tags:
       - symbol:
           name: hawk.i2.ipContName

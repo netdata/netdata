@@ -67,7 +67,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
         name: cpqDaPhyDrvSize
         description: Size of the physical drive in megabytes
-        unit: "MB"
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.57
         name: cpqDaPhyDrvSmartStatus
         description: S.M.A.R.T status of the physical drive

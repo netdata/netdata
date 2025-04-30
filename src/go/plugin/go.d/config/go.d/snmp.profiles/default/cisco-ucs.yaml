@@ -305,19 +305,19 @@ metrics:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.35
         tag: cucs_compute_rack_unit_num_of_cores
         description: "number of cores"
-        unit: "\"{core}\""
+        unit: "{core}"
       - symbol:
           name: cucsComputeRackUnitNumOfCpus
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
         tag: cucs_compute_rack_unit_num_of_cpus
         description: "number of cpus"
-        unit: "\"{cpu}\""
+        unit: "{cpu}"
       - symbol:
           name: cucsComputeRackUnitNumOfThreads
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
         tag: cucs_compute_rack_unit_num_of_threads
         description: "number of threads"
-        unit: "\"{thread}\""
+        unit: "{thread}"
       - symbol:
           name: cucsComputeRackUnitSerial
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.47
@@ -529,20 +529,20 @@ metrics:
     symbols:
       - name: cucsComputeRackUnitMbTempStatsAmbientTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.4
-        description: "ambient temperature"
-        unit: "\"Cel\""
+        description: "Ambient temperature"
+        unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsFrontTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.8
-        description: "front temperature"
-        unit: "\"Cel\""
+        description: "Front temperature"
+        unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsIoh1Temp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.13
-        description: "ioh1 temperature"
-        unit: "\"Cel\""
+        description: "Ioh1 temperature"
+        unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsRearTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.21
-        description: "rear temperature"
-        unit: "\"Cel\""
+        description: "Rear temperature"
+        unit: "Cel"
     metric_tags:
       - symbol:
           name: cucsComputeRackUnitMbTempStatsDn
@@ -1082,7 +1082,7 @@ metrics:
       - name: cucsMemoryUnitEnvStatsTemperature
         OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.6
         description: "temperature"
-        unit: "\"Cel\""
+        unit: "Cel"
     metric_tags:
       - symbol:
           name: cucsMemoryUnitEnvStatsDn
@@ -1096,7 +1096,7 @@ metrics:
       - name: cucsProcessorEnvStatsTemperature
         OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.10
         description: "temperature"
-        unit: "\"Cel\""
+        unit: "Cel"
     metric_tags:
       - symbol:
           name: cucsProcessorEnvStatsDn
@@ -1152,7 +1152,7 @@ metrics:
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.20
         tag: cucs_processor_unit_threads
         description: "number of threads"
-        unit: "\"{thread}\""
+        unit: "{thread}"
       - symbol:
           name: cucsProcessorUnitVendor
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.21
@@ -1308,7 +1308,7 @@ metrics:
       - name: cucsStorageFlexFlashCardReadIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.19
         description: "read io error count"
-        unit: "\"{error}\""
+        unit: "{error}"
       - name: cucsStorageFlexFlashCardSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.22
         description: "size of the flex flash card"
@@ -1316,7 +1316,7 @@ metrics:
       - name: cucsStorageFlexFlashCardWriteIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.26
         description: "write io error count"
-        unit: "\"{error}\""
+        unit: "{error}"
     metric_tags:
       - symbol:
           name: cucsStorageFlexFlashCardDn
@@ -1367,7 +1367,7 @@ metrics:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.29
         tag: cucs_storage_flex_flash_card_drives_enabled
         description: "number of drives enabled"
-        unit: "\"{drive}\""
+        unit: "{drive}"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.5
           name: cucsStorageFlexFlashCardCardHealth

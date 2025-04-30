@@ -43,7 +43,7 @@ metrics:
           9: power
           10: door
         description: Characteristics being monitored by this sensor
-        unit: "{characteristic}"
+        unit: "1"
       - symbol:
           OID: 1.3.6.1.3.94.1.8.1.4
           name: connUnitSensorStatus
