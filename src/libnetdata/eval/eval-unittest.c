@@ -347,20 +347,30 @@ typedef struct {
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-static void run_test_group(TestGroup *group) {
-    printf("\n=== Running Test Group: %s ===\n", group->name);
+static void run_test_group(TestGroup *group, bool verbose, bool only_parsing_success) {
+    if (verbose) {
+        printf("\n=== Running Test Group: %s ===\n", group->name);
+    }
     
     int passed = 0;
     int failed = 0;
     
     for (int i = 0; i < group->test_count; i++) {
         TestCase *tc = &group->test_cases[i];
+        
+        // Skip tests that are expected to fail parsing, if requested
+        if (only_parsing_success && !tc->should_parse) {
+            continue;
+        }
+        
         const char *failed_at = NULL;
         EVAL_ERROR error = EVAL_ERROR_OK;
         bool test_failed = false;
         char error_message[1024] = "";
         
-        printf("Test %d: %s\n", i + 1, tc->expression);
+        if (verbose) {
+            printf("Test %d: %s\n", i + 1, tc->expression);
+        }
         
         // Try to parse the expression
         EVAL_EXPRESSION *exp = expression_parse(tc->expression, &failed_at, &error);
@@ -428,13 +438,15 @@ static void run_test_group(TestGroup *group) {
                 }
             }
             
-            // Print additional information for debugging
-            printf("  Parsed as: %s\n", expression_parsed_as(exp));
-            
-            if (eval_result) {
-                printf("  Evaluated to: %f\n", expression_result(exp));
-            } else {
-                printf("  Evaluation failed: %s\n", expression_error_msg(exp));
+            if (verbose) {
+                // Print additional information for debugging
+                printf("  Parsed as: %s\n", expression_parsed_as(exp));
+                
+                if (eval_result) {
+                    printf("  Evaluated to: %f\n", expression_result(exp));
+                } else {
+                    printf("  Evaluation failed: %s\n", expression_error_msg(exp));
+                }
             }
             
             // Special handling for API function tests
@@ -454,7 +466,7 @@ static void run_test_group(TestGroup *group) {
                                 "expression_hardcode_variable failed: expected 123.456, got %f (error: %u)",
                                 exp->result, exp->error);
                         test_failed = true;
-                    } else {
+                    } else if (verbose) {
                         printf("  expression_hardcode_variable test passed!\n");
                     }
                 } 
@@ -466,7 +478,7 @@ static void run_test_group(TestGroup *group) {
                                 "expression_source failed: expected '1 + 2', got '%s'",
                                 source);
                         test_failed = true;
-                    } else {
+                    } else if (verbose) {
                         printf("  expression_source test passed!\n");
                     }
                     
@@ -476,7 +488,7 @@ static void run_test_group(TestGroup *group) {
                         snprintf(error_message, sizeof(error_message),
                                 "expression_parsed_as failed: got empty or NULL result");
                         test_failed = true;
-                    } else {
+                    } else if (verbose) {
                         printf("  expression_parsed_as test passed! Result: %s\n", parsed);
                     }
                     
@@ -487,11 +499,11 @@ static void run_test_group(TestGroup *group) {
                                 "expression_result failed: expected 3.0, got %f",
                                 result);
                         test_failed = true;
-                    } else {
+                    } else if (verbose) {
                         printf("  expression_result test passed!\n");
                     }
                 }
-                else if (strcmp(tc->expression, "bad/syntax") == 0) {
+                else if (strcmp(tc->expression, "bad/syntax") == 0 && verbose) {
                     // This case is for testing expression_error_msg, but it is already tested
                     // in the main evaluation loop when errors occur.
                     printf("  expression_error_msg is tested during evaluation failures\n");
@@ -501,27 +513,33 @@ static void run_test_group(TestGroup *group) {
             // Clean up
             expression_free(exp);
         }
-        else if (!tc->should_parse) {
+        else if (!tc->should_parse && verbose) {
             printf("  Parsing failed as expected at: %s\n", 
                    failed_at ? ((*failed_at) ? failed_at : "<END OF EXPRESSION>") : "<NONE>");
         }
         
         // Report test result
         if (test_failed) {
+            if (verbose) {
 #ifdef USE_RE2C_LEMON_PARSER
-            printf("  [RE2C_LEMON] FAILED: %s\n", error_message);
+                printf("  [RE2C_LEMON] FAILED: %s\n", error_message);
 #else
-            printf("  [RECURSIVE] FAILED: %s\n", error_message);
+                printf("  [RECURSIVE] FAILED: %s\n", error_message);
 #endif
+            }
             failed++;
         } else {
-            printf("  PASSED\n");
+            if (verbose) {
+                printf("  PASSED\n");
+            }
             passed++;
         }
     }
     
-    printf("\nGroup Results: %d tests, %d passed, %d failed\n", 
-           passed + failed, passed, failed);
+    if (verbose) {
+        printf("\nGroup Results: %d tests, %d passed, %d failed\n", 
+               passed + failed, passed, failed);
+    }
 }
 
 static TestCase arithmetic_tests[] = {
@@ -1261,7 +1279,8 @@ static TestGroup test_groups[] = {
 #endif
 };
 
-int eval_unittest(void) {
+// Run the evaluation tests and return the number of failed tests
+int run_eval_unittest(bool verbose, bool only_parsing_success) {
     // Test cases for basic arithmetic operations
 
     // Run all test groups
@@ -1269,14 +1288,19 @@ int eval_unittest(void) {
     int total_failed = 0;
     int total_tests = 0;
     
+    if (verbose) {
 #ifdef USE_RE2C_LEMON_PARSER
-    printf("Starting comprehensive evaluation tests using RE2C/LEMON PARSER\n");
+        printf("Starting comprehensive evaluation tests using RE2C/LEMON PARSER\n");
 #else
-    printf("Starting comprehensive evaluation tests using RECURSIVE DESCENT PARSER\n");
+        printf("Starting comprehensive evaluation tests using RECURSIVE DESCENT PARSER\n");
 #endif
+        if (only_parsing_success) {
+            printf("Running only tests that should parse successfully\n");
+        }
+    }
     
     for (size_t i = 0; i < ARRAY_SIZE(test_groups); i++) {
-        run_test_group(&test_groups[i]);
+        run_test_group(&test_groups[i], verbose, only_parsing_success);
         
         int group_tests = test_groups[i].test_count;
         int group_passed = 0;
@@ -1284,6 +1308,12 @@ int eval_unittest(void) {
         
         for (int j = 0; j < group_tests; j++) {
             TestCase *tc = &test_groups[i].test_cases[j];
+            
+            // Skip tests that are expected to fail parsing, if requested
+            if (only_parsing_success && !tc->should_parse) {
+                continue;
+            }
+            
             const char *failed_at = NULL;
             EVAL_ERROR error = EVAL_ERROR_OK;
             
@@ -1350,10 +1380,126 @@ int eval_unittest(void) {
         total_tests += group_tests;
     }
     
-    printf("\n========== OVERALL TEST SUMMARY ==========\n");
-    printf("Total tests: %d\n", total_tests);
-    printf("Passed: %d (%.1f%%)\n", total_passed, (float)total_passed / total_tests * 100);
-    printf("Failed: %d (%.1f%%)\n", total_failed, (float)total_failed / total_tests * 100);
+    if (verbose) {
+        printf("\n========== OVERALL TEST SUMMARY ==========\n");
+        printf("Total tests: %d\n", total_tests);
+        printf("Passed: %d (%.1f%%)\n", total_passed, (float)total_passed / total_tests * 100);
+        printf("Failed: %d (%.1f%%)\n", total_failed, (float)total_failed / total_tests * 100);
+    }
     
     return total_failed > 0 ? 1 : 0;
+}
+
+// Thread data structure for multithreaded testing
+typedef struct {
+    int thread_id;
+    volatile int *stop_flag;
+    int tests_run;
+    int failed;
+} ThreadData;
+
+// Thread function to run tests in a loop until time expires
+static void *thread_test_function(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    int tests_run = 0;
+    int failed = 0;
+    
+    // Run tests in a loop until stop_flag is set
+    while (*(data->stop_flag) == 0) {
+        // Run only tests that should parse successfully for multithreaded testing
+        int result = run_eval_unittest(false, true);
+        tests_run++;
+        if (result != 0) {
+            failed++;
+        }
+    }
+    
+    data->tests_run = tests_run;
+    data->failed = failed;
+    
+    return NULL;
+}
+
+// The main unittest function that runs both single-threaded and multi-threaded tests
+int eval_unittest(void) {
+    int failed = 0;
+    
+    // Run the standard unit tests in a single thread first
+    printf("\n========== RUNNING SINGLE-THREADED TESTS ==========\n");
+    failed = run_eval_unittest(true, false);  // Run all tests for single-threaded case
+    
+    if (failed > 0) {
+        printf("Single-threaded tests failed, skipping multi-threaded tests\n");
+        return failed;
+    }
+    
+    // Define constants for the multithreaded test
+    const int num_threads = 5;
+    const int duration_seconds = 5;
+    
+    // Now run the same tests in parallel with 5 threads for 5 seconds
+    printf("\n========== RUNNING MULTI-THREADED TESTS FOR %d SECONDS WITH %d THREADS ==========\n", 
+           duration_seconds, num_threads);
+    printf("Note: Running only tests that should parse successfully for multithreaded testing\n");
+    
+    ThreadData thread_data[num_threads];
+    volatile int stop_flag = 0;
+    ND_THREAD *threads[num_threads];
+    
+    // Create threads
+    for (int i = 0; i < num_threads; i++) {
+        thread_data[i].thread_id = i;
+        thread_data[i].stop_flag = &stop_flag;
+        thread_data[i].tests_run = 0;
+        thread_data[i].failed = 0;
+        
+        char thread_name[24];
+        snprintf(thread_name, sizeof(thread_name), "EVAL-TEST-%d", i);
+        
+        threads[i] = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_JOINABLE, thread_test_function, &thread_data[i]);
+        
+        if (!threads[i]) {
+            printf("ERROR: Failed to create thread %d\n", i);
+            // Set stop flag to stop any threads that were created
+            stop_flag = 1;
+            
+            // Wait for created threads to terminate
+            for (int j = 0; j < i; j++) {
+                nd_thread_join(threads[j]);
+            }
+            
+            return 1;
+        }
+    }
+    
+    // Sleep for the specified duration
+    sleep(duration_seconds);
+    
+    // Signal threads to stop
+    stop_flag = 1;
+    
+    // Wait for all threads to finish
+    int total_runs = 0;
+    int total_failed = 0;
+    
+    for (int i = 0; i < num_threads; i++) {
+        nd_thread_join(threads[i]);
+        
+        total_runs += thread_data[i].tests_run;
+        total_failed += thread_data[i].failed;
+        
+        printf("Thread %d: %d test runs, %d failed\n", 
+               i, thread_data[i].tests_run, thread_data[i].failed);
+    }
+    
+    printf("\n========== MULTITHREADED TEST SUMMARY ==========\n");
+    printf("Completed %d total runs of the unittests.\n", total_runs);
+    
+    if (total_failed > 0) {
+        printf("FAIL: %d out of %d runs failed\n", total_failed, total_runs);
+        return 1;
+    } else {
+        printf("SUCCESS: All %d runs passed\n", total_runs);
+        return 0;
+    }
 }
