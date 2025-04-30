@@ -170,13 +170,13 @@ metrics:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
     description: "The size of the storage represented by this entry, in units of hrStorageAllocationUnits."
-    unit: "\"{byte}\""
+    unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.100
     description: "The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits."
-    unit: "\"{byte}\""
+    unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: cpu.usage
@@ -269,11 +269,11 @@ metrics:
       - name: aristaIfInOctetRate
         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.5
         description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."
-        unit: "\"By/s\""
+        unit: "By/s"
       - name: aristaIfOutOctetRate
         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.6
         description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."
-        unit: "\"By/s\""
+        unit: "By/s"
     metric_tags:
       - symbol:
           name: aristaIfRateInterval

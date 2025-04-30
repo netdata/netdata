@@ -278,11 +278,11 @@ metrics:
       - name: cucsComputeRackUnitAvailableMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.9
         description: "available memory"
-        unit: "\"By\""
+        unit: "By"
       - name: cucsComputeRackUnitTotalMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.49
         description: "total memory"
-        unit: "\"By\""
+        unit: "By"
     metric_tags:
       - symbol:
           name: cucsComputeRackUnitDn
@@ -890,7 +890,7 @@ metrics:
       - name: cucsMemoryUnitCapacity
         OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.6
         description: "capacity of the memory unit"
-        unit: "\"By\""
+        unit: "By"
     metric_tags:
       - symbol:
           name: cucsMemoryUnitDn
@@ -1312,7 +1312,7 @@ metrics:
       - name: cucsStorageFlexFlashCardSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.22
         description: "size of the flex flash card"
-        unit: "\"By\""
+        unit: "By"
       - name: cucsStorageFlexFlashCardWriteIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.26
         description: "write io error count"
@@ -1480,7 +1480,7 @@ metrics:
       - name: cucsStorageFlexFlashDriveSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.18
         description: "size of the flex flash drive"
-        unit: "\"By\""
+        unit: "By"
     metric_tags:
       - symbol:
           name: cucsStorageFlexFlashDriveDn

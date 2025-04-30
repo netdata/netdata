@@ -23,19 +23,19 @@ metrics:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 = Physical memory
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-      unit: "{byte}"
+      unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
       name: hrMemoryBuffers
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-      unit: "{byte}"
+      unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
       name: hrCachedMemory
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
-      unit: "{byte}"
+      unit: "By"
 #  - MIB: SYNOLOGY-SYSTEM-MIB
 #    symbol:
 #      name: synology.system.systemStatus
@@ -132,12 +132,12 @@ metrics:
         OID: 1.3.6.1.4.1.6574.3.1.1.4
         metric_type: monotonic_count
         description: The free size of raid
-        unit: "{byte}"
+        unit: "By"
       - name: synology.raidTotalSize
         OID: 1.3.6.1.4.1.6574.3.1.1.5
         metric_type: monotonic_count
         description: The total size of raid
-        unit: "{byte}"
+        unit: "By"
     metric_tags:
       - symbol:
           name: synology.raid.raidName

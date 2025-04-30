@@ -78,7 +78,7 @@ metrics:
     name: extcache64Hits  # Indicates number of wafl buffers read from the external cache
     metric_type: monotonic_count
     description: Number of wafl buffers read from the external cache
-    unit: "{buffers}"
+    unit: "{buffer}"
 
   # Snap vaults
 
