@@ -704,6 +704,7 @@ static void health_main_cleanup(void *pptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
+    finalize_self_prepared_sql_statements();
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");
 }
 
