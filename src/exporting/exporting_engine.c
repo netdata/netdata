@@ -157,8 +157,8 @@ static void exporting_main_cleanup(void *pptr)
                 exited++;
 
                 if(instance->thread) {
-                    uv_thread_join(&instance->thread);
-                    instance->thread = 0;
+                    nd_thread_join(instance->thread);
+                    instance->thread = NULL;
                 }
             }
             else if(iterations % 100 == 0)

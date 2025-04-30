@@ -9,6 +9,6 @@
 
 int init_pubsub_instance(struct instance *instance);
 void clean_pubsub_instance(struct instance *instance);
-void pubsub_connector_worker(void *instance_p);
+void *pubsub_connector_worker(void *instance_p);
 
 #endif //NETDATA_EXPORTING_PUBSUB_H

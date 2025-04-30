@@ -90,11 +90,12 @@ int init_connectors(struct engine *engine)
         }
 
         // dispatch the instance worker thread
-        int error = uv_thread_create(&instance->thread, instance->worker, instance);
-        if (error) {
-            netdata_log_error("EXPORTING: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
+        char threadname[ND_THREAD_TAG_MAX + 1];
+        snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPCON[%zu]", instance->index);
+        instance->thread = nd_thread_create(threadname, NETDATA_THREAD_OPTION_JOINABLE, instance->worker, instance);
+        if (!instance->thread) {
+            netdata_log_error("EXPORTING: cannot create thread worker for instance %s", instance->config.name);
             instance->exited = 1;
-            instance->thread = 0;
             return 1;
         }
 
