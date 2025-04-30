@@ -328,11 +328,14 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     if(!host->health_log.alarms)
         return;
 
+    if (!rw_spinlock_trywrite_lock(&host->health_log.spinlock)) {
+        // If we can't get the lock, just return
+        return;
+    }
+
     time_t now = now_realtime_sec();
     time_t retention = host->health_log.health_log_retention_s;
-    
-    rw_spinlock_write_lock(&host->health_log.spinlock);
-    
+
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
