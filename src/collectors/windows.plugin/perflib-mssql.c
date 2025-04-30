@@ -153,7 +153,7 @@ struct mssql_lock_instance {
 struct mssql_db_instance {
     struct mssql_instance *parent;
 
-    bool collect_data;
+    bool collecting_data;
 
     RRDSET *st_db_data_file_size;
     RRDSET *st_db_active_transactions;
@@ -307,9 +307,6 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     long value;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
-    if (!mdi->collect_data)
-        return;
-
     SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
         (char *)query,
@@ -320,6 +317,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
+        mdi->collecting_data = false;
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
         goto endtransactions;
@@ -382,9 +380,6 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     } while (true);
 
 endtransactions:
-    if (ret != SQL_NO_DATA)
-        mdi->collect_data = false;
-
     SQLFreeStmt(mdi->parent->conn.dbTransactionSTMT, SQL_CLOSE);
 }
 
@@ -398,9 +393,6 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
     long value;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
-    if (!mdi->collect_data)
-        return;
-
     SQLCHAR query[sizeof(NETDATA_QUERY_LOCKS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
         (char *)query,
@@ -411,6 +403,7 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbLocksSTMT, (SQLCHAR *)query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
+        mdi->collecting_data = false;
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
         goto endlocks;
@@ -453,9 +446,6 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
     } while (true);
 
 endlocks:
-    if (ret != SQL_NO_DATA)
-        mdi->collect_data = false;
-
     SQLFreeStmt(mdi->parent->conn.dbLocksSTMT, SQL_CLOSE);
 }
 
@@ -464,10 +454,17 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
+    if (!mdi->collecting_data)
+        return 0;
+
     // We failed to collect this for the database, so we are not going to try again
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
+    else {
+        mdi->collecting_data = false;
+        return 0;
+    }
 
     dict_mssql_fill_transactions(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
@@ -729,7 +726,7 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 {
     struct mssql_db_instance *mdi = value;
 
-    mdi->collect_data = true;
+    mdi->collecting_data = true;
 }
 
 // Options
@@ -1466,7 +1463,7 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1511,7 +1508,7 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1549,7 +1546,7 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1587,7 +1584,7 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
 
 static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1628,7 +1625,7 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1670,7 +1667,7 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
 
 static void mssql_lockwait_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1710,7 +1707,7 @@ static void mssql_lockwait_chart(struct mssql_db_instance *mli, const char *db, 
 
 static void mssql_deadlock_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1750,7 +1747,7 @@ static void mssql_deadlock_chart(struct mssql_db_instance *mli, const char *db, 
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1792,7 +1789,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || unlikely(!mli->collect_data))
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1833,6 +1830,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
 {
     struct mssql_db_instance *mli = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    if (!mli->collecting_data)
+        return;
 
     int *update_every = data;
 
@@ -2024,7 +2024,7 @@ int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *
 {
     struct mssql_db_instance *mdi = value;
 
-    mdi->collect_data = false;
+    mdi->collecting_data = false;
 }
 
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
