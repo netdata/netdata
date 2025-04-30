@@ -34,67 +34,81 @@ int init_connectors(struct engine *engine)
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
         instance->index = engine->instance_num++;
         instance->after = engine->now;
-
+        
+        // Set thread tag and initialize connector based on type
         switch (instance->config.type) {
             case EXPORTING_CONNECTOR_TYPE_GRAPHITE:
+                instance->config.thread_tag = "EXPGRPH";
                 if (init_graphite_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP:
+                instance->config.thread_tag = "EXPGRPH";
                 if (init_graphite_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_JSON:
+                instance->config.thread_tag = "EXPJSON";
                 if (init_json_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
+                instance->config.thread_tag = "EXPJSON";
                 if (init_json_http_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
+                instance->config.thread_tag = "EXPTSDB";
                 if (init_opentsdb_telnet_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP:
+                instance->config.thread_tag = "EXPTSDB";
                 if (init_opentsdb_http_instance(instance) != 0)
                     return 1;
                 break;
             case EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE:
+                instance->config.thread_tag = "EXPPRW";
 #ifdef ENABLE_PROMETHEUS_REMOTE_WRITE
                 if (init_prometheus_remote_write_instance(instance) != 0)
                     return 1;
 #endif
                 break;
             case EXPORTING_CONNECTOR_TYPE_KINESIS:
+                instance->config.thread_tag = "EXPKINS";
 #if HAVE_KINESIS
                 if (init_aws_kinesis_instance(instance) != 0)
                     return 1;
 #endif
                 break;
             case EXPORTING_CONNECTOR_TYPE_PUBSUB:
+                instance->config.thread_tag = "EXPPUBS";
 #if ENABLE_EXPORTING_PUBSUB
                 if (init_pubsub_instance(instance) != 0)
                     return 1;
 #endif
                 break;
             case EXPORTING_CONNECTOR_TYPE_MONGODB:
+                instance->config.thread_tag = "EXPMNG";
 #ifdef HAVE_MONGOC
                 if (init_mongodb_instance(instance) != 0)
                     return 1;
 #endif
                 break;
             default:
+                instance->config.thread_tag = "EXPCON";
                 netdata_log_error("EXPORTING: unknown exporting connector type");
                 return 1;
         }
 
         // dispatch the instance worker thread
-        int error = uv_thread_create(&instance->thread, instance->worker, instance);
-        if (error) {
-            netdata_log_error("EXPORTING: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
+        char threadname[ND_THREAD_TAG_MAX + 1];
+        snprintfz(threadname, ND_THREAD_TAG_MAX, "%s[%zu]", instance->config.thread_tag, instance->index);
+        
+        instance->thread = nd_thread_create(threadname, NETDATA_THREAD_OPTION_JOINABLE, instance->worker, instance);
+        if (!instance->thread) {
+            netdata_log_error("EXPORTING: cannot create thread worker for instance %s", instance->config.name);
             instance->exited = 1;
-            instance->thread = 0;
             return 1;
         }
 

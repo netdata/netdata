@@ -74,6 +74,7 @@ struct instance_config {
     const char *prefix;
     const char *label_prefix;
     const char *hostname;
+    const char *thread_tag;
 
     int update_every;
     int buffer_on_failures;
@@ -195,7 +196,7 @@ struct stats {
 struct instance {
     struct instance_config config;
     void *buffer;
-    void (*worker)(void *instance_p);
+    void *(*worker)(void *instance_p);
     struct stats stats;
 
     int scheduled;
@@ -208,7 +209,7 @@ struct instance {
     time_t after;
     time_t before;
 
-    uv_thread_t thread;
+    ND_THREAD *thread;
     uv_mutex_t mutex;
     uv_cond_t cond_var;
     int data_is_ready;
@@ -290,7 +291,7 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance);
 void simple_connector_receive_response(int *sock, struct instance *instance);
 void simple_connector_send_buffer(
     int *sock, int *failures, struct instance *instance, BUFFER *header, BUFFER *buffer, size_t buffered_metrics);
-void simple_connector_worker(void *instance_p);
+void *simple_connector_worker(void *instance_p);
 
 void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system);
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system);
