@@ -186,10 +186,14 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 // This must be called when the thread terminates
 void finalize_self_prepared_sql_statements()
 {
+    if (!thread_stmt_pool)
+        return;
+
+    Word_t thread_id = thread_stmt_pool->thread_id;
     finalize_and_free_stmt_list(thread_stmt_pool);
     thread_stmt_pool = NULL;
     spinlock_lock(&JudyL_thread_stmt_lock);
-    (void) JudyLDel(&JudyL_thread_stmt_pool, (Word_t)gettid_cached(), PJE0);
+    (void) JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
 
@@ -198,16 +202,21 @@ void finalize_all_prepared_sql_statements()
     spinlock_lock(&JudyL_thread_stmt_lock);
     bool first_then_next = true;
     Pvoid_t *Pvalue = NULL;
-    pid_t thread_id = 0;
-    while ((Pvalue = JudyLFirstThenNext(JudyL_thread_stmt_pool, (Word_t *) &thread_id, &first_then_next))) {
-        struct stmt_pool_s *local_stmt_pool = (struct stmt_pool_s *) *Pvalue;
-        nd_log_daemon(
-            NDLP_WARNING,
-            "SQL: Pending SQL statements for thread %d (%s), make sure thread does a proper cleanup",
-            thread_id, local_stmt_pool->name);
-        finalize_and_free_stmt_list(local_stmt_pool);
+    Word_t thread_id = 0;
+    if (JudyL_thread_stmt_pool) {
+        while ((Pvalue = JudyLFirstThenNext(JudyL_thread_stmt_pool, &thread_id, &first_then_next))) {
+            struct stmt_pool_s *local_stmt_pool = (struct stmt_pool_s *) *Pvalue;
+            if (!local_stmt_pool)
+                continue;
+            nd_log_daemon(
+                NDLP_WARNING,
+                "SQL: Pending SQL statements for thread %lu (%s), make sure thread does a proper cleanup",
+                thread_id,
+                local_stmt_pool->name);
+            finalize_and_free_stmt_list(local_stmt_pool);
+        }
+        (void)JudyLFreeArray(&JudyL_thread_stmt_pool, PJE0);
     }
-    JudyLFreeArray(&JudyL_thread_stmt_pool, PJE0);
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
 
