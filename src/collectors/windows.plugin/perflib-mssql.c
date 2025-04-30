@@ -214,6 +214,7 @@ static char *netdata_MSSQL_error_text(enum netdata_mssql_odbc_errors val)
         default:
             return "QUERY FETCH";
     }
+    return NULL;
 }
 
 static char *netdata_MSSQL_type_text(uint32_t type)
@@ -454,8 +455,9 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    if (!mdi->collecting_data)
-        return 0;
+    if (!mdi->collecting_data) {
+        goto enddrunquery;
+    }
 
     // We failed to collect this for the database, so we are not going to try again
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
@@ -463,13 +465,14 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
             mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
     else {
         mdi->collecting_data = false;
-        return 0;
+        goto enddrunquery;
     }
 
     dict_mssql_fill_transactions(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
 
-    return 0;
+enddrunquery:
+    return 1;
 }
 
 #define NETDATA_QUERY_CHECK_PERM                                                                                       \
@@ -1366,6 +1369,7 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
+/*
 void dict_mssql_locks_wait_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
 {
     if (!mli->rd_lockWait) {
@@ -1377,6 +1381,7 @@ void dict_mssql_locks_wait_dimension(struct mssql_instance *mi, struct mssql_loc
     }
     rrddim_set_by_pointer(mi->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
 }
+ */
 
 void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
 {
@@ -1403,6 +1408,7 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
+/*
 void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
 {
     if (!mli->rd_deadLocks) {
@@ -1414,6 +1420,7 @@ void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock
     }
     rrddim_set_by_pointer(mi->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
 }
+*/
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
@@ -1831,8 +1838,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     struct mssql_db_instance *mli = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    if (!mli->collecting_data)
-        return;
+    if (!mli->collecting_data) {
+        goto endchartcb;
+    }
 
     int *update_every = data;
 
@@ -1855,6 +1863,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
         transaction_chart[i](mli, db, *update_every);
     }
 
+endchartcb:
     return 1;
 }
 
@@ -2025,6 +2034,8 @@ int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *
     struct mssql_db_instance *mdi = value;
 
     mdi->collecting_data = false;
+
+    return 1;
 }
 
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
