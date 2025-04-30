@@ -47,10 +47,10 @@ struct nd_thread {
 };
 
 static struct {
-//    struct {
-//        SPINLOCK spinlock;
-//        ND_THREAD *list;
-//    } exited;
+    struct {
+        SPINLOCK spinlock;
+        ND_THREAD *list;
+    } exited;
 
     struct {
         SPINLOCK spinlock;
@@ -59,10 +59,10 @@ static struct {
 
     pthread_attr_t attr;
 } threads_globals = {
-//    .exited = {
-//        .spinlock = SPINLOCK_INITIALIZER,
-//        .list = NULL,
-//    },
+    .exited = {
+        .spinlock = SPINLOCK_INITIALIZER,
+        .list = NULL,
+    },
     .running = {
         .spinlock = SPINLOCK_INITIALIZER,
         .list = NULL,
@@ -261,29 +261,29 @@ void query_target_free(void);
 void service_exits(void);
 void rrd_collector_finished(void);
 
-//static void nd_thread_join_exited_detached_threads(void) {
-//    while(1) {
-//        spinlock_lock(&threads_globals.exited.spinlock);
-//
-//        ND_THREAD *nti = threads_globals.exited.list;
-//        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
-//            nti = nti->next;
-//
-//        if(nti) {
-//            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-//            nti->list = ND_THREAD_LIST_NONE;
-//        }
-//
-//        spinlock_unlock(&threads_globals.exited.spinlock);
-//
-//        if(nti) {
-//            nd_log(NDLS_DAEMON, NDLP_INFO, "Joining detached thread '%s', tid %d", nti->tag, nti->tid);
-//            nd_thread_join(nti);
-//        }
-//        else
-//            break;
-//    }
-//}
+static void nd_thread_join_exited_detached_threads(void) {
+    while(1) {
+        spinlock_lock(&threads_globals.exited.spinlock);
+
+        ND_THREAD *nti = threads_globals.exited.list;
+        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
+            nti = nti->next;
+
+        if(nti) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
+
+        spinlock_unlock(&threads_globals.exited.spinlock);
+
+        if(nti) {
+            nd_log(NDLS_DAEMON, NDLP_INFO, "Joining detached thread '%s', tid %d", nti->tag, nti->tid);
+            nd_thread_join(nti);
+        }
+        else
+            break;
+    }
+}
 
 static void nd_thread_exit(ND_THREAD *nti) {
 
@@ -342,12 +342,12 @@ static void nd_thread_exit(ND_THREAD *nti) {
     }
     spinlock_unlock(&threads_globals.running.spinlock);
 
-//    if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
-//        spinlock_lock(&threads_globals.exited.spinlock);
-//        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-//        nti->list = ND_THREAD_LIST_EXITED;
-//        spinlock_unlock(&threads_globals.exited.spinlock);
-//    }
+    if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
+        spinlock_lock(&threads_globals.exited.spinlock);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_EXITED;
+        spinlock_unlock(&threads_globals.exited.spinlock);
+    }
 }
 
 static void *nd_thread_starting_point(void *ptr) {
@@ -389,7 +389,7 @@ bool nd_thread_is_me(ND_THREAD *nti) {
 }
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg) {
-//    nd_thread_join_exited_detached_threads();
+    nd_thread_join_exited_detached_threads();
 
     ND_THREAD *nti = callocz(1, sizeof(*nti));
     spinlock_init(&nti->canceller.spinlock);
@@ -467,12 +467,12 @@ int nd_thread_join(ND_THREAD *nti) {
         }
         spinlock_unlock(&threads_globals.running.spinlock);
 
-//        spinlock_lock(&threads_globals.exited.spinlock);
-//        if(nti->list == ND_THREAD_LIST_EXITED) {
-//            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-//            nti->list = ND_THREAD_LIST_NONE;
-//        }
-//        spinlock_unlock(&threads_globals.exited.spinlock);
+        spinlock_lock(&threads_globals.exited.spinlock);
+        if(nti->list == ND_THREAD_LIST_EXITED) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
+        spinlock_unlock(&threads_globals.exited.spinlock);
 
         freez(nti);
     }
