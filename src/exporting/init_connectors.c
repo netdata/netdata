@@ -91,7 +91,37 @@ int init_connectors(struct engine *engine)
 
         // dispatch the instance worker thread
         char threadname[ND_THREAD_TAG_MAX + 1];
-        snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPCON[%zu]", instance->index);
+        
+        // Use connector-specific thread names for better identification
+        switch (instance->config.type) {
+            case EXPORTING_CONNECTOR_TYPE_GRAPHITE:
+            case EXPORTING_CONNECTOR_TYPE_GRAPHITE_HTTP:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPGRPH[%zu]", instance->index);
+                break;
+            case EXPORTING_CONNECTOR_TYPE_JSON:
+            case EXPORTING_CONNECTOR_TYPE_JSON_HTTP:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPJSON[%zu]", instance->index);
+                break;
+            case EXPORTING_CONNECTOR_TYPE_OPENTSDB:
+            case EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPTSDB[%zu]", instance->index);
+                break;
+            case EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPPRW[%zu]", instance->index);
+                break;
+            case EXPORTING_CONNECTOR_TYPE_KINESIS:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPKINS[%zu]", instance->index);
+                break;
+            case EXPORTING_CONNECTOR_TYPE_PUBSUB:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPPUBS[%zu]", instance->index);
+                break;
+            case EXPORTING_CONNECTOR_TYPE_MONGODB:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPMNG[%zu]", instance->index);
+                break;
+            default:
+                snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPCON[%zu]", instance->index);
+        }
+        
         instance->thread = nd_thread_create(threadname, NETDATA_THREAD_OPTION_JOINABLE, instance->worker, instance);
         if (!instance->thread) {
             netdata_log_error("EXPORTING: cannot create thread worker for instance %s", instance->config.name);
