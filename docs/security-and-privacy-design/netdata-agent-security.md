@@ -32,12 +32,12 @@ Raw data remains local and is never transmitted.
 
 Netdata Agent safeguards your data at every stage.
 
-| **Aspect** | **Protection Mechanism** |
-|:-----------|:--------------------------|
-| Raw Data | Stays on your system |
-| Plugins | Hard-coded for collection only, reject external commands |
-| Functions Feature | Predefined plugin functions, UI only calls these |
-| Privileges | Most plugins run without escalated privileges; the main process does not require them |
+| **Aspect**        | **Protection Mechanism**                                                              |
+|:------------------|:--------------------------------------------------------------------------------------|
+| Raw Data          | Stays on your system                                                                  |
+| Plugins           | Hard-coded for collection only, reject external commands                              |
+| Functions Feature | Predefined plugin functions, UI only calls these                                      |
+| Privileges        | Most plugins run without escalated privileges; the main process does not require them |
 
 Plugins needing escalated privileges are isolated:
 
@@ -58,12 +58,12 @@ Netdata's decentralized design keeps all data local.
 
 Netdata secures all internal and external communications:
 
-| **Communication** | **Protection** |
-|:------------------|:----------------|
-| Plugins to Daemon | Ephemeral in-memory pipes, isolated from other processes |
-| Streaming Metrics | Requires API keys, optional TLS encryption |
-| Web API | Supports TLS if configured |
-| Cloud Connection | MQTT over WebSockets over TLS with public/private key authorization |
+| **Communication** | **Protection**                                                      |
+|:------------------|:--------------------------------------------------------------------|
+| Plugins to Daemon | Ephemeral in-memory pipes, isolated from other processes            |
+| Streaming Metrics | Requires API keys, optional TLS encryption                          |
+| Web API           | Supports TLS if configured                                          |
+| Cloud Connection  | MQTT over WebSockets over TLS with public/private key authorization |
 
 Public and private keys are exchanged securely during Cloud provisioning.
 
@@ -85,11 +85,11 @@ flowchart TD
 
 Netdata supports multiple authentication methods depending on connection type:
 
-| **Connection** | **Authentication Method** |
-|:---------------|:---------------------------|
-| Direct Agent Access | Typically unauthenticated, relies on LAN isolation or firewall policies |
-| Streaming Between Agents | Requires API key authentication, optional TLS |
-| Agent-to-Cloud | Public/private key cryptography with mandatory TLS |
+| **Connection**           | **Authentication Method**                                               |
+|:-------------------------|:------------------------------------------------------------------------|
+| Direct Agent Access      | Typically unauthenticated, relies on LAN isolation or firewall policies |
+| Streaming Between Agents | Requires API key authentication, optional TLS                           |
+| Agent-to-Cloud           | Public/private key cryptography with mandatory TLS                      |
 
 :::tip
 
@@ -121,10 +121,10 @@ Learn more in [Netdata's GitHub Security Policy](https://github.com/netdata/netd
 
 Netdata Agent is resilient against major security threats:
 
-| **Threat** | **Defense Mechanism** |
-|:-----------|:----------------------|
-| DDoS Attacks | Fixed thread counts, automatic memory management, resource prioritization |
-| SQL Injections | No UI data passed back to database-accessing plugins |
+| **Threat**                 | **Defense Mechanism**                                                      |
+|:---------------------------|:---------------------------------------------------------------------------|
+| DDoS Attacks               | Fixed thread counts, automatic memory management, resource prioritization  |
+| SQL Injections             | No UI data passed back to database-accessing plugins                       |
 | System Resource Starvation | Nice priority protects production apps, early termination in OS-OOM events |
 
 Additional protections include:
@@ -139,11 +139,11 @@ Additional protections include:
 
 You can tailor the Agent's security settings:
 
-| **Setting** | **Options Available** |
-|:------------|:----------------------|
-| TLS Encryption | Configurable for web API and streaming |
-| Access Control Lists (ACLs) | Limit endpoint access by IP address |
-| CPU/Memory Priority | Adjust scheduling priority and memory thresholds |
+| **Setting**                 | **Options Available**                            |
+|:----------------------------|:-------------------------------------------------|
+| TLS Encryption              | Configurable for web API and streaming           |
+| Access Control Lists (ACLs) | Limit endpoint access by IP address              |
+| CPU/Memory Priority         | Adjust scheduling priority and memory thresholds |
 
 :::tip
 

@@ -9,7 +9,6 @@ We follow best practices to support GDPR, CCPA, PCI DSS, SOC 2, and HIPAA compli
 
 :::
 
-
 ## Introduction
 
 This page explains how Netdata designs and operates secure, privacy-respecting services across the Netdata Agent and Netdata Cloud.
@@ -24,9 +23,9 @@ Netdata builds security into every layer. You retain control over your observabi
 
 Netdata separates your system information into two categories:
 
-| **Type** | **Description** | **Where It Lives** |
-|:---------|:----------------|:-------------------|
-| Observability Data | Metrics and logs | Stored locally, fully under your control |
+| **Type**               | **Description**                 | **Where It Lives**                                                |
+|:-----------------------|:--------------------------------|:------------------------------------------------------------------|
+| Observability Data     | Metrics and logs                | Stored locally, fully under your control                          |
 | Observability Metadata | Hostnames, metric names, alerts | Routed securely to Netdata Cloud for dashboards and notifications |
 
 This ensures that your critical system insights remain private, and only minimal metadata flows to the cloud.
@@ -97,9 +96,9 @@ Contact Netdata Support to request a DPA.
 
 ### Data Transfers
 
-| **Type** | **Handling** |
-|:---------|:-------------|
-| Observability Data | Remains on your infrastructure |
+| **Type**               | **Handling**                                                                 |
+|:-----------------------|:-----------------------------------------------------------------------------|
+| Observability Data     | Remains on your infrastructure                                               |
 | Observability Metadata | Securely transferred and stored in US-based data centers (Google Cloud, AWS) |
 
 Data is tunneled securely in real-time without being stored on Netdata Cloud servers.
@@ -110,9 +109,9 @@ All data handling follows GDPR and CCPA requirements.
 
 You can manage your privacy rights easily:
 
-| **Right** | **How to Access** |
-|:----------|:------------------|
-| Access, correct, or delete your data | Use the Netdata Cloud UI |
+| **Right**                              | **How to Access**                                                                                |
+|:---------------------------------------|:-------------------------------------------------------------------------------------------------|
+| Access, correct, or delete your data   | Use the Netdata Cloud UI                                                                         |
 | Fully delete your account and all data | Log in to [app.netdata.cloud](https://app.netdata.cloud), go to Profile, and delete your account |
 
 :::tip
@@ -131,10 +130,10 @@ Netdata continuously updates its policies and technical controls to stay aligned
 
 Netdata collects anonymous installation and telemetry statistics to improve its services.
 
-| **Collected** | **Used For** |
-|:--------------|:-------------|
+| **Collected**                                                 | **Used For**                                          |
+|:--------------------------------------------------------------|:------------------------------------------------------|
 | Installation info (plugins, operating systems, feature usage) | Guide product development and prioritize improvements |
-| Telemetry events (errors, performance metrics) | Identify issues and enhance stability |
+| Telemetry events (errors, performance metrics)                | Identify issues and enhance stability                 |
 
 - Observability data (metrics and logs) is never collected.
 - Metadata is anonymized before storage.
@@ -160,15 +159,15 @@ Netdata does not sell or share anonymous statistics with any third parties.
 
 Netdata enforces layered security controls:
 
-| **Area** | **Control** |
-|:---------|:------------|
-| Infrastructure Management | Infrastructure as Code (Terraform) |
-| Authentication | GitHub SSO, Google SSO, email validation |
-| Data Handling | TLS encryption, session tracking |
-| Access Control | Role-based access, multi-factor authentication |
-| Threat Defense | DDoS protection, vulnerability scanning |
-| Developer Process | Static analyzers, mandatory senior code reviews |
-| Production Isolation | No direct access to production environments |
+| **Area**                  | **Control**                                     |
+|:--------------------------|:------------------------------------------------|
+| Infrastructure Management | Infrastructure as Code (Terraform)              |
+| Authentication            | GitHub SSO, Google SSO, email validation        |
+| Data Handling             | TLS encryption, session tracking                |
+| Access Control            | Role-based access, multi-factor authentication  |
+| Threat Defense            | DDoS protection, vulnerability scanning         |
+| Developer Process         | Static analyzers, mandatory senior code reviews |
+| Production Isolation      | No direct access to production environments     |
 
 :::tip
 
@@ -220,13 +219,13 @@ Request a BAA through Netdata Support if required.
 
 Netdata’s operations align with SOC 2 Trust Service Criteria:
 
-| **Principle** | **Practices** |
-|:--------------|:--------------|
-| Security | TLS encryption, strict access controls |
-| Availability | Resilient systems, continuous monitoring |
-| Processing Integrity | Reliable metric collection |
-| Confidentiality | Metadata isolation, role-based access |
-| Privacy | GDPR and CCPA-compliant data handling |
+| **Principle**        | **Practices**                            |
+|:---------------------|:-----------------------------------------|
+| Security             | TLS encryption, strict access controls   |
+| Availability         | Resilient systems, continuous monitoring |
+| Processing Integrity | Reliable metric collection               |
+| Confidentiality      | Metadata isolation, role-based access    |
+| Privacy              | GDPR and CCPA-compliant data handling    |
 
 Netdata is not currently SOC 2 certified but applies equivalent controls.
 
