@@ -2,12 +2,13 @@
 
 :::tip
 
-**Executive Summary**  
-Netdata Agent is designed with a security-first approach to protect system data.  
-Raw data never leaves the system where Netdata is installed.  
-Only processed metrics and minimal metadata are stored, streamed, or archived.  
-Communications are secured with TLS, authentication uses API keys and cryptographic validation, and Agent architecture enforces isolation and resilience.  
-Netdata Agent follows best practices supporting PCI DSS, HIPAA, GDPR, and CCPA compliance, and is continuously audited and improved for security.
+**Executive Summary**
+
+- Netdata Agent is designed with a security-first approach to protect system data.
+- Raw data never leaves the system where Netdata is installed.
+- Only processed metrics and minimal metadata are stored, streamed, or archived.
+- Communications are secured with TLS, authentication uses API keys and cryptographic validation, and Agent architecture enforces isolation and resilience.
+- Netdata Agent follows best practices supporting PCI DSS, HIPAA, GDPR, and CCPA compliance, and is continuously audited and improved for security.
 
 :::
 
@@ -83,7 +84,7 @@ flowchart TD
 
 ## Authentication
 
-Netdata supports multiple authentication methods depending on connection type:
+Netdata supports multiple authentication methods depending on the connection type:
 
 | **Connection**           | **Authentication Method**                                               |
 |:-------------------------|:------------------------------------------------------------------------|

@@ -1,11 +1,12 @@
 # Security and Privacy Design
 
-::::tip
+:::tip
 
-**Executive Summary**  
-Netdata is built with security-first principles to protect user data across all systems.  
-Observability data remains local, while minimal metadata travels securely to Netdata Cloud.  
-We follow best practices to support GDPR, CCPA, PCI DSS, SOC 2, and HIPAA compliance.
+**Executive Summary**
+
+- Netdata is built with security-first principles to protect user data across all systems.
+- Observability data remains local, while minimal metadata travels securely to Netdata Cloud.
+- We follow best practices to support GDPR, CCPA, PCI DSS, SOC 2, and HIPAA compliance.
 
 :::
 
@@ -103,7 +104,7 @@ Contact Netdata Support to request a DPA.
 
 Data is tunneled securely in real-time without being stored on Netdata Cloud servers.
 
-All data handling follows GDPR and CCPA requirements.
+Data processing complies with GDPR and CCPA requirements.
 
 ### Privacy Rights
 
@@ -205,7 +206,7 @@ Netdata aligns with HIPAA security practices:
 - Minimized data handling
 - Secure authentication and encryption
 
-Netdata provides **Business Associate Agreements (BAAs)** for healthcare organizations but is **not HIPAA certified**.
+Netdata provides **Business Associate Agreements (BAAs)** for healthcare organizations but is **not HIPAA-certified**.
 
 :::tip
 
