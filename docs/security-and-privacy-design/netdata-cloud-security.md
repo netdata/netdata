@@ -132,82 +132,16 @@ If self-service isn't available, submit written requests processed under applica
 
 ## User Privacy and Data Protection
 
-Netdata Cloud prioritizes privacy and data protection.
+Netdata Cloud prioritizes privacy and data protection, continuously reviewing and updating privacy and security practices.
 
-### Data Collection
-
-Minimal personal information collected:
-
-| **Data**      | **Purpose**                       |
-|:--------------|:----------------------------------|
-| Email Address | Account, communication, analytics |
-| IP Address    | Web proxy access logs             |
-
-### Data Usage
-
-Collected data is:
-
-- Stored in AWS databases
-- Copied to BigQuery for analytics
-- Used for product improvement
-
-With consent to analytical cookies, tracking occurs via:
-
-- Google Analytics
-- Posthog
-- Gainsight PX
-
-Stripe securely handles payments.
-
-### Data Sharing
-
-Netdata Cloud doesn't sell or share personal data.  
-Third-party services supporting operations:
-
-- Google Cloud/AWS (infrastructure)
-- Stripe (payments)
-- Analytics services (product improvement)
-
-### Data Protection
-
-All infrastructure data uses encrypted ACLK.  
-All user-Cloud communication uses TLS encryption.
-
-### User Control Over Data
-
-Users can:
-
-- Access their data
-- Correct inaccuracies
-- Retrieve personal data
-- Delete accounts
-
-Temporary maintenance may limit access, but Netdata ensures legal compliance.
-
-### Compliance with Data Protection Laws
-
-Netdata Cloud complies fully with:
-
-- GDPR
-- CCPA
-
-### Data Transfer
-
-All transfers use secure, encrypted WebSocket (WSS) connections.
-
-### Use of Tracking Technologies
-
-With consent, Netdata Cloud uses analytical cookies tracked via:
-
-- Google Analytics
-- Posthog
-- Gainsight PX
-
-### Data Breach Notification
-
-For data breaches:
-
-- Netdata follows DPA guidelines and industry timelines
-- Users receive notifications per data protection laws
-
-Netdata continuously reviews and updates privacy and security practices.
+| **Category**              | **Details**                                                                                                                                                                                                               |
+|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Data Collection**       | • Email Address (account, communication, analytics)<br/>• IP Address (web proxy access logs)                                                                                                                              |
+| **Data Usage**            | • Stored in AWS databases<br/>• Copied to BigQuery for analytics<br/>• Used for product improvement<br/>• With consent, tracking via Google Analytics, Posthog, and Gainsight PX<br/>• Stripe for secure payment handling |
+| **Data Sharing**          | • No selling or sharing of personal data<br/>• Third-party services: Google Cloud/AWS (infrastructure), Stripe (payments), Analytics services                                                                             |
+| **Data Protection**       | • Encrypted ACLK for all infrastructure data<br/>• TLS encryption for all user-Cloud communication                                                                                                                        |
+| **User Control**          | • Access personal data<br/>• Correct inaccuracies<br/>• Retrieve personal data<br/>• Delete accounts<br/>• Note: Temporary maintenance may limit access                                                                   |
+| **Compliance**            | • Full compliance with GDPR and CCPA                                                                                                                                                                                      |
+| **Data Transfer**         | • Secure, encrypted WebSocket (WSS) connections for all transfers                                                                                                                                                         |
+| **Tracking Technologies** | • With consent: analytical cookies tracked via Google Analytics, Posthog, and Gainsight PX                                                                                                                                |
+| **Data Breach Protocol**  | • Follows DPA guidelines and industry timelines<br/>• User notifications as required by data protection laws<br/>• Continuous review and updates to privacy and security practices                                        |
