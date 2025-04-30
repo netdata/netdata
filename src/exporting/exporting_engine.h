@@ -74,6 +74,7 @@ struct instance_config {
     const char *prefix;
     const char *label_prefix;
     const char *hostname;
+    const char *thread_tag;
 
     int update_every;
     int buffer_on_failures;
