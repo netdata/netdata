@@ -3,6 +3,8 @@
 #include "libnetdata/libnetdata.h"
 #include "eval-internal.h"
 
+int eval_hardcode_unittest(void);
+
 // Mock variable lookup function for testing
 static bool test_variable_lookup(STRING *variable, void *data __maybe_unused, NETDATA_DOUBLE *result) {
     const char *var_name = string2str(variable);

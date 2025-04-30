@@ -166,12 +166,12 @@ int eval_hardcode_unittest(void) {
         
         // Parse the expression
         const char *failed_at = NULL;
-        int error = 0;
+        EVAL_ERROR error = EVAL_ERROR_OK;
         EVAL_EXPRESSION *exp = expression_parse(tc->expression, &failed_at, &error);
         
-        if (!exp) {
+        if (exp != EVAL_ERROR_OK) {
             printf("  FAILED: Could not parse expression, error: %d (%s)\n", 
-                   error, expression_strerror(error));
+                   (int)error, expression_strerror(error));
             failed++;
             continue;
         }
