@@ -233,42 +233,42 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.4.1.0
       name: powerFactxy1
     description: XY1 power factor x 100
-    unit: "1"
+    unit: "10*2.{power_factor}"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.4.2.0
       name: powerFactyz1
     description: YZ1 power factor x 100
-    unit: "1"
+    unit: "10*2.{power_factor}"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.4.3.0
       name: powerFactzx1
     description: ZX1 power factor x 100
-    unit: "1"
+    unit: "10*2.{power_factor}"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.4.4.0
       name: powerFactxy2
     description: XY2 power factor x 100
-    unit: "1"
+    unit: "10*2.{power_factor}"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.4.5.0
       name: powerFactyz2
     description: YZ2 power factor x 100
-    unit: "1"
+    unit: "10*2.{power_factor}"
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.4.6.0
       name: powerFactzx2
     description: ZX2 power factor x 100
-    unit: "1"
+    unit: "10*2.{power_factor}"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -902,7 +902,7 @@ metrics:
         OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
         name: cpiPduBranchPowerFactor
         description: Power factor for the branch
-        unit: "1"
+        unit: "10*2.1"
 
       - # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
         OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.8

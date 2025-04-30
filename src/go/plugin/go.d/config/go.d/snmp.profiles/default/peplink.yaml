@@ -75,7 +75,7 @@ metrics:
       - name: peplink.deviceFanSpeed
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.3
         description: Device fan speed
-        unit: "1/s"
+        unit: "1.s"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.1

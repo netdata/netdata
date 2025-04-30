@@ -176,31 +176,31 @@ metrics:
       name: ibm.dpStatusEnvironmentalSensorscpu1rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.4.0
       description: CPU 1 fan speed in revolutions per minute
-      unit: "1/min"
+      unit: "1.min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu2rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.5.0
       description: CPU 2 fan speed in revolutions per minute
-      unit: "1/min"
+      unit: "1.min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis1rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.6.0
       description: Chassis 1 fan speed in revolutions per minute
-      unit: "1/min"
+      unit: "1.min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis2rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.7.0
       description: Chassis 2 fan speed in revolutions per minute
-      unit: "1/min"
+      unit: "1.min"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis3rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.8.0
       description: Chassis 3 fan speed in revolutions per minute
-      unit: "1/min"
+      unit: "1.min"
 #  - MIB: DATAPOWER-STATUS-MIB
 #    symbol:
 #      name: ibm.dpStatusEnvironmentalSensorsCaseOpen

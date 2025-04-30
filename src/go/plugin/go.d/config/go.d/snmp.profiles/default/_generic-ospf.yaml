@@ -11,7 +11,7 @@ metrics:
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
         description: The number of times this neighbor relationship has changed state or an error has occurred
-        unit: "1"
+        unit: "{change}"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
         description: The current length of the retransmission queue
@@ -79,7 +79,7 @@ metrics:
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
         description: The number of times this virtual link has changed its state or an error has occurred
-        unit: "1"
+        unit: "{change}"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
         description: The current length of the retransmission queue

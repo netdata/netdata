@@ -402,7 +402,7 @@ metrics:
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.34
         name: ltmVirtualServStatCurrentConnsPerSec
         description: The number of current connections per second to the specified virtual server
-        unit: "1/s"
+        unit: "1.s"
       - OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.35
         name: ltmVirtualServStatDurationRateExceeded
         description: Duration of time in seconds the specified virtual server has exceeded the configured connection rate limit
@@ -578,7 +578,7 @@ metrics:
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.22
         name: ltmNodeAddrStatCurrentConnsPerSec
         description: The number of current connections per second to the specified node address
-        unit: "1/s"
+        unit: "1.s"
       - OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.23
         name: ltmNodeAddrStatDurationRateExceeded
         description: Duration of time in seconds the specified node address has exceeded the configured connection rate limit
@@ -835,7 +835,7 @@ metrics:
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.30
         name: ltmPoolMemberStatCurrentConnsPerSec
         description: The number of current connections per second to the specified pool member
-        unit: "1/s"
+        unit: "1.s"
       - OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.31
         name: ltmPoolMemberStatDurationRateExceeded
         description: Duration of time in seconds the specified pool member has exceeded the configured connection rate limit

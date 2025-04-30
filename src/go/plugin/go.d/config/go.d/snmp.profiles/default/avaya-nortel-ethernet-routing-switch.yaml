@@ -44,8 +44,6 @@ metrics:
     symbols:
       - name: avaya.s5ChasCom
         constant_value_one: true
-        description: Constant value one for chassis component table
-        unit: "1"
     metric_tags:
       - symbol:
           name: avaya.s5ChasComDescr

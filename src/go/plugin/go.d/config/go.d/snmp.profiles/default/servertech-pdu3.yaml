@@ -192,8 +192,6 @@ metrics:
     symbols:
       - name: servertech.sentry3.outlet
         constant_value_one: true
-        description: Outlet constant value one
-        unit: "1"
     metric_tags:
       - symbol:
           name: servertech.sentry3.outletID
@@ -256,8 +254,6 @@ metrics:
     symbols:
       - name: servertech.sentry3.envMon
         constant_value_one: true
-        description: Environmental monitor constant value one
-        unit: "1"
     metric_tags:
       - symbol:
           name: servertech.sentry3.envMonID

@@ -231,8 +231,6 @@ metrics:
     metric_tags:
       - index: 1  # tlpAlarmId
         tag: tlp_alarm_id
-        description: A unique identifier for an alarm condition.
-        unit: "{alarm_condition}"
       - symbol:
           OID: 1.3.6.1.4.1.850.1.3.2.1.2
           name: tlpAlarmDescr

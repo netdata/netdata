@@ -137,12 +137,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.3
         name: tlUpsOutputCircuitLoadCurrent
-        description: The magnitude of the present output current in tenths of an amp
-        unit: "0.1A"
+        description: The magnitude of the present output current in deciamperes
+        unit: "dA"
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.4
         name: tlUpsOutputCircuitVoltage
         description: The magnitude of the present circuit voltage in tenths of an volt
-        unit: "0.1V"
+        unit: "dV"
       - OID: 1.3.6.1.4.1.850.100.1.4.7.1.5
         name: tlUpsOutputCircuitPower
         description: The magnitude of the present power in watts

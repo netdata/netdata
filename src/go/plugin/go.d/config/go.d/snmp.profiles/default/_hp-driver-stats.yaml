@@ -63,7 +63,7 @@ metrics:
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.22
         name: cpqDaPhyDrvSpinupTime
         description: Time it takes for a physical drive to spin up to full speed in tenths of seconds
-        unit: "0.1s"
+        unit: "ds"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
         name: cpqDaPhyDrvSize
         description: Size of the physical drive in megabytes

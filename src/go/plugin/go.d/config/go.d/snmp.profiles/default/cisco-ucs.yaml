@@ -244,15 +244,15 @@ metrics:
       - name: cucsComputeMbPowerStatsConsumedPower
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.4
         description: "consumed power"
-        unit: "\"W\""
+        unit: "W"
       - name: cucsComputeMbPowerStatsInputCurrent
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.8
         description: "input current"
-        unit: "\"A\""
+        unit: "A"
       - name: cucsComputeMbPowerStatsInputVoltage
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.12
         description: "input voltage"
-        unit: "\"V\""
+        unit: "V"
     metric_tags:
       - symbol:
           name: cucsComputeMbPowerStatsDn

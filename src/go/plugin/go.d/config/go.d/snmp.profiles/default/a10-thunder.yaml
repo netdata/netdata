@@ -240,7 +240,7 @@ metrics:
       - name: axFanSpeed
         OID: 1.3.6.1.4.1.22610.2.4.1.5.9.1.4
         description: The fan1's speed
-        unit: "1/s"
+        unit: "1.s"
     metric_tags:
       - symbol:
           name: axFanName

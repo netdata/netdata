@@ -17,19 +17,19 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.9.9.178.1.6.2.1.0
       name: cceAlarmCriticalCount
-    description: The value of this object specifies the number of alarms currently raised with a severity of 'critical'.
+    description: Number of alarms currently raised with a severity of 'critical'.
     unit: "{alarm}"
   - MIB: CISCO-CONTENT-ENGINE-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.178.1.6.2.2.0
       name: cceAlarmMajorCount
-    description: The value of this object specifies the number of alarms currently raised with a severity of 'major'.
+    description: Number of alarms currently raised with a severity of 'major'.
     unit: "{alarm}"
   - MIB: CISCO-CONTENT-ENGINE-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.178.1.6.2.3.0
       name: cceAlarmMinorCount
-    description: The value of this object specifies the number of alarms currently raised with a severity of 'minor'.
+    description: Number of alarms currently raised with a severity of 'minor'.
     unit: "{alarm}"
   - MIB: CISCO-WAN-OPTIMIZATION-MIB
     symbol:

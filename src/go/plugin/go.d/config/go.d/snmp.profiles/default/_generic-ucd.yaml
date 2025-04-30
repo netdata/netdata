@@ -109,12 +109,12 @@ metrics:
         OID: 1.3.6.1.4.1.2021.13.15.1.1.5
         metric_type: monotonic_count
         description: The number of read accesses from this device since boot
-        unit: "{access}"
+        unit: "{read_access}"
       - name: ucd.diskIOWrites
         OID: 1.3.6.1.4.1.2021.13.15.1.1.6
         metric_type: monotonic_count
         description: The number of write accesses to this device since boot
-        unit: "{access}"
+        unit: "{write_access}"
       - name: ucd.diskIOLA1
         OID: 1.3.6.1.4.1.2021.13.15.1.1.9
         description: The 1 minute average load of disk (%)

@@ -29,8 +29,6 @@ metrics:
     symbols:
       - name: avaya.avEntPhyChFru
         constant_value_one: true
-        description: Avaya chassis FRU presence indicator
-        unit: "{avaya_entity}"
     metric_tags:
       - index: 1
         tag: avaya_ent_physical_index

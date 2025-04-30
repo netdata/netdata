@@ -9,13 +9,13 @@ metrics:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1  # hrStorageSize.1 (hrStorageSize at index 1)
     description: Size of the storage represented by this entry in units of hrStorageAllocationUnits
-    unit: "{access_point}"
+    unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 (hrStorageUsed at index 1)
     description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
-    unit: "{access_point}"
+    unit: "By"
   - MIB: INTERCEPTOR-MIB
     symbol:
       name: cpu.usage
@@ -56,7 +56,7 @@ metrics:
       - name: riverbed.interceptor.neighborConnectionCount
         OID: 1.3.6.1.4.1.17163.1.3.2.6.1.4
         description: Number of neighbor connections
-        unit: "{access_point}"
+        unit: "{connection}"
     metric_tags:
       - symbol:
           name: riverbed.interceptor.neighborName

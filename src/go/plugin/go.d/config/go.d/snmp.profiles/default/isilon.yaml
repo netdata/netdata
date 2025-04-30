@@ -174,7 +174,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12124.2.2.10.1.3
         name: protocolOpsPerSecond
         description: The number of operations per second for the last 5 second
-        unit: "1/s"
+        unit: "1.s"
       - OID: 1.3.6.1.4.1.12124.2.2.10.1.14
         name: latencyMin
         description: The minimum latency in microseconds for all operations for the protocol

@@ -6,8 +6,6 @@ metrics:
     symbols:
       - name: lldpRem
         constant_value_one: true
-        description: "Information about a particular physical network connection"
-        unit: "{access_point}"
     metric_tags:
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.6

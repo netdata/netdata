@@ -76,8 +76,6 @@ metrics:
     symbols:
       - name: huawei.hwStackPort
         constant_value_one: true
-        description: Stack port constant value one
-        unit: "1"
     metric_tags:
       - symbol:
           name: huawei.hwStackPortName
