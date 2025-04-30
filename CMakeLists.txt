@@ -852,6 +852,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/eval/eval.h
         src/libnetdata/eval/eval-internal.h
         src/libnetdata/eval/eval-unittest.c
+        src/libnetdata/eval/eval-unittest-hardcoding.c
         src/libnetdata/eval/re2c_lemon/lexer.c
         src/libnetdata/eval/re2c_lemon/parser.c
         src/libnetdata/eval/re2c_lemon/parser_wrapper.c

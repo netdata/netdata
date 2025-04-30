@@ -1110,6 +1110,8 @@ static TestGroup test_groups[] = {
     {"Crash Tests", crash_tests, ARRAY_SIZE(crash_tests)},
 };
 
+int eval_hardcode_unittest(void);
+
 int eval_unittest(void) {
     // Test cases for basic arithmetic operations
 
@@ -1203,6 +1205,9 @@ int eval_unittest(void) {
     printf("Total tests: %d\n", total_tests);
     printf("Passed: %d (%.1f%%)\n", total_passed, (float)total_passed / total_tests * 100);
     printf("Failed: %d (%.1f%%)\n", total_failed, (float)total_failed / total_tests * 100);
-    
+
+    if(!total_failed)
+        return eval_hardcode_unittest();
+
     return total_failed > 0 ? 1 : 0;
 }
