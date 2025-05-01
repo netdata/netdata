@@ -220,7 +220,7 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
 
 static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
 {
-    if (unlikely(!labels || !key || !value)) return;
+    if (unlikely(!labels || !key)) return;
 
     RRDLABEL *new_label = add_label_name_value(key, value);
 
