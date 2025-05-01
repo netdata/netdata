@@ -1393,20 +1393,6 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
-/*
-void dict_mssql_locks_wait_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
-{
-    if (!mli->rd_lockWait) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "%s", mli->resourceID);
-        netdata_fix_chart_name(id);
-
-        mli->rd_lockWait = rrddim_add(mi->st_lockWait, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
-    rrddim_set_by_pointer(mi->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
-}
- */
-
 void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
 {
     if (!mi->st_deadLocks) {
@@ -1432,20 +1418,6 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
-/*
-void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
-{
-    if (!mli->rd_deadLocks) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "%s", mli->resourceID);
-        netdata_fix_chart_name(id);
-
-        mli->rd_deadLocks = rrddim_add(mi->st_deadLocks, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
-    rrddim_set_by_pointer(mi->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
-}
-*/
-
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_LOCKS]);
@@ -1457,33 +1429,6 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
     dict_mssql_locks_wait_charts(mi, update_every);
     dict_mssql_dead_locks_charts(mi, update_every);
-    /*
-    PERF_INSTANCE_DEFINITION *pi = NULL;
-    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
-            break;
-
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
-
-        if (!strcasecmp(windows_shared_buffer, "_Total"))
-            continue;
-
-        struct mssql_lock_instance *mli =
-            dictionary_set(mi->locks_instances, windows_shared_buffer, NULL, sizeof(*mli));
-        if (!mli)
-            continue;
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait))
-            dict_mssql_locks_wait_dimension(mi, mli);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks))
-            dict_mssql_deadlocks_dimension(mi, mli);
-
-        mli->parent = mi;
-    }
-     */
 
     if (mi->st_lockWait)
         rrdset_done(mi->st_lockWait);
