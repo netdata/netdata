@@ -256,6 +256,12 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
     }
 }
 
+static inline void netdata_MSSQL_release_results(SQLHSTMT *stmt) {
+    SQLFreeStmt(stmt, SQL_CLOSE);
+    SQLFreeStmt(stmt, SQL_UNBIND);
+    SQLFreeStmt(stmt, SQL_RESET_PARAMS);
+}
+
 static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname, char *instance)
 {
     long db_size = 0;
@@ -285,7 +291,7 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
-    SQLFreeStmt(stmt, SQL_CLOSE);
+    netdata_MSSQL_release_results(stmt);
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
@@ -399,7 +405,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     } while (true);
 
 endtransactions:
-    SQLFreeStmt(mdi->parent->conn.dbTransactionSTMT, SQL_CLOSE);
+    netdata_MSSQL_release_results(mdi->parent->conn.dbTransactionSTMT);
 }
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-tran-locks-transact-sql?view=sql-server-ver16
@@ -465,7 +471,7 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
     } while (true);
 
 endlocks:
-    SQLFreeStmt(mdi->parent->conn.dbLocksSTMT, SQL_CLOSE);
+    netdata_MSSQL_release_results(mdi->parent->conn.dbLocksSTMT);
 }
 
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -511,6 +517,7 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
     ret = SQLExecDirect(mi->conn.checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        perm = LONG_MAX;
         goto endperm;
     }
 
@@ -518,17 +525,19 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
 
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        perm = LONG_MAX;
         goto endperm;
     }
 
     ret = SQLFetch(mi->conn.checkPermSTMT);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH, mi->instanceID);
-        return (ULONGLONG)ULONG_LONG_MAX;
+        perm = LONG_MAX;
+        goto endperm;
     }
 
-    SQLFreeStmt(mi->conn.checkPermSTMT, SQL_CLOSE);
 endperm:
+    netdata_MSSQL_release_results(mi->conn.checkPermSTMT);
     return perm;
 }
 
@@ -576,7 +585,7 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
     } while (true);
 
 enddblist:
-    SQLFreeStmt(mi->conn.databaseListSTMT, SQL_CLOSE);
+    netdata_MSSQL_release_results(mi->conn.databaseListSTMT);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
