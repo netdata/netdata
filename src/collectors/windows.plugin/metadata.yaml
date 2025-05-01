@@ -1832,7 +1832,19 @@ modules:
               unit: deadlocks/s
               chart_type: line
               dimensions:
-                - name: deadlock
+                - name: deadlocks
+            - name: mssql.database_lock_timeouts
+              description: Lock that timed out.
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: mssql.database_lock_requests
+              description: Number of new locks and lock conversions requested.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
             - name: mssql.database_backup_restore_operations
               description: Backup IO per database
               unit: operations/s
