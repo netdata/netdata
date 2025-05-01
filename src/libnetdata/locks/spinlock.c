@@ -9,12 +9,12 @@
 void spinlock_deadlock_detect(usec_t *timestamp, const char *type, const char *func) {
     if (!*timestamp) {
         // First time checking - initialize the timestamp
-        *timestamp = now_monotonic_high_precision_usec();
+        *timestamp = now_monotonic_usec();
         return;
     }
 
     // Check if we've exceeded the timeout
-    usec_t now = now_monotonic_high_precision_usec();
+    usec_t now = now_monotonic_usec();
     if (now - *timestamp >= SPINLOCK_DEADLOCK_TIMEOUT_SEC * USEC_PER_SEC) {
         // We've been spinning for too long - likely deadlock
         fatal("DEADLOCK DETECTED: %s in function '%s' could not be acquired for %"PRIi64" seconds",
