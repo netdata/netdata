@@ -335,7 +335,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     watcher_shutdown_end();
     watcher_thread_stop();
-    finalize_all_prepared_sql_statements();
 
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");

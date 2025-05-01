@@ -420,7 +420,12 @@ extern sqlite3 *db_context_meta;
 
 void sqlite_close_databases(void)
 {
+    // In case we have statements in the main thread
     finalize_self_prepared_sql_statements();
+
+    // Finalize pending statements and report any thread that failed
+    // to do it properly
+    finalize_all_prepared_sql_statements();
 
     spinlock_lock(&sqlite_spinlock);
     sqlite_online = false;
