@@ -19,7 +19,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.4.1.1.3
         name: hh3cProcessUtil5Min
-        description: "general idea of how busy a process caused the processor to be over a 5 minute period"
+        description: "General idea of how busy a process caused the processor to be over a 5 minute period"
         unit: "%"
     metric_tags:
       - symbol:
@@ -37,7 +37,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.6
         name: cpu.usage
-        description: "cpu usage for this entity"
+        description: "Cpu usage for this entity"
         unit: "%"
     metric_tags:
       - MIB: HH3C-ENTITY-EXT-MIB
@@ -61,7 +61,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.8
         name: memory.usage
-        description: "memory usage for the entity"
+        description: "Memory usage for the entity"
         unit: "%"
     metric_tags:
       - MIB: HH3C-ENTITY-EXT-MIB

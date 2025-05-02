@@ -75,19 +75,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.2
         name: multiProcUserTime
-        description: "processor user time"
+        description: "Processor user time"
         unit: "{processor}"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.3
         name: multiProcSystemTime
-        description: "processor system time"
+        description: "Processor system time"
         unit: "{processor}"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.4
         name: multiProcIdleTime
-        description: "processor idle time"
+        description: "Processor idle time"
         unit: "{processor}"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
         name: multiProcUsage
-        description: "processor usage"
+        description: "Processor usage"
         unit: "%"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.5
@@ -96,7 +96,7 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.2.7.0
       name: procNum
-      description: "number of processors"
+      description: "Number of processors"
       unit: "{processor}"
     # Memory
   - MIB: CHECKPOINT-MIB
@@ -104,35 +104,35 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.3.0
       name: memTotalReal64
-      description: "total real memory"
+      description: "Total real memory"
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.4.0
       name: memActiveReal64
-      description: "active real memory"
+      description: "Active real memory"
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.5.0
       name: memFreeReal64
-      description: "free real memory"
+      description: "Free real memory"
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.1.0
       name: memTotalVirtual64
-      description: "total virtual memory"
+      description: "Total virtual memory"
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.2.0
       name: memActiveVirtual64
-      description: "active virtual memory"
+      description: "Active virtual memory"
       unit: "By"
     # Disk
   - MIB: CHECKPOINT-MIB
@@ -149,27 +149,27 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.3
         name: multiDiskSize
-        description: "disk size"
+        description: "Disk size"
         unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
         name: multiDiskUsed
-        description: "disk used"
+        description: "Disk used"
         unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
         name: multiDiskFreeTotalBytes
-        description: "disk free total bytes"
+        description: "Disk free total bytes"
         unit: "By"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
         name: multiDiskFreeAvailableBytes
-        description: "disk free available bytes"
+        description: "Disk free available bytes"
         unit: "By"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
         name: multiDiskFreeTotalPercent
-        description: "disk free total percent"
+        description: "Disk free total percent"
         unit: "%"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
         name: multiDiskFreeAvailablePercent
-        description: "disk free available percent"
+        description: "Disk free available percent"
         unit: "%"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.6
@@ -188,11 +188,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.3
         name: fanSpeedSensorValue
-        description: "sensor value"
+        description: "Sensor value"
         unit: "TBD"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
         name: fanSpeedSensorStatus
-        description: "sensor is out of range true(1), false(0), reading error(2)"
+        description: "Sensor is out of range true(1), false(0), reading error(2)"
         unit: "TBD"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.8.2
@@ -236,11 +236,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.3
         name: tempertureSensorValue
-        description: "sensor value"
+        description: "Sensor value"
         unit: "TBD"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
         name: tempertureSensorStatus
-        description: "sensor is out of range true(1), false(0), reading error(2)"
+        description: "Sensor is out of range true(1), false(0), reading error(2)"
         unit: "TBD"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.8.1
@@ -251,31 +251,31 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.4.0
       name: fwAccepted
-      description: "number of accepted packets"
+      description: "Number of accepted packets"
       unit: "{packet}"
   - MIB: CHECKPOINT-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.6.0
       name: fwDropped
-      description: "number of dropped packets"
+      description: "Number of dropped packets"
       unit: "{packet}"
   - MIB: CHECKPOINT-MIB
     metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.5.0
       name: fwRejected
-      description: "number of rejected packets"
+      description: "Number of rejected packets"
       unit: "{packet}"
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.25.3.0
       name: fwNumConn
-      description: "number of connections"
+      description: "Number of connections"
       unit: "{connection}"
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.25.4.0
       name: fwPeakNumConn
-      description: "peak number of connections"
+      description: "Peak number of connections"
       unit: "{connection}"

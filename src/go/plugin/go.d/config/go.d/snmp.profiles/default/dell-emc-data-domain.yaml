@@ -81,10 +81,10 @@ metrics:
 #      TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
   - MIB: DATA-DOMAIN-MIB
     symbol:
-     name: datadomain.fileSystemVirtualSpace
-     OID: 1.3.6.1.4.1.19746.1.3.1.2.0
-     description: Amount of uncompressed data that has been backed up by the system
-     unit: "By"
+      name: datadomain.fileSystemVirtualSpace
+      OID: 1.3.6.1.4.1.19746.1.3.1.2.0
+      description: Amount of uncompressed data that has been backed up by the system
+      unit: "By"
 # TODO: octet string cannot be collected
 #  - MIB: DATA-DOMAIN-MIB
 #    symbol:

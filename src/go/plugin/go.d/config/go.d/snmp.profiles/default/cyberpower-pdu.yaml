@@ -19,23 +19,23 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.2
         name: cyberpower.ePDULoadStatusLoad
-        description: "phase/bank load measured in tenths of Amps"
+        description: "Phase/bank load measured in tenths of Amps"
         unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.6
         name: cyberpower.ePDULoadStatusVoltage
-        description: "phase/bank voltage measured in tenths of Volts"
+        description: "Phase/bank voltage measured in tenths of Volts"
         unit: "dV"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.7
         name: cyberpower.ePDULoadStatusActivePower
-        description: "phase/bank active power measured in watts"
+        description: "Phase/bank active power measured in watts"
         unit: "W"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.8
         name: cyberpower.ePDULoadStatusApparentPower
-        description: "phase/bank apparent power measured in VA"
+        description: "Phase/bank apparent power measured in VA"
         unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.9
         name: cyberpower.ePDULoadStatusPowerFactor
-        description: "power factor of the output measured in hundredths"
+        description: "Power factor of the output measured in hundredths"
         unit: "%"
     metric_tags:
       - symbol:
@@ -79,11 +79,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.7
         name: cyberpower.ePDUOutletStatusLoad
-        description: "measured Outlet load for an Outlet Monitored Rack PDU in tenths of Amps"
+        description: "Measured Outlet load for an Outlet Monitored Rack PDU in tenths of Amps"
         unit: "A"
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.8
         name: cyberpower.ePDUOutletStatusActivePower
-        description: "measured Outlet load for an Outlet Monitored Rack PDU in watts"
+        description: "Measured Outlet load for an Outlet Monitored Rack PDU in watts"
         unit: "W"
     metric_tags:
       - symbol:
@@ -224,13 +224,13 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.7
       name: cyberpower.ePDUStatusInputVoltage
-      description: "input voltage in 0.1 Volt"
+      description: "Input voltage in 0.1 Volt"
       unit: "V"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.8
       name: cyberpower.ePDUStatusInputFrequency
-      description: "input frequency in 0.1 Hertz"
+      description: "Input frequency in 0.1 Hertz"
       unit: "Hz"
   - MIB: CPS-MIB
     table:
@@ -239,19 +239,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.5
         name: cyberpower.ePDU2DeviceStatusCurrentLoad
-        description: "power consumption of the Rack PDU load in tenths of amps"
+        description: "Power consumption of the Rack PDU load in tenths of amps"
         unit: "A"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.6
         name: cyberpower.ePDU2DeviceStatusCurrentPeakLoad
-        description: "peak power consumption of the Rack PDU load in tenths of amps"
+        description: "Peak power consumption of the Rack PDU load in tenths of amps"
         unit: "A"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.15
         name: cyberpower.ePDU2DeviceStatusApparentPower
-        description: "apparent power consumption of the Rack PDU load in VoltAmps (VA)"
+        description: "Apparent power consumption of the Rack PDU load in VoltAmps (VA)"
         unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.16
         name: cyberpower.ePDU2DeviceStatusPowerFactor
-        description: "power factor of the Rack PDU load in hundredths"
+        description: "Power factor of the Rack PDU load in hundredths"
         unit: "%"
     metric_tags:
       - symbol:
@@ -307,27 +307,27 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.5
         name: cyberpower.ePDU2PhaseStatusLoad
-        description: "current draw in tenths of Amps of the load on the Rack PDU phase being queried"
+        description: "Current draw in tenths of Amps of the load on the Rack PDU phase being queried"
         unit: "A"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.6
         name: cyberpower.ePDU2PhaseStatusVoltage
-        description: "voltage in Volts of the Rack PDU phase being queried"
+        description: "Voltage in Volts of the Rack PDU phase being queried"
         unit: "V"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.7
         name: cyberpower.ePDU2PhaseStatusPower
-        description: "load power in watts (kW) consumed on the Rack PDU phase being queried"
+        description: "Load power in watts (kW) consumed on the Rack PDU phase being queried"
         unit: "W"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.8
         name: cyberpower.ePDU2PhaseStatusApparentPower
-        description: "load apparent power in hundredths of kiloVoltAmps (kVA) consumed on the Rack PDU phase being queried"
+        description: "Load apparent power in hundredths of kiloVoltAmps (kVA) consumed on the Rack PDU phase being queried"
         unit: "kVA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.9
         name: cyberpower.ePDU2PhaseStatusPowerFactor
-        description: "load power factor in hundredths of the Rack PDU phase being queried"
+        description: "Load power factor in hundredths of the Rack PDU phase being queried"
         unit: "%"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.10
         name: cyberpower.ePDU2PhaseStatusPeakLoad
-        description: "peak current of the Rack PDU phase load in tenths of Amps"
+        description: "Peak current of the Rack PDU phase load in tenths of Amps"
         unit: "A"
     metric_tags:
       - symbol:
@@ -350,11 +350,11 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.5
         name: cyberpower.ePDU2BankStatusLoad
-        description: "current draw in tenths of Amps of the load on the Rack PDU bank being queried"
+        description: "Current draw in tenths of Amps of the load on the Rack PDU bank being queried"
         unit: "A"
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.6
         name: cyberpower.ePDU2BankStatusPeakLoad
-        description: "peak current of the Rack PDU bank load in tenths of Amps"
+        description: "Peak current of the Rack PDU bank load in tenths of Amps"
         unit: "A"
     metric_tags:
       - symbol:
@@ -397,19 +397,19 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.1.0
       name: cyberpower.envirTemperature
-      description: "environment temperature expressed in 1/10 Fahrenheit"
+      description: "Environment temperature expressed in 1/10 Fahrenheit"
       unit: "degF/10"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.6.0
       name: cyberpower.envirTemperatureCelsius
-      description: "environment temperature expressed in Celsius"
+      description: "Environment temperature expressed in Celsius"
       unit: "Cel"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.3.1.0
       name: cyberpower.envirHumidity
-      description: "environment relative humidity expressed in persentage"
+      description: "Environment relative humidity expressed in persentage"
       unit: "%"
 metric_tags:
   - OID: 1.3.6.1.4.1.3808.1.1.3.1.1.0

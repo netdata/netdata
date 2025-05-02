@@ -9,8 +9,8 @@ metrics:
         description: Current operational state of the SIP application
         unit: "{state}"
     metric_tags:
-    - index: 1
-      tag: applIndex
+      - index: 1
+        tag: applIndex
   - MIB: SIP-COMMON-MIB
     table:
       name: sipCommonSummaryStatsTable
@@ -37,8 +37,8 @@ metrics:
         description: Count of transactions in progress and terminated transactions
         unit: "{transaction}"
     metric_tags:
-    - index: 1
-      tag: applIndex
+      - index: 1
+        tag: applIndex
   - MIB: SIP-COMMON-MIB
     table:
       name: sipCommonStatusCodeTable
@@ -53,12 +53,12 @@ metrics:
         description: Total number of response messages sent with the specified status code
         unit: "{response}"
     metric_tags:
-    - index: 1
-      tag: applIndex
-    - index: 2
-      tag: sipCommonStatusCodeMethod
-    - index: 3
-      tag: sipCommonStatusCodeValue
+      - index: 1
+        tag: applIndex
+      - index: 2
+        tag: sipCommonStatusCodeMethod
+      - index: 3
+        tag: sipCommonStatusCodeValue
   - MIB: SIP-COMMON-MIB
     table:
       name: sipCommonTransCurrentTable
@@ -69,5 +69,5 @@ metrics:
         description: Number of transactions awaiting definitive response
         unit: "{transaction}"
     metric_tags:
-    - index: 1
-      tag: applIndex
+      - index: 1
+        tag: applIndex

@@ -1,8 +1,8 @@
 metrics:
   ### Interface
 
-  - # This table contains statistical information of the ingress queue in an interface.
-    MIB: ARISTA-QUEUE-MIB
+    # This table contains statistical information of the ingress queue in an interface.
+  - MIB: ARISTA-QUEUE-MIB
     table:
       OID: 1.3.6.1.4.1.30065.3.6.1.1
       name: aristaIngressQueueTable
@@ -22,8 +22,8 @@ metrics:
           OID: 1.3.6.1.4.1.30065.3.6.1.1.1.2
           name: aristaIngressQueueIndex
 
-  - # This table contains statistical objects for the egress queues of an interface.
-    MIB: ARISTA-QUEUE-MIB
+    # This table contains statistical objects for the egress queues of an interface.
+  - MIB: ARISTA-QUEUE-MIB
     table:
       OID: 1.3.6.1.4.1.30065.3.6.1.2
       name: aristaEgressQueueTable

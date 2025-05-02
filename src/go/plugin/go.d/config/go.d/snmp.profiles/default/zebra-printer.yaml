@@ -34,7 +34,7 @@ metrics:
     symbols:
       - name: zbrTrackedAlerts
         constant_value_one: true
-        description: "number of tracked alerts"
+        description: "Number of tracked alerts"
         unit: "{alert}"
     metric_tags:
       - symbol:

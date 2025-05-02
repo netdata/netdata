@@ -29,9 +29,9 @@ metrics:
       - name: alcatel.ind.chasEntPhysical
         constant_value_one: true
     metric_tags:
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
           name: alcatel.ind.entPhysicalClass
         tag: ent_physical_class
@@ -51,21 +51,21 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: alcatel.ind.entPhysicalName
         tag: ent_physical_name
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
           name: alcatel.ind.entPhysicalSerialNum
         tag: ent_physical_serial_num
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
           name: alcatel.ind.entPhysicalModelName
         tag: ent_physical_model_name

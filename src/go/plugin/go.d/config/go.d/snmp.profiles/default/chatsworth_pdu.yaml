@@ -34,16 +34,16 @@ metric_tags:
 
 metrics:
   ### [Legacy] PDU
-  - # [legacy] This table contains a list of PDU entries that are being monitored by the PDU.
-    MIB: CPI-UNITY-MIB
+    # [legacy] This table contains a list of PDU entries that are being monitored by the PDU.
+  - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.2.58.2.0
       name: pduRole
     description: PDU role, 1 = primary, 0 = secondary
     unit: "{PDU}"
 
-  - # [legacy] Get whether the PDU is in-service: inservice(0), outofservice(1)
-    MIB: CPI-UNITY-MIB
+    # [legacy] Get whether the PDU is in-service: inservice(0), outofservice(1)
+  - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.2.58.12.0
       name: outOfService
@@ -682,8 +682,8 @@ metrics:
 
   ### PDU
 
-  - # This table contains a list of PDU entries that are being monitored by the PDU.
-    MIB: CPI-UNITY-MIB
+    # This table contains a list of PDU entries that are being monitored by the PDU.
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.2.10
       name: cpiPduTable
@@ -718,8 +718,8 @@ metrics:
         description: Role of the PDU in a daisy chain
         unit: "{role}"
 
-      - # Get the power in volt-amps for the entire PDU.
-        OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.16
+        # Get the power in volt-amps for the entire PDU.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.16
         name: cpiPduTotalPower
         description: Power in volt-amps for the entire PDU
         unit: "VA"
@@ -752,8 +752,8 @@ metrics:
 
   ### Locks
 
-  - # This table contains a list of electronic locks that are connected to the PDU
-    MIB: CPI-UNITY-MIB
+    # This table contains a list of electronic locks that are connected to the PDU
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.7.100
       name: cpiPduOutletTable
@@ -764,14 +764,14 @@ metrics:
         description: Status of the Electronic Access Control system
         unit: "{status}"
 
-      - # Indicates if the door sensor is closed or open: closed(0), open(1)
-        OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.4
+        # Indicates if the door sensor is closed or open: closed(0), open(1)
+      - OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.4
         name: cpiPduDoorStatus
         description: Door sensor status, closed or open
         unit: "{status}"
 
-      - # Indicates if the lock is closed or open: closed(0), open(1)
-        OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.5
+        # Indicates if the lock is closed or open: closed(0), open(1)
+      - OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.5
         name: cpiPduLockStatus
         description: Lock status, closed or open
         unit: "{status}"
@@ -820,14 +820,14 @@ metrics:
 
   ### Sensor
 
-  - # This table contains a list of PDU sensor entries that are being monitored by the PDU.
-    MIB: CPI-UNITY-MIB
+    # This table contains a list of PDU sensor entries that are being monitored by the PDU.
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.5.10
       name: cpiPduSensorTable
     symbols:
-      - # Get the value of the sensor. For temperature the value is in degrees Fahrenheit and for humidity the value is percent humidity.
-        OID: 1.3.6.1.4.1.30932.1.10.1.5.10.1.5
+        # Get the value of the sensor. For temperature the value is in degrees Fahrenheit and for humidity the value is percent humidity.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.5.10.1.5
         name: cpiPduSensorValue
         description: Value of the sensor, temperature in degrees Fahrenheit or humidity in percent
         unit: "TBD"
@@ -840,72 +840,72 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.5.10.1.3
           name: cpiPduSensorName
-      - # Get the type of sensor for the entry: temperature(1), humidity(2)
-        tag: sensor_type
+        # Get the type of sensor for the entry: temperature(1), humidity(2)
+      - tag: sensor_type
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.5.10.1.4
           name: cpiPduSensorType
 
   ### Line
 
-  - # This table contains a list of PDU line entries that are being monitored by the PDU.
-    MIB: CPI-UNITY-MIB
+    # This table contains a list of PDU line entries that are being monitored by the PDU.
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.3.10
       name: cpiPduLineTable
     symbols:
-      - # Get current draw in 1/100 amp of the line on the PDU. Convert the value by dividing by 100.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.10.1.3
+        # Get current draw in 1/100 amp of the line on the PDU. Convert the value by dividing by 100.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.10.1.3
         name: cpiPduLineCurrent
         description: Current draw in 1/100 amp of the line on the PDU
         unit: "A"
     metric_tags:
-      - # Get the ID of the input line on the PDU.
-        tag: line_id
+        # Get the ID of the input line on the PDU.
+      - tag: line_id
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.3.10.1.2
           name: cpiPduLineId
 
   ### Branch
 
-  - # This table contains a list of PDU branch entries that are being monitored by the PDU.
-    MIB: CPI-UNITY-MIB
+    # This table contains a list of PDU branch entries that are being monitored by the PDU.
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.3.110
       name: cpiPduBranchTable
     symbols:
-      - # Get the current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.3
+        # Get the current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.3
         name: cpiPduBranchCurrent
         description: Current draw in 1/100 amp of the branch on the PDU
         unit: "A"
 
-      - # Get the maximum current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.4
+        # Get the maximum current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.4
         name: cpiPduBranchMaxCurrent
         description: Maximum current draw in 1/100 amp of the branch on the PDU
         unit: "A"
 
-      - # Get the voltage in 1/10 volts of the branch on the PDU. Convert the value by dividing by 10.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.5
+        # Get the voltage in 1/10 volts of the branch on the PDU. Convert the value by dividing by 10.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.5
         name: cpiPduBranchVoltage
         description: Voltage in 1/10 volts of the branch on the PDU
         unit: "V"
 
-      - # Get the power in volt-amps for the branch.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.6
+        # Get the power in volt-amps for the branch.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.6
         name: cpiPduBranchPower
         description: Power in volt-amps for the branch
         unit: "VA"
 
-      - # Get the power factor for the branch.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
+        # Get the power factor for the branch.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
         name: cpiPduBranchPowerFactor
         description: Power factor for the branch
         unit: "10*2.1"
 
-      - # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.8
+        # Get the alarm status of the branch: noalarm(0), warning(1), alarm(2)
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.8
         name: cpiPduBranchStatus
         description: Alarm status of the branch
         unit: "{status}"
@@ -934,15 +934,15 @@ metrics:
             end: 7
         tag: pdu_name
 
-  - # Redefine the table to force the type on cpiPduBranchEnergy
-    MIB: CPI-UNITY-MIB
+    # Redefine the table to force the type on cpiPduBranchEnergy
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.3.110
       name: cpiPduBranchTable
     metric_type: monotonic_count
     symbols:
-      - # Get the branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr.
-        OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.9
+        # Get the branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.9
         name: cpiPduBranchEnergy
         description: Branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr
         unit: "Vs"
@@ -973,32 +973,32 @@ metrics:
 
   ### Outlet
 
-  - # This table contains a list of PDU outlet entries that are being monitored by the PDU.
-    MIB: CPI-UNITY-MIB
+    # This table contains a list of PDU outlet entries that are being monitored by the PDU.
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.4.10
       name: cpiPduOutletTable
     symbols:
-      - # Get the current draw in 1/100 amp of the outlet on the PDU. Convert the value by dividing by 100.
-        OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.6
+        # Get the current draw in 1/100 amp of the outlet on the PDU. Convert the value by dividing by 100.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.6
         name: cpiPduOutletCurrent
         description: Current draw in 1/100 amp of the outlet on the PDU
         unit: "A"
 
-      - # Get the voltage in 1/10 volts of the outlet on the PDU. Convert the value by dividing by 10.
-        OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.7
+        # Get the voltage in 1/10 volts of the outlet on the PDU. Convert the value by dividing by 10.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.7
         name: cpiPduOutletVoltage
         description: Voltage in 1/10 volts of the outlet on the PDU
         unit: "V"
 
-      - # The power in Volt-Amps of the outlet on the PDU.
-        OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.8
+        # The power in Volt-Amps of the outlet on the PDU.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.8
         name: cpiPduOutletPower
         description: Power in Volt-Amps of the outlet on the PDU
         unit: "VA"
 
-      - # Get the alarm status of the outlet: noalarm(0), warning(1), alarm(2)
-        OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.9
+        # Get the alarm status of the outlet: noalarm(0), warning(1), alarm(2)
+      - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.9
         name: cpiPduOutletStatus
         description: Alarm status of the outlet
         unit: "{status}"
@@ -1011,21 +1011,21 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.4
           name: cpiPduOutletName
-      - # Get the ID of the branch the outlet is associated with on the PDU.
-        tag: outlet_branchid
+        # Get the ID of the branch the outlet is associated with on the PDU.
+      - tag: outlet_branchid
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.3
           name: cpiPduOutletBranchId
 
-  - # Redefine the table to force the type on cpiPduOutletEnergy
-    MIB: CPI-UNITY-MIB
+    # Redefine the table to force the type on cpiPduOutletEnergy
+  - MIB: CPI-UNITY-MIB
     table:
       OID: 1.3.6.1.4.1.30932.1.10.1.4.10
       name: cpiPduOutletTable
     metric_type: monotonic_count
     symbols:
-      - # Get the outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr.
-        OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.10
+        # Get the outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr.
+      - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.10
         name: cpiPduOutletEnergy
         description: Outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr
         unit: "Ws"
@@ -1038,8 +1038,8 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.4
           name: cpiPduOutletName
-      - # Get the ID of the branch the outlet is associated with on the PDU.
-        tag: outlet_branchid
+        # Get the ID of the branch the outlet is associated with on the PDU.
+      - tag: outlet_branchid
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.3
           name: cpiPduOutletBranchId

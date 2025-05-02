@@ -45,9 +45,9 @@ metrics:
         description: Physical entity constant value one
         unit: "{physical_entity}"
     metric_tags:
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         tag: ent_physical_class
@@ -69,25 +69,25 @@ metrics:
           15: storage_drive
         description: An indication of the general hardware type of the physical entity
         unit: "{physical_entity}"
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
         tag: ent_physical_name
         description: The textual name of the physical entity
         unit: "{physical_entity}"
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
         tag: ent_physical_serial_num
         description: The vendor-specific serial number string for the physical entity
         unit: "{physical_entity}"
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
         tag: ent_physical_model_name
@@ -281,9 +281,9 @@ metrics:
         description: Current temperature of the physical entity
         unit: "Cel"
     metric_tags:
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         tag: ent_physical_class
@@ -303,21 +303,21 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
         tag: ent_physical_name
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
         tag: ent_physical_serial_num
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
         tag: ent_physical_model_name

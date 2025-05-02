@@ -25,7 +25,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.3.3.1.2
         name: cpu.usage
-        description: "average over the last minute of the percentage of time that this processor was not idle"
+        description: "Average over the last minute of the percentage of time that this processor was not idle"
         unit: "%"
     metric_tags:
       - tag: hr_processor_frw_id
@@ -36,19 +36,19 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
-      description: "size of the storage represented by this entry in units of hrStorageAllocationUnits"
+      description: "Size of the storage represented by this entry in units of hrStorageAllocationUnits"
       unit: "kBy"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
-      description: "amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits"
+      description: "Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits"
       unit: "kBy"
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     symbol:
       name: dell.os10ChassisTemp
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.11
-      description: "temperature of the chassis"
+      description: "Temperature of the chassis"
       unit: "{temperature}"
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
@@ -57,7 +57,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.5
         name: dell.os10CardTemp
-        description: "temperature of the card"
+        description: "Temperature of the card"
         unit: "{temperature}"
     metric_tags:
       - symbol:
@@ -198,7 +198,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.6
           name: dell.os10bgp4V2PeerLocalPort
         tag: dell_os10bgp4_v2_peer_local_port
-        description: "local port for the TCP connection between the BGP peers"
+        description: "Local port for the TCP connection between the BGP peers"
         unit: "{port}"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.7
@@ -216,13 +216,13 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.9
           name: dell.os10bgp4V2PeerRemotePort
         tag: dell_os10bgp4_v2_peer_remote_port
-        description: "remote port for the TCP connection between the BGP peers"
+        description: "Remote port for the TCP connection between the BGP peers"
         unit: "{port}"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.10
           name: dell.os10bgp4V2PeerRemoteAs
         tag: dell_os10bgp4_v2_peer_remote_as
-        description: "remote autonomous system number received in the BGP OPEN message"
+        description: "Remote autonomous system number received in the BGP OPEN message"
         unit: "1"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.11
@@ -234,13 +234,13 @@ metrics:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.14
           name: dell.os10bgp4V2PeerDescription
         tag: dell_os10bgp4_v2_peer_description
-        description: "user configured description identifying this peer"
+        description: "User configured description identifying this peer"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.12
           name: dell.os10bgp4V2PeerAdminStatus
         tag: dell_os10bgp4_v2_peer_admin_status
-        description: "whether the BGP FSM for this remote peer is halted or running"
+        description: "Whether the BGP FSM for this remote peer is halted or running"
         unit: "TBD"
         mapping:
           1: halted

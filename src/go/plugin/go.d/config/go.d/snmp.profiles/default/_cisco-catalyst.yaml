@@ -27,7 +27,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
         name: entSensorValue
-        description: "the most recent measurement seen by the sensor"
+        description: "The most recent measurement seen by the sensor"
         unit: "TBD"
     metric_tags:
       - symbol:
@@ -44,19 +44,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.1
         name: cieIfLastInTime
-        description: "elapsed time in milliseconds since last protocol input packet was received"
+        description: "Elapsed time in milliseconds since last protocol input packet was received"
         unit: "ms"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.2
         name: cieIfLastOutTime
-        description: "elapsed time in milliseconds since last protocol output packet was transmitted"
+        description: "Elapsed time in milliseconds since last protocol output packet was transmitted"
         unit: "ms"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.10
         name: cieIfInputQueueDrops
-        description: "number of input packets which were dropped"
+        description: "Number of input packets which were dropped"
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.11
         name: cieIfOutputQueueDrops
-        description: "number of output packets dropped by the interface"
+        description: "Number of output packets dropped by the interface"
         unit: "{packet}"
     metric_tags:
       - MIB: IF-MIB

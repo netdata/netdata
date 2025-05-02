@@ -61,7 +61,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "oper power state of the board"
+        description: "Oper power state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.8
@@ -100,7 +100,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operational state of the board"
+        description: "Operational state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.9
@@ -139,7 +139,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the board"
+        description: "Operability state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.10
@@ -155,7 +155,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "performance state of the board"
+        description: "Performance state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.11
@@ -175,7 +175,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "power state of the board"
+        description: "Power state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.12
@@ -202,7 +202,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the board"
+        description: "Presence state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.15
@@ -218,7 +218,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "thermal state of the board"
+        description: "Thermal state of the board"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.17
@@ -234,7 +234,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "voltage state of the board"
+        description: "Voltage state of the board"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
     table:
@@ -243,15 +243,15 @@ metrics:
     symbols:
       - name: cucsComputeMbPowerStatsConsumedPower
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.4
-        description: "consumed power"
+        description: "Consumed power"
         unit: "W"
       - name: cucsComputeMbPowerStatsInputCurrent
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.8
-        description: "input current"
+        description: "Input current"
         unit: "A"
       - name: cucsComputeMbPowerStatsInputVoltage
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.12
-        description: "input voltage"
+        description: "Input voltage"
         unit: "V"
     metric_tags:
       - symbol:
@@ -277,11 +277,11 @@ metrics:
     symbols:
       - name: cucsComputeRackUnitAvailableMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.9
-        description: "available memory"
+        description: "Available memory"
         unit: "By"
       - name: cucsComputeRackUnitTotalMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.49
-        description: "total memory"
+        description: "Total memory"
         unit: "By"
     metric_tags:
       - symbol:
@@ -304,19 +304,19 @@ metrics:
           name: cucsComputeRackUnitNumOfCores
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.35
         tag: cucs_compute_rack_unit_num_of_cores
-        description: "number of cores"
+        description: "Number of cores"
         unit: "{core}"
       - symbol:
           name: cucsComputeRackUnitNumOfCpus
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
         tag: cucs_compute_rack_unit_num_of_cpus
-        description: "number of cpus"
+        description: "Number of cpus"
         unit: "{cpu}"
       - symbol:
           name: cucsComputeRackUnitNumOfThreads
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
         tag: cucs_compute_rack_unit_num_of_threads
-        description: "number of threads"
+        description: "Number of threads"
         unit: "{thread}"
       - symbol:
           name: cucsComputeRackUnitSerial
@@ -354,7 +354,7 @@ metrics:
           31: admin_up
           32: admin_down
           33: ipmi_reset
-        description: "admin power state of the rack unit"
+        description: "Admin power state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.5
@@ -364,7 +364,7 @@ metrics:
           1: in_service
           2: out_of_service
           3: in_maintenance
-        description: "admin state of the rack unit"
+        description: "Admin state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.7
@@ -377,7 +377,7 @@ metrics:
           3: removing
           4: failed
           5: throttled
-        description: "association state of the rack unit"
+        description: "Association state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.8
@@ -386,7 +386,7 @@ metrics:
         mapping:
           0: unavailable
           1: available
-        description: "availability state of the rack unit"
+        description: "Availability state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.10
@@ -398,7 +398,7 @@ metrics:
           2: shallow_checkpoint
           3: deep_checkpoint
           4: discovered
-        description: "checkpoint state of the rack unit"
+        description: "Checkpoint state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.40
@@ -418,7 +418,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "operational power state of the rack unit"
+        description: "Operational power state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.42
@@ -458,7 +458,7 @@ metrics:
           210: pending_reboot
           211: pending_reassociation
           212: svnic_not_present
-        description: "operational state of the rack unit"
+        description: "Operational state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.43
@@ -497,7 +497,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the rack unit"
+        description: "Operability state of the rack unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.45
@@ -520,7 +520,7 @@ metrics:
           40: unauthorized
           101: equipped_unsupported
           102: equipped_deprecated
-        description: "presence state of the rack unit"
+        description: "Presence state of the rack unit"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
     table:
@@ -568,7 +568,7 @@ metrics:
           0: chassis
           1: switch
           2: fex
-        description: "type of the fan"
+        description: "Type of the fan"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.9
@@ -607,7 +607,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operational state of the fan"
+        description: "Operational state of the fan"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.10
@@ -646,7 +646,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the fan"
+        description: "Operability state of the fan"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.11
@@ -662,7 +662,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "performance state of the fan"
+        description: "Performance state of the fan"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.12
@@ -682,7 +682,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "power state of the fan"
+        description: "Power state of the fan"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.13
@@ -709,7 +709,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the fan"
+        description: "Presence state of the fan"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-EQUIPMENT-MIB
     table:
@@ -778,7 +778,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operational state of the psu"
+        description: "Operational state of the psu"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.8
@@ -817,7 +817,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the psu"
+        description: "Operability state of the psu"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.9
@@ -833,7 +833,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "performance state of the psu"
+        description: "Performance state of the psu"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.10
@@ -853,7 +853,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "power state of the psu"
+        description: "Power state of the psu"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.11
@@ -880,7 +880,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the psu"
+        description: "Presence state of the psu"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-MEMORY-MIB
     table:
@@ -889,7 +889,7 @@ metrics:
     symbols:
       - name: cucsMemoryUnitCapacity
         OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.6
-        description: "capacity of the memory unit"
+        description: "Capacity of the memory unit"
         unit: "By"
     metric_tags:
       - symbol:
@@ -900,7 +900,7 @@ metrics:
           name: cucsMemoryUnitLocation
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.11
         tag: cucs_memory_unit_location
-        description: "location of the memory unit"
+        description: "Location of the memory unit"
         unit: "TBD"
       - symbol:
           name: cucsMemoryUnitType
@@ -931,7 +931,7 @@ metrics:
           24: ddr3
           25: fbd2
           26: ddr4
-        description: "type of the memory unit"
+        description: "Type of the memory unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.13
@@ -970,7 +970,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operational state of the memory unit"
+        description: "Operational state of the memory unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.14
@@ -1009,7 +1009,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the memory unit"
+        description: "Operability state of the memory unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.15
@@ -1025,7 +1025,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "performance state of the memory unit"
+        description: "Performance state of the memory unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.16
@@ -1045,7 +1045,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "power state of the memory unit"
+        description: "Power state of the memory unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.17
@@ -1072,7 +1072,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the memory unit"
+        description: "Presence state of the memory unit"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-MEMORY-MIB
     table:
@@ -1081,7 +1081,7 @@ metrics:
     symbols:
       - name: cucsMemoryUnitEnvStatsTemperature
         OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.6
-        description: "temperature"
+        description: "Temperature"
         unit: "Cel"
     metric_tags:
       - symbol:
@@ -1095,7 +1095,7 @@ metrics:
     symbols:
       - name: cucsProcessorEnvStatsTemperature
         OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.10
-        description: "temperature"
+        description: "Temperature"
         unit: "Cel"
     metric_tags:
       - symbol:
@@ -1127,37 +1127,37 @@ metrics:
           178: pentium4
           179: xeon
           181: xeon_mp
-        description: "architecture of the processor unit"
+        description: "Architecture of the processor unit"
         unit: "TBD"
       - symbol:
           name: cucsProcessorUnitCores
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.5
         tag: cucs_processor_unit_cores
-        description: "number of cores"
+        description: "Number of cores"
         unit: "\"{core}\""
       - symbol:
           name: cucsProcessorUnitCoresEnabled
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.6
         tag: cucs_processor_unit_cores_enabled
-        description: "number of cores enabled"
+        description: "Number of cores enabled"
         unit: "\"{core}\""
       - symbol:
           name: cucsProcessorUnitModel
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.8
         tag: cucs_processor_unit_model
-        description: "model of the processor unit"
+        description: "Model of the processor unit"
         unit: "TBD"
       - symbol:
           name: cucsProcessorUnitThreads
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.20
         tag: cucs_processor_unit_threads
-        description: "number of threads"
+        description: "Number of threads"
         unit: "{thread}"
       - symbol:
           name: cucsProcessorUnitVendor
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.21
         tag: cucs_processor_unit_vendor
-        description: "vendor of the processor unit"
+        description: "Vendor of the processor unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.9
@@ -1196,7 +1196,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operational state of the processor unit"
+        description: "Operational state of the processor unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.10
@@ -1235,7 +1235,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the processor unit"
+        description: "Operability state of the processor unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.11
@@ -1251,7 +1251,7 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "performance state of the processor unit"
+        description: "Performance state of the processor unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.12
@@ -1271,7 +1271,7 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "power state of the processor unit"
+        description: "Power state of the processor unit"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.13
@@ -1298,7 +1298,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the processor unit"
+        description: "Presence state of the processor unit"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-STORAGE-MIB
     table:
@@ -1307,15 +1307,15 @@ metrics:
     symbols:
       - name: cucsStorageFlexFlashCardReadIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.19
-        description: "read io error count"
+        description: "Read io error count"
         unit: "{error}"
       - name: cucsStorageFlexFlashCardSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.22
-        description: "size of the flex flash card"
+        description: "Size of the flex flash card"
         unit: "By"
       - name: cucsStorageFlexFlashCardWriteIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.26
-        description: "write io error count"
+        description: "Write io error count"
         unit: "{error}"
     metric_tags:
       - symbol:
@@ -1331,13 +1331,13 @@ metrics:
           1: ff_phy_drive_primary
           2: ff_phy_drive_secondary_act
           3: ff_phy_drive_secondary_unhealthy
-        description: "mode of the flex flash card"
+        description: "Mode of the flex flash card"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashCardCardType
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.7
         tag: cucs_storage_flex_flash_card_card_type
-        description: "type of the flex flash card"
+        description: "Type of the flex flash card"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashCardConnectionProtocol
@@ -1348,25 +1348,25 @@ metrics:
           1: sas
           2: sata
           3: nvme
-        description: "connection protocol of the flex flash card"
+        description: "Connection protocol of the flex flash card"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashCardRevision
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.20
         tag: cucs_storage_flex_flash_card_revision
-        description: "revision of the flex flash card"
+        description: "Revision of the flex flash card"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashCardSerial
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.21
         tag: cucs_storage_flex_flash_card_serial
-        description: "serial of the flex flash card"
+        description: "Serial of the flex flash card"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashCardDrivesEnabled
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.29
         tag: cucs_storage_flex_flash_card_drives_enabled
-        description: "number of drives enabled"
+        description: "Number of drives enabled"
         unit: "{drive}"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.5
@@ -1379,7 +1379,7 @@ metrics:
           3: ff_phy_unhealthy_other
           4: ff_phy_raid_sync_in_progress
           5: ff_phy_raid_out_of_sync
-        description: "health state of the flex flash card"
+        description: "Health state of the flex flash card"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.17
@@ -1418,7 +1418,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the flex flash card"
+        description: "Operability state of the flex flash card"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.18
@@ -1445,7 +1445,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the flex flash card"
+        description: "Presence state of the flex flash card"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.27
@@ -1459,7 +1459,7 @@ metrics:
           4: ignored
           5: failed
           6: unknown
-        description: "state of the flex flash card"
+        description: "State of the flex flash card"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.28
@@ -1470,7 +1470,7 @@ metrics:
           1: manual
           2: auto
           3: unknown
-        description: "sync state of the flex flash card"
+        description: "Sync state of the flex flash card"
         unit: "TBD"
   - MIB: CISCO-UNIFIED-COMPUTING-STORAGE-MIB
     table:
@@ -1479,7 +1479,7 @@ metrics:
     symbols:
       - name: cucsStorageFlexFlashDriveSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.18
-        description: "size of the flex flash drive"
+        description: "Size of the flex flash drive"
         unit: "By"
     metric_tags:
       - symbol:
@@ -1495,7 +1495,7 @@ metrics:
           1: sas
           2: sata
           3: nvme
-        description: "connection protocol of the flex flash drive"
+        description: "Connection protocol of the flex flash drive"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashDriveDriveType
@@ -1507,19 +1507,19 @@ metrics:
           2: huu
           3: hv
           4: drivers
-        description: "type of the flex flash drive"
+        description: "Type of the flex flash drive"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashDriveModel
           OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.10
         tag: cucs_storage_flex_flash_drive_model
-        description: "model of the flex flash drive"
+        description: "Model of the flex flash drive"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashDriveName
           OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.11
         tag: cucs_storage_flex_flash_drive_name
-        description: "name of the flex flash drive"
+        description: "Name of the flex flash drive"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashDriveVisible
@@ -1528,7 +1528,7 @@ metrics:
         mapping:
           0: no
           1: yes
-        description: "visibility state of the flex flash drive"
+        description: "Visibility state of the flex flash drive"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashDriveRemovable
@@ -1538,7 +1538,7 @@ metrics:
           0: na
           1: yes
           2: no
-        description: "removable state of the flex flash drive"
+        description: "Removable state of the flex flash drive"
         unit: "TBD"
       - symbol:
           name: cucsStorageFlexFlashDriveRWType
@@ -1547,7 +1547,7 @@ metrics:
         mapping:
           0: read_write
           1: read_only
-        description: "read/write type of the flex flash drive"
+        description: "Read/write type of the flex flash drive"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.7
@@ -1556,7 +1556,7 @@ metrics:
         mapping:
           0: nonraid
           1: raid
-        description: "drive state of the flex flash drive"
+        description: "Drive state of the flex flash drive"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.14
@@ -1595,7 +1595,7 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "operability state of the flex flash drive"
+        description: "Operability state of the flex flash drive"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.15
@@ -1622,7 +1622,7 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "presence state of the flex flash drive"
+        description: "Presence state of the flex flash drive"
         unit: "TBD"
       - symbol:
           OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.25
@@ -1647,5 +1647,5 @@ metrics:
           15: partition_non_mirrored_updating_success
           16: partition_non_mirrored_erasing_success
           17: unknown
-        description: "operation state of the flex flash drive"
+        description: "Operation state of the flex flash drive"
         unit: "TBD"

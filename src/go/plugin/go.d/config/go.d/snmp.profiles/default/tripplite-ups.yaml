@@ -149,7 +149,7 @@ metrics:
         unit: "W"
     metric_tags:
       - index: 1
-        tag:  tl_ups_output_circuit_index
+        tag: tl_ups_output_circuit_index
       - symbol:
           OID: 1.3.6.1.4.1.850.100.1.4.7.1.2
           name: tlUpsOutputCircuitStatus

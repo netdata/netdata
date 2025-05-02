@@ -139,19 +139,19 @@ metrics:
 #      OID: 1.3.6.1.4.1.12532.48.0
 #      name: juniper.ive.iveTotalSignedInUsers
 metric_tags:
-  - # MIB: PULSESECURE-PSG-MIB
-    tag: juniper_ive_product_name
+    # MIB: PULSESECURE-PSG-MIB
+  - tag: juniper_ive_product_name
     OID: 1.3.6.1.4.1.12532.6.0
     symbol: productName
-  - # MIB: PULSESECURE-PSG-MIB
-    tag: juniper_ive_product_version
+    # MIB: PULSESECURE-PSG-MIB
+  - tag: juniper_ive_product_version
     OID: 1.3.6.1.4.1.12532.7.0
     symbol: productVersion
-  - # MIB: PULSESECURE-PSG-MIB
-    tag: juniper_ive_esap_version
+    # MIB: PULSESECURE-PSG-MIB
+  - tag: juniper_ive_esap_version
     OID: 1.3.6.1.4.1.12532.45.0
     symbol: esapVersion
-  - # MIB: PULSESECURE-PSG-MIB
-    tag: juniper_ive_ive_max_concurrent_users_license_capacity
+    # MIB: PULSESECURE-PSG-MIB
+  - tag: juniper_ive_ive_max_concurrent_users_license_capacity
     OID: 1.3.6.1.4.1.12532.55.0
     symbol: iveMaxConcurrentUsersLicenseCapacity
