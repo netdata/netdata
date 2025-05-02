@@ -66,6 +66,8 @@ void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str
 // ----------------------------------------------------------------------------
 
 ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
+    if (unlikely(!s)) return NULL;
+
     struct rrdengine_datafile *datafile = NULL;
 
     rw_spinlock_read_lock(&s->ctx->njfv2idx.spinlock);
@@ -106,14 +108,16 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 
         datafile = *PValue;
 
-        if (!datafile || !datafile->journalfile) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+
+        if (!datafile || !journalfile) {
             datafile = NULL;
             PValue = NULL;
             continue;
         }
 
-        TIME_RANGE_COMPARE rc = is_page_in_time_range(datafile->journalfile->v2.first_time_s,
-                                                      datafile->journalfile->v2.last_time_s,
+        TIME_RANGE_COMPARE rc = is_page_in_time_range(journalfile->v2.first_time_s,
+                                                      journalfile->v2.last_time_s,
                                                       s->wanted_start_time_s,
                                                       s->wanted_end_time_s);
 
@@ -135,7 +139,8 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
         }
     }
 
-    if(datafile)
+    struct rrdengine_journalfile *journalfile = datafile->journalfile;
+    if(datafile && journalfile)
         s->j2_header_acquired = journalfile_v2_data_acquire(datafile->journalfile, NULL,
                                                             s->wanted_start_time_s,
                                                             s->wanted_end_time_s);
