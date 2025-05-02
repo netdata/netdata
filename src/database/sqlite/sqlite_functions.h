@@ -101,6 +101,9 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
 // Helpers
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement);
+void finalize_self_prepared_sql_statements();
+void finalize_all_prepared_sql_statements();
+
 int execute_insert(sqlite3_stmt *res);
 int db_execute(sqlite3 *database, const char *cmd);
 char *get_database_extented_error(sqlite3 *database, int i, const char *description);

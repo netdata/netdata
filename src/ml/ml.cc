@@ -983,6 +983,7 @@ ml_detect_main(void *arg)
         }
     }
     Cfg.training_stop = true;
+    finalize_self_prepared_sql_statements();
 
     return NULL;
 }
@@ -1211,6 +1212,7 @@ void *ml_train_main(void *arg) {
         worker_is_idle();
         std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
     }
+    finalize_self_prepared_sql_statements();
 
     return NULL;
 }

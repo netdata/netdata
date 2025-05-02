@@ -2,8 +2,19 @@
 
 #include "sqlite_functions.h"
 
-#define MAX_PREPARED_STATEMENTS (32)
-pthread_key_t key_pool[MAX_PREPARED_STATEMENTS];
+#define MAX_PREPARED_THREAD_STATEMENTS (32)
+
+SPINLOCK JudyL_thread_stmt_lock = SPINLOCK_INITIALIZER;
+Pvoid_t JudyL_thread_stmt_pool = NULL;
+
+struct stmt_pool_s {
+    int count;
+    pid_t thread_id;
+    char *name;
+    void *stmt[MAX_PREPARED_THREAD_STATEMENTS];
+};
+
+__thread struct stmt_pool_s *thread_stmt_pool = NULL;
 
 long long def_journal_size_limit = 16777216;
 
@@ -157,64 +168,88 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
     return 0;
 }
 
-#define MAX_OPEN_STATEMENTS (512)
-
-static void add_stmt_to_list(sqlite3_stmt *res)
+static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 {
-    static int idx = 0;
-    static sqlite3_stmt *statements[MAX_OPEN_STATEMENTS];
-
-    if (unlikely(!res)) {
-        if (idx)
-            netdata_log_info("Finilizing %d statements", idx);
-        else
-            netdata_log_info("No statements pending to finalize");
-        while (idx > 0) {
-            int rc;
-            rc = sqlite3_finalize(statements[--idx]);
-            if (unlikely(rc != SQLITE_OK))
-                error_report("Failed to finalize statement during shutdown, rc = %d", rc);
-        }
+    if (!stmt_list)
         return;
-    }
 
-    if (unlikely(idx == MAX_OPEN_STATEMENTS))
-        return;
-}
-
-static void release_statement(void *statement)
-{
-    int rc;
-    spinlock_lock(&sqlite_spinlock);
-    if (sqlite_online) {
-        if (unlikely(rc = sqlite3_finalize((sqlite3_stmt *)statement) != SQLITE_OK))
+    int max_keys = stmt_list->count;
+    for (int i = 0; i < max_keys; i++) {
+        int rc = sqlite3_finalize((sqlite3_stmt *)stmt_list->stmt[i]);
+        if (unlikely(rc != SQLITE_OK))
             error_report("Failed to finalize statement, rc = %d", rc);
     }
-    spinlock_unlock(&sqlite_spinlock);
+    freez(stmt_list->name);
+    freez(stmt_list);
 }
 
-static void initialize_thread_key_pool(void)
+// This must be called when the thread terminates
+void finalize_self_prepared_sql_statements()
 {
-    for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
-        (void)pthread_key_create(&key_pool[i], release_statement);
+    if (!thread_stmt_pool)
+        return;
+
+    Word_t thread_id = thread_stmt_pool->thread_id;
+    finalize_and_free_stmt_list(thread_stmt_pool);
+    thread_stmt_pool = NULL;
+    spinlock_lock(&JudyL_thread_stmt_lock);
+    (void) JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
+    spinlock_unlock(&JudyL_thread_stmt_lock);
+}
+
+void finalize_all_prepared_sql_statements()
+{
+    spinlock_lock(&JudyL_thread_stmt_lock);
+    bool first_then_next = true;
+    Pvoid_t *Pvalue = NULL;
+    Word_t thread_id = 0;
+    if (JudyL_thread_stmt_pool) {
+        while ((Pvalue = JudyLFirstThenNext(JudyL_thread_stmt_pool, &thread_id, &first_then_next))) {
+            struct stmt_pool_s *local_stmt_pool = (struct stmt_pool_s *) *Pvalue;
+            if (!local_stmt_pool)
+                continue;
+            nd_log_daemon(
+                NDLP_WARNING,
+                "SQL: Pending SQL statements for thread %lu (%s), make sure thread does a proper cleanup",
+                thread_id,
+                local_stmt_pool->name);
+            finalize_and_free_stmt_list(local_stmt_pool);
+        }
+        (void)JudyLFreeArray(&JudyL_thread_stmt_pool, PJE0);
+    }
+    spinlock_unlock(&JudyL_thread_stmt_lock);
+}
+
+static void init_thread_stmt_pool(void) {
+    thread_stmt_pool = (struct stmt_pool_s *)mallocz(sizeof(struct stmt_pool_s));
+    if (!thread_stmt_pool)
+        fatal("Failed to allocate memory for statement pool");
+
+    thread_stmt_pool->count = 0;
+    thread_stmt_pool->thread_id = gettid_cached();
+    thread_stmt_pool->name = strdupz(nd_thread_tag());
+    memset(thread_stmt_pool->stmt, 0, sizeof(void *) * MAX_PREPARED_THREAD_STATEMENTS);
+
+    // Add it to the JudyL array
+    spinlock_lock(&JudyL_thread_stmt_lock);
+    Pvoid_t *Pvalue = JudyLIns(&JudyL_thread_stmt_pool, (Word_t)thread_stmt_pool->thread_id, PJE0);
+    if (!Pvalue || Pvalue == PJERR)
+        fatal("Failed to allocate memory for JudyL thread statement pool");
+    struct stmt_pool_s *old_pool = *Pvalue;
+    fatal_assert(old_pool == NULL);
+    *Pvalue = thread_stmt_pool;
+    spinlock_unlock(&JudyL_thread_stmt_lock);
 }
 
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
 {
-    static __thread uint32_t keys_used = 0;
-
-    pthread_key_t *key = NULL;
-    int ret = 1;
-
-    if (likely(keys_used < MAX_PREPARED_STATEMENTS))
-        key = &key_pool[keys_used++];
-
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
     if (rc == SQLITE_OK) {
-        if (key)
-            ret = pthread_setspecific(*key, *statement);
-        if (ret)
-            add_stmt_to_list(*statement);
+        if (!thread_stmt_pool)
+            init_thread_stmt_pool();
+        int stmt_key = __atomic_fetch_add(&thread_stmt_pool->count, 1, __ATOMIC_RELAXED);
+        if (stmt_key < MAX_PREPARED_THREAD_STATEMENTS)
+            thread_stmt_pool->stmt[stmt_key] = *statement;
     }
     return rc;
 }
@@ -385,7 +420,12 @@ extern sqlite3 *db_context_meta;
 
 void sqlite_close_databases(void)
 {
-    add_stmt_to_list(NULL);
+    // In case we have statements in the main thread
+    finalize_self_prepared_sql_statements();
+
+    // Finalize pending statements and report any thread that failed
+    // to do it properly
+    finalize_all_prepared_sql_statements();
 
     spinlock_lock(&sqlite_spinlock);
     sqlite_online = false;
@@ -417,7 +457,6 @@ uint64_t get_total_database_space(void)
 int sqlite_library_init(void)
 {
     spinlock_lock(&sqlite_spinlock);
-    initialize_thread_key_pool();
 
     int rc = sqlite3_initialize();
     if (rc == SQLITE_OK) {
