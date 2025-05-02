@@ -108,7 +108,7 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 
         datafile = *PValue;
 
-        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+        struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
 
         if (!datafile || !journalfile) {
             datafile = NULL;
