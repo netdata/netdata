@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Small fixes2 [\#20219](https://github.com/netdata/netdata/pull/20219) ([ktsaou](https://github.com/ktsaou))
 - Improve health log cleanup [\#20213](https://github.com/netdata/netdata/pull/20213) ([stelfrag](https://github.com/stelfrag))
 - use nd threads in exporting [\#20212](https://github.com/netdata/netdata/pull/20212) ([ktsaou](https://github.com/ktsaou))
 - fix hardcoding of eval variables [\#20210](https://github.com/netdata/netdata/pull/20210) ([ktsaou](https://github.com/ktsaou))
@@ -468,8 +469,6 @@
 - initial setup of custom OpenTelemetry Collector distribution [\#19678](https://github.com/netdata/netdata/pull/19678) ([ilyam8](https://github.com/ilyam8))
 - Fix freebsd compilation [\#19677](https://github.com/netdata/netdata/pull/19677) ([stelfrag](https://github.com/stelfrag))
 - test\(go.d dyncfg\): fix tests [\#19676](https://github.com/netdata/netdata/pull/19676) ([ilyam8](https://github.com/ilyam8))
-- Dyncfg users actions log [\#19674](https://github.com/netdata/netdata/pull/19674) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d dyncfg\): don't overwrite source [\#19673](https://github.com/netdata/netdata/pull/19673) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
