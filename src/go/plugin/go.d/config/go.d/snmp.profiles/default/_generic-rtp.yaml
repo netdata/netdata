@@ -14,7 +14,7 @@ metrics:
         unit: "{session}"
       - OID: 1.3.6.1.2.1.87.1.3.1.8
         name: rtpSessionByes
-        description: A count of RTCP BYE (see RFC 1889, 'RTP: A Transport Protocol for Real-Time Applications,' sec. 6.6) messages received by this entity
+        description: "A count of RTCP BYE messages received by this entity"
         unit: "{message}"
     metric_tags:
       - index: 1
