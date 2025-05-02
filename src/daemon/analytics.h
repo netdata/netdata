@@ -7,7 +7,7 @@
 #include "database/rrdhost-system-info.h"
 
 /* Max number of seconds before the first META analytics is sent */
-#define ANALYTICS_INIT_SLEEP_SEC 120
+#define ANALYTICS_INIT_SLEEP_SEC (10)
 
 /* Send a META event every X seconds */
 #define ANALYTICS_HEARTBEAT (6 * 3600)
