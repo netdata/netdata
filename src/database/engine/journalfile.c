@@ -139,7 +139,7 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
         }
     }
 
-    struct rrdengine_journalfile *journalfile = datafile->journalfile;
+    struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
     if(datafile && journalfile)
         s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
                                                             s->wanted_start_time_s,
