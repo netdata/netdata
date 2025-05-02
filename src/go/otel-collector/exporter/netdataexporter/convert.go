@@ -43,7 +43,7 @@ type DimensionDefinition struct {
 const maxChartIDLength = 1000
 
 // Convert transforms OTLP metrics into Netdata charts
-func (e *netdataExporter) convert(pms pmetric.Metrics) {
+func (e *netdataExporter) Convert(pms pmetric.Metrics) map[string]*ChartDefinition {
 	// Track new and updated charts in this batch
 	currentCharts := make(map[string]bool, len(e.charts))
 
@@ -74,6 +74,8 @@ func (e *netdataExporter) convert(pms pmetric.Metrics) {
 			chart.IsNew = false
 		}
 	}
+
+	return e.charts
 }
 
 // processGauge handles gauge metric types
