@@ -1,35 +1,37 @@
 # Centralizing systemd-journal Namespace Logs to a Central systemd-journal-remote Server
 
-This guide explains how to centralize `systemd-journald` logs from journal *namespaces* to a remote server using `systemd-journal-upload`, particularly for distributions running systemd versions **prior to 254**, which lack the `--namespace` option.
+This guide explains how to forward `systemd-journald` logs from journal _namespaces_ to a remote server using `systemd-journal-upload`, particularly for distributions running systemd versions **prior to 254**, which lack native namespace support.
 
-## Background
+## Current Limitations
 
-`systemd-journal-upload` supports forwarding logs using the `--merge` option. However, it does **not** merge logs across journal namespaces. Each namespace stores its logs in a separate directory, and must be uploaded independently.
+While `systemd-journal-upload` can forward logs with the `--merge` option, it doesn't natively consolidate logs across different journal namespaces in older systemd versions. Each namespace stores logs in a separate directory and requires independent uploading.
 
-Systemd version 254+ introduces `--namespace=NAMESPACE`, which simplifies the process. Until such versions are widely available, the recommended method is to run `systemd-journal-upload` per namespace using `--directory`.
+Starting with systemd 254, the new `--namespace=NAMESPACE` option simplifies this process. Until this version becomes widely available, we need to run separate `systemd-journal-upload` instances for each namespace using the `--directory` option.
 
-## Assumptions
+## Prerequisites
 
-This setup assumes that users have already:
-- Configured `systemd-journal-upload` properly on the local machine
-- Enabled and configured `systemd-journal-remote` on the remote server
+This guide assumes you have:
 
-The namespace uploader uses the same destination as the default `systemd-journal-upload`, so logs from all namespaces will be **multiplexed with the system logs** on the central log server.
+- Configured `systemd-journal-upload` on your local machine
+- Set up and enabled `systemd-journal-remote` on your central server
 
-## Solution Overview
+The solution will send namespace logs to the same destination as your regular system logs, **multiplexing** them on your central log server.
 
-This solution creates a dedicated `systemd-journal-upload@<namespace>` unit per namespace. A helper script automatically locates the appropriate journal directory for the namespace and launches `systemd-journal-upload` with the correct `--directory` and `--save-state` options.
+## Solution
 
-### Benefits:
-- Minimal configuration per namespace
-- Proper use of systemd's `StateDirectory=` for persistent state
-- No need to hardcode journal paths or state files
+We'll create a dedicated `systemd-journal-upload@<namespace>` unit for each namespace. A helper script automatically locates the appropriate journal directory and launches `systemd-journal-upload` with the correct parameters.
 
----
+**Advantages**:
 
-## 1. Systemd Unit Template
+- Minimal per-namespace configuration
+- Proper state management using systemd's `StateDirectory=`
+- Dynamic journal path detection
 
-**Path:** `/etc/systemd/system/systemd-journal-upload@.service`
+### 1. Systemd Unit Template
+
+Create this file at:` /etc/systemd/system/systemd-journal-upload@.service`
+
+<details open><summary>systemd-journal-upload@.service</summary>
 
 ```ini
 [Unit]
@@ -54,15 +56,15 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### Notes:
-- `%i` is the unescaped instance name (e.g., `netdata`)
-- `StateDirectory=` ensures state files are handled properly per instance
+</details>
 
----
+Note that `%i` represents the unescaped instance name (e.g., netdata), and `StateDirectory=` ensures proper state file management per namespace.
 
-## 2. Helper Script
+### 2. Helper Script
 
-**Path:** `/usr/local/bin/start-journal-upload-namespace.sh`
+Create this file at: `/usr/local/bin/start-journal-upload-namespace.sh`
+
+<details open><summary>start-journal-upload-namespace.sh</summary>
 
 ```bash
 #!/bin/bash
@@ -115,39 +117,40 @@ else
 fi
 ```
 
----
+</details>
 
-## 3. Usage Example
+Remember to make the script executable:
 
-Assume a namespace called `netdata` exists. To start the upload service for it:
+```bash
+sudo chmod +x /usr/local/bin/start-journal-upload-namespace.sh
+```
+
+### 3. Enabling and Starting the Service
+
+To enable and start the upload service for a namespace called `netdata`:
 
 ```bash
 sudo systemctl enable --now systemd-journal-upload@netdata.service
 ```
 
-## 4. On the Remote Server
+### 4. Remote Server Configuration
 
-Ensure the central system is running `systemd-journal-remote` with appropriate configuration to receive logs from upload clients. All uploaded logs, including those from namespaces, will appear in the same journal unless further filtering is applied.
-
----
+Ensure your central server is running `systemd-journal-remote` and is properly configured to receive logs from upload clients. All uploaded logs, including those from namespaces, will appear in the same journal unless you implement additional filtering.
 
 ## Future Improvements
 
-With systemd **254+**, `systemd-journal-upload` supports the `--namespace=` option. This allows uploading logs from specific namespaces without needing to use `--directory=` manually. Furthermore, passing `--namespace=*` enables uploading logs from **all namespaces**, including the default one, interleaved:
+With systemd 254 and newer, you can use the built-in `--namespace=` option:
 
 ```bash
 systemd-journal-upload --namespace=*
 ```
 
-This greatly simplifies deployment and eliminates the need to run multiple `systemd-journal-upload` instances per namespace. It mirrors the functionality introduced in `journalctl` in systemd version 245, now extended to uploading logs in version 254.
+This single command uploads logs from all namespaces, including the default one, interleaved together. This approach greatly simplifies deployment by eliminating the need for multiple `systemd-journal-upload` instances.
 
-Until systemd 254+ becomes widespread, the per-namespace `--directory` approach remains the most compatible and robust method.
+Until systemd 254+ becomes widely adopted, the per-namespace approach described in this guide remains the most reliable method.
 
----
+## Additional Resources
 
-## See Also
-- `man systemd-journal-upload`
-- `man systemd-journald`
-- `man systemd.exec`
-- https://www.freedesktop.org/wiki/Software/systemd/journal-remote/
-
+- [man systemd-journal-upload](https://www.freedesktop.org/software/systemd/man/latest/systemd-journal-upload.service.html)
+- [man systemd-journald](https://www.freedesktop.org/software/systemd/man/latest/systemd-journald.service.html)
+- [man systemd.exec](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html)
