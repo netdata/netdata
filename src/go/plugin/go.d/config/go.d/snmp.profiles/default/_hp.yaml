@@ -1,5 +1,5 @@
 extends:
- - _base.yaml
+  - _base.yaml
 
 metadata:
   device:

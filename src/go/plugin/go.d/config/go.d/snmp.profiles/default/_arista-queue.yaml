@@ -1,8 +1,8 @@
 metrics:
   ### Interface
 
-  - # This table contains statistical information of the ingress queue in an interface.
-    MIB: ARISTA-QUEUE-MIB
+    # This table contains statistical information of the ingress queue in an interface.
+  - MIB: ARISTA-QUEUE-MIB
     table:
       OID: 1.3.6.1.4.1.30065.3.6.1.1
       name: aristaIngressQueueTable
@@ -10,6 +10,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.30065.3.6.1.1.1.3
         name: aristaIngressQueuePktsDropped
+        description: The number of dropped packets due to congestion at the ingress port in an interface.
+        unit: "{packet}"
     metric_tags:
       - tag: interface_index
         symbol:
@@ -20,8 +22,8 @@ metrics:
           OID: 1.3.6.1.4.1.30065.3.6.1.1.1.2
           name: aristaIngressQueueIndex
 
-  - # This table contains statistical objects for the egress queues of an interface.
-    MIB: ARISTA-QUEUE-MIB
+    # This table contains statistical objects for the egress queues of an interface.
+  - MIB: ARISTA-QUEUE-MIB
     table:
       OID: 1.3.6.1.4.1.30065.3.6.1.2
       name: aristaEgressQueueTable
@@ -29,6 +31,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.30065.3.6.1.2.1.6
         name: aristaEgressQueuePktsDropped
+        description: The number of packets discarded from this egress queue.
+        unit: "{packet}"
     metric_tags:
       - tag: interface_index
         symbol:
