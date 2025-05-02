@@ -1097,8 +1097,11 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(analytics_check_enabled()) {
-        delta_startup_time("anonymous analytics");
+    {
+        if(analytics_check_enabled())
+            delta_startup_time("anonymous analytics");
+        else // collect data but do not send it (needed in /api/v1/info)
+            delta_startup_time("anonymous analytics (disabled)");
 
         analytics_statistic_t start_statistic = {"START", "-", "-"};
         analytics_statistic_send(&start_statistic);
