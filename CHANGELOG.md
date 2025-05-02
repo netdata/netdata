@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Small fixes2 [\#20219](https://github.com/netdata/netdata/pull/20219) ([ktsaou](https://github.com/ktsaou))
+- Improve health log cleanup [\#20213](https://github.com/netdata/netdata/pull/20213) ([stelfrag](https://github.com/stelfrag))
+- use nd threads in exporting [\#20212](https://github.com/netdata/netdata/pull/20212) ([ktsaou](https://github.com/ktsaou))
+- fix hardcoding of eval variables [\#20210](https://github.com/netdata/netdata/pull/20210) ([ktsaou](https://github.com/ktsaou))
+- Small fixes [\#20209](https://github.com/netdata/netdata/pull/20209) ([ktsaou](https://github.com/ktsaou))
+- Security and Privacy Design [\#20208](https://github.com/netdata/netdata/pull/20208) ([kanelatechnical](https://github.com/kanelatechnical))
 - added more annotations in spinlock deadlock detection [\#20207](https://github.com/netdata/netdata/pull/20207) ([ktsaou](https://github.com/ktsaou))
 - call spinlock\_init\(\) when initializing rrdlabels spinlock [\#20206](https://github.com/netdata/netdata/pull/20206) ([ktsaou](https://github.com/ktsaou))
 - remove the status file spinlock to avoid deadlocks [\#20205](https://github.com/netdata/netdata/pull/20205) ([ktsaou](https://github.com/ktsaou))
@@ -32,6 +38,7 @@
 - Group anomaly rate per chart context instead of type. [\#20180](https://github.com/netdata/netdata/pull/20180) ([vkalintiris](https://github.com/vkalintiris))
 - bump go mod 1.24.0 [\#20179](https://github.com/netdata/netdata/pull/20179) ([ilyam8](https://github.com/ilyam8))
 - Retry nightly changelog generation. [\#20178](https://github.com/netdata/netdata/pull/20178) ([Ferroin](https://github.com/Ferroin))
+- Add Fedora 42 to CI and package builds. [\#20177](https://github.com/netdata/netdata/pull/20177) ([Ferroin](https://github.com/Ferroin))
 - build\(deps\): update go toolchain to v1.24.2 [\#20176](https://github.com/netdata/netdata/pull/20176) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump k8s.io/client-go from 0.32.3 to 0.33.0 in /src/go [\#20175](https://github.com/netdata/netdata/pull/20175) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.49.0 to 0.50.0 in /src/go [\#20173](https://github.com/netdata/netdata/pull/20173) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -462,15 +469,6 @@
 - initial setup of custom OpenTelemetry Collector distribution [\#19678](https://github.com/netdata/netdata/pull/19678) ([ilyam8](https://github.com/ilyam8))
 - Fix freebsd compilation [\#19677](https://github.com/netdata/netdata/pull/19677) ([stelfrag](https://github.com/stelfrag))
 - test\(go.d dyncfg\): fix tests [\#19676](https://github.com/netdata/netdata/pull/19676) ([ilyam8](https://github.com/ilyam8))
-- Dyncfg users actions log [\#19674](https://github.com/netdata/netdata/pull/19674) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d dyncfg\): don't overwrite source [\#19673](https://github.com/netdata/netdata/pull/19673) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d dyncfg\): log collector dyncfg actions [\#19672](https://github.com/netdata/netdata/pull/19672) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/k8sstate\): correct deployment conditions [\#19671](https://github.com/netdata/netdata/pull/19671) ([ilyam8](https://github.com/ilyam8))
-- chore: remove netdata\_configured\_lock\_dir [\#19669](https://github.com/netdata/netdata/pull/19669) ([ilyam8](https://github.com/ilyam8))
-- chore: remove lock files from go.d/python.d [\#19668](https://github.com/netdata/netdata/pull/19668) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/sensors\): disable by default [\#19667](https://github.com/netdata/netdata/pull/19667) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d dyncfg\): add user to source [\#19666](https://github.com/netdata/netdata/pull/19666) ([ilyam8](https://github.com/ilyam8))
-- add k8s\_state\_deployment\_condition\_available alert [\#19664](https://github.com/netdata/netdata/pull/19664) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
