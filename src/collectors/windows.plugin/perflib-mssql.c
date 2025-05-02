@@ -9,10 +9,11 @@
 
 #define MEGA_FACTOR (1048576) // 1024 * 1024
 // https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
-#define NETDATA_MAX_INSTANCE_NAME 32
-#define NETDATA_MAX_INSTANCE_OBJECT 128
+#define NETDATA_MAX_INSTANCE_NAME (32)
+#define NETDATA_MAX_INSTANCE_OBJECT (128)
 // https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
-#define SQLSERVER_MAX_NAME_LENGTH (128)
+#define SQLSERVER_MAX_NAME_LENGTH NETDATA_MAX_INSTANCE_OBJECT
+#define NETDATA_MSSQL_NEXT_TRY (60)
 
 BOOL is_sqlexpress = FALSE;
 
@@ -29,7 +30,12 @@ struct netdata_mssql_conn {
 
     SQLHENV netdataSQLEnv;
     SQLHDBC netdataSQLHDBc;
+
+    SQLHSTMT checkPermSTMT;
+    SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
+    SQLHSTMT dbTransactionSTMT;
+    SQLHSTMT dbLocksSTMT;
 
     BOOL is_connected;
 };
@@ -133,6 +139,8 @@ struct mssql_instance {
 };
 
 struct mssql_lock_instance {
+    struct mssql_instance *parent;
+
     char *resourceID;
 
     COUNTER_DATA lockWait;
@@ -142,19 +150,10 @@ struct mssql_lock_instance {
     RRDDIM *rd_deadLocks;
 };
 
-enum db_instance_idx {
-    NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS,
-    NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP,
-    NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED,
-    NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES,
-    NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS,
-    NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS,
-
-    NETDATA_MSSQL_ENUM_MDI_IDX_END
-};
-
 struct mssql_db_instance {
     struct mssql_instance *parent;
+
+    bool collecting_data;
 
     RRDSET *st_db_data_file_size;
     RRDSET *st_db_active_transactions;
@@ -163,6 +162,10 @@ struct mssql_db_instance {
     RRDSET *st_db_log_flushes;
     RRDSET *st_db_transactions;
     RRDSET *st_db_write_transactions;
+    RRDSET *st_db_lockwait;
+    RRDSET *st_db_deadlock;
+    RRDSET *st_lock_timeouts;
+    RRDSET *st_lock_requests;
 
     RRDDIM *rd_db_data_file_size;
     RRDDIM *rd_db_active_transactions;
@@ -171,14 +174,24 @@ struct mssql_db_instance {
     RRDDIM *rd_db_log_flushes;
     RRDDIM *rd_db_transactions;
     RRDDIM *rd_db_write_transactions;
+    RRDDIM *rd_db_lockwait;
+    RRDDIM *rd_db_deadlock;
+    RRDDIM *rd_lock_timeouts;
+    RRDDIM *rd_lock_requests;
+
+    COUNTER_DATA MSSQLDatabaseDataFileSize;
 
     COUNTER_DATA MSSQLDatabaseActiveTransactions;
     COUNTER_DATA MSSQLDatabaseBackupRestoreOperations;
-    COUNTER_DATA MSSQLDatabaseDataFileSize;
     COUNTER_DATA MSSQLDatabaseLogFlushed;
     COUNTER_DATA MSSQLDatabaseLogFlushes;
     COUNTER_DATA MSSQLDatabaseTransactions;
     COUNTER_DATA MSSQLDatabaseWriteTransactions;
+
+    COUNTER_DATA MSSQLDatabaseLockWaitSec;
+    COUNTER_DATA MSSQLDatabaseDeadLockSec;
+    COUNTER_DATA MSSQLDatabaseLockTimeoutsSec;
+    COUNTER_DATA MSSQLDatabaseLockRequestsSec;
 
     uint32_t updated;
 };
@@ -223,17 +236,19 @@ static char *netdata_MSSQL_type_text(uint32_t type)
 }
 
 // Connection and SQL
-static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_odbc_errors step)
+static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_mssql_odbc_errors step, char *instance)
 {
     SQLCHAR state[1024];
     SQLCHAR message[1024];
     if (SQL_SUCCESS == SQLGetDiagRec((short)type, handle, 1, state, NULL, message, 1024, NULL)) {
         char *str_step = netdata_MSSQL_error_text(step);
         char *str_type = netdata_MSSQL_type_text(type);
+        char *use_instance = (!instance) ? "no instance" : instance;
         nd_log(
             NDLS_COLLECTORS,
-            NDLP_ERR,
-            "MSSQL server error using the handle %s running %s :  %s, %s",
+            NDLP_INFO,
+            "MSSQL server error on %s using the handle %s running %s :  %s, %s",
+            use_instance,
             str_type,
             str_step,
             message,
@@ -241,60 +256,336 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
     }
 }
 
-static ULONGLONG netdata_MSSQL_fill_data_file_size_dict(SQLHSTMT *stmt, SQLCHAR *query)
+static inline void netdata_MSSQL_release_results(SQLHSTMT *stmt) {
+    SQLFreeStmt(stmt, SQL_CLOSE);
+    SQLFreeStmt(stmt, SQL_UNBIND);
+    SQLFreeStmt(stmt, SQL_RESET_PARAMS);
+}
+
+static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask, const char *dbname, char *instance)
 {
-    static long db_size = 0;
-    static SQLLEN col_data_len = 0;
+    long db_size = 0;
+    SQLLEN col_data_len = 0;
+
+    SQLCHAR query[512];
+    snprintfz((char *)query, 511, mask, dbname);
 
     SQLRETURN ret;
 
     ret = SQLExecDirect(stmt, query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY);
-        return 0;
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY, instance);
+        return (ULONGLONG)ULONG_LONG_MAX;
     }
 
     ret = SQLBindCol(stmt, 1, SQL_C_LONG, &db_size, sizeof(long), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE);
-        return 0;
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE, instance);
+        return (ULONGLONG)ULONG_LONG_MAX;
     }
 
     ret = SQLFetch(stmt);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH);
-        return 0;
+        netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH, instance);
+        return (ULONGLONG)ULONG_LONG_MAX;
     }
 
+    netdata_MSSQL_release_results(stmt);
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
-ULONGLONG netdata_MSSQL_fill_data_file_size(struct netdata_mssql_conn *nmc, char *dbname)
+#define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
+
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
+#define NETDATA_QUERY_DATA_FILE_SIZE_MASK "SELECT size * 8/1024 FROM %s.sys.database_files WHERE type = 0;"
+
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-compatibility-views/sys-sysprocesses-transact-sql?view=sql-server-ver16
+// SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
+// https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
+#define NETDATA_QUERY_TRANSACTIONS_MASK                                                                                \
+    "select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec', 'Lock Timeouts/sec', 'Lock Requests/sec');"
+
+#define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
+#define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
+#define NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC "Write Transactions/sec"
+#define NETDATA_MSSQL_BACKUP_RESTORE_METRIC "Backup/Restore Throughput/sec"
+#define NETDATA_MSSQL_LOG_FLUSHED_METRIC "Log Bytes Flushed/sec"
+#define NETDATA_MSSQL_LOG_FLUSHES_METRIC "Log Flushes/sec"
+#define NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC "Number of Deadlocks/sec"
+#define NETDATA_MSSQL_LOCK_WAITS_METRIC "Lock Waits/sec"
+#define NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC "Lock Timeouts/sec"
+#define NETDATA_MSSQL_LOCK_REQUESTS_METRIC "Lock Requests/sec"
+
+void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
 {
-    ULONGLONG value = 0;
+    char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1];
+    long value;
+    SQLLEN col_object_len = 0, col_value_len = 0;
 
-    // We cannot access data for these tables without additional changes.
-    // They should be blacklisted.
-    if (!strcmp(dbname, "model") || !!strcmp(dbname, "model_msdb") || !!strcmp(dbname, "model_replicatedmaster")  || strcmp(dbname, "mssqlsystemresource"))
-        return ULONG_LONG_MAX;
+    SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
+    snprintfz(
+        (char *)query,
+        sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
+        NETDATA_QUERY_TRANSACTIONS_MASK,
+        dbname,
+        dbname);
 
-    // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
-    SQLCHAR query[512];
-    snprintfz((char *)query, 511, "SELECT size * 8/1024 FROM %s.sys.database_files WHERE type = 0;", dbname);
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        mdi->collecting_data = false;
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+        goto endtransactions;
+    }
 
-    value = netdata_MSSQL_fill_data_file_size_dict(nmc->dataFileSizeSTMT, query);
+    ret = SQLBindCol(
+        mdi->parent->conn.dbTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endtransactions;
+    }
 
-    SQLFreeStmt(nmc->dataFileSizeSTMT, SQL_CLOSE);
-    return value;
+    ret = SQLBindCol(mdi->parent->conn.dbTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endtransactions;
+    }
+
+    do {
+        ret = SQLFetch(mdi->parent->conn.dbTransactionSTMT);
+        switch (ret) {
+            case SQL_SUCCESS:
+            case SQL_SUCCESS_WITH_INFO:
+                break;
+            case SQL_NO_DATA:
+            default:
+                goto endtransactions;
+        }
+
+        // We cannot use strcmp, because buffer is filled with spaces instead NULL.
+        if (!strncmp(
+                object_name,
+                NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC,
+                sizeof(NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC) - 1))
+            mdi->MSSQLDatabaseActiveTransactions.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name,
+                     NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC,
+                     sizeof(NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC) - 1))
+            mdi->MSSQLDatabaseTransactions.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name,
+                     NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC,
+                     sizeof(NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC) - 1))
+            mdi->MSSQLDatabaseWriteTransactions.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name, NETDATA_MSSQL_BACKUP_RESTORE_METRIC, sizeof(NETDATA_MSSQL_BACKUP_RESTORE_METRIC) - 1))
+            mdi->MSSQLDatabaseBackupRestoreOperations.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHED_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHED_METRIC) - 1))
+            mdi->MSSQLDatabaseLogFlushed.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_LOG_FLUSHES_METRIC, sizeof(NETDATA_MSSQL_LOG_FLUSHES_METRIC) - 1))
+            mdi->MSSQLDatabaseLogFlushes.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name,
+                     NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC,
+                     sizeof(NETDATA_MSSQL_NUMBER_DEADLOCKS_METRIC) - 1))
+            mdi->MSSQLDatabaseDeadLockSec.current.Data = (ULONGLONG)value;
+        else if (!strncmp(object_name, NETDATA_MSSQL_LOCK_WAITS_METRIC, sizeof(NETDATA_MSSQL_LOCK_WAITS_METRIC) - 1))
+            mdi->MSSQLDatabaseLockWaitSec.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name, NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC, sizeof(NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC) - 1))
+            mdi->MSSQLDatabaseLockTimeoutsSec.current.Data = (ULONGLONG)value;
+        else if (!strncmp(
+                     object_name, NETDATA_MSSQL_LOCK_REQUESTS_METRIC, sizeof(NETDATA_MSSQL_LOCK_REQUESTS_METRIC) - 1))
+            mdi->MSSQLDatabaseLockRequestsSec.current.Data = (ULONGLONG)value;
+
+    } while (true);
+
+endtransactions:
+    netdata_MSSQL_release_results(mdi->parent->conn.dbTransactionSTMT);
 }
 
-int dict_mssql_databases_run_query(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-tran-locks-transact-sql?view=sql-server-ver16
+#define NETDATA_QUERY_LOCKS_MASK                                                                                       \
+    "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
+void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
+{
+#define NETDATA_MSSQL_MAX_RESOURCE_TYPE (60)
+    char resource_type[NETDATA_MSSQL_MAX_RESOURCE_TYPE + 1];
+    long value;
+    SQLLEN col_object_len = 0, col_value_len = 0;
+
+    SQLCHAR query[sizeof(NETDATA_QUERY_LOCKS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
+    snprintfz(
+        (char *)query,
+        sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT,
+        NETDATA_QUERY_LOCKS_MASK,
+        dbname,
+        dbname);
+
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbLocksSTMT, (SQLCHAR *)query, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        mdi->collecting_data = false;
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+        goto endlocks;
+    }
+
+    ret =
+        SQLBindCol(mdi->parent->conn.dbLocksSTMT, 1, SQL_C_CHAR, resource_type, sizeof(resource_type), &col_object_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endlocks;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn.dbLocksSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endlocks;
+    }
+
+    do {
+        ret = SQLFetch(mdi->parent->conn.dbLocksSTMT);
+        switch (ret) {
+            case SQL_SUCCESS:
+            case SQL_SUCCESS_WITH_INFO:
+                break;
+            case SQL_NO_DATA:
+            default:
+                goto endlocks;
+        }
+
+        char *space = strchr(resource_type, ' ');
+        if (space)
+            *space = '\0';
+
+        struct mssql_lock_instance *mli =
+            dictionary_set(mdi->parent->locks_instances, resource_type, NULL, sizeof(*mli));
+        if (!mli)
+            continue;
+    } while (true);
+
+endlocks:
+    netdata_MSSQL_release_results(mdi->parent->conn.dbLocksSTMT);
+}
+
+int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_data_file_size(&mdi->parent->conn, (char *)dbname);
+    if (!mdi->collecting_data) {
+        goto enddrunquery;
+    }
+
+    // We failed to collect this for the database, so we are not going to try again
+    if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
+        mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
+            mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
+    else {
+        mdi->collecting_data = false;
+        goto enddrunquery;
+    }
+
+    dict_mssql_fill_transactions(mdi, dbname);
+    dict_mssql_fill_locks(mdi, dbname);
+
+enddrunquery:
+    return 1;
+}
+
+#define NETDATA_QUERY_CHECK_PERM                                                                                       \
+    "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
+long metdata_mssql_check_permission(struct mssql_instance *mi)
+{
+    static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
+    long perm = 0;
+    SQLLEN col_data_len = 0;
+
+    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+        return 1;
+
+    next_try = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn.checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        perm = LONG_MAX;
+        goto endperm;
+    }
+
+    ret = SQLBindCol(mi->conn.checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
+
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        perm = LONG_MAX;
+        goto endperm;
+    }
+
+    ret = SQLFetch(mi->conn.checkPermSTMT);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH, mi->instanceID);
+        perm = LONG_MAX;
+        goto endperm;
+    }
+
+endperm:
+    netdata_MSSQL_release_results(mi->conn.checkPermSTMT);
+    return perm;
+}
+
+void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
+{
+    char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
+    SQLLEN col_data_len = 0;
+
+    static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
+
+    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+        return;
+
+    next_try = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn.databaseListSTMT, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto enddblist;
+    }
+
+    ret = SQLBindCol(mi->conn.databaseListSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
+
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddblist;
+    }
+
+    do {
+        ret = SQLFetch(mi->conn.databaseListSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            goto enddblist;
+        }
+
+        struct mssql_db_instance *mdi = dictionary_set(mi->databases, dbname, NULL, sizeof(*mdi));
+        if (!mdi)
+            continue;
+
+        mdi->updated = 0;
+        if (!mdi->parent) {
+            mdi->parent = mi;
+        }
+    } while (true);
+
+enddblist:
+    netdata_MSSQL_release_results(mi->conn.databaseListSTMT);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -336,7 +627,7 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
         case SQL_INVALID_HANDLE:
         case SQL_ERROR:
         default:
-            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc, NETDATA_MSSQL_ODBC_CONNECT);
+            netdata_MSSQL_error(SQL_HANDLE_DBC, nmc->netdataSQLHDBc, NETDATA_MSSQL_ODBC_CONNECT, NULL);
             retConn = FALSE;
             break;
         case SQL_SUCCESS:
@@ -346,7 +637,23 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
     }
 
     if (retConn) {
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->checkPermSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->databaseListSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dataFileSizeSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbTransactionSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbLocksSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
     }
@@ -444,15 +751,9 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    struct mssql_db_instance *ptr = value;
+    struct mssql_db_instance *mdi = value;
 
-    // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
-    ptr->MSSQLDatabaseActiveTransactions.key = "Active Transactions";
-    ptr->MSSQLDatabaseBackupRestoreOperations.key = "Backup/Restore Throughput/sec";
-    ptr->MSSQLDatabaseLogFlushed.key = "Log Bytes Flushed/sec";
-    ptr->MSSQLDatabaseLogFlushes.key = "Log Flushes/sec";
-    ptr->MSSQLDatabaseTransactions.key = "Transactions/sec";
-    ptr->MSSQLDatabaseWriteTransactions.key = "Write Transactions/sec";
+    mdi->collecting_data = true;
 }
 
 // Options
@@ -505,7 +806,11 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 {
     dbconn->netdataSQLEnv = NULL;
     dbconn->netdataSQLHDBc = NULL;
+    dbconn->checkPermSTMT = NULL;
+    dbconn->databaseListSTMT = NULL;
     dbconn->dataFileSizeSTMT = NULL;
+    dbconn->dbTransactionSTMT = NULL;
+    dbconn->dbLocksSTMT = NULL;
 
     dbconn->is_connected = FALSE;
 
@@ -1068,15 +1373,15 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, int update_every)
     if (!mi->st_lockWait) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_lock_wait", mi->instanceID);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_lock_wait", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_lockWait = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
             "locks",
-            "mssql.instance_locks_lock_wait",
-            "Lock requests that required the caller to wait.",
+            "mssql.instance_resource_lock_wait",
+            "Lock requests that required the caller to wait per resource.",
             "locks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
@@ -1088,53 +1393,29 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
-void dict_mssql_locks_wait_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
-{
-    if (!mli->rd_lockWait) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "%s", mli->resourceID);
-        netdata_fix_chart_name(id);
-
-        mli->rd_lockWait = rrddim_add(mi->st_lockWait, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
-    rrddim_set_by_pointer(mi->st_lockWait, mli->rd_lockWait, (collected_number)(mli->lockWait.current.Data));
-}
-
 void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
 {
     if (!mi->st_deadLocks) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_deadlocks", mi->instanceID);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_deadlocks", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_deadLocks = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
             "locks",
-            "mssql.instance_locks_deadlocks",
-            "Lock requests that resulted in deadlock.",
+            "mssql.instance_resource_deadlocks",
+            "Active lock requests that resulted in deadlock per resource.",
             "deadlocks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
-            PRIO_MSSQL_LOCKS_DEADLOCK,
+            PRIO_MSSQL_LOCKS_DEADLOCK_PER_RESOURCE,
             update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mi->st_deadLocks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
-}
-
-void dict_mssql_deadlocks_dimension(struct mssql_instance *mi, struct mssql_lock_instance *mli)
-{
-    if (!mli->rd_deadLocks) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "%s", mli->resourceID);
-        netdata_fix_chart_name(id);
-
-        mli->rd_deadLocks = rrddim_add(mi->st_deadLocks, id, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
-    rrddim_set_by_pointer(mi->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
 }
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
@@ -1148,29 +1429,6 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
     dict_mssql_locks_wait_charts(mi, update_every);
     dict_mssql_dead_locks_charts(mi, update_every);
-    PERF_INSTANCE_DEFINITION *pi = NULL;
-    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
-            break;
-
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
-
-        if (!strcasecmp(windows_shared_buffer, "_Total"))
-            continue;
-
-        struct mssql_lock_instance *mli =
-            dictionary_set(mi->locks_instances, windows_shared_buffer, NULL, sizeof(*mli));
-        if (!mli)
-            continue;
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait))
-            dict_mssql_locks_wait_dimension(mi, mli);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks))
-            dict_mssql_deadlocks_dimension(mi, mli);
-    }
 
     if (mi->st_lockWait)
         rrdset_done(mi->st_lockWait);
@@ -1181,6 +1439,9 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_backup_restore_operations) {
@@ -1213,18 +1474,19 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
             rrddim_add(mli->st_db_backup_restore_operations, "backup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP)) {
-        rrddim_set_by_pointer(
-            mli->st_db_backup_restore_operations,
-            mli->rd_db_backup_restore_operations,
-            (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_backup_restore_operations,
+        mli->rd_db_backup_restore_operations,
+        (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
 
     rrdset_done(mli->st_db_backup_restore_operations);
 }
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_log_flushes) {
@@ -1252,18 +1514,17 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
         mli->rd_db_log_flushes = rrddim_add(mli->st_db_log_flushes, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES)) {
-        rrddim_set_by_pointer(
-            mli->st_db_log_flushes,
-            mli->rd_db_log_flushes,
-            (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_log_flushes, mli->rd_db_log_flushes, (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
 
     rrdset_done(mli->st_db_log_flushes);
 }
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_log_flushed) {
@@ -1291,18 +1552,17 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
         mli->rd_db_log_flushed = rrddim_add(mli->st_db_log_flushed, "flushed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED)) {
-        rrddim_set_by_pointer(
-            mli->st_db_log_flushed,
-            mli->rd_db_log_flushed,
-            (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_log_flushed, mli->rd_db_log_flushed, (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
 
     rrdset_done(mli->st_db_log_flushed);
 }
 
 static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_transactions) {
@@ -1331,18 +1591,19 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
             rrddim_add(mli->st_db_transactions, "transactions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS)) {
-        rrddim_set_by_pointer(
-            mli->st_db_transactions,
-            mli->rd_db_transactions,
-            (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_transactions,
+        mli->rd_db_transactions,
+        (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
 
     rrdset_done(mli->st_db_transactions);
 }
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_write_transactions) {
@@ -1372,18 +1633,163 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
             rrddim_add(mli->st_db_write_transactions, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS)) {
-        rrddim_set_by_pointer(
-            mli->st_db_write_transactions,
-            mli->rd_db_write_transactions,
-            (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_write_transactions,
+        mli->rd_db_write_transactions,
+        (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
 
     rrdset_done(mli->st_db_write_transactions);
 }
 
+static void mssql_lockwait_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
+    char id[RRD_ID_LENGTH_MAX + 1];
+
+    if (!mli->st_db_lockwait) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lockwait", db, mli->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mli->st_db_lockwait = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.database_lockwait",
+            "Lock requests that required the caller to wait.",
+            "locks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_DATABASE_LOCKWAIT_PER_SECOND,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->st_db_lockwait->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mli->st_db_lockwait->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mli->rd_db_lockwait = rrddim_add(mli->st_db_lockwait, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        mli->st_db_lockwait, mli->rd_db_lockwait, (collected_number)mli->MSSQLDatabaseLockWaitSec.current.Data);
+
+    rrdset_done(mli->st_db_lockwait);
+}
+
+static void mssql_deadlock_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
+    char id[RRD_ID_LENGTH_MAX + 1];
+
+    if (!mli->st_db_deadlock) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_deadlocks", db, mli->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mli->st_db_deadlock = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.database_deadlocks",
+            "Lock requests that resulted in deadlock.",
+            "deadlocks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->st_db_deadlock->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mli->st_db_deadlock->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mli->rd_db_deadlock = rrddim_add(mli->st_db_deadlock, "deadlocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        mli->st_db_deadlock, mli->rd_db_deadlock, (collected_number)mli->MSSQLDatabaseDeadLockSec.current.Data);
+
+    rrdset_done(mli->st_db_deadlock);
+}
+
+static void mssql_lock_request_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
+    char id[RRD_ID_LENGTH_MAX + 1];
+
+    if (!mli->st_lock_requests) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_requests", db, mli->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mli->st_lock_requests = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.database_lock_requests",
+            "Number of new locks and lock conversions requested.",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_DATABASE_LOCK_REQUESTS_SEC,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->st_lock_requests->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mli->st_lock_requests->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mli->rd_lock_requests = rrddim_add(mli->st_lock_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        mli->st_lock_requests, mli->rd_lock_requests, (collected_number)mli->MSSQLDatabaseLockRequestsSec.current.Data);
+
+    rrdset_done(mli->st_lock_requests);
+}
+
+static void mssql_lock_timeout_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+{
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
+    char id[RRD_ID_LENGTH_MAX + 1];
+
+    if (!mli->st_lock_timeouts) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_timeouts", db, mli->parent->instanceID);
+        netdata_fix_chart_name(id);
+        mli->st_lock_timeouts = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.database_lock_timeouts",
+            "Lock that timed out.",
+            "timeouts/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_DATABASE_LOCKS_TIMEOUT_PER_SECOND,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mli->st_lock_timeouts->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mli->st_lock_timeouts->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mli->rd_lock_timeouts = rrddim_add(mli->st_lock_timeouts, "timeouts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        mli->st_lock_timeouts, mli->rd_lock_timeouts, (collected_number)mli->MSSQLDatabaseLockTimeoutsSec.current.Data);
+
+    rrdset_done(mli->st_lock_timeouts);
+}
+
 static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
+    if (unlikely(!mli->parent->conn.is_connected))
+        return;
+
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_active_transactions) {
@@ -1413,19 +1819,17 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
             rrddim_add(mli->st_db_active_transactions, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (mli->updated & (1 << NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS)) {
-        rrddim_set_by_pointer(
-            mli->st_db_active_transactions,
-            mli->rd_db_active_transactions,
-            (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
-    }
+    rrddim_set_by_pointer(
+        mli->st_db_active_transactions,
+        mli->rd_db_active_transactions,
+        (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
 
     rrdset_done(mli->st_db_active_transactions);
 }
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected) || mli->MSSQLDatabaseDataFileSize.current.Data == ULONG_LONG_MAX)
+    if (unlikely(!mli->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1467,6 +1871,10 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     struct mssql_db_instance *mli = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
+    if (!mli->collecting_data) {
+        goto endchartcb;
+    }
+
     int *update_every = data;
 
     void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
@@ -1477,6 +1885,10 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
         mssql_database_log_flushes_chart,
         mssql_active_transactions_chart,
         mssql_write_transactions_chart,
+        mssql_lockwait_chart,
+        mssql_deadlock_chart,
+        mssql_lock_timeout_chart,
+        mssql_lock_request_chart,
 
         // Last function pointer must be NULL
         NULL};
@@ -1486,6 +1898,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
         transaction_chart[i](mli, db, *update_every);
     }
 
+endchartcb:
     return 1;
 }
 
@@ -1511,28 +1924,9 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         if (!mdi)
             continue;
 
-        mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = mi;
         }
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseBackupRestoreOperations))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushed))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushes))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseTransactions))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseWriteTransactions))
-            mdi->updated |= (1 << NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS);
     }
 
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_charts_cb, &update_every);
@@ -1670,13 +2064,36 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
+int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_db_instance *mdi = value;
+
+    mdi->collecting_data = false;
+
+    return 1;
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
+    static long have_perm = 1;
     int *update_every = data;
 
-    if (mi->conn.is_connected) {
-        dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_query, NULL);
+    if (mi->conn.is_connected && have_perm) {
+        have_perm = metdata_mssql_check_permission(mi);
+        if (!have_perm) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "User %s does not have permission to run queries on %s",
+                mi->conn.username,
+                mi->instanceID);
+        } else {
+            metdata_mssql_fill_dictionary_from_db(mi);
+            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
+        }
+    } else {
+        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
     }
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
