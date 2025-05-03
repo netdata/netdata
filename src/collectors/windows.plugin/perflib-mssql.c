@@ -16,6 +16,7 @@
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
 BOOL is_sqlexpress = FALSE;
+ND_THREAD *mssql_query_thread = NULL;
 
 struct netdata_mssql_conn {
     const char *driver;
@@ -846,6 +847,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 {
     struct mssql_instance *mi = value;
     const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    bool *create_thread = data;
 
     if (!mi->locks_instances) {
         mi->locks_instances = dictionary_create_advanced(
@@ -863,8 +865,11 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     initialize_mssql_keys(mi);
     netdata_read_config_options(&mi->conn);
 
-    if (mi->conn.connectionString)
+    if (mi->conn.connectionString) {
         mi->conn.is_connected = netdata_MSSQL_initialize_conection(&mi->conn);
+        if (mi->conn.is_connected)
+            *create_thread = true;
+    }
 }
 
 static int mssql_fill_dictionary()
@@ -913,16 +918,38 @@ endMSSQLFillDict:
     return (ret == ERROR_SUCCESS) ? 0 : -1;
 }
 
-static int initialize(void)
+void *netdata_mssql_queries(void *ptr __maybe_unused)
 {
+    heartbeat_t hb;
+    int update_every = *((int *)ptr);
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+
+    while (service_running(SERVICE_COLLECTORS)) {
+        usec_t hb_dt = heartbeat_next(&hb);
+
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
+    }
+
+    return NULL;
+}
+
+static int initialize(int update_every)
+{
+    bool create_thread = false;
     mssql_instances = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_instance));
 
-    dictionary_register_insert_callback(mssql_instances, dict_mssql_insert_cb, NULL);
+    dictionary_register_insert_callback(mssql_instances, dict_mssql_insert_cb, &create_thread);
 
     if (mssql_fill_dictionary()) {
         return -1;
     }
+
+    if (create_thread)
+        mssql_query_thread = nd_thread_create("mssql_queries",
+                                              NETDATA_THREAD_OPTION_JOINABLE,
+                                              netdata_mssql_queries, &update_every);
 
     return 0;
 }
@@ -2132,7 +2159,7 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
-        if (initialize())
+        if (initialize(update_every))
             return -1;
 
         initialized = true;
