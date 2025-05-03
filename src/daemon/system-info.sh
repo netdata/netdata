@@ -210,7 +210,7 @@ if [ -d "/etc/pve" ] && \
   HOST_NAME="Proxmox VE"
   HOST_ID="proxmox"
   HOST_ID_LIKE="proxmox"
-  HOST_VERSION="$(pveversion | tr '/' ' ' | cut -f 2 -d ' ')"
+  HOST_VERSION="$(pveversion | cut -f 2 -d '/')"
   HOST_VERSION_ID="$(echo "${HOST_VERSION}" | cut -f 1 -d '.')"
   HOST_OS_DETECTION="pveversion"
 fi
