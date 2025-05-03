@@ -957,7 +957,7 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
     while (service_running(SERVICE_COLLECTORS)) {
-        usec_t hb_dt = heartbeat_next(&hb);
+        (void)heartbeat_next(&hb);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
