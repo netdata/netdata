@@ -205,8 +205,8 @@ else
 fi
 
 if [ -d "/etc/pve" ] && \
-   [[ "${KERNEL_VERSION}" =~ .*-pve$ ]] && \
-   command -v pveversion &> /dev/null; then
+   echo "${KERNEL_VERSION}" | grep -q -- '-pve$' && \
+   command -v pveversion > /dev/null 2>&1; then
   HOST_NAME="Proxmox VE"
   HOST_ID="proxmox"
   HOST_ID_LIKE="proxmox"
