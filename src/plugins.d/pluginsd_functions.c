@@ -172,6 +172,9 @@ static void pluginsd_function_cancel(void *data) {
 static void pluginsd_function_progress_to_plugin(void *data) {
     struct inflight_function *look_for = data, *t;
 
+    if (unlikely(!look_for || !look_for->parser || !look_for->parser->inflight.functions))
+        fatal("PLUGINSD: function progress to plugin called with invalid data.");
+
     bool sent = false;
     dfe_start_read(look_for->parser->inflight.functions, t) {
         if(look_for == t) {
