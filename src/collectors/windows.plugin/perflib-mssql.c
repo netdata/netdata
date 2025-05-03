@@ -746,8 +746,6 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object
     struct mssql_lock_instance *ptr = value;
     ptr->resourceID = strdupz(resource);
-    ptr->deadLocks.key = "Number of Deadlocks/sec";
-    ptr->lockWait.key = "Lock Waits/sec";
 }
 
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
