@@ -1500,17 +1500,17 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
         rrdset_done(mi->st_deadLocks);
 }
 
-static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_backup_restore_operations) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_backup_restore_operations", db, mli->parent->instanceID);
+    if (!mdi->st_db_backup_restore_operations) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_backup_restore_operations", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_backup_restore_operations = rrdset_create_localhost(
+        mdi->st_db_backup_restore_operations = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1525,37 +1525,35 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(
-            mli->st_db_backup_restore_operations->rrdlabels,
+            mdi->st_db_backup_restore_operations->rrdlabels,
             "mssql_instance",
-            mli->parent->instanceID,
+            mdi->parent->instanceID,
             RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_backup_restore_operations->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
-    }
+        rrdlabels_add(mdi->st_db_backup_restore_operations->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-    if (!mli->rd_db_backup_restore_operations) {
-        mli->rd_db_backup_restore_operations =
-            rrddim_add(mli->st_db_backup_restore_operations, "backup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_backup_restore_operations =
+            rrddim_add(mdi->st_db_backup_restore_operations, "backup", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_backup_restore_operations,
-        mli->rd_db_backup_restore_operations,
-        (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
+        mdi->st_db_backup_restore_operations,
+        mdi->rd_db_backup_restore_operations,
+        (collected_number)mdi->MSSQLDatabaseBackupRestoreOperations.current.Data);
 
-    rrdset_done(mli->st_db_backup_restore_operations);
+    rrdset_done(mdi->st_db_backup_restore_operations);
 }
 
-static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_log_flushes) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushes", db, mli->parent->instanceID);
+    if (!mdi->st_db_log_flushes) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushes", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_log_flushes = rrdset_create_localhost(
+        mdi->st_db_log_flushes = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1569,31 +1567,31 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_db_log_flushes->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_log_flushes->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_log_flushes->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_log_flushes->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
     }
 
-    if (!mli->rd_db_log_flushes) {
-        mli->rd_db_log_flushes = rrddim_add(mli->st_db_log_flushes, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    if (!mdi->rd_db_log_flushes) {
+        mdi->rd_db_log_flushes = rrddim_add(mdi->st_db_log_flushes, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_log_flushes, mli->rd_db_log_flushes, (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
+        mdi->st_db_log_flushes, mdi->rd_db_log_flushes, (collected_number)mdi->MSSQLDatabaseLogFlushes.current.Data);
 
-    rrdset_done(mli->st_db_log_flushes);
+    rrdset_done(mdi->st_db_log_flushes);
 }
 
-static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_log_flushed) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushed", db, mli->parent->instanceID);
+    if (!mdi->st_db_log_flushed) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushed", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_log_flushed = rrdset_create_localhost(
+        mdi->st_db_log_flushed = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1607,31 +1605,29 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_db_log_flushed->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_log_flushed->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
-    }
+        rrdlabels_add(mdi->st_db_log_flushed->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_log_flushed->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-    if (!mli->rd_db_log_flushed) {
-        mli->rd_db_log_flushed = rrddim_add(mli->st_db_log_flushed, "flushed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_log_flushed = rrddim_add(mdi->st_db_log_flushed, "flushed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_log_flushed, mli->rd_db_log_flushed, (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
+        mdi->st_db_log_flushed, mdi->rd_db_log_flushed, (collected_number)mdi->MSSQLDatabaseLogFlushed.current.Data);
 
-    rrdset_done(mli->st_db_log_flushed);
+    rrdset_done(mdi->st_db_log_flushed);
 }
 
-static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_transactions) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_transactions", db, mli->parent->instanceID);
+    if (!mdi->st_db_transactions) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_transactions", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_transactions = rrdset_create_localhost(
+        mdi->st_db_transactions = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1645,34 +1641,32 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_db_transactions->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_transactions->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
-    }
+        rrdlabels_add(mdi->st_db_transactions->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_transactions->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-    if (!mli->rd_db_transactions) {
-        mli->rd_db_transactions =
-            rrddim_add(mli->st_db_transactions, "transactions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_transactions =
+            rrddim_add(mdi->st_db_transactions, "transactions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_transactions,
-        mli->rd_db_transactions,
-        (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
+        mdi->st_db_transactions,
+        mdi->rd_db_transactions,
+        (collected_number)mdi->MSSQLDatabaseTransactions.current.Data);
 
-    rrdset_done(mli->st_db_transactions);
+    rrdset_done(mdi->st_db_transactions);
 }
 
-static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_write_transactions) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_write_transactions", db, mli->parent->instanceID);
+    if (!mdi->st_db_write_transactions) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_write_transactions", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_write_transactions = rrdset_create_localhost(
+        mdi->st_db_write_transactions = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1687,34 +1681,32 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(
-            mli->st_db_write_transactions->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_write_transactions->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
-    }
+            mdi->st_db_write_transactions->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_write_transactions->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-    if (!mli->rd_db_write_transactions) {
-        mli->rd_db_write_transactions =
-            rrddim_add(mli->st_db_write_transactions, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_write_transactions =
+            rrddim_add(mdi->st_db_write_transactions, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_write_transactions,
-        mli->rd_db_write_transactions,
-        (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
+        mdi->st_db_write_transactions,
+        mdi->rd_db_write_transactions,
+        (collected_number)mdi->MSSQLDatabaseWriteTransactions.current.Data);
 
-    rrdset_done(mli->st_db_write_transactions);
+    rrdset_done(mdi->st_db_write_transactions);
 }
 
-static void mssql_lockwait_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_lockwait) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lockwait", db, mli->parent->instanceID);
+    if (!mdi->st_db_lockwait) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lockwait", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_lockwait = rrdset_create_localhost(
+        mdi->st_db_lockwait = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1728,29 +1720,29 @@ static void mssql_lockwait_chart(struct mssql_db_instance *mli, const char *db, 
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_db_lockwait->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_lockwait->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_lockwait->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_lockwait->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mli->rd_db_lockwait = rrddim_add(mli->st_db_lockwait, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_lockwait = rrddim_add(mdi->st_db_lockwait, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_lockwait, mli->rd_db_lockwait, (collected_number)mli->MSSQLDatabaseLockWaitSec.current.Data);
+        mdi->st_db_lockwait, mdi->rd_db_lockwait, (collected_number)mdi->MSSQLDatabaseLockWaitSec.current.Data);
 
-    rrdset_done(mli->st_db_lockwait);
+    rrdset_done(mdi->st_db_lockwait);
 }
 
-static void mssql_deadlock_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_deadlock) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_deadlocks", db, mli->parent->instanceID);
+    if (!mdi->st_db_deadlock) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_deadlocks", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_deadlock = rrdset_create_localhost(
+        mdi->st_db_deadlock = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1764,29 +1756,29 @@ static void mssql_deadlock_chart(struct mssql_db_instance *mli, const char *db, 
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_db_deadlock->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_deadlock->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_deadlock->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_deadlock->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mli->rd_db_deadlock = rrddim_add(mli->st_db_deadlock, "deadlocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_db_deadlock = rrddim_add(mdi->st_db_deadlock, "deadlocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_deadlock, mli->rd_db_deadlock, (collected_number)mli->MSSQLDatabaseDeadLockSec.current.Data);
+        mdi->st_db_deadlock, mdi->rd_db_deadlock, (collected_number)mdi->MSSQLDatabaseDeadLockSec.current.Data);
 
-    rrdset_done(mli->st_db_deadlock);
+    rrdset_done(mdi->st_db_deadlock);
 }
 
-static void mssql_lock_request_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_lock_requests) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_requests", db, mli->parent->instanceID);
+    if (!mdi->st_lock_requests) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_requests", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_lock_requests = rrdset_create_localhost(
+        mdi->st_lock_requests = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1800,29 +1792,29 @@ static void mssql_lock_request_chart(struct mssql_db_instance *mli, const char *
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_lock_requests->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_lock_requests->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_lock_requests->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_lock_requests->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mli->rd_lock_requests = rrddim_add(mli->st_lock_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_lock_requests = rrddim_add(mdi->st_lock_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_lock_requests, mli->rd_lock_requests, (collected_number)mli->MSSQLDatabaseLockRequestsSec.current.Data);
+        mdi->st_lock_requests, mdi->rd_lock_requests, (collected_number)mdi->MSSQLDatabaseLockRequestsSec.current.Data);
 
-    rrdset_done(mli->st_lock_requests);
+    rrdset_done(mdi->st_lock_requests);
 }
 
-static void mssql_lock_timeout_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_lock_timeouts) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_timeouts", db, mli->parent->instanceID);
+    if (!mdi->st_lock_timeouts) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_timeouts", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_lock_timeouts = rrdset_create_localhost(
+        mdi->st_lock_timeouts = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1836,29 +1828,29 @@ static void mssql_lock_timeout_chart(struct mssql_db_instance *mli, const char *
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mli->st_lock_timeouts->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_lock_timeouts->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_lock_timeouts->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_lock_timeouts->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-        mli->rd_lock_timeouts = rrddim_add(mli->st_lock_timeouts, "timeouts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdi->rd_lock_timeouts = rrddim_add(mdi->st_lock_timeouts, "timeouts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        mli->st_lock_timeouts, mli->rd_lock_timeouts, (collected_number)mli->MSSQLDatabaseLockTimeoutsSec.current.Data);
+        mdi->st_lock_timeouts, mdi->rd_lock_timeouts, (collected_number)mdi->MSSQLDatabaseLockTimeoutsSec.current.Data);
 
-    rrdset_done(mli->st_lock_timeouts);
+    rrdset_done(mdi->st_lock_timeouts);
 }
 
-static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (!mli->st_db_active_transactions) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_active_transactions", db, mli->parent->instanceID);
+    if (!mdi->st_db_active_transactions) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_active_transactions", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_active_transactions = rrdset_create_localhost(
+        mdi->st_db_active_transactions = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1873,34 +1865,32 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(
-            mli->st_db_active_transactions->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_active_transactions->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
-    }
+            mdi->st_db_active_transactions->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_active_transactions->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
 
-    if (!mli->rd_db_active_transactions) {
-        mli->rd_db_active_transactions =
-            rrddim_add(mli->st_db_active_transactions, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mdi->rd_db_active_transactions =
+            rrddim_add(mdi->st_db_active_transactions, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
-        mli->st_db_active_transactions,
-        mli->rd_db_active_transactions,
-        (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
+        mdi->st_db_active_transactions,
+        mdi->rd_db_active_transactions,
+        (collected_number)mdi->MSSQLDatabaseActiveTransactions.current.Data);
 
-    rrdset_done(mli->st_db_active_transactions);
+    rrdset_done(mdi->st_db_active_transactions);
 }
 
-static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every)
+static inline void mssql_data_file_size_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mli->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn.is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
 
-    if (unlikely(!mli->st_db_data_file_size)) {
-        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_data_files_size", db, mli->parent->instanceID);
+    if (unlikely(!mdi->st_db_data_file_size)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_data_files_size", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
-        mli->st_db_data_file_size = rrdset_create_localhost(
+        mdi->st_db_data_file_size = rrdset_create_localhost(
             "mssql",
             id,
             NULL,
@@ -1915,26 +1905,24 @@ static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, con
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(
-            mli->st_db_data_file_size->rrdlabels, "mssql_instance", mli->parent->instanceID, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(mli->st_db_data_file_size->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+            mdi->st_db_data_file_size->rrdlabels, "mssql_instance", mdi->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdi->st_db_data_file_size->rrdlabels, "database", db, RRDLABEL_SRC_AUTO);
+
+        mdi->rd_db_data_file_size = rrddim_add(mdi->st_db_data_file_size, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    if (unlikely(!mli->rd_db_data_file_size)) {
-        mli->rd_db_data_file_size = rrddim_add(mli->st_db_data_file_size, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    }
+    collected_number data = mdi->MSSQLDatabaseDataFileSize.current.Data;
+    rrddim_set_by_pointer(mdi->st_db_data_file_size, mdi->rd_db_data_file_size, data);
 
-    collected_number data = mli->MSSQLDatabaseDataFileSize.current.Data;
-    rrddim_set_by_pointer(mli->st_db_data_file_size, mli->rd_db_data_file_size, data);
-
-    rrdset_done(mli->st_db_data_file_size);
+    rrdset_done(mdi->st_db_data_file_size);
 }
 
 int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    struct mssql_db_instance *mli = value;
+    struct mssql_db_instance *mdi = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    if (!mli->collecting_data) {
+    if (!mdi->collecting_data) {
         goto endchartcb;
     }
 
@@ -1958,7 +1946,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
 
     int i;
     for (i = 0; transaction_chart[i]; i++) {
-        transaction_chart[i](mli, db, *update_every);
+        transaction_chart[i](mdi, db, *update_every);
     }
 
 endchartcb:
