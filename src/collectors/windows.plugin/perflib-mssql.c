@@ -918,6 +918,40 @@ endMSSQLFillDict:
     return (ret == ERROR_SUCCESS) ? 0 : -1;
 }
 
+int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_db_instance *mdi = value;
+
+    mdi->collecting_data = false;
+
+    return 1;
+}
+
+int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct mssql_instance *mi = value;
+    static long have_perm = 1;
+
+    if (mi->conn.is_connected && have_perm) {
+        have_perm = metdata_mssql_check_permission(mi);
+        if (!have_perm) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "User %s does not have permission to run queries on %s",
+                mi->conn.username,
+                mi->instanceID);
+        } else {
+            metdata_mssql_fill_dictionary_from_db(mi);
+            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
+        }
+    } else {
+        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
+    }
+
+    return 1;
+}
+
 void *netdata_mssql_queries(void *ptr __maybe_unused)
 {
     heartbeat_t hb;
@@ -929,6 +963,8 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
+
+        dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_query_cb, &update_every);
     }
 
     return NULL;
@@ -2091,37 +2127,10 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
-int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
-{
-    struct mssql_db_instance *mdi = value;
-
-    mdi->collecting_data = false;
-
-    return 1;
-}
-
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
-    static long have_perm = 1;
     int *update_every = data;
-
-    if (mi->conn.is_connected && have_perm) {
-        have_perm = metdata_mssql_check_permission(mi);
-        if (!have_perm) {
-            nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "User %s does not have permission to run queries on %s",
-                mi->conn.username,
-                mi->instanceID);
-        } else {
-            metdata_mssql_fill_dictionary_from_db(mi);
-            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
-        }
-    } else {
-        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
-    }
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
