@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- status file 28 [\#20229](https://github.com/netdata/netdata/pull/20229) ([ktsaou](https://github.com/ktsaou))
 - Fix potential null pointer dereference when accessing journalfile [\#20226](https://github.com/netdata/netdata/pull/20226) ([stelfrag](https://github.com/stelfrag))
 - fix crashes 8 [\#20225](https://github.com/netdata/netdata/pull/20225) ([ktsaou](https://github.com/ktsaou))
 - fix crashes 7 [\#20224](https://github.com/netdata/netdata/pull/20224) ([ktsaou](https://github.com/ktsaou))
@@ -468,7 +469,6 @@
 - build\(deps\): bump github.com/docker/docker from 27.5.1+incompatible to 28.0.0+incompatible in /src/go [\#19692](https://github.com/netdata/netdata/pull/19692) ([dependabot[bot]](https://github.com/apps/dependabot))
 - load health config before creating localhost [\#19689](https://github.com/netdata/netdata/pull/19689) ([ktsaou](https://github.com/ktsaou))
 - chore\(go.d/pkg/iprange\): add iterator [\#19688](https://github.com/netdata/netdata/pull/19688) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/mysql\): InnodbOSLogIO in MariaDB \>= 10.8 [\#19687](https://github.com/netdata/netdata/pull/19687) ([arkamar](https://github.com/arkamar))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
