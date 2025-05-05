@@ -22,7 +22,7 @@ struct nd_thread {
     void *ret; // the return value of start routine
     void *(*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
-    pthread_t thread;
+    uv_thread_t thread;
     bool cancel_atomic;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -347,7 +347,7 @@ static void nd_thread_exit(ND_THREAD *nti) {
     //}
 }
 
-static void *nd_thread_starting_point(void *ptr) {
+static void nd_thread_starting_point(void *ptr) {
     ND_THREAD *nti = _nd_thread_info = (ND_THREAD *)ptr;
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_STARTED);
 
@@ -356,12 +356,6 @@ static void *nd_thread_starting_point(void *ptr) {
 
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_STARTUP) != NETDATA_THREAD_OPTION_DONT_LOG_STARTUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid_cached());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
     signals_block_all_except_deadly();
 
@@ -374,7 +368,6 @@ static void *nd_thread_starting_point(void *ptr) {
     nti->ret = nti->start_routine(nti->arg);
 
     nd_thread_exit(nti);
-    return nti;
 }
 
 ND_THREAD *nd_thread_self(void) {
@@ -383,6 +376,26 @@ ND_THREAD *nd_thread_self(void) {
 
 bool nd_thread_is_me(ND_THREAD *nti) {
     return nti && nti->thread == pthread_self();
+}
+
+
+// utils
+#define MAX_THREAD_CREATE_RETRIES (10)
+#define MAX_THREAD_CREATE_WAIT_MS (1000)
+
+static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+{
+    int err;
+
+    do {
+        err = uv_thread_create(thread, thread_func, arg);
+        if (err == 0)
+            break;
+
+        sleep_usec(MAX_THREAD_CREATE_WAIT_MS * USEC_PER_MS);
+    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+
+    return err;
 }
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg)
@@ -397,15 +410,18 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     if ((options & NETDATA_THREAD_OPTION_JOINABLE) == 0)
         nd_log_daemon(NDLP_INFO, "WARNING: Creating detached thread '%s'", tag);
 
-    int ret = pthread_create(&nti->thread, &threads_globals.attr, nd_thread_starting_point, nti);
+    int retries = 0;
+    int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, &retries);
     if(ret != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "failed to create new thread for %s. pthread_create() failed with code %d",
+               "failed to create new thread for %s. uv_thread_create() failed with code %d",
                tag, ret);
 
         freez(nti);
         return NULL;
     }
+    if (retries)
+        nd_log_daemon(NDLP_WARNING, "nd_thread_create required %d attempts", retries);
 
     return nti;
 }
@@ -454,12 +470,12 @@ int nd_thread_join(ND_THREAD *nti) {
     int ret = 0;
     bool joinable = nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE);
     if (joinable)
-        ret = pthread_join(nti->thread, NULL);
+        ret = uv_thread_join(&nti->thread);
     if(ret != 0) {
         // we can't join the thread
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "cannot join thread. pthread_join() failed with code %d. (tag=%s)",
+               "cannot join thread. uv_thread_join() failed with code %d. (tag=%s)",
                ret, nti->tag);
     }
     else {

@@ -1287,7 +1287,7 @@ static inline void discovery_find_all_cgroups() {
     netdata_log_debug(D_CGROUP, "done searching for cgroups");
 }
 
-void cgroup_discovery_worker(void *ptr)
+void *cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
     uv_thread_set_name_np("P[cgroupsdisc]");
@@ -1311,7 +1311,7 @@ void cgroup_discovery_worker(void *ptr)
             NULL,
             SIMPLE_PATTERN_EXACT, true);
 
-    service_register(SERVICE_THREAD_TYPE_LIBUV, NULL, NULL, NULL, false);
+    service_register(NULL, NULL, NULL);
 
     netdata_cgroup_ebpf_initialize_shm();
 
@@ -1342,4 +1342,5 @@ void cgroup_discovery_worker(void *ptr)
     worker_unregister();
     service_exits();
     __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
+    return NULL;
 }
