@@ -24,18 +24,12 @@ typedef enum {
     SERVICE_SYSTEMD               = (1 << 15),
 } SERVICE_TYPE;
 
-typedef enum {
-    SERVICE_THREAD_TYPE_NETDATA,
-    SERVICE_THREAD_TYPE_LIBUV,
-    SERVICE_THREAD_TYPE_EVENT_LOOP,
-} SERVICE_THREAD_TYPE;
-
 typedef void (*force_quit_t)(void *data);
 typedef void (*request_quit_t)(void *data);
 
 void service_exits(void);
 bool service_running(SERVICE_TYPE service);
-struct service_thread *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused);
+struct service_thread *service_register(request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data);
 
 void service_signal_exit(SERVICE_TYPE service);
 bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut);

@@ -223,7 +223,7 @@ struct metadata_cmd {
 };
 
 struct meta_config_s {
-    uv_thread_t thread;
+    ND_THREAD *thread;
     uv_loop_t loop;
     uv_async_t async;
     uv_timer_t timer_req;
@@ -1772,7 +1772,7 @@ struct work_payload {
 };
 
 struct host_context_load_thread {
-    uv_thread_t thread;
+    ND_THREAD *thread;
     RRDHOST *host;
     sqlite3 *db_meta_thread;
     sqlite3 *db_context_thread;
@@ -1784,13 +1784,13 @@ __thread sqlite3 *db_meta_thread = NULL;
 __thread sqlite3 *db_context_thread = NULL;
 __thread bool main_context_thread = false;
 
-static void restore_host_context(void *arg)
+static void *restore_host_context(void *arg)
 {
     struct host_context_load_thread *hclt = arg;
     RRDHOST *host = hclt->host;
 
     if (!host)
-        return;
+        return NULL;
 
     if (!db_meta_thread) {
         if (hclt->db_meta_thread) {
@@ -1837,6 +1837,7 @@ static void restore_host_context(void *arg)
     }
 
     __atomic_store_n(&hclt->finished, true, __ATOMIC_RELEASE);
+    return NULL;
 }
 
 // Callback after scan of hosts is done
@@ -1866,7 +1867,7 @@ static bool cleanup_finished_threads(struct host_context_load_thread *hclt, size
             if (__atomic_load_n(&(hclt[index].finished), __ATOMIC_RELAXED) ||
                 (wait && __atomic_load_n(&(hclt[index].busy), __ATOMIC_ACQUIRE))) {
 
-                int rc = uv_thread_join(&(hclt[index].thread));
+                int rc = nd_thread_join(hclt[index].thread);
                 if (rc)
                     nd_log_daemon(NDLP_WARNING, "Failed to join thread, rc = %d", rc);
                 __atomic_store_n(&(hclt[index].busy), false, __ATOMIC_RELEASE);
@@ -1933,8 +1934,8 @@ static void ctx_hosts_load(uv_work_t *req)
         if (thread_found) {
             __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
             hclt[thread_index].host = host;
-            rc = uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]);
-            async_exec += (rc == 0);
+            hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_JOINABLE, restore_host_context, &hclt[thread_index]);
+            async_exec += (hclt[thread_index].thread != NULL);
             // if it failed, mark the thread slot as free
             if (rc)
                 __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
@@ -2153,8 +2154,6 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worke
     SQLITE_FINALIZE(ml_load_stmt);
     SQLITE_FINALIZE(store_dimension);
     SQLITE_FINALIZE(store_chart);
-
-    return;
 }
 
 
@@ -2481,10 +2480,11 @@ static void start_metadata_hosts(uv_work_t *req)
 #define MAX_SHUTDOWN_TIMEOUT_SECONDS (10)
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
 
-static void metadata_event_loop(void *arg)
+static void *metadata_event_loop(void *arg)
 {
     struct meta_config_s *config = arg;
     uv_thread_set_name_np(EVENT_LOOP_NAME);
+    service_register(NULL, NULL, NULL);
     worker_register(EVENT_LOOP_NAME);
 
     config->ar = aral_by_size_acquire(sizeof(struct metadata_cmd));
@@ -2714,6 +2714,8 @@ static void metadata_event_loop(void *arg)
     worker_unregister();
 
     completion_mark_complete(&config->start_stop_complete);
+
+    return NULL;
 }
 
 void metadata_sync_shutdown(void)
@@ -2728,9 +2730,10 @@ void metadata_sync_shutdown(void)
     nd_log_daemon(NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
     completion_wait_for(&meta_config.start_stop_complete);
     completion_destroy(&meta_config.start_stop_complete);
-    int rc = uv_thread_join(&meta_config.thread);
+
+    int rc = nd_thread_join(meta_config.thread);
     if (rc)
-        nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread, error %s", uv_err_name(rc));
+        nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread");
     else
         nd_log_daemon(NDLP_INFO, "METADATA: synchronization thread shutdown completed");
 }
@@ -2743,15 +2746,16 @@ void metadata_sync_init(void)
     memset(&meta_config, 0, sizeof(meta_config));
     completion_init(&meta_config.start_stop_complete);
 
-    int retries = 0;
-    int create_uv_thread_rc = create_uv_thread(&meta_config.thread, metadata_event_loop, &meta_config, &retries);
-    if (create_uv_thread_rc)
-        nd_log_daemon(NDLP_ERR, "Failed to create SQLite metadata sync thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+    meta_config.thread = nd_thread_create("METASYNC", NETDATA_THREAD_OPTION_JOINABLE, metadata_event_loop, &meta_config);
+//    int retries = 0;
+//    int create_uv_thread_rc = create_uv_thread(&meta_config.thread, metadata_event_loop, &meta_config, &retries);
+//    if (create_uv_thread_rc)
+//        nd_log_daemon(NDLP_ERR, "Failed to create SQLite metadata sync thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
 
-    fatal_assert(0 == create_uv_thread_rc);
+    fatal_assert(NULL != meta_config.thread);
 
-    if (retries)
-        nd_log_daemon(NDLP_WARNING, "SQLite metadata sync thread was created after %d attempts", retries);
+//    if (retries)
+//        nd_log_daemon(NDLP_WARNING, "SQLite metadata sync thread was created after %d attempts", retries);
 
     // Wait for initialization
     completion_wait_for(&meta_config.start_stop_complete);

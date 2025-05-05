@@ -31,7 +31,7 @@ static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_
 static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_worker);
 
 struct rrdeng_main {
-    uv_thread_t thread;
+    ND_THREAD *thread;
     uv_loop_t loop;
     uv_async_t async;
     uv_timer_t timer;
@@ -1339,7 +1339,7 @@ static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *c
 
 struct mrg_load_thread {
     int max_threads;
-    uv_thread_t thread;
+    ND_THREAD *thread;
     uv_sem_t *sem;
     int tier;
     struct rrdengine_datafile *datafile;
@@ -1350,7 +1350,7 @@ struct mrg_load_thread {
 size_t max_running_threads = 0;
 size_t running_threads = 0;
 
-void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
+void *journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 {
     struct mrg_load_thread *mlt = arg;
     uv_sem_wait(mlt->sem);
@@ -1374,6 +1374,7 @@ void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 
     // Signal completion - this needs to be last
     __atomic_store_n(&mlt->finished, true, __ATOMIC_RELEASE);
+    return NULL;
 }
 
 static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1444,7 +1445,7 @@ static void *populate_mrg_tp_worker(
                 if (__atomic_load_n(&mlt[index].finished, __ATOMIC_RELAXED) &&
                     __atomic_load_n(&mlt[index].tier, __ATOMIC_ACQUIRE) == tier) {
 
-                    rc = uv_thread_join(&(mlt[index].thread));
+                    rc = nd_thread_join(mlt[index].thread);
                     if (rc)
                         nd_log_daemon(NDLP_WARNING, "Failed to join thread, rc = %d", rc);
 
@@ -1479,11 +1480,10 @@ static void *populate_mrg_tp_worker(
         __atomic_store_n(&mlt[thread_index].tier, tier, __ATOMIC_RELAXED);
         mlt[thread_index].datafile = datafile;
 
-        rc = uv_thread_create(&mlt[thread_index].thread,
-                              journalfile_v2_populate_retention_to_mrg_worker,
-                              &mlt[thread_index]);
+        mlt[thread_index].thread = nd_thread_create("MRGLOAD", NETDATA_THREAD_OPTION_JOINABLE, journalfile_v2_populate_retention_to_mrg_worker,
+                                                    &mlt[thread_index]);
 
-        if (rc) {
+        if (!mlt[thread_index].thread) {
             nd_log_daemon(NDLP_WARNING, "Failed to create thread, rc = %d", rc);
             __atomic_store_n(&mlt[thread_index].busy, false, __ATOMIC_RELEASE);
             spinlock_unlock(&datafile->populate_mrg.spinlock);
@@ -1504,7 +1504,7 @@ static void *populate_mrg_tp_worker(
 
                 if (__atomic_load_n(&mlt[index].finished, __ATOMIC_RELAXED)) {
                     // Thread is finished, join it
-                    rc = uv_thread_join(&(mlt[index].thread));
+                    rc = nd_thread_join((mlt[index].thread));
                     if (rc)
                         nd_log_daemon(NDLP_WARNING, "Failed to join thread, rc = %d", rc);
 
@@ -1958,11 +1958,13 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         dbengine_initialize_structures();
 
         int retries = 0;
-        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
-        if (create_uv_thread_rc)
-            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+//        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
+        rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_JOINABLE, dbengine_event_loop, &rrdeng_main);
 
-        fatal_assert(0 == create_uv_thread_rc);
+//        if (!rrdeng_main.thread)
+//            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+
+        fatal_assert(0 != rrdeng_main.thread);
 
         if (retries)
             nd_log_daemon(NDLP_WARNING, "DBENGINE thread was created after %d attempts", retries);
@@ -2036,10 +2038,10 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
     (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&                                     \
      !__atomic_load_n(&(ctx)->atomic.now_deleting_files, __ATOMIC_RELAXED))
 
-void dbengine_event_loop(void* arg) {
+void *dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np("DBENGINE");
-    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
+    service_register(NULL, NULL, NULL);
 
     worker_register("DBENGINE");
 
@@ -2265,13 +2267,14 @@ void dbengine_event_loop(void* arg) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     (void) uv_loop_close(&main->loop);
     worker_unregister();
+    return NULL;
 }
 
 void dbengine_shutdown()
 {
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
-    int rc = uv_thread_join(&rrdeng_main.thread);
+    int rc = nd_thread_join(rrdeng_main.thread);
     if (rc)
         nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
     else
