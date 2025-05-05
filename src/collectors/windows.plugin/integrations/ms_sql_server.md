@@ -88,8 +88,8 @@ Metrics:
 | mssql.instance_memmgr_connection_memory_bytes | memory | bytes |
 | mssql.instance_memmgr_pending_memory_grants | pending | processes |
 | mssql.instance_memmgr_external_benefit_of_memory | benefit | bytes |
-| mssql.instance_locks_deadlocks | alloc_unit, application, database, extent, file, hobt, key, metadata, oib, object, page, rid, row_group, xact | deadlocks/s |
-| mssql.instance_locks_lock_wait | alloc_unit, application, database, extent, file, hobt, key, metadata, oib, object, page, rid, row_group, xact | locks/s |
+| mssql.instance_resource_deadlocks | alloc_unit, application, database, extent, file, hobt, key, metadata, oib, object, page, rid, row_group, xact | deadlocks/s |
+| mssql.instance_resource_lock_wait | alloc_unit, application, database, extent, file, hobt, key, metadata, oib, object, page, rid, row_group, xact | locks/s |
 | mssql.instance_blocked_processes | blocked | processes |
 
 ### Per Database
@@ -110,9 +110,14 @@ Metrics:
 | mssql.database_active_transactions | active | transactions |
 | mssql.database_transactions | transactions | transactions/s |
 | mssql.database_write_transactions | write | transactions/s |
+| mssql.database_lockwait | lock | locks/s |
+| mssql.database_deadlocks | deadlocks | deadlocks/s |
+| mssql.database_lock_timeouts | timeouts | timeouts/s |
+| mssql.database_lock_requests | requests | requests/s |
 | mssql.database_backup_restore_operations | backup | operations/s |
 | mssql.database_log_flushes | log | flushes/s |
 | mssql.database_log_flushed | flushed | bytes/s |
+| mssql.database_data_files_size | size | bytes |
 
 
 
