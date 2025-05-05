@@ -1281,7 +1281,7 @@ static int iis_web_service(char *name, int update_every, typeof(bool(PERF_DATA_B
     return 0;
 }
 
-int do_PerflibWebService(int update_every, usec_t dt __maybe_unused)
+int do_PerflibWebService(int update_every __maybe_unused, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
 
