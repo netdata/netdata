@@ -1,4 +1,4 @@
-# Dynamic Configuration (DynCfg)
+# Developing with Dynamic Configuration (DynCfg)
 
 Dynamic Configuration (DynCfg) is a system in Netdata that enables both internal and external plugins/modules to expose their configurations dynamically to users through a unified interface. This document provides an overview of the DynCfg system and directs developers to detailed implementation documentation.
 
