@@ -1,12 +1,16 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v2.5.0](https://github.com/netdata/netdata/tree/v2.5.0) (2025-05-05)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.4.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.4.0...v2.5.0)
 
 **Merged pull requests:**
 
+- Revert "fix\(go.d/couchdb\): correct db size charts unit" [\#20234](https://github.com/netdata/netdata/pull/20234) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/couchdb\): correct db size charts unit [\#20233](https://github.com/netdata/netdata/pull/20233) ([ilyam8](https://github.com/ilyam8))
+- docs: rename DynCfg developer doc to avoid title conflict [\#20232](https://github.com/netdata/netdata/pull/20232) ([ilyam8](https://github.com/ilyam8))
 - status file 28 [\#20229](https://github.com/netdata/netdata/pull/20229) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#20227](https://github.com/netdata/netdata/pull/20227) ([netdatabot](https://github.com/netdatabot))
 - Fix potential null pointer dereference when accessing journalfile [\#20226](https://github.com/netdata/netdata/pull/20226) ([stelfrag](https://github.com/stelfrag))
 - fix crashes 8 [\#20225](https://github.com/netdata/netdata/pull/20225) ([ktsaou](https://github.com/ktsaou))
 - fix crashes 7 [\#20224](https://github.com/netdata/netdata/pull/20224) ([ktsaou](https://github.com/ktsaou))
@@ -466,9 +470,6 @@
 - build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.23 to 2.8.24 in /src/go [\#19698](https://github.com/netdata/netdata/pull/19698) ([dependabot[bot]](https://github.com/apps/dependabot))
 - change the moto and the description of netdata [\#19696](https://github.com/netdata/netdata/pull/19696) ([ktsaou](https://github.com/ktsaou))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.0 to 9.7.1 in /src/go [\#19693](https://github.com/netdata/netdata/pull/19693) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 27.5.1+incompatible to 28.0.0+incompatible in /src/go [\#19692](https://github.com/netdata/netdata/pull/19692) ([dependabot[bot]](https://github.com/apps/dependabot))
-- load health config before creating localhost [\#19689](https://github.com/netdata/netdata/pull/19689) ([ktsaou](https://github.com/ktsaou))
-- chore\(go.d/pkg/iprange\): add iterator [\#19688](https://github.com/netdata/netdata/pull/19688) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
