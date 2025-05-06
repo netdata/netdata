@@ -80,42 +80,33 @@ struct log_stack_entry {
 void log_stack_pop(void *ptr);
 void log_stack_push(struct log_stack_entry *lgs);
 
-#define D_WEB_BUFFER        0x0000000000000001
-#define D_WEB_CLIENT        0x0000000000000002
-#define D_LISTENER          0x0000000000000004
-#define D_WEB_DATA          0x0000000000000008
-#define D_OPTIONS           0x0000000000000010
-#define D_PROCNETDEV_LOOP   0x0000000000000020
-#define D_RRD_STATS         0x0000000000000040
-#define D_WEB_CLIENT_ACCESS 0x0000000000000080
-#define D_TC_LOOP           0x0000000000000100
-#define D_DEFLATE           0x0000000000000200
-#define D_CONFIG            0x0000000000000400
-#define D_PLUGINSD          0x0000000000000800
-#define D_CHILDS            0x0000000000001000
-#define D_EXIT              0x0000000000002000
-#define D_CHECKS            0x0000000000004000
-#define D_NFACCT_LOOP       0x0000000000008000
-#define D_PROCFILE          0x0000000000010000
-#define D_RRD_CALLS         0x0000000000020000
-#define D_DICTIONARY        0x0000000000040000
-#define D_MEMORY            0x0000000000080000
-#define D_CGROUP            0x0000000000100000
-#define D_REGISTRY          0x0000000000200000
-#define D_VARIABLES         0x0000000000400000
-#define D_HEALTH            0x0000000000800000
-#define D_CONNECT_TO        0x0000000001000000
-#define D_RRDHOST           0x0000000002000000
-#define D_LOCKS             0x0000000004000000
-#define D_EXPORTING         0x0000000008000000
-#define D_STATSD            0x0000000010000000
-#define D_POLLFD            0x0000000020000000
-#define D_STREAM            0x0000000040000000
-#define D_ANALYTICS         0x0000000080000000
-#define D_RRDENGINE         0x0000000100000000
-#define D_ACLK              0x0000000200000000
-#define D_REPLICATION       0x0000002000000000
-#define D_SYSTEM            0x8000000000000000
+#define D_WEB_BUFFER        (1ULL << 0)
+#define D_WEB_CLIENT        (1ULL << 1)
+#define D_LISTENER          (1ULL << 2)
+#define D_WEB_DATA          (1ULL << 3)
+#define D_OPTIONS           (1ULL << 4)
+#define D_PROCNETDEV_LOOP   (1ULL << 5)
+#define D_RRD_STATS         (1ULL << 6)
+#define D_WEB_CLIENT_ACCESS (1ULL << 7)
+#define D_TC_LOOP           (1ULL << 8)
+#define D_DEFLATE           (1ULL << 9)
+#define D_CONFIG            (1ULL << 10)
+#define D_PLUGINSD          (1ULL << 11)
+#define D_PROCFILE          (1ULL << 12)
+#define D_RRD_CALLS         (1ULL << 13)
+#define D_DICTIONARY        (1ULL << 14)
+#define D_CGROUP            (1ULL << 15)
+#define D_REGISTRY          (1ULL << 16)
+#define D_HEALTH            (1ULL << 17)
+#define D_LOCKS             (1ULL << 18)
+#define D_EXPORTING         (1ULL << 19)
+#define D_STATSD            (1ULL << 20)
+#define D_STREAM            (1ULL << 21)
+#define D_ANALYTICS         (1ULL << 22)
+#define D_RRDENGINE         (1ULL << 23)
+#define D_ACLK              (1ULL << 24)
+#define D_WEBSOCKET         (1ULL << 25)
+#define D_SYSTEM            (1ULL << 26)
 
 extern uint64_t debug_flags;
 extern const char *program_name;

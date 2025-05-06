@@ -3,7 +3,7 @@
 #include "libnetdata/libnetdata.h"
 
 static inline void poll_process_updated_events(POLLINFO *pi) {
-    if(pi->events != pi->events_we_wait_for) {
+    if(pi->events != pi->events_we_wait_for && !(pi->flags & POLLINFO_FLAG_REMOVED_FROM_POLL)) {
         if(!nd_poll_upd(pi->p->ndpl, pi->fd, pi->events))
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update socket %d to nd_poll", pi->fd);
         pi->events_we_wait_for = pi->events;
@@ -72,15 +72,26 @@ POLLINFO *poll_add_fd(POLLJOB *p
     return pi;
 }
 
+void poll_process_remove_from_poll(POLLINFO *pi) {
+    POLLJOB *p = pi->p;
+
+    if(!nd_poll_del(p->ndpl, pi->fd))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to delete socket %d from nd_poll() - is the socket already closed?", pi->fd);
+    else
+        pi->flags |= POLLINFO_FLAG_REMOVED_FROM_POLL;
+}
+
 static inline void poll_close_fd(POLLINFO *pi, const char *func) {
     POLLJOB *p = pi->p;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
-    if(!nd_poll_del(p->ndpl, pi->fd))
-        // this is ok, if the socket is already closed
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+    if(!(pi->flags & POLLINFO_FLAG_REMOVED_FROM_POLL) && !nd_poll_del(p->ndpl, pi->fd))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
                "Failed to delete socket %d from nd_poll() - called from %s() - is the socket already closed?",
                pi->fd, func);
+    else
+        pi->flags |= POLLINFO_FLAG_REMOVED_FROM_POLL;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);

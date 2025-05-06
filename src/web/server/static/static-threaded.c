@@ -166,6 +166,13 @@ static void web_server_del_callback(POLLINFO *pi) {
     worker_is_idle();
 }
 
+static __thread POLLINFO *current_thread_pollinfo = NULL;
+
+void web_server_remove_current_socket_from_poll(void) {
+    if(!current_thread_pollinfo) return;
+    poll_process_remove_from_poll(current_thread_pollinfo);
+}
+
 static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
     int ret = -1;
     worker_is_busy(WORKER_JOB_RCV_DATA);
@@ -184,7 +191,9 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
+        current_thread_pollinfo = pi;
         web_client_process_request_from_web_server(w);
+        current_thread_pollinfo = NULL;
 
         if (unlikely(w->mode == HTTP_REQUEST_MODE_STREAM)) {
             ssize_t rc = web_client_send(w);
@@ -226,7 +235,9 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
+    current_thread_pollinfo = pi;
     ssize_t ret = web_client_send(w);
+    current_thread_pollinfo = NULL;
 
     if(unlikely(ret < 0)) {
         retval = -1;
@@ -298,8 +309,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                 , NULL
                 , web_client_first_request_timeout
                 , web_client_timeout
-                ,
-        nd_profile.update_every * 1000 // timer_milliseconds
+                , nd_profile.update_every * 1000 // timer_milliseconds
                 , ptr // timer_data
                 , worker_private->max_sockets
     );

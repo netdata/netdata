@@ -4,6 +4,7 @@
 #define NETDATA_WEB_CLIENT_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "web/server/websocket-server/websocket.h"
 
 struct web_client;
 
@@ -66,6 +67,10 @@ typedef enum __attribute__((packed)) {
 
     // transient settings
     WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 25), // flag to avoid redoing progress work
+    
+    // websocket flags
+    WEB_CLIENT_FLAG_WEBSOCKET_CLIENT        = (1 << 26), // this is a websocket client
+    WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE     = (1 << 27), // websocket handshake detected
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
@@ -115,6 +120,14 @@ typedef enum __attribute__((packed)) {
 #define WEB_CLIENT_FLAG_ALL_AUTHS (WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER | WEB_CLIENT_FLAG_AUTH_GOD)
 #define web_client_flags_check_auth(w) web_client_flag_check(w, WEB_CLIENT_FLAG_ALL_AUTHS)
 #define web_client_flags_clear_auth(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_ALL_AUTHS)
+
+#define web_client_is_websocket(w) web_client_flag_check(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT)
+#define web_client_set_websocket(w) web_client_flag_set(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT)
+#define web_client_clear_websocket(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT)
+
+#define web_client_has_websocket_handshake(w) web_client_flag_check(w, WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE)
+#define web_client_set_websocket_handshake(w) web_client_flag_set(w, WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE)
+#define web_client_clear_websocket_handshake(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE)
 
 void web_client_reset_permissions(struct web_client *w);
 void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth);
@@ -186,6 +199,16 @@ struct web_client {
     char *forwarded_for;                // the X-Forwarded-For: header
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
+
+    // WebSocket related data - NEED TO BE FREED
+    struct {
+        char *key;                      // the Sec-WebSocket-Key header
+        WEBSOCKET_PROTOCOL protocol;    // the selected subprotocol
+        WEBSOCKET_EXTENSION ext_flags;  // bit flags for supported extensions
+        uint8_t client_max_window_bits; // client_max_window_bits parameter (8-15)
+        uint8_t server_max_window_bits; // server_max_window_bits parameter (8-15)
+        char *requested_protocols;      // the requested Sec-WebSocket-Protocol header
+    } websocket;
 
     BUFFER *payload;                    // when this request is a POST, this has the payload
 
