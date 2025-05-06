@@ -784,8 +784,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
     dictionary_destroy(all_rrdcalcs);
     all_rrdcalcs = NULL;
 
-    if (!host->health_max_unique_id)
-        host->health_max_unique_id = get_uint32_id();
     if (!host->health_max_alarm_id)
         host->health_max_alarm_id = get_uint32_id();
 
