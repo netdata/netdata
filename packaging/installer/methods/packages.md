@@ -1,79 +1,95 @@
-# Install Netdata using native DEB/RPM packages
+# Install Netdata Using Native DEB/RPM Packages
 
-For most DEB- or RPM-based Linux distributions, Netdata provides pre-built native packages, following our [platform support policy](/docs/netdata-agent/versions-and-platforms.md).  
+Netdata provides pre-built native packages for most DEB- and RPM-based Linux distributions, following our [platform support policy](/docs/netdata-agent/versions-and-platforms.md).
 
-Our [kickstart.sh installer](/packaging/installer/methods/kickstart.md) uses these by default on supported platforms. To force native DEB or RPM packages, add `--native-only` when running the script—it will fail if native packages aren’t available.
+Our [kickstart.sh installer](/packaging/installer/methods/kickstart.md) uses these packages by default on supported platforms.
 
-> **Note**
-> 
-> Until late 2024 we continued to provide packages via Package Cloud, but we have since then switched to only  providing packages via our repositories.
+Add `--native-only` when running `kickstart.sh` to force native packages. The script will fail if native packages aren’t available.
 
-## Manual setup of RPM packages
+:::note
 
-Netdata’s official RPM repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. We provide four groups of
-repositories at that top level:
+Until late 2024, Netdata packages were hosted on Package Cloud. All packages are now provided exclusively from our own repositories.
 
-- `stable`: Contains packages for stable releases of the Netdata Agent.
-- `edge`: Contains packages for nightly builds of the Netdata Agent.
-- `repoconfig`: Provides packages that set up configuration files for using the other repositories.
-- `devel`: Is used for one-off development builds of the Netdata Agent, and can simply be ignored by users.
+:::
 
-Within each top level group of repositories, there are directories for each supported group of distributions:
+---
 
-- `amazonlinux`: Is for Amazon Linux and binary compatible distros.
-- `el`: Is for Red Hat Enterprise Linux and binary compatible distros that are not covered by other repos, such
-  as CentOS, Alma Linux, and Rocky Linux.
-- `fedora`: Is for Fedora and binary compatible distros.
-- `ol`: Is for Oracle Linux and binary compatible distros.
-- `opensuse`: Is for openSUSE and binary compatible distros.
+## Manual Setup of RPM Packages
 
-Each distribution has a directory for supported releases, with subdirectories for each CPU architecture containing the actual repository.  
+Repositories: [https://repository.netdata.cloud/repos/index.html](https://repository.netdata.cloud/repos/index.html)
 
-For example, the stable release for RHEL 9 on 64-bit x86 is at:  
-<https://repository.netdata.cloud/repos/stable/el/9/x86_64/>  
+Available groups:
 
-Our RPM packages and repository metadata are signed with a GPG key (`Netdatabot`), fingerprint:  
-`6E155DC153906B73765A74A99DD4A74CECFA8F4F`.  
+| Repo         | Purpose                       |
+|--------------|-------------------------------|
+| `stable`     | Stable Netdata Agent releases |
+| `edge`       | Nightly builds                |
+| `repoconfig` | Configuration packages        |
+| `devel`      | Dev builds (ignore)           |
+
+Supported distributions:
+
+- `amazonlinux`
+- `el` (RHEL, CentOS, AlmaLinux, Rocky Linux)
+- `fedora`
+- `ol` (Oracle Linux)
+- `opensuse`
+
+Example repository for RHEL 9 x86_64:  
+[https://repository.netdata.cloud/repos/stable/el/9/x86_64/](https://repository.netdata.cloud/repos/stable/el/9/x86_64/)
+
+GPG Key fingerprint:  
+`6E155DC153906B73765A74A99DD4A74CECFA8F4F`
+
 Public key:  
-<https://repository.netdata.cloud/netdatabot.gpg.key>  
+[https://repository.netdata.cloud/netdatabot.gpg.key](https://repository.netdata.cloud/netdatabot.gpg.key)
 
-For manual repository setup, download the appropriate config package from:  
-<https://repository.netdata.cloud/repos/repoconfig/index.html>  
-Install it with your package manager to ensure dependencies and smooth updates.  
+### Steps
 
-> **Note:**  
-> On RHEL and other `el`-based systems, some Netdata dependencies are in the EPEL repository, which isn’t enabled by default.  
-> Our config packages should handle this, but if not, install `epel-release` manually.
+1. Download config package:  
+   [https://repository.netdata.cloud/repos/repoconfig/index.html](https://repository.netdata.cloud/repos/repoconfig/index.html)
 
-## Manual setup of DEB packages
+2. Install it with your package manager:
 
-Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. 
-We provide four groups of repositories at that top level:
+   ```bash
+   # For RHEL/CentOS/Fedora
+   sudo rpm -i netdata-repo-*.rpm
+   sudo dnf install netdata
+   ```
 
-- `stable`: Contains packages for stable releases of the Netdata Agent.
-- `edge`: Contains packages for nightly builds of the Netdata Agent.
-- `repoconfig`: Provides packages that set up configuration files for using the other repositories.
-- `devel`: Is used for one-off development builds of the Netdata Agent, and can simply be ignored by users.
+   > **Note**  
+   > On RHEL systems, EPEL repository is required.
+   > Our config packages handle this automatically — if not, install epel-release manually.
 
-Within each top level group of repositories, there are directories for each supported group of distributions:
+---
 
-- `debian`: Is for Debian Linux and binary compatible distros.
-- `ubuntu`: Is for Ubuntu Linux and binary compatible distros.
+## Manual Setup of DEB Packages
 
-Each directory contains subdirectories for supported releases, named by codename.  
+Repositories: [https://repository.netdata.cloud/repos/index.html](https://repository.netdata.cloud/repos/index.html)
 
-Our repositories use **flat repository** structure (per Debian standards) and are accessible via HTTP and HTTPS. They also support metadata retrieval **by-hash**, which improves reliability. Example:  
-`http://repository.netdata.cloud/repos/edge/ubuntu/focal/by-hash/SHA256/91ccff6523a3c4483ebb539ff2b4adcd3b6b5d0c0c2c9573c5a6947a127819bc`
+Available groups:
 
-As a result of this structure, the required APT sources.list entry for stable packages for Debian 11 (Bullseye) is:
+| Repo         | Purpose                       |
+|--------------|-------------------------------|
+| `stable`     | Stable Netdata Agent releases |
+| `edge`       | Nightly builds                |
+| `repoconfig` | Configuration packages        |
+| `devel`      | Dev builds (ignore)           |
 
-```text
+Supported distributions:
+
+- `debian`
+- `ubuntu`
+
+APT source for Debian 11 (Bullseye):
+
+```
 deb by-hash=yes http://repository.netdata.cloud/repos/stable/debian/ bullseye/
 ```
 
-And the equivalent required deb822 style entry for stable packages for Debian 11 (Bullseye) is:
+Deb822 format:
 
-```text
+```
 Types: deb
 URIs: http://repository.netdata.cloud/repos/stable/debian/
 Suites: bullseye/
@@ -81,39 +97,66 @@ By-Hash: Yes
 Enabled: Yes
 ```
 
-Note the `/` at the end of the codename, this is required for the repository to be processed correctly.
+GPG Key fingerprint:  
+`6E155DC153906B73765A74A99DD4A74CECFA8F4F`
 
-Our DEB packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
-current key fingerprint is `6E155DC153906B73765A74A99DD4A74CECFA8F4F`. The associated public key can be fetched from
-`https://repository.netdata.cloud/netdatabot.gpg.key`.
+Public key:  
+[https://repository.netdata.cloud/netdatabot.gpg.key](https://repository.netdata.cloud/netdatabot.gpg.key)
 
-For manual repository setup, download the appropriate config package from:  
-<https://repository.netdata.cloud/repos/repoconfig/index.html>  
+### Steps
 
-Install it using your package manager to ensure all dependencies are met and to allow a smooth transition if our infrastructure changes.
+1. Download config package:  
+   [https://repository.netdata.cloud/repos/repoconfig/index.html](https://repository.netdata.cloud/repos/repoconfig/index.html)
 
-## Local mirrors of the official Netdata repositories
+2. Install it using your package manager:
 
-Local mirrors of our official repositories can be created in one of two ways:
+   ```bash
+   # For Debian/Ubuntu
+   sudo apt install ./netdata-repo_*.deb
+   sudo apt update
+   sudo apt install netdata
+   ```
 
-1. Using the standard tooling for mirroring the type of repository you want a local mirror of, such as Aptly for
-   APT repositories, or reposync for RPM repositories. For this approach, please consult the documentation for
-   the specific tool you are using for info on how to mirror the repositories.
-2. Using a regular website mirroring tool, such as GNU wget’s `--mirror` option. For this approach, simply point
-   your mirroring tool at `https://repository.netdata.cloud/repos/`, and everything should just work.
+---
 
-We don’t officially support mirroring our repositories, but here are some tips:  
+## Local Mirrors of the Official Netdata Repositories
 
-- Our repository config packages **don’t** work with custom mirrors (except caching proxies like `apt-cacher-ng`), so you’ll need to configure mirrors manually.  
-- Packages are built and published in stages: 64-bit x86 first, then 32-bit x86, followed by other architectures in alphabetical order. Publishing takes a few hours.  
-- Repository metadata updates up to six times an hour, but syncing more than once per hour isn’t necessary.  
-- A full mirror requires up to **100 GB** of storage, so mirror only what you need.  
-- For daily syncing, **05:00–08:00 UTC** is ideal, as nightly packages are usually published by then.  
-- If using our GPG signatures, grab our public key:  
-  <https://repository.netdata.cloud/netdatabot.gpg.key>
+You can mirror Netdata’s repositories:
 
-## Public mirrors of the official Netdata repositories
+### Recommended Methods:
 
-There are no official public mirrors of our repositories.
+| Method           | Use case                              |
+|------------------|---------------------------------------|
+| Standard tools   | e.g., Aptly (APT) or `reposync` (RPM) |
+| Simple mirroring | Use `wget --mirror` or similar tools  |
 
-If you wish to provide a public mirror of our official repositories, you are free to do so, but we kindly ask that you make it clear to your users that your mirror is not an official mirror of our repositories.
+Mirror root URL:  
+[https://repository.netdata.cloud/repos/](https://repository.netdata.cloud/repos/)
+
+---
+
+### Mirror Tips:
+
+- Config packages don’t support custom mirrors — configure mirrors manually.
+- Packages are built in stages by architecture.
+- Metadata updates up to six times/hour.
+- Full mirror can require up to **100 GB**.
+- Ideal sync window: **05:00–08:00 UTC**.
+- Fetch a GPG key from:  
+  [https://repository.netdata.cloud/netdatabot.gpg.key](https://repository.netdata.cloud/netdatabot.gpg.key)
+
+---
+
+## Public Mirrors of the Official Netdata Repositories
+
+:::note
+
+**There are no official public mirrors**.
+
+:::
+
+If you wish to provide a public mirror of Netdata repositories:
+
+- You’re free to do so.
+- Please clearly state to your users that it is *not* an official mirror.
+- Follow best practices for repository mirroring and security.

@@ -11,6 +11,13 @@ typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 typedef struct ml_dimension rrd_ml_dimension_t;
 typedef struct rrdmetric_acquired RRDMETRIC_ACQUIRED;
 
+// gcc with libstdc++ may require this,
+// but with libc++ it does not work correctly.
+#if defined(__cplusplus) && !defined(_LIBCPP_VERSION)
+#include <cmath>
+using std::isnan;
+#endif
+
 #include "rrdset.h"
 
 // options are permanent configuration options (no atomics to alter/access them)
@@ -36,11 +43,10 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
 
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 1),
-    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 2),  // Metadata needs to go to the database
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 1),  // Metadata needs to go to the database
 
-    RRDDIM_FLAG_META_HIDDEN                     = (1 << 3),  // Status of hidden option in the metadata database
-    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 4),  // Do ML LOAD for this dimension
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 2),  // Status of hidden option in the metadata database
+    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 3),  // Do ML LOAD for this dimension
 
     // this is 8 bit
 } RRDDIM_FLAGS;
@@ -61,9 +67,10 @@ struct rrddim {
     STRING *name;                                   // the name of this dimension (as presented to user)
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRD_DB_MODE rrd_memory_mode;                // the memory mode for this dimension
+    RRD_DB_MODE rrd_memory_mode;                    // the memory mode for this dimension
     RRDDIM_FLAGS flags;                             // run time changing status flags
 
+    SPINLOCK destroy_lock;
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
 
@@ -207,11 +214,11 @@ int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
 int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier);
 int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor);
 
-RRDDIM *rrddim_find(RRDSET *st, const char *id);
-RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id);
+RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete);
+RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool include_obsolete);
 RRDDIM *rrddim_acquired_to_rrddim(RRDDIM_ACQUIRED *rda);
 void rrddim_acquired_release(RRDDIM_ACQUIRED *rda);
-RRDDIM *rrddim_find_active(RRDSET *st, const char *id);
+#define rrddim_find_active(st, id) rrddim_find(st, id, false)
 
 int rrddim_hide(RRDSET *st, const char *id);
 int rrddim_unhide(RRDSET *st, const char *id);

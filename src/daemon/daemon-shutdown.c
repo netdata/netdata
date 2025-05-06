@@ -16,12 +16,13 @@
 // External configuration structures that need cleanup
 extern struct config netdata_config;
 extern struct config cloud_config;
-extern void inicfg_free(struct config *root);
+
 // Functions to free various configurations
-extern void claim_config_free(void);
-extern void stream_config_free(void);
-extern void exporting_config_free(void);
-extern void rrd_functions_inflight_destroy(void);
+void claim_config_free(void);
+void rrd_functions_inflight_destroy(void);
+void cgroup_netdev_link_destroy(void);
+void bearer_tokens_destroy(void);
+void alerts_by_x_cleanup(void);
 
 static bool abort_on_fatal = true;
 
@@ -264,9 +265,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     cancel_main_threads();
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
-    metadata_sync_shutdown_background();
-    watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
-
     if (abnormal) {
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
@@ -309,7 +307,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
 
-        metadata_sync_shutdown_background_wait();
+        metadata_sync_shutdown();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
@@ -349,12 +347,17 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     dyncfg_shutdown();
     rrd_functions_inflight_destroy();
     health_plugin_destroy();
+    cgroup_netdev_link_destroy();
+    bearer_tokens_destroy();
 
     fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
-    size_t dictionaries_referenced = cleanup_destroyed_dictionaries();
+    size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
     if(dictionaries_referenced)
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
                 dictionaries_referenced);
+                
+    // Always report dictionary allocations during ASAN builds
+    dictionary_print_still_allocated_stacktraces();
 
 #ifdef ENABLE_DBENGINE
     // destroy the caches in reverse order (extent and open depend on main cache)
@@ -392,10 +395,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     stream_config_free();
     inicfg_free(&cloud_config);
     inicfg_free(&netdata_config);
-    
+
     fprintf(stderr, "Cleaning up worker utilization...\n");
     worker_utilization_cleanup();
-    
+
+    alerts_by_x_cleanup();
     size_t strings_referenced = string_destroy();
     if(strings_referenced)
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",

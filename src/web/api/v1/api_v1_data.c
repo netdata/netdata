@@ -137,7 +137,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
     if(chart && !context) {
         // check if this is a specific chart
-        st = rrdset_find(host, chart);
+        st = rrdset_find(host, chart, false);
         if (!st) st = rrdset_find_byname(host, chart);
     }
 

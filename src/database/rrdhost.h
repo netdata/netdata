@@ -25,6 +25,14 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 #include "rrdlabels.h"
 #include "health/health-alert-log.h"
 
+struct rrdcontext;
+DEFINE_JUDYL_TYPED_ADVANCED(RRDCONTEXT_QUEUE, struct rrdcontext *, JUDYL_TYPED_NO_CONVERSION, JUDYL_TYPED_NO_CONVERSION, \
+                            SPINLOCK spinlock; \
+                            Word_t id; \
+                            uint32_t version; \
+                            int32_t entries; \
+                            );
+
 // ----------------------------------------------------------------------------
 // RRDHOST flags
 // use this for configuration flags, not for state control
@@ -217,9 +225,6 @@ struct rrdhost {
 
                 time_t last_connected;              // the time the last sender was connected
                 time_t last_disconnected;           // the time the last sender was disconnected
-                time_t last_chart;                  // the time of the last CHART streaming command
-                bool check_obsolete;                // set when child connects, will instruct parent to
-                                                    // trigger a check for obsoleted charts since previous connect
 
                 uint32_t connections;               // the number of times this receiver has connected
                 STREAM_HANDSHAKE reason;            // the last receiver exit reason
@@ -304,8 +309,8 @@ struct rrdhost {
 
     struct {
         DICTIONARY *contexts;
-        DICTIONARY *hub_queue;
-        DICTIONARY *pp_queue;
+        RRDCONTEXT_QUEUE_JudyLSet pp_queue;
+        RRDCONTEXT_QUEUE_JudyLSet hub_queue;
         uint32_t metrics_count;                     // atomic
         uint32_t instances_count;                   // atomic
         uint32_t contexts_count;                    // atomic

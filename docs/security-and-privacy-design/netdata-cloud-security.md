@@ -1,116 +1,147 @@
 # Netdata Cloud Security and Privacy Design
 
-Netdata Cloud is designed with a security-first approach to ensure the highest level of protection for user data. When
-using Netdata Cloud in environments that require compliance with standards like PCI DSS, SOC 2, or HIPAA, users can be
-confident that all collected data is stored within their infrastructure. Data viewed on dashboards and alert
-notifications travel over Netdata Cloud, but aren’t stored—instead, they're transformed in transit, aggregated from
-multiple Agents and parents (centralization points), to appear as one data source in the user's browser.
+:::tip
+
+**Executive Summary**
+
+- Netdata Cloud offers secure real-time monitoring without storing raw metrics.
+- Only minimal metadata passes securely through Netdata Cloud.  
+  Users retain full control of their data.
+- Infrastructure is protected with strong encryption, access control, and compliance with GDPR, CCPA, PCI DSS, SOC 2, and HIPAA standards.
+- Netdata Cloud continuously evolves its security and privacy practices to meet the highest industry standards.
+
+:::
+
+## Introduction
+
+Netdata Cloud enables secure real-time system insights without storing raw metrics.
+
+Data passes through Netdata Cloud securely but isn't retained. Metric views and alerts from multiple Agents display as a unified dashboard in your browser.
 
 ## User Identification and Authorization
 
-Netdata Cloud requires only an email address to create an account and use the service. User identification and
-authorization are conducted either via third-party integrations (Google, GitHub accounts) or through short-lived access
-tokens sent to the user’s email account. Email addresses are stored securely in our production database on AWS and are
-also used for product and marketing communications. Netdata Cloud doesn’t store user credentials.
+Netdata Cloud requires only an email address for accounts.
+
+| **Method**     | **Details**                                        |
+|:---------------|:---------------------------------------------------|
+| Identification | Email via Google, GitHub, or short-lived tokens    |
+| Credentials    | No passwords stored                                |
+| Storage        | Secure AWS storage; used for product and marketing |
+
+Authentication uses third-party integrations or secure tokens. Netdata Cloud never stores credentials.
 
 ## Data Storage and Transfer
 
-Although Netdata Cloud doesn’t store metric data, it does keep some metadata for each node connected to user spaces.
-This metadata includes the hostname, information from the `/api/v1/info` endpoint, metric metadata
-from `/api/v1/contexts`, and alerts configurations from `/api/v1/alarms`. This data is securely stored in our production
-database on AWS and copied to Google BigQuery for analytics purposes.
+Netdata Cloud stores no raw metrics, only essential metadata:
 
-All data visible on Netdata Cloud is transferred through the Agent-Cloud link (ACLK) mechanism, which securely connects
-a Netdata Agent to Netdata Cloud. The ACLK is encrypted and safe, and is only established if the user connects/claims
-their node. Data in transit between a user and Netdata Cloud is encrypted using TLS.
+| **Metadata Stored**  | **Source**                  |
+|:---------------------|:----------------------------|
+| Hostname             | `/api/v1/info` endpoint     |
+| Metric Metadata      | `/api/v1/contexts` endpoint |
+| Alerts Configuration | `/api/v1/alarms` endpoint   |
+
+All metadata is stored in AWS and copied to Google BigQuery for analytics.
+
+Metric data travels via secure Agent-Cloud Link (ACLK):
+
+- ACLK encrypts data and activates only for claimed nodes
+- All user-Cloud communication uses TLS encryption
+
+### ACLK Secure Data Flow
+
+```mermaid
+flowchart TD
+    A[Netdata Agent] -->|Encrypts metrics<br/>and minimal metadata| B[Agent-Cloud Link ACLK]
+    B -->|TLS Encryption| C[Netdata Cloud]
+    C -->|Aggregates metadata<br/>for dashboards and alerts| D[User Browser]
+
+```
 
 ## Data Retention and Erasure
 
-Netdata Cloud retains deleted customer content for 90 days. Users can access, modify, and delete their personal data through self-service tools. If needed, users can request data deletion in writing, which Netdata will process in accordance with data protection laws.
+| **Process**     | **Details**                                         |
+|:----------------|:----------------------------------------------------|
+| Retention       | Deleted content kept 90 days                        |
+| Self-Service    | Modify/delete personal data via Cloud UI            |
+| Manual Requests | Written deletion requests processed under data laws |
+
+:::tip
+
+Users can delete accounts and data directly from their Netdata Cloud profile.
+
+:::
 
 ## Infrastructure and Authentication
 
-Netdata Cloud operates on an Infrastructure as Code (IaC) model. Its microservices environment is completely isolated,
-and all changes occur through Terraform. At the edge of Netdata Cloud, there is a TLS termination and an Identity and
-Access Management (IAM) service that validates JWT tokens included in request cookies.
+Netdata Cloud uses Infrastructure as Code (IaC).
 
-Netdata Cloud does not store user credentials.
+| **Feature**             | **Implementation**                   |
+|:------------------------|:-------------------------------------|
+| Infrastructure Changes  | Managed via Terraform                |
+| Authentication          | JWT tokens at TLS termination points |
+| Microservices Isolation | Complete environment separation      |
 
-## Security Features and Response
+Netdata Cloud never stores user credentials.
 
-Netdata Cloud offers a variety of security features, including infrastructure-level dashboards, centralized alert notifications, auditing logs, and role-based access to different segments of the infrastructure. It employs several protection mechanisms against DDoS attacks, such as rate-limiting and automated blocklisting. It also uses static code analyzers to prevent other types of attacks.
+## Security Features and Incident Response
 
-In the event of potential security vulnerabilities or incidents, Netdata Cloud follows the same process as the Netdata
-agent. Every report is acknowledged and analyzed by the Netdata team within three working days, and the team keeps the
-reporter updated throughout the process.
+Built-in security protections include:
+
+| **Feature**               | **Details**                        |
+|:--------------------------|:-----------------------------------|
+| Infrastructure Dashboards | Centralized monitoring/alerting    |
+| Audit Logs                | Role-based access tracking         |
+| DDoS Protection           | Rate-limiting and blacklisting     |
+| Secure Development        | Static analyzers and secure coding |
+
+Security vulnerabilities follow a structured process:
+
+- Acknowledge within three business days
+- Analyze and fix promptly
+- Maintain communication with reporters
+
+:::tip
+
+See [Netdata's GitHub Security Policy](https://github.com/netdata/netdata/security/policy) for details.
+
+:::
 
 ## User Customization
 
-Netdata Cloud uses the highest level of security. There is no user customization available out of the box. Its security
-settings are designed to provide maximum protection for all users. We are offering customization (like custom SSO
-integrations, custom data retention policies, advanced user access controls, tailored audit logs, integration with other
-security tools, etc.) on a per-contract basis.
+Netdata Cloud uses maximum security defaults without out-of-box customization.
+
+Per-contract customization options include:
+
+- Custom SSO
+- Custom retention policies
+- Advanced access controls
+- Tailored audit logs
+- Third-party security tool integration
+
+Contact Netdata Sales for enterprise solutions.
 
 ## Deleting Personal Data
 
-Users who wish to remove all personal data (including email and activities) can delete their account by logging into Netdata Cloud and accessing their profile.
+Users can delete personal data by:
+
+- Logging into Netdata Cloud
+- Accessing Profile settings
+- Initiating account deletion
+
+If self-service isn't available, submit written requests processed under applicable laws.
 
 ## User Privacy and Data Protection
 
-Netdata Cloud is built with an unwavering commitment to user privacy and data protection. We understand that our users'
-data is both sensitive and valuable, and we’ve implemented stringent measures to ensure its safety.
+Netdata Cloud prioritizes privacy and data protection, continuously reviewing and updating privacy and security practices.
 
-### Data Collection
-
-Netdata Cloud collects minimal personal information from its users. The only personal data required to create an account
-and use the service is an email address. This email address is used for product and marketing communications.
-Additionally, the IP address used to access Netdata Cloud is stored in web proxy access logs.
-
-### Data Usage
-
-The collected email addresses are stored in our production database on Amazon Web Services (AWS) and copied to Google
-BigQuery, our data lake, for analytics purposes. These analytics are crucial for our product development process. If a
-user accepts the use of analytical cookies, their email address and IP are stored in the systems we use to track
-application usage (Google Analytics, Posthog, and Gainsight PX). Stripe handles subscriptions and Payments data.
-
-### Data Sharing
-
-Netdata Cloud does not share any personal data with third parties, ensuring the privacy of our users' data, but Netdata
-Cloud does use third parties for its services, including, but not limited to, Google Cloud and Amazon Web Services for
-its infrastructure, Stripe for payment processing, Google Analytics, Posthog and Gainsight PX for analytics.
-
-### Data Protection
-
-We use the newest security measures to protect user data from unauthorized access, use, or disclosure. All
-infrastructure data visible on Netdata Cloud passes through the Agent-Cloud Link (ACLK) mechanism, which securely
-connects a Netdata Agent to Netdata Cloud. The ACLK is encrypted, safe, and is only established if the user connects
-their node. All data in transit between a user and Netdata Cloud is encrypted using TLS.
-
-### User Control over Data
-
-Netdata provides its users with the ability to access, retrieve, correct, and delete their personal data stored in Netdata Cloud.
-This ability may occasionally be limited due to temporary service outages for maintenance or other updates to Netdata Cloud, or when it is technically not possible.
-If self-service data deletion isn't possible, Netdata will process written deletion requests within DPA-specified timeframes, in compliance with data protection laws.
-
-### Compliance with Data Protection Laws
-
-Netdata Cloud is fully compliant with data protection laws like the General Data Protection Regulation (GDPR) and the
-California Consumer Privacy Act (CCPA).
-
-### Data Transfer
-
-Data transfer within Netdata Cloud is secure and respects the privacy of the user data. The Netdata Agent establishes an
-outgoing secure WebSocket (WSS) connection to Netdata Cloud, ensuring that the data is encrypted when in transit.
-
-### Use of Tracking Technologies
-
-Netdata Cloud uses analytical cookies if a user consents to their use. These cookies are used to track the usage of the
-application and are stored in systems like Google Analytics, Posthog and Gainsight PX.
-
-### Data Breach Notification Process
-
-In the event of a data breach, Netdata has a well-defined process in place for notifying users. The details of this
-process align with the standard procedures and timelines defined in the Data Protection Agreement (DPA).
-
-We continually review and update our privacy and data protection practices to ensure the highest level of data safety
-and privacy for our users.
+| **Category**              | **Details**                                                                                                                                                                                                               |
+|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Data Collection**       | • Email Address (account, communication, analytics)<br/>• IP Address (web proxy access logs)                                                                                                                              |
+| **Data Usage**            | • Stored in AWS databases<br/>• Copied to BigQuery for analytics<br/>• Used for product improvement<br/>• With consent, tracking via Google Analytics, Posthog, and Gainsight PX<br/>• Stripe for secure payment handling |
+| **Data Sharing**          | • No selling or sharing of personal data<br/>• Third-party services: Google Cloud/AWS (infrastructure), Stripe (payments), Analytics services                                                                             |
+| **Data Protection**       | • Encrypted ACLK for all infrastructure data<br/>• TLS encryption for all user-Cloud communication                                                                                                                        |
+| **User Control**          | • Access personal data<br/>• Correct inaccuracies<br/>• Retrieve personal data<br/>• Delete accounts<br/>• Note: Temporary maintenance may limit access                                                                   |
+| **Compliance**            | • Full compliance with GDPR and CCPA                                                                                                                                                                                      |
+| **Data Transfer**         | • Secure, encrypted WebSocket (WSS) connections for all transfers                                                                                                                                                         |
+| **Tracking Technologies** | • With consent: analytical cookies tracked via Google Analytics, Posthog, and Gainsight PX                                                                                                                                |
+| **Data Breach Protocol**  | • Follows DPA guidelines and industry timelines<br/>• User notifications as required by data protection laws<br/>• Continuous review and updates to privacy and security practices                                        |

@@ -48,7 +48,7 @@ void ml_host_new(RRDHOST *rh)
     host->queue = Cfg.workers[times_called++ % Cfg.num_worker_threads].queue;
 
     netdata_mutex_init(&host->mutex);
-    spinlock_init(&host->type_anomaly_rate_spinlock);
+    spinlock_init(&host->context_anomaly_rate_spinlock);
 
     host->ml_running = false;
     rh->ml_host = (rrd_ml_host_t *) host;
@@ -502,4 +502,12 @@ bool ml_model_received_from_child(RRDHOST *host, const char *json)
     }
 
     return ok;
+}
+
+void ml_host_disconnected(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host)
+        return;
+
+    __atomic_store_n(&host->reset_pointers, true, __ATOMIC_RELAXED);
 }

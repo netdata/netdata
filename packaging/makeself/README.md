@@ -1,65 +1,135 @@
-# Netdata static binary build
+# Netdata Static Binary Build
 
-We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
-AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
-require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
-you are on a platform which we provide static builds for but do not provide native packages for, a static build
-will be used by default for installation.
+Netdata provides pre-built static binaries for Linux systems where native packages aren't available. The [installer](/packaging/installer/methods/kickstart.md) automatically uses these static builds when needed.
 
-If you want to enforce the usage of a static build and have the installer return a failure if one is not available,
-you can do so by adding `--static-only` to the options you pass to the installer.
+**Key Features**:
 
-## Requirements
+- Self-contained installation (no system dependencies required, no interference with system libraries)
+- Installed under `/opt/netdata`
 
-- Container runtime tool (Docker or Podman)
+## Supported Architectures
 
-## Building a static binary package
+| Architecture | Identifier | Notes                            |
+|--------------|------------|----------------------------------|
+| x86_64       | `x86_64`   | 64-bit Intel/AMD processors      |
+| ARMv7        | `armv7l`   | Raspberry Pi 2/3, many SBCs      |
+| AArch64      | `aarch64`  | ARM 64-bit (Pi 4, newer devices) |
+| POWER8+      | `ppc64le`  | IBM POWER architecture           |
 
-Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
-Otherwise, [perform a cleanup](/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+---
 
+## Build Process
 
-To build the static binary 64-bit distribution package, into the root folder on the netdata repo, run:
+### Requirements
+
+| Requirement      | Purpose                                   |
+|------------------|-------------------------------------------|
+| Docker or Podman | Container environment for isolated builds |
+| ~10GB disk space | For build artifacts and containers        |
+
+### Preparation
+
+Before building, ensure your repository is clean from previous builds.
+
+→ [Perform a cleanup](/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+
+### Building the Static Binary
+
+Run the build script with your target [architecture identifier](#supported-architectures):
 
 ```bash
+# For x86_64 (default)
 ./packaging/makeself/build-static.sh x86_64
+
+# For ARM 64-bit (AArch64)
+./packaging/makeself/build-static.sh aarch64
+
+# For ARMv7
+./packaging/makeself/build-static.sh armv7l
+
+# For POWER8+
+./packaging/makeself/build-static.sh ppc64le
 ```
 
-The program will:
+The script will automatically:
 
-1.  setup a new docker container with Alpine Linux
-2.  install the required alpine packages (the build environment, needed libraries, etc)
-3.  download and compile third party apps that are packaged with Netdata (`bash`, `curl`, etc)
-4.  compile Netdata
+- Launch an Alpine Linux container
+- Install necessary build dependencies
+- Compile required third-party tools (bash, curl, etc.)
+- Build Netdata with optimized settings
+- Package everything into a self-extracting installer
 
-Once finished, a file named `netdata-vX.X.X-gGITHASH-x86_64-DATE-TIME.run` will be created in the current directory. This is the Netdata binary package that can be run to install Netdata on any other computer.
+When building for an architecture different from your host:
 
-You can build static binaries for other architectures such as `armv7l`, `aarch64`, and `ppc64le`.
+- The build process uses QEMU for emulation
+- Build times will be significantly longer
+- More disk space may be required
+- Some features may have architecture-specific limitations
 
-## Building binaries with debug info
+### Build Output
 
-To build Netdata binaries with debugging / tracing information in them, use:
+The process generates several installer files in the artifacts/ directory:
+
+```
+artifacts/
+├── netdata-latest.gz.run                    # Latest version
+├── netdata-v[VERSION]-[BUILD].gz.run        # Specific version
+├── netdata-[ARCH]-latest.gz.run             # Architecture-specific latest
+└── netdata-[ARCH]-v[VERSION]-[BUILD].gz.run # Architecture-specific version
+```
+
+Example output:
+
+```
+$ ls -l artifacts/
+drwxrwxr-x   - user group     cache
+.rwxrwxr-x 94M user group     netdata-latest.gz.run
+.rwxrwxr-x 94M user group     netdata-v2.3.0-193-nightly.gz.run
+.rwxrwxr-x 94M user group     netdata-x86_64-latest.gz.run
+.rwxrwxr-x 94M user group     netdata-x86_64-v2.3.0-193-nightly.gz.run
+```
+
+## Advanced Build Options
+
+### Debug Builds
+
+For troubleshooting, you can create a debug-enabled build:
 
 ```bash
-cd /path/to/netdata.git
 ./packaging/makeself/build-static.sh x86_64 debug
 ```
 
-These binaries are not optimized (they are a bit slower), they have certain features disables (like log flood protection), other features enables (like `debug flags`) and are not stripped (the binary files are bigger, since they now include source code tracing information).
+Debug build characteristics:
 
-## Debugging Netdata binaries
+- Larger file size
+- Runtime performance impact
+- Additional diagnostic information
+- Disabled optimizations
+- Enhanced tracing capabilities
 
-Once you have installed a binary package with debugging info, you will need to install `valgrind` and run this command to start Netdata:
+## Troubleshooting
+
+### Running with Valgrind
+
+To diagnose memory issues or crashes:
 
 ```bash
 PATH="/opt/netdata/bin:${PATH}" valgrind --undef-value-errors=no /opt/netdata/bin/srv/netdata -D
 ```
 
-The above command, will run Netdata under `valgrind`. While Netdata runs under `valgrind` it will be 10x slower and use a lot more memory.
+**Important notes**:
 
-If Netdata crashes, `valgrind` will print a stack trace of the issue. Open a github issue to let us know.
+- Performance will be significantly reduced (~10x slower)
+- Stop Valgrind with Ctrl+C
+- The `--undef-value-errors=no` flag suppresses hundreds of false positives from the bundled libraries
 
-To stop Netdata while it runs under `valgrind`, press Control-C on the console.
+### Crash Reporting
 
-> If you omit the parameter `--undef-value-errors=no` to valgrind, you will get hundreds of errors about conditional jumps that depend on uninitialized values. This is normal. Valgrind has heuristics to prevent it from printing such errors for system libraries, but for the static Netdata binary, all the required libraries are built into Netdata. So, valgrind cannot apply its heuristics and prints them.
-> 
+If Netdata crashes during development or testing:
+
+1. Capture the complete Valgrind output
+2. [Open a GitHub Issue](https://github.com/netdata/netdata/issues/new/choose)
+3. Include:
+    - Build details (architecture, version)
+    - Complete stack trace
+    - Steps to reproduce the issue

@@ -219,7 +219,7 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
 mark_as_advanced(ENABLE_LIBUNWIND)
@@ -843,9 +843,19 @@ set(LIBNETDATA_FILES
         src/libnetdata/datetime/rfc3339.c
         src/libnetdata/datetime/rfc3339.h
         src/libnetdata/dictionary/dictionary.c
+        src/libnetdata/dictionary/dictionary-debug.c
+        src/libnetdata/dictionary/dictionary-debug.h
         src/libnetdata/dictionary/dictionary.h
-        src/libnetdata/eval/eval.c
+        src/libnetdata/eval/eval-parser-legacy.c
+        src/libnetdata/eval/eval-evaluate.c
+        src/libnetdata/eval/eval-utils.c
         src/libnetdata/eval/eval.h
+        src/libnetdata/eval/eval-internal.h
+        src/libnetdata/eval/eval-unittest.c
+        src/libnetdata/eval/eval-unittest-hardcoding.c
+        src/libnetdata/eval/re2c_lemon/lexer.c
+        src/libnetdata/eval/re2c_lemon/parser.c
+        src/libnetdata/eval/re2c_lemon/parser_wrapper.c
         src/libnetdata/facets/facets.c
         src/libnetdata/facets/facets.h
         src/libnetdata/functions_evloop/functions_evloop.c
@@ -984,6 +994,17 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
+        src/libnetdata/stacktrace/stacktrace.h
+        src/libnetdata/stacktrace/stacktrace-common.h
+        src/libnetdata/stacktrace/stacktrace-common.c
+        src/libnetdata/stacktrace/stacktrace-array.h
+        src/libnetdata/stacktrace/stacktrace-array.c
+        src/libnetdata/stacktrace/stacktrace-libbacktrace.c
+        src/libnetdata/stacktrace/stacktrace-libunwind.c
+        src/libnetdata/stacktrace/stacktrace-backtrace.c
+        src/libnetdata/stacktrace/stacktrace-none.c
+        src/libnetdata/stacktrace/stacktrace-log.c
+        src/libnetdata/stacktrace/stacktrace-unittest.c
         src/libnetdata/json/json-c-parser-inline.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
@@ -1064,7 +1085,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/benchmark.h
         src/libnetdata/locks/benchmark-rw.c
         src/libnetdata/locks/benchmark-rw.h
-        src/libnetdata/log/nd_log-stacktrace.c
         src/libnetdata/memory/nd-mallocz.c
         src/libnetdata/memory/nd-mallocz.h
         src/libnetdata/memory/nd-mmap.c
@@ -1579,15 +1599,15 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/api_v2_contexts_alerts.h
         src/database/contexts/api_v2_contexts_alert_transitions.c
         src/database/contexts/api_v2_contexts_alert_config.c
-        src/database/contexts/context.c
-        src/database/contexts/instance.c
-        src/database/contexts/internal.h
-        src/database/contexts/metric.c
+        src/database/contexts/rrdcontext-context.c
+        src/database/contexts/rrdcontext-instance.c
+        src/database/contexts/rrdcontext-internal.h
+        src/database/contexts/rrdcontext-metric.c
         src/database/contexts/query_scope.c
         src/database/contexts/query_target.c
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
-        src/database/contexts/worker.c
+        src/database/contexts/rrdcontext-worker.c
         src/database/rrdcollector.c
         src/database/rrdcollector.h
         src/database/rrddim.c
@@ -1639,7 +1659,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
-        src/database/contexts/contexts-loading.c
+        src/database/contexts/rrdcontext-loading.c
         src/database/rrdset-index-id.c
         src/database/rrdset-index-id.h
         src/database/rrdset-index-name.c
@@ -1669,6 +1689,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdhost-collection.h
         src/database/pattern-array.c
         src/database/pattern-array.h
+        src/database/contexts/rrdcontext-queues.c
 )
 
 if(ENABLE_DBENGINE)
@@ -2115,7 +2136,7 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/context_stream.cc
         src/aclk/schema-wrappers/context_stream.h
         src/aclk/schema-wrappers/context.cc
-        src/aclk/schema-wrappers/context.h
+        src/aclk/schema-wrappers/rrdcontext-context.h
         src/aclk/schema-wrappers/schema_wrappers.h
         src/aclk/schema-wrappers/schema_wrapper_utils.cc
         src/aclk/schema-wrappers/schema_wrapper_utils.h
@@ -2971,8 +2992,7 @@ if(OS_WINDOWS)
 
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
         configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
-        configure_file(packaging/windows/gpl-3.0.rtf gpl-3.0.rtf COPYONLY)
-        configure_file(packaging/windows/ncul1.rtf ncul1.rtf COPYONLY)
+        configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
 endif()
@@ -3019,6 +3039,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32>"
 )
 
 netdata_add_protobuf(netdata)

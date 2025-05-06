@@ -3,7 +3,7 @@
 #ifndef NETDATA_API_V2_CONTEXTS_ALERTS_H
 #define NETDATA_API_V2_CONTEXTS_ALERTS_H
 
-#include "internal.h"
+#include "rrdcontext-internal.h"
 #include "api_v2_contexts.h"
 
 struct alert_transitions_callback_data {

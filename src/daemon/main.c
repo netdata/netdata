@@ -216,6 +216,7 @@ int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+int eval_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -257,7 +258,6 @@ int netdata_main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     bool close_open_fds = true; (void)close_open_fds;
-    size_t default_stacksize;
     const char *user = NULL;
 
 #ifdef OS_WINDOWS
@@ -402,8 +402,10 @@ int netdata_main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            if (eval_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
+                            if (stacktrace_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
@@ -454,6 +456,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
+                        else if(strcmp(optarg, "stacktracetest") == 0) {
+                            unittest_running = true;
+                            return stacktrace_unittest();
+                        }
 #ifdef OS_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {
                             return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);
@@ -495,6 +501,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "progresstest") == 0) {
                             unittest_running = true;
                             return progress_unittest();
+                        }
+                        else if(strcmp(optarg, "evaltest") == 0) {
+                            unittest_running = true;
+                            return eval_unittest();
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
@@ -822,18 +832,6 @@ int netdata_main(int argc, char **argv) {
     nd_profile_setup();
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("stack size");
-
-    // initialize thread - this is required before the first nd_thread_create()
-    default_stacksize = netdata_threads_init();
-
-    // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
-    if (default_stacksize < 1 * 1024 * 1024)
-        default_stacksize = 1 * 1024 * 1024;
-
-    netdata_threads_set_stack_size(default_stacksize);
-
-    // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("crash reports");
 
     daemon_status_file_check_crash();
@@ -1010,8 +1008,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("threads after fork");
 
-    netdata_threads_set_stack_size(
-        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    netdata_conf_reset_stack_size();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("registry");
@@ -1100,8 +1097,11 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(analytics_check_enabled()) {
-        delta_startup_time("anonymous analytics");
+    {
+        if(analytics_check_enabled())
+            delta_startup_time("anonymous analytics");
+        else // collect data but do not send it (needed in /api/v1/info)
+            delta_startup_time("anonymous analytics (disabled)");
 
         analytics_statistic_t start_statistic = {"START", "-", "-"};
         analytics_statistic_send(&start_statistic);
@@ -1135,7 +1135,9 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("mrg cleanup");
 
+#ifdef ENABLE_DBENGINE
     mrg_metric_prepopulate_cleanup(main_mrg);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("done");

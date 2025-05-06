@@ -1027,6 +1027,25 @@ size_t dictionary_unittest_views(void) {
     return errors;
 }
 
+bool dictionary_traverse_or_destroy_unittest(void) {
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(dict, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
+    dictionary_set(dict, "KEY 2", "VALUE2", strlen("VALUE2") + 1);
+    dictionary_set(dict, "KEY 3", "VALUE3", strlen("VALUE3") + 1);
+
+    size_t counted = 0;
+    const char *s;
+    dfe_start_read(dict, s) {
+        if(!counted)
+            dictionary_destroy(dict);
+
+        counted++;
+    }
+    dfe_done(s);
+
+    return counted == 1;
+}
+
 /*
  * FIXME: a dictionary-related leak is reported when running the address
  * sanitizer. Need to investigate if it's introduced by the unit-test itself,
@@ -1183,7 +1202,21 @@ int dictionary_unittest(size_t entries) {
     errors += dictionary_unittest_threads();
     errors += dictionary_unittest_view_threads();
 
-    cleanup_destroyed_dictionaries();
+    if(!dictionary_traverse_or_destroy_unittest()) {
+        fprintf(stderr, "Destroy on traversal test failed\n");
+        errors++;
+    }
+    else
+        fprintf(stderr, "Destroy on traversal test OK\n");
+
+    cleanup_destroyed_dictionaries(false);
+
+    size_t delayed = dictionary_destroy_delayed_count();
+    if(delayed != 0) {
+        fprintf(stderr, "WARNING: There are %zu dictionaries that cannot be destroyed\n", delayed);
+    }
+    else
+        fprintf(stderr, "All dictionaries have been freed: OK\n");
 
     fprintf(stderr, "\n%zu errors found\n", errors);
     return  errors ? 1 : 0;

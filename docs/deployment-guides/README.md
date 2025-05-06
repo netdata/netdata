@@ -1,4 +1,4 @@
-# Deployment Guide
+# Deployment Guides
 
 Netdata provides real-time monitoring for various infrastructure types, from small IoT devices to complex hybrid environments that combine on-premise and cloud infrastructure. It supports bare-metal servers, virtual machines, and containers.
 

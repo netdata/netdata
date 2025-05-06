@@ -11,7 +11,7 @@
 #include "machine-guid.h"
 #include "status-file-dmi.h"
 
-#define STATUS_FILE_VERSION 27
+#define STATUS_FILE_VERSION 28
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -32,7 +32,6 @@ typedef enum {
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(DAEMON_OS_TYPE);
 
 typedef struct daemon_status_file {
-    SPINLOCK spinlock;
     uint32_t v;                 // the version of the status file
 
     char version[32];           // the netdata version

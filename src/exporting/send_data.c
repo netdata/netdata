@@ -129,6 +129,15 @@ void simple_connector_send_buffer(
     flags += MSG_NOSIGNAL;
 #endif
 
+    // Safety check to prevent NULL pointer crashes, but don't allocate new memory
+    if (unlikely(!buffer || !header)) {
+        netdata_log_error("EXPORTING: NULL %s passed to simple_connector_send_buffer for instance %s", 
+                          (!buffer && !header) ? "buffer and header" : (!buffer ? "buffer" : "header"),
+                          instance->config.name ? instance->config.name : "unknown");
+        (*failures)++;
+        return;
+    }
+
     uint32_t options = (uint32_t)instance->config.options;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
@@ -196,14 +205,12 @@ void simple_connector_send_buffer(
  *
  * @param instance_p an instance data structure.
  */
-void simple_connector_worker(void *instance_p)
+void *simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
-    char threadname[ND_THREAD_TAG_MAX + 1];
-    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPSMPL[%zu]", instance->index);
-    uv_thread_set_name_np(threadname);
+    // Thread name is set during creation
 
     uint32_t options = (uint32_t)instance->config.options;
 
@@ -383,4 +390,6 @@ void simple_connector_worker(void *instance_p)
 #endif
 
     simple_connector_cleanup(instance);
+    
+    return NULL;
 }

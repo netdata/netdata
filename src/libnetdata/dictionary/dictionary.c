@@ -150,6 +150,11 @@ void dictionary_version_increment(DICTIONARY *dict) {
 }
 
 // ----------------------------------------------------------------------------
+// tracking allocated dictionaries
+
+#include "dictionary-debug.h"
+
+// ----------------------------------------------------------------------------
 // items garbage collector
 
 void garbage_collect_pending_deletes(DICTIONARY *dict) {
@@ -212,9 +217,8 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
     (void)deleted;
     (void)examined;
 
-    internal_error(false, "DICTIONARY: garbage collected dictionary created by %s (%zu@%s), "
+    dictionary_internal_error(false, dict, "DICTIONARY: garbage collected dictionary, "
                           "examined %zu items, deleted %zu items, still pending %zu items",
-                          dict->creation_function, dict->creation_line, dict->creation_file,
                           examined, deleted, pending);
 }
 
@@ -258,9 +262,6 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     long int entries = dict->entries;
     long int referenced_items = dict->referenced_items;
     long int pending_deletion_items = dict->pending_deletion_items;
-    const char *creation_function = dict->creation_function;
-    const char *creation_file = dict->creation_file;
-    size_t creation_line = dict->creation_line;
 #endif
 
     // destroy the index
@@ -295,14 +296,12 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(dict->value_aral)
         aral_by_size_release(dict->value_aral);
 
+    dictionary_debug_untrack_dict(dict);
     aral_freez(ar_dict, dict);
 
     internal_error(
         false,
-        "DICTIONARY: Freed dictionary created from %s() %zu@%s, having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total freed memory: %zu bytes (sizeof(dict) = %zu, sizeof(item) = %zu).",
-        creation_function,
-        creation_line,
-        creation_file,
+        "DICTIONARY: Freed dictionary having %ld (counted %zu) entries, %ld referenced, %ld pending deletion, total freed memory: %zu bytes (sizeof(dict) = %zu, sizeof(item) = %zu).",
         entries, counted_items, referenced_items, pending_deletion_items,
         dict_size + item_size, sizeof(DICTIONARY), sizeof(DICTIONARY_ITEM) + sizeof(DICTIONARY_ITEM_SHARED));
 
@@ -314,6 +313,10 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 
 netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex = NETDATA_MUTEX_INITIALIZER;
 static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
+
+#ifdef FSANITIZE_ADDRESS
+DEFINE_JUDYL_TYPED(STACKTRACE, size_t);
+#endif
 
 static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     if(is_dictionary_destroyed(dict))
@@ -330,7 +333,20 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
-size_t cleanup_destroyed_dictionaries(void) {
+size_t dictionary_destroy_delayed_count(void) {
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    size_t count = 0;
+    for(DICTIONARY *dict = dictionaries_waiting_to_be_destroyed, *next; dict ; dict = next) {
+        next = dict->next;
+        count++;
+    }
+
+    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    return count;
+}
+
+size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused) {
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
     if (!dictionaries_waiting_to_be_destroyed) {
         netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
@@ -339,41 +355,138 @@ size_t cleanup_destroyed_dictionaries(void) {
 
     size_t remaining = 0;
 
+#ifdef FSANITIZE_ADDRESS
+    // Create Judy arrays for tracking stats by stacktrace
+    STACKTRACE_JudyLSet dict_counts = { 0 };     // Count of dictionaries per stacktrace
+    STACKTRACE_JudyLSet item_counts = { 0 };     // Count of items per stacktrace
+    STACKTRACE_JudyLSet item_stacktrace_counts = { 0 }; // Count of items by their creation stacktrace
+    
+    STACKTRACE_INIT(&dict_counts);
+    STACKTRACE_INIT(&item_counts);
+    STACKTRACE_INIT(&item_stacktrace_counts);
+#endif
+
     DICTIONARY *dict, *last = NULL, *next = NULL;
     for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
         next = dict->next;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        size_t line = dict->creation_line;
-        const char *file = dict->creation_file;
-        const char *function = dict->creation_function;
-        pid_t pid = dict->creation_tid;
-#endif
-
         DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
         if(dictionary_free_all_resources(dict, NULL, false)) {
-
-            internal_error(
-                true,
-                "DICTIONARY DELAYED: freed dict created from %s() %zu@%s pid %d.",
-                function, line, file, pid);
-
             if(last) last->next = next;
             else dictionaries_waiting_to_be_destroyed = next;
         }
         else {
+#ifdef FSANITIZE_ADDRESS
+            size_t ref_items = dictionary_referenced_items(dict);
 
-            internal_error(
-                    true,
-                    "DICTIONARY DELAYED %zu: %zu referenced in dict created from %s() %zu@%s pid %d.",
-                    remaining + 1, dictionary_referenced_items(dict),
-                    function, line, file, pid);
+            // Track this dictionary for deduplication reporting
+            if (shutdown) {
+                // Process all stacktraces from this dictionary
+                for (int i = 0; i < dict->stacktraces.num_stacktraces; i++) {
+                    if (dict->stacktraces.stacktraces[i]) {
+                        // Update dictionary count
+                        uintptr_t key = (uintptr_t)dict->stacktraces.stacktraces[i];
+                        size_t dict_count = STACKTRACE_GET(&dict_counts, key);
+                        dict_count++;
+                        STACKTRACE_SET(&dict_counts, key, dict_count);
+
+                        // Update item count
+                        size_t items_count = STACKTRACE_GET(&item_counts, key);
+                        items_count += ref_items;
+                        STACKTRACE_SET(&item_counts, key, items_count);
+                    }
+                }
+            }
+#endif
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
             remaining++;
         }
     }
+
+#ifdef FSANITIZE_ADDRESS
+    if (remaining > 0 && shutdown) {
+        // Print deduplicated report
+        fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n", 
+                remaining);
+        
+        // Buffer for formatting stack traces
+        BUFFER *wb = buffer_create(16384, NULL);
+        
+        // Print each unique stacktrace group
+        Word_t stacktrace_idx = 0;
+        size_t i = 0;
+        
+        // Get the first key from dict_counts (both Judy arrays have the same keys)
+        for(size_t key_index = STACKTRACE_FIRST(&dict_counts, &stacktrace_idx);
+             key_index;
+             key_index = STACKTRACE_NEXT(&dict_counts, &stacktrace_idx)) {
+
+            i++;
+            STACKTRACE st = (STACKTRACE)stacktrace_idx;
+            size_t dict_count = STACKTRACE_GET(&dict_counts, stacktrace_idx);
+            size_t item_count = STACKTRACE_GET(&item_counts, stacktrace_idx);
+            
+            // Format stacktrace to buffer
+            buffer_flush(wb);
+            stacktrace_to_buffer(st, wb);
+            
+            fprintf(stderr, "\n > DICTIONARY DELAYED %zu: %zu items in %zu dictionaries accessed from:\n%s\n\n",
+                    i, item_count, dict_count, buffer_tostring(wb));
+        }
+        
+        // Clean up
+        // Now collect and report information about dictionary items grouped by their creation stacktrace
+            fprintf(stderr, "\n========= DICTIONARY ITEMS GROUPED BY CREATION STACKTRACE =========\n");
+            
+        // Loop through dictionaries to collect item stacktraces
+        for(dict = dictionaries_waiting_to_be_destroyed; dict; dict = dict->next) {
+            // Iterate through all items and count by stacktrace
+            DICTIONARY_ITEM *item;
+            for(item = dict->items.list; item; item = item->next) {
+                // Count each unique stacktrace in the item's array
+                for (int i = 0; i < item->stacktraces.num_stacktraces; i++) {
+                    if (item->stacktraces.stacktraces[i]) {
+                        uintptr_t item_key = (uintptr_t)item->stacktraces.stacktraces[i];
+                        size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_key);
+                        count++;
+                        STACKTRACE_SET(&item_stacktrace_counts, item_key, count);
+                    }
+                }
+            }
+        }
+
+        // Print report of items by stacktrace
+        Word_t item_st_idx = 0;
+        size_t j = 0;
+
+        for(size_t key_index = STACKTRACE_FIRST(&item_stacktrace_counts, &item_st_idx);
+             key_index;
+             key_index = STACKTRACE_NEXT(&item_stacktrace_counts, &item_st_idx)) {
+
+            j++;
+            STACKTRACE st = (STACKTRACE)item_st_idx;
+            size_t count = STACKTRACE_GET(&item_stacktrace_counts, item_st_idx);
+
+            // Format stacktrace to buffer
+            buffer_flush(wb);
+            stacktrace_to_buffer(st, wb);
+
+            fprintf(stderr, "\n > DICTIONARY ITEMS DELAYED %zu: %zu items accessed from:\n%s\n\n",
+                    j, count, buffer_tostring(wb));
+        }
+
+        fprintf(stderr, "Total: %zu dictionaries\n", j);
+        fprintf(stderr, "==================================================================\n");
+
+        STACKTRACE_FREE(&dict_counts, NULL, NULL);
+        STACKTRACE_FREE(&item_counts, NULL, NULL);
+        STACKTRACE_FREE(&item_stacktrace_counts, NULL, NULL);
+        
+        buffer_free(wb);
+    }
+#endif
 
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 
@@ -383,112 +496,42 @@ size_t cleanup_destroyed_dictionaries(void) {
 // ----------------------------------------------------------------------------
 // API internal checks
 
-#ifdef NETDATA_INTERNAL_CHECKS
-#define api_internal_check(dict, item, allow_null_dict, allow_null_item) api_internal_check_with_trace(dict, item, __FUNCTION__, allow_null_dict, allow_null_item)
-static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_ITEM *item, const char *function, bool allow_null_dict, bool allow_null_item) {
-    if(!allow_null_dict && !dict) {
-        internal_error(
-            item,
-            "DICTIONARY: attempted to %s() with a NULL dictionary, passing an item created from %s() %zu@%s.",
-            function,
-            item->dict->creation_function,
-            item->dict->creation_line,
-            item->dict->creation_file);
-        fatal("DICTIONARY: attempted to %s() but dict is NULL", function);
-    }
-
-    if(!allow_null_item && !item) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() without an item on a dictionary created from %s() %zu@%s.",
-            function,
-            dict?dict->creation_function:"unknown",
-            dict?dict->creation_line:0,
-            dict?dict->creation_file:"unknown");
-        fatal("DICTIONARY: attempted to %s() but item is NULL", function);
-    }
-
-    if(dict && item && dict != item->dict) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() an item on a dictionary created from %s() %zu@%s, but the item belongs to the dictionary created from %s() %zu@%s.",
-            function,
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file,
-            item->dict->creation_function,
-            item->dict->creation_line,
-            item->dict->creation_file
-        );
-        fatal("DICTIONARY: %s(): item does not belong to this dictionary.", function);
-    }
-
-    if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
-        if (unlikely(refcount <= 0)) {
-            internal_error(
-                true,
-                "DICTIONARY: attempted to %s() of an item with reference counter = %d on a dictionary created from %s() %zu@%s",
-                function,
-                refcount,
-                item->dict->creation_function,
-                item->dict->creation_line,
-                item->dict->creation_file);
-            fatal("DICTIONARY: attempted to %s but item is having refcount = %d", function, refcount);
-        }
-    }
-}
-#else
-#define api_internal_check(dict, item, allow_null_dict, allow_null_item) debug_dummy()
-#endif
+// Use the debug version from dictionary-debug.h
+#define api_internal_check(dict, item, allow_null_dict, allow_null_item) dictionary_debug_internal_check(dict, item, allow_null_dict, allow_null_item)
 
 #define api_is_name_good(dict, name, name_len) api_is_name_good_with_trace(dict, name, name_len, __FUNCTION__)
 static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const char *name, ssize_t name_len __maybe_unused, const char *function __maybe_unused) {
     if(unlikely(!name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() with name = NULL on a dictionary created from %s() %zu@%s.",
-            function,
-            dict?dict->creation_function:"unknown",
-            dict?dict->creation_line:0,
-            dict?dict->creation_file:"unknown");
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to %s() with name = NULL on a dictionary",
+            function);
         return false;
     }
 
     if(unlikely(!*name)) {
-        internal_error(
-            true,
-            "DICTIONARY: attempted to %s() with empty name on a dictionary created from %s() %zu@%s.",
-            function,
-            dict?dict->creation_function:"unknown",
-            dict?dict->creation_line:0,
-            dict?dict->creation_file:"unknown");
+        dictionary_internal_error(true, dict,
+            "DICTIONARY: attempted to %s() with empty name on a dictionary",
+            function);
         return false;
     }
 
-    internal_error(
-        name_len > 0 && name_len != (ssize_t)strlen(name),
+    dictionary_internal_error(
+        name_len > 0 && name_len != (ssize_t)strlen(name), dict,
         "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu, "
-        "but the supplied name_len = %ld, on a dictionary created from %s() %zu@%s.",
+        "but the supplied name_len = %ld",
         function,
         name,
         strlen(name),
-        (long int) name_len,
-        dict?dict->creation_function:"unknown",
-        dict?dict->creation_line:0,
-        dict?dict->creation_file:"unknown");
+        (long int) name_len);
 
-    internal_error(
-        name_len <= 0 && name_len != -1,
+    dictionary_internal_error(
+        name_len <= 0 && name_len != -1, dict,
         "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu, "
-        "but the supplied name_len = %ld, on a dictionary created from %s() %zu@%s.",
+        "but the supplied name_len = %ld",
         function,
         name,
         strlen(name),
-        (long int) name_len,
-        dict?dict->creation_function:"unknown",
-        dict?dict->creation_line:0,
-        dict?dict->creation_file:"unknown");
+        (long int) name_len);
 
     return true;
 }
@@ -498,7 +541,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
 
 static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
     dictionary_init_aral();
-    cleanup_destroyed_dictionaries();
+    cleanup_destroyed_dictionaries(false);
 
     DICTIONARY *dict = aral_callocz(ar_dict);
     dict->options = options;
@@ -535,30 +578,30 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     return dict;
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file) {
-#else
-DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
+// Helper function to add a stacktrace to a dictionary
+#ifdef FSANITIZE_ADDRESS
+static inline void dict_add_stacktrace(DICTIONARY *dict) {
+    stacktrace_array_add(&dict->stacktraces, 1);
+}
 #endif
 
+DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
     DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other, fixed_size);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    dict->creation_function = function;
-    dict->creation_file = file;
-    dict->creation_line = line;
+#ifdef FSANITIZE_ADDRESS
+    // Initialize stacktrace tracking
+    stacktrace_array_init(&dict->stacktraces);
+    
+    // Add the first stack trace at creation time
+    dict_add_stacktrace(dict);
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
+    dictionary_debug_track_dict(dict);
     return dict;
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *function, size_t line, const char *file) {
-#else
 DICTIONARY *dictionary_create_view(DICTIONARY *master) {
-#endif
-
     DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
                                                   master->value_aral ? aral_requested_element_size(master->value_aral) : 0);
 
@@ -572,14 +615,16 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
     dict->hooks = master->hooks;
     __atomic_add_fetch(&master->hooks->links, 1, __ATOMIC_ACQUIRE);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    dict->creation_function = function;
-    dict->creation_file = file;
-    dict->creation_line = line;
-    dict->creation_tid = gettid_cached();
+#ifdef FSANITIZE_ADDRESS
+    // Initialize stacktrace tracking
+    stacktrace_array_init(&dict->stacktraces);
+    
+    // Add the first stack trace at creation time
+    dict_add_stacktrace(dict);
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);
+    dictionary_debug_track_dict(dict);
     return dict;
 }
 
@@ -603,7 +648,7 @@ void dictionary_flush(DICTIONARY *dict) {
 }
 
 size_t dictionary_destroy(DICTIONARY *dict) {
-    cleanup_destroyed_dictionaries();
+    cleanup_destroyed_dictionaries(false);
 
     if(!dict) return 0;
 
@@ -616,14 +661,10 @@ size_t dictionary_destroy(DICTIONARY *dict) {
         dictionary_flush(dict);
         dictionary_queue_for_destruction(dict);
 
-        internal_error(
-            true,
-            "DICTIONARY: delaying destruction of dictionary created from %s() %zu@%s, because it has %d referenced items in it (%d total).",
-            dict->creation_function,
-            dict->creation_line,
-            dict->creation_file,
-            dict->referenced_items,
-            dict->entries);
+        dictionary_internal_error(
+            true, dict,
+            "DICTIONARY: delaying destruction of dictionary, because it has %d referenced items in it (%d total).",
+            dict->referenced_items, dict->entries);
 
         ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;

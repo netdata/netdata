@@ -113,22 +113,11 @@ struct dictionary_stats {
 };
 
 // Create a dictionary
-#ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, 0, __FUNCTION__, __LINE__, __FILE__)
-#define dictionary_create_advanced(options, stats, fixed_size) dictionary_create_advanced_with_trace(options, stats, fixed_size, __FUNCTION__, __LINE__, __FILE__)
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file);
-#else
 #define dictionary_create(options) dictionary_create_advanced(options, NULL, 0)
 DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size);
-#endif
 
 // Create a view on a dictionary
-#ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create_view(master) dictionary_create_view_with_trace(master, __FUNCTION__, __LINE__, __FILE__)
-DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *function, size_t line, const char *file);
-#else
 DICTIONARY *dictionary_create_view(DICTIONARY *master);
-#endif
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
@@ -168,7 +157,10 @@ void dictionary_version_increment(DICTIONARY *dict);
 
 void dictionary_garbage_collect(DICTIONARY *dict);
 
-size_t cleanup_destroyed_dictionaries(void);
+size_t cleanup_destroyed_dictionaries(bool shutdown);
+
+// Report on allocated dictionaries - used during Address Sanitizer builds
+void dictionary_print_still_allocated_stacktraces(void);
 
 // ----------------------------------------------------------------------------
 // Set an item in the dictionary
@@ -297,14 +289,22 @@ typedef DICTFE_CONST struct dictionary_foreach {
 #define dfe_start_write(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_WRITE)
 #define dfe_start_reentrant(dict, value) dfe_start_rw(dict, value, DICTIONARY_LOCK_REENTRANT)
 
-#define dfe_start_rw(dict, value, mode)                                                             \
+#define dfe_start_rw(dictionary, ptr, mode)                                                         \
         do {                                                                                        \
             /* automatically cleanup DFE, to allow using return from within the loop */             \
-            DICTFE _cleanup_(dictionary_foreach_done) value ## _dfe = {};                           \
-            (void)(value); /* needed to avoid warning when looping without using this */            \
-            for((value) = dictionary_foreach_start_rw(&value ## _dfe, (dict), (mode));              \
-                (value ## _dfe.item) || (value) ;                                                   \
-                (value) = dictionary_foreach_next(&value ## _dfe))                                  \
+            DICTFE _cleanup_(dictionary_foreach_done) ptr ## _dfe = (DICTFE){                       \
+                .dict = (dictionary),                                                               \
+                .item = NULL,                                                                       \
+                .name = NULL,                                                                       \
+                .value = NULL,                                                                      \
+                .counter = 0,                                                                       \
+                .rw = (mode),                                                                       \
+                .locked = false,                                                                    \
+            };                                                                                      \
+            (void)(ptr); /* needed to avoid warning when looping without using this */              \
+            for((ptr) = dictionary_foreach_start_rw(&ptr ## _dfe);                                  \
+                (ptr ## _dfe.item) || (ptr) ;                                                       \
+                (ptr) = dictionary_foreach_next(&ptr ## _dfe))                                      \
             {
 
 #define dfe_done(value)                                                                             \
@@ -313,7 +313,7 @@ typedef DICTFE_CONST struct dictionary_foreach {
 
 #define dfe_unlock(value) dictionary_foreach_unlock(&value ## _dfe)
 
-void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw);
+void *dictionary_foreach_start_rw(DICTFE *dfe);
 void *dictionary_foreach_next(DICTFE *dfe);
 void  dictionary_foreach_done(DICTFE *dfe);
 void  dictionary_foreach_unlock(DICTFE *dfe);

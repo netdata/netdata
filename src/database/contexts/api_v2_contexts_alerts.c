@@ -193,9 +193,15 @@ static void alerts_v2_add(struct alert_v2_entry *t, RRDCALC *rc) {
     dictionary_set(t->configs, key, NULL, 0);
 }
 
+static STRING *silent_string = NULL;
+void alerts_by_x_cleanup(void) {
+    string_freez(silent_string);
+    silent_string = NULL;
+}
+
 static void alerts_by_x_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
-    static STRING *silent = NULL;
-    if(unlikely(!silent)) silent = string_strdupz("silent");
+    if(unlikely(!silent_string))
+        silent_string = string_strdupz("silent");
 
     struct alert_by_x_entry *b = value;
     RRDCALC *rc = data;
@@ -208,7 +214,7 @@ static void alerts_by_x_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
 
         b->running.total++;
 
-        if (rc->config.recipient == silent)
+        if (rc->config.recipient == silent_string)
             b->running.silent++;
     }
 }

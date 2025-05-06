@@ -22,7 +22,8 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
 
     int code = 0;
 
-    if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) {
+    bool in_process = ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+    if (!in_process) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not an execution in progress");
         code = 128;
         goto cleanup;
@@ -45,7 +46,8 @@ cleanup:
     if(ae->exec_code != 0)
         ae->flags |= HEALTH_ENTRY_FLAG_EXEC_FAILED;
 
-    unlink_alarm_notify_in_progress(ae);
+    if (in_process)
+        unlink_alarm_notify_in_progress(ae);
 }
 
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void) {

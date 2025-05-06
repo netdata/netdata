@@ -302,6 +302,10 @@ static void bearer_tokens_load_from_disk(void) {
 bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
     bool rc = false;
 
+    // javascript may send "null" or "undefined"
+    if(!v || !*v || strcmp(v, "null") == 0 || strcmp(v, "undefined") == 0)
+        return rc;
+
     if(!uuid_parse_flexi(v, w->auth.bearer_token)) {
         char uuid_str[UUID_COMPACT_STR_LEN];
         uuid_unparse_lower_compact(w->auth.bearer_token, uuid_str);
@@ -337,6 +341,11 @@ void bearer_tokens_init(void) {
         NULL, sizeof(struct bearer_token));
 
     bearer_tokens_load_from_disk();
+}
+
+void bearer_tokens_destroy(void) {
+    dictionary_destroy(netdata_authorized_bearers);
+    netdata_authorized_bearers = NULL;
 }
 
 bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {

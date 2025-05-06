@@ -173,7 +173,7 @@ void nd_initialize_signals(bool chain_existing) {
     signals_block_all_except_deadly();
     
     // Set the signal handler name for stack trace filtering
-    capture_stack_trace_set_signal_handler_function("nd_signal_handler");
+    stacktrace_set_signal_handler_function("nd_signal_handler");
 
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
@@ -227,17 +227,25 @@ static void process_triggered_signals(void) {
 
             switch (signals_waiting[i].action) {
                 case NETDATA_SIGNAL_RELOAD_HEALTH:
-                    nd_log_limits_unlimited();
-                    netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
-                    nd_log_limits_reset();
-                    execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
+                    if(exit_initiated_get())
+                        netdata_log_info("SIGNAL: Received %s. Ignoring it, as we are exiting...", name);
+                    else {
+                        nd_log_limits_unlimited();
+                        netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
+                        nd_log_limits_reset();
+                        execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
+                    }
                     break;
 
                 case NETDATA_SIGNAL_REOPEN_LOGS:
-                    nd_log_limits_unlimited();
-                    netdata_log_info("SIGNAL: Received %s. Reopening all log files...", name);
-                    nd_log_limits_reset();
-                    execute_command(CMD_REOPEN_LOGS, NULL, NULL);
+                    if(exit_initiated_get())
+                        netdata_log_info("SIGNAL: Received %s. Ignoring it, as we are exiting...", name);
+                    else {
+                        nd_log_limits_unlimited();
+                        netdata_log_info("SIGNAL: Received %s. Reopening all log files...", name);
+                        nd_log_limits_reset();
+                        execute_command(CMD_REOPEN_LOGS, NULL, NULL);
+                    }
                     break;
 
                 case NETDATA_SIGNAL_EXIT_CLEANLY:
