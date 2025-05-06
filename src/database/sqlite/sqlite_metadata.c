@@ -2681,7 +2681,7 @@ static void metadata_event_loop(void *arg)
     while ((config->metadata_running || config->ctx_load_running) && --loop_count) {
         if (!uv_run(loop, UV_RUN_NOWAIT))
             break;  // No pending callbacks
-        uv_sleep(SHUTDOWN_SLEEP_INTERVAL_MS);
+        sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
     }
 
     (void)uv_loop_close(loop);
