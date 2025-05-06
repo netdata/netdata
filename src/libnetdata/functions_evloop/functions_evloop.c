@@ -362,12 +362,12 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
 
     char tag_buffer[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_READER", wg->tag);
-    wg->reader_thread = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
+    wg->reader_thread = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
                                          rrd_functions_worker_globals_reader_main, wg);
 
     for(size_t i = 0; i < wg->workers ; i++) {
         snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_WORK[%zu]", wg->tag, i+1);
-        wg->worker_threads[i] = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
+        wg->worker_threads[i] = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
                                                  rrd_functions_worker_globals_worker_main, wg);
     }
 

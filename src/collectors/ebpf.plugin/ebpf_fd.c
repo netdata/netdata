@@ -1558,7 +1558,7 @@ void *ebpf_fd_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_fd.thread = nd_thread_create(ebpf_read_fd.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_fd_thread, em);
+    ebpf_read_fd.thread = nd_thread_create(ebpf_read_fd.name, NETDATA_THREAD_OPTION_JOINABLE, ebpf_read_fd_thread, em);
 
     fd_collector(em);
 

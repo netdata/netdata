@@ -1069,7 +1069,7 @@ int netdata_main(int argc, char **argv) {
 
         if(st->enabled) {
             netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, st);
         }
         else
             netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
@@ -1120,7 +1120,7 @@ int netdata_main(int argc, char **argv) {
                 struct netdata_static_thread *st = &static_threads[i];
                 st->enabled = 1;
                 netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-                st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+                st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, st);
             }
         }
     }
