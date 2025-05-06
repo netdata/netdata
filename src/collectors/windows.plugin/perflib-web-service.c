@@ -103,6 +103,9 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_requests_active;
     RRDDIM *rd_wescv_w3wp_requests_active;
 
+    RRDSET *st_wescv_w3wp_file_cache_mem_usage;
+    RRDDIM *rd_wescv_w3wp_file_cache_mem_usage;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1477,6 +1480,38 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFileCacheMemUsage)) {
+        if (!p->st_wescv_w3wp_file_cache_mem_usage) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_file_cache_mem_usage", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_file_cache_mem_usage = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_file_cache_mem_usage",
+                "Current memory usage by the worker process.",
+                "bytes/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_FILE_CACHE_MEM_USAGE,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_file_cache_mem_usage =
+                rrddim_add(p->st_wescv_w3wp_file_cache_mem_usage, "mem", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_wescv_w3wp_file_cache_mem_usage->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_file_cache_mem_usage,
+            p->rd_wescv_w3wp_file_cache_mem_usage,
+            (collected_number)p->WESCVW3WPFileCacheMemUsage.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_file_cache_mem_usage);
+    }
 }
 
 static inline void w3svc_w3wp_files_cached_total(
