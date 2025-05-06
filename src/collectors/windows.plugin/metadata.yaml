@@ -1242,6 +1242,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: requests
+            - name: iis.w3scv_w3wp_file_cache_mem_usage
+              description: Current memory usage by the worker process.
+              unit: "bytes/s"
+              chart_type: line
+              dimensions:
+                - name: mem
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
