@@ -1225,13 +1225,19 @@ modules:
               description: The name of the Application running.
           metrics:
             - name: iis.w3scv_w3wp_active_threads
-              description: Threads actively processing requests in the worker process
+              description: Threads actively processing requests in the worker process.
               unit: "threads"
               chart_type: line
               dimensions:
                 - name: threads
             - name: iis.w3scv_w3wp_requests_total
               description: Maximum number of threads to which the thread pool can grow as needed.
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.w3scv_w3wp_requests_active
+              description: Current number of requests being processed by the worker process.
               unit: "requests"
               chart_type: line
               dimensions:
