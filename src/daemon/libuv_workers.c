@@ -122,8 +122,7 @@ int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, i
         err = uv_thread_create(thread, thread_func, arg);
         if (err == 0)
             break;
-
-        uv_sleep(MAX_THREAD_CREATE_WAIT_MS);
+        sleep_usec(MAX_THREAD_CREATE_WAIT_MS * USEC_PER_MS);
     } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
 
     return err;
