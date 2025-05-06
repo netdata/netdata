@@ -121,7 +121,7 @@ static void claim_add_user_info_command(BUFFER *wb) {
 #else
     os_filename = filename;
     if (localhost_is_docker())
-        os_prefix = "docker exec netdata cat /var/lib/netdata/netdata_random_session_id";
+        os_prefix = "docker exec netdata cat";
     else
         os_prefix = "sudo cat";
     os_message = "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:";
