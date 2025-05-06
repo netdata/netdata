@@ -1248,6 +1248,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: mem
+            - name: iis.w3scv_w3wp_file_cache_total
+              description: Total number of files whose contents were ever added to the cache.
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: files
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
