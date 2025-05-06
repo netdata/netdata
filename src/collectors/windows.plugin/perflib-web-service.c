@@ -100,6 +100,9 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_requests_total;
     RRDDIM *rd_wescv_w3wp_requests_total;
 
+    RRDSET *st_wescv_w3wp_requests_active;
+    RRDDIM *rd_wescv_w3wp_requests_active;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1433,6 +1436,38 @@ static inline void w3svc_w3wp_requests_active(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPRequestActive)) {
+        if (!p->st_wescv_w3wp_requests_active) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_requests_active", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_requests_active = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_requests_active",
+                "Current number of requests being processed by the worker process.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_REQUESTS_ACTIVE,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_requests_active =
+                rrddim_add(p->st_wescv_w3wp_requests_active, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_wescv_w3wp_requests_active->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_requests_active,
+            p->rd_wescv_w3wp_requests_active,
+            (collected_number)p->WESCVW3WPRequestActive.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_requests_active);
+    }
 }
 
 static inline void w3svc_w3wp_file_cache_mem_usage(
