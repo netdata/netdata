@@ -677,3 +677,10 @@ bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
 
     return true;
 }
+
+bool localhost_is_docker() {
+    if (localhost && localhost->system_info) {
+        return (localhost->system_info->container && strcmp(localhost->system_info->container, "docker") == 0);
+    }
+    return false;
+};
