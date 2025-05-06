@@ -87,8 +87,11 @@ static void netdata_conf_stack_size(void) {
     if (default_stacksize < 1 * 1024 * 1024)
         default_stacksize = 1 * 1024 * 1024;
 
-    netdata_threads_set_stack_size(
-        (size_t)inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize));
+    // Let the user override the default stack size
+    default_stacksize = inicfg_get_size_bytes(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", default_stacksize);
+
+    netdata_threads_set_stack_size(default_stacksize);
+
 }
 
 void netdata_conf_reset_stack_size(void) {
