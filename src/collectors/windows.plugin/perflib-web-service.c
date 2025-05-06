@@ -93,6 +93,28 @@ struct web_service {
     COUNTER_DATA IISRequestsOther;
 };
 
+struct ws3svc_w3wp_data {
+    COUNTER_DATA WESCVW3WPActiveThreads;
+
+    COUNTER_DATA WESCVW3WPRequestTotal;
+    COUNTER_DATA WESCVW3WPRequestActive;
+
+    COUNTER_DATA WESCVW3WPFileCacheMemUsage;
+
+    COUNTER_DATA WESCVW3WPFilesCachedTotal;
+    COUNTER_DATA WESCVW3WPFilesFlushedTotal;
+
+    COUNTER_DATA WESCVW3WPURICachedFlushed;
+    COUNTER_DATA WESCVW3WPTotalURICached;
+
+    COUNTER_DATA WESCVW3WPTotalMetadataCached;
+    COUNTER_DATA WESCVW3WPTotalMetadataFlushed;
+
+    COUNTER_DATA WESCVW3WPOutputCacheActiveFlushedItens;
+    COUNTER_DATA WESCVW3WPOutputCacheMemoryUsage;
+    COUNTER_DATA WESCVW3WPOutputCacheFlushesTotal;
+};
+
 // AD information
 struct iis_app {
     RRDSET *st_app_current_application_pool_state;
@@ -208,8 +230,38 @@ void dict_app_pool_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *v
     initialize_app_pool_keys(p);
 }
 
+static inline void initialize_w3svc_w3wp_keys(struct ws3svc_w3wp_data *p)
+{
+    p->WESCVW3WPActiveThreads.key = "Active Threads Count";
+
+    p->WESCVW3WPRequestTotal.key = "Total HTTP Requests Served";
+    p->WESCVW3WPRequestActive.key = "Active Requests";
+
+    p->WESCVW3WPFileCacheMemUsage.key = "Current File Cache Memory Usage";
+
+    p->WESCVW3WPFilesCachedTotal.key = "Total Files Cached";
+    p->WESCVW3WPFilesFlushedTotal.key = "Total Flushed Files";
+
+    p->WESCVW3WPURICachedFlushed.key = "Total Flushed URIs";
+    p->WESCVW3WPTotalURICached.key = "Total URIs Cached";
+
+    p->WESCVW3WPTotalMetadataCached.key = "Total Metadata Cached";
+    p->WESCVW3WPTotalMetadataFlushed.key = "Total Flushed Metadata";
+
+    p->WESCVW3WPOutputCacheActiveFlushedItens.key = "Output Cache Current Flushed Items";
+    p->WESCVW3WPOutputCacheMemoryUsage.key = "Output Cache Current Memory Usage";
+    p->WESCVW3WPOutputCacheFlushesTotal.key = "Output Cache Total Flushes";
+}
+
+void dict_wesvc_w3wp_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct ws3svc_w3wp_data *p = value;
+    initialize_w3svc_w3wp_keys(p);
+}
+
 static DICTIONARY *web_services = NULL;
 static DICTIONARY *app_pools = NULL;
+static DICTIONARY *w3svc_w3wp_service = NULL;
 
 static void initialize(void)
 {
@@ -224,6 +276,11 @@ static void initialize(void)
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct iis_app));
 
     dictionary_register_insert_callback(app_pools, dict_app_pool_insert_cb, NULL);
+
+    w3svc_w3wp_service = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct ws3svc_w3wp_data));
+
+    dictionary_register_insert_callback(w3svc_w3wp_service, dict_wesvc_w3wp_insert_cb, NULL);
 }
 
 static inline void netdata_webservice_traffic(
@@ -1281,7 +1338,124 @@ static int iis_web_service(char *name, int update_every, typeof(bool(PERF_DATA_B
     return 0;
 }
 
-static bool do_W3SCV(PERF_DATA_BLOCK *pDataBlock, int update_every)
+static inline void w3svc_w3wp_active_threads(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_requests_total(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_requests_active(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_file_cache_mem_usage(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_files_cached_total(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_files_flushed_total(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_uri_cached_flushed(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_total_uri_cached(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_total_metadata_cached(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_total_metadata_flushed(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_output_cache_active_flushed_itens(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_output_cache_memory_usage(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static inline void w3svc_w3wp_output_cache_flushed_total(
+    struct ws3svc_w3wp_data *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+}
+
+static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "W3SVC_W3WP");
     if (!pObjectType)
@@ -1300,6 +1474,27 @@ static bool do_W3SCV(PERF_DATA_BLOCK *pDataBlock, int update_every)
         if (strcasecmp(windows_shared_buffer, "_Total") == 0) {
             continue;
         }
+
+        struct ws3svc_w3wp_data *p = dictionary_set(w3svc_w3wp_service, windows_shared_buffer, NULL, sizeof(*p));
+        w3svc_w3wp_active_threads(p, pDataBlock, pObjectType, pi, update_every);
+
+        w3svc_w3wp_requests_total(p, pDataBlock, pObjectType, pi, update_every);
+        w3svc_w3wp_requests_active(p, pDataBlock, pObjectType, pi, update_every);
+
+        w3svc_w3wp_file_cache_mem_usage(p, pDataBlock, pObjectType, pi, update_every);
+
+        w3svc_w3wp_files_cached_total(p, pDataBlock, pObjectType, pi, update_every);
+        w3svc_w3wp_files_flushed_total(p, pDataBlock, pObjectType, pi, update_every);
+
+        w3svc_w3wp_uri_cached_flushed(p, pDataBlock, pObjectType, pi, update_every);
+        w3svc_w3wp_total_uri_cached(p, pDataBlock, pObjectType, pi, update_every);
+
+        w3svc_w3wp_total_metadata_cached(p, pDataBlock, pObjectType, pi, update_every);
+        w3svc_w3wp_total_metadata_flushed(p, pDataBlock, pObjectType, pi, update_every);
+
+        w3svc_w3wp_output_cache_active_flushed_itens(p, pDataBlock, pObjectType, pi, update_every);
+        w3svc_w3wp_output_cache_memory_usage(p, pDataBlock, pObjectType, pi, update_every);
+        w3svc_w3wp_output_cache_flushed_total(p, pDataBlock, pObjectType, pi, update_every);
     }
 
     return true;
@@ -1320,7 +1515,7 @@ int do_PerflibWebService(int update_every __maybe_unused, usec_t dt __maybe_unus
         ret++;
     if (iis_web_service("APP_POOL_WAS", update_every, do_app_pool))
         ret++;
-    if (iis_web_service("W3SVC_W3WP", update_every, do_W3SCV))
+    if (iis_web_service("W3SVC_W3WP", update_every, do_W3SCV_W3WP))
         ret++;
 
     return (ret == TOTAL_NUMBER_OF_FAILURES) ? -1 : 0;
