@@ -1230,6 +1230,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: threads
+            - name: iis.w3scv_w3wp_requests_total
+              description: Maximum number of threads to which the thread pool can grow as needed.
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
