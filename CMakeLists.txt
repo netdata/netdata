@@ -1829,6 +1829,21 @@ set(WEB_PLUGIN_FILES
         src/web/server/web_client.h
         src/web/server/web_server.c
         src/web/server/web_server.h
+        src/web/server/websocket-server/websocket.c
+        src/web/server/websocket-server/websocket.h
+        src/web/server/websocket-server/websocket-compression.c
+        src/web/server/websocket-server/websocket-compression.h
+        src/web/server/websocket-server/websocket-internal.h
+        src/web/server/websocket-server/websocket-message.c
+        src/web/server/websocket-server/websocket-payload-rcv.c
+        src/web/server/websocket-server/websocket-payload-snd.c
+        src/web/server/websocket-server/websocket-protocol-rcv.c
+        src/web/server/websocket-server/websocket-protocol-snd.c
+        src/web/server/websocket-server/websocket-receiver.c
+        src/web/server/websocket-server/websocket-structures.h
+        src/web/server/websocket-server/websocket-thread.c
+        src/web/server/websocket-server/websocket-thread.h
+        src/web/server/websocket-server/websocket-utils.c
         src/web/server/static/static-threaded.c
         src/web/server/static/static-threaded.h
         src/web/server/web_client_cache.c
@@ -1841,6 +1856,7 @@ set(WEB_PLUGIN_FILES
         src/web/api/functions/function-metrics-cardinality.h
         src/web/api/request_source.c
         src/web/api/request_source.h
+        src/web/server/websocket-server/websocket-buffer.h
 )
 
 set(CLAIM_PLUGIN_FILES
