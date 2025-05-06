@@ -1218,6 +1218,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: IIS W3SCV W3MP
+          description: "These metrics refer to the World Wide Web Publishing Service, the service responsible for hosting and serving web content"
+          labels:
+            - name: app
+              description: The name of the Application running.
+          metrics:
+            - name: iis.w3scv_w3wp_active_threads
+              description: Threads actively processing requests in the worker process
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV

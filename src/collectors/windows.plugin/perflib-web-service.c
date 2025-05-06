@@ -94,6 +94,9 @@ struct web_service {
 };
 
 struct ws3svc_w3wp_data {
+    RRDSET *st_wescv_w3wp_active_threads;
+    RRDDIM *rd_wescv_w3wp_active_threads;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1345,6 +1348,38 @@ static inline void w3svc_w3wp_active_threads(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPActiveThreads)) {
+        if (!p->st_wescv_w3wp_active_threads) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_active_threads", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_active_threads = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_active_threads",
+                "Threads actively processing requests in the worker process",
+                "threads",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_ACTIVE_THREADS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_active_threads =
+                rrddim_add(p->st_wescv_w3wp_active_threads, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_wescv_w3wp_active_threads->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_active_threads,
+            p->rd_wescv_w3wp_active_threads,
+            (collected_number)p->WESCVW3WPActiveThreads.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_active_threads);
+    }
 }
 
 static inline void w3svc_w3wp_requests_total(
