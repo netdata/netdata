@@ -1281,6 +1281,30 @@ static int iis_web_service(char *name, int update_every, typeof(bool(PERF_DATA_B
     return 0;
 }
 
+static bool do_W3SCV(PERF_DATA_BLOCK *pDataBlock, int update_every)
+{
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "W3SVC_W3WP");
+    if (!pObjectType)
+        return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        // We are not ploting _Total here, because cloud will group the sites
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0) {
+            continue;
+        }
+    }
+
+    return true;
+}
+
 int do_PerflibWebService(int update_every __maybe_unused, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
@@ -1291,10 +1315,12 @@ int do_PerflibWebService(int update_every __maybe_unused, usec_t dt __maybe_unus
     }
 
     int ret = 0;
-#define TOTAL_NUMBER_OF_FAILURES (2)
+#define TOTAL_NUMBER_OF_FAILURES (3)
     if (iis_web_service("Web Service", update_every, do_web_services))
         ret++;
     if (iis_web_service("APP_POOL_WAS", update_every, do_app_pool))
+        ret++;
+    if (iis_web_service("W3SVC_W3WP", update_every, do_W3SCV))
         ret++;
 
     return (ret == TOTAL_NUMBER_OF_FAILURES) ? -1 : 0;
