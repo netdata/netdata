@@ -8,14 +8,17 @@ metrics:
         name: rtpSessionSenderJoins
         description: The number of senders that have been observed to have joined the session since this conceptual row was created (rtpSessionStartTime)
         unit: "{session}"
+        family: "Network/RTP/Session"
       - OID: 1.3.6.1.2.1.87.1.3.1.7
         name: rtpSessionReceiverJoins
         description: The number of receivers that have been been observed to have joined this session since this conceptual row was created (rtpSessionStartTime)
         unit: "{session}"
+        family: "Network/RTP/Session"
       - OID: 1.3.6.1.2.1.87.1.3.1.8
         name: rtpSessionByes
         description: "A count of RTCP BYE messages received by this entity"
         unit: "{message}"
+        family: "Network/RTP/Session"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -36,10 +39,12 @@ metrics:
         name: rtpSenderPackets
         description: Count of RTP packets sent by this sender, or observed by an RTP monitor, since rtpSenderStartTime
         unit: "{packet}"
+        family: "Network/RTP/Sender"
       - OID: 1.3.6.1.2.1.87.1.5.1.5
         name: rtpSenderOctets
         description: Count of non-header RTP octets sent by this sender, or observed by an RTP monitor, since rtpSenderStartTime
         unit: "By"
+        family: "Network/RTP/Sender"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -54,18 +59,22 @@ metrics:
         name: rtpRcvrPackets
         description: Count of RTP packets received by this RTP host receiver since rtpRcvrStartTime
         unit: "{packet}"
+        family: "Network/RTP/Receiver"
       - OID: 1.3.6.1.2.1.87.1.7.1.13
         name: rtpRcvrOctets
         description: Count of non-header RTP octets received by this receiving RTP host since rtpRcvrStartTime
         unit: "By"
+        family: "Network/RTP/Receiver"
       - OID: 1.3.6.1.2.1.87.1.7.1.6
         name: rtpRcvrLostPackets
         description: A count of RTP packets lost as observed by this receiver since rtpRcvrStartTime
         unit: "{packet}"
+        family: "Network/RTP/Receiver"
       - OID: 1.3.6.1.2.1.87.1.7.1.7
         name: rtpRcvrJitter
         description: An estimate of delay variation as observed by this receiver
         unit: "ms"
+        family: "Network/RTP/Receiver"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex

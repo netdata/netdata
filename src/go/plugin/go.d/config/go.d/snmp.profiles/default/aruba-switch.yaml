@@ -82,6 +82,7 @@ metrics:
         name: sysExtFanStatus
         description: Status of the Fan
         unit: "TBD"
+        family: "Hardware/Fans"
     metric_tags:
       - tag: fan_index
         symbol:
@@ -97,6 +98,7 @@ metrics:
         constant_value_one: true
         description: Fan constant value one
         unit: "TBD"
+        family: "Hardware/Fans"
     metric_tags:
       - tag: fan_index
         symbol:
@@ -124,6 +126,7 @@ metrics:
         name: sysExtPowerSupplyStatus
         description: Status of the power supply
         unit: "TBD"
+        family: "Hardware/PowerSupplies"
     metric_tags:
       - tag: powersupply_index
         symbol:
@@ -143,6 +146,7 @@ metrics:
         name: sysExtProcessorLoad
         description: The average over the last minute of the percentage of time that this processor was not idle
         unit: "%"
+        family: "Hardware/Processor"
     metric_tags:
       - tag: processor_index
         symbol:
@@ -161,14 +165,17 @@ metrics:
         name: sysExtMemorySize
         description: Total memory in KB
         unit: "kBy"
+        family: "Hardware/Memory"
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.3
         name: sysExtMemoryUsed
         description: Used memory in KB
         unit: "kBy"
+        family: "Hardware/Memory"
       - OID: 1.3.6.1.4.1.14823.2.2.1.2.1.15.1.4
         name: sysExtMemoryFree
         description: Free memory in KB
         unit: "kBy"
+        family: "Hardware/Memory"
     metric_tags:
       - tag: memory_index
         symbol:
@@ -185,3 +192,4 @@ metrics:
       name: wlsxSysExtPacketLossPercent
       description: Packet loss percent of the switch
       unit: "%"
+      family: "Network/Interfaces/Aruba"

@@ -9,198 +9,231 @@ metrics:
       OID: 1.3.6.1.4.1.14685.3.1.14.2.0 # dpStatusCPUUsageoneMinute
       description: Cpu usage percentage over one minute
       unit: "%"
+      family: "System/CPU"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.14685.3.1.5.1.0 # dpStatusMemoryStatusUsage
       description: Memory usage percentage
       unit: "%"
+      family: "System/Memory"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusSystemUsageLoad
       OID: 1.3.6.1.4.1.14685.3.1.52.2.0
       description: System load average
       unit: "TBD"
+      family: "System/Load"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryestablished
       OID: 1.3.6.1.4.1.14685.3.1.12.1.0
       description: Number of established TCP connections
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarysynsent
       OID: 1.3.6.1.4.1.14685.3.1.12.2.0
       description: Number of TCP connections in SYN sent state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarysynreceived
       OID: 1.3.6.1.4.1.14685.3.1.12.3.0
       description: Number of TCP connections in SYN received state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryfinwait1
       OID: 1.3.6.1.4.1.14685.3.1.12.4.0
       description: Number of TCP connections in FIN wait 1 state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryfinwait2
       OID: 1.3.6.1.4.1.14685.3.1.12.5.0
       description: Number of TCP connections in FIN wait 2 state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarytimewait
       OID: 1.3.6.1.4.1.14685.3.1.12.6.0
       description: Number of TCP connections in TIME wait state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryclosed
       OID: 1.3.6.1.4.1.14685.3.1.12.7.0
       description: Number of TCP connections in closed state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryclosewait
       OID: 1.3.6.1.4.1.14685.3.1.12.8.0
       description: Number of TCP connections in close wait state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarylastack
       OID: 1.3.6.1.4.1.14685.3.1.12.9.0
       description: Number of TCP connections in last ACK state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummarylisten
       OID: 1.3.6.1.4.1.14685.3.1.12.10.0
       description: Number of TCP connections in listen state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusTCPSummaryclosing
       OID: 1.3.6.1.4.1.14685.3.1.12.11.0
       description: Number of TCP connections in closing state
       unit: "{connection}"
+      family: "Network/TCPConnections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedtenSeconds
       OID: 1.3.6.1.4.1.14685.3.1.13.1.0
       description: Number of connections accepted in last ten seconds
       unit: "{connection}"
+      family: "Network/Connections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedoneMinute
       OID: 1.3.6.1.4.1.14685.3.1.13.2.0
       description: Number of connections accepted in last one minute
       unit: "{connection}"
+      family: "Network/Connections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedtenMinutes
       OID: 1.3.6.1.4.1.14685.3.1.13.3.0
       description: Number of connections accepted in last ten minutes
       unit: "{connection}"
+      family: "Network/Connections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedoneHour
       OID: 1.3.6.1.4.1.14685.3.1.13.4.0
       description: Number of connections accepted in last one hour
       unit: "{connection}"
+      family: "Network/Connections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusConnectionsAcceptedoneDay
       OID: 1.3.6.1.4.1.14685.3.1.13.5.0
       description: Number of connections accepted in last one day
       unit: "{connection}"
+      family: "Network/Connections"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusFreeEncrypted
       OID: 1.3.6.1.4.1.14685.3.1.29.1.0
       description: Free encrypted filesystem space
       unit: "By"
+      family: "System/Filesystem/Encrypted"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusTotalEncrypted
       OID: 1.3.6.1.4.1.14685.3.1.29.2.0
       description: Total encrypted filesystem space
       unit: "By"
+      family: "System/Filesystem/Encrypted"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusFreeTemporary
       OID: 1.3.6.1.4.1.14685.3.1.29.5.0
       description: Free temporary filesystem space
       unit: "By"
+      family: "System/Filesystem/Temporary"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusTotalTemporary
       OID: 1.3.6.1.4.1.14685.3.1.29.6.0
       description: Total temporary filesystem space
       unit: "By"
+      family: "System/Filesystem/Temporary"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusFreeInternal
       OID: 1.3.6.1.4.1.14685.3.1.29.7.0
       description: Free internal filesystem space
       unit: "By"
+      family: "System/Filesystem/Internal"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusFilesystemStatusTotalInternal
       OID: 1.3.6.1.4.1.14685.3.1.29.8.0
       description: Total internal filesystem space
       unit: "By"
+      family: "System/Filesystem/Internal"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorssystemTemp
       OID: 1.3.6.1.4.1.14685.3.1.55.1.0
       description: System temperature sensor reading
       unit: "Cel"
+      family: "System/EnvironmentalSensors/Temperature"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu1Temp
       OID: 1.3.6.1.4.1.14685.3.1.55.2.0
       description: CPU 1 temperature sensor reading
       unit: "Cel"
+      family: "System/EnvironmentalSensors/Temperature"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu2Temp
       OID: 1.3.6.1.4.1.14685.3.1.55.3.0
       description: CPU 2 temperature sensor reading
       unit: "Cel"
+      family: "System/EnvironmentalSensors/Temperature"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu1rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.4.0
       description: CPU 1 fan speed in revolutions per minute
       unit: "1.min"
+      family: "System/EnvironmentalSensors/FanSpeed"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorscpu2rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.5.0
       description: CPU 2 fan speed in revolutions per minute
       unit: "1.min"
+      family: "System/EnvironmentalSensors/FanSpeed"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis1rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.6.0
       description: Chassis 1 fan speed in revolutions per minute
       unit: "1.min"
+      family: "System/EnvironmentalSensors/FanSpeed"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis2rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.7.0
       description: Chassis 2 fan speed in revolutions per minute
       unit: "1.min"
+      family: "System/EnvironmentalSensors/FanSpeed"
   - MIB: DATAPOWER-STATUS-MIB
     symbol:
       name: ibm.dpStatusEnvironmentalSensorschassis3rpm
       OID: 1.3.6.1.4.1.14685.3.1.55.8.0
       description: Chassis 3 fan speed in revolutions per minute
       unit: "1.min"
+      family: "System/EnvironmentalSensors/FanSpeed"
 #  - MIB: DATAPOWER-STATUS-MIB
 #    symbol:
 #      name: ibm.dpStatusEnvironmentalSensorsCaseOpen
@@ -232,16 +265,19 @@ metrics:
         metric_type: monotonic_count
         description: Number of log target events processed
         unit: "{event}"
+        family: "System/LogEvents"
       - name: ibm.dpStatusLogTargetStatusEventsDropped
         OID: 1.3.6.1.4.1.14685.3.1.28.1.4
         metric_type: monotonic_count
         description: Number of log target events dropped
         unit: "{event}"
+        family: "System/LogEvents"
       - name: ibm.dpStatusLogTargetStatusEventsPending
         OID: 1.3.6.1.4.1.14685.3.1.28.1.5
         metric_type: monotonic_count
         description: Number of log target events pending
         unit: "{event}"
+        family: "System/LogEvents"
     metric_tags:
       - symbol:
           name: ibm.dpStatusLogTargetStatusLogTarget
@@ -271,41 +307,49 @@ metrics:
         metric_type: monotonic_count
         description: Number of received high capacity bytes
         unit: "By"
+        family: "Network/Interfaces/Bytes"
       - name: ibm.dpStatusNetworkInterfaceStatusRxHCPackets
         OID: 1.3.6.1.4.1.14685.3.1.124.1.20
         metric_type: monotonic_count
         description: Number of received high capacity packets
         unit: "{packet}"
+        family: "Network/Interfaces/Packets"
       - name: ibm.dpStatusNetworkInterfaceStatusRxErrors2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.21
         metric_type: monotonic_count
         description: Number of receive errors
         unit: "{error}"
+        family: "Network/Interfaces/Errors"
       - name: ibm.dpStatusNetworkInterfaceStatusRxDrops2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.22
         metric_type: monotonic_count
         description: Number of received packets dropped
         unit: "{packet}"
+        family: "Network/Interfaces/Drops"
       - name: ibm.dpStatusNetworkInterfaceStatusTxHCBytes
         OID: 1.3.6.1.4.1.14685.3.1.124.1.23
         metric_type: monotonic_count
         description: Number of transmitted high capacity bytes
         unit: "By"
+        family: "Network/Interfaces/Bytes"
       - name: ibm.dpStatusNetworkInterfaceStatusTxHCPackets
         OID: 1.3.6.1.4.1.14685.3.1.124.1.24
         metric_type: monotonic_count
         description: Number of transmitted high capacity packets
         unit: "{packet}"
+        family: "Network/Interfaces/Packets"
       - name: ibm.dpStatusNetworkInterfaceStatusTxErrors2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.25
         metric_type: monotonic_count
         description: Number of transmit errors
         unit: "{error}"
+        family: "Network/Interfaces/Errors"
       - name: ibm.dpStatusNetworkInterfaceStatusTxDrops2
         OID: 1.3.6.1.4.1.14685.3.1.124.1.26
         metric_type: monotonic_count
         description: Number of transmitted packets dropped
         unit: "{packet}"
+        family: "Network/Interfaces/Drops"
     metric_tags:
       - symbol:
           name: ibm.dpStatusNetworkInterfaceStatusInterfaceType

@@ -18,12 +18,14 @@ metrics:
       OID: 1.3.6.1.4.1.13742.3.1.1.0
       description: Memory usage
       unit: "%"
+    family: "System/Memory"
   - MIB: RemoteKVMDevice-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.13742.3.1.2.0
       description: CPU usage
       unit: "%"
+    family: "System/CPU"
   - MIB: RemoteKVMDevice-MIB
     table:
       name: systemPowerSupplyTable
@@ -41,6 +43,7 @@ metrics:
         mapping:
           1: 'true'
           2: 'false'
+    family: "System/PowerSupply"
   - MIB: RemoteKVMDevice-MIB
     table:
       name: portDataTable
@@ -68,3 +71,4 @@ metrics:
           2: available
           3: connected
           4: busy
+    family: "Network/Interfaces"

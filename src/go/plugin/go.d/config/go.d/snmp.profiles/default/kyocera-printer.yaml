@@ -20,6 +20,7 @@ metrics:
         name: kcprtAlertStateCode
         description: "Alert state code"
         unit: "TBD"
+        family: "Printer/Alerts"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.1347.43.18.2.1.2
@@ -34,10 +35,12 @@ metrics:
         name: kcprtMemoryDeviceTotalSize
         description: "Total size of the memory device"
         unit: "By"
+        family: "Printer/Memory"
       - OID: 1.3.6.1.4.1.1347.43.20.1.1.5
         name: kcprtMemoryDeviceUsedSize
         description: "Used size of the memory device"
         unit: "By"
+        family: "Printer/Memory"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.1347.43.20.1.1.2

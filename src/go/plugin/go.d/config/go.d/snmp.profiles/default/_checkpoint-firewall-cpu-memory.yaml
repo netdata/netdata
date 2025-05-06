@@ -19,6 +19,7 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.5
       name: multiProcTable
+    family: "CPU"
     # Memory
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -28,6 +29,7 @@ metrics:
       name: memory.total
       description: "Total real memory"
       unit: "By"
+    family: "Memory"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
@@ -36,3 +38,4 @@ metrics:
       name: memory.used
       description: "Active real memory"
       unit: "By"
+    family: "Memory"

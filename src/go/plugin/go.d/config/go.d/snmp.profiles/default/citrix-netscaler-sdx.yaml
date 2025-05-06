@@ -36,6 +36,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.2.1000.1.1.7
           name: netscaler.sdx.hardwareResourceStatus
         tag: netscaler_sdx_hardware_resource_status
+    family: "Hardware/Resources"
   - MIB: SDX-ROOT-MIB
     table:
       name: softwareResourceTable
@@ -54,6 +55,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.2.1000.2.1.7
           name: netscaler.sdx.softwareResourceStatus
         tag: netscaler_sdx_software_resource_status
+    family: "Software/Resources"
   - MIB: SDX-ROOT-MIB
     table:
       name: srTable
@@ -80,6 +82,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.2.1000.4.1.7
           name: netscaler.sdx.srStatus
         tag: netscaler_sdx_sr_status
+    family: "Storage/Repositories"
   - MIB: SDX-ROOT-MIB
     table:
       name: interfaceTable
@@ -122,6 +125,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.2.1000.5.1.4
           name: netscaler.sdx.interfaceState
         tag: netscaler_sdx_interface_state
+    family: "Network/Interfaces"
   - MIB: SDX-ROOT-MIB
     table:
       name: healthMonitoringTable
@@ -144,6 +148,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.2.1000.6.1.4
           name: netscaler.sdx.hmStatus
         tag: netscaler_sdx_hm_status
+    family: "Health/Monitoring"
   - MIB: SDX-ROOT-MIB
     table:
       name: xenTable
@@ -179,6 +184,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.3.1.1.6
           name: netscaler.sdx.xenUuid
         tag: netscaler_sdx_xen_uuid
+    family: "Virtualization/Xen"
   - MIB: SDX-ROOT-MIB
     table:
       name: netscalerTable
@@ -321,6 +327,7 @@ metrics:
           OID: 1.3.6.1.4.1.5951.6.3.2.1.45
           name: netscaler.sdx.nsHaSync
         tag: netscaler_sdx_ns_ha_sync
+    family: "Network/Interfaces/NetScaler"
 metric_tags:
   - OID: 1.3.6.1.4.1.5951.6.2.2.0
     symbol: systemProduct

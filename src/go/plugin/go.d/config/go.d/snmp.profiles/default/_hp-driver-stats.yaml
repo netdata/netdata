@@ -10,34 +10,42 @@ metrics:
         name: cpqDaPhyDrvUsedReallocs
         description: Number of sectors of the reallocation area that have been used by the physical drive
         unit: "{sector}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.9
         name: cpqDaPhyDrvRefHours
         description: Total number of hours that a physical drive has been in operation since it was stamped
         unit: "h"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.16
         name: cpqDaPhyDrvHardReadErrs
         description: Number of read errors that could not be recovered by a physical drive's ECC algorithm or retries
         unit: "{error}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.17
         name: cpqDaPhyDrvRecvReadErrs
         description: Number of read errors corrected through physical drive retries
         unit: "{error}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.18
         name: cpqDaPhyDrvHardWriteErrs
         description: Number of write errors that could not be recovered by a physical drive
         unit: "{error}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.19
         name: cpqDaPhyDrvRecvWriteErrs
         description: Number of write errors corrected through physical drive retries or recovered by a physical drive
         unit: "{error}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.20
         name: cpqDaPhyDrvHSeekErrs
         description: Total number of times the physical disk drive detected a seek error (high)
         unit: "{error}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.21
         name: cpqDaPhyDrvSeekErrs
         description: Total number of times the physical disk drive detected a seek error (low)
         unit: "{error}"
+        family: "DriveArray/PhysicalDrive"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.3.2.5.1.1.1
@@ -56,26 +64,32 @@ metrics:
         name: cpqDaPhyDrvStatus
         description: Status of the physical drive
         unit: "TBD"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.7
         name: cpqDaPhyDrvFactReallocs
         description: Number of spare sectors available for remapping at the time the physical drive was shipped
         unit: "{sector}"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.22
         name: cpqDaPhyDrvSpinupTime
         description: Time it takes for a physical drive to spin up to full speed in tenths of seconds
         unit: "ds"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.45
         name: cpqDaPhyDrvSize
         description: Size of the physical drive in megabytes
         unit: "MBy"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.57
         name: cpqDaPhyDrvSmartStatus
         description: S.M.A.R.T status of the physical drive
         unit: "TBD"
+        family: "DriveArray/PhysicalDrive"
       - OID: 1.3.6.1.4.1.232.3.2.5.1.1.70
         name: cpqDaPhyDrvCurrentTemperature
         description: Temperature of the physical drive in degrees Celsius
         unit: "Cel"
+        family: "DriveArray/PhysicalDrive"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.3.2.5.1.1.1

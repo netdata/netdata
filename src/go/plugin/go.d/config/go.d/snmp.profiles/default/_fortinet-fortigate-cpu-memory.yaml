@@ -10,6 +10,7 @@ metrics:
       name: cpu.usage
       description: Current CPU usage (percentage)
       unit: "%"
+      family: "System/CPU"
 
 
   ### Memory
@@ -21,3 +22,4 @@ metrics:
       name: memory.usage
       description: Current memory utilization (percentage)
       unit: "%"
+      family: "System/Memory"

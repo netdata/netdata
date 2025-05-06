@@ -63,6 +63,7 @@ metrics:
       name: sysStatMemoryTotal
     description: The total memory available in bytes for TMM (Traffic Management Module)
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -70,6 +71,7 @@ metrics:
       name: sysStatMemoryUsed
     description: The memory in use in bytes for TMM (Traffic Management Module)
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -77,6 +79,7 @@ metrics:
       name: sysGlobalTmmStatMemoryTotal
     description: The total memory available in bytes for TMM (Traffic Management Module)
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -84,6 +87,7 @@ metrics:
       name: sysGlobalTmmStatMemoryUsed
     description: The memory in use in bytes for TMM (Traffic Management Module)
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -91,6 +95,7 @@ metrics:
       name: sysGlobalHostOtherMemoryTotal
     description: The total other non-TMM memory in bytes for the system
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -98,6 +103,7 @@ metrics:
       name: sysGlobalHostOtherMemoryUsed
     description: The other non-TMM memory in bytes currently in use for the system
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -105,6 +111,7 @@ metrics:
       name: sysGlobalHostSwapTotal
     description: The total swap in bytes for the system
     unit: "By"
+    family: "System/Memory"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -112,6 +119,7 @@ metrics:
       name: sysGlobalHostSwapUsed
     description: The swap in bytes currently in use for the system
     unit: "By"
+    family: "System/Memory"
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
@@ -128,6 +136,7 @@ metrics:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
           name: sysMultiHostCpuId
         tag: cpu
+    family: "System/CPU"
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.1.7.5.2
@@ -167,6 +176,7 @@ metrics:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
           name: sysMultiHostCpuId
         tag: cpu
+    family: "System/CPU"
 
   # TCP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
@@ -175,24 +185,28 @@ metrics:
       name: sysTcpStatOpen
     description: The number of current open connections
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.3.0
       name: sysTcpStatCloseWait
     description: The number of current connections in CLOSE-WAIT/LAST-ACK
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.4.0
       name: sysTcpStatFinWait
     description: The number of current connections in FIN-WAIT/CLOSING
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.12.5.0
       name: sysTcpStatTimeWait
     description: The number of current connections in TIME-WAIT
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -200,6 +214,7 @@ metrics:
       name: sysTcpStatAccepts
     description: The number of connections accepted
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -207,6 +222,7 @@ metrics:
       name: sysTcpStatAcceptfails
     description: The number of connections not accepted
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -214,6 +230,7 @@ metrics:
       name: sysTcpStatConnects
     description: The number of connections established
     unit: "{connection}"
+    family: "Network/TCP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -221,6 +238,7 @@ metrics:
       name: sysTcpStatConnfails
     description: The number of connections failures
     unit: "{connection}"
+    family: "Network/TCP"
   # UDP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
@@ -228,6 +246,7 @@ metrics:
       name: sysUdpStatOpen
     description: The number of current open connections
     unit: "{connection}"
+    family: "Network/UDP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -235,6 +254,7 @@ metrics:
       name: sysUdpStatAccepts
     description: The number of connections accepted
     unit: "{connection}"
+    family: "Network/UDP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -242,6 +262,7 @@ metrics:
       name: sysUdpStatAcceptfails
     description: The number of connections not accepted
     unit: "{connection}"
+    family: "Network/UDP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -249,6 +270,7 @@ metrics:
       name: sysUdpStatConnects
     description: The number of connections established
     unit: "{connection}"
+    family: "Network/UDP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -256,12 +278,14 @@ metrics:
       name: sysUdpStatConnfails
     description: The number of connections failures
     unit: "{connection}"
+    family: "Network/UDP"
   - MIB: F5-BIGIP-SYSTEM-MIB
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.9.2.0
       name: sysClientsslStatCurConns
     description: The current number of concurrent connections with established SSL sessions being maintained by the filter
     unit: "{connection}"
+    family: "Network/SSL/Client"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -269,6 +293,7 @@ metrics:
       name: sysClientsslStatEncryptedBytesIn
     description: The total encrypted bytes received
     unit: "By"
+    family: "Network/SSL/Client"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -276,6 +301,7 @@ metrics:
       name: sysClientsslStatEncryptedBytesOut
     description: The total encrypted bytes sent
     unit: "By"
+    family: "Network/SSL/Client"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -283,6 +309,7 @@ metrics:
       name: sysClientsslStatDecryptedBytesIn
     description: The total decrypted bytes received
     unit: "By"
+    family: "Network/SSL/Client"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -290,6 +317,7 @@ metrics:
       name: sysClientsslStatDecryptedBytesOut
     description: The total decrypted bytes sent
     unit: "By"
+    family: "Network/SSL/Client"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: monotonic_count
     symbol:
@@ -297,6 +325,7 @@ metrics:
       name: sysClientsslStatHandshakeFailures
     description: The total number of handshake failures
     unit: "{connection}"
+    family: "Network/SSL/Client"
 
   # Metrics from F5-BIGIP-LOCAL-MIB provide monitoring information about virtual servers, nodes, and pools.
   # These concepts are related to the LTM (Local Traffic Management) features of BIG IP devices.
@@ -313,6 +342,7 @@ metrics:
       name: ltmVirtualServNumber
     description: The number of ltmVirtualServ entries in the table
     unit: "{virtual_server}"
+    family: "LTM/VirtualServers"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -333,6 +363,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.1
           name: ltmVirtualServName
+    family: "LTM/VirtualServers"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -360,6 +391,8 @@ metrics:
           1: enabled
           2: disabled
           3: disabledbyparent
+    family: "LTM/VirtualServers"
+
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.10.2.3
@@ -412,6 +445,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.1
           name: ltmVirtualServStatName
+    family: "LTM/VirtualServers"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -444,6 +478,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.10.2.3.1.1
           name: ltmVirtualServStatName
+    family: "LTM/VirtualServers"
 
   # Nodes.
 
@@ -453,6 +488,7 @@ metrics:
       name: ltmNodeAddrNumber
     description: The number of ltmNodeAddr entries in the table
     unit: "{node}"
+    family: "LTM/Nodes"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -489,6 +525,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
           name: ltmNodeAddrName
+    family: "LTM/Nodes"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -544,6 +581,7 @@ metrics:
           27: fqdn_down
           28: fqdn_up
           29: fqdn_up_no_address
+    family: "LTM/Nodes"
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.4.2.3
@@ -588,6 +626,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.20
           name: ltmNodeAddrStatNodeName
+    family: "LTM/Nodes"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -608,6 +647,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.4.2.3.1.20
           name: ltmNodeAddrStatNodeName
+    family: "LTM/Nodes"
 
   # Pools.
 
@@ -617,6 +657,7 @@ metrics:
       name: ltmPoolNumber
     description: The number of ltmPool entries in the table
     unit: "{pool}"
+    family: "LTM/Pools"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -641,6 +682,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.1.2.1.1
           name: ltmPoolName
+    family: "LTM/Pools"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -686,6 +728,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.1
           name: ltmPoolStatName
+    family: "LTM/Pools"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -710,6 +753,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.2.3.1.1
           name: ltmPoolStatName
+    family: "LTM/Pools"
 
   # Pool members.
 
@@ -719,6 +763,7 @@ metrics:
       name: ltmPoolMemberNumber
     description: The number of ltmPoolMember entries in the table
     unit: "{member}"
+    family: "LTM/PoolMembers"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -759,6 +804,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
           name: ltmPoolMemberNodeName
+    family: "LTM/PoolMembers"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -793,6 +839,7 @@ metrics:
           23: inband_down
           24: down_manual_resume
           25: disabled
+    family: "LTM/PoolMembers"
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.5.4.3
@@ -849,6 +896,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
           name: ltmPoolMemberStatNodeName
+    family: "LTM/PoolMembers"
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -877,3 +925,4 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.3375.2.2.5.4.3.1.28
           name: ltmPoolMemberStatNodeName
+    family: "LTM/PoolMembers"

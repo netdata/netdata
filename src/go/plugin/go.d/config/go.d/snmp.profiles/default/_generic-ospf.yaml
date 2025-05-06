@@ -8,14 +8,17 @@ metrics:
         name: ospfNbrState
         description: The state of the relationship with this neighbor
         unit: "{neighbor}"
+        family: "Network/OSPF/Neighbors"
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
         description: The number of times this neighbor relationship has changed state or an error has occurred
         unit: "{change}"
+        family: "Network/OSPF/Neighbors"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
         description: The current length of the retransmission queue
         unit: "{retransmission_queue}"
+        family: "Network/OSPF/Neighbors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -45,6 +48,7 @@ metrics:
     symbols:
       - name: ospfNbr
         constant_value_one: true
+        family: "Network/OSPF/Neighbors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -76,14 +80,17 @@ metrics:
         name: ospfVirtNbrState
         description: The state of the virtual neighbor relationship
         unit: "{virtual_neighbor}"
+        family: "Network/OSPF/VirtualNeighbors"
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
         description: The number of times this virtual link has changed its state or an error has occurred
         unit: "{change}"
+        family: "Network/OSPF/VirtualNeighbors"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
         description: The current length of the retransmission queue
         unit: "{retransmission_queue}"
+        family: "Network/OSPF/VirtualNeighbors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -113,6 +120,7 @@ metrics:
     symbols:
       - name: ospfVirtNbr
         constant_value_one: true
+        family: "Network/OSPF/VirtualNeighbors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -144,14 +152,17 @@ metrics:
         name: ospfIfRetransInterval
         description: The number of seconds between link state advertisement retransmissions for adjacencies belonging to this interface
         unit: "s"
+        family: "Network/OSPF/Interfaces"
       - OID: 1.3.6.1.2.1.14.7.1.12
         name: ospfIfState
         description: The OSPF Interface State
         unit: "{interface_state}"
+        family: "Network/OSPF/Interfaces"
       - OID: 1.3.6.1.2.1.14.7.1.21
         name: ospfIfLsaCount
         description: The total number of link-local link state advertisements in this interface's link-local link state database
         unit: "{link_state_advertisement}"
+        family: "Network/OSPF/Interfaces"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -182,6 +193,7 @@ metrics:
     symbols:
       - name: ospfIf
         constant_value_one: true
+        family: "Network/OSPF/Interfaces"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -214,14 +226,17 @@ metrics:
         name: ospfVirtIfRetransInterval
         description: The number of seconds between link state advertisement retransmissions for adjacencies belonging to this virtual interface
         unit: "s"
+        family: "Network/OSPF/VirtualInterfaces"
       - OID: 1.3.6.1.2.1.14.9.1.7
         name: ospfVirtIfState
         description: OSPF virtual interface states
         unit: "{virtual_interface_state}"
+        family: "Network/OSPF/VirtualInterfaces"
       - OID: 1.3.6.1.2.1.14.9.1.12
         name: ospfVirtIfLsaCount
         description: The total number of link-local link state advertisements in this virtual interface's link-local link state database
         unit: "{link_state_advertisement}"
+        family: "Network/OSPF/VirtualInterfaces"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
@@ -243,6 +258,7 @@ metrics:
     symbols:
       - name: ospfVirtIf
         constant_value_one: true
+        family: "Network/OSPF/VirtualInterfaces"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2

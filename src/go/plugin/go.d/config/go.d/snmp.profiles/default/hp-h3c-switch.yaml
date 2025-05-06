@@ -21,6 +21,7 @@ metrics:
         name: hh3cProcessUtil5Min
         description: "General idea of how busy a process caused the processor to be over a 5 minute period"
         unit: "%"
+        family: "System/Processes/CPU"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.25506.2.6.1.4.1.1.1
@@ -39,6 +40,7 @@ metrics:
         name: cpu.usage
         description: "Cpu usage for this entity"
         unit: "%"
+        family: "System/Entity/CPU"
     metric_tags:
       - MIB: HH3C-ENTITY-EXT-MIB
         symbol:
@@ -63,6 +65,7 @@ metrics:
         name: memory.usage
         description: "Memory usage for the entity"
         unit: "%"
+        family: "System/Entity/Memory"
     metric_tags:
       - MIB: HH3C-ENTITY-EXT-MIB
         symbol:

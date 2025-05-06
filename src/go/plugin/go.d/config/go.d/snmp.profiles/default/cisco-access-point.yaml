@@ -20,14 +20,17 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.1
         description: "Number of wireless clients currently associating with this device on this interface."
         unit: "{wireless_client}"
+        family: "Network/Wireless/Clients"
       - name: cDot11ActiveBridges
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.2
         description: "Number of bridges currently associating with this device on this interface."
         unit: "{bridge}"
+        family: "Network/Wireless/Bridges"
       - name: cDot11ActiveRepeaters
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.3
         description: "Number of repeaters currently associating with this device on this interface."
         unit: "{repeater}"
+        family: "Network/Wireless/Repeaters"
     metric_tags:
       - tag: if_name
         symbol:
@@ -43,31 +46,37 @@ metrics:
         metric_type: monotonic_count
         description: "Number of stations associated with this device on this interface since device re-started."
         unit: "{station}"
+        family: "Network/Wireless/Stations"
       - name: cDot11AssStatsAuthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.2
         metric_type: monotonic_count
         description: "Number of stations authenticated with this device on this interface since device re-started."
         unit: "{station}"
+        family: "Network/Wireless/Stations"
       - name: cDot11AssStatsRoamedIn
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.3
         metric_type: monotonic_count
         description: "Number of stations roamed from another device to this device on this interface since device re-started."
         unit: "{station}"
+        family: "Network/Wireless/Stations"
       - name: cDot11AssStatsRoamedAway
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.4
         metric_type: monotonic_count
         description: "Number of stations roamed away from this device on this interface since device re-started."
         unit: "{station}"
+        family: "Network/Wireless/Stations"
       - name: cDot11AssStatsDeauthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.5
         metric_type: monotonic_count
         description: "Number of stations deauthenticated with this device on this interface since device re-started."
         unit: "{station}"
+        family: "Network/Wireless/Stations"
       - name: cDot11AssStatsDisassociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.6
         metric_type: monotonic_count
         description: "Number of stations disassociated with this device on this interface since device re-started."
         unit: "{station}"
+        family: "Network/Wireless/Stations"
     metric_tags:
       - tag: if_name
         symbol:

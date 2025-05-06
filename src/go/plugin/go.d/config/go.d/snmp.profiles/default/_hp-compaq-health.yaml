@@ -12,6 +12,7 @@ metrics:
       name: cpqHeSysUtilLifeTime
     description: Total time the system has been in full operation in minutes
     unit: "min"
+    family: "System/Utilization"
 
     # EISA bus utilization as percentage of theoretical maximum during last minute.
   - MIB: CPQHLTH-MIB
@@ -20,6 +21,7 @@ metrics:
       name: cpqHeSysUtilEisaBusMin
     description: EISA bus utilization as a percentage of the theoretical maximum during the last minute
     unit: "%"
+    family: "System/Utilization"
 
   # Critical errors.
 
@@ -31,6 +33,7 @@ metrics:
       name: cpqHeCritLogCondition
     description: Overall condition of the critical error log feature
     unit: "{instance}"
+    family: "System/CriticalErrors"
 
   # Correctable memory errors tracking.
 
@@ -42,6 +45,7 @@ metrics:
       name: cpqHeCorrMemLogStatus
     description: Overall status of the correctable memory error log feature
     unit: "{instance}"
+    family: "Memory/CorrectableErrors"
 
     # Overall condition of the correctable memory error log feature.
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -51,6 +55,7 @@ metrics:
       name: cpqHeCorrMemLogCondition
     description: Overall condition of the correctable memory error log feature
     unit: "{instance}"
+    family: "Memory/CorrectableErrors"
 
     # Number of correctable memory errors that have occurred.
   - MIB: CPQHLTH-MIB
@@ -60,6 +65,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of correctable memory errors that have occurred
     unit: "{error}"
+    family: "Memory/CorrectableErrors"
 
   # ASR (Automatic Server Recovery)
 
@@ -71,6 +77,7 @@ metrics:
       name: cpqHeAsrStatus
     description: Overall status of the ASR feature
     unit: "{instance}"
+    family: "System/ASR"
 
     # Whether the ASR timer passed the server Power-On Self-Test (POST).
     # NOTE: other(1), failed(2), ok(3)
@@ -80,6 +87,7 @@ metrics:
       name: cpqHeAsrPost
     description: Whether the ASR timer passed the server Power-On Self-Test
     unit: "{instance}"
+    family: "System/ASR"
 
     # Number of ASR reboots that occurred on the server since last manual reboot.
     # NOTE: -1 if not supported.
@@ -90,6 +98,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of ASR reboots that have occurred on the server since last manual reboot
     unit: "{reboot}"
+    family: "System/ASR"
 
     # Overall condition of the ASR feature.
     # NOTE: other(1), notAvailable(2), disabled(3), enabled(4)
@@ -99,6 +108,7 @@ metrics:
       name: cpqHeAsrCondition
     description: Overall condition of the ASR feature
     unit: "{instance}"
+    family: "System/ASR"
 
     # Status of the ASR network access feature.
     # NOTE: other(1), disabled(2), enabled(3)
@@ -108,6 +118,7 @@ metrics:
       name: cpqHeAsrNetworkAccessStatus
     description: Status of the ASR network access feature
     unit: "{instance}"
+    family: "System/ASR"
 
   # Temperature and fans.
 
@@ -119,6 +130,7 @@ metrics:
       name: cpqHeThermalTempStatus
     description: Status of the system's temperature sensors
     unit: "{instance}"
+    family: "System/Thermal"
 
     # Status of fan(s).
     # NOTE: other(1), ok(2), degraded(3), failed(4)
@@ -128,6 +140,7 @@ metrics:
       name: cpqHeThermalSystemFanStatus
     description: Status of the fan(s) in the system
     unit: "{instance}"
+    family: "System/Thermal/Fans"
 
     # Status of processor fan(s).
     # NOTE: other(1), ok(2), failed(4)
@@ -137,6 +150,7 @@ metrics:
       name: cpqHeThermalCpuFanStatus
     description: Status of the processor fan(s) in the system
     unit: "{instance}"
+    family: "System/Thermal/Fans"
 
     # Temperator sensors.
   - MIB: CPQHLTH-MIB
@@ -148,11 +162,13 @@ metrics:
         name: cpqHeTemperatureCelsius
         description: Current temperature sensor reading in degrees celsius
         unit: "Cel"
+        family: "System/Thermal/TemperatureSensors"
         # NOTE: other(1), ok(2), degraded(3), failed(4)
       - OID: 1.3.6.1.4.1.232.6.2.6.8.1.6
         name: cpqHeTemperatureCondition
         description: Temperature sensor condition
         unit: "{instance}"
+        family: "System/Thermal/TemperatureSensors"
     metric_tags:
       - tag: temperature_index
         symbol:
@@ -168,6 +184,7 @@ metrics:
       name: cpqHePowerMeterCurrReading
     description: Current power meter reading in watts
     unit: "W"
+    family: "Power/PowerMeter"
 
     # A table of battery entries.
   - MIB: CPQHLTH-MIB
@@ -180,11 +197,13 @@ metrics:
         name: cpqHeSysBatteryCondition
         description: Overall condition of the battery
         unit: "{instance}"
+        family: "Power/Battery"
         # NOTE: 15 different statuses are possible -- not listed here, see MIB.
       - OID: 1.3.6.1.4.1.232.6.2.17.2.1.5
         name: cpqHeSysBatteryStatus
         description: Status of the battery
         unit: "{instance}"
+        family: "Power/Battery"
     metric_tags:
       - tag: battery_index
         symbol:
@@ -199,6 +218,8 @@ metrics:
       name: cpqHeThermalCondition
     description: Overall condition of the system's thermal environment
     unit: "{instance}"
+    family: "System/Thermal"
+
     # NOTE: other(1), notSupported(2), notInstalled(3), installed(4)
   - MIB: CPQHLTH-MIB
     symbol:
@@ -206,6 +227,7 @@ metrics:
       name: cpqHeFltTolPwrSupplyStatus
     description: Status of the fault tolerant power supply
     unit: "{instance}"
+    family: "Power/FaultTolerantPowerSupply"
 
   - MIB: CPQHLTH-MIB
     table:
@@ -216,6 +238,7 @@ metrics:
         name: cpqHeResMem2ModuleCondition
         description: Current status of the correctable memory errors for this memory module
         unit: "{instance}"
+        family: "Memory/CorrectableErrors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.14.13.1.15
@@ -232,6 +255,7 @@ metrics:
         name: cpqHeFltTolPowerSupplyStatus
         description: Status of the fault tolerant power supply
         unit: "{instance}"
+        family: "Power/FaultTolerantPowerSupply"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
@@ -249,10 +273,12 @@ metrics:
         name: cpqHeFltTolPowerSupplyCapacityUsed
         description: Currently used capacity of the power supply in watts
         unit: "W"
+        family: "Power/FaultTolerantPowerSupply"
       - OID: 1.3.6.1.4.1.232.6.2.9.3.1.8
         name: cpqHeFltTolPowerSupplyCapacityMaximum
         description: Maximum capacity of the power supply in watts
         unit: "W"
+        family: "Power/FaultTolerantPowerSupply"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.5

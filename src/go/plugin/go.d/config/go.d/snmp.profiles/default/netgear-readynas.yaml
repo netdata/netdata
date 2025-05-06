@@ -24,14 +24,17 @@ metrics:
         name: netgear.readynasos.ataError
         description: Ata error count
         unit: "{error}"
+        family: "Network/Interfaces/Disk"
       - OID: 1.3.6.1.4.1.4526.22.3.1.7
         name: netgear.readynasos.diskCapacity
         description: Disk capacity
         unit: "By"
+        family: "Network/Interfaces/Disk"
       - OID: 1.3.6.1.4.1.4526.22.3.1.10
         name: netgear.readynasos.diskTemperature
         description: Disk temperature
         unit: "Cel"
+        family: "Network/Interfaces/Disk"
     metric_tags:
       - tag: netgear_readynasos_disk_id
         symbol:
@@ -70,10 +73,12 @@ metrics:
         name: netgear.readynasos.fanRPM
         description: Fan revolutions per minute
         unit: "1.min"
+        family: "Network/Interfaces/Fan"
       - OID: 1.3.6.1.4.1.4526.22.4.1.3
         name: netgear.readynasos.fanStatus
         description: Fan status
         unit: "TBD"
+        family: "Network/Interfaces/Fan"
     metric_tags:
       - tag: netgear_readynasos_fan_type
         symbol:
@@ -88,14 +93,17 @@ metrics:
         name: netgear.readynasos.temperatureValue
         description: Temperature value
         unit: "Cel"
+        family: "Network/Interfaces/Temperature"
       - OID: 1.3.6.1.4.1.4526.22.5.1.4
         name: netgear.readynasos.temperatureMin
         description: Minimum temperature
         unit: "Cel"
+        family: "Network/Interfaces/Temperature"
       - OID: 1.3.6.1.4.1.4526.22.5.1.5
         name: netgear.readynasos.temperatureMax
         description: Maximum temperature
         unit: "Cel"
+        family: "Network/Interfaces/Temperature"
     metric_tags:
       - tag: netgear_readynasos_temperature_type
         symbol:
@@ -110,14 +118,17 @@ metrics:
         name: netgear.readynasos.volumeRAIDLevel
         description: Volume RAID level
         unit: "TBD"
+        family: "Network/Interfaces/Volume"
       - OID: 1.3.6.1.4.1.4526.22.7.1.5
         name: netgear.readynasos.volumeSize
         description: Volume size
         unit: "By"
+        family: "Network/Interfaces/Volume"
       - OID: 1.3.6.1.4.1.4526.22.7.1.6
         name: netgear.readynasos.volumeFreeSpace
         description: Volume free space
         unit: "By"
+        family: "Network/Interfaces/Volume"
     metric_tags:
       - tag: netgear_readynasos_volume_name
         symbol:
@@ -144,6 +155,7 @@ metrics:
         constant_value_one: true
         description: Power supply unit presence
         unit: "{psu}"
+        family: "Network/Interfaces/PSU"
     metric_tags:
       - tag: netgear_readynasos_psu_desc
         symbol:

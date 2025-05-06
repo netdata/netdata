@@ -11,24 +11,28 @@ metrics:
       name: hsmOperationRequests
     description: Number of operation requests
     unit: "{request}"
+    family: "Network/Interfaces/Chrysalis"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.2.0
       name: hsmOperationErrors
     description: Number of operation errors
     unit: "{error}"
+    family: "Network/Interfaces/Chrysalis"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.3.0
       name: hsmCriticalEvents
     description: Number of critical events
     unit: "{event}"
+    family: "Network/Interfaces/Chrysalis"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.4.0
       name: hsmNonCriticalEvents
     description: Number of non critical events
     unit: "{event}"
+    family: "Network/Interfaces/Chrysalis"
 # TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
 #  - MIB: CHRYSALIS-UTSP-MIB
 #    symbol:
@@ -44,24 +48,28 @@ metrics:
       name: ntlsConnectedClients
     description: Number of connected clients
     unit: "{client}"
+    family: "Network/Interfaces/Chrysalis"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.3.0
       name: ntlsLinks
     description: Number of links
     unit: "{link}"
+    family: "Network/Interfaces/Chrysalis"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.4.0
       name: ntlsSuccessfulClientConnections
     description: Number of successful client connections
     unit: "{connection}"
+    family: "Network/Interfaces/Chrysalis"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.5.0
       name: ntlsFailedClientConnections
     description: Number of failed client connections
     unit: "{connection}"
+    family: "Network/Interfaces/Chrysalis"
 # TODO: sending tags for scalar metric is not supported yet (keep this metric and this)
 # - MIB: CHRYSALIS-UTSP-MIB
 #   OID: 1.3.6.1.4.1.12383.3.1.2.6.0

@@ -36,6 +36,7 @@ metrics:
         constant_value_one: true
         description: "Number of tracked alerts"
         unit: "{alert}"
+        family: "Alerts/Zebra"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10642.10.31.1.2

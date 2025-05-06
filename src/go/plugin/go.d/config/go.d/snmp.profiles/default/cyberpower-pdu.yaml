@@ -21,22 +21,27 @@ metrics:
         name: cyberpower.ePDULoadStatusLoad
         description: "Phase/bank load measured in tenths of Amps"
         unit: "dA"
+        family: "Power/Rack PDU/Load"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.6
         name: cyberpower.ePDULoadStatusVoltage
         description: "Phase/bank voltage measured in tenths of Volts"
         unit: "dV"
+        family: "Power/Rack PDU/Voltage"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.7
         name: cyberpower.ePDULoadStatusActivePower
         description: "Phase/bank active power measured in watts"
         unit: "W"
+        family: "Power/Rack PDU/Active Power"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.8
         name: cyberpower.ePDULoadStatusApparentPower
         description: "Phase/bank apparent power measured in VA"
         unit: "VA"
+        family: "Power/Rack PDU/Apparent Power"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.9
         name: cyberpower.ePDULoadStatusPowerFactor
         description: "Power factor of the output measured in hundredths"
         unit: "%"
+        family: "Power/Rack PDU/Power Factor"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.1
@@ -58,6 +63,7 @@ metrics:
     symbols:
       - name: cyberpower.ePDULoadBankConfig
         constant_value_one: true
+        family: "Power/Rack PDU/Load Bank Config"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1.1.1
@@ -81,10 +87,12 @@ metrics:
         name: cyberpower.ePDUOutletStatusLoad
         description: "Measured Outlet load for an Outlet Monitored Rack PDU in tenths of Amps"
         unit: "A"
+        family: "Power/Rack PDU/Outlet Load"
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.8
         name: cyberpower.ePDUOutletStatusActivePower
         description: "Measured Outlet load for an Outlet Monitored Rack PDU in watts"
         unit: "W"
+        family: "Power/Rack PDU/Outlet Active Power"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.1
@@ -152,6 +160,7 @@ metrics:
     symbols:
       - name: cyberpower.ePDUStatusBank
         constant_value_one: true
+        family: "Power/Rack PDU/Bank Status"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.1
@@ -177,6 +186,7 @@ metrics:
     symbols:
       - name: cyberpower.ePDUStatusPhase
         constant_value_one: true
+        family: "Power/Rack PDU/Phase Status"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.1
@@ -202,6 +212,7 @@ metrics:
     symbols:
       - name: cyberpower.ePDUStatusOutlet
         constant_value_one: true
+        family: "Power/Rack PDU/Outlet Status"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.1
@@ -226,12 +237,14 @@ metrics:
       name: cyberpower.ePDUStatusInputVoltage
       description: "Input voltage in 0.1 Volt"
       unit: "V"
+      family: "Power/Rack PDU/Input"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.8
       name: cyberpower.ePDUStatusInputFrequency
       description: "Input frequency in 0.1 Hertz"
       unit: "Hz"
+      family: "Power/Rack PDU/Input"
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.6.3.4
@@ -241,18 +254,22 @@ metrics:
         name: cyberpower.ePDU2DeviceStatusCurrentLoad
         description: "Power consumption of the Rack PDU load in tenths of amps"
         unit: "A"
+        family: "Power/Rack PDU2/Load"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.6
         name: cyberpower.ePDU2DeviceStatusCurrentPeakLoad
         description: "Peak power consumption of the Rack PDU load in tenths of amps"
         unit: "A"
+        family: "Power/Rack PDU2/Peak Load"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.15
         name: cyberpower.ePDU2DeviceStatusApparentPower
         description: "Apparent power consumption of the Rack PDU load in VoltAmps (VA)"
         unit: "VA"
+        family: "Power/Rack PDU2/Apparent Power"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.16
         name: cyberpower.ePDU2DeviceStatusPowerFactor
         description: "Power factor of the Rack PDU load in hundredths"
         unit: "%"
+        family: "Power/Rack PDU2/Power Factor"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.1
@@ -309,26 +326,32 @@ metrics:
         name: cyberpower.ePDU2PhaseStatusLoad
         description: "Current draw in tenths of Amps of the load on the Rack PDU phase being queried"
         unit: "A"
+        family: "Power/Rack PDU2/Phase Load"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.6
         name: cyberpower.ePDU2PhaseStatusVoltage
         description: "Voltage in Volts of the Rack PDU phase being queried"
         unit: "V"
+        family: "Power/Rack PDU2/Phase Voltage"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.7
         name: cyberpower.ePDU2PhaseStatusPower
         description: "Load power in watts (kW) consumed on the Rack PDU phase being queried"
         unit: "W"
+        family: "Power/Rack PDU2/Phase Power"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.8
         name: cyberpower.ePDU2PhaseStatusApparentPower
         description: "Load apparent power in hundredths of kiloVoltAmps (kVA) consumed on the Rack PDU phase being queried"
         unit: "kVA"
+        family: "Power/Rack PDU2/Phase Apparent Power"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.9
         name: cyberpower.ePDU2PhaseStatusPowerFactor
         description: "Load power factor in hundredths of the Rack PDU phase being queried"
         unit: "%"
+        family: "Power/Rack PDU2/Phase Power Factor"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.10
         name: cyberpower.ePDU2PhaseStatusPeakLoad
         description: "Peak current of the Rack PDU phase load in tenths of Amps"
         unit: "A"
+        family: "Power/Rack PDU2/Phase Peak Load"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.1
@@ -352,10 +375,12 @@ metrics:
         name: cyberpower.ePDU2BankStatusLoad
         description: "Current draw in tenths of Amps of the load on the Rack PDU bank being queried"
         unit: "A"
+        family: "Power/Rack PDU2/Bank Load"
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.6
         name: cyberpower.ePDU2BankStatusPeakLoad
         description: "Peak current of the Rack PDU bank load in tenths of Amps"
         unit: "A"
+        family: "Power/Rack PDU2/Bank Peak Load"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.1
@@ -377,6 +402,7 @@ metrics:
     symbols:
       - name: cyberpower.ePDU2OutletSwitchedStatus
         constant_value_one: true
+        family: "Power/Rack PDU2/Outlet Switched Status"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.1
@@ -399,18 +425,21 @@ metrics:
       name: cyberpower.envirTemperature
       description: "Environment temperature expressed in 1/10 Fahrenheit"
       unit: "degF/10"
+      family: "Environment/Temperature"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.6.0
       name: cyberpower.envirTemperatureCelsius
       description: "Environment temperature expressed in Celsius"
       unit: "Cel"
+      family: "Environment/Temperature"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.3.1.0
       name: cyberpower.envirHumidity
       description: "Environment relative humidity expressed in persentage"
       unit: "%"
+      family: "Environment/Humidity"
 metric_tags:
   - OID: 1.3.6.1.4.1.3808.1.1.3.1.1.0
     symbol: ePDUIdentName

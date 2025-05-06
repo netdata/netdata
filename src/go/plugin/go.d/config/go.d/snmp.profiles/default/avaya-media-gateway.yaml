@@ -16,12 +16,14 @@ metrics:
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.5.10 # genCpuAverageUtilization.10
       description: Current average CPU utilization in percentage
       unit: "%"
+    family: "Generic/CPU"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.10 # genMemUtilizationPercentUsed.10
       description: Percentage of memory used
       unit: "%"
+    family: "Generic/Memory"
   - MIB: AVAYA-ENTITY-MIB
     table:
       name: avEntPhyChFruTable
@@ -54,42 +56,49 @@ metrics:
           6: multiple_fan_fault
           7: bad_expansion_cable
           255: unknown
+    family: "Avaya/Chassis/FRU"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSigDscp
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.2.0
       description: DiffServ code point for signaling traffic on the H.248 link received from the controller
       unit: "1"
+    family: "Network/Interfaces/G700-MG"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.3.0
       description: 802.1 priority for signaling traffic on the H.248 link received from the controller
       unit: "{priority_level}"
+    family: "Network/Interfaces/G700-MG"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSigDscp
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.4.0
       description: DiffServ code point for signaling traffic on the H.248 link locally administered
       unit: "1"
+    family: "Network/Interfaces/G700-MG"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.5.0
       description: 802.1 priority for signaling traffic on the H.248 link locally administered
       unit: "{priority_level}"
+    family: "Network/Interfaces/G700-MG"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgCurrent802Vlan
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.7.0
       description: Current 802.1 VLAN ID in use
       unit: "{vlan_id}"
+    family: "Network/Interfaces/G700-MG"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgH248LinkErrorCode
       OID: 1.3.6.1.4.1.6889.2.9.1.3.4.0
       description: Most recently received H.248 error code affecting the link between media gateway and controller
       unit: "{error_code}"
+    family: "Network/Interfaces/G700-MG"
   - MIB: G700-MG-MIB
     table:
       name: cmgVoipEngineTable
@@ -137,6 +146,7 @@ metrics:
           1: idle
           2: in_use
           3: fault
+    family: "Network/VoIP/G700-MG"
   - MIB: G700-MG-MIB
     table:
       name: cmgVoipDSPCoreTable
@@ -181,6 +191,8 @@ metrics:
           6: error_code6
           7: not_responding
           255: pass
+    family: "Network/VoIP/DSPCore"
+
 metric_tags:
   - OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
     symbol: cmgHWType

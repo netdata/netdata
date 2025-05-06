@@ -16,36 +16,42 @@ metrics:
       name: upsSecondsOnBattery
       description: If the unit is on battery power, the elapsed time since the UPS last switched to battery power, or the time since the network management subsystem was last restarted, whichever is less. Zero shall be returned if the unit is not on battery power.
       unit: "s"
+    family: "Power/UPS/Battery"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.3.0
       name: upsEstimatedMinutesRemaining
       description: An estimate of the time to battery charge depletion under the present load conditions if the utility power is off and remains off, or if it were to be lost and remain off.
       unit: "min"
+    family: "Power/UPS/Battery"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.4.0
       name: upsEstimatedChargeRemaining
       description: An estimate of the battery charge remaining expressed as a percent of full charge.
       unit: "%"
+    family: "Power/UPS/Battery"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.5.0
       name: upsBatteryVoltage
       description: The magnitude of the present battery voltage.
       unit: "V"
+    family: "Power/UPS/Battery"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.6.0
       name: upsBatteryCurrent
       description: The present battery current.
       unit: "A"
+    family: "Power/UPS/Battery"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.7.0
       name: upsBatteryTemperature
       description: The ambient temperature at or near the UPS Battery casing.
       unit: "Cel"
+    family: "Power/UPS/Battery"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.1.0
@@ -53,12 +59,14 @@ metrics:
       description: A count of the number of times the input entered an out-of-tolerance condition as defined by the manufacturer. This count is incremented by one each time the input transitions from zero out-of-tolerance lines to one or more input lines out-of-tolerance.
       unit: "{event}"
     metric_type: monotonic_count
+    family: "Power/UPS/Input"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.2.0
       name: upsInputNumLines
       description: The number of input lines utilized in this device. This variable indicates the number of rows in the input table.
       unit: "{input_line}"
+    family: "Power/UPS/Input"
 #  - MIB: UPS-MIB
 #    symbol:
 #      OID: 1.3.6.1.2.1.33.1.4.1.0
@@ -79,30 +87,35 @@ metrics:
       name: upsOutputFrequency
       description: The present output frequency.
       unit: "Hz"
+    family: "Power/UPS/Output"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.4.3.0
       name: upsOutputNumLines
       description: The number of output lines utilized in this device. This variable indicates the number of rows in the output table.
       unit: "{output_line}"
+    family: "Power/UPS/Output"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.1.0
       name: upsBypassFrequency
       description: The present bypass frequency.
       unit: "Hz"
+    family: "Power/UPS/Bypass"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.2.0
       name: upsBypassNumLines
       description: The number of bypass lines utilized in this device. This entry indicates the number of rows in the bypass table.
       unit: "{bypass_line}"
+    family: "Power/UPS/Bypass"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.6.1.0
       name: upsAlarmsPresent
       description: The present number of active alarm conditions.
       unit: "{alarm}"
+    family: "Power/UPS/Alarm"
 #  - MIB: UPS-MIB
 #    symbol:
 #      OID: 1.3.6.1.2.1.33.1.7.3.0
@@ -122,6 +135,7 @@ metrics:
       name: upsTestStartTime
       description: The value of sysUpTime at the time the test in progress was initiated, or, if no test is in progress, the time the previous test was initiated. If the value of upsTestResultsSummary is noTestsInitiated(6), upsTestStartTime has the value 0.
       unit: "s"
+    family: "Power/UPS/Test"
   - MIB: UPS-MIB
     table:
       OID: 1.3.6.1.2.1.33.1.4.4
@@ -131,18 +145,22 @@ metrics:
         name: upsOutputVoltage
         description: The present output voltage.
         unit: "V"
+        family: "Power/UPS/Output"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.3
         name: upsOutputCurrent
         description: The present output current.
         unit: "A"
+        family: "Power/UPS/Output"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.4
         name: upsOutputPower
         description: The present output true power.
         unit: "W"
+        family: "Power/UPS/Output"
       - OID: 1.3.6.1.2.1.33.1.4.4.1.5
         name: upsOutputPercentLoad
         description: The percentage of the UPS power capacity presently being used on this output line, i.e., the greater of the percent load of true power capacity and the percent load of VA.
         unit: "%"
+        family: "Power/UPS/Output"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.4.4.1.1
@@ -157,18 +175,22 @@ metrics:
         name: upsInputFrequency
         description: The present input frequency.
         unit: "Hz"
+        family: "Power/UPS/Input"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.3
         name: upsInputVoltage
         description: The magnitude of the present input voltage.
         unit: "V"
+        family: "Power/UPS/Input"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.4
         name: upsInputCurrent
         description: The magnitude of the present input current.
         unit: "A"
+        family: "Power/UPS/Input"
       - OID: 1.3.6.1.2.1.33.1.3.3.1.5
         name: upsInputTruePower
         description: The magnitude of the present input true power.
         unit: "W"
+        family: "Power/UPS/Input"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.3.3.1.1
@@ -183,14 +205,17 @@ metrics:
         name: upsBypassVoltage
         description: The present bypass voltage.
         unit: "V"
+        family: "Power/UPS/Bypass"
       - OID: 1.3.6.1.2.1.33.1.5.3.1.3
         name: upsBypassCurrent
         description: The present bypass current.
         unit: "A"
+        family: "Power/UPS/Bypass"
       - OID: 1.3.6.1.2.1.33.1.5.3.1.4
         name: upsBypassPower
         description: The present true power conveyed by the bypass.
         unit: "W"
+        family: "Power/UPS/Bypass"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.5.3.1.1
@@ -205,6 +230,7 @@ metrics:
         name: upsAlarmTime
         description: The value of sysUpTime when the alarm condition was detected. If the alarm condition was detected at the time of agent startup and presumably existed before agent startup, the value of upsAlarmTime shall equal 0.
         unit: "s"
+        family: "Power/UPS/Alarm"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.33.1.6.2.1.2

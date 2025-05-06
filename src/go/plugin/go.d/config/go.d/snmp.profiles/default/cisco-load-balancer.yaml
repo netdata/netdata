@@ -18,41 +18,49 @@ metrics:
         metric_type: monotonic_count
         description: Number of TCP and UDP connections created since SLB was configured
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.7
         name: slbStatsCreatedHCConnections
         metric_type: monotonic_count
         description: Number of connections created by SLB since it was configured
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.8
         name: slbStatsEstablishedConnections
         metric_type: monotonic_count
         description: Number of connections established through SLB
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.9
         name: slbStatsEstablishedHCConnections
         metric_type: monotonic_count
         description: Number of connections established through SLB
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.10
         name: slbStatsDestroyedConnections
         metric_type: monotonic_count
         description: Number of TCP and UDP connections destroyed by SLB
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.11
         name: slbStatsDestroyedHCConnections
         metric_type: monotonic_count
         description: Number of TCP and UDP connections destroyed by SLB
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.12
         name: slbStatsReassignedConnections
         metric_type: monotonic_count
         description: Number of TCP and UDP connections reassigned from one real server to another
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.13
         name: slbStatsReassignedHCConnections
         metric_type: monotonic_count
         description: Number of TCP and UDP connections reassigned from one real server to another
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
     metric_tags:
       - index: 1  # index `slbEntity`
         tag: slb_entity
@@ -66,146 +74,175 @@ metrics:
         name: cslbxStatsCurrConnections
         description: Number of connections currently still open
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.5
         name: cslbxStatsFailedConns
         metric_type: monotonic_count
         description: Number of connections that were load balanced to real servers that then failed to respond
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.7
         name: cslbxStatsL4PolicyConns
         metric_type: monotonic_count
         description: Number of connections made to the virtual servers with only layer 4 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.8
         name: cslbxStatsL7PolicyConns
         metric_type: monotonic_count
         description: Number of connections made to the virtual servers with some layer 7 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.9
         name: cslbxStatsDroppedL4PolicyConns
         metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with only layer 4 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.10
         name: cslbxStatsDroppedL7PolicyConns
         metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with some layer 7 policy
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.11
         name: cslbxStatsFtpConns
         metric_type: monotonic_count
         description: Number of connections made to virtual servers with the FTP service
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.12
         name: cslbxStatsHttpRedirectConns
         metric_type: monotonic_count
         description: Number of connections made to HTTP redirect servers
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.13
         name: cslbxStatsDroppedRedirectConns
         metric_type: monotonic_count
         description: Number of connections dropped by HTTP redirect servers
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.14
         name: cslbxStatsNoMatchPolicyRejects
         metric_type: monotonic_count
         description: Number of connections rejected because they failed to match any configured policy
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.15
         name: cslbxStatsNoCfgPolicyRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the matching virtual server was not configured with any policy
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.16
         name: cslbxStatsNoActiveServerRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the chosen server farm did not have any active servers
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.17
         name: cslbxStatsAclDenyRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the the matching client access list was configured to deny access
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.18
         name: cslbxStatsMaxParseLenRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the length of an HTTP request or response header exceeded the maximum L7 parse length configured for the matching virtual server
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.19
         name: cslbxStatsBadSslFormatRejects
         metric_type: monotonic_count
         description: Number of connections rejected because some invalid or unrecognized SSL format was detected
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.20
         name: cslbxStatsL7ParserErrorRejects
         metric_type: monotonic_count
         description: Number of connections rejected because an error occurred while parsing the connection data at Layer 7
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.21
         name: cslbxStatsVerMismatchRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the Layer 7 configuration was changed while Layer 7 parsing was occurring on the connection
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.22
         name: cslbxStatsOutOfMemoryRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the SLB module could not allocate the required memory
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.23
         name: cslbxStatsTimedOutConnections
         metric_type: monotonic_count
         description: Number of connections that were terminated because they were idle longer than the configured idle timeout value
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.24
         name: cslbxStatsTcpChecksumErrorPkts
         metric_type: monotonic_count
         description: Accumulated number of TCP packets which have checksum error
         unit: "{packet}"
+        family: "Network/LoadBalancer/Packets"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.25
         name: cslbxStatsIpChecksumErrorPkts
         metric_type: monotonic_count
         description: Accumulated number of IP packets which have checksum error
         unit: "{packet}"
+        family: "Network/LoadBalancer/Packets"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.26
         name: cslbxStatsL4PolicyHCConns
         metric_type: monotonic_count
         description: Number of connections made to the virtual servers with only layer 4 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.27
         name: cslbxStatsL7PolicyHCConns
         metric_type: monotonic_count
         description: Number of connections made to the virtual servers with some layer 7 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.28
         name: cslbxStatsDroppedL4PolicyHCConns
         metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with only layer 4 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.29
         name: cslbxStatsDroppedL7PolicyHCConns
         metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with some layer 7 configuration
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.30
         name: cslbxStatsNoMatchPolicyHCRejects
         metric_type: monotonic_count
         description: Number of connections rejected because they failed to match any configured policy
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.31
         name: cslbxStatsNoCfgPolicyHCRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the matching virtual server was not configured with any policy
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.32
         name: cslbxStatsAclDenyHCRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the the matching client access list was configured to deny access
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.33
         name: cslbxStatsVerMismatchHCRejects
         metric_type: monotonic_count
         description: Number of connections rejected because the Layer 7 configuration was changed while Layer 7 parsing was occurring on the connection
         unit: "{connection}"
+        family: "Network/LoadBalancer/Connections"
     metric_tags:
       - index: 1  # index `slbEntity` of `slbStatsTable`
         tag: slb_entity

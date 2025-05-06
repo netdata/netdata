@@ -15,12 +15,14 @@ metrics:
       OID: 1.3.6.1.4.1.1230.2.7.2.5.1.0
     description: Current overall CPU usage in percent
     unit: "%"
+    family: "System/CPU"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.1230.2.7.2.5.15.0
     description: Virtual memory consumption of the main processes divided by RAM + half of SWAP space. Projected to 0-100.
     unit: "%"
+    family: "System/Memory"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stMalwareDetected
@@ -28,6 +30,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of infections detected by the McAfee Gateway Antimalware Engine
     unit: "{infection}"
+    family: "Security/McAfee/Malware"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stConnectionsLegitimate
@@ -35,6 +38,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of connections that not have been blocked
     unit: "{connection}"
+    family: "Security/McAfee/Connections"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stBlockedByAntiMalware
@@ -42,6 +46,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of connections blocked by Anti-Malware
     unit: "{connection}"
+    family: "Security/McAfee/Connections"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stConnectionsBlocked
@@ -49,6 +54,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of blocked connections
     unit: "{connection}"
+    family: "Security/McAfee/Connections"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stBlockedByMediaFilter
@@ -56,6 +62,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of connections that have been blocked by the Media-Type filter
     unit: "{connection}"
+    family: "Security/McAfee/Connections"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stBlockedByURLFilter
@@ -63,6 +70,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of connection that have been blocked by the URL filter
     unit: "{connection}"
+    family: "Security/McAfee/Connections"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stMimeType
@@ -70,6 +78,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of media types detected by the Media Type filter
     unit: "{media_type}"
+    family: "Security/McAfee/Media"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stCategories
@@ -77,6 +86,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of categories detected by the URL filter
     unit: "{category}"
+    family: "Security/McAfee/URLFilter"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpRequests
@@ -84,6 +94,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of HTTP requests
     unit: "{request}"
+    family: "Network/Proxy/HTTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpTraffic
@@ -91,6 +102,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred between proxy and server(s) using the HTTP protocol
     unit: "By"
+    family: "Network/Proxy/HTTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesFromClient
@@ -98,6 +110,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes transferred from client to proxy using the HTTP protocol
     unit: "By"
+    family: "Network/Proxy/HTTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesFromServer
@@ -105,6 +118,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes transferred from server to proxy using the HTTP protocol
     unit: "By"
+    family: "Network/Proxy/HTTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesToClient
@@ -112,6 +126,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes transferred from proxy to client(s) using the HTTP protocol
     unit: "By"
+    family: "Network/Proxy/HTTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpBytesToServer
@@ -119,6 +134,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes transferred from proxy to server(s) using the HTTP protocol
     unit: "By"
+    family: "Network/Proxy/HTTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsRequests
@@ -126,6 +142,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of HTTPS requests
     unit: "{request}"
+    family: "Network/Proxy/HTTPS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsTraffic
@@ -133,6 +150,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred between proxy and server(s) using the HTTPS protocol
     unit: "By"
+    family: "Network/Proxy/HTTPS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesFromClient
@@ -140,6 +158,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from client(s) to proxy using the HTTPS protocol
     unit: "By"
+    family: "Network/Proxy/HTTPS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesFromServer
@@ -147,6 +166,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from server(s) to proxy using the HTTPS protocol
     unit: "By"
+    family: "Network/Proxy/HTTPS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesToClient
@@ -154,6 +174,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from proxy to client(s) and proxy using the HTTPS protocol
     unit: "By"
+    family: "Network/Proxy/HTTPS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stHttpsBytesToServer
@@ -161,6 +182,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from proxy to server(s) and proxy using the HTTPS protocol
     unit: "By"
+    family: "Network/Proxy/HTTPS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpTraffic
@@ -168,6 +190,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes transmitted between proxy and server(s) using the FTP protocol
     unit: "By"
+    family: "Network/Proxy/FTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesFromClient
@@ -175,6 +198,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from proxy to client(s) using the FTP protocol
     unit: "By"
+    family: "Network/Proxy/FTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesFromServer
@@ -182,6 +206,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from server(s) to proxy using the FTP protocol
     unit: "By"
+    family: "Network/Proxy/FTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesToClient
@@ -189,6 +214,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from proxy to client(s) using the FTP protocol
     unit: "By"
+    family: "Network/Proxy/FTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stFtpBytesToServer
@@ -196,6 +222,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of bytes tranferred from proxy to server(s) using the FTP protocol
     unit: "By"
+    family: "Network/Proxy/FTP"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stClientCount
@@ -203,6 +230,7 @@ metrics:
     metric_type: monotonic_count
     description: Currently connected clients
     unit: "{client}"
+    family: "Network/Proxy/Clients"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stConnectedSockets
@@ -210,6 +238,7 @@ metrics:
     metric_type: monotonic_count
     description: Number of open network sockets in use by the proxy
     unit: "{socket}"
+    family: "Network/Proxy/Sockets"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stResolveHostViaDNS
@@ -217,6 +246,7 @@ metrics:
     metric_type: monotonic_count
     description: Time to resolve DNS in ms
     unit: "ms"
+    family: "Network/DNS"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stTimeConsumedByRuleEngine
@@ -224,6 +254,7 @@ metrics:
     metric_type: monotonic_count
     description: Average time used by the rule engine in ms
     unit: "ms"
+    family: "System/RuleEngine"
   - MIB: MCAFEE-MWG-MIB
     symbol:
       name: mcafee.mwg.stTimeForTransaction
@@ -231,6 +262,7 @@ metrics:
     metric_type: monotonic_count
     description: Average time for transaction in ms
     unit: "ms"
+    family: "System/Transaction"
   - MIB: MCAFEE-MWG-MIB
     table:
       name: stCategoriesTable
@@ -241,6 +273,7 @@ metrics:
         metric_type: monotonic_count
         description: Number of times the URL filter detected this category
         unit: "{occurrence}"
+        family: "Security/McAfee/URLFilter"
     metric_tags:
       - symbol:
           name: mcafee.mwg.stCategoryName

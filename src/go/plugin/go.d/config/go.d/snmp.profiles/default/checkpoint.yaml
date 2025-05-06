@@ -77,18 +77,22 @@ metrics:
         name: multiProcUserTime
         description: "Processor user time"
         unit: "{processor}"
+        family: "CPU/Processor"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.3
         name: multiProcSystemTime
         description: "Processor system time"
         unit: "{processor}"
+        family: "CPU/Processor"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.4
         name: multiProcIdleTime
         description: "Processor idle time"
         unit: "{processor}"
+        family: "CPU/Processor"
       - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
         name: multiProcUsage
         description: "Processor usage"
         unit: "%"
+        family: "CPU/Processor"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.5
       name: multiProcTable
@@ -98,6 +102,7 @@ metrics:
       name: procNum
       description: "Number of processors"
       unit: "{processor}"
+      family: "CPU"
     # Memory
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -106,6 +111,7 @@ metrics:
       name: memTotalReal64
       description: "Total real memory"
       unit: "By"
+      family: "Memory"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
@@ -113,6 +119,7 @@ metrics:
       name: memActiveReal64
       description: "Active real memory"
       unit: "By"
+      family: "Memory"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
@@ -120,6 +127,7 @@ metrics:
       name: memFreeReal64
       description: "Free real memory"
       unit: "By"
+      family: "Memory"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
@@ -127,6 +135,7 @@ metrics:
       name: memTotalVirtual64
       description: "Total virtual memory"
       unit: "By"
+      family: "Memory"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
     symbol:
@@ -134,6 +143,7 @@ metrics:
       name: memActiveVirtual64
       description: "Active virtual memory"
       unit: "By"
+      family: "Memory"
     # Disk
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -151,26 +161,32 @@ metrics:
         name: multiDiskSize
         description: "Disk size"
         unit: "GBy"
+        family: "Disk"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
         name: multiDiskUsed
         description: "Disk used"
         unit: "GBy"
+        family: "Disk"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
         name: multiDiskFreeTotalBytes
         description: "Disk free total bytes"
         unit: "By"
+        family: "Disk"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
         name: multiDiskFreeAvailableBytes
         description: "Disk free available bytes"
         unit: "By"
+        family: "Disk"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
         name: multiDiskFreeTotalPercent
         description: "Disk free total percent"
         unit: "%"
+        family: "Disk"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
         name: multiDiskFreeAvailablePercent
         description: "Disk free available percent"
         unit: "%"
+        family: "Disk"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.6
       name: multiDiskTable
@@ -190,10 +206,12 @@ metrics:
         name: fanSpeedSensorValue
         description: "Sensor value"
         unit: "TBD"
+        family: "Appliance/Sensors/FanSpeed"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
         name: fanSpeedSensorStatus
         description: "Sensor is out of range true(1), false(0), reading error(2)"
         unit: "TBD"
+        family: "Appliance/Sensors/FanSpeed"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.8.2
       name: fanSpeedSensorTable
@@ -238,10 +256,12 @@ metrics:
         name: tempertureSensorValue
         description: "Sensor value"
         unit: "TBD"
+        family: "Appliance/Sensors/Temperature"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
         name: tempertureSensorStatus
         description: "Sensor is out of range true(1), false(0), reading error(2)"
         unit: "TBD"
+        family: "Appliance/Sensors/Temperature"
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.8.1
       name: tempertureSensorTable
@@ -253,6 +273,7 @@ metrics:
       name: fwAccepted
       description: "Number of accepted packets"
       unit: "{packet}"
+      family: "Network/Firewall"
   - MIB: CHECKPOINT-MIB
     metric_type: monotonic_count
     symbol:
@@ -260,6 +281,7 @@ metrics:
       name: fwDropped
       description: "Number of dropped packets"
       unit: "{packet}"
+      family: "Network/Firewall"
   - MIB: CHECKPOINT-MIB
     metric_type: monotonic_count
     symbol:
@@ -267,15 +289,18 @@ metrics:
       name: fwRejected
       description: "Number of rejected packets"
       unit: "{packet}"
+      family: "Network/Firewall"
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.25.3.0
       name: fwNumConn
       description: "Number of connections"
       unit: "{connection}"
+      family: "Network/Firewall"
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.25.4.0
       name: fwPeakNumConn
       description: "Peak number of connections"
       unit: "{connection}"
+      family: "Network/Firewall"

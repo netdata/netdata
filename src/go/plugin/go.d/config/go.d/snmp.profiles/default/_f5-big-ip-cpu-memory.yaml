@@ -10,6 +10,7 @@ metrics:
       name: memory.total
     description: The total memory available in bytes for TMM (Traffic Management Module)
     unit: "By"
+    family: "Memory/TMM"
   - MIB: F5-BIGIP-SYSTEM-MIB
     metric_type: gauge
     symbol:
@@ -18,6 +19,7 @@ metrics:
       name: memory.used
     description: The memory in use in bytes for TMM (Traffic Management Module)
     unit: "By"
+    family: "Memory/TMM"
   # CPU
   - MIB: F5-BIGIP-SYSTEM-MIB
     table:
@@ -29,6 +31,7 @@ metrics:
         name: cpu.usage # sysMultiHostCpuUsageRatio1m
         description: This is average usage ratio of CPU for the associated host in the last one minute
         unit: "%"
+        family: "CPU/Usage"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3

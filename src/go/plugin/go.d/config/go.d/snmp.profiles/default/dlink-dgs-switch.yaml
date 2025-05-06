@@ -21,6 +21,7 @@ metrics:
         OID: 1.3.6.1.4.1.171.14.5.1.7.1.3 # dEntityExtCpuUtilOneMinute
         description: Overall CPU busy percentage in the last 1 minute period
         unit: "%"
+        family: "System/CPU"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.171.14.5.1.7.1.1
@@ -43,10 +44,12 @@ metrics:
         OID: 1.3.6.1.4.1.171.14.5.1.4.1.3
         description: Total memory size of the entry
         unit: "By"
+        family: "System/Memory"
       - name: memory.used
         OID: 1.3.6.1.4.1.171.14.5.1.4.1.4
         description: Used memory size of the entry
         unit: "By"
+        family: "System/Memory"
     metric_tags:
       - symbol:
           name: dEntityExtMemUtilUnitId
@@ -69,6 +72,7 @@ metrics:
         OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.4
         description: Current measurement of the testpoint
         unit: "Cel"
+        family: "Environment/Temperature"
     metric_tags:
       - symbol:
           name: dEntityExtEnvTempUnitId
@@ -96,6 +100,7 @@ metrics:
     symbols:
       - name: dlink.dEntityExtEnvFan
         constant_value_one: true
+        family: "Environment/Fans"
     metric_tags:
       - symbol:
           name: dEntityExtEnvFanUnitId
@@ -125,10 +130,12 @@ metrics:
         OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.4
         description: Amount of the power that has been allocated
         unit: "W"
+        family: "Environment/Power"
       - name: dlink.dEntityExtEnvPowerMaxPower
         OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.5
         description: Maximum power which the power module can supply
         unit: "W"
+        family: "Environment/Power"
     metric_tags:
       - symbol:
           name: dEntityExtEnvPowerUnitId
@@ -157,6 +164,7 @@ metrics:
     symbols:
       - name: dlink.dEntityExtEnvAirFlow
         constant_value_one: true
+        family: "Environment/AirFlow"
     metric_tags:
       - symbol:
           name: dEntityExtEnvAirFlowUnitId
@@ -176,6 +184,7 @@ metrics:
     symbols:
       - name: dlink.dEntityExtUnit
         constant_value_one: true
+        family: "System/Units"
     metric_tags:
       - symbol:
           name: dEntityExtUnitIndex

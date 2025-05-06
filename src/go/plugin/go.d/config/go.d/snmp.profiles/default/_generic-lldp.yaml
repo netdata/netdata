@@ -13,6 +13,7 @@ metrics:
         tag: lldp_rem_port_id_subtype
         description: "The type of port identifier encoding used in the associated port identifier object"
         unit: "TBD"
+        family: "Network/Interfaces/LLDP"
         mapping:
           1: interface_alias
           2: port_component
@@ -27,9 +28,11 @@ metrics:
         tag: lldp_rem_port_id
         description: "The string value used to identify the port component associated with the remote system"
         unit: "TBD"
+        family: "Network/Interfaces/LLDP"
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.9
           name: lldpRemSysName
         tag: lldp_rem_sys_name
         description: "The string value used to identify the system name of the remote system"
         unit: "TBD"
+        family: "Network/Interfaces/LLDP"

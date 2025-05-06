@@ -8,6 +8,7 @@ metrics:
         name: sipCommonCfgServiceOperStatus
         description: Current operational state of the SIP application
         unit: "{state}"
+        family: "Network/SIP/Application"
     metric_tags:
       - index: 1
         tag: applIndex
@@ -20,22 +21,27 @@ metrics:
         name: sipCommonSummaryInRequests
         description: Total number of SIP request messages received including retransmissions
         unit: "{request}"
+        family: "Network/SIP/Statistics"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.2
         name: sipCommonSummaryOutRequests
         description: Total number of SIP request messages sent including retransmissions
         unit: "{request}"
+        family: "Network/SIP/Statistics"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.3
         name: sipCommonSummaryInResponses
         description: Total number of SIP response messages received including retransmissions
         unit: "{response}"
+        family: "Network/SIP/Statistics"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.4
         name: sipCommonSummaryOutResponses
         description: Total number of SIP response messages sent including retransmissions
         unit: "{response}"
+        family: "Network/SIP/Statistics"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.5
         name: sipCommonSummaryTotalTransactions
         description: Count of transactions in progress and terminated transactions
         unit: "{transaction}"
+        family: "Network/SIP/Statistics"
     metric_tags:
       - index: 1
         tag: applIndex
@@ -48,10 +54,12 @@ metrics:
         name: sipCommonStatusCodeIns
         description: Total number of response messages received with the specified status code
         unit: "{response}"
+        family: "Network/SIP/StatusCodes"
       - OID: 1.3.6.1.2.1.149.1.5.1.1.4
         name: sipCommonStatusCodeOuts
         description: Total number of response messages sent with the specified status code
         unit: "{response}"
+        family: "Network/SIP/StatusCodes"
     metric_tags:
       - index: 1
         tag: applIndex
@@ -68,6 +76,7 @@ metrics:
         name: sipCommonTransCurrentactions
         description: Number of transactions awaiting definitive response
         unit: "{transaction}"
+        family: "Network/SIP/Transactions"
     metric_tags:
       - index: 1
         tag: applIndex

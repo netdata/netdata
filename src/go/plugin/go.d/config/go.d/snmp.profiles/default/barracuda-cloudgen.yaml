@@ -20,6 +20,7 @@ metrics:
         constant_value_one: true
         description: " "
         unit: "TBD"
+        family: "Firewall/Services"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.0.1.1
@@ -45,6 +46,7 @@ metrics:
       name: phion.vpnUsers
       description: "Number of vpn users"
       unit: "{Session}"
+      family: "VPN/Users"
   - MIB: PHION-MIB
     table:
       OID: 1.3.6.1.4.1.10704.1.12
@@ -55,71 +57,85 @@ metrics:
         metric_type: monotonic_count
         description: "Rate in kbit per second"
         unit: "kbit/s"
+        family: "Network/TrafficShape"
       - OID: 1.3.6.1.4.1.10704.1.12.1.3
         name: phion.trafficShape.sessions
         metric_type: monotonic_count
         description: "Number of sessions"
         unit: "{Session}"
+        family: "Network/TrafficShape"
       - OID: 1.3.6.1.4.1.10704.1.12.1.4
         name: phion.trafficShape.class1Total
         metric_type: monotonic_count
         description: "Total bytes for class1"
         unit: "By"
+        family: "Network/TrafficShape/Class1"
       - OID: 1.3.6.1.4.1.10704.1.12.1.5
         name: phion.trafficShape.class1Pakets
         metric_type: monotonic_count
         description: "Total packets for class1"
         unit: "{packet}"
+        family: "Network/TrafficShape/Class1"
       - OID: 1.3.6.1.4.1.10704.1.12.1.6
         name: phion.trafficShape.class1Drop
         metric_type: monotonic_count
         description: "Dropped packets for class1"
         unit: "{packet}"
+        family: "Network/TrafficShape/Class1"
       - OID: 1.3.6.1.4.1.10704.1.12.1.7
         name: phion.trafficShape.class2Total
         metric_type: monotonic_count
         description: "Total bytes for class2"
         unit: "By"
+        family: "Network/TrafficShape/Class2"
       - OID: 1.3.6.1.4.1.10704.1.12.1.8
         name: phion.trafficShape.class2Pakets
         metric_type: monotonic_count
         description: "Total packets for class2"
         unit: "{packet}"
+        family: "Network/TrafficShape/Class2"
       - OID: 1.3.6.1.4.1.10704.1.12.1.9
         name: phion.trafficShape.class2Drop
         metric_type: monotonic_count
         description: "Dropped packets for class2"
         unit: "{packet}"
+        family: "Network/TrafficShape/Class2"
       - OID: 1.3.6.1.4.1.10704.1.12.1.10
         name: phion.trafficShape.class3Total
         metric_type: monotonic_count
         description: "Total bytes for class3"
         unit: "By"
+        family: "Network/TrafficShape/Class3"
       - OID: 1.3.6.1.4.1.10704.1.12.1.11
         name: phion.trafficShape.class3Pakets
         metric_type: monotonic_count
         description: "Total packets for class3"
         unit: "{packet}"
+        family: "Network/TrafficShape/Class3"
       - OID: 1.3.6.1.4.1.10704.1.12.1.12
         name: phion.trafficShape.class3Drop
         metric_type: monotonic_count
         description: "Dropped packets for class3"
         unit: "{packet}"
+        family: "Network/TrafficShape/Class3"
       - OID: 1.3.6.1.4.1.10704.1.12.1.13
         name: phion.trafficShape.noDelayTotal
         metric_type: monotonic_count
         description: "Total bytes for no delay"
         unit: "By"
+        family: "Network/TrafficShape/NoDelay"
       - OID: 1.3.6.1.4.1.10704.1.12.1.14
         name: phion.trafficShape.noDelayPakets
         metric_type: monotonic_count
         description: "Total packets for no delay"
         unit: "{packet}"
+        family: "Network/TrafficShape/NoDelay"
       - OID: 1.3.6.1.4.1.10704.1.12.1.15
         name: phion.trafficShape.noDelayDrop
         metric_type: monotonic_count
         description: "Dropped packets for no delay"
         unit: "{packet}"
+        family: "Network/TrafficShape/NoDelay"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.12.1.1
@@ -136,6 +152,7 @@ metrics:
         name: phion.hwSensorValue
         description: "Sensor value"
         unit: "1"
+        family: "Hardware/Sensors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.4.1.1
@@ -164,6 +181,7 @@ metrics:
         constant_value_one: true
         description: " "
         unit: "TBD"
+        family: "VPN/Tunnels"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.6.1.1
@@ -190,6 +208,7 @@ metrics:
         constant_value_one: true
         description: " "
         unit: "TBD"
+        family: "Network/BGP"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.7.1.1
@@ -206,6 +225,7 @@ metrics:
         constant_value_one: true
         description: " "
         unit: "TBD"
+        family: "Network/OSPF"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.8.1.1
@@ -240,6 +260,7 @@ metrics:
         constant_value_one: true
         description: " "
         unit: "TBD"
+        family: "Network/RIP"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.9.1.1
@@ -253,19 +274,3 @@ metrics:
         tag: rip_neighbor_state
         description: " "
         unit: "TBD"
-  # - MIB: PHION-MIB # Removed for lack of clarity on how this table is indexed.
-  #   table:
-  #     OID: 1.3.6.1.4.1.10704.1.10
-  #     name: fwStats
-  #   symbols:
-  #     - OID: 1.3.6.1.4.1.10704.1.10.1.1
-  #       name: firewallSessions
-  #     - OID: 1.3.6.1.4.1.10704.1.10.1.2
-  #       name: packetThroughput
-  #     - OID: 1.3.6.1.4.1.10704.1.10.1.3
-  #       name: dataThroughput
-  #   metric_tags:
-  #     - symbol:
-  #         OID: 1.3.6.1.4.1.10704.1.10.1.1
-  #         name: firewallSessions
-  #       tag: firewall_sessions

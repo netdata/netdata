@@ -17,14 +17,17 @@ metrics:
         name: vertiv.internalTemp
         description: Internal temperature measurement
         unit: "Cel"
+        family: "Network/Interfaces/InternalTemperature"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.6
         name: vertiv.internalHumidity
         description: Internal humidity measurement
         unit: "%"
+        family: "Network/Interfaces/InternalHumidity"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.7
         name: vertiv.internalDewPoint
         description: Internal dew point temperature
         unit: "Cel"
+        family: "Network/Interfaces/InternalDewPoint"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.21239.5.1.2.1.2
@@ -56,6 +59,7 @@ metrics:
         name: vertiv.tempSensorTemp
         description: Temperature measured by the temperature sensor
         unit: "Cel"
+        family: "Network/Interfaces/TemperatureSensor"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.21239.5.1.4.1.2

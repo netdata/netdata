@@ -27,6 +27,7 @@ metrics:
         tag: hpe_fibrechannel_conn_unit_sensor_name
         description: Textual identification of the sensor intended primarily for operator use
         unit: "{sensor}"
+        family: "Network/Interfaces/FibreChannel/Sensors"
       - symbol:
           OID: 1.3.6.1.3.94.1.8.1.8
           name: connUnitSensorCharacteristic
@@ -44,6 +45,7 @@ metrics:
           10: door
         description: Characteristics being monitored by this sensor
         unit: "1"
+        family: "Network/Interfaces/FibreChannel/Sensors"
       - symbol:
           OID: 1.3.6.1.3.94.1.8.1.4
           name: connUnitSensorStatus
@@ -56,6 +58,7 @@ metrics:
           5: failed
         description: Status indicated by the sensor
         unit: "{status}"
+        family: "Network/Interfaces/FibreChannel/Sensors"
   - MIB: FCMGMT-MIB
     table:
       OID: 1.3.6.1.3.94.1.10
@@ -90,6 +93,7 @@ metrics:
           19: ssa
         description: Type of the port
         unit: "{port_type}"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.8
           name: connUnitPortTransmitterType
@@ -108,6 +112,7 @@ metrics:
           11: ssa
         description: Technology of the port transceiver
         unit: "{transmitter_type}"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.9
           name: connUnitPortModuleType
@@ -124,24 +129,28 @@ metrics:
           9: small_form_factor
         description: Module type of the port connector
         unit: "{module_type}"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.10
           name: connUnitPortWwn
         tag: hpe_fibrechannel_conn_unit_port_wwn
         description: World Wide Name of the port if applicable
         unit: "{wwn}"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.15
           name: connUnitPortSpeed
         tag: hpe_fibrechannel_conn_unit_port_speed
         description: Speed of the port in kilobytes per second
         unit: "kBy/s"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.17
           name: connUnitPortName
         tag: hpe_fibrechannel_conn_unit_port_name
         description: String describing the addressed port
         unit: "{port}"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.6
           name: connUnitPortState
@@ -154,6 +163,7 @@ metrics:
           5: diagnostics
         description: User selected state of the port hardware
         unit: "{state}"
+        family: "Network/Interfaces/FibreChannel/Ports"
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.7
           name: connUnitPortStatus
@@ -170,6 +180,7 @@ metrics:
           9: ols
         description: Overall protocol status for the port
         unit: "{status}"
+        family: "Network/Interfaces/FibreChannel/Ports"
 metric_tags:
   - tag: hpe_fibrechannel_cpq_si_sys_serial_num
     OID: 1.3.6.1.4.1.232.2.2.2.1

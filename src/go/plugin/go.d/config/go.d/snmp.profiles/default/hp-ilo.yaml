@@ -29,6 +29,7 @@ metrics:
       name: cpqSm2CntlrServerPowerState
     description: Power state of the server
     unit: "{state}"
+    family: "Server/Power"
 
     # Status of battery.
     # NOTE: other(1), batteryOk(2), batteryFailed(3), batteryDisconnected(4)
@@ -38,6 +39,7 @@ metrics:
       name: cpqSm2CntlrBatteryStatus
     description: Status of the battery
     unit: "{state}"
+    family: "Server/Battery"
 
     # Charge level of battery.
   - MIB: CPQSM2-MIB
@@ -46,6 +48,7 @@ metrics:
       name: cpqSm2CntlrBatteryPercentCharged
     description: Charge level of the battery
     unit: "%"
+    family: "Server/Battery"
 
     # A bitmap of self-test errors.
     # NOTE: 0 indicates that no errors have occurred.
@@ -55,6 +58,7 @@ metrics:
       name: cpqSm2CntlrSelfTestErrors
     description: Bitmap of self-test errors
     unit: "{error}"
+    family: "Server/SelfTest"
 
     # Whether a remote session is active.
     # NOTE: other(1), active(2), inactive(3)
@@ -64,6 +68,7 @@ metrics:
       name: cpqSm2CntlrRemoteSessionStatus
     description: Status of remote session activity
     unit: "{state}"
+    family: "Server/RemoteSession"
 
     # Status of the remote interface.
     # NOTE: other(1), ok(2), notResponding(3)
@@ -73,6 +78,7 @@ metrics:
       name: cpqSm2CntlrInterfaceStatus
     description: Status of the remote interface
     unit: "{state}"
+    family: "Server/Interface"
 
   # Event log.
 
@@ -83,6 +89,7 @@ metrics:
       name: cpqSm2EventTotalEntries
     description: Number of entries in the event log
     unit: "{entry}"
+    family: "Server/EventLog"
 
   # Network interfaces and traffic.
 
@@ -96,42 +103,52 @@ metrics:
         name: cpqSm2NicXmitBytes
         description: Number of bytes transmitted by the network interface controller
         unit: "By"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.3
         name: cpqSm2NicXmitTotalPackets
         description: Total number of packets transmitted by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.6
         name: cpqSm2NicXmitDiscardPackets
         description: Total number of discarded packets transmitted by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.7
         name: cpqSm2NicXmitErrorPackets
         description: Total number of error packets transmitted by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.8
         name: cpqSm2NicXmitQueueLength
         description: Number of outstanding packets in the transmit queue
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.9
         name: cpqSm2NicRecvBytes
         description: Number of bytes received by the network interface controller
         unit: "By"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.10
         name: cpqSm2NicRecvTotalPackets
         description: Total number of packets received by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.13
         name: cpqSm2NicRecvDiscardPackets
         description: Total number of discarded packets received by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.14
         name: cpqSm2NicRecvErrorPackets
         description: Total number of error packets received by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.15
         name: cpqSm2NicRecvUnknownPackets
         description: Number of unknown protocol packets received by the network interface controller
         unit: "{packet}"
+        family: "Network/Interfaces"
     metric_type: monotonic_count # Sent as Counter (would be ingested as rates if not forced).
     metric_tags:
         # Location of the controller (embedded controller vs. PC card).
@@ -152,11 +169,13 @@ metrics:
         name: cpqNicIfPhysAdapterGoodTransmits
         description: Count of frames successfully transmitted by the physical adapter
         unit: "{frame}"
+        family: "Network/Interfaces"
         # Number of frames successfully received.
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.17
         name: cpqNicIfPhysAdapterGoodReceives
         description: Count of frames successfully received by the physical adapter
         unit: "{frame}"
+        family: "Network/Interfaces"
         # Number of frames not transmitted because of an error.
         # NOTE: this is the sum of 4 other metrics. (As a result, we don't submit those 4 metrics.)
         # NOTE: MIB recommends looking at details stats and take action if this counter increments frequently.
@@ -164,6 +183,7 @@ metrics:
         name: cpqNicIfPhysAdapterBadTransmits
         description: Count of frames not transmitted due to errors by the physical adapter
         unit: "{frame}"
+        family: "Network/Interfaces"
         # Number of frames not received because of an error.
         # NOTE: this is the sum of 4 other metrics. (As a result, we don't submit those 4 metrics.)
         # NOTE: MIB recommends looking at details stats and take action if this counter increments frequently.
@@ -171,16 +191,19 @@ metrics:
         name: cpqNicIfPhysAdapterBadReceives
         description: Count of frames not received due to errors by the physical adapter
         unit: "{frame}"
+        family: "Network/Interfaces"
         # Number of octets received.
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.37
         name: cpqNicIfPhysAdapterInOctets
         description: Count of octets received on the physical adapter
         unit: "By"
+        family: "Network/Interfaces"
         # Number of octets sent.
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.38
         name: cpqNicIfPhysAdapterOutOctets
         description: Count of octets sent on the physical adapter
         unit: "By"
+        family: "Network/Interfaces"
     metric_type: monotonic_count  # Sent as Counters (not forcing would make us ingest them as rates).
     metric_tags:
       - tag: interface
@@ -200,11 +223,13 @@ metrics:
         name: cpqNicIfPhysAdapterSpeed
         description: Estimate of the interface's current bandwidth in bits per second
         unit: "bit/s"
+        family: "Network/Interfaces"
         # Estimate of current bandwidth in Mbps.
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.36
         name: cpqNicIfPhysAdapterSpeedMbps
         description: Estimate of the interface's current bandwidth in Megabits per second
         unit: "Mbit/s"
+        family: "Network/Interfaces"
     # NOTE: no 'metric_type', as these are correctly sent as gauges.
     metric_tags:
       - tag: interface
@@ -222,3 +247,4 @@ metrics:
       name: cpqNicVtVirusActivity
     description: Virus activity detection status
     unit: "{state}"
+    family: "Server/Virus"

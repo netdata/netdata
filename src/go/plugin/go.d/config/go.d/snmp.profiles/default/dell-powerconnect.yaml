@@ -101,18 +101,21 @@ metrics:
       extract_value: 60 Secs.*?(\d+[.]?\d+)
     description: "Cpu usage in percent over 60 seconds"
     unit: "%"
+    family: "System/CPU"
   - MIB: DNOS-SWITCHING-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.1.0
     description: "Amount of free memory"
     unit: "By"
+    family: "System/Memory"
   - MIB: DNOS-SWITCHING-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.674.10895.5000.2.6132.1.1.1.1.4.2.0
     description: "Total amount of memory"
     unit: "By"
+    family: "System/Memory"
 #  - MIB: Dell-Vendor-MIB
 #    symbol:
 #      name: productStatusGlobalStatus
@@ -131,6 +134,7 @@ metrics:
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.4
         description: "Fan speed in revolutions per minute"
         unit: "1.min"
+        family: "Hardware/Fans"
     metric_tags:
       - symbol:
           name: dell.envMonFanStatusDescr
@@ -156,10 +160,12 @@ metrics:
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.5
         description: "Current power consumption"
         unit: "W"
+        family: "Hardware/Power"
       - name: dell.envMonSupplyAveragePower
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.6
         description: "Average power consumption"
         unit: "W"
+        family: "Hardware/Power"
     metric_tags:
       - symbol:
           name: dell.envMonSupplyStatusDescr

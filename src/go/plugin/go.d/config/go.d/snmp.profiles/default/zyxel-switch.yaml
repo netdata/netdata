@@ -19,12 +19,14 @@ metrics:
       OID: 1.3.6.1.4.1.890.1.15.3.2.4.0
     description: Device CPU usage (%)
     unit: "%"
+    family: "System/CPU"
   - MIB: ZYXEL-ES-COMMON
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.890.1.15.3.2.5.0
     description: Device memory usage (%)
     unit: "%"
+    family: "System/Memory"
 
 metric_tags:
   - OID: 1.3.6.1.4.1.890.1.15.3.1.1.0

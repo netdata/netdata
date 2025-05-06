@@ -48,6 +48,7 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.3
         description: Units are 0.1 Hz; divide by ten to get Hz
         unit: "Hz"
+        family: "Power/Input"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.10
@@ -69,6 +70,7 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.2.1.3
         description: An input voltage measurement value
         unit: "mV"
+        family: "Power/Input"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
@@ -93,10 +95,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.4
         description: An input current measurement value
         unit: "mA"
+        family: "Power/Input"
       - name: eaton.epdu.inputCurrentPercentLoad
         OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.11
         description: Current percent load based on the rated current capacity
         unit: "%"
+        family: "Power/Input"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
@@ -121,10 +125,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.4.1.3
         description: An input VA value
         unit: "VA"
+        family: "Power/Input"
       - name: eaton.epdu.inputWatts
         OID: 1.3.6.1.4.1.534.6.6.7.3.4.1.4
         description: An input Watts value
         unit: "W"
+        family: "Power/Input"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
@@ -137,6 +143,7 @@ metrics:
     symbols:
       - name: eaton.epdu.group
         constant_value_one: true
+        family: "Power/Groups"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -170,6 +177,7 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.5.3.1.3
         description: Units are millivolts
         unit: "mV"
+        family: "Power/Groups"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -205,10 +213,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.3
         description: A group current measurement value
         unit: "mA"
+        family: "Power/Groups"
       - name: eaton.epdu.groupCurrentPercentLoad
         OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.10
         description: Current percent load based on the rated current capacity
         unit: "%"
+        family: "Power/Groups"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -244,10 +254,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.5.5.1.2
         description: A group VA value
         unit: "VA"
+        family: "Power/Groups"
       - name: eaton.epdu.groupWatts
         OID: 1.3.6.1.4.1.534.6.6.7.5.5.1.3
         description: A group Watts value
         unit: "W"
+        family: "Power/Groups"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -271,6 +283,7 @@ metrics:
     symbols:
       - name: eaton.epdu.groupControl
         constant_value_one: true
+        family: "Power/Groups"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
@@ -305,6 +318,7 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.6.3.1.2
         description: Units are millivolts
         unit: "mV"
+        family: "Power/Outlets"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
@@ -329,10 +343,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.3
         description: An outlet current measurement value
         unit: "mA"
+        family: "Power/Outlets"
       - name: eaton.epdu.outletCurrentPercentLoad
         OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.10
         description: Current percent load based on the rated current capacity
         unit: "%"
+        family: "Power/Outlets"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
@@ -357,10 +373,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.6.5.1.2
         description: An outlet VA value
         unit: "VA"
+        family: "Power/Outlets"
       - name: eaton.epdu.outletWatts
         OID: 1.3.6.1.4.1.534.6.6.7.6.5.1.3
         description: An outlet Watts value
         unit: "W"
+        family: "Power/Outlets"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
@@ -375,6 +393,7 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.4
         description: Units are in tenths of a degree according to the scale specified by temperatureScale either Fahrenheit or Celsius Divide by ten to get degrees
         unit: "Cel"
+        family: "Environmental/Temperature"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.2
@@ -407,6 +426,7 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.4
         description: Units are tenths of a percent relative humidity Divide the value by 10 to get %RH
         unit: "%"
+        family: "Environmental/Humidity"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.2
@@ -437,6 +457,7 @@ metrics:
     symbols:
       - name: eaton.epdu.contact
         constant_value_one: true
+        family: "Environmental/Contact"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.2

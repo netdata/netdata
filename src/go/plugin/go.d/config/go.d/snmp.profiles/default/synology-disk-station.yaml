@@ -18,24 +18,28 @@ metrics:
       OID: 1.3.6.1.4.1.2021.10.1.5.1
       description: The 1,5 and 15 minute load averages as an integer
       unit: "{load_average}"
+      family: "System/CPU"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.6.1  # hrStorageUsed.1 = Physical memory
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
       unit: "By"
+      family: "System/Memory"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
       name: hrMemoryBuffers
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
       unit: "By"
+      family: "System/Memory"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
       name: hrCachedMemory
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits
       unit: "By"
+      family: "System/Memory"
 #  - MIB: SYNOLOGY-SYSTEM-MIB
 #    symbol:
 #      name: synology.system.systemStatus
@@ -51,6 +55,7 @@ metrics:
       OID: 1.3.6.1.4.1.6574.1.2.0
       description: The temperature of Disk Station uses Celsius degree
       unit: "Cel"
+      family: "System/Temperature"
 #  - MIB: SYNOLOGY-SYSTEM-MIB
 #    symbol:
 #      name: synology.system.powerStatus
@@ -99,6 +104,7 @@ metrics:
         OID: 1.3.6.1.4.1.6574.2.1.1.6
         description: The temperature of each disk uses Celsius degree
         unit: "Cel"
+        family: "Storage/Disks/Temperature"
     metric_tags:
       - symbol:
           name: synology.diskID
@@ -133,11 +139,13 @@ metrics:
         metric_type: monotonic_count
         description: The free size of raid
         unit: "By"
+        family: "Storage/RAID"
       - name: synology.raidTotalSize
         OID: 1.3.6.1.4.1.6574.3.1.1.5
         metric_type: monotonic_count
         description: The total size of raid
         unit: "By"
+        family: "Storage/RAID"
     metric_tags:
       - symbol:
           name: synology.raid.raidName
@@ -179,10 +187,12 @@ metrics:
         OID: 1.3.6.1.4.1.6574.5.1.1.5
         description: SMART attribute current value
         unit: "1"
+        family: "Storage/Disks/SMART"
       - name: synology.diskSMARTAttrThreshold
         OID: 1.3.6.1.4.1.6574.5.1.1.7
         description: SMART attribute threshold value
         unit: "1"
+        family: "Storage/Disks/SMART"
     metric_tags:
       - symbol:
           name: synology.diskSMARTInfoDevName
@@ -209,6 +219,7 @@ metrics:
         OID: 1.3.6.1.4.1.6574.6.1.1.3
         description: Number of users using this service
         unit: "{user}"
+        family: "Services/Users"
     metric_tags:
       - symbol:
           name: synology.serviceName
@@ -224,25 +235,30 @@ metrics:
         metric_type: monotonic_count
         description: The number of read accesses from this device since boot
         unit: "{read_access}"
+        family: "Storage/IO"
       - name: synology.storageIOWrites
         OID: 1.3.6.1.4.1.6574.101.1.1.6
         metric_type: monotonic_count
         description: The number of write accesses to this device since boot
         unit: "{write_access}"
+        family: "Storage/IO"
       - name: synology.storageIOLA
         OID: 1.3.6.1.4.1.6574.101.1.1.8
         description: The load of disk (%)
         unit: "%"
+        family: "Storage/IO"
       - name: synology.storageIONReadX
         OID: 1.3.6.1.4.1.6574.101.1.1.12
         metric_type: monotonic_count
         description: The number of bytes read from this device since boot
         unit: "By"
+        family: "Storage/IO"
       - name: synology.storageIONWrittenX
         OID: 1.3.6.1.4.1.6574.101.1.1.13
         metric_type: monotonic_count
         description: The number of bytes written to this device since boot
         unit: "By"
+        family: "Storage/IO"
     metric_tags:
       - symbol:
           name: synology.storageIODevice
@@ -258,25 +274,30 @@ metrics:
         metric_type: monotonic_count
         description: The number of read accesses from this device since boot
         unit: "{read_access}"
+        family: "Storage/IO"
       - name: synology.spaceIOWrites
         OID: 1.3.6.1.4.1.6574.102.1.1.6
         metric_type: monotonic_count
         description: The number of write accesses to this device since boot
         unit: "{write_access}"
+        family: "Storage/IO"
       - name: synology.spaceIOLA
         OID: 1.3.6.1.4.1.6574.102.1.1.8
         description: The load of disk (%)
         unit: "%"
+        family: "Storage/IO"
       - name: synology.spaceIONReadX
         OID: 1.3.6.1.4.1.6574.102.1.1.12
         metric_type: monotonic_count
         description: The number of bytes read from this device since boot
         unit: "By"
+        family: "Storage/IO"
       - name: synology.spaceIONWrittenX
         OID: 1.3.6.1.4.1.6574.102.1.1.13
         metric_type: monotonic_count
         description: The number of bytes written to this device since boot
         unit: "By"
+        family: "Storage/IO"
     metric_tags:
       - symbol:
           name: synology.spaceIODevice
@@ -297,12 +318,14 @@ metrics:
       OID: 1.3.6.1.4.1.6574.108.2.0
       description: GPU utilization percentage
       unit: "%"
+      family: "System/GPU"
   - MIB: SYNOLOGY-GPUINFO-MIB
     symbol:
       name: synology.gpuMemoryUtilization
       OID: 1.3.6.1.4.1.6574.108.3.0
       description: GPU memory utilization percentage
       unit: "%"
+      family: "System/GPU"
 metric_tags:
   - OID: 1.3.6.1.4.1.6574.1.5.1.0
     symbol: modelName

@@ -10,54 +10,67 @@ metrics:
         name: systemStateChassisStatus
         description: Chassis status of the system state
         unit: "{state}"
+        family: "System/State"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
         name: systemStatePowerUnitStatusRedundancy
         description: Power unit status redundancy of the system state
         unit: "{state}"
+        family: "System/State/PowerUnit"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
         name: systemStatePowerSupplyStatusCombined
         description: Combined power supply status of the system state
         unit: "{state}"
+        family: "System/State/PowerSupply"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
         name: systemStateAmperageStatusCombined
         description: Combined amperage status of the system state
         unit: "{state}"
+        family: "System/State/Amperage"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
         name: systemStateCoolingUnitStatusRedundancy
         description: Cooling unit status redundancy of the system state
         unit: "{state}"
+        family: "System/State/CoolingUnit"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
         name: systemStateCoolingDeviceStatusCombined
         description: Combined cooling device status of the system state
         unit: "{state}"
+        family: "System/State/CoolingDevice"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
         name: systemStateTemperatureStatusCombined
         description: Combined temperature status of the system state
         unit: "{state}"
+        family: "System/State/Temperature"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
         name: systemStateMemoryDeviceStatusCombined
         description: Combined memory device status of the system state
         unit: "{state}"
+        family: "System/State/MemoryDevice"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
         name: systemStateChassisIntrusionStatusCombined
         description: Combined chassis intrusion status of the system state
         unit: "{state}"
+        family: "System/State/ChassisIntrusion"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
         name: systemStatePowerUnitStatusCombined
         description: Combined power unit status of the system state
         unit: "{state}"
+        family: "System/State/PowerUnit"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
         name: systemStateCoolingUnitStatusCombined
         description: Combined cooling unit status of the system state
         unit: "{state}"
+        family: "System/State/CoolingUnit"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
         name: systemStateProcessorDeviceStatusCombined
         description: Combined processor device status of the system state
         unit: "{state}"
+        family: "System/State/ProcessorDevice"
       - OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
         name: systemStateTemperatureStatisticsStatusCombined
         description: Combined temperature statistics status of the system state
         unit: "{state}"
+        family: "System/State/Temperature"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -88,6 +101,7 @@ metrics:
           6: non_recoverable
         description: Chassis status of the system state
         unit: "{state}"
+        family: "System/State"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.6
           name: systemStatePowerUnitStatusRedundancy
@@ -102,6 +116,7 @@ metrics:
           7: redundancy_offline
         description: Power unit status redundancy of the system state
         unit: "{state}"
+        family: "System/State/PowerUnit"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.9
           name: systemStatePowerSupplyStatusCombined
@@ -115,6 +130,7 @@ metrics:
           6: non_recoverable
         description: Combined power supply status of the system state
         unit: "{state}"
+        family: "System/State/PowerSupply"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.15
           name: systemStateAmperageStatusCombined
@@ -128,6 +144,7 @@ metrics:
           6: non_recoverable
         description: Combined amperage status of the system state
         unit: "{state}"
+        family: "System/State/Amperage"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.18
           name: systemStateCoolingUnitStatusRedundancy
@@ -142,6 +159,7 @@ metrics:
           7: redundancy_offline
         description: Cooling unit status redundancy of the system state
         unit: "{state}"
+        family: "System/State/CoolingUnit"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.21
           name: systemStateCoolingDeviceStatusCombined
@@ -155,6 +173,7 @@ metrics:
           6: non_recoverable
         description: Combined cooling device status of the system state
         unit: "{state}"
+        family: "System/State/CoolingDevice"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.24
           name: systemStateTemperatureStatusCombined
@@ -168,6 +187,7 @@ metrics:
           6: non_recoverable
         description: Combined temperature status of the system state
         unit: "{state}"
+        family: "System/State/Temperature"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.27
           name: systemStateMemoryDeviceStatusCombined
@@ -181,6 +201,7 @@ metrics:
           6: non_recoverable
         description: Combined memory device status of the system state
         unit: "{state}"
+        family: "System/State/MemoryDevice"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.30
           name: systemStateChassisIntrusionStatusCombined
@@ -194,6 +215,7 @@ metrics:
           6: non_recoverable
         description: Combined chassis intrusion status of the system state
         unit: "{state}"
+        family: "System/State/ChassisIntrusion"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.42
           name: systemStatePowerUnitStatusCombined
@@ -207,6 +229,7 @@ metrics:
           6: non_recoverable
         description: Combined power unit status of the system state
         unit: "{state}"
+        family: "System/State/PowerUnit"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.44
           name: systemStateCoolingUnitStatusCombined
@@ -220,6 +243,7 @@ metrics:
           6: non_recoverable
         description: Combined cooling unit status of the system state
         unit: "{state}"
+        family: "System/State/CoolingUnit"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.50
           name: systemStateProcessorDeviceStatusCombined
@@ -233,6 +257,7 @@ metrics:
           6: non_recoverable
         description: Combined processor device status of the system state
         unit: "{state}"
+        family: "System/State/ProcessorDevice"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.63
           name: systemStateTemperatureStatisticsStatusCombined
@@ -246,6 +271,7 @@ metrics:
           6: non_recoverable
         description: Combined temperature statistics status of the system state
         unit: "{state}"
+        family: "System/State/Temperature"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4
@@ -255,18 +281,22 @@ metrics:
         name: physicalDiskState
         description: State of the physical disk
         unit: "{state}"
+        family: "Storage/PhysicalDisk"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.11
         name: physicalDiskCapacityInMB
         description: Capacity of the physical disk in megabytes
         unit: "MBy"
+        family: "Storage/PhysicalDisk"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.17
         name: physicalDiskUsedSpaceInMB
         description: Used space of the physical disk in megabytes
         unit: "MBy"
+        family: "Storage/PhysicalDisk"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.19
         name: physicalDiskFreeSpaceInMB
         description: Free space of the physical disk in megabytes
         unit: "MBy"
+        family: "Storage/PhysicalDisk"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
@@ -297,6 +327,7 @@ metrics:
           10: readonly
         description: State of the physical disk
         unit: "{state}"
+        family: "Storage/PhysicalDisk"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.2
           name: physicalDiskName
@@ -307,6 +338,7 @@ metrics:
         tag: disk_number
         description: Number of the physical disk
         unit: "{disk}"
+        family: "Storage/PhysicalDisk"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9
@@ -316,6 +348,7 @@ metrics:
         name: enclosurePowerSupplyState
         description: State of the enclosure power supply
         unit: "{state}"
+        family: "Power/EnclosurePowerSupply"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
@@ -349,6 +382,7 @@ metrics:
           5: degraded
         description: State of the enclosure power supply
         unit: "{state}"
+        family: "Power/EnclosurePowerSupply"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.2
           name: enclosurePowerSupplyName
@@ -370,6 +404,7 @@ metrics:
         name: batteryState
         description: State of the battery
         unit: "{state}"
+        family: "Power/Battery"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
@@ -401,6 +436,7 @@ metrics:
           7: below_threshold
         description: State of the battery
         unit: "{state}"
+        family: "Power/Battery"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.20
           name: batteryFQDD
@@ -418,6 +454,7 @@ metrics:
         name: controllerRollUpStatus
         description: Roll up status of the controller
         unit: "{state}"
+        family: "Storage/Controller"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
@@ -464,6 +501,7 @@ metrics:
           6: non_recoverable
         description: Roll up status of the controller
         unit: "{state}"
+        family: "Storage/Controller"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.1
           name: controllerNumber
@@ -497,6 +535,7 @@ metrics:
         name: pCIDeviceStatus
         description: Status of the PCI device
         unit: "{state}"
+        family: "Hardware/PCIDevice"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
@@ -527,6 +566,7 @@ metrics:
           6: non_recoverable
         description: Status of the PCI device
         unit: "{state}"
+        family: "Hardware/PCIDevice"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.9
           name: pCIDeviceDescriptionName
@@ -544,6 +584,7 @@ metrics:
         name: systemSlotStatus
         description: Status of the system slot
         unit: "{state}"
+        family: "System/Slot"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
@@ -574,6 +615,7 @@ metrics:
           6: non_recoverable
         description: Status of the system slot
         unit: "{state}"
+        family: "System/Slot"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.8
           name: systemSlotSlotExternalSlotName
@@ -591,6 +633,7 @@ metrics:
         name: networkDeviceStatus
         description: Status of the network device
         unit: "{state}"
+        family: "Network/Interfaces"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
@@ -625,6 +668,7 @@ metrics:
           6: non_recoverable
         description: Status of the network device
         unit: "{state}"
+        family: "Network/Interfaces"
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.1
           name: networkDeviceChassisIndex
@@ -650,6 +694,7 @@ metrics:
         name: systemBIOSStatus
         description: Status of the system BIOS
         unit: "{state}"
+        family: "System/BIOS"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
@@ -688,6 +733,7 @@ metrics:
           6: non_recoverable
         description: Status of the system BIOS
         unit: "{state}"
+        family: "System/BIOS"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.300.70
@@ -697,10 +743,12 @@ metrics:
         name: intrusionStatus
         description: Status of the intrusion
         unit: "{state}"
+        family: "System/Intrusion"
       - OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.6
         name: intrusionReading
         description: Reading of the intrusion
         unit: "TBD"
+        family: "System/Intrusion"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.70.1.1
@@ -723,14 +771,17 @@ metrics:
         name: powerSupplyOutputWatts
         description: Output power of the power supply in watts
         unit: "W"
+        family: "Power/PowerSupply"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.9
         name: powerSupplyMaximumInputVoltage
         description: Maximum input voltage of the power supply
         unit: "V"
+        family: "Power/PowerSupply"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.16
         name: powerSupplyCurrentInputVoltage
         description: Current input voltage of the power supply
         unit: "V"
+        family: "Power/PowerSupply"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.12.1.1
@@ -753,10 +804,12 @@ metrics:
         name: amperageProbeStatus
         description: Status of the amperage probe
         unit: "{state}"
+        family: "Power/AmperageProbe"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.6
         name: amperageProbeReading
         description: Reading of the amperage probe in amperes
         unit: "A"
+        family: "Power/AmperageProbe"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
@@ -849,6 +902,7 @@ metrics:
           10: failed
         description: Status of the amperage probe
         unit: "{state}"
+        family: "Power/AmperageProbe"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.60
@@ -858,6 +912,7 @@ metrics:
         name: powerUsageStatus
         description: Status of the power usage
         unit: "{state}"
+        family: "Power/Usage"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.60.1.1
@@ -880,10 +935,12 @@ metrics:
         name: voltageProbeStatus
         description: Status of the voltage probe
         unit: "{state}"
+        family: "Power/VoltageProbe"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.6
         name: voltageProbeReading
         description: Reading of the voltage probe in volts
         unit: "V"
+        family: "Power/VoltageProbe"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
@@ -974,6 +1031,7 @@ metrics:
           10: failed
         description: Status of the voltage probe
         unit: "{state}"
+        family: "Power/VoltageProbe"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.600.50
@@ -983,10 +1041,12 @@ metrics:
         name: systemBatteryStatus
         description: Status of the system battery
         unit: "{state}"
+        family: "Power/SystemBattery"
       - OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.6
         name: systemBatteryReading
         description: Reading of the system battery
         unit: "TBD"
+        family: "Power/SystemBattery"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.50.1.1
@@ -1009,10 +1069,12 @@ metrics:
         name: coolingUnitRedundancyStatus
         description: Redundancy status of the cooling unit
         unit: "{state}"
+        family: "Cooling/Unit"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.8
         name: coolingUnitStatus
         description: Status of the cooling unit
         unit: "{state}"
+        family: "Cooling/Unit"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.10.1.1
@@ -1035,14 +1097,17 @@ metrics:
         name: coolingDeviceStatus
         description: Status of the cooling device
         unit: "{state}"
+        family: "Cooling/Device"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.6
         name: coolingDeviceReading
         description: Reading of the cooling device
         unit: "TBD"
+        family: "Cooling/Device"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.18
         name: coolingDeviceDiscreteReading
         description: Discrete reading of the cooling device
         unit: "TBD"
+        family: "Cooling/Device"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.1
@@ -1085,14 +1150,17 @@ metrics:
         name: temperatureProbeStatus
         description: Status of the temperature probe
         unit: "{state}"
+        family: "Temperature/Probe"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.6
         name: temperatureProbeReading
         description: Reading of the temperature probe in degrees Celsius
         unit: "Cel"
+        family: "Temperature/Probe"
       - OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.16
         name: temperatureProbeDiscreteReading
         description: Discrete reading of the temperature probe
         unit: "TBD"
+        family: "Temperature/Probe"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.1
@@ -1124,18 +1192,22 @@ metrics:
         name: processorDeviceStatus
         description: Status of the processor device
         unit: "{state}"
+        family: "Processor/Device"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.11
         name: processorDeviceMaximumSpeed
         description: Maximum speed of the processor device in megahertz
         unit: "MHz"
+        family: "Processor/Device"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.12
         name: processorDeviceCurrentSpeed
         description: Current speed of the processor device in megahertz
         unit: "MHz"
+        family: "Processor/Device"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.14
         name: processorDeviceVoltage
         description: Voltage of the processor device in volts
         unit: "V"
+        family: "Processor/Device"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.30.1.1
@@ -1162,10 +1234,12 @@ metrics:
         name: processorDeviceStatusStatus
         description: Status of the processor device status
         unit: "{state}"
+        family: "Processor/DeviceStatus"
       - OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.6
         name: processorDeviceStatusReading
         description: Reading of the processor device status
         unit: "TBD"
+        family: "Processor/DeviceStatus"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.32.1.1
@@ -1188,6 +1262,7 @@ metrics:
         name: memoryDeviceStatus
         description: Status of the memory device
         unit: "{state}"
+        family: "Memory/Device"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
@@ -1256,6 +1331,7 @@ metrics:
           4: non_critical
           5: critical
           6: non_recoverable
+        family: "Memory/Device"
   - MIB: IDRAC-MIB-SMIv2
     table:
       OID: 1.3.6.1.4.1.674.10892.5.4.2000.10
@@ -1265,6 +1341,7 @@ metrics:
         name: fruInformationStatus
         description: Status of the FRU information
         unit: "{state}"
+        family: "System/FRU"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.1
@@ -1287,18 +1364,22 @@ metrics:
         name: virtualDiskState
         description: State of the virtual disk
         unit: "{state}"
+        family: "Storage/VirtualDisk"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.6
         name: virtualDiskSizeInMB
         description: Size of the virtual disk in megabytes
         unit: "MBy"
+        family: "Storage/VirtualDisk"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.20
         name: virtualDiskComponentStatus
         description: Component status of the virtual disk
         unit: "{state}"
+        family: "Storage/VirtualDisk"
       - OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.37
         name: virtualDiskT10PIStatus
         description: T10 PI status of the virtual disk
         unit: "{state}"
+        family: "Storage/VirtualDisk"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.1
@@ -1318,30 +1399,35 @@ metrics:
       name: drsCMCCurrStatus
       description: CMC health status being monitored by the chassis management card
       unit: "{state}"
+      family: "Chassis/CMC"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.1.0
       name: drsGlobalCurrStatus
       description: Overall chassis status being monitored by the chassis management card
       unit: "{state}"
+      family: "Chassis/Global"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.5.0
       name: drsPowerCurrStatus
       description: Power subsystem health status being monitored by the chassis management card
       unit: "{state}"
+      family: "Chassis/Power"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.3.1.4.0
       name: drsRedCurrStatus
       description: Redundancy status being monitored by the chassis management card
       unit: "{state}"
+      family: "Chassis/Redundancy"
   - MIB: DELL-RAC-MIB
     symbol:
       OID: 1.3.6.1.4.1.674.10892.2.2.1.0
       name: drsGlobalSystemStatus
       description: Overall chassis status being monitored by the chassis management card
       unit: "{state}"
+      family: "Chassis/Global"
   - MIB: DELL-RAC-MIB
     table:
       OID: 1.3.6.1.4.1.674.10892.2.4.1
@@ -1351,10 +1437,12 @@ metrics:
         name: drsWattsReading
         description: Instantaneous chassis power usage in watts
         unit: "W"
+        family: "Chassis/Power"
       - OID: 1.3.6.1.4.1.674.10892.2.4.1.1.14
         name: drsAmpsReading
         description: Instantaneous chassis current usage in amperes
         unit: "A"
+        family: "Chassis/Power"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1
@@ -1374,6 +1462,7 @@ metrics:
         name: drsKWhCumulative
         description: Cumulative chassis power usage in kilowatt hours since last reset
         unit: "kW.h"
+        family: "Chassis/Power"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.2.4.1.1.1

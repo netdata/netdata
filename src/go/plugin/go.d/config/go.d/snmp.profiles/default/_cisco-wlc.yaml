@@ -46,6 +46,7 @@ metrics:
           1: enable
           2: disable
         tag: ap_admin_status
+    family: "Network/AccessPoints"
 
   # Connected APs 802.11 interfaces metrics
 
@@ -107,6 +108,7 @@ metrics:
           1: enable
           2: disable
         tag: ap_if_admin_status
+    family: "Network/Interfaces/Airespace"
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -155,6 +157,7 @@ metrics:
           - start: 0
             end: 5
         tag: ap_ip_address
+    family: "Network/Interfaces/Airespace"
 
   # Load metrics
 
@@ -217,6 +220,7 @@ metrics:
           - start: 0
             end: 5
         tag: ap_ip_address
+    family: "Network/Interfaces/Airespace/Load"
 
   # WLAN Metrics
 
@@ -254,6 +258,7 @@ metrics:
           5: createAndWait
           6: destroy
         tag: wlan_row_status
+    family: "Network/WLAN"
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -274,3 +279,4 @@ metrics:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.2
           name: bsnDot11EssSsid
         tag: ssid
+    family: "Network/WLAN"

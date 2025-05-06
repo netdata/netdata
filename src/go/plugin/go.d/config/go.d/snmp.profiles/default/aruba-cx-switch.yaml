@@ -26,18 +26,21 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.5.1 # hrStorageSize.1
       description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
       unit: "{logical_storage_area}"
+    family: "Host/Resources/Memory"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1
       description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
       unit: "{logical_storage_area}"
+    family: "Host/Resources/Memory"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608 # hrProcessorLoad.196608
       description: The average, over the last minute, of the percentage of time that this processor was not idle.
       unit: "%"
+    family: "Host/Resources/CPU"
   - MIB: ARUBAWIRED-TEMPSENSOR-MIB
     table:
       OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1
@@ -56,6 +59,7 @@ metrics:
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1.1.6
           name: arubaWiredTempSensorState
         tag: aruba_wired_temp_sensor_state
+    family: "Aruba/TemperatureSensors"
   - MIB: ARUBAWIRED-POWERSUPPLY-MIB
     table:
       OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1
@@ -90,6 +94,7 @@ metrics:
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.4
           name: arubaWiredPSUState
         tag: aruba_wired_psu_state
+    family: "Aruba/PowerSupply"
   - MIB: ARUBAWIRED-FANTRAY-MIB
     table:
       OID: 1.3.6.1.4.1.47196.4.1.1.3.11.4.1
@@ -116,6 +121,7 @@ metrics:
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.4.1.1.4
           name: arubaWiredFanTrayState
         tag: aruba_wired_fan_tray_state
+    family: "Aruba/FanTray"
   - MIB: ARUBAWIRED-FAN-MIB
     table:
       OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1
@@ -146,3 +152,4 @@ metrics:
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.5
           name: arubaWiredFanState
         tag: aruba_wired_fan_state
+    family: "Aruba/Fan"

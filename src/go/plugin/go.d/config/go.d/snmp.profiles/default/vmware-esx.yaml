@@ -24,6 +24,7 @@ metrics:
         constant_value_one: true
         description: "Hardware host bus adapter"
         unit: "{hardware_host_bus_adapter}"
+        family: "Hardware/HostBusAdapter"
     metric_tags:
       - symbol:
           name: vmwHbaDeviceName
@@ -50,6 +51,7 @@ metrics:
         constant_value_one: true
         description: "Hardware environment"
         unit: "{hardware_environment}"
+        family: "Hardware/Environment"
     metric_tags:
       - symbol:
           name: vmwSubsystemType

@@ -10,11 +10,13 @@ metrics:
         name: jnxUserFwLDAPTotalQuery
         description: Total LDAP query number
         unit: "{request}"
+        family: "Network/UserFirewall/LDAP"
     #  LDAP failed query number.
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.4
         name: jnxUserFwLDAPFailedQuery
         description: LDAP failed query number
         unit: "{request}"
+        family: "Network/UserFirewall/LDAP"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.1

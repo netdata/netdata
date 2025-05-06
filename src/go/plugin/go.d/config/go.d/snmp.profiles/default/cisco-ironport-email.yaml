@@ -13,30 +13,35 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.1.0
     description: This object provides a general idea of how much memory is being consumed by the appliance software.
     unit: "%"
+    family: "IronPort/Memory"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.15497.1.1.1.2.0
     description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of utilization. This measurement may or may not reflect the overall CPU utilization of the appliance, and may or may not be a per-process or a per-thread CPU utilization value.
     unit: "%"
+    family: "IronPort/CPU"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.oldestMessageAge
       OID: 1.3.6.1.4.1.15497.1.1.1.14.0
     description: The number of seconds the oldest message has been in queue
     unit: "s"
+    family: "IronPort/Queue"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.perCentDiskIOUtilization
       OID: 1.3.6.1.4.1.15497.1.1.1.3.0
     description: This object provides a general idea of how much disk I/O has been generated within the last 5-15 seconds.
     unit: "%"
+    family: "IronPort/Disk"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.perCentQueueUtilization
       OID: 1.3.6.1.4.1.15497.1.1.1.4.0
     description: Percent of total queue capacity used.
     unit: "%"
+    family: "IronPort/Queue"
 #  - MIB: ASYNCOS-MAIL-MIB
 #    symbol:
 #      name: ironport.queueAvailabilityStatus
@@ -77,6 +82,7 @@ metrics:
         constant_value_one: true
     description: A table of one or power supply entries.
     unit: "{power_supply}"
+    family: "IronPort/PowerSupply"
     metric_tags:
       - symbol:
           name: ironport.powerSupplyName
@@ -115,6 +121,7 @@ metrics:
         unit: "Cel"
     description: A table of chassis temperature sensor states.
     unit: "{temperature_sensor}"
+    family: "IronPort/Temperature"
     metric_tags:
       - symbol:
           name: ironport.temperatureName
@@ -133,6 +140,7 @@ metrics:
         unit: "rpm"
     description: A table of chassis fan entries.
     unit: "{fan}"
+    family: "IronPort/Fan"
     metric_tags:
       - symbol:
           name: ironport.fanName
@@ -146,6 +154,7 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.11.0
     description: Number of messages in the work queue.
     unit: "{message}"
+    family: "IronPort/Queue"
   - MIB: ASYNCOS-MAIL-MIB
     table:
       name: keyExpirationTable
@@ -157,6 +166,7 @@ metrics:
         unit: "s"
     description: A table of Feature Key expiration entries.
     unit: "{feature_key_expiration_entry}"
+    family: "IronPort/FeatureKey"
     metric_tags:
       - symbol:
           name: ironport.keyDescription
@@ -188,6 +198,7 @@ metrics:
         unit: "{update_attempt}"
     description: A table of one or more update entries.
     unit: "{update_entry}"
+    family: "IronPort/Update"
     metric_tags:
       - symbol:
           name: ironport.updateServiceName
@@ -201,18 +212,21 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.15.0
     description: Number of DNS requests that have been sent but for which no reply has been received.
     unit: "{dns_request}"
+    family: "IronPort/DNS"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.pendingDNSRequests
       OID: 1.3.6.1.4.1.15497.1.1.1.16.0
     description: Number of DNS requests waiting to be sent.
     unit: "{dns_request}"
+    family: "IronPort/DNS"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.raidEvents
       OID: 1.3.6.1.4.1.15497.1.1.1.17.0
     description: The total number of RAID events that have occurred since the last appliance power on event.
     unit: "{raid_event}"
+    family: "IronPort/RAID"
   - MIB: ASYNCOS-MAIL-MIB
     table:
       name: raidTable
@@ -222,6 +236,7 @@ metrics:
         constant_value_one: true
     description: Unique index for a drive being instrumented in the appliance. This index is for SNMP purposes only; it has no intrinsic value.
     unit: "{raid_drive}"
+    family: "IronPort/RAID"
     metric_tags:
       - symbol:
           name: ironport.raidID
@@ -251,12 +266,14 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.19.0
     description: This object notes how many files or sockets are open on the appliance. In normal operating conditions, the measurement is taken at least once every 5-15 seconds.
     unit: "{file_or_socket}"
+    family: "IronPort/FilesAndSockets"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.mailTransferThreads
       OID: 1.3.6.1.4.1.15497.1.1.1.20.0
     description: Number of threads that perform some task related to transferring mail.
     unit: "{thread}"
+    family: "IronPort/MailTransfer"
 #  - MIB: ASYNCOS-MAIL-MIB
 #    symbol:
 #      name: ironport.fipsMode
@@ -272,228 +289,266 @@ metrics:
       OID: 1.3.6.1.4.1.15497.1.1.1.26.0
     description: This object provides a general idea of how busy the CPU is according to the appliance software, within the last 5 seconds of utilization. This measurement may or may not reflect the overall CPU utilization of the appliance, and may or may not be a per-process or a per-thread CPU utilization value.
     unit: "%"
+    family: "IronPort/CPU"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientRequests
       OID: 1.3.6.1.4.1.15497.1.2.3.2.2.0
     description: The number of HTTP requests received from clients.
     unit: "{http_request}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientErrors
       OID: 1.3.6.1.4.1.15497.1.2.3.2.4.0
     description: The number of HTTP errors caused by client connections.
     unit: "{http_error}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientIdleConns
       OID: 1.3.6.1.4.1.15497.1.2.3.2.7.0
     description: The number of connected but idle persistent client connections.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientTotalConns
       OID: 1.3.6.1.4.1.15497.1.2.3.2.8.0
     description: The current number of active + idle client connections.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientMaxConns
       OID: 1.3.6.1.4.1.15497.1.2.3.2.9.0
     description: The maximum number of simultaneous client connections that will be allowed.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientAccepts
       OID: 1.3.6.1.4.1.15497.1.2.3.2.10.0
     description: The total number of sockets accepted from the clients.
     unit: "{socket}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheClientReqDenials
       OID: 1.3.6.1.4.1.15497.1.2.3.2.17.0
     description: The number of responses blocked by access control.
     unit: "{response}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerRequests
       OID: 1.3.6.1.4.1.15497.1.2.3.3.2.0
     description: The total number of HTTP requests sent to servers.
     unit: "{http_request}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerSockets
       OID: 1.3.6.1.4.1.15497.1.2.3.3.3.0
     description: The total number of sockets opened from the servers.
     unit: "{socket}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerErrors
       OID: 1.3.6.1.4.1.15497.1.2.3.3.4.0
     description: The number of HTTP errors while fetching objects.
     unit: "{http_error}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerIdleConns
       OID: 1.3.6.1.4.1.15497.1.2.3.3.7.0
     description: The number of connected but idle persistent server connections.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerTotalConns
       OID: 1.3.6.1.4.1.15497.1.2.3.3.8.0
     description: The current number of active + idle server connections.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerCloseIdleConns
       OID: 1.3.6.1.4.1.15497.1.2.3.3.9.0
     description: The number of server connections closed due to idle time limits.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerLimitIdleConns
       OID: 1.3.6.1.4.1.15497.1.2.3.3.10.0
     description: The number of times the number of idle persistent connections hit the count limit and caused a connection to be closed.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheServerConnsThresh
       OID: 1.3.6.1.4.1.15497.1.2.3.3.11.0
     description: The limit on the number of server connections.
     unit: "{connection}"
+    family: "IronPort/WebSecurity/Server"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheTotalHttpReqs
       OID: 1.3.6.1.4.1.15497.1.2.3.6.1.0
     description: Total number of HTTP requests from clients
     unit: "{http_request}"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMeanRespTime
       OID: 1.3.6.1.4.1.15497.1.2.3.6.2.0
     description: The HTTP mean response time
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMeanMissRespTime
       OID: 1.3.6.1.4.1.15497.1.2.3.6.3.0
     description: The HTTP mean response time of Misses
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMeanHitRespTime
       OID: 1.3.6.1.4.1.15497.1.2.3.6.4.0
     description: The HTTP mean response time of Hits
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMeanHitRatio
       OID: 1.3.6.1.4.1.15497.1.2.3.6.5.0
     description: The HTTP hit ratio
     unit: "%"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMeanByteHitRatio
       OID: 1.3.6.1.4.1.15497.1.2.3.6.6.0
     description: The HTTP byte hit ratio
     unit: "%"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheTotalBandwidthSaving
       OID: 1.3.6.1.4.1.15497.1.2.3.6.7.0
     description: The total bandwidth savings for HTTP in Mbits/sec
     unit: "Mbit/s"
+    family: "IronPort/WebSecurity/Bandwidth"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheDuration
       OID: 1.3.6.1.4.1.15497.1.2.3.6.8.0
     description: The proxy up time
     unit: "s"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheCltReplyErrPct
       OID: 1.3.6.1.4.1.15497.1.2.3.6.9.0
     description: The percentage of errors in the HTTP replies to clients
     unit: "%"
+    family: "IronPort/WebSecurity/Client"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheThruputNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.1.1.0
     description: Request throughput in the last minute
     unit: "{request}"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheBwidthSavingNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.2.1.0
     description: Bandwidth savings in the last minute (in Kb/sec)
     unit: "kbit/s"
+    family: "IronPort/WebSecurity/Bandwidth"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheBwidthSpentNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.3.1.0
     description: Bandwidth spent in the last minute (in Kb/sec)
     unit: "kbit/s"
+    family: "IronPort/WebSecurity/Bandwidth"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheBwidthTotalNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.4.1.0
     description: Bandwidth total in the last minute (in Kb/sec)
     unit: "kbit/s"
+    family: "IronPort/WebSecurity/Bandwidth"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheHitsNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.5.1.0
     description: Hit throughput in the last minute
     unit: "{hit}"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMissesNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.6.1.0
     description: Miss throughput in the last minute
     unit: "{miss}"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheHitRespTimeNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.7.1.0
     description: Cache hit response time in the last minute
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheMissRespTimeNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.8.1.0
     description: Cache miss response time in the last minute
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheTotalRespTimeNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.9.1.0
     description: Cache total response time in the last minute
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheErrsNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.10.1.0
     description: Cache error throughput time in the last minute
     unit: "{error}"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheDeniedNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.11.1.0
     description: Cache denial throughput time in the last minute
     unit: "{denial}"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheErrRespTimeNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.12.1.0
     description: Cache error response time in the last minute
     unit: "ms"
+    family: "IronPort/WebSecurity"
   - MIB: ASYNCOSWEBSECURITYAPPLIANCE-MIB
     symbol:
       name: ironport.cacheDeniedRespTimeNow
       OID: 1.3.6.1.4.1.15497.1.2.3.7.13.1.0
     description: Cache denial response time in the last minute
     unit: "ms"
+    family: "IronPort/WebSecurity"
 metric_tags:
   - OID: 1.3.6.1.4.1.15497.1.2.2.1.0
     symbol: cacheAdmin

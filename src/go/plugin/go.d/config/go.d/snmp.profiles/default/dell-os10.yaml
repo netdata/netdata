@@ -27,6 +27,7 @@ metrics:
         name: cpu.usage
         description: "Average over the last minute of the percentage of time that this processor was not idle"
         unit: "%"
+        family: "Host/Processor"
     metric_tags:
       - tag: hr_processor_frw_id
         symbol:
@@ -38,18 +39,21 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
       description: "Size of the storage represented by this entry in units of hrStorageAllocationUnits"
       unit: "kBy"
+      family: "Host/Memory"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
       description: "Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits"
       unit: "kBy"
+      family: "Host/Memory"
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     symbol:
       name: dell.os10ChassisTemp
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.11
       description: "Temperature of the chassis"
       unit: "{temperature}"
+      family: "Chassis/Temperature"
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4
@@ -59,6 +63,7 @@ metrics:
         name: dell.os10CardTemp
         description: "Temperature of the card"
         unit: "{temperature}"
+        family: "Chassis/Cards/Temperature"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4.1.3
@@ -86,6 +91,7 @@ metrics:
     symbols:
       - name: dell.os10PowerSupply
         constant_value_one: true
+        family: "Chassis/PowerSupply"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.4
@@ -111,6 +117,7 @@ metrics:
     symbols:
       - name: dell.os10FanTray
         constant_value_one: true
+        family: "Chassis/FanTray"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.4
@@ -136,6 +143,7 @@ metrics:
     symbols:
       - name: dell.os10Fan
         constant_value_one: true
+        family: "Chassis/Fan"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.7
@@ -161,6 +169,7 @@ metrics:
     symbols:
       - name: dell.os10bgp4V2Peer
         constant_value_one: true
+        family: "Network/BGP/Peers"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.2
@@ -200,48 +209,56 @@ metrics:
         tag: dell_os10bgp4_v2_peer_local_port
         description: "Local port for the TCP connection between the BGP peers"
         unit: "{port}"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.7
           name: dell.os10bgp4V2PeerLocalAs
         tag: dell_os10bgp4_v2_peer_local_as
         description: "AS that this peering session is representing itself as to the remote peer"
         unit: "1"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.8
           name: dell.os10bgp4V2PeerLocalIdentifier
         tag: dell_os10bgp4_v2_peer_local_identifier
         description: "BGP Identifier of the local system for this peering session"
         unit: "{identifier}"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.9
           name: dell.os10bgp4V2PeerRemotePort
         tag: dell_os10bgp4_v2_peer_remote_port
         description: "Remote port for the TCP connection between the BGP peers"
         unit: "{port}"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.10
           name: dell.os10bgp4V2PeerRemoteAs
         tag: dell_os10bgp4_v2_peer_remote_as
         description: "Remote autonomous system number received in the BGP OPEN message"
         unit: "1"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.11
           name: dell.os10bgp4V2PeerRemoteIdentifier
         tag: dell_os10bgp4_v2_peer_remote_identifier
         description: "BGP Identifier of this entry's remote BGP peer"
         unit: "{identifier}"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.14
           name: dell.os10bgp4V2PeerDescription
         tag: dell_os10bgp4_v2_peer_description
         description: "User configured description identifying this peer"
         unit: "TBD"
+        family: "Network/BGP/Peers"
       - symbol:
           OID: 1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.12
           name: dell.os10bgp4V2PeerAdminStatus
         tag: dell_os10bgp4_v2_peer_admin_status
         description: "Whether the BGP FSM for this remote peer is halted or running"
         unit: "TBD"
+        family: "Network/BGP/Peers"
         mapping:
           1: halted
           2: running
@@ -251,6 +268,7 @@ metrics:
         tag: dell_os10bgp4_v2_peer_state
         description: "BGP peer connection state"
         unit: "TBD"
+        family: "Network/BGP/Peers"
         mapping:
           1: idle
           2: connect

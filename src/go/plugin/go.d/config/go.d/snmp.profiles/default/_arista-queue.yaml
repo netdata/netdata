@@ -21,6 +21,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.30065.3.6.1.1.1.2
           name: aristaIngressQueueIndex
+    family: "Network/Interfaces/IngressQueue"
 
     # This table contains statistical objects for the egress queues of an interface.
   - MIB: ARISTA-QUEUE-MIB
@@ -42,3 +43,4 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.30065.3.6.1.2.1.2
           name: aristaEgressQueueIndex
+    family: "Network/Interfaces/EgressQueue"

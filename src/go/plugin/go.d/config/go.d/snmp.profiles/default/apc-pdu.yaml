@@ -19,6 +19,7 @@ metrics:
         name: powernet.rPDULoadStatusLoad
         description: Load status of the PDU
         unit: "TBD"
+        family: "PowerNet/PDU/LoadStatus"
     metric_tags:
       - tag: powernet_r_pdu_load_status_index
         symbol:
@@ -42,6 +43,7 @@ metrics:
         name: powernet.rPDUOutletStatusLoad
         description: Load status of the PDU outlet
         unit: "TBD"
+        family: "PowerNet/PDU/OutletStatus"
     metric_tags:
       - tag: powernet_r_pdu_outlet_status_index
         symbol:
@@ -83,6 +85,7 @@ metrics:
       name: powernet.rPDUPowerSupplyAlarm
       description: Alarm status of the PDU power supply
       unit: "TBD"
+      family: "PowerNet/PDU/PowerSupply"
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.5.2
@@ -92,6 +95,7 @@ metrics:
         constant_value_one: true
         description: Status of the PDU bank
         unit: "TBD"
+        family: "PowerNet/PDU/StatusBank"
     metric_tags:
       - tag: powernet_r_pdu_status_bank_index
         symbol:
@@ -119,6 +123,7 @@ metrics:
         constant_value_one: true
         description: Status of the PDU phase
         unit: "TBD"
+        family: "PowerNet/PDU/StatusPhase"
     metric_tags:
       - tag: powernet_r_pdu_status_phase_index
         symbol:
@@ -146,6 +151,7 @@ metrics:
         constant_value_one: true
         description: Status of the PDU outlet
         unit: "TBD"
+        family: "PowerNet/PDU/StatusOutlet"
     metric_tags:
       - tag: powernet_r_pdu_status_outlet_index
         symbol:
@@ -173,14 +179,17 @@ metrics:
         name: powernet.rPDU2SensorTempHumidityStatusTempF
         description: Temperature in degrees Fahrenheit
         unit: "degF"
+        family: "PowerNet/PDU/Sensor/Temperature"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.8
         name: powernet.rPDU2SensorTempHumidityStatusTempC
         description: Temperature in degrees Celsius
         unit: "Cel"
+        family: "PowerNet/PDU/Sensor/Temperature"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.10
         name: powernet.rPDU2SensorTempHumidityStatusRelativeHumidity
         description: Relative humidity percentage
         unit: "%"
+        family: "PowerNet/PDU/Sensor/Humidity"
     metric_tags:
       - tag: powernet_r_pdu2_sensor_temp_humidity_status_name
         symbol:

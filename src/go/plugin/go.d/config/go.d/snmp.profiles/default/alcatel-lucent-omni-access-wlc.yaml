@@ -17,6 +17,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.3
         description: The average, over the last minute, of the percentage of time that this processor was not idle.
         unit: "%"
+        family: "Network/Interfaces/Aruba/CPU"
     metric_tags:
       - index: 1
         tag: cpu
@@ -33,10 +34,12 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
         description: Size of the storage filesystem in MB.
         unit: "MBy"
+        family: "Network/Interfaces/Aruba/Storage"
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         description: Size of the storage filesystem in MB.
         unit: "MBy"
+        family: "Network/Interfaces/Aruba/Storage"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.2
@@ -58,14 +61,17 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.2
         description: Total memory in KB.
         unit: "kBy"
+        family: "Network/Interfaces/Aruba/Memory"
       - name: memory.used
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.3
         description: Used memory in KB.
         unit: "kBy"
+        family: "Network/Interfaces/Aruba/Memory"
       - name: memory.free
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.4
         description: Free memory in KB.
         unit: "kBy"
+        family: "Network/Interfaces/Aruba/Memory"
     metric_tags:
       - index: 1
         tag: mem
@@ -75,12 +81,14 @@ metrics:
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.1.0
       description: Total number of access points connected to this switch.
       unit: "{access_point}"
+      family: "Network/AccessPoints"
   - MIB: WLSX-SWITCH-MIB
     symbol:
       name: wlsxSwitchTotalNumStationsAssociated
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.2.0
       description: Total number of stations associated to this switch.
       unit: "{station}"
+      family: "Network/Stations"
 metric_tags:
   - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
     symbol: wlsxModelName

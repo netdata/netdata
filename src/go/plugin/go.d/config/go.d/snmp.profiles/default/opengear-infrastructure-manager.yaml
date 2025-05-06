@@ -16,11 +16,13 @@ metrics:
         metric_type: monotonic_count
         description: Serial port bytes received
         unit: "By"
+        family: "Network/Interfaces/SerialPort"
       - name: ogSerialPortStatusTxBytes
         OID: 1.3.6.1.4.1.25049.16.1.1.4
         metric_type: monotonic_count
         description: Serial port bytes transmitted
         unit: "By"
+        family: "Network/Interfaces/SerialPort"
     metric_tags:
       - symbol:
           name: ogSerialPortStatusPort
@@ -94,10 +96,12 @@ metrics:
         OID: 1.3.6.1.4.1.25049.16.3.1.3
         description: Maximum temperature on the RPC
         unit: "Cel"
+        family: "Environment/RPC"
       - name: ogRpcStatusAlertCount
         OID: 1.3.6.1.4.1.25049.16.3.1.4
         description: Number of alerts triggered on the RPC
         unit: "{alert}"
+        family: "Environment/RPC"
     metric_tags:
       - symbol:
           name: ogRpcStatusName
@@ -112,14 +116,17 @@ metrics:
         OID: 1.3.6.1.4.1.25049.16.4.1.3
         description: Current temperature on the EMD
         unit: "Cel"
+        family: "Environment/EMD"
       - name: ogEmdStatusHumidity
         OID: 1.3.6.1.4.1.25049.16.4.1.4
         description: Humidity sensor on the EMD
         unit: "%"
+        family: "Environment/EMD"
       - name: ogEmdStatusAlertCount
         OID: 1.3.6.1.4.1.25049.16.4.1.5
         description: Number of alerts triggered on the EMD
         unit: "{alert}"
+        family: "Environment/EMD"
     metric_tags:
       - symbol:
           name: ogEmdStatusName

@@ -18,36 +18,44 @@ metrics:
         OID: 1.3.6.1.4.1.37447.1.2.1.4
         description: Maximum defined size of a volume in bytes - low order bytes.
         unit: "By"
+        family: "Storage/Volumes/Size"
       - name: nimble.volSizeHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.5
         description: Maximum defined size of a volume in bytes - high order bytes.
         unit: "By"
+        family: "Storage/Volumes/Size"
       - name: nimble.volUsageLow
         OID: 1.3.6.1.4.1.37447.1.2.1.6
         description: Current number of bytes a volume is using - low order bytes.
         unit: "By"
+        family: "Storage/Volumes/Usage"
       - name: nimble.volUsageHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.7
         description: Current number of bytes a volume is using - high order bytes.
         unit: "By"
+        family: "Storage/Volumes/Usage"
       - name: nimble.volReserveLow
         OID: 1.3.6.1.4.1.37447.1.2.1.8
         description: Number of bytes reserved for a volume - low order bytes.
         unit: "By"
+        family: "Storage/Volumes/Reserved"
       - name: nimble.volReserveHigh
         OID: 1.3.6.1.4.1.37447.1.2.1.9
         description: Number of bytes reserved for a volume - high order bytes.
         unit: "By"
+        family: "Storage/Volumes/Reserved"
       - name: nimble.volIoReads
         OID: 1.3.6.1.4.1.37447.1.2.1.13
         metric_type: monotonic_count
         description: Total cumulative number of Read I/Os (sequential and random).
         unit: "{read_io}"
+        family: "Storage/Volumes/IO"
       - name: nimble.volIoWrites
         OID: 1.3.6.1.4.1.37447.1.2.1.34
         metric_type: monotonic_count
         description: Total cumulative number of Write I/Os.
         unit: "{write_io}"
+        family: "Storage/Volumes/IO"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.37447.1.2.1.3
@@ -66,6 +74,7 @@ metrics:
       name: nimble.ioReads
       description: Total cumulative number of Read I/Os (sequential and random).
       unit: "{read_io}"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -73,6 +82,7 @@ metrics:
       name: nimble.ioWrites
       description: Total cumulative number of Write I/Os.
       unit: "{write_io}"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -80,6 +90,7 @@ metrics:
       name: nimble.ioReadTimeMicrosec
       description: Total cumulative microseconds the system has spent processing Read I/Os. This includes system and disk latency, but not any network latency back to the initiator.
       unit: "us"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -87,6 +98,7 @@ metrics:
       name: nimble.ioWriteTimeMicrosec
       description: Total cumulative microseconds the system has spent processing Write I/Os. This includes system and disk latency, but not any network latency back to the initiator.
       unit: "us"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -94,6 +106,7 @@ metrics:
       name: nimble.ioReadBytes
       description: Total cumulative number of Read I/O bytes (sequential and random).
       unit: "By"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -101,6 +114,7 @@ metrics:
       name: nimble.ioSeqReadBytes
       description: Total cumulative number of Sequential Read I/O bytes.
       unit: "By"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -108,6 +122,7 @@ metrics:
       name: nimble.ioWriteBytes
       description: Total cumulative number of Write I/O bytes (sequential and random).
       unit: "By"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -115,6 +130,7 @@ metrics:
       name: nimble.ioSeqWriteBytes
       description: Total cumulative number of Sequential Write I/O bytes.
       unit: "By"
+      family: "Storage/Global/IO"
     metric_type: monotonic_count
   - MIB: NIMBLE-MIB
     symbol:
@@ -122,28 +138,33 @@ metrics:
       name: nimble.diskVolBytesUsedLow
       description: Total number of bytes used on disk for volumes - low order bytes.
       unit: "By"
+      family: "Storage/Global/DiskUsage"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.13.0
       name: nimble.diskVolBytesUsedHigh
       description: Total number of bytes used on disk for volumes - high order bytes.
       unit: "By"
+      family: "Storage/Global/DiskUsage"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.14.0
       name: nimble.diskSnapBytesUsedLow
       description: Total number of bytes used on disk for snapshots - low order bytes.
       unit: "By"
+      family: "Storage/Global/DiskUsage"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.15.0
       name: nimble.diskSnapBytesUsedHigh
       description: Total number of bytes used on disk for snapshots - high order bytes.
       unit: "By"
+      family: "Storage/Global/DiskUsage"
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.16.0
       name: nimble.ioNonseqReadHits
       description: Total cumulative number of cache hits for Non-Sequential Read I/Os.
       unit: "{cache_hit}"
+      family: "Storage/Global/Cache"
     metric_type: monotonic_count

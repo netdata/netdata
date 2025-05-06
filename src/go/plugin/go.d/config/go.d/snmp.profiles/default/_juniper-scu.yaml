@@ -12,11 +12,13 @@ metrics:
         name: jnxScuStatsPackets
         description: Number of packets sent out of destination interface that match the source class and address type
         unit: "{packet}"
+        family: "Network/Interfaces/Juniper/SourceClassUsage"
     # The number of bytes sent out of jnxScuStatsDstIfIndex that match the source class (jnxScuStatsClassName) and match the address type (jnxScuStatsAddrFamily) defined for this table entry. 
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.5
         name: jnxScuStatsBytes
         description: Number of bytes sent out of destination interface that match the source class and address type
         unit: "By"
+        family: "Network/Interfaces/Juniper/SourceClassUsage"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1

@@ -8,6 +8,7 @@ metrics:
       name: udpHCInDatagrams
     description: The total number of UDP datagrams delivered to UDP users, for devices that can receive more than 1 million UDP datagrams per second.
     unit: "{datagram}"
+    family: "Network/UDP"
   - MIB: UDP-MIB
     metric_type: monotonic_count
     symbol:
@@ -15,6 +16,7 @@ metrics:
       name: udpNoPorts
     description: The total number of received UDP datagrams for which there was no application at the destination port.
     unit: "{datagram}"
+    family: "Network/UDP"
   - MIB: UDP-MIB
     metric_type: monotonic_count
     symbol:
@@ -22,6 +24,7 @@ metrics:
       name: udpInErrors
     description: The number of received UDP datagrams that could not be delivered for reasons other than the lack of an application at the destination port.
     unit: "{datagram}"
+    family: "Network/UDP"
   - MIB: UDP-MIB
     metric_type: monotonic_count
     symbol:
@@ -29,3 +32,4 @@ metrics:
       name: udpHCOutDatagrams
     description: The total number of UDP datagrams sent from this entity, for devices that can transmit more than 1 million UDP datagrams per second.
     unit: "{datagram}"
+    family: "Network/UDP"

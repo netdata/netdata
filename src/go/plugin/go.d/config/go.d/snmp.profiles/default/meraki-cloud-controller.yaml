@@ -30,10 +30,12 @@ metrics:
         name: devStatus
         description: "The status of the device's connection to the Meraki Cloud Controller Enumeration: 'offline': 0, 'online': 1."
         unit: "TBD"
+        family: "Network/Devices/ConnectionStatus"
       - OID: 1.3.6.1.4.1.29671.1.1.4.1.5
         name: devClientCount
         description: The number of clients currently associated with the device.
         unit: "{client}"
+        family: "Network/Devices/ClientCount"
     metric_tags:
       # devMac is part of the devTable index
       - symbol:
@@ -64,6 +66,7 @@ metrics:
         constant_value_one: true
         description: Meraki dev constant value one
         unit: "TBD"
+        family: "Network/Devices"
     metric_tags:
       # devMac is part of the devTable index
       - symbol:
@@ -101,18 +104,22 @@ metrics:
         name: devInterfaceSentPkts
         description: The number of packets sent on this interface.
         unit: "{packet}"
+        family: "Network/Interfaces/Packets"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.5
         name: devInterfaceRecvPkts
         description: The number of packets received on this interface.
         unit: "{packet}"
+        family: "Network/Interfaces/Packets"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.6
         name: devInterfaceSentBytes
         description: The number of bytes sent on this interface.
         unit: "By"
+        family: "Network/Interfaces/Bytes"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.7
         name: devInterfaceRecvBytes
         description: The number of bytes received on this interface.
         unit: "By"
+        family: "Network/Interfaces/Bytes"
     metric_tags:
       # devMac and devInterfaceIndex are part of the devInterfaceTable index
       - symbol:
