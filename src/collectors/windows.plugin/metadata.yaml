@@ -1254,6 +1254,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: files
+            - name: iis.w3scv_w3wp_uri_cache_flushed
+              description: Total number of URI cache flushes.
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
