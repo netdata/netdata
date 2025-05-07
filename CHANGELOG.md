@@ -1,5 +1,16 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.0...HEAD)
+
+**Merged pull requests:**
+
+- Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
+- Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
+- Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
+- Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
+
 ## [v2.5.0](https://github.com/netdata/netdata/tree/v2.5.0) (2025-05-05)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.4.0...v2.5.0)
@@ -465,11 +476,6 @@
 - under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
 - Integrate OpenTelemetry collector build into build system. [\#19702](https://github.com/netdata/netdata/pull/19702) ([Ferroin](https://github.com/Ferroin))
 - Document journal v2 index file format. [\#19701](https://github.com/netdata/netdata/pull/19701) ([vkalintiris](https://github.com/vkalintiris))
-- build\(deps\): update go.d packages [\#19700](https://github.com/netdata/netdata/pull/19700) ([ilyam8](https://github.com/ilyam8))
-- ADFS \(windows.plugin\) [\#19699](https://github.com/netdata/netdata/pull/19699) ([thiagoftsm](https://github.com/thiagoftsm))
-- build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.23 to 2.8.24 in /src/go [\#19698](https://github.com/netdata/netdata/pull/19698) ([dependabot[bot]](https://github.com/apps/dependabot))
-- change the moto and the description of netdata [\#19696](https://github.com/netdata/netdata/pull/19696) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.0 to 9.7.1 in /src/go [\#19693](https://github.com/netdata/netdata/pull/19693) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
