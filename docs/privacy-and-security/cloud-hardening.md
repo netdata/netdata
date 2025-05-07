@@ -6,19 +6,21 @@ All recommendations in this guide are based on official Netdata documentation, s
 
 ## Table of Contents
 
-- [Audience](#audience)
-- [Scope](#scope)
-- [Threat Model and Risk Assessment](#threat-model-and-risk-assessment)
-- [Secure Architecture Overview](#secure-architecture-overview)
-- [Security Hardening Areas](#security-hardening-areas)
-- [TL;DR: Hardening Checklist](#tldr-hardening-checklist)
-- [Netdata Cloud Security Controls](#netdata-cloud-security-controls)
-- [Authentication and RBAC](#authentication-and-rbac)
-- [Alert Notification Security](#alert-notification-security)
-- [Metadata and Privacy Considerations](#metadata-and-privacy-considerations)
-- [Change Management and Auditing](#change-management-and-auditing)
-- [Compliance Mapping](#compliance-mapping)
-- [Final Notes](#final-notes)
+- [Netdata Cloud Hardening Guide](#netdata-cloud-hardening-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Audience](#audience)
+  - [Scope](#scope)
+  - [Threat Model and Risk Assessment](#threat-model-and-risk-assessment)
+  - [Secure Architecture Overview](#secure-architecture-overview)
+  - [Security Hardening Areas](#security-hardening-areas)
+  - [TL;DR: Hardening Checklist](#tldr-hardening-checklist)
+  - [Netdata Cloud Security Controls](#netdata-cloud-security-controls)
+  - [Authentication and RBAC](#authentication-and-rbac)
+  - [Alert Notification Security](#alert-notification-security)
+  - [Metadata and Privacy Considerations](#metadata-and-privacy-considerations)
+  - [Change Management and Auditing](#change-management-and-auditing)
+  - [Compliance Mapping](#compliance-mapping)
+  - [Final Notes](#final-notes)
 
 ## Audience
 
@@ -28,12 +30,12 @@ Intended for infrastructure engineers, platform security teams, and IT administr
 
 This document applies to:
 
-| Environment | Included |
-|-------------|----------|
-| [Netdata Cloud (SaaS)](https://app.netdata.cloud) and its web dashboard | ✓ |
-| Cloud-to-Agent interactions (including Netdata Parents) | ✓ |
-| Optional on-premises or private-hosted Netdata Cloud setups | ✓ |
-| Netdata Agent security (covered in separate guide) | ✗ |
+| Environment                                                             | Included |
+| ----------------------------------------------------------------------- | -------- |
+| [Netdata Cloud (SaaS)](https://app.netdata.cloud) and its web dashboard | ✓        |
+| Cloud-to-Agent interactions (including Netdata Parents)                 | ✓        |
+| Optional on-premises or private-hosted Netdata Cloud setups             | ✓        |
+| Netdata Agent security (covered in separate guide)                      | ✗        |
 
 ## Threat Model and Risk Assessment
 
@@ -43,18 +45,18 @@ These threat vectors are validated against current Netdata Cloud features and do
 
 :::
 
-| Threat Vector | Description | Risk Level | Primary Mitigations |
-|---------------|-------------|------------|---------------------|
-| Unauthorized Dashboard Access | Unauthenticated access to Netdata Cloud UI | **High** | SSO, MFA, RBAC |
-| Man-in-the-Middle Attacks | Interception of ACLK connections | **High** | TLS encryption (ACLK) |
-| Credential Theft | Compromised login credentials | **High** | MFA, SSO, short session duration |
-| Excessive Permission Grants | Users with unnecessary privileges | **Medium** | RBAC, Room-level access segregation |
-| Alert Channel Compromise | Misconfigured webhooks or leaked tokens | **Medium** | HTTPS, token rotation |
-| Metadata Exposure | Internal system names exposed via Cloud | **Medium** | Custom node naming, label sanitization |
+| Threat Vector                 | Description                                | Risk Level | Primary Mitigations                      |
+| ----------------------------- | ------------------------------------------ | ---------- | ---------------------------------------- |
+| Unauthorized Dashboard Access | Unauthenticated access to Netdata Cloud UI | **High**   | SSO, MFA, RBAC                           |
+| Man-in-the-Middle Attacks     | Interception of ACLK connections           | **High**   | TLS encryption (Agent-Cloud LinK - ACLK) |
+| Credential Theft              | Compromised login credentials              | **High**   | MFA, SSO, short session duration         |
+| Excessive Permission Grants   | Users with unnecessary privileges          | **Medium** | RBAC, Room-level access segregation      |
+| Alert Channel Compromise      | Misconfigured webhooks or leaked tokens    | **Medium** | HTTPS, token rotation                    |
+| Metadata Exposure             | Internal system names exposed via Cloud    | **Medium** | Custom node naming, label sanitization   |
 
 ## Secure Architecture Overview
 
-:::tip 
+:::tip
 
 Diagram
 This architecture ensures secure communication paths while protecting internal systems.
@@ -111,33 +113,33 @@ flowchart TB
 
 ## Security Hardening Areas
 
-| Section | Purpose | Risk Level |
-|--------|---------|------------|
-| **1. Secure Agent-to-Cloud Connection** | Enforce encrypted streaming and access control policies between Agents/Parents and Cloud. | **Critical** |
-| **2. Authentication and SSO** | Use identity providers and enable SSO or MFA to restrict access. | **Critical** |
-| **3. Role-Based Access Control (RBAC)** | Assign least-privilege roles to team members within Netdata Cloud Rooms. | **High** |
-| **4. Cloud Configuration Management** | Review change history for dashboards, alerts, and spaces. | **Medium** |
-| **5. Alert Notification Security** | Secure all alert endpoints and notification channels. | **High** |
-| **6. External Access Protection** | Secure the Cloud UI with SSO, enforce session expiration policies. | **Critical** |
-| **7. Integration Security** | Secure third-party endpoints (e.g., Slack, PagerDuty) with proper tokens. | **Medium** |
-| **8. Metadata Privacy** | Limit what metadata is collected by Agents and uploaded to Cloud. | **Medium** |
-| **9. Telemetry and Analytics Opt-Out** | Disable usage telemetry if needed for compliance. | **Low** |
-| **10. Compliance Mapping** | Align usage of Netdata Cloud with frameworks such as SOC 2, ISO 27001, GDPR, etc. | **Medium** |
+| Section                                 | Purpose                                                                                                       | Risk Level   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------ |
+| **1. Secure Agent-to-Cloud Connection** | Enforce encrypted streaming and access control policies between Agents/Parents and Cloud.                     | **Critical** |
+| **2. Authentication and SSO**           | Use identity providers and enable SSO or MFA to restrict access.                                              | **Critical** |
+| **3. Role-Based Access Control (RBAC)** | Assign least-privilege roles to team members within Netdata Cloud Rooms.                                      | **High**     |
+| **4. Cloud Configuration Management**   | Review change history for dashboards, alerts, and spaces.                                                     | **Medium**   |
+| **5. Alert Notification Security**      | Secure all alert endpoints and notification channels.                                                         | **High**     |
+| **6. External Access Protection**       | Secure the Cloud UI with SSO, enforce session expiration policies.                                            | **Critical** |
+| **7. Integration Security**             | Secure third-party endpoints (e.g., Slack, PagerDuty) with proper tokens.                                     | **Medium**   |
+| **8. Metadata Privacy**                 | Limit what metadata is collected by Agents and uploaded to Cloud.                                             | **Medium**   |
+| **9. Telemetry and Analytics Opt-Out**  | Disable usage telemetry if needed for compliance.                                                             | **Low**      |
+| **10. Compliance Mapping**              | Align usage of Netdata Cloud with frameworks such as SOC 2, ISO 27001, GDPR, etc.                             | **Medium**   |
+| **11. Consider using IAAC**             | We have a [Terraform provider](https://registry.terraform.io/providers/netdata/netdata/latest/docs) available | **Low**      |
 
 ## TL;DR: Hardening Checklist
 
-| Area | Recommendation | Risk Level | Notes |
-|--------------------------|-------------------------------------------------------------------------------------------------------|----------|-------|
-| Connection Security | Ensure all connected Netdata Parents stream over TLS. | **Critical** | TLS is enforced by default |
-| Dashboard Access | Use SSO or SAML integration. Require MFA if supported. | **Critical** | |
-| RBAC | Create distinct Rooms and assign only the roles needed. | **High** | |
-| Notification Channels | Use HTTPS endpoints and secure tokens. | **High** | |
-| Cloud Settings Reviews | Regularly audit alert rules and custom dashboards. | **Medium** | |
-| Agent Discovery Control | Disable automatic Cloud registration unless needed. | **Medium** | |
-| Custom Dashboards | Avoid exposing sensitive identifiers in shared dashboards. | **Medium** | |
-| Account Protection | Use strong passwords and enforce idle timeouts. | **Critical** | |
-| Audit Events | Review audit logs available on Netdata Cloud. | **High** | Business tier only |
-| Data Sovereignty | Use on-prem Cloud or avoid transmitting sensitive metadata. | **High** | |
+| Area                    | Recommendation                                               | Risk Level   | Notes                                                           |
+| ----------------------- | ------------------------------------------------------------ | ------------ | --------------------------------------------------------------- |
+| Connection Security     | Ensure all connected Netdata Parents stream over TLS.        | **Critical** | See more: [Network Security and TLS](#network-security-and-tls) |
+| Dashboard Access        | Use SSO or SAML integration. Require MFA if supported.       | **Critical** | Business tier only                                              |
+| RBAC                    | Create distinct Rooms and assign only the roles needed.      | **High**     |                                                                 |
+| Notification Channels   | Use HTTPS endpoints and secure tokens for your integrations. | **High**     |                                                                 |
+| Cloud Settings Reviews  | Regularly audit alert rules and custom dashboards.           | **Medium**   |                                                                 |
+| Agent Discovery Control | Disable automatic Cloud registration unless needed.          | **Medium**   |                                                                 |
+| Custom Dashboards       | Avoid exposing sensitive identifiers in shared dashboards.   | **Medium**   |                                                                 |
+| Audit Events            | Review audit logs available on Netdata Cloud.                | **High**     | Business tier only                                              |
+| Data Sovereignty        | Use on-prem Cloud or avoid transmitting sensitive metadata.  | **High**     |                                                                 |
 
 ## Netdata Cloud Security Controls
 
@@ -206,15 +208,22 @@ Use identity providers (Google, GitHub, SAML) with MFA enforcement. Limit roles 
 
 :::
 
-| Role Type | Access Level |
-|-----------|--------------|
-| Viewer | Read-only access to dashboards |
-| Manager | Can edit dashboards and alerts |
-| Admin | Full control, including Room settings |
+| Role Type | Access Level                          |
+| --------- | ------------------------------------- |
+| Viewer    | Read-only access to dashboards        |
+| Manager   | Can edit dashboards and alerts        |
+| Admin     | Full control, including Room settings |
 
 - Enable SSO and MFA via Netdata Cloud settings.
 - Assign users to Rooms based on environment or team.
 - Regularly review user access and roles.
+
+To setup:
+
+- Go to app.netdata.cloud
+- Go to space settings (cogwheel icon on bottom-left corner)
+- Select from left hand side menu the `User Management`
+- You can add users inline there but if you want to integrate with SAML for example you will find controls under the `Authentication & Authorization` tab
 
 To verify:
 
@@ -241,6 +250,15 @@ Always validate your alert channels and rotate secrets regularly.
 - Review webhook payloads and enable signing/verification where supported.
 - Rotate API tokens and webhook secrets on a regular schedule.
 
+To setup:
+
+- Go to app.netdata.cloud
+- Go to space settings (cogwheel icon on bottom-left corner)
+- Pick `Alert & Notifications` from left hand side menu
+- `Notification Methods` tab allows you to set how you want to be notified
+- `Silencing Rules` tab allows to setup alert silencing
+- `Reachability` tab is responsible for setting up notifications regarding node state (online/offline transitions). It is 2 minutes by default.
+
 ## Metadata and Privacy Considerations
 
 :::tip
@@ -258,12 +276,13 @@ Netdata Cloud receives only metadata, not raw metrics. Still, naming and labels 
 :::tip
 
 Audit trails and configuration versioning improve traceability and reduce misconfigurations.
+It is also a good practice to use dedicated git repository and setup basics in [Terraform](https://registry.terraform.io/providers/netdata/netdata/latest/docs).
 
 :::
 
 - Use the Netdata Cloud UI to review changes to dashboards and alerts.
 - Export and archive configurations regularly.
-- Review audit logs available on Business plans.
+- Review audit logs available on Business plans (`Events` tab in UI).
 
 ## Compliance Mapping
 
@@ -273,12 +292,12 @@ Netdata Cloud supports many best practices aligned with modern compliance framew
 
 :::
 
-| Framework | Alignment |
-|-----------|-----------|
-| SOC 2 | Role-based access control, audit logs |
-| ISO 27001 | SSO, MFA, asset tagging |
-| GDPR | No raw metrics, customizable metadata exposure |
-| NIS2 | Visibility, alerting, incident monitoring |
+| Framework | Alignment                                      |
+| --------- | ---------------------------------------------- |
+| SOC 2     | Role-based access control, audit logs          |
+| ISO 27001 | SSO, MFA, asset tagging                        |
+| GDPR      | No raw metrics, customizable metadata exposure |
+| NIS2      | Visibility, alerting, incident monitoring      |
 
 ## Final Notes
 
@@ -288,6 +307,7 @@ Netdata Cloud supports many best practices aligned with modern compliance framew
 - Regularly audit users, dashboards, and alert settings.
 
 For more information:
+
 - [Netdata Learn](https://learn.netdata.cloud)
 - [Netdata Cloud Security & Privacy Design](https://learn.netdata.cloud/docs/netdata-cloud/security-design)
 - [Netdata GitHub](https://github.com/netdata/netdata)
