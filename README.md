@@ -472,11 +472,9 @@ Ways you help us stay sharp:
 The Netdata ecosystem includes:
 
 * **Netdata Agent** – Open-source core (GPLv3+). **Includes** data collection, storage, ML, alerting, APIs and **redistributes** several other open-source tools and libraries.
+    * [Netdata Agent License](https://github.com/netdata/netdata/blob/master/LICENSE)
+    * [Netdata Agent Redistributed](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md)
 * **Netdata UI** – Closed-source but free to use with Netdata Agent and Cloud. Delivered via CDN. It integrates third-party open-source components.
+    * [Netdata Cloud UI License](https://app.netdata.cloud/LICENSE.txt)
+    * [Netdata UI third-party licenses](https://app.netdata.cloud/3D_PARTY_LICENSES.txt)
 * **Netdata Cloud** – Closed-source, with free and paid tiers. Adds remote access, SSO, scalability.
-
-> [!NOTE]
-> [Netdata Agent License](https://github.com/netdata/netdata/blob/master/LICENSE)
-> [Netdata Agent Redistributed](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md)
-> [Netdata Cloud UI License](https://app.netdata.cloud/LICENSE.txt)
-> [Netdata UI third-party licenses](https://app.netdata.cloud/3D_PARTY_LICENSES.txt)
