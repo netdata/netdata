@@ -1223,6 +1223,8 @@ modules:
           labels:
             - name: app
               description: The name of the Application running.
+            - name: pid
+              description: Current PID of the process.
           metrics:
             - name: iis.w3scv_w3wp_active_threads
               description: Threads actively processing requests in the worker process.
