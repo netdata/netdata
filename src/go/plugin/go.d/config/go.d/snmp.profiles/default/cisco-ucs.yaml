@@ -311,44 +311,51 @@ metrics:
         description: "Cisco UCS compute:RackUnit:model managed object property"
         unit: "TBD"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitName
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.33
+      - symbol:
+          name: cucsComputeRackUnitName
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.33
         tag: cucs_compute_rack_unit_name
         description: "Cisco UCS compute:RackUnit:name managed object property"
         unit: "TBD"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitNumOfCores
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.35
+      - symbol:
+          name: cucsComputeRackUnitNumOfCores
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.35
         tag: cucs_compute_rack_unit_num_of_cores
         description: "Number of cores"
         unit: "{core}"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitNumOfCpus
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
+      - symbol:
+          name: cucsComputeRackUnitNumOfCpus
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
         tag: cucs_compute_rack_unit_num_of_cpus
         description: "Number of cpus"
         unit: "{cpu}"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitNumOfThreads
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
+      - symbol:
+          name: cucsComputeRackUnitNumOfThreads
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
         tag: cucs_compute_rack_unit_num_of_threads
         description: "Number of threads"
         unit: "{thread}"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitSerial
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.47
+      - symbol:
+          name: cucsComputeRackUnitSerial
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.47
         tag: cucs_compute_rack_unit_serial
         description: "Cisco UCS compute:RackUnit:serial managed object property"
         unit: "TBD"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitUuid
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.50
+      - symbol:
+          name: cucsComputeRackUnitUuid
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.50
         tag: cucs_compute_rack_unit_uuid
         description: "Cisco UCS compute:RackUnit:uuid managed object property"
         unit: "TBD"
         family: "Compute/RackUnit"
-      - name: cucsComputeRackUnitVendor
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.51
+      - symbol:
+          name: cucsComputeRackUnitVendor
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.51
         tag: cucs_compute_rack_unit_vendor
         description: "Cisco UCS compute:RackUnit:vendor managed object property"
         unit: "TBD"
