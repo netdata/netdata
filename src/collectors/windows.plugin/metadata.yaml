@@ -1272,6 +1272,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: blocks
+            - name: iis.w3scv_w3wp_total_metadata_flushed
+              description: Total number of user-mode metadata cache flushed.
+              unit: "flishes/s"
+              chart_type: line
+              dimensions:
+                - name: flishes
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV

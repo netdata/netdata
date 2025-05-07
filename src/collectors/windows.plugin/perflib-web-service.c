@@ -121,6 +121,9 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_total_metadata_cache;
     RRDDIM *rd_wescv_w3wp_total_metadata_cache;
 
+    RRDSET *st_wescv_w3wp_total_metadata_flushed;
+    RRDDIM *rd_wescv_w3wp_total_metadata_flushed;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1741,6 +1744,38 @@ static inline void w3svc_w3wp_total_metadata_flushed(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalMetadataFlushed)) {
+        if (!p->st_wescv_w3wp_total_metadata_flushed) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_total_metadata_flushed", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_total_metadata_flushed = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_total_metadata_flushed",
+                "Total number of user-mode metadata cache flushed.",
+                "flushes/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_METADATA_FLUSHED,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_total_metadata_flushed =
+                rrddim_add(p->st_wescv_w3wp_total_metadata_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_wescv_w3wp_total_metadata_flushed->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_total_metadata_flushed,
+            p->rd_wescv_w3wp_total_metadata_flushed,
+            (collected_number)p->WESCVW3WPTotalMetadataFlushed.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_total_metadata_flushed);
+    }
 }
 
 static inline void w3svc_w3wp_output_cache_active_flushed_itens(
