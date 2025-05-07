@@ -1247,9 +1247,15 @@ modules:
               unit: "bytes/s"
               chart_type: line
               dimensions:
-                - name: mem
-            - name: iis.w3scv_w3wp_file_cache_total
+                - name: used
+            - name: iis.w3scv_w3wp_files_cache_total
               description: Total number of files whose contents were ever added to the cache.
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.w3scv_w3wp_files_flushed_total
+              description: Total number of file handles that have been removed from the cache.
               unit: "files/s"
               chart_type: line
               dimensions:
