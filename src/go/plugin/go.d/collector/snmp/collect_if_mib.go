@@ -159,6 +159,9 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 
 	for _, iface := range c.netInterfaces {
 		if iface.ifName == "" {
+			iface.ifName = iface.ifDescr
+		}
+		if iface.ifName == "" {
 			continue
 		}
 
