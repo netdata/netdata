@@ -1405,8 +1405,7 @@ static inline void w3svc_w3wp_active_threads(
 
             p->rd_wescv_w3wp_active_threads =
                 rrddim_add(p->st_wescv_w3wp_active_threads, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_wescv_w3wp_active_threads->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_wescv_w3wp_active_threads->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1446,8 +1445,7 @@ static inline void w3svc_w3wp_requests_total(
 
             p->rd_wescv_w3wp_requests_total =
                 rrddim_add(p->st_wescv_w3wp_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(
-                p->st_wescv_w3wp_requests_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_wescv_w3wp_requests_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1487,8 +1485,7 @@ static inline void w3svc_w3wp_requests_active(
 
             p->rd_wescv_w3wp_requests_active =
                 rrddim_add(p->st_wescv_w3wp_requests_active, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(
-                p->st_wescv_w3wp_requests_active->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_wescv_w3wp_requests_active->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1813,10 +1810,13 @@ static inline void w3svc_w3wp_output_cache_active_flushed_itens(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_output_cache_active_flushed_items =
-                rrddim_add(p->st_wescv_w3wp_output_cache_active_flushed_items, "items", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_wescv_w3wp_output_cache_active_flushed_items = rrddim_add(
+                p->st_wescv_w3wp_output_cache_active_flushed_items, "items", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels,
+                "app",
+                windows_shared_buffer,
+                RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1895,8 +1895,8 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_output_cache_flushed_total =
-                rrddim_add(p->st_wescv_w3wp_output_cache_flushed_total, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_wescv_w3wp_output_cache_flushed_total = rrddim_add(
+                p->st_wescv_w3wp_output_cache_flushed_total, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_wescv_w3wp_output_cache_flushed_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
