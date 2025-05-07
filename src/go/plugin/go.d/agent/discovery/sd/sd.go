@@ -108,7 +108,7 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile, in ch
 	var cfg pipeline.Config
 
 	if err := yaml.Unmarshal(conf.content, &cfg); err != nil {
-		d.Error(err)
+		d.Errorf("failed to unmarshal pipeline config '%s' (%s): %v", cfg.Name, conf.source, err)
 		return
 	}
 
