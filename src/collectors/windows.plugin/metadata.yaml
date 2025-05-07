@@ -1260,6 +1260,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: flushes
+            - name: iis.w3scv_w3wp_total_uri_cached
+              description: Total number of URI information blocks added to the cache.
+              unit: "blocks/s"
+              chart_type: line
+              dimensions:
+                - name: blocks
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
