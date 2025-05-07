@@ -1321,7 +1321,7 @@ int do_module_libsensors(int update_every, const char *name __maybe_unused) {
     if(!libsensors) {
         libsensors_update_every = update_every;
         libsensors_running = true;
-        libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_JOINABLE, libsensors_thread, NULL);
+        libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_DEFAULT, libsensors_thread, NULL);
     }
 
     return libsensors && libsensors_running ? 0 : 1;

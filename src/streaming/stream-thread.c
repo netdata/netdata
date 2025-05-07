@@ -728,7 +728,7 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM "[%zu]", sth->id);
 
-        sth->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, stream_thread, sth);
+        sth->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_thread, sth);
         if (!sth->thread)
             nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: failed to create new thread for client.", sth->id);
     }

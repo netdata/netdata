@@ -382,7 +382,7 @@ static int uuidmap_concurrent_unittest(void) {
         snprintf(thread_name, sizeof(thread_name), "UUID-TEST-%d", i);
         threads[i] = nd_thread_create(
             thread_name,
-            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+            NETDATA_THREAD_OPTION_DONT_LOG,
             concurrent_test_thread,
             &stats[i]);
     }

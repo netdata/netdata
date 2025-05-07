@@ -580,7 +580,7 @@ int dyncfg_unittest(void) {
     // ------------------------------------------------------------------------
     // create the thread for testing async communication
 
-    ND_THREAD *thread = nd_thread_create("unittest", NETDATA_THREAD_OPTION_JOINABLE, dyncfg_unittest_thread_action, NULL);
+    ND_THREAD *thread = nd_thread_create("unittest", NETDATA_THREAD_OPTION_DEFAULT, dyncfg_unittest_thread_action, NULL);
 
     // ------------------------------------------------------------------------
     // single

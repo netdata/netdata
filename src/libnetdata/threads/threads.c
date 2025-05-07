@@ -339,12 +339,10 @@ static void nd_thread_exit(ND_THREAD *nti) {
     }
     spinlock_unlock(&threads_globals.running.spinlock);
 
-    //if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
     spinlock_lock(&threads_globals.exited.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
     nti->list = ND_THREAD_LIST_EXITED;
     spinlock_unlock(&threads_globals.exited.spinlock);
-    //}
 }
 
 static void nd_thread_starting_point(void *ptr) {
@@ -407,9 +405,6 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     nti->options = (options & NETDATA_THREAD_OPTIONS_ALL);
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
 
-    if ((options & NETDATA_THREAD_OPTION_JOINABLE) == 0)
-        nd_log_daemon(NDLP_INFO, "WARNING: Creating detached thread '%s'", tag);
-
     int retries = 0;
     int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, &retries);
     if(ret != 0) {
@@ -467,11 +462,8 @@ int nd_thread_join(ND_THREAD *nti) {
         return 0;
     }
 
-    int ret = 0;
-    bool joinable = nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE);
-    if (joinable)
-        ret = uv_thread_join(&nti->thread);
-    if(ret != 0) {
+    int ret;
+    if((ret = uv_thread_join(&nti->thread))) {
         // we can't join the thread
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -480,9 +472,6 @@ int nd_thread_join(ND_THREAD *nti) {
     }
     else {
         // we successfully joined the thread
-        if (joinable)
-            nd_log(NDLS_DAEMON, NDLP_DEBUG, "Joining thread '%s', tid %d", nti->tag, nti->tid);
-
        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
 
         spinlock_lock(&threads_globals.running.spinlock);
@@ -499,10 +488,7 @@ int nd_thread_join(ND_THREAD *nti) {
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
-        if (joinable)
-            freez(nti);
-        else
-            nti->thread = 0;
+        freez(nti);
     }
 
     return ret;

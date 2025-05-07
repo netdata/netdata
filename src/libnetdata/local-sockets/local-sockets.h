@@ -1671,7 +1671,7 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
         workers_data[last_thread].inode = inode;
         workers[last_thread] = nd_thread_create(
             "local-sockets-worker",
-            NETDATA_THREAD_OPTION_JOINABLE,
+            NETDATA_THREAD_OPTION_DEFAULT,
             local_sockets_get_namespace_sockets_worker,
             &workers_data[last_thread]);
 

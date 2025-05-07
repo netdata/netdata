@@ -195,7 +195,7 @@ void watcher_thread_start() {
     completion_init(&shutdown_begin_completion);
     completion_init(&shutdown_end_completion);
 
-    watcher_thread = nd_thread_create("EXIT_WATCHER", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
+    watcher_thread = nd_thread_create("EXIT_WATCHER", NETDATA_THREAD_OPTION_DEFAULT, watcher_main, NULL);
 }
 
 void watcher_thread_stop() {

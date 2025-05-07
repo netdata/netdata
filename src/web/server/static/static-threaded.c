@@ -384,7 +384,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
         char tag[50 + 1];
         snprintfz(tag, sizeof(tag) - 1, "WEB[%d]", i+1);
 
-        static_workers_private_data[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+        static_workers_private_data[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
                                                                  socket_listen_main_static_threaded_worker,
                                                                  (void *)&static_workers_private_data[i]);
     }

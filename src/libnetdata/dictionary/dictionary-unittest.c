@@ -690,11 +690,7 @@ static int dictionary_unittest_threads() {
 
         char buf[100 + 1];
         snprintf(buf, 100, "dict%d", i);
-        tu[i].thread = nd_thread_create(
-            buf,
-            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-            unittest_dict_thread,
-            &tu[i]);
+        tu[i].thread = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, unittest_dict_thread, &tu[i]);
     }
 
     sleep_usec(seconds_to_run * USEC_PER_SEC);
@@ -871,17 +867,9 @@ static int dictionary_unittest_view_threads() {
     ND_THREAD *master_thread, *view_thread;
     tv.join = 0;
 
-    master_thread = nd_thread_create(
-        "master",
-        NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-        unittest_dict_master_thread,
-        &tv);
+    master_thread = nd_thread_create("master", NETDATA_THREAD_OPTION_DONT_LOG, unittest_dict_master_thread, &tv);
 
-    view_thread = nd_thread_create(
-        "view",
-        NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-        unittest_dict_view_thread,
-        &tv);
+    view_thread = nd_thread_create("view", NETDATA_THREAD_OPTION_DONT_LOG, unittest_dict_view_thread, &tv);
 
     sleep_usec(seconds_to_run * USEC_PER_SEC);
 
