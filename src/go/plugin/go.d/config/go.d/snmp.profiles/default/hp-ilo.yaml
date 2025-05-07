@@ -21,120 +21,166 @@ metadata:
 metrics:
   # iLO controller metrics.
 
-  - # Power state.
+    # Power state.
     # NOTE: unknown(1), poweredOff(2), poweredOn(3), insufficientPowerOrPowerOnDenied(4)
-    MIB: CPQSM2-MIB
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.2.32.0
       name: cpqSm2CntlrServerPowerState
+    description: Power state of the server
+    unit: "{state}"
 
-  - # Status of battery.
+    # Status of battery.
     # NOTE: other(1), batteryOk(2), batteryFailed(3), batteryDisconnected(4)
-    MIB: CPQSM2-MIB
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.2.5.0
       name: cpqSm2CntlrBatteryStatus
+    description: Status of the battery
+    unit: "{state}"
 
-  - # Charge level of battery.
-    MIB: CPQSM2-MIB
+    # Charge level of battery.
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.2.6.0
       name: cpqSm2CntlrBatteryPercentCharged
+    description: Charge level of the battery
+    unit: "%"
 
-  - # A bitmap of self-test errors.
+    # A bitmap of self-test errors.
     # NOTE: 0 indicates that no errors have occurred.
-    MIB: CPQSM2-MIB
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.2.9.0
       name: cpqSm2CntlrSelfTestErrors
+    description: Bitmap of self-test errors
+    unit: "{error}"
 
-  - # Whether a remote session is active.
+    # Whether a remote session is active.
     # NOTE: other(1), active(2), inactive(3)
-    MIB: CPQSM2-MIB
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.2.16.0
       name: cpqSm2CntlrRemoteSessionStatus
+    description: Status of remote session activity
+    unit: "{state}"
 
-  - # Status of the remote interface.
+    # Status of the remote interface.
     # NOTE: other(1), ok(2), notResponding(3)
-    MIB: CPQSM2-MIB
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.2.17.0
       name: cpqSm2CntlrInterfaceStatus
+    description: Status of the remote interface
+    unit: "{state}"
 
   # Event log.
 
-  - # Number of entries in the event log.
-    MIB: CPQSM2-MIB
+    # Number of entries in the event log.
+  - MIB: CPQSM2-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.9.2.3.1.0
       name: cpqSm2EventTotalEntries
+    description: Number of entries in the event log
+    unit: "{entry}"
 
   # Network interfaces and traffic.
 
-  - # Network interface card statistics.
-    MIB: CPQSM2-MIB
+    # Network interface card statistics.
+  - MIB: CPQSM2-MIB
     table:
       OID: 1.3.6.1.4.1.232.9.2.5.2
       name: cpqSm2NicStatsTable
     symbols:
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.2
         name: cpqSm2NicXmitBytes
+        description: Number of bytes transmitted by the network interface controller
+        unit: "By"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.3
         name: cpqSm2NicXmitTotalPackets
+        description: Total number of packets transmitted by the network interface controller
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.6
         name: cpqSm2NicXmitDiscardPackets
+        description: Total number of discarded packets transmitted by the network interface controller
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.7
         name: cpqSm2NicXmitErrorPackets
+        description: Total number of error packets transmitted by the network interface controller
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.8
         name: cpqSm2NicXmitQueueLength
+        description: Number of outstanding packets in the transmit queue
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.9
         name: cpqSm2NicRecvBytes
+        description: Number of bytes received by the network interface controller
+        unit: "By"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.10
         name: cpqSm2NicRecvTotalPackets
+        description: Total number of packets received by the network interface controller
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.13
         name: cpqSm2NicRecvDiscardPackets
+        description: Total number of discarded packets received by the network interface controller
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.14
         name: cpqSm2NicRecvErrorPackets
+        description: Total number of error packets received by the network interface controller
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.232.9.2.5.2.1.15
         name: cpqSm2NicRecvUnknownPackets
+        description: Number of unknown protocol packets received by the network interface controller
+        unit: "{packet}"
     metric_type: monotonic_count # Sent as Counter (would be ingested as rates if not forced).
     metric_tags:
-      - # Location of the controller (embedded controller vs. PC card).
+        # Location of the controller (embedded controller vs. PC card).
         # NOTE: other(1), embedded(2), pcmcia(3)
-        tag: nic_stats_location
+      - tag: nic_stats_location
         symbol:
           OID: 1.3.6.1.4.1.232.9.2.5.2.1.1
           name: cpqSm2NicStatsLocation
 
-  - # Network physical adapters statistics (counts).
-    MIB: CPQNIC-MIB
+    # Network physical adapters statistics (counts).
+  - MIB: CPQNIC-MIB
     table:
       OID: 1.3.6.1.4.1.232.18.2.3.1
       name: cpqNicIfPhysAdapterTable
     symbols:
-      - # Number of frames successfully transmitted.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.16
+        # Number of frames successfully transmitted.
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.16
         name: cpqNicIfPhysAdapterGoodTransmits
-      - # Number of frames successfully received.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.17
+        description: Count of frames successfully transmitted by the physical adapter
+        unit: "{frame}"
+        # Number of frames successfully received.
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.17
         name: cpqNicIfPhysAdapterGoodReceives
-      - # Number of frames not transmitted because of an error.
+        description: Count of frames successfully received by the physical adapter
+        unit: "{frame}"
+        # Number of frames not transmitted because of an error.
         # NOTE: this is the sum of 4 other metrics. (As a result, we don't submit those 4 metrics.)
         # NOTE: MIB recommends looking at details stats and take action if this counter increments frequently.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.18
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.18
         name: cpqNicIfPhysAdapterBadTransmits
-      - # Number of frames not received because of an error.
+        description: Count of frames not transmitted due to errors by the physical adapter
+        unit: "{frame}"
+        # Number of frames not received because of an error.
         # NOTE: this is the sum of 4 other metrics. (As a result, we don't submit those 4 metrics.)
         # NOTE: MIB recommends looking at details stats and take action if this counter increments frequently.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.19
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.19
         name: cpqNicIfPhysAdapterBadReceives
-      - # Number of octets received.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.37
+        description: Count of frames not received due to errors by the physical adapter
+        unit: "{frame}"
+        # Number of octets received.
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.37
         name: cpqNicIfPhysAdapterInOctets
-      - # Number of octets sent.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.38
+        description: Count of octets received on the physical adapter
+        unit: "By"
+        # Number of octets sent.
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.38
         name: cpqNicIfPhysAdapterOutOctets
+        description: Count of octets sent on the physical adapter
+        unit: "By"
     metric_type: monotonic_count  # Sent as Counters (not forcing would make us ingest them as rates).
     metric_tags:
       - tag: interface
@@ -142,19 +188,23 @@ metrics:
           OID: 1.3.6.1.4.1.232.18.2.3.1.1.39
           name: cpqNicIfPhysAdapterName
 
-  - # Network physical adapters statistics (rates).
-    MIB: CPQNIC-MIB
+    # Network physical adapters statistics (rates).
+  - MIB: CPQNIC-MIB
     table:
       OID: 1.3.6.1.4.1.232.18.2.3.1
       name: cpqNicIfPhysAdapterTable
     symbols:
-      - # Estimate of current bandwidth in bps.
+        # Estimate of current bandwidth in bps.
         # NOTE: this is zero if the value exceeds 4Gbps.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.33
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.33
         name: cpqNicIfPhysAdapterSpeed
-      - # Estimate of current bandwidth in Mbps.
-        OID: 1.3.6.1.4.1.232.18.2.3.1.1.36
+        description: Estimate of the interface's current bandwidth in bits per second
+        unit: "bit/s"
+        # Estimate of current bandwidth in Mbps.
+      - OID: 1.3.6.1.4.1.232.18.2.3.1.1.36
         name: cpqNicIfPhysAdapterSpeedMbps
+        description: Estimate of the interface's current bandwidth in Megabits per second
+        unit: "Mbit/s"
     # NOTE: no 'metric_type', as these are correctly sent as gauges.
     metric_tags:
       - tag: interface
@@ -164,9 +214,11 @@ metrics:
 
   # Miscellaneous.
 
-  - # Virus activity detection.
+    # Virus activity detection.
     # NOTE: notDetected(1), detected(2)
-    MIB: CPQNIC-MIB
+  - MIB: CPQNIC-MIB
     symbol:
       OID: 1.3.6.1.4.1.232.18.2.5.3.0
       name: cpqNicVtVirusActivity
+    description: Virus activity detection status
+    unit: "{state}"

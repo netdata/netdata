@@ -34,18 +34,32 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.2
         name: cpqSeCpuSlot
+        description: Cpu slot number
+        unit: "{slot}"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.4
         name: cpqSeCpuSpeed
+        description: Current internal speed of the processor in megahertz
+        unit: "MHz"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.6
         name: cpqSeCpuStatus
+        description: Status of the processor
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.7
         name: cpqSeCpuExtSpeed
+        description: External frequency of the processor bus in megahertz
+        unit: "MHz"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.15
         name: cpqSeCpuCore
+        description: Number of cores in the CPU module
+        unit: "{core}"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.25
         name: cpqSeCPUCoreMaxThreads
+        description: Maximum number of threads a CPU core is capable of
+        unit: "{thread}"
       - OID: 1.3.6.1.4.1.232.1.2.2.1.1.27
         name: cpqSeCpuPrimary
+        description: Indicates if the CPU is primary
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.1.2.2.1.1.1
@@ -58,12 +72,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.2
         name: cpqHoCpuUtilMin
+        description: Cpu utilization as a percentage of the theoretical maximum during the last minute
+        unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.3
         name: cpqHoCpuUtilFiveMin
+        description: Cpu utilization as a percentage of the theoretical maximum during the last five minutes
+        unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.4
         name: cpqHoCpuUtilThirtyMin
+        description: Cpu utilization as a percentage of the theoretical maximum during the last thirty minutes
+        unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.3.1.1.5
         name: cpqHoCpuUtilHour
+        description: Cpu utilization as a percentage of the theoretical maximum during the last hour
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.11.2.3.1.1.1
@@ -76,16 +98,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.3
         name: cpqHoFileSysSpaceTotal
+        description: File system size in megabytes
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.4
         name: cpqHoFileSysSpaceUsed
+        description: Megabytes of file system space currently in use
+        unit: "MBy"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.5
         name: cpqHoFileSysPercentSpaceUsed
+        description: Percent of file system space currently in use
+        unit: "%"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.6
         name: cpqHoFileSysAllocUnitsTotal
+        description: Total number of files that can be stored on the file system if a limit exists
+        unit: "{file}"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.7
         name: cpqHoFileSysAllocUnitsUsed
+        description: Number of files on the file system
+        unit: "{file}"
       - OID: 1.3.6.1.4.1.232.11.2.4.1.1.8
         name: cpqHoFileSysStatus
+        description: Threshold status of the file system
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.11.2.4.1.1.1
@@ -98,18 +132,32 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.3
         name: cpqSiMemModuleSize
+        description: Module memory size in kilobytes
+        unit: "kBy"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.4
         name: cpqSiMemModuleType
+        description: Type of memory module installed
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.5
         name: cpqSiMemModuleSpeed
+        description: Module memory speed in nanoseconds
+        unit: "ns"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.6
         name: cpqSiMemModuleTechnology
+        description: Technology type of memory module installed
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.11
         name: cpqSiMemModuleECCStatus
+        description: Current status of correctable memory errors for this memory module
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.13
         name: cpqSiMemModuleFrequency
+        description: Memory module frequency in megahertz
+        unit: "MHz"
       - OID: 1.3.6.1.4.1.232.2.2.4.5.1.15
         name: cpqSiMemModuleCellStatus
+        description: Current status for this memory module
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.2.2.4.5.1.1
@@ -126,8 +174,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.13
         name: cpqNicIfPhysAdapterState
+        description: Fault tolerant state of the physical adapter
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.232.18.2.3.1.1.14
         name: cpqNicIfPhysAdapterStatus
+        description: Physical adapter status
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.18.2.3.1.1.4
@@ -144,6 +196,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.232.3.2.2.1.1.6
         name: cpqDaCntlrCondition
+        description: Condition of the device controller
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.3.2.2.1.1.1

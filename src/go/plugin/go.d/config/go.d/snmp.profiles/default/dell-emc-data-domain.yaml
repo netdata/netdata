@@ -47,18 +47,26 @@ metrics:
     symbol:
       name: memory.total
       OID: 1.3.6.1.2.1.25.2.3.1.5.1
+      description: Size of the storage represented by this entry in units of hrStorageAllocationUnits
+      unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.2.1.25.2.3.1.6.1
+      description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
+      unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.6  # hrStorageUsed.6 = Memory buffers
       name: hrMemoryBuffers
+      description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
+      unit: "By"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.2.3.1.6.7  # hrStorageUsed.7 = Cached memory
       name: hrCachedMemory
+      description: Amount of the storage represented by this entry that is allocated in units of hrStorageAllocationUnits
+      unit: "By"
 #  - MIB: DATA-DOMAIN-MIB
 #    symbol:
 #      name: fileSystemStatus
@@ -73,8 +81,10 @@ metrics:
 #      TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
   - MIB: DATA-DOMAIN-MIB
     symbol:
-     name: datadomain.fileSystemVirtualSpace
-     OID: 1.3.6.1.4.1.19746.1.3.1.2.0
+      name: datadomain.fileSystemVirtualSpace
+      OID: 1.3.6.1.4.1.19746.1.3.1.2.0
+      description: Amount of uncompressed data that has been backed up by the system
+      unit: "By"
 # TODO: octet string cannot be collected
 #  - MIB: DATA-DOMAIN-MIB
 #    symbol:
@@ -93,6 +103,8 @@ metrics:
     symbols:
       - name: datadomain.powerModule
         constant_value_one: true
+        description: A table containing entries of PowerModuleEntry
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: powerModuleDescription
@@ -116,6 +128,8 @@ metrics:
     symbols:
       - name: datadomain.tempSensorCurrentValue
         OID: 1.3.6.1.4.1.19746.1.1.2.1.1.1.5
+        description: Current temperature value of the sensor
+        unit: "Cel"
     metric_tags:
       - symbol:
           name: tempSensorDescription
@@ -138,6 +152,8 @@ metrics:
     symbols:
       - name: datadomain.fanProperties
         constant_value_one: true
+        description: A table containing entries of FanPropertiesEntry
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: fanDescription
@@ -167,14 +183,24 @@ metrics:
     symbols:
       - name: datadomain.fileSystemSpaceSize
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.4
+        description: Size of the file system resource in gigabytes
+        unit: "GBy"
       - name: datadomain.fileSystemSpaceUsed
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.5
+        description: Amount of used space within the file system resource in gigabytes
+        unit: "GBy"
       - name: datadomain.fileSystemSpaceAvail
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.6
+        description: Amount of available space within the file system resource in gigabytes
+        unit: "GBy"
       - name: datadomain.fileSystemPercentUsed
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.7
+        description: Percentage of used space within the file system resource
+        unit: "%"
       - name: datadomain.fileSystemSpaceCleanable
         OID: 1.3.6.1.4.1.19746.1.3.2.1.1.8
+        description: Amount of file system space that can be cleaned
+        unit: "GBy"
     metric_tags:
       - symbol:
           name: fileSystemResourceName
@@ -191,20 +217,36 @@ metrics:
     symbols:
       - name: datadomain.fileSystemCompressionStartTime
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.3
+        description: Start time of file system compression
+        unit: "s"
       - name: datadomain.fileSystemCompressionEndTime
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.4
+        description: End time of file system compression
+        unit: "s"
       - name: datadomain.fileSystemPreCompressionSize
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.5
+        description: Size of file system before compression
+        unit: "By"
       - name: datadomain.fileSystemPostCompressionSize
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.6
+        description: Size of file system after compression
+        unit: "By"
       - name: datadomain.fileSystemGlobalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.7
+        description: Global compression factor of the file system
+        unit: "1"
       - name: datadomain.fileSystemLocalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.8
+        description: Local compression factor of the file system
+        unit: "1"
       - name: datadomain.fileSystemTotalCompressionFactor
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.9
+        description: Total compression factor of the file system
+        unit: "1"
       - name: datadomain.fileSystemReductionPercent1
         OID: 1.3.6.1.4.1.19746.1.3.3.1.1.11
+        description: Percentage reduction of the file system size due to compression
+        unit: "%"
     metric_tags:
       - symbol:
           name: fileSystemCompressionIndex
@@ -217,34 +259,64 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.2
+        description: CPU 0 percentage busy
+        unit: "%"
       - name: datadomain.cpuMaxPercentageBusy
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.3
+        description: CPU 1 percentage busy
+        unit: "%"
       - name: datadomain.nfsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.4
+        description: Number of NFS operations performed per second
+        unit: "{operation}/s"
       - name: datadomain.nfsIdlePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.5
+        description: Percentage of time NFS was idle
+        unit: "%"
       - name: datadomain.nfsProcPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.6
+        description: Percentage of time NFS was processing
+        unit: "%"
       - name: datadomain.nfsSendPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.7
+        description: Percentage of time NFS was sending requests
+        unit: "%"
       - name: datadomain.nfsReceivePercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.8
+        description: Percentage of time NFS was receiving requests
+        unit: "%"
       - name: datadomain.cifsOpsPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.9
+        description: Number of CIFS operations performed per second
+        unit: "{operation}/s"
       - name: datadomain.diskReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.10
+        description: Number of kilobytes per second read from disk
+        unit: "kBy/s"
       - name: datadomain.diskWriteKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.11
+        description: Number of kilobytes per second written to disk
+        unit: "kBy/s"
       - name: datadomain.diskBusyPercentage
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.12
+        description: Percentage of time disks were busy
+        unit: "%"
       - name: datadomain.nvramReadKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.13
+        description: Number of kilobytes read per second from NVRAM
+        unit: "kBy/s"
       - name: datadomain.nvramWriteKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.14
+        description: Number of kilobytes written per second to NVRAM
+        unit: "kBy/s"
       - name: datadomain.replInKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.15
+        description: Number of kilobytes per second received for replication
+        unit: "kBy/s"
       - name: datadomain.replOutKBytesPerSecond
         OID: 1.3.6.1.4.1.19746.1.5.1.1.1.16
+        description: Number of kilobytes per second sent for replication
+        unit: "kBy/s"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.19746.1.5.1.1.1.1
@@ -257,6 +329,8 @@ metrics:
     symbols:
       - name: datadomain.diskProperties
         constant_value_one: true
+        description: A table containing entries of DiskPropertiesEntry
+        unit: "TBD"
     metric_tags:
       - symbol:
           name: diskPropEnclosureID
@@ -310,12 +384,20 @@ metrics:
     symbols:
       - name: datadomain.diskSectorsRead
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.3
+        description: Number of disk sectors read per second
+        unit: "{disk_sector}"
       - name: datadomain.diskSectorsWritten
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.4
+        description: Number of disk sectors written per second
+        unit: "{disk_sector}"
       - name: datadomain.diskTotalKBytes
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.5
+        description: Total number of kilobytes read or written per second
+        unit: "kBy/s"
       - name: datadomain.diskBusy
         OID: 1.3.6.1.4.1.19746.1.6.2.1.1.6
+        description: Percentage of time disk is busy
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.19746.1.6.2.1.1.7

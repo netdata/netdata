@@ -6,6 +6,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.99.1.1.1.4
         name: entPhySensorValue
+        description: The most recent measurement obtained by the agent for this sensor
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
@@ -24,6 +26,8 @@ metrics:
           10: rpm
           11: cmm
           12: truthvalue
+        description: The type of data returned by the associated entPhySensorValue object
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.2
           name: entPhySensorScale
@@ -46,14 +50,20 @@ metrics:
           15: peta
           16: zetta
           17: yotta
+        description: The exponent to apply to values returned by the associated entPhySensorValue object
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.3
           name: entPhySensorPrecision
         tag: ent_phy_sensor_precision
+        description: The number of decimal places of precision in fixed-point sensor values returned by the associated entPhySensorValue object
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.6
           name: entPhySensorUnitsDisplay
         tag: ent_phy_sensor_units_display
+        description: A textual description of the data units that should be used in the display of entPhySensorValue
+        unit: "TBD"
       - symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.2
           name: entPhysicalDescr
@@ -98,3 +108,5 @@ metrics:
           1: ok
           2: unavailable
           3: nonoperational
+        description: The operational status of the sensor
+        unit: "TBD"

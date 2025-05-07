@@ -220,6 +220,8 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
 
 static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
 {
+    if (unlikely(!labels || !key)) return;
+
     RRDLABEL *new_label = add_label_name_value(key, value);
 
     spinlock_lock(&labels->spinlock);
@@ -227,13 +229,12 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
     RRDLABEL_SRC new_ls = (ls & ~(RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_OLD));
 
     JudyAllocThreadPulseReset();
-    int64_t judy_mem;
 
     Pvoid_t *PValue = JudyLIns(&labels->JudyL, (Word_t)new_label, PJE0);
     if (!PValue || PValue == PJERR)
         fatal("RRDLABELS: corrupted labels JudyL array");
 
-    judy_mem = JudyAllocThreadPulseGetAndReset();
+    int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
     RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
     if(*PValue) {

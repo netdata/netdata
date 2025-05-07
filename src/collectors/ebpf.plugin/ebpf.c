@@ -4244,7 +4244,7 @@ static void ebpf_initialize_data_sharing()
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SOCKET: {
             socket_ipc =
-                nd_thread_create("ebpf_socket_ipc", NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_thread_ipc, NULL);
+                nd_thread_create("ebpf_socket_ipc", NETDATA_THREAD_OPTION_JOINABLE, ebpf_socket_thread_ipc, NULL);
             break;
         }
         case NETDATA_EBPF_INTEGRATION_SHM:
@@ -4389,7 +4389,7 @@ int main(int argc, char **argv)
     cgroup_integration_thread.start_routine = ebpf_cgroup_integration;
 
     cgroup_integration_thread.thread =
-        nd_thread_create(cgroup_integration_thread.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
+        nd_thread_create(cgroup_integration_thread.name, NETDATA_THREAD_OPTION_JOINABLE, ebpf_cgroup_integration, NULL);
 
     ebpf_initialize_data_sharing();
 

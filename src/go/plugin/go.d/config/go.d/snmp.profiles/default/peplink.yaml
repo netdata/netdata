@@ -20,22 +20,32 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.23695.200.1.1.1.3.1.0
+      description: Cpu usage
+      unit: "%"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.23695.200.1.1.1.3.2.0
+      description: Total memory
+      unit: "By"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.23695.200.1.1.1.3.3.0
+      description: Memory usage
+      unit: "%"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: peplink.deviceTemperatureCelsius
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.4.1.0
+      description: Device temperature celsius
+      unit: "Cel"
   - MIB: PEPLINK-DEVICE
     symbol:
       name: peplink.deviceTemperatureFahrenheit
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.4.2.0
+      description: Device temperature fahrenheit
+      unit: "{temperature}"
   - MIB: PEPLINK-DEVICE
     table:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1
@@ -43,6 +53,8 @@ metrics:
     symbols:
       - name: peplink.devicePSUPercentage
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.5
+        description: Device psu percentage
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.1
@@ -62,6 +74,8 @@ metrics:
     symbols:
       - name: peplink.deviceFanSpeed
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.3
+        description: Device fan speed
+        unit: "1.s"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.1
@@ -81,6 +95,8 @@ metrics:
     symbols:
       - name: peplink.devicePowerSource
         constant_value_one: true
+        description: Device power source
+        unit: "{power_source}"
     metric_tags:
       - symbol:
           name: devicePowerSourceId
@@ -110,12 +126,18 @@ metrics:
       - name: peplink.linkThroughputIn
         OID: 1.3.6.1.4.1.23695.1.1.2.2.1.4
         metric_type: monotonic_count
+        description: Number of inbound packets discarded to free buffer space
+        unit: "{packet}"
       - name: peplink.linkThroughputOut
         OID: 1.3.6.1.4.1.23695.1.1.2.2.1.5
         metric_type: monotonic_count
+        description: Number of outbound packets discarded to free buffer space
+        unit: "{packet}"
       - name: peplink.linkDataTransferred
         OID: 1.3.6.1.4.1.23695.1.1.2.2.1.6
         metric_type: monotonic_count
+        description: Number of bytes transferred through
+        unit: "By"
     metric_tags:
       - symbol:
           name: linkConnNum
@@ -137,12 +159,18 @@ metrics:
       - name: peplink.wanUsageThroughputIn
         OID: 1.3.6.1.4.1.23695.1.1.3.1.2
         metric_type: monotonic_count
+        description: Number of inbound packets discarded to free buffer space
+        unit: "{packet}"
       - name: peplink.wanUsageThroughputOut
         OID: 1.3.6.1.4.1.23695.1.1.3.1.3
         metric_type: monotonic_count
+        description: Number of outbound packets discarded to free buffer space
+        unit: "{packet}"
       - name: peplink.wanUsageDataTransferred
         OID: 1.3.6.1.4.1.23695.1.1.3.1.4
         metric_type: monotonic_count
+        description: Number of bytes transferred through
+        unit: "By"
     metric_tags:
       - symbol:
           name: wanUsageIndex

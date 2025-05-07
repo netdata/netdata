@@ -20,6 +20,8 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.1916.1.32.1.2.0
+      description: Total CPU utlization (percentage) as of last sampling.
+      unit: "%"
   - MIB: EXTREME-SOFTWARE-MONITOR-MIB
     table:
       name: extremeMemoryMonitorSystemTable
@@ -27,8 +29,12 @@ metrics:
     symbols:
       - name: memory.total
         OID: 1.3.6.1.4.1.1916.1.32.2.2.1.2
+        description: Total amount of DRAM in Kbytes in the system.
+        unit: "kBy"
       - name: memory.free
         OID: 1.3.6.1.4.1.1916.1.32.2.2.1.3
+        description: Total amount of free memory in Kbytes in the system.
+        unit: "kBy"
     metric_tags:
       - index: 1  # extremeMemoryMonitorSystemSlotId
         tag: mem
@@ -45,6 +51,8 @@ metrics:
     symbol:
       name: extremeCurrentTemperature
       OID: 1.3.6.1.4.1.1916.1.1.1.8.0
+      description: Current temperature in degrees celcius measured inside device enclosure.
+      unit: "Cel"
   # - MIB: EXTREME-SYSTEM-MIB
   #   symbol:
   #     name: extremePrimaryPowerOperational
@@ -87,6 +95,8 @@ metrics:
     symbol:
       name: extremeInputPowerVoltage
       OID: 1.3.6.1.4.1.1916.1.1.1.20.0
+      description: The input power voltage at which the system is currently operating.
+      unit: "V"
   # - MIB: EXTREME-SYSTEM-MIB
   #   symbol:
   #     name: extremePowerStatus

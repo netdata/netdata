@@ -57,20 +57,28 @@ metrics:
     OID: 1.3.6.1.4.1.789.1.2.3.8.0
     name: cfInterconnectStatus  # The current status of the interconnect. The partialFailure(3) status indicates that
                                 # one of the links in the interconnect hardware is down.
+    description: The current status of the interconnect
+    unit: "{status}"
   - MIB: NETAPP-MIB
     OID: 1.3.6.1.4.1.789.1.2.2.23.0
     name: miscCacheAge  # Age in minutes of the oldest read-only blocks in the buffer cache.
                         # This indicates how fast read operations are cycling through system memory;
                         # when the appliance is reading very large files (larger than the machine's memory size),
                         # buffer cache age will be very low.
+    description: Age in minutes of the oldest read-only blocks in the buffer cache
+    unit: "min"
   - MIB: NETAPP-MIB
     OID: 1.3.6.1.4.1.789.1.8.3.6.36.0
     name: ncHttpActiveCliConns  # Number of currently active TCP/IP connections to HTTP clients
+    description: Number of currently active TCP/IP connections to HTTP clients
+    unit: "{connection}"
 
   - MIB: NETAPP-MIB
     OID: 1.3.6.1.4.1.789.1.26.8.0
     name: extcache64Hits  # Indicates number of wafl buffers read from the external cache
     metric_type: monotonic_count
+    description: Number of wafl buffers read from the external cache
+    unit: "{buffer}"
 
   # Snap vaults
 
@@ -95,6 +103,8 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.789.1.19.11.1.5
           name: svState
+    description: Total number of failed snapvault transfers
+    unit: "{transfers}"
 
   # Snap mirrors
 
@@ -115,6 +125,8 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.789.1.9.20.1.5
           name: snapmirrorState
+    description: How far behind from the source the destination is
+    unit: "cs"
 
   - MIB: NETAPP-MIB
     table:
@@ -133,6 +145,8 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.789.1.9.20.1.5
           name: snapmirrorState
+    description: Total number of failed snapmirror transfers
+    unit: "{transfers}"
 
   # Disk filesystems
 
@@ -144,12 +158,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.789.1.5.4.1.14
         name: dfHighTotalKBytes
+        description: Total capacity in KBytes for the referenced file system (most significant 32 bits)
+        unit: "kBy"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.18
         name: dfHighAvailKBytes
+        description: Total disk space in KBytes that is free for use on the referenced file system (most significant 32 bits)
+        unit: "kBy"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.7
         name: dfInodesUsed
+        description: Total number of inodes in use on the referenced file system
+        unit: "{inode}"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.8
         name: dfInodesFree
+        description: Total number of inodes that are available for use on the referenced file system
+        unit: "{inode}"
     metric_tags:
       - tag: index
         symbol:
@@ -170,6 +192,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.789.1.22.1.2.1.3
         name: ifHighInOctets
+        description: Total number of octets received on the interface including framing characters (most significant 32 bits)
+        unit: "By"
     metric_tags:
       - tag: index
         symbol:

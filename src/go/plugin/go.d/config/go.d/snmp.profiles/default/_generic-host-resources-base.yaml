@@ -11,18 +11,26 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.25.1.1.0
       name: hrSystemUptime
+    description: The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
+    unit: "cs"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.5.0
       name: hrSystemNumUsers
+    description: The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a single act of user authentication and possibly subject to collective job control.
+    unit: "{session}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.6.0
       name: hrSystemProcesses
+    description: The number of process contexts currently loaded or running on this system.
+    unit: "{process}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.7.0
       name: hrSystemMaxProcesses
+    description: The maximum number of process contexts this system can support. If there is no fixed maximum, the value should be zero. On systems that have a fixed maximum, this object can help diagnose failures that occur when this maximum is reached.
+    unit: "{process}"
 
   #
   # Storage Devices
@@ -34,12 +42,21 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.2.3.1.4
         name: hrStorageAllocationUnits
+        description: The size, in bytes, of the data objects allocated from this pool. If this entry is monitoring sectors, blocks, buffers, or packets, for example, this number will commonly be greater than one. Otherwise this number will typically be one.
+        unit: "By"
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: hrStorageSize
+        description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits. This object is writable to allow remote configuration of the size of the storage area in those cases where such an operation makes sense and is possible on the underlying system. For example, the amount of main memory allocated to a buffer pool might be modified or the amount of disk space allocated to virtual memory might be modified.
+        unit: "{storage_unit}"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: hrStorageUsed
+        description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
+        unit: "{storage_unit}"
       - OID: 1.3.6.1.2.1.25.2.3.1.7
         name: hrStorageAllocationFailures
+        description: The number of requests for storage represented by this entry that could not be honored due to not enough storage. It should be noted that as this object has a SYNTAX of Counter32, that it does not have a defined initial value. However, it is recommended that this object be initialized to zero, even though management stations must not depend on such an initialization.
+        unit: "{request}"
+
     metric_tags:
       - tag: storagedesc
         symbol:
@@ -60,6 +77,8 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.3.3.1.2
         name: hrProcessorLoad
+        description: The average, over the last minute, of the percentage of time that this processor was not idle. Implementations may approximate this one minute smoothing period if necessary.
+        unit: "%"
     metric_tags:
       - index: 1  # hrDeviceIndex
         tag: hr_device_index

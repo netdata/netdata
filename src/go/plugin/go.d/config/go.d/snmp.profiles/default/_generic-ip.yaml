@@ -1,150 +1,261 @@
 # Generic IP metrics.
 
 metrics:
-- MIB: IP-MIB
-  table:
-    OID: 1.3.6.1.2.1.4.31.1
-    name: ipSystemStatsTable
-  metric_type: monotonic_count
-  symbols:
-  - OID: 1.3.6.1.2.1.4.31.1.1.4
-    name: ipSystemStatsHCInReceives
-  - OID: 1.3.6.1.2.1.4.31.1.1.6
-    name: ipSystemStatsHCInOctets
-  - OID: 1.3.6.1.2.1.4.31.1.1.7
-    name: ipSystemStatsInHdrErrors
-  - OID: 1.3.6.1.2.1.4.31.1.1.8
-    name: ipSystemStatsInNoRoutes
-  - OID: 1.3.6.1.2.1.4.31.1.1.9
-    name: ipSystemStatsInAddrErrors
-  - OID: 1.3.6.1.2.1.4.31.1.1.10
-    name: ipSystemStatsInUnknownProtos
-  - OID: 1.3.6.1.2.1.4.31.1.1.11
-    name: ipSystemStatsInTruncatedPkts
-  - OID: 1.3.6.1.2.1.4.31.1.1.13
-    name: ipSystemStatsHCInForwDatagrams
-  - OID: 1.3.6.1.2.1.4.31.1.1.14
-    name: ipSystemStatsReasmReqds
-  - OID: 1.3.6.1.2.1.4.31.1.1.15
-    name: ipSystemStatsReasmOKs
-  - OID: 1.3.6.1.2.1.4.31.1.1.16
-    name: ipSystemStatsReasmFails
-  - OID: 1.3.6.1.2.1.4.31.1.1.17
-    name: ipSystemStatsInDiscards
-  - OID: 1.3.6.1.2.1.4.31.1.1.19
-    name: ipSystemStatsHCInDelivers
-  - OID: 1.3.6.1.2.1.4.31.1.1.21
-    name: ipSystemStatsHCOutRequests
-  - OID: 1.3.6.1.2.1.4.31.1.1.22
-    name: ipSystemStatsOutNoRoutes
-  - OID: 1.3.6.1.2.1.4.31.1.1.24
-    name: ipSystemStatsHCOutForwDatagrams
-  - OID: 1.3.6.1.2.1.4.31.1.1.25
-    name: ipSystemStatsOutDiscards
-  - OID: 1.3.6.1.2.1.4.31.1.1.26
-    name: ipSystemStatsOutFragReqds
-  - OID: 1.3.6.1.2.1.4.31.1.1.27
-    name: ipSystemStatsOutFragOKs
-  - OID: 1.3.6.1.2.1.4.31.1.1.28
-    name: ipSystemStatsOutFragFails
-  - OID: 1.3.6.1.2.1.4.31.1.1.29
-    name: ipSystemStatsOutFragCreates
-  - OID: 1.3.6.1.2.1.4.31.1.1.31
-    name: ipSystemStatsHCOutTransmits
-  - OID: 1.3.6.1.2.1.4.31.1.1.33
-    name: ipSystemStatsHCOutOctets
-  - OID: 1.3.6.1.2.1.4.31.1.1.35
-    name: ipSystemStatsHCInMcastPkts
-  - OID: 1.3.6.1.2.1.4.31.1.1.37
-    name: ipSystemStatsHCInMcastOctets
-  - OID: 1.3.6.1.2.1.4.31.1.1.39
-    name: ipSystemStatsHCOutMcastPkts
-  - OID: 1.3.6.1.2.1.4.31.1.1.41
-    name: ipSystemStatsHCOutMcastOctets
-  - OID: 1.3.6.1.2.1.4.31.1.1.43
-    name: ipSystemStatsHCInBcastPkts
-  - OID: 1.3.6.1.2.1.4.31.1.1.45
-    name: ipSystemStatsHCOutBcastPkts
-  metric_tags:
-  - index: 1
-    tag: ipversion
-    mapping:
-      0: unknown
-      1: ipv4
-      2: ipv6
-      3: ipv4z
-      4: ipv6z
-      16: dns
-- MIB: IP-MIB
-  table:
-    OID: 1.3.6.1.2.1.4.31.3
-    name: ipIfStatsTable
-  metric_type: monotonic_count
-  symbols:
-  - OID: 1.3.6.1.2.1.4.31.3.1.6
-    name: ipIfStatsHCInOctets
-  - OID: 1.3.6.1.2.1.4.31.3.1.7
-    name: ipIfStatsInHdrErrors
-  - OID: 1.3.6.1.2.1.4.31.3.1.8
-    name: ipIfStatsInNoRoutes
-  - OID: 1.3.6.1.2.1.4.31.3.1.9
-    name: ipIfStatsInAddrErrors
-  - OID: 1.3.6.1.2.1.4.31.3.1.10
-    name: ipIfStatsInUnknownProtos
-  - OID: 1.3.6.1.2.1.4.31.3.1.11
-    name: ipIfStatsInTruncatedPkts
-  - OID: 1.3.6.1.2.1.4.31.3.1.13
-    name: ipIfStatsHCInForwDatagrams
-  - OID: 1.3.6.1.2.1.4.31.3.1.14
-    name: ipIfStatsReasmReqds
-  - OID: 1.3.6.1.2.1.4.31.3.1.15
-    name: ipIfStatsReasmOKs
-  - OID: 1.3.6.1.2.1.4.31.3.1.16
-    name: ipIfStatsReasmFails
-  - OID: 1.3.6.1.2.1.4.31.3.1.17
-    name: ipIfStatsInDiscards
-  - OID: 1.3.6.1.2.1.4.31.3.1.19
-    name: ipIfStatsHCInDelivers
-  - OID: 1.3.6.1.2.1.4.31.3.1.21
-    name: ipIfStatsHCOutRequests
-  - OID: 1.3.6.1.2.1.4.31.3.1.24
-    name: ipIfStatsHCOutForwDatagrams
-  - OID: 1.3.6.1.2.1.4.31.3.1.25
-    name: ipIfStatsOutDiscards
-  - OID: 1.3.6.1.2.1.4.31.3.1.26
-    name: ipIfStatsOutFragReqds
-  - OID: 1.3.6.1.2.1.4.31.3.1.27
-    name: ipIfStatsOutFragOKs
-  - OID: 1.3.6.1.2.1.4.31.3.1.28
-    name: ipIfStatsOutFragFails
-  - OID: 1.3.6.1.2.1.4.31.3.1.29
-    name: ipIfStatsOutFragCreates
-  - OID: 1.3.6.1.2.1.4.31.3.1.31
-    name: ipIfStatsHCOutTransmits
-  - OID: 1.3.6.1.2.1.4.31.3.1.33
-    name: ipIfStatsHCOutOctets
-  - OID: 1.3.6.1.2.1.4.31.3.1.35
-    name: ipIfStatsHCInMcastPkts
-  - OID: 1.3.6.1.2.1.4.31.3.1.37
-    name: ipIfStatsHCInMcastOctets
-  - OID: 1.3.6.1.2.1.4.31.3.1.39
-    name: ipIfStatsHCOutMcastPkts
-  - OID: 1.3.6.1.2.1.4.31.3.1.41
-    name: ipIfStatsHCOutMcastOctets
-  - OID: 1.3.6.1.2.1.4.31.3.1.43
-    name: ipIfStatsHCInBcastPkts
-  - OID: 1.3.6.1.2.1.4.31.3.1.45
-    name: ipIfStatsHCOutBcastPkts
-  metric_tags:
-  - index: 1
-    tag: ipversion
-    mapping:
-      0: unknown
-      1: ipv4
-      2: ipv6
-      3: ipv4z
-      4: ipv6z
-      16: dns
-  - index: 2
-    tag: interface
-
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.31.1
+      name: ipSystemStatsTable
+    metric_type: monotonic_count
+    symbols:
+      - OID: 1.3.6.1.2.1.4.31.1.1.4
+        name: ipSystemStatsHCInReceives
+        description: The total number of input IP datagrams received, including those received in error
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.6
+        name: ipSystemStatsHCInOctets
+        description: The total number of octets received in input IP datagrams, including those received in error
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.1.1.7
+        name: ipSystemStatsInHdrErrors
+        description: The number of input IP datagrams discarded due to errors in their IP headers, including version number mismatch, other format errors, hop count exceeded, errors discovered in processing their IP options, etc
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.8
+        name: ipSystemStatsInNoRoutes
+        description: The number of input IP datagrams discarded because no route could be found to transmit them to their destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.9
+        name: ipSystemStatsInAddrErrors
+        description: The number of input IP datagrams discarded because the IP address in their IP header's destination field was not a valid address to be received at this entity
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.10
+        name: ipSystemStatsInUnknownProtos
+        description: The number of locally-addressed IP datagrams received successfully but discarded because of an unknown or unsupported protocol
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.11
+        name: ipSystemStatsInTruncatedPkts
+        description: The number of input IP datagrams discarded because the datagram frame didn't carry enough data
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.13
+        name: ipSystemStatsHCInForwDatagrams
+        description: The number of input datagrams for which this entity was not their final IP destination and for which this entity attempted to find a route to forward them to that final destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.14
+        name: ipSystemStatsReasmReqds
+        description: The number of IP fragments received that needed to be reassembled at this interface
+        unit: "{fragment}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.15
+        name: ipSystemStatsReasmOKs
+        description: The number of IP datagrams successfully reassembled
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.16
+        name: ipSystemStatsReasmFails
+        description: The number of failures detected by the IP re-assembly algorithm
+        unit: "{failure}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.17
+        name: ipSystemStatsInDiscards
+        description: The number of input IP datagrams for which no problems were encountered to prevent their continued processing, but were discarded
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.19
+        name: ipSystemStatsHCInDelivers
+        description: The total number of datagrams successfully delivered to IP user-protocols including ICMP
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.21
+        name: ipSystemStatsHCOutRequests
+        description: The total number of IP datagrams that local IP user-protocols including ICMP supplied to IP in requests for transmission
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.22
+        name: ipSystemStatsOutNoRoutes
+        description: The number of locally generated IP datagrams discarded because no route could be found to transmit them to their destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.24
+        name: ipSystemStatsHCOutForwDatagrams
+        description: The number of datagrams for which this entity was not their final IP destination and for which it was successful in finding a path to their final destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.25
+        name: ipSystemStatsOutDiscards
+        description: The number of output IP datagrams for which no problem was encountered to prevent their transmission to their destination, but were discarded
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.26
+        name: ipSystemStatsOutFragReqds
+        description: The number of IP datagrams that would require fragmentation in order to be transmitted
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.27
+        name: ipSystemStatsOutFragOKs
+        description: The number of IP datagrams that have been successfully fragmented
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.28
+        name: ipSystemStatsOutFragFails
+        description: The number of IP datagrams that have been discarded because they needed to be fragmented but could not be
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.29
+        name: ipSystemStatsOutFragCreates
+        description: The number of output datagram fragments that have been generated as a result of IP fragmentation
+        unit: "{fragment}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.31
+        name: ipSystemStatsHCOutTransmits
+        description: The total number of IP datagrams that this entity supplied to the lower layers for transmission
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.33
+        name: ipSystemStatsHCOutOctets
+        description: The total number of octets in IP datagrams delivered to the lower layers for transmission
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.1.1.35
+        name: ipSystemStatsHCInMcastPkts
+        description: The number of IP multicast datagrams received
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.37
+        name: ipSystemStatsHCInMcastOctets
+        description: The total number of octets received in IP multicast datagrams
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.1.1.39
+        name: ipSystemStatsHCOutMcastPkts
+        description: The number of IP multicast datagrams transmitted
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.41
+        name: ipSystemStatsHCOutMcastOctets
+        description: The total number of octets transmitted in IP multicast datagrams
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.1.1.43
+        name: ipSystemStatsHCInBcastPkts
+        description: The number of IP broadcast datagrams received
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.1.1.45
+        name: ipSystemStatsHCOutBcastPkts
+        description: The number of IP broadcast datagrams transmitted
+        unit: "{datagram}"
+    metric_tags:
+      - index: 1
+        tag: ipversion
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.31.3
+      name: ipIfStatsTable
+    metric_type: monotonic_count
+    symbols:
+      - OID: 1.3.6.1.2.1.4.31.3.1.6
+        name: ipIfStatsHCInOctets
+        description: The total number of octets received in input IP datagrams, including those received in error
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.3.1.7
+        name: ipIfStatsInHdrErrors
+        description: The number of input IP datagrams discarded due to errors in their IP headers, including version number mismatch, other format errors, hop count exceeded, errors discovered in processing their IP options, etc
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.8
+        name: ipIfStatsInNoRoutes
+        description: The number of input IP datagrams discarded because no route could be found to transmit them to their destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.9
+        name: ipIfStatsInAddrErrors
+        description: The number of input IP datagrams discarded because the IP address in their IP header's destination field was not a valid address to be received at this entity
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.10
+        name: ipIfStatsInUnknownProtos
+        description: The number of locally-addressed IP datagrams received successfully but discarded because of an unknown or unsupported protocol
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.11
+        name: ipIfStatsInTruncatedPkts
+        description: The number of input IP datagrams discarded because the datagram frame didn't carry enough data
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.13
+        name: ipIfStatsHCInForwDatagrams
+        description: The number of input datagrams for which this entity was not their final IP destination and for which this entity attempted to find a route to forward them to that final destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.14
+        name: ipIfStatsReasmReqds
+        description: The number of IP fragments received that needed to be reassembled at this interface
+        unit: "{fragment}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.15
+        name: ipIfStatsReasmOKs
+        description: The number of IP datagrams successfully reassembled
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.16
+        name: ipIfStatsReasmFails
+        description: The number of failures detected by the IP re-assembly algorithm
+        unit: "{failure}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.17
+        name: ipIfStatsInDiscards
+        description: The number of input IP datagrams for which no problems were encountered to prevent their continued processing, but were discarded
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.19
+        name: ipIfStatsHCInDelivers
+        description: The total number of datagrams successfully delivered to IP user-protocols including ICMP
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.21
+        name: ipIfStatsHCOutRequests
+        description: The total number of IP datagrams that local IP user-protocols including ICMP supplied to IP in requests for transmission
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.24
+        name: ipIfStatsHCOutForwDatagrams
+        description: The number of datagrams for which this entity was not their final IP destination and for which it was successful in finding a path to their final destination
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.25
+        name: ipIfStatsOutDiscards
+        description: The number of output IP datagrams for which no problem was encountered to prevent their transmission to their destination, but were discarded
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.26
+        name: ipIfStatsOutFragReqds
+        description: The number of IP datagrams that would require fragmentation in order to be transmitted
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.27
+        name: ipIfStatsOutFragOKs
+        description: The number of IP datagrams that have been successfully fragmented
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.28
+        name: ipIfStatsOutFragFails
+        description: The number of IP datagrams that have been discarded because they needed to be fragmented but could not be
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.29
+        name: ipIfStatsOutFragCreates
+        description: The number of output datagram fragments that have been generated as a result of IP fragmentation
+        unit: "{fragment}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.31
+        name: ipIfStatsHCOutTransmits
+        description: The total number of IP datagrams that this entity supplied to the lower layers for transmission
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.33
+        name: ipIfStatsHCOutOctets
+        description: The total number of octets in IP datagrams delivered to the lower layers for transmission
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.3.1.35
+        name: ipIfStatsHCInMcastPkts
+        description: The number of IP multicast datagrams received
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.37
+        name: ipIfStatsHCInMcastOctets
+        description: The total number of octets received in IP multicast datagrams
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.3.1.39
+        name: ipIfStatsHCOutMcastPkts
+        description: The number of IP multicast datagrams transmitted
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.41
+        name: ipIfStatsHCOutMcastOctets
+        description: The total number of octets transmitted in IP multicast datagrams
+        unit: "By"
+      - OID: 1.3.6.1.2.1.4.31.3.1.43
+        name: ipIfStatsHCInBcastPkts
+        description: The number of IP broadcast datagrams received
+        unit: "{datagram}"
+      - OID: 1.3.6.1.2.1.4.31.3.1.45
+        name: ipIfStatsHCOutBcastPkts
+        description: The number of IP broadcast datagrams transmitted
+        unit: "{datagram}"
+    metric_tags:
+      - index: 1
+        tag: ipversion
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - index: 2
+        tag: interface

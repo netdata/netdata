@@ -116,6 +116,7 @@ void nd_thread_rwspinlock_write_unlocked(void);
 #endif
 
 void nd_thread_can_run_sql(bool exclude);
+void nd_thread_join_threads();
 bool nd_thread_runs_sql(void);
 
 #endif //NETDATA_THREADS_H

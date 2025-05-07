@@ -2613,7 +2613,7 @@ void *statsd_main(void *ptr) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
         spinlock_init(&statsd.collection_threads_status[i].spinlock);
-        statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+        statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
                                                                       statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 

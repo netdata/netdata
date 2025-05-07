@@ -31,7 +31,7 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
     netdata_log_info("Starting thread %s with lifetime = %d", em->info.thread_name, period);
 #endif
 
-    st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+    st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
     return st->thread ? 0 : 1;
 }
 

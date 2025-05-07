@@ -11,7 +11,7 @@
 #include "machine-guid.h"
 #include "status-file-dmi.h"
 
-#define STATUS_FILE_VERSION 27
+#define STATUS_FILE_VERSION 28
 
 typedef enum {
     DAEMON_STATUS_NONE,
