@@ -1504,7 +1504,7 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
                 "w3scv w3wp",
                 "iis.w3scv_w3wp_file_cache_mem_usage",
                 "Current memory usage by the worker process.",
-                "bytes/s",
+                "bytes",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_FILE_CACHE_MEM_USAGE,
@@ -1553,7 +1553,7 @@ static inline void w3svc_w3wp_files_cached_total(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_file_cache_total =
-                rrddim_add(p->st_wescv_w3wp_file_cache_total, "files", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_wescv_w3wp_file_cache_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_wescv_w3wp_file_cache_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
@@ -1594,7 +1594,7 @@ static inline void w3svc_w3wp_files_flushed_total(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_file_flushed_total =
-                rrddim_add(p->st_wescv_w3wp_file_flushed_total, "files", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_wescv_w3wp_file_flushed_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_wescv_w3wp_file_flushed_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
@@ -1635,7 +1635,7 @@ static inline void w3svc_w3wp_uri_cached_flushed(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_uri_cache_flushed =
-                rrddim_add(p->st_wescv_w3wp_uri_cache_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_wescv_w3wp_uri_cache_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_wescv_w3wp_uri_cache_flushed->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
