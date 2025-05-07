@@ -118,6 +118,9 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_total_uri_cached;
     RRDDIM *rd_wescv_w3wp_total_uri_cached;
 
+    RRDSET *st_wescv_w3wp_total_metadata_cache;
+    RRDDIM *rd_wescv_w3wp_total_metadata_cache;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1697,6 +1700,38 @@ static inline void w3svc_w3wp_total_metadata_cached(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalMetadataCached)) {
+        if (!p->st_wescv_w3wp_total_metadata_cache) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_total_metadata_cache", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_total_metadata_cache = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_total_metadata_cache",
+                "Number of metadata information blocks currently present in user-mode cache.",
+                "blocks/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_METADATA_CACHED,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_total_metadata_cache =
+                rrddim_add(p->st_wescv_w3wp_total_metadata_cache, "blocks", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrdlabels_add(
+                p->st_wescv_w3wp_total_metadata_cache->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_total_metadata_cache,
+            p->rd_wescv_w3wp_total_metadata_cache,
+            (collected_number)p->WESCVW3WPTotalMetadataCached.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_total_metadata_cache);
+    }
 }
 
 static inline void w3svc_w3wp_total_metadata_flushed(
