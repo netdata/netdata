@@ -124,6 +124,9 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_total_metadata_flushed;
     RRDDIM *rd_wescv_w3wp_total_metadata_flushed;
 
+    RRDSET *st_wescv_w3wp_output_cache_active_flushed_itens;
+    RRDDIM *rd_wescv_w3wp_output_cache_active_flushed_itens;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1785,6 +1788,38 @@ static inline void w3svc_w3wp_output_cache_active_flushed_itens(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheActiveFlushedItens)) {
+        if (!p->st_wescv_w3wp_output_cache_active_flushed_itens) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_output_cache_active_flushed_itens", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_output_cache_active_flushed_itens = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_output_cache_active_flushed_itens",
+                "Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.",
+                "itens/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_OUTPUT_CACHE_ACTIVE_FLUSH,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_output_cache_active_flushed_itens =
+                rrddim_add(p->st_wescv_w3wp_output_cache_active_flushed_itens, "itens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_wescv_w3wp_output_cache_active_flushed_itens->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_output_cache_active_flushed_itens,
+            p->rd_wescv_w3wp_output_cache_active_flushed_itens,
+            (collected_number)p->WESCVW3WPOutputCacheActiveFlushedItens.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_output_cache_active_flushed_itens);
+    }
 }
 
 static inline void w3svc_w3wp_output_cache_memory_usage(
