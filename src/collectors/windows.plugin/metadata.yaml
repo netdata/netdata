@@ -1290,6 +1290,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: mem
+            - name: iis.w3scv_w3wp_output_cache_flushed_total
+              description: Total number of flushes of output cache.
+              unit: "flushes"
+              chart_type: line
+              dimensions:
+                - name: flushes
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
