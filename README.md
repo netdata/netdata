@@ -34,7 +34,7 @@
 
 <hr class="solid">
 
-MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#license)**
+MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#scroll-license)**
 
 > [!WARNING]
 > People **get addicted to Netdata.**
@@ -282,7 +282,6 @@ No. Even with ML and per-second metrics, Netdata uses minimal resources.
 * <1% CPU and \~100MiB RAM when ML and alerts are disabled and using ephemeral storage
 * Parents scale to millions of metrics per second with appropriate hardware
 
-> [!NOTE]  
 > You can use the **Netdata Monitoring** section in the dashboard to inspect its resource usage.
 
 </details>
@@ -310,7 +309,6 @@ Yes. With Netdata you can:
 * Scale vertically with powerful Parents
 * Scale infinitely via Netdata Cloud
 
-> [!NOTE]  
 > You can use Netdata Cloud to merge many independent infrastructures into one logical view.
 
 </details>
@@ -324,7 +322,6 @@ No. Netdata minimizes disk usage:
 * Uses direct I/O and compression (ZSTD)
 * Can run entirely in RAM or stream to a Parent
 
-> [!NOTE]  
 > You can use `alloc` or `ram` mode for no disk writes.
 
 </details>
@@ -338,7 +335,6 @@ With Netdata you get a complete monitoring solution—not just tools.
 * Built-in ML, alerts, dashboards, and correlations
 * More efficient and easier to deploy
 
-> [!NOTE]
 > [Performance comparison](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/)
 
 </details>
@@ -376,7 +372,6 @@ You can start small:
 * Explore anomaly scoring ("AR" toggle)
 * Create custom dashboards in Netdata Cloud
 
-> [!NOTE]  
 > [Docs and guides](https://learn.netdata.cloud/guides)
 
 </details>
@@ -403,7 +398,6 @@ Anonymous telemetry helps improve the product. You can disable it:
 * Add `--disable-telemetry` to the installer, or
 * Create `/etc/netdata/.opt-out-from-anonymous-statistics` and restart Netdata
 
-> [!NOTE]  
 > Telemetry helps us understand usage, not track users. No private data is collected.
 
 </details>
