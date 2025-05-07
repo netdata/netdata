@@ -115,6 +115,9 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_uri_cache_flushed;
     RRDDIM *rd_wescv_w3wp_uri_cache_flushed;
 
+    RRDSET *st_wescv_w3wp_total_uri_cached;
+    RRDDIM *rd_wescv_w3wp_total_uri_cached;
+
     COUNTER_DATA WESCVW3WPActiveThreads;
 
     COUNTER_DATA WESCVW3WPRequestTotal;
@@ -1653,6 +1656,38 @@ static inline void w3svc_w3wp_total_uri_cached(
     PERF_INSTANCE_DEFINITION *pi,
     int update_every)
 {
+    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalURICached)) {
+        if (!p->st_wescv_w3wp_total_uri_cached) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_total_uri_cached", windows_shared_buffer);
+            netdata_fix_chart_name(id);
+            p->st_wescv_w3wp_total_uri_cached = rrdset_create_localhost(
+                "iis",
+                id,
+                NULL,
+                "w3scv w3wp",
+                "iis.w3scv_w3wp_total_uri_cached",
+                "Total number of URI information blocks added to the cache.",
+                "blocks/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibWebService",
+                PRIO_W3SVC_W3WP_URI_CACHED_TOTAL,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_wescv_w3wp_total_uri_cached =
+                rrddim_add(p->st_wescv_w3wp_total_uri_cached, "blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_wescv_w3wp_total_uri_cached->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        }
+
+        rrddim_set_by_pointer(
+            p->st_wescv_w3wp_total_uri_cached,
+            p->rd_wescv_w3wp_total_uri_cached,
+            (collected_number)p->WESCVW3WPTotalURICached.current.Data);
+
+        rrdset_done(p->st_wescv_w3wp_total_uri_cached);
+    }
 }
 
 static inline void w3svc_w3wp_total_metadata_cached(
