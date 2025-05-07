@@ -1284,6 +1284,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: itens
+            - name: iis.w3scv_w3wp_output_cache_memory_usage
+              description: Current number of bytes used by output cache.
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: mem
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
