@@ -124,8 +124,8 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_total_metadata_flushed;
     RRDDIM *rd_wescv_w3wp_total_metadata_flushed;
 
-    RRDSET *st_wescv_w3wp_output_cache_active_flushed_itens;
-    RRDDIM *rd_wescv_w3wp_output_cache_active_flushed_itens;
+    RRDSET *st_wescv_w3wp_output_cache_active_flushed_items;
+    RRDDIM *rd_wescv_w3wp_output_cache_active_flushed_items;
 
     RRDSET *st_wescv_w3wp_output_cache_memory_usage;
     RRDDIM *rd_wescv_w3wp_output_cache_memory_usage;
@@ -1795,36 +1795,36 @@ static inline void w3svc_w3wp_output_cache_active_flushed_itens(
     int update_every)
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheActiveFlushedItens)) {
-        if (!p->st_wescv_w3wp_output_cache_active_flushed_itens) {
+        if (!p->st_wescv_w3wp_output_cache_active_flushed_items) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_output_cache_active_flushed_itens", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_output_cache_active_flushed_items", windows_shared_buffer);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_output_cache_active_flushed_itens = rrdset_create_localhost(
+            p->st_wescv_w3wp_output_cache_active_flushed_items = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "w3scv w3wp",
-                "iis.w3scv_w3wp_output_cache_active_flushed_itens",
+                "iis.w3scv_w3wp_output_cache_active_flushed_items",
                 "Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.",
-                "itens/s",
+                "items/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_OUTPUT_CACHE_ACTIVE_FLUSH,
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_output_cache_active_flushed_itens =
-                rrddim_add(p->st_wescv_w3wp_output_cache_active_flushed_itens, "itens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_wescv_w3wp_output_cache_active_flushed_items =
+                rrddim_add(p->st_wescv_w3wp_output_cache_active_flushed_items, "items", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_wescv_w3wp_output_cache_active_flushed_itens->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_output_cache_active_flushed_itens,
-            p->rd_wescv_w3wp_output_cache_active_flushed_itens,
+            p->st_wescv_w3wp_output_cache_active_flushed_items,
+            p->rd_wescv_w3wp_output_cache_active_flushed_items,
             (collected_number)p->WESCVW3WPOutputCacheActiveFlushedItens.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_output_cache_active_flushed_itens);
+        rrdset_done(p->st_wescv_w3wp_output_cache_active_flushed_items);
     }
 }
 
@@ -1855,7 +1855,7 @@ static inline void w3svc_w3wp_output_cache_memory_usage(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_output_cache_memory_usage =
-                rrddim_add(p->st_wescv_w3wp_output_cache_memory_usage, "mem", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_output_cache_memory_usage, "used", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_wescv_w3wp_output_cache_memory_usage->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }

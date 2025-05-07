@@ -1284,7 +1284,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: flushes
-            - name: iis.w3scv_w3wp_output_cache_active_flushed_itens
+            - name: iis.w3scv_w3wp_output_cache_active_flushed_items
               description: Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.
               unit: "itens/s"
               chart_type: line
@@ -1295,7 +1295,7 @@ modules:
               unit: "bytes"
               chart_type: line
               dimensions:
-                - name: mem
+                - name: used
             - name: iis.w3scv_w3wp_output_cache_flushed_total
               description: Total number of flushes of output cache.
               unit: "flushes"
