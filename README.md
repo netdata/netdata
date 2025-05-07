@@ -209,7 +209,7 @@ Netdata Cloud is optional. Your data stays in your infrastructure.
   <br/>
   <i>These demo clusters run with default configuration and show real monitoring data.</i>
   <br/>
-  <i>Choose the instance closest to you for best performance.</i>
+  <i>Choose the instance closest to you for the best performance.</i>
 </p>
 
 ---
@@ -254,7 +254,7 @@ Learn more: [Netdata's architecture](https://learn.netdata.cloud/docs/netdata-ag
 
 ## Agent Capabilities
 
-With the Netdata Agent you can use these core capabilities out-of-the-box:
+With the Netdata Agent, you can use these core capabilities out-of-the-box:
 
 | Capability                   | Description                                                                                                                                   |
 |------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
@@ -320,7 +320,7 @@ With Netdata you can use tiered retention:
 * Tier 1: per-minute resolution
 * Tier 2: per-hour resolution
 
-These are queried automatically based on zoom level.
+These are queried automatically based on the zoom level.
 </details>
 
 <details>
@@ -390,7 +390,7 @@ Yes. You can use Netdata together with traditional tools.
 With Netdata you get:
 
 * Real-time, high-resolution monitoring
-* Zero config and auto-generated dashboards
+* Zero configuration and auto-generated dashboards
 * Anomaly detection and advanced visualization
 
 </details>
