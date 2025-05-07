@@ -1480,7 +1480,7 @@ static void *populate_mrg_tp_worker(
         __atomic_store_n(&mlt[thread_index].tier, tier, __ATOMIC_RELAXED);
         mlt[thread_index].datafile = datafile;
 
-        mlt[thread_index].thread = nd_thread_create("MRGLOAD", NETDATA_THREAD_OPTION_JOINABLE, journalfile_v2_populate_retention_to_mrg_worker,
+        mlt[thread_index].thread = nd_thread_create("MRGLOAD", NETDATA_THREAD_OPTION_DEFAULT, journalfile_v2_populate_retention_to_mrg_worker,
                                                     &mlt[thread_index]);
 
         if (!mlt[thread_index].thread) {
@@ -1959,7 +1959,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
 
         int retries = 0;
 //        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
-        rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_JOINABLE, dbengine_event_loop, &rrdeng_main);
+        rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
 
 //        if (!rrdeng_main.thread)
 //            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);

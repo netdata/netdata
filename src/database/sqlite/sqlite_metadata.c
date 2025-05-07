@@ -1934,7 +1934,7 @@ static void ctx_hosts_load(uv_work_t *req)
         if (thread_found) {
             __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
             hclt[thread_index].host = host;
-            hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_JOINABLE, restore_host_context, &hclt[thread_index]);
+            hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
             async_exec += (hclt[thread_index].thread != NULL);
             // if it failed, mark the thread slot as free
             if (rc)
@@ -2746,16 +2746,8 @@ void metadata_sync_init(void)
     memset(&meta_config, 0, sizeof(meta_config));
     completion_init(&meta_config.start_stop_complete);
 
-    meta_config.thread = nd_thread_create("METASYNC", NETDATA_THREAD_OPTION_JOINABLE, metadata_event_loop, &meta_config);
-//    int retries = 0;
-//    int create_uv_thread_rc = create_uv_thread(&meta_config.thread, metadata_event_loop, &meta_config, &retries);
-//    if (create_uv_thread_rc)
-//        nd_log_daemon(NDLP_ERR, "Failed to create SQLite metadata sync thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
-
+    meta_config.thread = nd_thread_create("METASYNC", NETDATA_THREAD_OPTION_DEFAULT, metadata_event_loop, &meta_config);
     fatal_assert(NULL != meta_config.thread);
-
-//    if (retries)
-//        nd_log_daemon(NDLP_WARNING, "SQLite metadata sync thread was created after %d attempts", retries);
 
     // Wait for initialization
     completion_wait_for(&meta_config.start_stop_complete);
@@ -2995,11 +2987,7 @@ static void *metadata_unittest_threads(void)
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
         snprintf(buf, sizeof(buf) - 1, "META[%d]", i);
-        threads[i] = nd_thread_create(
-            buf,
-            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-            unittest_queue_metadata,
-            &tu);
+        threads[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, unittest_queue_metadata, &tu);
     }
     (void) uv_async_send(&meta_config.async);
     sleep_usec(seconds_to_run * USEC_PER_SEC);

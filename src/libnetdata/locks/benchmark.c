@@ -374,7 +374,7 @@ int locks_stress_test(void) {
             snprintf(thr_name, sizeof(thr_name), "%s%d", lock_names[type], i);
             threads[type][i].thread = nd_thread_create(
                 thr_name,
-                NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+                NETDATA_THREAD_OPTION_DONT_LOG,
                 benchmark_thread,
                 &threads[type][i]);
         }

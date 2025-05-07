@@ -92,7 +92,7 @@ void service_signal_exit(SERVICE_TYPE service) {
 
         if((sth->services & service)) {
             nd_thread_signal_cancel(sth->netdata_thread);
-            nd_log_daemon(NDLP_INFO, "Signal to stop : %s", sth->name);
+            nd_log_daemon(NDLP_DEBUG, "SERVICE: Signal to stop : %s", sth->name);
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
                 sth->request_quit_callback(sth->data);

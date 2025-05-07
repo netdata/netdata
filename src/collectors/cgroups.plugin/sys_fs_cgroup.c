@@ -1399,7 +1399,7 @@ void *cgroups_main(void *ptr) {
     }
 
 //    int error = uv_thread_create(&discovery_thread.thread, cgroup_discovery_worker, NULL);
-    discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_JOINABLE, cgroup_discovery_worker, NULL);
+    discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
 
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");

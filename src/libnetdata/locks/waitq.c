@@ -247,10 +247,7 @@ static int unittest_stress(void) {
                 char thread_name[32];
                 snprintf(thread_name, sizeof(thread_name), "STRESS%d-%d", prio, t);
                 threads[thread_idx] = nd_thread_create(
-                    thread_name,
-                    NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-                    stress_thread,
-                    &thread_args[thread_idx]);
+                    thread_name, NETDATA_THREAD_OPTION_DONT_LOG, stress_thread, &thread_args[thread_idx]);
                 thread_idx++;
             }
         }
