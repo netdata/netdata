@@ -36,11 +36,9 @@
 
 MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#license)**
 
-:::warning
-
-People **get addicted to Netdata.** Once you use it on your systems, **there's no going back!**
-
-:::
+> [!WARNING]
+> People **get addicted to Netdata.**
+> Once you use it on your systems, **there's no going back!**
 
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20FreeBSD%20%7C%20Windows-blue)]()
 
@@ -83,12 +81,9 @@ With Netdata, you get real-time, per-second updates. Clear **insights at a glanc
 | **Complete Visibility**    | From infrastructure to applications       | Simplifies operations and eliminates silos               |
 | **Edge-Based**             | Processing at your premises               | Distributes code instead of centralizing data            |
 
-:::note
-
-Want to put Netdata to the test against Prometheus?
-Explore the [full comparison](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/).
-
-:::
+> [!NOTE]  
+> Want to put Netdata to the test against Prometheus?
+> Explore the [full comparison](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/).
 
 ---
 
@@ -142,11 +137,8 @@ Choose your platform and follow the installation guide:
 * [Docker Guide](/packaging/docker/README.md)
 * [Kubernetes Setup](https://learn.netdata.cloud/docs/installation/install-on-specific-environments/kubernetes)
 
-:::note
-
-You can access the Netdata UI at `http://localhost:19999` (or `http://NODE:19999` if remote).
-
-:::
+> [!NOTE]
+> You can access the Netdata UI at `http://localhost:19999` (or `http://NODE:19999` if remote).
 
 ### 2. Configure Collectors
 
@@ -161,11 +153,8 @@ You can use hundreds of built-in alerts and integrate with:
 
 `email`, `Slack`, `Telegram`, `PagerDuty`, `Discord`, `Microsoft Teams`, and more.
 
-:::note
-
-Email alerts work by default if there's a configured MTA.
-
-:::
+> [!NOTE]  
+> Email alerts work by default if there's a configured MTA.
 
 ### 4. Configure Parents
 
@@ -173,11 +162,8 @@ You can centralize dashboards, alerts, and storage with Netdata Parents:
 
 * [Streaming Reference](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference)
 
-:::note
-
-You can use Netdata Parents for central dashboards, longer retention, and alert configuration.
-
-:::
+> [!NOTE]  
+> You can use Netdata Parents for central dashboards, longer retention, and alert configuration.
 
 ### 5. Connect to Netdata Cloud
 
@@ -189,11 +175,8 @@ You can use Netdata Parents for central dashboards, longer retention, and alert 
 * Role-based access control
 * Free tier available
 
-:::note
-
-Netdata Cloud is optional. Your data stays in your infrastructure.
-
-:::
+> [!NOTE]  
+> Netdata Cloud is optional. Your data stays in your infrastructure.
 
 ## Live Demo Sites
 
@@ -246,11 +229,8 @@ With each Agent you can:
 8. **Query** – Access metrics via an API for dashboards or third-party tools.
 9. **Score** – Use a scoring engine to find patterns and correlations across metrics.
 
-:::note
-
-Learn more: [Netdata's architecture](https://learn.netdata.cloud/docs/netdata-agent/architecture-overview/)
-
-:::
+> [!NOTE]  
+> Learn more: [Netdata's architecture](https://learn.netdata.cloud/docs/netdata-agent/architecture-overview/)
 
 ## Agent Capabilities
 
@@ -302,11 +282,9 @@ No. Even with ML and per-second metrics, Netdata uses minimal resources.
 * <1% CPU and \~100MiB RAM when ML and alerts are disabled and using ephemeral storage
 * Parents scale to millions of metrics per second with appropriate hardware
 
-:::note
+> [!NOTE]  
+> You can use the **Netdata Monitoring** section in the dashboard to inspect its resource usage.
 
-You can use the **Netdata Monitoring** section in the dashboard to inspect its resource usage.
-
-:::
 </details>
 
 <details>
@@ -332,11 +310,9 @@ Yes. With Netdata you can:
 * Scale vertically with powerful Parents
 * Scale infinitely via Netdata Cloud
 
-:::note
+> [!NOTE]  
+> You can use Netdata Cloud to merge many independent infrastructures into one logical view.
 
-You can use Netdata Cloud to merge many independent infrastructures into one logical view.
-
-:::
 </details>
 
 <details>
@@ -348,11 +324,9 @@ No. Netdata minimizes disk usage:
 * Uses direct I/O and compression (ZSTD)
 * Can run entirely in RAM or stream to a Parent
 
-:::note
+> [!NOTE]  
+> You can use `alloc` or `ram` mode for no disk writes.
 
-You can use `alloc` or `ram` mode for no disk writes.
-
-:::
 </details>
 
 <details>
@@ -364,11 +338,9 @@ With Netdata you get a complete monitoring solution—not just tools.
 * Built-in ML, alerts, dashboards, and correlations
 * More efficient and easier to deploy
 
-:::note
+> [!NOTE]
+> [Performance comparison](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/)
 
-[Performance comparison](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/)
-
-:::
 </details>
 
 <details>
@@ -404,11 +376,9 @@ You can start small:
 * Explore anomaly scoring ("AR" toggle)
 * Create custom dashboards in Netdata Cloud
 
-:::note
+> [!NOTE]  
+> [Docs and guides](https://learn.netdata.cloud/guides)
 
-[Docs and guides](https://learn.netdata.cloud/guides)
-
-:::
 </details>
 
 <details>
@@ -433,11 +403,9 @@ Anonymous telemetry helps improve the product. You can disable it:
 * Add `--disable-telemetry` to the installer, or
 * Create `/etc/netdata/.opt-out-from-anonymous-statistics` and restart Netdata
 
-:::note
+> [!NOTE]  
+> Telemetry helps us understand usage, not track users. No private data is collected.
 
-Telemetry helps us understand usage, not track users. No private data is collected.
-
-:::
 </details>
 
 <details>
@@ -461,11 +429,8 @@ You'll join users including:
 
 Visit [Netdata Learn](https://learn.netdata.cloud) for full documentation and guides.
 
-:::note
-
-Includes deployment, configuration, alerting, exporting, troubleshooting, and more.
-
-:::
+> [!NOTE]  
+> Includes deployment, configuration, alerting, exporting, troubleshooting, and more.
 
 ---
 
@@ -477,11 +442,8 @@ Join the Netdata community:
 * [Forum](https://community.netdata.cloud)
 * [GitHub Discussions](https://github.com/netdata/netdata/discussions)
 
-:::note
-
-[Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md)
-
-:::
+> [!NOTE]  
+> [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md)
 
 Follow us on:
 [Twitter](https://twitter.com/netdatahq) | [Reddit](https://www.reddit.com/r/netdata/) | [YouTube](https://www.youtube.com/c/Netdata) | [LinkedIn](https://www.linkedin.com/company/netdata-cloud/)
@@ -500,11 +462,8 @@ Ways you help us stay sharp:
 * Develop new integrations or collectors
 * Help users in forums and chats
 
-:::note
-
-[Contribution guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md)
-
-:::
+> [!NOTE]  
+> [Contribution guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md)
 
 ---
 
@@ -516,11 +475,8 @@ The Netdata ecosystem includes:
 * **Netdata UI** – Closed-source but free to use with Netdata Agent and Cloud. Delivered via CDN. It integrates third-party open-source components.
 * **Netdata Cloud** – Closed-source, with free and paid tiers. Adds remote access, SSO, scalability.
 
-:::note
-
-[Netdata Agent License](https://github.com/netdata/netdata/blob/master/LICENSE)
-[Netdata Agent Redistributed](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md)
-[Netdata Cloud UI License](https://app.netdata.cloud/LICENSE.txt)
-[Netdata UI third-party licenses](https://app.netdata.cloud/3D_PARTY_LICENSES.txt)
-
-:::
+> [!NOTE]
+> [Netdata Agent License](https://github.com/netdata/netdata/blob/master/LICENSE)
+> [Netdata Agent Redistributed](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md)
+> [Netdata Cloud UI License](https://app.netdata.cloud/LICENSE.txt)
+> [Netdata UI third-party licenses](https://app.netdata.cloud/3D_PARTY_LICENSES.txt)
