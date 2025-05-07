@@ -102,4 +102,6 @@ void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_
 bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds);
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b);
 
+bool localhost_is_docker();
+
 #endif //NETDATA_RRDHOST_SYSTEM_INFO_H
