@@ -106,11 +106,11 @@ struct ws3svc_w3wp_data {
     RRDSET *st_wescv_w3wp_file_cache_mem_usage;
     RRDDIM *rd_wescv_w3wp_file_cache_mem_usage;
 
-    RRDSET *st_wescv_w3wp_file_cache_total;
-    RRDDIM *rd_wescv_w3wp_file_cache_total;
+    RRDSET *st_wescv_w3wp_files_cache_total;
+    RRDDIM *rd_wescv_w3wp_files_cache_total;
 
-    RRDSET *st_wescv_w3wp_file_flushed_total;
-    RRDDIM *rd_wescv_w3wp_file_flushed_total;
+    RRDSET *st_wescv_w3wp_files_flushed_total;
+    RRDDIM *rd_wescv_w3wp_files_flushed_total;
 
     RRDSET *st_wescv_w3wp_uri_cache_flushed;
     RRDDIM *rd_wescv_w3wp_uri_cache_flushed;
@@ -1395,7 +1395,7 @@ static inline void w3svc_w3wp_active_threads(
                 NULL,
                 "w3scv w3wp",
                 "iis.w3scv_w3wp_active_threads",
-                "Threads actively processing requests in the worker process",
+                "Threads actively processing requests in the worker process.",
                 "threads",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1527,7 +1527,7 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_file_cache_mem_usage =
-                rrddim_add(p->st_wescv_w3wp_file_cache_mem_usage, "mem", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_wescv_w3wp_file_cache_mem_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(
                 p->st_wescv_w3wp_file_cache_mem_usage->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
@@ -1549,16 +1549,16 @@ static inline void w3svc_w3wp_files_cached_total(
     int update_every)
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFilesCachedTotal)) {
-        if (!p->st_wescv_w3wp_file_cache_total) {
+        if (!p->st_wescv_w3wp_files_cache_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_file_cache_total", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_files_cache_total", windows_shared_buffer);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_file_cache_total = rrdset_create_localhost(
+            p->st_wescv_w3wp_files_cache_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "w3scv w3wp",
-                "iis.w3scv_w3wp_file_cache_total",
+                "iis.w3scv_w3wp_files_cache_total",
                 "Total number of files whose contents were ever added to the cache.",
                 "files/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1567,18 +1567,18 @@ static inline void w3svc_w3wp_files_cached_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_file_cache_total =
-                rrddim_add(p->st_wescv_w3wp_file_cache_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_wescv_w3wp_files_cache_total =
+                rrddim_add(p->st_wescv_w3wp_files_cache_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_wescv_w3wp_file_cache_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_wescv_w3wp_files_cache_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_file_cache_total,
-            p->rd_wescv_w3wp_file_cache_total,
+            p->st_wescv_w3wp_files_cache_total,
+            p->rd_wescv_w3wp_files_cache_total,
             (collected_number)p->WESCVW3WPFilesCachedTotal.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_file_cache_total);
+        rrdset_done(p->st_wescv_w3wp_files_cache_total);
     }
 }
 
@@ -1590,16 +1590,16 @@ static inline void w3svc_w3wp_files_flushed_total(
     int update_every)
 {
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFilesFlushedTotal)) {
-        if (!p->st_wescv_w3wp_file_flushed_total) {
+        if (!p->st_wescv_w3wp_files_flushed_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_file_flushed_total", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_files_flushed_total", windows_shared_buffer);
             netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_file_flushed_total = rrdset_create_localhost(
+            p->st_wescv_w3wp_files_flushed_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
                 "w3scv w3wp",
-                "iis.w3scv_w3wp_file_flushed_total",
+                "iis.w3scv_w3wp_files_flushed_total",
                 "Total number of file handles that have been removed from the cache.",
                 "files/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1608,18 +1608,18 @@ static inline void w3svc_w3wp_files_flushed_total(
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_wescv_w3wp_file_flushed_total =
-                rrddim_add(p->st_wescv_w3wp_file_flushed_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_wescv_w3wp_files_flushed_total =
+                rrddim_add(p->st_wescv_w3wp_files_flushed_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
-                p->st_wescv_w3wp_file_flushed_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_wescv_w3wp_files_flushed_total->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
-            p->st_wescv_w3wp_file_flushed_total,
-            p->rd_wescv_w3wp_file_flushed_total,
+            p->st_wescv_w3wp_files_flushed_total,
+            p->rd_wescv_w3wp_files_flushed_total,
             (collected_number)p->WESCVW3WPFilesFlushedTotal.current.Data);
 
-        rrdset_done(p->st_wescv_w3wp_file_flushed_total);
+        rrdset_done(p->st_wescv_w3wp_files_flushed_total);
     }
 }
 
