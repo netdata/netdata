@@ -15,6 +15,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
+// TODO: Profiles
+// - Check all Network/Interfaces/* families
+
 var log = logger.New().With("component", "snmp/ddsnmp")
 
 var ddProfiles []*Profile
