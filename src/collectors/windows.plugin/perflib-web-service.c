@@ -1725,7 +1725,7 @@ static inline void w3svc_w3wp_total_metadata_cached(
                 "w3scv w3wp",
                 "iis.w3scv_w3wp_total_metadata_cache",
                 "Number of metadata information blocks currently present in user-mode cache.",
-                "blocks/s",
+                "blocks",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_METADATA_CACHED,
