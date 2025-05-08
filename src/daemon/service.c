@@ -185,7 +185,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
         svc_rrdhost_cleanup_charts_marked_obsolete(host);
 
-        if (host == localhost)
+        if (rrdhost_is_local(host))
             continue;
 
         rrdhost_receiver_lock(host);
