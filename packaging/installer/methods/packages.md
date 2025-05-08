@@ -122,8 +122,8 @@ You can find our DEB repositories at: [https://repository.netdata.cloud/repos/in
 
 Within each repository group, you'll find directories for specific distributions:
 
-- `debian`: For Debian Linux and compatible distributions
-- `ubuntu`: For Ubuntu Linux and compatible distributions
+- `debian`: For Debian Linux and binary-compatible distributions
+- `ubuntu`: For Ubuntu Linux and binary-compatible distributions
 
 ### Repository Structure
 
