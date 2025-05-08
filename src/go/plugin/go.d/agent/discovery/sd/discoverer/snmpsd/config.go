@@ -49,12 +49,12 @@ type (
 		SecurityLevel string `yaml:"security_level"`
 		// AuthProtocol must be one of: "md5", "sha", "sha224", "sha256", "sha384", "sha512" (for SNMPv3)
 		AuthProtocol string `yaml:"auth_protocol"`
-		// AuthPassword is the authentication passphrase (for SNMPv3)
-		AuthPassword string `yaml:"auth_password"`
+		// AuthPassphrase is the authentication passphrase (for SNMPv3)
+		AuthPassphrase string `yaml:"auth_password"`
 		// PrivacyProtocol must be one of: "des", "aes", "aes192", "aes256", "aes192C", "aes256C" (for SNMPv3)
 		PrivacyProtocol string `yaml:"priv_protocol"`
-		// PrivacyPassword is the privacy passphrase (for SNMPv3)
-		PrivacyPassword string `yaml:"priv_password"`
+		// PrivacyPassphrase is the privacy passphrase (for SNMPv3)
+		PrivacyPassphrase string `yaml:"priv_password"`
 	}
 )
 
@@ -136,9 +136,9 @@ func setCredential(client gosnmp.Handler, cred CredentialConfig) {
 		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
 			UserName:                 cred.UserName,
 			AuthenticationProtocol:   parseSNMPv3AuthProtocol(cred),
-			AuthenticationPassphrase: cred.AuthPassword,
+			AuthenticationPassphrase: cred.AuthPassphrase,
 			PrivacyProtocol:          parseSNMPv3PrivProtocol(cred),
-			PrivacyPassphrase:        cred.PrivacyPassword,
+			PrivacyPassphrase:        cred.PrivacyPassphrase,
 		})
 	}
 }
