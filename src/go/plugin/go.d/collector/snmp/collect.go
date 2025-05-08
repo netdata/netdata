@@ -20,7 +20,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	if c.enableProfiles {
+	if c.EnableProfiles {
 		sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
 		if err != nil {
 			return nil, err

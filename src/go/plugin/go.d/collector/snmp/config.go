@@ -15,6 +15,7 @@ type (
 		Options                Options                `yaml:"options,omitempty" json:"options"`
 		ChartsInput            []ChartConfig          `yaml:"charts,omitempty" json:"charts"`
 		NetworkInterfaceFilter NetworkInterfaceFilter `yaml:"network_interface_filter,omitempty" json:"network_interface_filter"`
+		EnableProfiles         bool                   `yaml:"enable_profiles,omitempty" json:"enable_profiles"`
 	}
 	NetworkInterfaceFilter struct {
 		ByName string `yaml:"by_name,omitempty" json:"by_name"`

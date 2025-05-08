@@ -156,7 +156,7 @@ func TestCollector_Charts(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 				setMockClientSysExpect(m)
@@ -208,7 +208,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 				setMockClientIfMibExpect(m)
@@ -223,7 +223,7 @@ func TestCollector_Check(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
 
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 
@@ -249,7 +249,7 @@ func TestCollector_Check(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 				m.EXPECT().Get(gomock.Any()).Return(nil, errors.New("mock Get() error")).Times(1)
@@ -291,7 +291,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareV2Config()
 
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 				setMockClientIfMibExpect(m)
@@ -397,7 +397,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
 
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 
@@ -435,7 +435,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
 
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 
@@ -466,7 +466,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
 
-				if collr.enableProfiles {
+				if collr.EnableProfiles {
 					setMockClientSysObjectidExpect(m)
 				}
 
@@ -505,7 +505,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			mx := collr.Collect(context.Background())
 
-			if collr.enableProfiles {
+			if collr.EnableProfiles {
 				mx["TestMetric"] = 1
 			}
 
