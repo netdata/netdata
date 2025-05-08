@@ -12,7 +12,7 @@ metrics:
         name: cpu.usage
         description: The overall CPU busy percentage in the last 1 minute period
         unit: "%"
-        family: "Hardware/CPU"
+        family: "CPU"
     metric_tags:
       - index: 1  # cpmCPUTotalIndex
         tag: cpu
@@ -26,12 +26,12 @@ metrics:
         name: memory.used
         description: Indicates the number of bytes from the memory pool that are currently in use by applications on the managed device
         unit: "By"
-        family: "Hardware/Memory"
+        family: "Memory"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6  # ciscoMemoryPoolFree
         name: memory.free
         description: Indicates the number of bytes from the memory pool that are currently unused on the managed device. Note that the sum of ciscoMemoryPoolUsed and ciscoMemoryPoolFree is the total amount of memory in the pool
         unit: "By"
-        family: "Hardware/Memory"
+        family: "Memory"
     metric_tags:
       - index: 1  # ciscoMemoryPoolType
         tag: mem
