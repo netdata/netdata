@@ -214,7 +214,7 @@ Help Options:
 sudo su -s /bin/bash netdata
 ```
 
-Depending on where Netdata was installed, execute one of the following commands to trace the execution of a python module:
+Depending on where Netdata was installed, execute one of the following commands to trace the execution of a go module:
 
 ```bash
 # execute the plugin in debug mode, for a specific module
