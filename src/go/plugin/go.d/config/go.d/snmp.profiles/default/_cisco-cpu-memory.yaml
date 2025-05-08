@@ -1,7 +1,5 @@
 # CPU and memory metrics for Cisco devices.
 
-# first pass
-
 metrics:
   - MIB: CISCO-PROCESS-MIB
     table:
