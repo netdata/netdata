@@ -5,8 +5,6 @@
 #   "Cisco Systems WS-C6509.Cisco Catalyst Operating System Software, Version 5.5(8).Copyright (c) 1995-2001 by Cisco Systems."
 #   "Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc. Compiled Sat 17-Dec-"
 
-# first pass
-
 metadata:
   device:
     fields:
