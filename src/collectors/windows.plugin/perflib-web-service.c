@@ -1418,47 +1418,6 @@ static inline void w3svc_w3wp_active_threads(
     }
 }
 
-static inline void w3svc_w3wp_requests_total(
-    struct ws3svc_w3wp_data *p,
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    int update_every,
-    char *app_name)
-{
-    if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPRequestTotal)) {
-        if (!p->st_wescv_w3wp_requests_total) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_requests_total", app_name);
-            netdata_fix_chart_name(id);
-            p->st_wescv_w3wp_requests_total = rrdset_create_localhost(
-                "iis",
-                id,
-                NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_requests_total",
-                "Maximum number of threads to which the thread pool can grow as needed.",
-                "requests",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibWebService",
-                PRIO_W3SVC_W3WP_REQUESTS_TOTAL,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-            p->rd_wescv_w3wp_requests_total =
-                rrddim_add(p->st_wescv_w3wp_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_wescv_w3wp_requests_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-            p->st_wescv_w3wp_requests_total,
-            p->rd_wescv_w3wp_requests_total,
-            (collected_number)p->WESCVW3WPRequestTotal.current.Data);
-
-        rrdset_done(p->st_wescv_w3wp_requests_total);
-    }
-}
-
 static inline void w3svc_w3wp_requests_active(
     struct ws3svc_w3wp_data *p,
     PERF_DATA_BLOCK *pDataBlock,
@@ -1942,7 +1901,6 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         w3svc_w3wp_active_threads(p, pDataBlock, pObjectType, pi, update_every, app);
 
-        w3svc_w3wp_requests_total(p, pDataBlock, pObjectType, pi, update_every, app);
         w3svc_w3wp_requests_active(p, pDataBlock, pObjectType, pi, update_every, app);
 
         w3svc_w3wp_file_cache_mem_usage(p, pDataBlock, pObjectType, pi, update_every, app);
