@@ -63,11 +63,11 @@ Within each repository group, you'll find directories for specific distributions
 
 | Repository Directory | Primary Distribution | Compatible Distributions |
 |---------------------|----------------------|--------------------------|
-| `amazonlinux` | Amazon Linux | Compatible Amazon-based distros |
-| `el` | Red Hat Enterprise Linux | CentOS, AlmaLinux, Rocky Linux |
-| `fedora` | Fedora | Compatible Fedora-based distros |
-| `ol` | Oracle Linux | Compatible Oracle-based distros |
-| `opensuse` | openSUSE | Compatible SUSE-based distros |
+| `amazonlinux` | Amazon Linux | Binary-compatible Amazon Linux based distros |
+| `el` | Red Hat Enterprise Linux | CentOS, AlmaLinux, Rocky Linux, and other binary-compatible distros |
+| `fedora` | Fedora | Binary-compatible Fedora-based distros |
+| `ol` | Oracle Linux | Binary-compatible Oracle Linux based distros |
+| `opensuse` | openSUSE | Binary-compatible SUSE-based distros |
 
 ### Repository Structure
 
