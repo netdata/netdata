@@ -1246,7 +1246,7 @@ modules:
                 - name: requests
             - name: iis.w3scv_w3wp_file_cache_mem_usage
               description: Current memory usage by the worker process.
-              unit: "bytes/s"
+              unit: "bytes"
               chart_type: line
               dimensions:
                 - name: used
@@ -1276,7 +1276,7 @@ modules:
                 - name: blocks
             - name: iis.w3scv_w3wp_total_metadata_cache
               description: Number of metadata information blocks currently present in user-mode cache.
-              unit: "blocks/s"
+              unit: "blocks"
               chart_type: line
               dimensions:
                 - name: blocks
