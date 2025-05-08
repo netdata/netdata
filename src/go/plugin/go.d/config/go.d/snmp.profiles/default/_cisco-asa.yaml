@@ -13,7 +13,7 @@ metrics:
         name: cfwConnectionStatValue
         description: Current status of the resource statistic
         unit: "1"
-        family: "firewall/statistics"
+        family: "Firewall/Statistics"
     metric_tags:
       - index: 1
         tag: service_type
@@ -27,7 +27,7 @@ metrics:
       name: crasNumDeclinedSessions
       description: Number of session setup attempts declined due to authentication or authorization failure
       unit: "{session}"
-      family: "firewall/sessions"
+      family: "Firewall/Sessions"
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     symbol:
       # num sessions
@@ -35,7 +35,7 @@ metrics:
       name: crasNumSessions
       description: Number of currently active sessions
       unit: "{session}"
-      family: "firewall/sessions"
+      family: "Firewall/Sessions"
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     symbol:
       # num users
@@ -43,7 +43,7 @@ metrics:
       name: crasNumUsers
       description: Number of users who have active sessions
       unit: "{user}"
-      family: "firewall/users"
+      family: "Firewall/Users"
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     metric_type: monotonic_count
     symbol:
@@ -52,14 +52,14 @@ metrics:
       name: crasNumSetupFailInsufResources
       description: Number of session setup attempts failed due to insufficient resources
       unit: "{attempt}"
-      family: "firewall/sessions"
+      family: "Firewall/Sessions"
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.171.1.3.1.1.0
       name: cipSecGlobalActiveTunnels
       description: Number of currently active IPsec Phase-2 Tunnels
       unit: "{tunnel}"
-      family: "firewall/ipsec"
+      family: "Firewall/IPsec"
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     metric_type: monotonic_count
     symbol:
@@ -67,7 +67,7 @@ metrics:
       name: cipSecGlobalHcInOctets
       description: High capacity count of total octets received by all current and previous IPsec Phase-2 Tunnels
       unit: "By"
-      family: "firewall/ipsec"
+      family: "Firewall/IPsec"
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     metric_type: monotonic_count
     symbol:
@@ -75,7 +75,7 @@ metrics:
       name: cipSecGlobalHcOutOctets
       description: High capacity count of total octets sent by all current and previous IPsec Phase-2 Tunnels
       unit: "By"
-      family: "firewall/ipsec"
+      family: "Firewall/IPsec"
   - MIB: ENTITY-SENSOR-MIB
     table:
       OID: 1.3.6.1.2.1.99.1.1
@@ -85,7 +85,7 @@ metrics:
         name: entPhySensorValue
         description: Most recent measurement obtained by the agent for this sensor
         unit: "1"
-        family: "sensors"
+        family: "Hardware/Sensors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
