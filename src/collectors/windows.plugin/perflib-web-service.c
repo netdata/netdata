@@ -1407,7 +1407,6 @@ static inline void w3svc_w3wp_active_threads(
             p->rd_wescv_w3wp_active_threads =
                 rrddim_add(p->st_wescv_w3wp_active_threads, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(p->st_wescv_w3wp_active_threads->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(p->st_wescv_w3wp_active_threads->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1449,7 +1448,6 @@ static inline void w3svc_w3wp_requests_total(
             p->rd_wescv_w3wp_requests_total =
                 rrddim_add(p->st_wescv_w3wp_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_requests_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(p->st_wescv_w3wp_requests_total->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1491,7 +1489,6 @@ static inline void w3svc_w3wp_requests_active(
             p->rd_wescv_w3wp_requests_active =
                 rrddim_add(p->st_wescv_w3wp_requests_active, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_requests_active->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(p->st_wescv_w3wp_requests_active->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1533,8 +1530,6 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
             p->rd_wescv_w3wp_file_cache_mem_usage =
                 rrddim_add(p->st_wescv_w3wp_file_cache_mem_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(p->st_wescv_w3wp_file_cache_mem_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_file_cache_mem_usage->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1576,8 +1571,6 @@ static inline void w3svc_w3wp_files_cached_total(
             p->rd_wescv_w3wp_files_cache_total =
                 rrddim_add(p->st_wescv_w3wp_files_cache_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_files_cache_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_files_cache_total->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1619,8 +1612,6 @@ static inline void w3svc_w3wp_files_flushed_total(
             p->rd_wescv_w3wp_files_flushed_total =
                 rrddim_add(p->st_wescv_w3wp_files_flushed_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_files_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_files_flushed_total->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1662,8 +1653,6 @@ static inline void w3svc_w3wp_uri_cached_flushed(
             p->rd_wescv_w3wp_uri_cache_flushed =
                 rrddim_add(p->st_wescv_w3wp_uri_cache_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_uri_cache_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_uri_cache_flushed->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1705,8 +1694,6 @@ static inline void w3svc_w3wp_total_uri_cached(
             p->rd_wescv_w3wp_total_uri_cached =
                 rrddim_add(p->st_wescv_w3wp_total_uri_cached, "blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_total_uri_cached->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_total_uri_cached->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1748,8 +1735,6 @@ static inline void w3svc_w3wp_total_metadata_cached(
             p->rd_wescv_w3wp_total_metadata_cache =
                 rrddim_add(p->st_wescv_w3wp_total_metadata_cache, "blocks", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(p->st_wescv_w3wp_total_metadata_cache->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_total_metadata_cache->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1791,8 +1776,6 @@ static inline void w3svc_w3wp_total_metadata_flushed(
             p->rd_wescv_w3wp_total_metadata_flushed =
                 rrddim_add(p->st_wescv_w3wp_total_metadata_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_total_metadata_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_total_metadata_flushed->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1804,7 +1787,7 @@ static inline void w3svc_w3wp_total_metadata_flushed(
     }
 }
 
-static inline void w3svc_w3wp_output_cache_active_flushed_itens(
+static inline void w3svc_w3wp_output_cache_active_flushed_items(
     struct ws3svc_w3wp_data *p,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -1824,7 +1807,7 @@ static inline void w3svc_w3wp_output_cache_active_flushed_itens(
                 "w3scv w3wp",
                 "iis.w3scv_w3wp_output_cache_active_flushed_items",
                 "Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.",
-                "items/s",
+                "items",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_OUTPUT_CACHE_ACTIVE_FLUSH,
@@ -1835,11 +1818,6 @@ static inline void w3svc_w3wp_output_cache_active_flushed_itens(
                 p->st_wescv_w3wp_output_cache_active_flushed_items, "items", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels,
-                "pid",
-                windows_shared_buffer,
-                RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1881,8 +1859,6 @@ static inline void w3svc_w3wp_output_cache_memory_usage(
             p->rd_wescv_w3wp_output_cache_memory_usage =
                 rrddim_add(p->st_wescv_w3wp_output_cache_memory_usage, "used", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_output_cache_memory_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_output_cache_memory_usage->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1924,8 +1900,6 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
             p->rd_wescv_w3wp_output_cache_flushed_total = rrddim_add(
                 p->st_wescv_w3wp_output_cache_flushed_total, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_output_cache_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                p->st_wescv_w3wp_output_cache_flushed_total->rrdlabels, "pid", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         rrddim_set_by_pointer(
@@ -1960,10 +1934,11 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         struct ws3svc_w3wp_data *p = dictionary_set(w3svc_w3wp_service, windows_shared_buffer, NULL, sizeof(*p));
         // Instance example: "11084_MSExchangeOABAppPool"
         char *app = strchr(windows_shared_buffer, '_');
-        if (app) {
-            *app++ = '\0';
-        } else
+        if (!app) {
             continue;
+        }
+
+        *app++ = '\0';
 
         w3svc_w3wp_active_threads(p, pDataBlock, pObjectType, pi, update_every, app);
 
@@ -1981,7 +1956,7 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         w3svc_w3wp_total_metadata_cached(p, pDataBlock, pObjectType, pi, update_every, app);
         w3svc_w3wp_total_metadata_flushed(p, pDataBlock, pObjectType, pi, update_every, app);
 
-        w3svc_w3wp_output_cache_active_flushed_itens(p, pDataBlock, pObjectType, pi, update_every, app);
+        w3svc_w3wp_output_cache_active_flushed_items(p, pDataBlock, pObjectType, pi, update_every, app);
         w3svc_w3wp_output_cache_memory_usage(p, pDataBlock, pObjectType, pi, update_every, app);
         w3svc_w3wp_output_cache_flushed_total(p, pDataBlock, pObjectType, pi, update_every, app);
     }
