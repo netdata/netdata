@@ -8,7 +8,7 @@ Netdata provides pre-built native packages for most DEB- and RPM-based Linux dis
 
 Install Netdata using our [kickstart.sh installer](/packaging/installer/methods/kickstart.md), which automatically uses native packages on supported platforms.
 
-To ensure the installer uses only native packages, add `--native-only` when running `kickstart.sh`.
+To ensure the installer only uses native packages, add the `--native-only` option when running `kickstart.sh`.
 
 :::note
 
