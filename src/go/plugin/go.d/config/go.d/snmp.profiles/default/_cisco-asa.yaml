@@ -85,7 +85,7 @@ metrics:
         name: entPhySensorValue
         description: Most recent measurement obtained by the agent for this sensor
         unit: "1"
-        family: "sensor"
+        family: "sensors"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
