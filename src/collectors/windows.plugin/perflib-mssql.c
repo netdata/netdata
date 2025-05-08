@@ -970,7 +970,7 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
 
 static int initialize(int update_every)
 {
-    bool create_thread = false;
+    static bool create_thread = false;
     mssql_instances = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_instance));
 
