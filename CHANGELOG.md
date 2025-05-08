@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- docs: fix license link and remove GH alerts syntax from FAQ [\#20252](https://github.com/netdata/netdata/pull/20252) ([ilyam8](https://github.com/ilyam8))
+- Update Netdata README [\#20251](https://github.com/netdata/netdata/pull/20251) ([kanelatechnical](https://github.com/kanelatechnical))
+- fix\(go.d/snmp\): use 32bit counters if 64 aren't available [\#20249](https://github.com/netdata/netdata/pull/20249) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
 - Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
+- Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
 - Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
 - Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
@@ -468,14 +474,6 @@
 - 4 malloc arenas for parents, not IoT [\#19711](https://github.com/netdata/netdata/pull/19711) ([ktsaou](https://github.com/ktsaou))
 - Fix Fresh Installation on Microsoft [\#19710](https://github.com/netdata/netdata/pull/19710) ([thiagoftsm](https://github.com/thiagoftsm))
 - Avoid post initialization errors repeateadly [\#19709](https://github.com/netdata/netdata/pull/19709) ([ktsaou](https://github.com/ktsaou))
-- Check for final step [\#19708](https://github.com/netdata/netdata/pull/19708) ([stelfrag](https://github.com/stelfrag))
-- daemon status improvements 3 [\#19707](https://github.com/netdata/netdata/pull/19707) ([ktsaou](https://github.com/ktsaou))
-- fix runtime directory; annotate daemon status file [\#19706](https://github.com/netdata/netdata/pull/19706) ([ktsaou](https://github.com/ktsaou))
-- Add repository priority configuration for DEB package repositories. [\#19705](https://github.com/netdata/netdata/pull/19705) ([Ferroin](https://github.com/Ferroin))
-- add host/os fields to status file [\#19704](https://github.com/netdata/netdata/pull/19704) ([ktsaou](https://github.com/ktsaou))
-- under MSYS2 use stat [\#19703](https://github.com/netdata/netdata/pull/19703) ([ktsaou](https://github.com/ktsaou))
-- Integrate OpenTelemetry collector build into build system. [\#19702](https://github.com/netdata/netdata/pull/19702) ([Ferroin](https://github.com/Ferroin))
-- Document journal v2 index file format. [\#19701](https://github.com/netdata/netdata/pull/19701) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
