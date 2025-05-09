@@ -26,7 +26,6 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN, "flushed to open");
 
     // datafile full
-    worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT, "jv2 index wait");
     worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX, "jv2 indexing");
 
     // db rotation related

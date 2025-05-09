@@ -24,7 +24,6 @@ enum event_loop_job {
     UV_EVENT_DBENGINE_FLUSHED_TO_OPEN,
 
     // datafile full
-    UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT,
     UV_EVENT_DBENGINE_JOURNAL_INDEX,
 
     // db rotation related
