@@ -120,7 +120,7 @@ void *watcher_main(void *arg)
 
     // wait until the agent starts the shutdown process
     completion_wait_for(&shutdown_begin_completion);
-    netdata_log_error("Shutdown process started");
+    netdata_log_info("Shutdown process started");
 
     usec_t shutdown_start_time = now_monotonic_usec();
 
@@ -150,8 +150,10 @@ void *watcher_main(void *arg)
     usec_t shutdown_end_time = now_monotonic_usec();
 
     usec_t shutdown_duration = shutdown_end_time - shutdown_start_time;
-    netdata_log_error("Shutdown process ended in %llu milliseconds",
-                      shutdown_duration / USEC_PER_MS);
+
+    char shutdown_timing[64];
+    duration_snprintf(shutdown_timing, sizeof(shutdown_timing), (int64_t)shutdown_duration, "us", 1);
+    netdata_log_info("Shutdown process ended in %s", shutdown_timing);
 
     daemon_status_file_shutdown_step(NULL, buffer_tostring(steps_timings));
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
