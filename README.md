@@ -34,21 +34,14 @@
 
 <hr class="solid">
 
-MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#scroll-license)**
+MENU: **[WHO WE ARE](#who-we-are)** | **[KEY FEATURES](#key-features)** | **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)** | **[FAQ](#faq)** | **[DOCS](#book-documentation)** | **[COMMUNITY](#tada-community)** | **[CONTRIBUTE](#pray-contribute)** | **[LICENSE](#scroll-license)**
+
 
 > [!WARNING]
 > People **get addicted to Netdata.**
-> Once you use it on your systems, **there's no going back!**
+> Once you use it on your systems, *there's no going back.*
 
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20FreeBSD%20%7C%20Windows-blue)]()
-
-## Most Energy-Efficient Monitoring Tool
-
-<p align="center">
-<img src="https://github.com/netdata/netdata/assets/139226121/4f64cbb6-05e4-48e3-b7c0-d1b79e37e219" alt="Energy efficiency" width="800"/>
-</p>
-
-According to the [University of Amsterdam study](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf), Netdata is "the most energy-efficient tool" for monitoring Docker-based systems. The study also shows Netdata excels in CPU usage, RAM usage, and execution time compared to other monitoring solutions.
 
 ---
 
@@ -65,6 +58,34 @@ Netdata is an open-source, real-time infrastructure monitoring platform. Monitor
 * **Secure & Distributed** – You can keep your data local with no central collection needed.
 
 With Netdata, you get real-time, per-second updates. Clear **insights at a glance**, no complexity.
+
+<details>
+  <summary><strong>All heroes have a great origin story. Click to discover ours.</strong></summary>
+  <br/>
+
+In 2013, at the company where Costa Tsaousis was COO, a significant percentage of their cloud-based transactions failed silently, severely impacting business performance.
+
+Costa and his team tried every troubleshooting tool available at the time. None could identify the root cause. As Costa later wrote:
+
+“*I couldn’t believe that monitoring systems provide so few metrics and with such low resolution, scale so badly, and cost so much to run.*”
+
+Frustrated, he decided to build his own monitoring tool, starting from scratch.
+
+That decision led to countless late nights and weekends. It also sparked a fundamental shift in how infrastructure monitoring and troubleshooting are approached, both in method and in cost.
+</details>
+
+### Most Energy-Efficient Monitoring Tool
+
+<p align="center">
+<a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-dark-mode-only">
+  <img src="https://github.com/netdata/netdata/assets/139226121/7118757a-38fb-48d7-b12a-53e709a8e8c0" alt="Energy Efficiency" width="800"/>
+</a>
+<a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-light-mode-only">
+  <img src="https://github.com/netdata/netdata/assets/139226121/4f64cbb6-05e4-48e3-b7c0-d1b79e37e219" alt="Energy efficiency" width="800"/>
+</a>
+</p>
+
+According to the [University of Amsterdam study](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf), Netdata is the most energy-efficient tool for monitoring Docker-based systems. The study also shows Netdata excels in CPU usage, RAM usage, and execution time compared to other monitoring solutions.
 
 ---
 
@@ -203,7 +224,7 @@ With Netdata you can run a modular pipeline for metrics collection, processing, 
 
 ```mermaid
 flowchart TB
-  A[Netdata Agent]
+  A[Netdata Agent]:::mainNode
   A1(Collect):::green --> A
   A2(Store):::green --> A
   A3(Learn):::green --> A
@@ -214,8 +235,9 @@ flowchart TB
   A8(Query):::green --> A
   A9(Score):::green --> A
 
-  classDef green fill:#bbf3bb,stroke:#333,stroke-width:1px
-  ```
+  classDef green fill:#bbf3bb,stroke:#333,stroke-width:1px,color:#000
+  classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+```
 
 With each Agent you can:
 
@@ -253,7 +275,11 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 ## CNCF Membership
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/black/cncf-black.svg" alt="CNCF" width="300">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/color/cncf-color.svg">
+    <img alt="CNCF Logo" src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/color/cncf-color.svg" width="300">
+  </picture>
   <br />
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF).<br />
   It is one of the most starred projects in the <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--netdata">CNCF landscape</a>.
@@ -265,6 +291,7 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 
 <details>
 <summary><strong>Is Netdata secure?</strong></summary>
+<br/>
 
 Yes. Netdata follows [OpenSSF best practices](https://bestpractices.coreinfrastructure.org/en/projects/2231), has a security-first design, and is regularly audited by the community.
 
@@ -275,6 +302,7 @@ Yes. Netdata follows [OpenSSF best practices](https://bestpractices.coreinfrastr
 
 <details>
 <summary><strong>Does Netdata use a lot of resources?</strong></summary>
+<br/>
 
 No. Even with ML and per-second metrics, Netdata uses minimal resources.
 
@@ -288,6 +316,7 @@ No. Even with ML and per-second metrics, Netdata uses minimal resources.
 
 <details>
 <summary><strong>How much data retention is possible?</strong></summary>
+<br/>
 
 As much as your disk allows.
 
@@ -302,6 +331,7 @@ These are queried automatically based on the zoom level.
 
 <details>
 <summary><strong>Can Netdata scale to many servers?</strong></summary>
+<br/>
 
 Yes. With Netdata you can:
 
@@ -315,6 +345,7 @@ Yes. With Netdata you can:
 
 <details>
 <summary><strong>Is disk I/O a concern?</strong></summary>
+<br/>
 
 No. Netdata minimizes disk usage:
 
@@ -328,6 +359,7 @@ No. Netdata minimizes disk usage:
 
 <details>
 <summary><strong>How is Netdata different from Prometheus + Grafana?</strong></summary>
+<br/>
 
 With Netdata you get a complete monitoring solution—not just tools.
 
@@ -341,6 +373,7 @@ With Netdata you get a complete monitoring solution—not just tools.
 
 <details>
 <summary><strong>How is Netdata different from commercial SaaS tools?</strong></summary>
+<br/>
 
 With Netdata you can store all metrics on your infrastructure—no sampling, no aggregation, no loss.
 
@@ -352,6 +385,7 @@ With Netdata you can store all metrics on your infrastructure—no sampling, no 
 
 <details>
 <summary><strong>Can Netdata run alongside Nagios, Zabbix, etc.?</strong></summary>
+<br/>
 
 Yes. You can use Netdata together with traditional tools.
 
@@ -365,6 +399,7 @@ With Netdata you get:
 
 <details>
 <summary><strong>What if I feel overwhelmed?</strong></summary>
+<br/>
 
 You can start small:
 
@@ -378,6 +413,7 @@ You can start small:
 
 <details>
 <summary><strong>Do I have to use Netdata Cloud?</strong></summary>
+<br/>
 
 No. Netdata Cloud is optional.
 
@@ -392,6 +428,7 @@ Netdata works without it, but with Cloud you can:
 
 <details>
 <summary><strong>What telemetry does Netdata collect?</strong></summary>
+<br/>
 
 Anonymous telemetry helps improve the product. You can disable it:
 
@@ -404,6 +441,7 @@ Anonymous telemetry helps improve the product. You can disable it:
 
 <details>
 <summary><strong>Who uses Netdata?</strong></summary>
+<br/>
 
 You'll join users including:
 
