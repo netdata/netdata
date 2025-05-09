@@ -224,7 +224,7 @@ With Netdata you can run a modular pipeline for metrics collection, processing, 
 
 ```mermaid
 flowchart TB
-  A[Netdata Agent]:::blackText
+  A[Netdata Agent]:::mainNode
   A1(Collect):::green --> A
   A2(Store):::green --> A
   A3(Learn):::green --> A
@@ -236,8 +236,8 @@ flowchart TB
   A9(Score):::green --> A
 
   classDef green fill:#bbf3bb,stroke:#333,stroke-width:1px,color:#000
-  classDef blackText color:#000
-  ```
+  classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+```
 
 With each Agent you can:
 
