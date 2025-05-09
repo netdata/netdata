@@ -2,10 +2,16 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.1...HEAD)
 
 **Merged pull requests:**
 
+- docs: reword go.d Troubleshooting section for clarity [\#20259](https://github.com/netdata/netdata/pull/20259) ([ilyam8](https://github.com/ilyam8))
+- Clearify the path of `plugins.d/go.d.plugin` in docs [\#20258](https://github.com/netdata/netdata/pull/20258) ([n0099](https://github.com/n0099))
+- Update documentation for native DEB/RPM packages [\#20257](https://github.com/netdata/netdata/pull/20257) ([kanelatechnical](https://github.com/kanelatechnical))
+- fix\(go.d/sd/snmp\): fix snmnpv3 again [\#20256](https://github.com/netdata/netdata/pull/20256) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp\): make enable\_profiles configurable \(needed for dev\) [\#20255](https://github.com/netdata/netdata/pull/20255) ([ilyam8](https://github.com/ilyam8))
+- fix obsolete chart cleanup to properly handle vnodes [\#20254](https://github.com/netdata/netdata/pull/20254) ([ilyam8](https://github.com/ilyam8))
 - docs: fix license link and remove GH alerts syntax from FAQ [\#20252](https://github.com/netdata/netdata/pull/20252) ([ilyam8](https://github.com/ilyam8))
 - Update Netdata README [\#20251](https://github.com/netdata/netdata/pull/20251) ([kanelatechnical](https://github.com/kanelatechnical))
 - fix\(go.d/snmp\): use 32bit counters if 64 aren't available [\#20249](https://github.com/netdata/netdata/pull/20249) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +22,10 @@
 - Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
 - Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
+
+## [v2.5.1](https://github.com/netdata/netdata/tree/v2.5.1) (2025-05-08)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.0...v2.5.1)
 
 ## [v2.5.0](https://github.com/netdata/netdata/tree/v2.5.0) (2025-05-05)
 
@@ -465,15 +475,6 @@
 - feat\(go.d\): add snmp devices discovery [\#19720](https://github.com/netdata/netdata/pull/19720) ([ilyam8](https://github.com/ilyam8))
 - save status on out of memory event [\#19719](https://github.com/netdata/netdata/pull/19719) ([ktsaou](https://github.com/ktsaou))
 - attempt to save status file from the signal handler [\#19718](https://github.com/netdata/netdata/pull/19718) ([ktsaou](https://github.com/ktsaou))
-- unified out of memory handling [\#19717](https://github.com/netdata/netdata/pull/19717) ([ktsaou](https://github.com/ktsaou))
-- chore\(go.d\): add file persister [\#19716](https://github.com/netdata/netdata/pull/19716) ([ilyam8](https://github.com/ilyam8))
-- do not call cleanup and exit on fatal conditions during startup [\#19715](https://github.com/netdata/netdata/pull/19715) ([ktsaou](https://github.com/ktsaou))
-- do not use mmap when the mmap limit is too low [\#19714](https://github.com/netdata/netdata/pull/19714) ([ktsaou](https://github.com/ktsaou))
-- systemd-journal: allow almost all fields to be facets [\#19713](https://github.com/netdata/netdata/pull/19713) ([ktsaou](https://github.com/ktsaou))
-- deduplicate all crash reports [\#19712](https://github.com/netdata/netdata/pull/19712) ([ktsaou](https://github.com/ktsaou))
-- 4 malloc arenas for parents, not IoT [\#19711](https://github.com/netdata/netdata/pull/19711) ([ktsaou](https://github.com/ktsaou))
-- Fix Fresh Installation on Microsoft [\#19710](https://github.com/netdata/netdata/pull/19710) ([thiagoftsm](https://github.com/thiagoftsm))
-- Avoid post initialization errors repeateadly [\#19709](https://github.com/netdata/netdata/pull/19709) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
