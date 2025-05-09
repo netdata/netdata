@@ -1677,7 +1677,6 @@ NOT_INLINE_HOT void pdc_route_synchronously_first(struct rrdengine_instance *ctx
 
 static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
-    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT);
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
