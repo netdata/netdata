@@ -39,7 +39,7 @@ MENU: **[WHO WE ARE](#who-we-are)** | **[KEY FEATURES](#key-features)** | **[GET
 
 > [!WARNING]
 > People **get addicted to Netdata.**
-> Once you use it on your systems, **there's no going back.**
+> Once you use it on your systems, *there's no going back.*
 
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20FreeBSD%20%7C%20Windows-blue)]()
 
