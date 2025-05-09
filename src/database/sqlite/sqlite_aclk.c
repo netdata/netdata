@@ -963,18 +963,10 @@ static void aclk_initialize_event_loop(void)
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     completion_init(&aclk_sync_config.start_stop_complete);
 
-//    int retries = 0;
     aclk_sync_config.thread = nd_thread_create("ACLKSYNC", NETDATA_THREAD_OPTION_DEFAULT, aclk_synchronization_event_loop, &aclk_sync_config);
-//    int create_uv_thread_rc = create_uv_thread(&aclk_sync_config.thread, aclk_synchronization_event_loop, &aclk_sync_config, &retries);
-//    if (create_uv_thread_rc)
-//        nd_log_daemon(NDLP_ERR, "Failed to create ACLK synchronization thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
-
     fatal_assert(NULL != aclk_sync_config.thread);
 
-//    if (retries)
-//        nd_log_daemon(NDLP_WARNING, "ACLK synchronization thread was created after %d attempts", retries);
     completion_wait_for(&aclk_sync_config.start_stop_complete);
-
     // Keep completion, just reset it for next use during shutdown
     completion_reset(&aclk_sync_config.start_stop_complete);
 }

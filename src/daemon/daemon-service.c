@@ -6,7 +6,6 @@ typedef struct service_thread {
     pid_t tid;
     SERVICE_TYPE services;
     char name[ND_THREAD_TAG_MAX + 1];
-//    bool stop_immediately;
     bool cancelled;
 
     ND_THREAD *netdata_thread;
@@ -71,14 +70,7 @@ bool service_running(SERVICE_TYPE service) {
 
     sth->services |= service;
 
-    bool cancelled = nd_thread_signaled_to_cancel();
-//    bool stop_immediately = false;
-//    if (!cancelled)
-//        stop_immediately = __atomic_load_n(&sth->stop_immediately, __ATOMIC_RELAXED);
-//
-//    bool stop_now = stop_immediately || cancelled;
-
-    return !cancelled && !exit_initiated_get();
+    return !nd_thread_signaled_to_cancel() && !exit_initiated_get();
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
