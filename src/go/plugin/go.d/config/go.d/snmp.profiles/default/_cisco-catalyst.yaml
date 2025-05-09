@@ -28,7 +28,7 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
         name: entSensorValue
         description: "The most recent measurement seen by the sensor"
-        unit:  "{1}"
+        unit:  "1"
         family: "Switches/Sensors"
     metric_tags:
       - symbol:
