@@ -919,6 +919,8 @@ done:
 
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     __atomic_store_n(&ctx->atomic.now_deleting_files, false, __ATOMIC_RELAXED);
+    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED))
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 struct uuid_first_time_s {
@@ -2180,8 +2182,11 @@ void dbengine_event_loop(void* arg) {
                     struct rrdengine_datafile *datafile = cmd.data;
                     if (NOT_INDEXING_OR_DELETING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
                         __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
+                        __atomic_store_n(&ctx->atomic.needs_indexing, false, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
                     }
+                    else
+                        __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
                     break;
                 }
 
