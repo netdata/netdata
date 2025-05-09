@@ -2405,6 +2405,8 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
             host_count++;
         }
         dfe_done(host);
+        if (!host_count)
+            host_count = 1; // avoid division by zero
     }
 
     size_t count = 0;
