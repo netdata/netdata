@@ -67,6 +67,7 @@ jobs:
             src/fluent-bit/
             src/web/server/h2o/libh2o/
           files_ignore: |
+            src/go/otel-collector/release-config.yaml.in
             **/*.md
             packaging/repoconfig/
       - name: List all changed files in pattern
