@@ -4,16 +4,11 @@
 
 typedef struct service_thread {
     pid_t tid;
-    SERVICE_THREAD_TYPE type;
     SERVICE_TYPE services;
     char name[ND_THREAD_TAG_MAX + 1];
-    bool stop_immediately;
     bool cancelled;
 
-    union {
-        ND_THREAD *netdata_thread;
-        uv_thread_t uv_thread;
-    };
+    ND_THREAD *netdata_thread;
 
     force_quit_t force_quit_callback;
     request_quit_t request_quit_callback;
@@ -27,7 +22,8 @@ struct service_globals {
     .pid_judy = NULL,
 };
 
-SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
+SERVICE_THREAD *service_register(request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data)
+{
     SERVICE_THREAD *sth = NULL;
     pid_t tid = gettid_cached();
 
@@ -36,23 +32,11 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
     if(!*PValue) {
         sth = callocz(1, sizeof(SERVICE_THREAD));
         sth->tid = tid;
-        sth->type = thread_type;
         sth->request_quit_callback = request_quit_callback;
         sth->force_quit_callback = force_quit_callback;
         sth->data = data;
         *PValue = sth;
-
-        switch(thread_type) {
-            default:
-            case SERVICE_THREAD_TYPE_NETDATA:
-                sth->netdata_thread = nd_thread_self();
-                break;
-
-            case SERVICE_THREAD_TYPE_EVENT_LOOP:
-            case SERVICE_THREAD_TYPE_LIBUV:
-                sth->uv_thread = uv_thread_self();
-                break;
-        }
+        sth->netdata_thread = nd_thread_self();
 
         const char *name = nd_thread_tag();
         if(!name) name = "";
@@ -82,15 +66,11 @@ bool service_running(SERVICE_TYPE service) {
     static __thread SERVICE_THREAD *sth = NULL;
 
     if(unlikely(!sth))
-        sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
+        sth = service_register(NULL, NULL, NULL);
 
     sth->services |= service;
 
-    bool cancelled = false;
-    if (sth->type == SERVICE_THREAD_TYPE_NETDATA)
-        cancelled = nd_thread_signaled_to_cancel();
-
-    return !sth->stop_immediately && !exit_initiated_get() && !cancelled;
+    return !nd_thread_signaled_to_cancel() && !exit_initiated_get();
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
@@ -103,19 +83,8 @@ void service_signal_exit(SERVICE_TYPE service) {
         SERVICE_THREAD *sth = *PValue;
 
         if((sth->services & service)) {
-            sth->stop_immediately = true;
-
-            switch(sth->type) {
-                default:
-                case SERVICE_THREAD_TYPE_NETDATA:
-                    nd_thread_signal_cancel(sth->netdata_thread);
-                    break;
-
-                case SERVICE_THREAD_TYPE_EVENT_LOOP:
-                case SERVICE_THREAD_TYPE_LIBUV:
-                    break;
-            }
-
+            nd_thread_signal_cancel(sth->netdata_thread);
+            nd_log_daemon(NDLP_DEBUG, "SERVICE: Signal to stop : %s", sth->name);
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
                 sth->request_quit_callback(sth->data);
@@ -123,7 +92,6 @@ void service_signal_exit(SERVICE_TYPE service) {
             }
         }
     }
-
     spinlock_unlock(&service_globals.lock);
 }
 
@@ -180,18 +148,7 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
             SERVICE_THREAD *sth = *PValue;
             if(sth->services & service && sth->tid != gettid_cached() && !sth->cancelled) {
                 sth->cancelled = true;
-
-                switch(sth->type) {
-                    default:
-                    case SERVICE_THREAD_TYPE_NETDATA:
-                        nd_thread_signal_cancel(sth->netdata_thread);
-                        break;
-
-                    case SERVICE_THREAD_TYPE_EVENT_LOOP:
-                    case SERVICE_THREAD_TYPE_LIBUV:
-                        break;
-                }
-
+                nd_thread_signal_cancel(sth->netdata_thread);
                 if(running)
                     buffer_strcat(thread_list, ", ");
 

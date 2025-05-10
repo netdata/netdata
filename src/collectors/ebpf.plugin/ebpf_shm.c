@@ -1395,7 +1395,7 @@ void *ebpf_shm_thread(void *ptr)
     pthread_mutex_unlock(&lock);
 
     ebpf_read_shm.thread =
-        nd_thread_create(ebpf_read_shm.name, NETDATA_THREAD_OPTION_JOINABLE, ebpf_read_shm_thread, em);
+        nd_thread_create(ebpf_read_shm.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_shm_thread, em);
 
     shm_collector(em);
 

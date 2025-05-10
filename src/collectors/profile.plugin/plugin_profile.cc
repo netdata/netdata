@@ -217,7 +217,7 @@ extern "C" void *profile_main(void *ptr) {
         char Tag[NETDATA_THREAD_TAG_MAX + 1];
 
         snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "PROFILER[%zu]", Idx);
-        Threads[Idx] = nd_thread_create(Tag, NETDATA_THREAD_OPTION_JOINABLE,
+        Threads[Idx] = nd_thread_create(Tag, NETDATA_THREAD_OPTION_DEFAULT,
                                         subprofile_main, static_cast<void *>(&Profilers[Idx]));
     }
 

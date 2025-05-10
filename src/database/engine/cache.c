@@ -2085,7 +2085,7 @@ PGC *pgc_create(const char *name,
     // last create the eviction thread
     {
         completion_init(&cache->evictor.completion);
-        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, pgc_evict_thread, cache);
+        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_DEFAULT, pgc_evict_thread, cache);
     }
 
     return cache;
@@ -2872,7 +2872,7 @@ void unittest_stress_test(void) {
 
     pthread_t service_thread;
     nd_thread_create(&service_thread, "SERVICE",
-                          NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                          NETDATA_THREAD_OPTION_DONT_LOG,
                           unittest_stress_test_service, NULL);
 
     pthread_t collect_threads[pgc_uts.collect_threads];
@@ -2882,7 +2882,7 @@ void unittest_stress_test(void) {
         char buffer[100 + 1];
         snprintfz(buffer, sizeof(buffer) - 1, "COLLECT_%zu", i);
         nd_thread_create(&collect_threads[i], buffer,
-                              NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                              NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_collector, &collect_thread_ids[i]);
     }
 
@@ -2895,7 +2895,7 @@ void unittest_stress_test(void) {
         snprintfz(buffer, sizeof(buffer) - 1, "QUERY_%zu", i);
         initstate_r(1, pgc_uts.rand_statebufs, 1024, &pgc_uts.random_data[i]);
         nd_thread_create(&queries_threads[i], buffer,
-                              NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                              NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_queries, &query_thread_ids[i]);
     }
 

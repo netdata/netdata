@@ -138,7 +138,7 @@ finish:
 void *systemd_watcher_thread(void *arg) {
     struct netdata_static_thread *static_thread = arg;
 
-    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
+    service_register(NULL, NULL, NULL);
 
     listen_for_systemd_dbus_events();
 

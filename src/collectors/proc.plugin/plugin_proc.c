@@ -217,7 +217,7 @@ void *proc_main(void *ptr)
 
     if (inicfg_get_boolean(&netdata_config, "plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
         netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
-        netdev_thread = nd_thread_create(THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, NULL);
+        netdev_thread = nd_thread_create(THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_DEFAULT, netdev_main, NULL);
     }
 
     inicfg_get_boolean(&netdata_config, "plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);

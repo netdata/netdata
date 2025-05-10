@@ -173,7 +173,7 @@ int mrg_unittest(void) {
     for(size_t i = 0; i < threads ; i++) {
         char buf[15 + 1];
         snprintfz(buf, sizeof(buf) - 1, "TH[%zu]", i);
-        th[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG, mrg_stress, &t);
+        th[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, mrg_stress, &t);
     }
 
     sleep_usec(run_for_secs * USEC_PER_SEC);
