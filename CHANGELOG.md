@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Update Netdata README with improved structure [\#20265](https://github.com/netdata/netdata/pull/20265) ([kanelatechnical](https://github.com/kanelatechnical))
+- Schedule journal file indexing after database file rotation [\#20264](https://github.com/netdata/netdata/pull/20264) ([stelfrag](https://github.com/stelfrag))
+- Minor fixes [\#20263](https://github.com/netdata/netdata/pull/20263) ([stelfrag](https://github.com/stelfrag))
+- fix\(go.d/mysql\): fix MariaDB User CPU Time [\#20262](https://github.com/netdata/netdata/pull/20262) ([ilyam8](https://github.com/ilyam8))
 - docs: reword go.d Troubleshooting section for clarity [\#20259](https://github.com/netdata/netdata/pull/20259) ([ilyam8](https://github.com/ilyam8))
 - Clearify the path of `plugins.d/go.d.plugin` in docs [\#20258](https://github.com/netdata/netdata/pull/20258) ([n0099](https://github.com/n0099))
 - Update documentation for native DEB/RPM packages [\#20257](https://github.com/netdata/netdata/pull/20257) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -470,11 +474,6 @@
 - handle flushing state during exit [\#19725](https://github.com/netdata/netdata/pull/19725) ([ktsaou](https://github.com/ktsaou))
 - allow configuring journal v2 unmount time; turn it off for parents [\#19724](https://github.com/netdata/netdata/pull/19724) ([ktsaou](https://github.com/ktsaou))
 - minor status file annotation fixes [\#19723](https://github.com/netdata/netdata/pull/19723) ([ktsaou](https://github.com/ktsaou))
-- status has install type [\#19722](https://github.com/netdata/netdata/pull/19722) ([ktsaou](https://github.com/ktsaou))
-- more status file annotations [\#19721](https://github.com/netdata/netdata/pull/19721) ([ktsaou](https://github.com/ktsaou))
-- feat\(go.d\): add snmp devices discovery [\#19720](https://github.com/netdata/netdata/pull/19720) ([ilyam8](https://github.com/ilyam8))
-- save status on out of memory event [\#19719](https://github.com/netdata/netdata/pull/19719) ([ktsaou](https://github.com/ktsaou))
-- attempt to save status file from the signal handler [\#19718](https://github.com/netdata/netdata/pull/19718) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
