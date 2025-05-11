@@ -92,7 +92,7 @@ struct websocket_server_client {
     WEBSOCKET_COMPRESSION_CTX compression;
 
     // Connection closing state
-    bool pending_flush_and_close;       // Flag to indicate we're just flushing buffer before close
+    bool flush_and_remove_client;       // Flag to indicate we're just flushing buffer before close
 
     // Message handling callbacks
     void (*on_message)(struct websocket_server_client *wsc, const char *message, size_t length, WEBSOCKET_OPCODE opcode);

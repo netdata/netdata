@@ -234,9 +234,9 @@ void *websocket_thread(void *ptr) {
                     continue;
                 }
 
-                if(wsc->pending_flush_and_close && cbuffer_used_size_unsafe(&wsc->out_buffer) == 0) {
-                    // if we finished sending remove this client,
-                    // otherwise wait for the send queue to accept the data
+                // Check if this client is waiting to be closed after flushing outgoing data
+                if(wsc->flush_and_remove_client && cbuffer_used_size_unsafe(&wsc->out_buffer) == 0) {
+                    // All data flushed - remove client
                     websocket_thread_remove_client(wth, wsc);
                 }
             }
@@ -495,7 +495,7 @@ bool websocket_thread_update_client_poll_flags(WS_CLIENT *wsc) {
     if(!wsc || !wsc->wth || wsc->sock.fd < 0)
         return false;
 
-    nd_poll_event_t events = wsc->pending_flush_and_close ? 0 : ND_POLL_READ;
+    nd_poll_event_t events = wsc->flush_and_remove_client ? 0 : ND_POLL_READ;
     if(cbuffer_next_unsafe(&wsc->out_buffer, NULL) > 0)
         events |= ND_POLL_WRITE;
 

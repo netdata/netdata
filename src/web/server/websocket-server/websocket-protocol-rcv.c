@@ -323,12 +323,11 @@ static bool websocket_protocol_process_control_message(
                 // Send close frame in response
                 websocket_protocol_send_close(wsc, code, reason);
 
-                // Immediately flush the response to ensure it's sent quickly
-                websocket_write_data(wsc);
-                websocket_thread_update_client_poll_flags(wsc);
-
                 wsc->state = WS_STATE_CLOSING_CLIENT;
-                wsc->pending_flush_and_close = true;
+                wsc->flush_and_remove_client = true;
+
+                // IMPORTANT: do not call websocket_write_data() here
+                // because it prevents wsc->flush_and_remove_client from removing the client!
             }
             else if (wsc->state == WS_STATE_CLOSING_SERVER) {
                 // We initiated the closing handshake and now received client's response
