@@ -153,6 +153,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "PROFILER",    .family = "workers profile",                 .priority = 1000000 },
     { .name = "PGCEVICT",    .family = "workers dbengine eviction",       .priority = 1000000 },
     { .name = "BACKFILL",    .family = "workers backfill",                .priority = 1000000 },
+    { .name = "WEBSOCKET",   .family = "workers websocket",               .priority = 1000000 },
 
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }

@@ -69,6 +69,8 @@ void web_server_listen_sockets_setup(void) {
 
 	if(unlikely(debug_flags & D_WEB_CLIENT))
 		debug_sockets();
+
+    websocket_initialize();
 }
 
 

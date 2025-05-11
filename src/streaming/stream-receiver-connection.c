@@ -137,6 +137,7 @@ static int stream_receiver_response_too_busy_now(struct web_client *w) {
 }
 
 static void stream_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
+    // Set the file descriptor and ssl from the web client
     rpt->sock.fd = w->fd;
     rpt->sock.ssl = w->ssl;
 
