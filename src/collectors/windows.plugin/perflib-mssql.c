@@ -320,8 +320,8 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 
 void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
 {
-    char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1];
-    long value;
+    char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
     SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
