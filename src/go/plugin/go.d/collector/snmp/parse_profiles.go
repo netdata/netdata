@@ -8,6 +8,99 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+type (
+	parsedResult struct {
+		OIDs          []string
+		nextOIDs      []string
+		bulkOIDs      []string
+		parsedMetrics []parsedMetric
+	}
+	parsedMetric any
+)
+
+type (
+	tableBatches  map[tableBatchKey]tableBatch
+	tableBatchKey struct {
+		mib   string
+		table string
+	}
+	tableBatch struct {
+		tableOID string
+		oids     []string
+	}
+)
+
+type indexTag struct {
+	parsedMetricTag parsedMetricTag
+	index           int
+}
+
+type columnTag struct {
+	parsedMetricTag parsedMetricTag
+	column          string
+	indexSlices     []indexSlice
+}
+
+type indexMapping struct {
+	tag     string
+	index   int
+	mapping map[int]string
+}
+
+type parsedSymbol struct {
+	name                string
+	oid                 string
+	extractValuePattern *regexp.Regexp
+	oidsToResolve       map[string]string
+}
+
+type parsedSymbolMetric struct {
+	name                string
+	tags                []string
+	forcedType          string
+	enforceScalar       bool
+	options             map[string]string
+	extractValuePattern *regexp.Regexp
+	baseoid             string //TODO consider changing this to OID, it will not have nested OIDs as it is a symbol
+	unit                string
+	description         string
+}
+
+type parsedTableMetric struct {
+	name                string
+	indexTags           []indexTag
+	columnTags          []columnTag
+	forcedType          string
+	options             map[string]string
+	extractValuePattern *regexp.Regexp
+	rowOID              string
+	tableName           string
+	tableOID            string
+}
+
+// union of two above
+
+type parsedMetricTag struct {
+	name string
+
+	tags    []string
+	pattern *regexp.Regexp
+	// symbol  Symbol not used yet
+}
+
+type metricParseResult struct {
+	oidsToFetch   []string
+	oidsToResolve map[string]string
+	indexMappings []indexMapping
+	tableBatches  tableBatches
+	parsedMetrics []parsedMetric
+}
+
+type indexSlice struct {
+	Start int
+	End   int
+}
+
 func parseMetrics(metrics []ddprofiledefinition.MetricsConfig) (parsedResult, error) {
 	var (
 		OIDs, nextOIDs, bulkOIDs []string
@@ -93,16 +186,17 @@ func parseMetric(metric ddprofiledefinition.MetricsConfig) (metricParseResult, e
 		// TODO investigate if this exists in the yamls
 		// return (parseOIDMetric(oidMetric{name: metric.Name, oid: metric.OID, metricTags: castedStringMetricTags, forcedType: string(metric.MetricType), options: metric.Options})), nil
 		return metricParseResult{}, nil
-
-	} else if len(metric.MIB) == 0 {
-		return metricParseResult{}, fmt.Errorf("unsupported metric {%v}", metric)
-	} else if metric.Symbol != (ddprofiledefinition.SymbolConfig{}) {
-		// Single Metric
-		return (parseSymbolMetric(metric.Symbol, metric.MIB)) // TODO metric tags might be needed here.
-		//Can't support tables at the moment
-	} else {
-		return metricParseResult{}, nil
 	}
+	if len(metric.MIB) == 0 {
+		return metricParseResult{}, fmt.Errorf("unsupported metric {%v}", metric)
+	}
+	if metric.Symbol != (ddprofiledefinition.SymbolConfig{}) {
+		// Single Metric
+		return parseSymbolMetric(metric.Symbol, metric.MIB) // TODO metric tags might be needed here.
+		//Can't support tables at the moment
+	}
+	return metricParseResult{}, nil
+
 }
 
 // TODO error outs on functions
@@ -169,28 +263,17 @@ func parseSymbol(symbol interface{}) (parsedSymbol, error) {
 
 	switch s := symbol.(type) {
 	case ddprofiledefinition.SymbolConfig:
-		oid := s.OID
-		name := s.Name
-		if s.ExtractValue != "" {
-			extractValuePattern, err := regexp.Compile(s.ExtractValue)
-			if err != nil {
-
-				return parsedSymbol{}, err
-			}
-			return parsedSymbol{
-				name,
-				oid,
-				extractValuePattern,
-				map[string]string{name: oid},
-			}, nil
-		} else {
-			return parsedSymbol{
-				name,
-				oid,
-				nil,
-				map[string]string{name: oid},
-			}, nil
+		ps := parsedSymbol{
+			name:          s.Name,
+			oid:           s.OID,
+			oidsToResolve: map[string]string{s.Name: s.OID},
 		}
+		if s.ExtractValue != "" {
+			if v, err := regexp.Compile(s.ExtractValue); err != nil {
+				ps.extractValuePattern = v
+			}
+		}
+		return ps, nil
 	case string:
 		return parsedSymbol{}, errors.New("string only symbol, can't support yet")
 	case map[string]interface{}:
@@ -198,7 +281,6 @@ func parseSymbol(symbol interface{}) (parsedSymbol, error) {
 		name, okName := s["name"].(string)
 
 		if !okOID || !okName {
-
 			return parsedSymbol{}, fmt.Errorf("invalid symbol format: %+v", s)
 		}
 
@@ -208,9 +290,7 @@ func parseSymbol(symbol interface{}) (parsedSymbol, error) {
 			extractValuePattern: nil,
 			oidsToResolve:       map[string]string{name: oid},
 		}, nil
-
 	default:
 		return parsedSymbol{}, fmt.Errorf("unsupported symbol type: %T", symbol)
 	}
-
 }

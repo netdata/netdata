@@ -25,6 +25,7 @@ type SysInfo struct {
 	Name         string `json:"name"`
 	Location     string `json:"location"`
 	Organization string `json:"organization"`
+	SysObjectID  string `json:"-"`
 }
 
 func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
@@ -52,6 +53,7 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 			var sysObj string
 			if sysObj, err = PduToString(pdu); err == nil {
 				si.Organization = LookupBySysObject(sysObj)
+				si.SysObjectID = sysObj
 			}
 		case OidSysContact:
 			si.Contact, err = PduToString(pdu)
