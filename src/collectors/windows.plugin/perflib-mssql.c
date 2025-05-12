@@ -982,7 +982,7 @@ static int initialize(int update_every)
 
     if (create_thread)
         mssql_query_thread = nd_thread_create("mssql_queries",
-                                              NETDATA_THREAD_OPTION_JOINABLE,
+                                              NETDATA_THREAD_OPTION_DEFAULT,
                                               netdata_mssql_queries, &update_every);
 
     return 0;
