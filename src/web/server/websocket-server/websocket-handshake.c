@@ -2,6 +2,9 @@
 
 #include "web/server/web_client.h"
 #include "websocket-internal.h"
+#include "websocket-jsonrpc.h"
+#include "websocket-echo.h"
+
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
@@ -228,7 +231,7 @@ static char *websocket_generate_handshake_key(const char *client_key) {
     return accept_key;
 }
 
-static bool websocket_send_first_response(WS_CLIENT *wsc, const char *accept_key, WEBSOCKET_EXTENSION ext_flags) {
+static bool websocket_send_first_response(WS_CLIENT *wsc, const char *accept_key, WEBSOCKET_EXTENSION ext_flags, bool url_protocol) {
     CLEAN_BUFFER *wb = buffer_create(1024, NULL);
 
     buffer_sprintf(wb,
@@ -241,8 +244,8 @@ static bool websocket_send_first_response(WS_CLIENT *wsc, const char *accept_key
     );
 
     // Add the selected subprotocol
-    if (wsc->protocol == WS_PROTOCOL_NETDATA_JSON)
-        buffer_strcat(wb, "Sec-WebSocket-Protocol: netdata-json\r\n");
+    if(!url_protocol && wsc->protocol != WS_PROTOCOL_UNKNOWN && wsc->protocol != WS_PROTOCOL_DEFAULT)
+        buffer_sprintf(wb, "Sec-WebSocket-Protocol: %s\r\n", WEBSOCKET_PROTOCOL_2str(wsc->protocol));
 
     switch (wsc->compression.type) {
         case WS_COMPRESS_DEFLATE:
@@ -298,7 +301,25 @@ short int websocket_handle_handshake(struct web_client *w) {
     // Copy client information
     strncpyz(wsc->client_ip, w->client_ip, sizeof(wsc->client_ip));
     strncpyz(wsc->client_port, w->client_port, sizeof(wsc->client_port));
+
+    bool url_protocol = false;
     wsc->protocol = w->websocket.protocol;
+
+    if(wsc->protocol == WS_PROTOCOL_DEFAULT) {
+        const char *path = buffer_tostring(w->url_path_decoded);
+        if (path && path[0] == '/' && path[1])
+            wsc->protocol = WEBSOCKET_PROTOCOL_2id(&path[1]);
+
+        url_protocol = true;
+    }
+
+    // If no protocol is selected by either URL or subprotocol, reject the connection
+    if(wsc->protocol == WS_PROTOCOL_UNKNOWN || wsc->protocol == WS_PROTOCOL_DEFAULT) {
+        netdata_log_error("WEBSOCKET: No valid protocol selected by either URL or subprotocol");
+        freez(accept_key);
+        websocket_client_free(wsc);
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     // Take over the connection immediately
     websocket_takeover_web_connection(w, wsc);
@@ -322,7 +343,7 @@ short int websocket_handle_handshake(struct web_client *w) {
         wsc->compression.server_max_window_bits = w->websocket.server_max_window_bits ? w->websocket.server_max_window_bits : WS_COMPRESS_WINDOW_BITS;
     }
 
-    if(!websocket_send_first_response(wsc, accept_key, w->websocket.ext_flags)) {
+    if(!websocket_send_first_response(wsc, accept_key, w->websocket.ext_flags, url_protocol)) {
         netdata_log_error("WEBSOCKET: Failed to send complete WebSocket handshake response"); // No client yet
         freez(accept_key);
         websocket_client_free(wsc);
@@ -333,6 +354,33 @@ short int websocket_handle_handshake(struct web_client *w) {
 
     // Now that we've sent the handshake response successfully, set the connection state to open
     wsc->state = WS_STATE_OPEN;
+
+    // Set up protocol-specific callbacks based on the selected protocol
+    switch (wsc->protocol) {
+        case WS_PROTOCOL_JSONRPC:
+            // Set up callbacks for jsonrpc protocol
+            wsc->on_connect = jsonrpc_on_connect;
+            wsc->on_message = jsonrpc_on_message_callback;
+            wsc->on_close = jsonrpc_on_close;
+            wsc->on_disconnect = jsonrpc_on_disconnect;
+            websocket_debug(wsc, "Setting up jsonrpc protocol callbacks");
+            break;
+
+        case WS_PROTOCOL_ECHO:
+            // Set up callbacks for echo protocol
+            wsc->on_connect = echo_on_connect;
+            wsc->on_message = echo_on_message_callback;
+            wsc->on_close = echo_on_close;
+            wsc->on_disconnect = echo_on_disconnect;
+            websocket_debug(wsc, "Setting up echo protocol callbacks");
+            break;
+
+        default:
+            // No protocol handler available - this shouldn't happen as we check earlier
+            netdata_log_error("WEBSOCKET: No handler available for protocol %d", wsc->protocol);
+            websocket_client_free(wsc);
+            return HTTP_RESP_BAD_REQUEST;
+    }
 
     // Register the client in our registry
     if (!websocket_client_register(wsc)) {
@@ -363,7 +411,7 @@ short int websocket_handle_handshake(struct web_client *w) {
            "compression: %s (client context takeover: %s, server context takeover: %s, "
            "client window bits: %d, server window bits: %d)",
            wsc->client_ip, wsc->client_port,
-           (wsc->protocol == WS_PROTOCOL_NETDATA_JSON) ? "netdata-json" : "unknown",
+           WEBSOCKET_PROTOCOL_2str(wsc->protocol),
            wsc->id, wth->id,
            wsc->compression.enabled ? "enabled" : "disabled",
            wsc->compression.client_context_takeover ? "enabled" : "disabled",

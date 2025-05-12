@@ -2,6 +2,52 @@
 
 #include "websocket-internal.h"
 
+// --------------------------------------------------------------------------------------------------------------------
+// writing to the socket
+
+// Actually write data to the client socket
+ssize_t websocket_write_data(WS_CLIENT *wsc) {
+    internal_fatal(wsc->wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );
+
+    worker_is_busy(WORKERS_WEBSOCKET_SOCK_SEND);
+
+    if (!wsc->out_buffer.data || wsc->sock.fd < 0)
+        return -1;
+
+    ssize_t bytes_written = 0;
+
+    // Let cbuffer_next_unsafe determine if there's data to write
+    // This correctly handles the circular buffer wrap-around cases
+
+    // Get data to write from circular buffer
+    char *data;
+    size_t data_length = cbuffer_next_unsafe(&wsc->out_buffer, &data);
+    if (data_length == 0)
+        goto done;
+
+    // Dump the data being written for debugging
+    websocket_dump_debug(wsc, data, data_length, "TX SOCK %zu bytes", data_length);
+
+    // In the websocket thread we want non-blocking behavior
+    // Use nd_sock_write with a single retry
+    bytes_written = nd_sock_write(&wsc->sock, data, data_length, 1); // 1 retry for non-blocking write
+
+    if (bytes_written < 0) {
+        websocket_error(wsc, "Failed to write to client: %s", strerror(errno));
+        goto done;
+    }
+
+    // Remove written bytes from circular buffer
+    if (bytes_written > 0)
+        cbuffer_remove_unsafe(&wsc->out_buffer, bytes_written);
+
+done:
+    websocket_thread_update_client_poll_flags(wsc);
+    return bytes_written;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static inline size_t select_header_size(size_t payload_len) {
     if (payload_len < 126)
         return 2;
@@ -85,7 +131,7 @@ int websocket_protocol_send_frame(
         int ret = deflate(zstrm, Z_SYNC_FLUSH);
 
         bool success = false;
-        if (ret == Z_STREAM_END)
+        if (ret == Z_STREAM_END || (ret == Z_OK && zstrm->avail_in == 0 && zstrm->avail_out > 0))
             success = true;
         else if (ret == Z_OK && zstrm->avail_in == 0 && zstrm->avail_out == 0) {
             unsigned pending = Z_NULL;
@@ -95,6 +141,11 @@ int websocket_protocol_send_frame(
                 success = true;
         }
 
+        uInt avail_in = zstrm->avail_in;
+        uInt avail_out = zstrm->avail_out;
+        uLong total_in = zstrm->total_in;
+        uLong total_out = zstrm->total_out;
+
         // we are done - reset the stream to avoid heap-use-after-free issues later
         if (deflateReset(zstrm) != Z_OK) {
             disconnect_msg = "Deflate reset failed";
@@ -102,16 +153,16 @@ int websocket_protocol_send_frame(
         }
 
         // Calculate compressed size if successful
-        if (!success || max_compressed_size - zstrm->avail_out <= 4) {
+        if (!success || total_out <= 4) {
             // Compression failed
-            websocket_debug(wsc, "Compression failed: %s (ret = %d, avail_in = %d, used_out) - sending uncompressed payload",
-                            zError(ret), ret, zstrm->avail_in,
-                            max_compressed_size - zstrm->avail_out);
+            websocket_error(wsc, "Compression failed: %s (ret = %d, avail_in = %d, avail_out = %d, total_in = %d, total_out = %d) - "
+                                 "sending uncompressed payload",
+                            zError(ret), ret, avail_in, avail_out, total_in, total_out);
             compress = false;
         }
         else {
             // As per RFC 7692, remove trailing 4 bytes (00 00 FF FF) from Z_SYNC_FLUSH
-            final_payload_len = max_compressed_size - zstrm->avail_out - 4;
+            final_payload_len = max_compressed_size - avail_out - 4;
 
             websocket_debug(wsc, "Compressed payload from %zu to %zu bytes (%.1f%%)",
                             payload_len, final_payload_len,
@@ -263,7 +314,7 @@ int websocket_protocol_send_binary(WS_CLIENT *wsc, const void *data, size_t leng
 }
 
 // Send a close frame
-int websocket_protocol_send_close(WS_CLIENT *wsc, uint16_t code, const char *reason) {
+int websocket_protocol_send_close(WS_CLIENT *wsc, WEBSOCKET_CLOSE_CODE code, const char *reason) {
     if (!wsc || wsc->sock.fd < 0)
         return -1;
 
@@ -276,12 +327,12 @@ int websocket_protocol_send_close(WS_CLIENT *wsc, uint16_t code, const char *rea
         return -1;
 
     // Validate close code
-    if (!websocket_validate_close_code(code)) {
-        websocket_error(wsc, "Invalid close code: %d", code);
+    if (!websocket_validate_close_code((uint16_t)code)) {
+        websocket_error(wsc, "Invalid close code: %d (%s)", code, WEBSOCKET_CLOSE_CODE_2str(code));
         code = WS_CLOSE_PROTOCOL_ERROR;
         reason = "Invalid close code";
     }
-    
+
     // Prepare close payload: 2-byte code + optional reason text
     size_t reason_len = reason ? strlen(reason) : 0;
 
@@ -296,12 +347,17 @@ int websocket_protocol_send_close(WS_CLIENT *wsc, uint16_t code, const char *rea
     char payload[payload_len];
 
     // Set status code in network byte order (big-endian)
-    payload[0] = (code >> 8) & 0xFF;
+    uint16_t code_value = (uint16_t)code;
+    payload[0] = (code_value >> 8) & 0xFF;
     payload[1] = code & 0xFF;
 
     // Add reason if provided (truncate if necessary)
     if (reason && reason_len > 0)
         memcpy(payload + 2, reason, reason_len);
+
+    // Call the close handler if registered - this is used to inject a message on close if needed
+    if(wsc->on_close)
+        wsc->on_close(wsc, WS_CLOSE_GOING_AWAY, reason);
 
     // Send close frame (never compressed)
     int result = websocket_protocol_send_frame(wsc, payload, payload_len, WS_OPCODE_CLOSE, false);

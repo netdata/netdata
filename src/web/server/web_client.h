@@ -207,7 +207,6 @@ struct web_client {
         WEBSOCKET_EXTENSION ext_flags;  // bit flags for supported extensions
         uint8_t client_max_window_bits; // client_max_window_bits parameter (8-15)
         uint8_t server_max_window_bits; // server_max_window_bits parameter (8-15)
-        char *requested_protocols;      // the requested Sec-WebSocket-Protocol header
     } websocket;
 
     BUFFER *payload;                    // when this request is a POST, this has the payload

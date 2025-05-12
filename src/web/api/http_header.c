@@ -208,17 +208,7 @@ static void http_header_sec_websocket_version(struct web_client *w, const char *
 static void http_header_sec_websocket_protocol(struct web_client *w, const char *v, size_t len __maybe_unused) {
     if(web_client_is_websocket(w)) {
         // Store the requested protocols for later evaluation during handshake
-        freez(w->websocket.requested_protocols);
-        w->websocket.requested_protocols = strdupz(v);
-        
-        // Default to unknown protocol - will be set during handshake
-        w->websocket.protocol = WS_PROTOCOL_UNKNOWN;
-        
-        // Check if netdata-json protocol is supported
-        if(strstr(v, "netdata-json") != NULL) {
-            // Client supports our protocol, we'll confirm during handshake
-            w->websocket.protocol = WS_PROTOCOL_NETDATA_JSON;
-        }
+        w->websocket.protocol = WEBSOCKET_PROTOCOL_2id(v);
     }
 }
 

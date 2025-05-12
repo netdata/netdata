@@ -196,7 +196,7 @@
         
         <div class="message-box">
             <label for="endpointInput">WebSocket URL:</label>
-            <input type="text" id="endpointInput" value="ws://localhost:19999/netdata-json" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <input type="text" id="endpointInput" value="ws://localhost:19999/echo" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
             <button id="toggleProtocolButton" title="Toggle between ws:// and wss://">Switch to wss://</button>
         </div>
         
@@ -304,11 +304,15 @@
             
             <div class="form-group">
                 <label for="messageFrequency">Messages per Second:</label>
-                <input type="range" id="messageFrequency" value="5" min="1" max="50" step="1">
+                <input type="range" id="messageFrequency" value="5" min="1" max="100" step="1">
                 <div style="display: flex; justify-content: space-between;">
                     <span>1</span>
                     <span id="messageFrequencyValue">5</span>
-                    <span>50</span>
+                    <span>100</span>
+                </div>
+                <div style="font-size: 0.85em; color: #0c5460; font-weight: normal; background-color: #d1ecf1; padding: 5px; border-radius: 4px; margin-top: 5px;">
+                    NOTE: Maximum rate is limited to 100 messages/second for reliable testing,
+                    as browsers cannot reliably process WebSocket messages at higher rates.
                 </div>
             </div>
             
@@ -443,7 +447,7 @@
             
             try {
                 // Create WebSocket connection with netdata-json protocol
-                const protocols = ['netdata-json'];
+                const protocols = [];
                 socket = new WebSocket(url, protocols);
                 addMessageToLog('WebSocket connection created', 'system');
                 
@@ -677,7 +681,7 @@
                     connectionStatus.textContent = 'Disconnected';
                     connectionStatus.className = 'disconnected';
                     connectionDetails.style.display = 'none';
-                    
+
                     // Disable all connection-dependent controls
                     connectButton.disabled = false;
                     disconnectButton.disabled = true;
@@ -685,39 +689,133 @@
                     sendButton.disabled = true;
                     testLargeMessageButton.disabled = true;
                     startStressTestButton.disabled = true;
-                    
+
                     // Stop any running stress test
                     if (stressTestRunning) {
                         stopStressTest();
                         addStressTestLog('Test stopped due to WebSocket disconnection', 'error');
                     }
-                    
+
                     let closeReason = '';
-                    
+                    let recommendedAction = '';
+
                     // Try to give a friendly description of common close codes
                     switch (event.code) {
-                        case 1000: closeReason = "Normal closure"; break;
-                        case 1001: closeReason = "Going away"; break;
-                        case 1002: closeReason = "Protocol error"; break;
-                        case 1003: closeReason = "Unsupported data"; break;
-                        case 1005: closeReason = "No status code"; break;
-                        case 1006: closeReason = "Abnormal closure"; break;
-                        case 1007: closeReason = "Invalid frame payload data"; break;
-                        case 1008: closeReason = "Policy violation"; break;
-                        case 1009: closeReason = "Message too big"; break;
-                        case 1010: closeReason = "Missing extension"; break;
-                        case 1011: closeReason = "Internal error"; break;
-                        case 1012: closeReason = "Service restart"; break;
-                        case 1013: closeReason = "Try again later"; break;
-                        case 1014: closeReason = "Bad gateway"; break;
-                        case 1015: closeReason = "TLS handshake failure"; break;
-                        default: closeReason = "Unknown";
+                        case 1000:
+                            closeReason = "Normal closure";
+                            recommendedAction = "This is a clean shutdown, no action needed.";
+                            break;
+                        case 1001:
+                            closeReason = "Going away";
+                            recommendedAction = "The server or browser is navigating away from the page.";
+                            break;
+                        case 1002:
+                            closeReason = "Protocol error";
+                            recommendedAction = "Check the messages sent - may indicate a problem with message format or headers.";
+                            break;
+                        case 1003:
+                            closeReason = "Unsupported data";
+                            recommendedAction = "The server couldn't process the data type sent.";
+                            break;
+                        case 1005:
+                            closeReason = "No status code";
+                            recommendedAction = "Connection closed without a proper code (abnormal).";
+                            break;
+                        case 1006:
+                            closeReason = "Abnormal closure";
+                            recommendedAction = "Connection was closed unexpectedly. Check server logs or network connectivity.";
+                            break;
+                        case 1007:
+                            closeReason = "Invalid frame payload data";
+                            recommendedAction = "Message contained invalid data format, possibly not valid UTF-8 text.";
+                            break;
+                        case 1008:
+                            closeReason = "Policy violation";
+                            recommendedAction = "Server policy was violated. Check message rate or authentication.";
+                            break;
+                        case 1009:
+                            closeReason = "Message too big";
+                            recommendedAction = "Try reducing your message size or using fragmentation.";
+                            break;
+                        case 1010:
+                            closeReason = "Missing extension";
+                            recommendedAction = "Client requested an extension the server doesn't support.";
+                            break;
+                        case 1011:
+                            closeReason = "Internal error";
+                            recommendedAction = "Server encountered an unexpected error. Check server logs.";
+                            break;
+                        case 1012:
+                            closeReason = "Service restart";
+                            recommendedAction = "The server is restarting, try reconnecting in a moment.";
+                            break;
+                        case 1013:
+                            closeReason = "Try again later";
+                            recommendedAction = "Server is temporarily unavailable, try reconnecting later.";
+                            break;
+                        case 1014:
+                            closeReason = "Bad gateway";
+                            recommendedAction = "A gateway or proxy received an invalid response from the upstream server.";
+                            break;
+                        case 1015:
+                            closeReason = "TLS handshake failure";
+                            recommendedAction = "Check your SSL/TLS configuration and certificates.";
+                            break;
+                        // Netdata specific codes (4000+)
+                        case 4000:
+                            closeReason = "Netdata: Client timeout";
+                            recommendedAction = "The connection was inactive for too long.";
+                            break;
+                        case 4001:
+                            closeReason = "Netdata: Server shutdown";
+                            recommendedAction = "The Netdata server is shutting down.";
+                            break;
+                        case 4002:
+                            closeReason = "Netdata: Connection rejected";
+                            recommendedAction = "The server rejected the connection (check authorization).";
+                            break;
+                        case 4003:
+                            closeReason = "Netdata: Rate limit exceeded";
+                            recommendedAction = "You've exceeded the message rate limit. Reduce message frequency.";
+                            break;
+                        default:
+                            closeReason = "Unknown";
+                            recommendedAction = "Unrecognized close code - check server logs for details.";
+                            break;
                     }
-                    
-                    addMessageToLog(`Connection closed (code: ${event.code} - ${closeReason})`, 'system');
-                    
+
+                    // Add detailed information to the log
+                    let closeMessage = `Connection closed (code: ${event.code} - ${closeReason})`;
                     if (event.reason) {
-                        addMessageToLog(`Reason: ${event.reason}`, 'system');
+                        closeMessage += `\nReason: ${event.reason}`;
+                    }
+
+                    // Add recommendation if available
+                    if (recommendedAction) {
+                        closeMessage += `\nRecommended action: ${recommendedAction}`;
+                    }
+
+                    // Check for common error conditions
+                    if (event.code === 1006) {
+                        // Add more detailed debugging advice for abnormal closures
+                        closeMessage += "\n\nThis error often occurs when:";
+                        closeMessage += "\n- The server crashed or was stopped";
+                        closeMessage += "\n- Network connectivity issues occurred";
+                        closeMessage += "\n- A browser timeout occurred due to inactivity";
+                        closeMessage += "\n- Invalid WebSocket headers were sent";
+                    } else if (event.code === 1009) {
+                        // For message too big errors
+                        closeMessage += "\n\nTo fix message size issues:";
+                        closeMessage += "\n- Break large messages into smaller chunks";
+                        closeMessage += "\n- Consider using binary mode for large messages";
+                        closeMessage += "\n- Check the server's max message size configuration";
+                    }
+
+                    addMessageToLog(closeMessage, 'system');
+
+                    // If we have pending messages during disconnect, log the details
+                    if (pendingMessages.size > 0) {
+                        addMessageToLog(`Warning: ${pendingMessages.size} messages were still pending when the connection closed`, 'system');
                     }
                 });
                 
@@ -726,14 +824,40 @@
                     connectionStatus.textContent = 'Connection Error';
                     connectionStatus.className = 'disconnected';
                     connectionDetails.style.display = 'none';
-                    
+
                     // Stop any running stress test
                     if (stressTestRunning) {
                         stopStressTest();
                         addStressTestLog('Test stopped due to WebSocket error', 'error');
                     }
-                    
-                    addMessageToLog('Connection error', 'system');
+
+                    // Log details about the error
+                    const errorDetails = `WebSocket error occurred during ${stressTestRunning ? 'stress test' : 'normal operation'}`;
+                    addMessageToLog(errorDetails, 'system');
+
+                    // Check the type of error and provide more helpful information
+                    if (error instanceof Event && error.target) {
+                        // WebSocket error events don't contain much useful information
+                        // Add troubleshooting advice
+                        let troubleshooting = "\nPossible reasons for WebSocket errors:";
+                        troubleshooting += "\n- Network connectivity issues";
+                        troubleshooting += "\n- Server unavailable or incorrect URL";
+                        troubleshooting += "\n- Cross-origin issues (CORS)";
+                        troubleshooting += "\n- Too many simultaneous connections";
+
+                        // Add specific advice for stress testing
+                        if (stressTestRunning) {
+                            troubleshooting += "\n\nFor stress test issues:";
+                            troubleshooting += "\n- Reduce message frequency";
+                            troubleshooting += "\n- Reduce message size";
+                            troubleshooting += "\n- Check for 'invalid frame header' errors in the browser console";
+                            troubleshooting += "\n- Try using smaller message bursts";
+                        }
+
+                        addMessageToLog(troubleshooting, 'system');
+                    }
+
+                    addMessageToLog('Check the browser console (F12 > Console tab) for more error details', 'system');
                     console.error('WebSocket error:', error);
                 });
             } catch (error) {
@@ -918,6 +1042,7 @@
         let stressTestInterval = null;
         let stressTestTimer = null;
         let pendingMessages = new Map(); // Map of messageId -> message data
+        const MAX_PENDING_MESSAGES = 500; // Limit concurrent pending messages to prevent browser overload
         
         // Stats tracking
         let stressTestStats = {
@@ -1094,8 +1219,20 @@
             stressTestRunning = true;
             
             // Set up intervals for sending messages and updating UI
+            // Simple approach with no batching - one message per interval at all frequencies
             const sendInterval = Math.floor(1000 / frequency);
-            stressTestInterval = setInterval(() => sendStressTestMessage(minSize, maxSize), sendInterval);
+
+            addStressTestLog(`Using standard timing mode: 1 message every ${sendInterval}ms`, 'info');
+
+            // Single message per interval for all frequencies
+            stressTestInterval = setInterval(() => {
+                // Only send if we don't have too many pending messages
+                if (pendingMessages.size < MAX_PENDING_MESSAGES) {
+                    sendStressTestMessage(minSize, maxSize);
+                } else {
+                    addStressTestLog(`Auto-throttling: ${pendingMessages.size} pending messages`, 'warning');
+                }
+            }, sendInterval);
             
             // Update timer every second
             stressTestTimer = setInterval(updateStressTestTimer, 1000);
@@ -1177,16 +1314,22 @@
             if (!stressTestRunning || !socket || socket.readyState !== WebSocket.OPEN) {
                 return;
             }
-            
+
             // Check if test should end
             if (Date.now() >= stressTestEndTime) {
                 stopStressTest();
                 return;
             }
-            
+
+            // Check if we need to throttle due to too many pending messages
+            if (pendingMessages.size >= MAX_PENDING_MESSAGES) {
+                addStressTestLog(`Throttling: ${pendingMessages.size} pending messages`, 'warning');
+                return;
+            }
+
             // Generate message size based on user settings
             let messageSize;
-            
+
             if (useSingleSize.checked) {
                 // Use fixed size if that option is selected
                 messageSize = parseInt(singleMessageSize.value);
@@ -1343,14 +1486,8 @@
                 stressTestStats.bytesReceived += message.length;
                 stressTestStats.totalLatency += latency;
                 
-                // Check if there was message size discrepancy
+                // Record original message size for statistics (no discrepancy logging)
                 const originalSize = pendingMessage.size;
-                if (message.length !== originalSize) {
-                    // Log size difference which could indicate compression issues
-                    const ratio = (message.length / originalSize).toFixed(2);
-                    addStressTestLog(`Message size changed: sent=${originalSize}, received=${message.length}, ratio=${ratio}`, 
-                                     ratio > 1 ? 'warning' : 'info');
-                }
                 
                 // Update UI
                 messagesReceivedElement.textContent = stressTestStats.messagesReceived;

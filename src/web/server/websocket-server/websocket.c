@@ -2,6 +2,68 @@
 
 #include "websocket-internal.h"
 
+ENUM_STR_MAP_DEFINE(WEBSOCKET_PROTOCOL) = {
+    { .id = WS_PROTOCOL_JSONRPC, .name = "jsonrpc" },
+    { .id = WS_PROTOCOL_ECHO,    .name = "echo" },
+    { .id = WS_PROTOCOL_UNKNOWN, .name = "unknown" },
+
+    // terminator
+    { .name = NULL, .id = 0 }
+};
+ENUM_STR_DEFINE_FUNCTIONS(WEBSOCKET_PROTOCOL, WS_PROTOCOL_UNKNOWN, "unknown");
+
+ENUM_STR_MAP_DEFINE(WEBSOCKET_STATE) = {
+    { .id = WS_STATE_HANDSHAKE,      .name = "handshake" },
+    { .id = WS_STATE_OPEN,           .name = "open" },
+    { .id = WS_STATE_CLOSING_SERVER, .name = "closing_server" },
+    { .id = WS_STATE_CLOSING_CLIENT, .name = "closing_client" },
+    { .id = WS_STATE_CLOSED,         .name = "closed" },
+
+    // terminator
+    { .name = NULL, .id = 0 }
+};
+ENUM_STR_DEFINE_FUNCTIONS(WEBSOCKET_STATE, WS_STATE_CLOSED, "closed");
+
+ENUM_STR_MAP_DEFINE(WEBSOCKET_OPCODE) = {
+    { .id = WS_OPCODE_CONTINUATION, .name = "continuation" },
+    { .id = WS_OPCODE_TEXT,         .name = "text" },
+    { .id = WS_OPCODE_BINARY,       .name = "binary" },
+    { .id = WS_OPCODE_CLOSE,        .name = "close" },
+    { .id = WS_OPCODE_PING,         .name = "ping" },
+    { .id = WS_OPCODE_PONG,         .name = "pong" },
+
+    // terminator
+    { .name = NULL, .id = 0 }
+};
+ENUM_STR_DEFINE_FUNCTIONS(WEBSOCKET_OPCODE, WS_OPCODE_TEXT, "text");
+
+ENUM_STR_MAP_DEFINE(WEBSOCKET_CLOSE_CODE) = {
+    // Standard WebSocket close codes
+    { .id = WS_CLOSE_NORMAL,            .name = "normal" },
+    { .id = WS_CLOSE_GOING_AWAY,        .name = "going_away" },
+    { .id = WS_CLOSE_PROTOCOL_ERROR,    .name = "protocol_error" },
+    { .id = WS_CLOSE_UNSUPPORTED_DATA,  .name = "unsupported_data" },
+    { .id = WS_CLOSE_RESERVED,          .name = "reserved" },
+    { .id = WS_CLOSE_NO_STATUS,         .name = "no_status" },
+    { .id = WS_CLOSE_ABNORMAL,          .name = "abnormal" },
+    { .id = WS_CLOSE_INVALID_PAYLOAD,   .name = "invalid_payload" },
+    { .id = WS_CLOSE_POLICY_VIOLATION,  .name = "policy_violation" },
+    { .id = WS_CLOSE_MESSAGE_TOO_BIG,   .name = "message_too_big" },
+    { .id = WS_CLOSE_EXTENSION_MISSING, .name = "extension_missing" },
+    { .id = WS_CLOSE_INTERNAL_ERROR,    .name = "internal_error" },
+    { .id = WS_CLOSE_TLS_HANDSHAKE,     .name = "tls_handshake_error" },
+
+    // Netdata-specific close codes
+    { .id = WS_CLOSE_NETDATA_TIMEOUT,   .name = "timeout" },
+    { .id = WS_CLOSE_NETDATA_SHUTDOWN,  .name = "shutdown" },
+    { .id = WS_CLOSE_NETDATA_REJECTED,  .name = "rejected" },
+    { .id = WS_CLOSE_NETDATA_RATE_LIMIT,.name = "rate_limit" },
+
+    // terminator
+    { .name = NULL, .id = 0 }
+};
+ENUM_STR_DEFINE_FUNCTIONS(WEBSOCKET_CLOSE_CODE, WS_CLOSE_NORMAL, "normal");
+
 // Private structure for WebSocket server state
 struct websocket_server {
     WS_CLIENTS_JudyLSet clients;     // JudyL array of WebSocket clients
@@ -18,12 +80,21 @@ static struct websocket_server ws_server = (struct websocket_server){
     .spinlock = SPINLOCK_INITIALIZER
 };
 
+// Forward declarations for protocol initialization
+void websocket_jsonrpc_initialize(void);
+void websocket_echo_initialize(void);
+
 // Initialize WebSocket subsystem
 void websocket_initialize(void) {
+    // debug_flags |= D_WEBSOCKET;
+
     // Initialize thread system
     websocket_threads_init();
 
-    // debug_flags |= D_WEBSOCKET;
+    // Initialize protocol handlers
+    websocket_jsonrpc_initialize();
+    websocket_echo_initialize();
+
     netdata_log_info("WebSocket server subsystem initialized");
 }
 
@@ -38,6 +109,12 @@ WS_CLIENT *websocket_client_create(void) {
 
     wsc->connected_t = now_realtime_sec();
     wsc->last_activity_t = wsc->connected_t;
+
+    // initialize callbacks to NULL
+    wsc->on_connect = NULL;
+    wsc->on_message = NULL;
+    wsc->on_close = NULL;
+    wsc->on_disconnect = NULL;
 
     // initialize the ND_SOCK with the web server's SSL context
     nd_sock_init(&wsc->sock, netdata_ssl_web_server_ctx, false);

@@ -169,11 +169,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     freez(w->websocket.key);
     w->websocket.key = NULL;
     
-    freez(w->websocket.requested_protocols);
-    w->websocket.requested_protocols = NULL;
-    
     w->websocket.ext_flags = WS_EXTENSION_NONE;
-    w->websocket.protocol = WS_PROTOCOL_UNKNOWN;
+    w->websocket.protocol = WS_PROTOCOL_DEFAULT;
 
     // if we had enabled compression, release it
     if(w->response.zinitialized) {

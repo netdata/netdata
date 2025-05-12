@@ -1834,13 +1834,14 @@ set(WEB_PLUGIN_FILES
         src/web/server/websocket-server/websocket-compression.c
         src/web/server/websocket-server/websocket-compression.h
         src/web/server/websocket-server/websocket-internal.h
+        src/web/server/websocket-server/websocket-jsonrpc.c
+        src/web/server/websocket-server/websocket-jsonrpc.h
+        src/web/server/websocket-server/websocket-echo.c
+        src/web/server/websocket-server/websocket-echo.h
         src/web/server/websocket-server/websocket-message.c
-        src/web/server/websocket-server/websocket-payload-rcv.c
-        src/web/server/websocket-server/websocket-payload-snd.c
-        src/web/server/websocket-server/websocket-protocol-rcv.c
-        src/web/server/websocket-server/websocket-protocol-snd.c
-        src/web/server/websocket-server/websocket-receiver.c
-        src/web/server/websocket-server/websocket-structures.h
+        src/web/server/websocket-server/websocket-receive.c
+        src/web/server/websocket-server/websocket-send.c
+        src/web/server/websocket-server/websocket-handshake.c
         src/web/server/websocket-server/websocket-thread.c
         src/web/server/websocket-server/websocket-thread.h
         src/web/server/websocket-server/websocket-utils.c

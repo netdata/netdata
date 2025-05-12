@@ -159,7 +159,25 @@ bool websocket_client_process_message(WS_CLIENT *wsc) {
 
     // Now handle the uncompressed message - using the new function
     // that contains the actual handler logic
-    websocket_payload_handle_message(wsc, wsb);
+
+   websocket_debug(wsc, "Handling message: type=%s, length=%zu, protocol=%d",
+                   (wsc->opcode == WS_OPCODE_BINARY) ? "binary" : "text",
+                   wsb_length(wsb), wsc->protocol);
+
+   // Ensure text messages are null-terminated
+   if (wsc->opcode == WS_OPCODE_TEXT)
+       wsb_null_terminate(wsb);
+
+   // Call the message callback if set - this allows protocols to be handled dynamically
+   if (wsc->on_message) {
+       websocket_debug(wsc, "Calling client message handler for protocol %d", wsc->protocol);
+       wsc->on_message(wsc, wsb_data(wsb), wsb_length(wsb), wsc->opcode);
+   }
+   else {
+       // No handler registered - this should not happen as we check during handshake
+       websocket_error(wsc, "No message handler registered for protocol %d", wsc->protocol);
+       return false;
+   }
 
     // Update client message stats
     wsc->message_id++;
