@@ -947,7 +947,7 @@ void aclk_create_node_instance_job(RRDHOST *host)
     if (!claim_id_is_set(claim_id))
         return;
 
-    aclk_query_t query = aclk_query_new(REGISTER_NODE);
+    aclk_query_t *query = aclk_query_new(REGISTER_NODE);
     int32_t hops =  rrdhost_ingestion_hops(host);
     node_instance_creation_t node_instance_creation = {
         .hops = hops,
@@ -974,7 +974,7 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
     if (!claim_id_is_set(claim_id))
         return;
 
-    aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
+    aclk_query_t *query = aclk_query_new(NODE_STATE_UPDATE);
 
     int32_t hops = rrdhost_ingestion_hops(host);
     node_instance_connection_t node_state_update = {

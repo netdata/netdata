@@ -452,6 +452,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return buffer_unittest();
                         }
+                        else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
+                            unittest_running = true;
+                            return test_cmd_pool_fifo();
+                        }
                         else if(strcmp(optarg, "uuidtest") == 0) {
                             unittest_running = true;
                             return uuid_unittest();

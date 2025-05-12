@@ -40,9 +40,9 @@ struct aclk_bin_payload {
     const char *msg_name;
 };
 
-typedef struct aclk_query *aclk_query_t;
-struct aclk_query {
+typedef struct {
     aclk_query_type_t type;
+    bool allocated;
 
     // dedup_id is used to deduplicate queries in the list
     // if type and dedup_id is the same message is deduplicated
@@ -68,13 +68,13 @@ struct aclk_query {
         void *payload;
         char *node_id;
     } data;
-};
+} aclk_query_t;
 
-aclk_query_t aclk_query_new(aclk_query_type_t type);
-void aclk_query_free(aclk_query_t query);
+aclk_query_t *aclk_query_new(aclk_query_type_t type);
+void aclk_query_free(aclk_query_t *query);
 
-void aclk_execute_query(aclk_query_t query);
-void aclk_add_job(aclk_query_t query);
+void aclk_execute_query(aclk_query_t *query);
+void aclk_add_job(aclk_query_t *query);
 
 #define QUEUE_IF_PAYLOAD_PRESENT(query)                                                                                \
     do {                                                                                                               \
@@ -85,5 +85,16 @@ void aclk_add_job(aclk_query_t query);
             aclk_query_free(query);                                                                                    \
         }                                                                                                              \
     } while (0)
+
+#define MAX_QUERY_ENTRIES (128)
+
+typedef struct {
+    aclk_query_t query_workers[MAX_QUERY_ENTRIES];
+    int free_stack[MAX_QUERY_ENTRIES];
+    int top;
+    SPINLOCK spinlock;
+} QueryPool;
+
+void init_query_pool();
 
 #endif /* NETDATA_ACLK_QUERY_QUEUE_H */

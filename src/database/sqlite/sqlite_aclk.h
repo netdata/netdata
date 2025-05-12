@@ -18,16 +18,13 @@ static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)
 enum aclk_database_opcode {
     ACLK_DATABASE_NOOP = 0,
     ACLK_DATABASE_NODE_STATE,
-    ACLK_DATABASE_PUSH_ALERT,
     ACLK_DATABASE_PUSH_ALERT_CONFIG,
     ACLK_DATABASE_NODE_UNREGISTER,
     ACLK_MQTT_WSS_CLIENT_SET,
     ACLK_MQTT_WSS_CLIENT_RESET,
     ACLK_CANCEL_NODE_UPDATE_TIMER,
     ACLK_QUEUE_NODE_INFO,
-    ACLK_MQTT_WSS_CLIENT,
     ACLK_QUERY_EXECUTE,
-    ACLK_QUERY_EXECUTE_SYNC,
     ACLK_QUERY_BATCH_ADD,
     ACLK_QUERY_BATCH_EXECUTE,
     ACLK_SYNC_SHUTDOWN,
@@ -37,11 +34,13 @@ enum aclk_database_opcode {
     ACLK_MAX_ENUMERATIONS_DEFINED
 };
 
-struct aclk_database_cmd {
-    enum aclk_database_opcode opcode;
-    void *param[2];
-    struct aclk_database_cmd *prev, *next;
-};
+//struct aclk_database_cmd {
+//    int opcode;
+//    union {
+//        void *param[2];
+//        char data[32];
+//    };
+//};
 
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
@@ -66,5 +65,7 @@ void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
 void cancel_node_update_timer(const RRDHOST *host, struct completion *completion);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
+
+bool test_cmd_pool_fifo();
 
 #endif //NETDATA_SQLITE_ACLK_H

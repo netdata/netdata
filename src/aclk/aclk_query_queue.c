@@ -2,14 +2,58 @@
 
 #include "aclk_query_queue.h"
 
-aclk_query_t aclk_query_new(aclk_query_type_t type)
+QueryPool queryPool;
+
+// Initialize the query pool
+void init_query_pool()
 {
-    aclk_query_t query = callocz(1, sizeof(struct aclk_query));
+    spinlock_init(&queryPool.spinlock);
+    for (int i = 0; i < MAX_QUERY_ENTRIES; i++) {
+        queryPool.free_stack[i] = i;
+    }
+    queryPool.top = MAX_QUERY_ENTRIES;
+}
+
+static aclk_query_t *get_query()
+{
+    spinlock_lock(&queryPool.spinlock);
+    if (queryPool.top == 0) {
+        spinlock_unlock(&queryPool.spinlock);
+        aclk_query_t *query = callocz(1, sizeof(aclk_query_t));
+        query->allocated = true;
+        return query;
+    }
+    int index = queryPool.free_stack[--queryPool.top];
+    memset(&queryPool.query_workers[index], 0, sizeof(aclk_query_t));
+    spinlock_unlock(&queryPool.spinlock);
+    return &queryPool.query_workers[index];
+}
+
+static void return_query(aclk_query_t *query)
+{
+    if (unlikely(query->allocated)) {
+       freez(query);
+       return;
+    }
+    spinlock_lock(&queryPool.spinlock);
+    int index = (int) (query - queryPool.query_workers);
+    if (index < 0 || index >= MAX_QUERY_ENTRIES) {
+        spinlock_unlock(&queryPool.spinlock);
+        return;  // Invalid (should not happen)
+    }
+    queryPool.free_stack[queryPool.top++] = index;
+    memset(query, 0, sizeof(aclk_query_t));
+    spinlock_unlock(&queryPool.spinlock);
+}
+
+aclk_query_t *aclk_query_new(aclk_query_type_t type)
+{
+    aclk_query_t *query = get_query();
     query->type = type;
     return query;
 }
 
-void aclk_query_free(aclk_query_t query)
+void aclk_query_free(aclk_query_t *query)
 {
     struct ctxs_checkpoint *cmd;
     switch (query->type) {
@@ -29,12 +73,8 @@ void aclk_query_free(aclk_query_t query)
             freez(query->data.node_id);
             freez(query->machine_guid);
             break;
+        // keep following cases together
         case CTX_STOP_STREAMING:
-            cmd = query->data.payload;
-            freez(cmd->claim_id);
-            freez(cmd->node_id);
-            freez(cmd);
-            break;
         case CTX_CHECKPOINT:
             cmd = query->data.payload;
             freez(cmd->claim_id);
@@ -49,5 +89,5 @@ void aclk_query_free(aclk_query_t query)
     freez(query->dedup_id);
     freez(query->callback_topic);
     freez(query->msg_id);
-    freez(query);
+    return_query(query);
 }

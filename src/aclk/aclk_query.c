@@ -103,7 +103,7 @@ static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, vo
     return req->canceled;
 }
 
-int http_api_v2(mqtt_wss_client client, aclk_query_t query)
+int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
 {
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "aclk"),
@@ -227,7 +227,7 @@ cleanup:
     return retval;
 }
 
-int send_bin_msg(mqtt_wss_client client, aclk_query_t query)
+int send_bin_msg(mqtt_wss_client client, aclk_query_t *query)
 {
     // this will be simplified when legacy support is removed
     aclk_send_bin_message_subtopic_pid(

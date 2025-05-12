@@ -119,3 +119,94 @@ void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
         uv_close(handle, NULL);
     }
 }
+
+// Initialize the worker pool
+void init_worker_pool(WorkerPool *pool) {
+    for (int i = 0; i < MAX_ACTIVE_WORKERS; i++) {
+        pool->free_stack[i] = i;  // Fill the stack with indices
+    }
+    pool->top = MAX_ACTIVE_WORKERS;  // All workers are initially free
+}
+
+// Get a worker (reuse if available, NULL if pool exhausted)
+worker_data_t *get_worker(WorkerPool *pool) {
+    if (pool->top == 0) {
+        worker_data_t *worker = callocz(1, sizeof(worker_data_t));
+        worker->allocated = true;  // Mark as allocated
+        return worker;
+    }
+    int index = pool->free_stack[--pool->top];  // Pop from stack
+    return &pool->workers[index];
+}
+
+// Return a worker for reuse
+void return_worker(WorkerPool *pool, worker_data_t *worker) {
+    if (unlikely(worker->allocated)) {
+        freez(worker);
+        return;
+    }
+
+    int index = (int) (worker - pool->workers);
+    if (index < 0 || index >= MAX_ACTIVE_WORKERS) {
+        return;  // Invalid worker (should not happen)
+    }
+    pool->free_stack[pool->top++] = index;  // Push index back to stack
+}
+
+// Initialize the command pool
+void init_cmd_pool(CmdPool *pool, int size) {
+    pool->buffer = mallocz(sizeof(cmd_data_t) * size);
+
+    pool->size = size;
+    pool->head = 0;
+    pool->tail = 0;
+    pool->count = 0;
+
+    uv_mutex_init(&pool->lock);
+    uv_cond_init(&pool->not_full);
+;}
+
+bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
+{
+    uv_mutex_lock(&pool->lock);
+
+    while (pool->count == pool->size) {
+        if (wait_on_full)
+            uv_cond_wait(&pool->not_full, &pool->lock);
+        else {
+            uv_mutex_unlock(&pool->lock); // No space, return
+            return false;
+        }
+    }
+
+    pool->buffer[pool->tail] = *cmd;
+    pool->tail = (pool->tail + 1) % pool->size;
+    pool->count++;
+
+    uv_mutex_unlock(&pool->lock);
+    return true;
+}
+
+bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd) {
+    uv_mutex_lock(&pool->lock);
+    if (pool->count == 0) {
+        uv_mutex_unlock(&pool->lock); // No commands to pop
+        return false;
+    }
+    *out_cmd = pool->buffer[pool->head];
+    pool->head = (pool->head + 1) % pool->size;
+    pool->count--;
+
+    uv_cond_signal(&pool->not_full);
+    uv_mutex_unlock(&pool->lock);
+    return true;
+}
+
+void release_cmd_pool(CmdPool *pool) {
+    if (pool->buffer) {
+        free(pool->buffer);
+        pool->buffer = NULL;
+    }
+    uv_mutex_destroy(&pool->lock);
+    uv_cond_destroy(&pool->not_full);
+}
