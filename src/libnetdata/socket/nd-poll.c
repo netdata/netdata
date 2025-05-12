@@ -6,7 +6,7 @@
 #define POLLRDHUP 0
 #endif
 
-#if defined(OS_LINUX)
+#if defined(OS_LINUX_DISABLE_EPOLL_DUE_TO_BUG)
 #include <sys/epoll.h>
 
 struct fd_info {
