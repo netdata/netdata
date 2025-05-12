@@ -274,7 +274,7 @@ func prepareNewTarget(sub subnet, ip string) *target {
 		Contact:      mockSysContact,
 		Name:         mockSysName,
 		Location:     mockSysLocation,
-		SysObjectID:  mockSysObject,
+		SysObjectID:  mockSysObject[1:],
 		Organization: "net-snmp",
 	})
 }
