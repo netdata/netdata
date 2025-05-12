@@ -1532,11 +1532,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     for(size_t i = 0; i < threads ; i++) {
         char tag[ND_THREAD_TAG_MAX + 1];
         snprintfz(tag, ND_THREAD_TAG_MAX, "TH[%zu]", i);
-        thread_ptrs[i] = nd_thread_create(
-            tag,
-            NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
-            aral_test_thread,
-            &auc);
+        thread_ptrs[i] = nd_thread_create(tag, NETDATA_THREAD_OPTION_DONT_LOG, aral_test_thread, &auc);
     }
 
     size_t malloc_done = 0;

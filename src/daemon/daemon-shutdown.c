@@ -264,7 +264,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             ND_THREAD *th[nd_profile.storage_tiers];
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-                th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
+                th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
             rrdeng_flush_everything_and_wait(true, true, false);

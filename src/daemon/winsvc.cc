@@ -141,7 +141,7 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
             netdata_service_log("Creating cleanup thread...");
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
-            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, call_netdata_cleanup, &controlCode);
+            cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, &controlCode);
 
             // Signal the stop request
             netdata_service_log("Signalling the cleanup thread...");

@@ -876,7 +876,7 @@ int string_unittest(size_t entries) {
         for (int i = 0; i < threads_to_create; i++) {
             char buf[100 + 1];
             snprintf(buf, 100, "string%d", i);
-            threads[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE, string_thread, &tu);
+            threads[i] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, string_thread, &tu);
         }
         sleep_usec(seconds_to_run * USEC_PER_SEC);
 

@@ -684,7 +684,7 @@ bool stream_connector_init(struct sender_state *s) {
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN" "[%d]",
             sc->id);
 
-        sc->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, stream_connector_thread, sc);
+        sc->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_connector_thread, sc);
         if (!sc->thread)
             nd_log_daemon(NDLP_ERR,
                           "STREAM CONNECT '%s': failed to create new thread for client.",

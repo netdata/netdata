@@ -443,14 +443,12 @@ void ml_start_threads() {
     char tag[NETDATA_THREAD_TAG_MAX + 1];
 
     snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
-    Cfg.detection_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                            ml_detect_main, NULL);
+    Cfg.detection_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, ml_detect_main, NULL);
 
     for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
         ml_worker_t *worker = &Cfg.workers[idx];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", worker->id);
-        worker->nd_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                                      ml_train_main, worker);
+        worker->nd_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, ml_train_main, worker);
     }
 }
 
