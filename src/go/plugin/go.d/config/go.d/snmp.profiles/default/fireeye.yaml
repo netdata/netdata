@@ -85,18 +85,19 @@ metrics:
         constant_value_one: true
         description: Physical disk entity
         unit: "{physical_disk}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.2
-          name: fePhysicalDiskName
-        tag: fe_physical_disk_name
-      - symbol:
-          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.4
-          name: fePhysicalDiskIsHealthy
-        tag: fe_physical_disk_is_healthy
-        mapping:
-          1: 'true'
-          2: 'false'
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.2
+#          name: fePhysicalDiskName
+#        tag: fe_physical_disk_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.25597.11.2.1.3.1.4
+#          name: fePhysicalDiskIsHealthy
+#        tag: fe_physical_disk_is_healthy
+#        mapping:
+#          1: 'true'
+#          2: 'false'
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   # - MIB: FE-FIREEYE-MIB
   #   symbol:
   #     OID: 1.3.6.1.4.1.25597.11.3.1.2.0

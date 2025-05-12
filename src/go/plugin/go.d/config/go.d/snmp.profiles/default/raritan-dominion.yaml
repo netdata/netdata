@@ -33,14 +33,15 @@ metrics:
         constant_value_one: true
         description: System power supply presence
         unit: "{system_power_supply}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.13742.3.1.3.1.2
-          name: raritan.remotekvm.systemPowerSupplyPowerOn
-        tag: raritan_remotekvm_system_power_supply_power_on
-        mapping:
-          1: 'true'
-          2: 'false'
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.13742.3.1.3.1.2
+    #       name: raritan.remotekvm.systemPowerSupplyPowerOn
+    #     tag: raritan_remotekvm_system_power_supply_power_on
+    #     mapping:
+    #       1: 'true'
+    #       2: 'false'
   - MIB: RemoteKVMDevice-MIB
     table:
       name: portDataTable
@@ -59,12 +60,13 @@ metrics:
           OID: 1.3.6.1.4.1.13742.3.1.4.1.4
           name: raritan.remotekvm.portDataType
         tag: raritan_remotekvm_port_data_type
-      - symbol:
-          OID: 1.3.6.1.4.1.13742.3.1.4.1.5
-          name: raritan.remotekvm.portDataStatus
-        tag: raritan_remotekvm_port_data_status
-        mapping:
-          1: inactive
-          2: available
-          3: connected
-          4: busy
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.13742.3.1.4.1.5
+    #       name: raritan.remotekvm.portDataStatus
+    #     tag: raritan_remotekvm_port_data_status
+    #     mapping:
+    #       1: inactive
+    #       2: available
+    #       3: connected
+    #       4: busy

@@ -72,30 +72,31 @@ metrics:
         name: bgpPeerMinASOriginationInterval
         description: Time interval in seconds for the MinASOriginationInterval timer
         unit: "s"
-    metric_tags:
-      - tag: remote_as
-        symbol:
-          OID: 1.3.6.1.2.1.15.3.1.9
-          name: bgpPeerRemoteAs
-      - tag: admin_status
-        symbol:
-          OID: 1.3.6.1.2.1.15.3.1.3
-          name: bgpPeerAdminStatus
-        mapping:
-          1: stop
-          2: start
-      - tag: peer_state
-        symbol:
-          OID: 1.3.6.1.2.1.15.3.1.2
-          name: bgpPeerState
-        mapping:
-          1: idle
-          2: connect
-          3: active
-          4: opensent
-          5: openconfirm
-          6: established
-      - tag: neighbor
-        symbol:
-          OID: 1.3.6.1.2.1.15.3.1.7
-          name: bgpPeerRemoteAddr
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - tag: remote_as
+    #     symbol:
+    #       OID: 1.3.6.1.2.1.15.3.1.9
+    #       name: bgpPeerRemoteAs
+    #   - tag: admin_status
+    #     symbol:
+    #       OID: 1.3.6.1.2.1.15.3.1.3
+    #       name: bgpPeerAdminStatus
+    #     mapping:
+    #       1: stop
+    #       2: start
+    #   - tag: peer_state
+    #     symbol:
+    #       OID: 1.3.6.1.2.1.15.3.1.2
+    #       name: bgpPeerState
+    #     mapping:
+    #       1: idle
+    #       2: connect
+    #       3: active
+    #       4: opensent
+    #       5: openconfirm
+    #       6: established
+    #   - tag: neighbor
+    #     symbol:
+    #       OID: 1.3.6.1.2.1.15.3.1.7
+    #       name: bgpPeerRemoteAddr

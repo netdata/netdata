@@ -19,20 +19,21 @@ metrics:
         name: powernet.rPDULoadStatusLoad
         description: Load status of the PDU
         unit: "TBD"
-    metric_tags:
-      - tag: powernet_r_pdu_load_status_index
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.1
-          name: rPDULoadStatusIndex
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
-          name: rPDULoadStatusLoadState
-        tag: powernet_r_pdu_load_status_load_state
-        mapping:
-          1: phase_load_normal
-          2: phase_load_low
-          3: phase_load_near_overload
-          4: phase_load_overload
+#    metric_tags:
+#      - tag: powernet_r_pdu_load_status_index
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.1
+#          name: rPDULoadStatusIndex
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
+#          name: rPDULoadStatusLoadState
+#        tag: powernet_r_pdu_load_status_load_state
+#        mapping:
+#          1: phase_load_normal
+#          2: phase_load_low
+#          3: phase_load_near_overload
+#          4: phase_load_overload
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.3.5.1
@@ -42,22 +43,23 @@ metrics:
         name: powernet.rPDUOutletStatusLoad
         description: Load status of the PDU outlet
         unit: "TBD"
-    metric_tags:
-      - tag: powernet_r_pdu_outlet_status_index
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.1
-          name: rPDUOutletStatusIndex
-      - tag: powernet_r_pdu_outlet_status_outlet_name
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.2
-          name: rPDUOutletStatusOutletName
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
-          name: rPDUOutletStatusOutletState
-        tag: powernet_r_pdu_outlet_status_outlet_state
-        mapping:
-          1: outlet_status_on
-          2: outlet_status_off
+#    metric_tags:
+#      - tag: powernet_r_pdu_outlet_status_index
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.1
+#          name: rPDUOutletStatusIndex
+#      - tag: powernet_r_pdu_outlet_status_outlet_name
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.2
+#          name: rPDUOutletStatusOutletName
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
+#          name: rPDUOutletStatusOutletState
+#        tag: powernet_r_pdu_outlet_status_outlet_state
+#        mapping:
+#          1: outlet_status_on
+#          2: outlet_status_off
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 #  - MIB: PowerNet-MIB
 #    symbol:
 #      OID: 1.3.6.1.4.1.318.1.1.12.4.1.1.0
@@ -92,24 +94,25 @@ metrics:
         constant_value_one: true
         description: Status of the PDU bank
         unit: "TBD"
-    metric_tags:
-      - tag: powernet_r_pdu_status_bank_index
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.1
-          name: rPDUStatusBankIndex
-      - tag: powernet_r_pdu_status_bank_number
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.2
-          name: rPDUStatusBankNumber
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
-          name: rPDUStatusBankState
-        tag: powernet_r_pdu_status_bank_state
-        mapping:
-          1: bank_load_normal
-          2: bank_load_low
-          3: bank_load_near_overload
-          4: bank_load_overload
+#    metric_tags:
+#      - tag: powernet_r_pdu_status_bank_index
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.1
+#          name: rPDUStatusBankIndex
+#      - tag: powernet_r_pdu_status_bank_number
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.2
+#          name: rPDUStatusBankNumber
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
+#          name: rPDUStatusBankState
+#        tag: powernet_r_pdu_status_bank_state
+#        mapping:
+#          1: bank_load_normal
+#          2: bank_load_low
+#          3: bank_load_near_overload
+#          4: bank_load_overload
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.5.4
@@ -119,24 +122,25 @@ metrics:
         constant_value_one: true
         description: Status of the PDU phase
         unit: "TBD"
-    metric_tags:
-      - tag: powernet_r_pdu_status_phase_index
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.1
-          name: rPDUStatusPhaseIndex
-      - tag: powernet_r_pdu_status_phase_number
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.2
-          name: rPDUStatusPhaseNumber
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
-          name: rPDUStatusPhaseState
-        tag: powernet_r_pdu_status_phase_state
-        mapping:
-          1: phase_load_normal
-          2: phase_load_low
-          3: phase_load_near_overload
-          4: phase_load_overload
+#    metric_tags:
+#      - tag: powernet_r_pdu_status_phase_index
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.1
+#          name: rPDUStatusPhaseIndex
+#      - tag: powernet_r_pdu_status_phase_number
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.2
+#          name: rPDUStatusPhaseNumber
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
+#          name: rPDUStatusPhaseState
+#        tag: powernet_r_pdu_status_phase_state
+#        mapping:
+#          1: phase_load_normal
+#          2: phase_load_low
+#          3: phase_load_near_overload
+#          4: phase_load_overload
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.5.6
@@ -146,24 +150,25 @@ metrics:
         constant_value_one: true
         description: Status of the PDU outlet
         unit: "TBD"
-    metric_tags:
-      - tag: powernet_r_pdu_status_outlet_index
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.1
-          name: rPDUStatusOutletIndex
-      - tag: powernet_r_pdu_status_outlet_number
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.2
-          name: rPDUStatusOutletNumber
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
-          name: rPDUStatusOutletState
-        tag: powernet_r_pdu_status_outlet_state
-        mapping:
-          1: outlet_load_normal
-          2: outlet_load_low
-          3: outlet_load_near_overload
-          4: outlet_load_overload
+#    metric_tags:
+#      - tag: powernet_r_pdu_status_outlet_index
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.1
+#          name: rPDUStatusOutletIndex
+#      - tag: powernet_r_pdu_status_outlet_number
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.2
+#          name: rPDUStatusOutletNumber
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
+#          name: rPDUStatusOutletState
+#        tag: powernet_r_pdu_status_outlet_state
+#        mapping:
+#          1: outlet_load_normal
+#          2: outlet_load_low
+#          3: outlet_load_near_overload
+#          4: outlet_load_overload
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.26.10.2.2
@@ -181,42 +186,43 @@ metrics:
         name: powernet.rPDU2SensorTempHumidityStatusRelativeHumidity
         description: Relative humidity percentage
         unit: "%"
-    metric_tags:
-      - tag: powernet_r_pdu2_sensor_temp_humidity_status_name
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.3
-          name: rPDU2SensorTempHumidityStatusName
-      - tag: powernet_r_pdu2_sensor_temp_humidity_status_type
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.5
-          name: rPDU2SensorTempHumidityStatusType
-        mapping:
-          1: temperature_only
-          2: temperature_humidity
-          3: comms_lost
-          4: not_installed
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
-          name: rPDU2SensorTempHumidityStatusTempStatus
-        tag: powernet_r_pdu2_sensor_temp_humidity_status_temp_status
-        mapping:
-          1: not_present
-          2: below_min
-          3: below_low
-          4: normal
-          5: above_high
-          6: above_max
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
-          name: rPDU2SensorTempHumidityStatusHumidityStatus
-        tag: powernet_r_pdu2_sensor_temp_humidity_status_humidity_status
-        mapping:
-          1: not_present
-          2: below_min
-          3: below_low
-          4: normal
-          5: above_high
-          6: above_max
+#    metric_tags:
+#      - tag: powernet_r_pdu2_sensor_temp_humidity_status_name
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.3
+#          name: rPDU2SensorTempHumidityStatusName
+#      - tag: powernet_r_pdu2_sensor_temp_humidity_status_type
+#        symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.5
+#          name: rPDU2SensorTempHumidityStatusType
+#        mapping:
+#          1: temperature_only
+#          2: temperature_humidity
+#          3: comms_lost
+#          4: not_installed
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
+#          name: rPDU2SensorTempHumidityStatusTempStatus
+#        tag: powernet_r_pdu2_sensor_temp_humidity_status_temp_status
+#        mapping:
+#          1: not_present
+#          2: below_min
+#          3: below_low
+#          4: normal
+#          5: above_high
+#          6: above_max
+#      - symbol:
+#          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
+#          name: rPDU2SensorTempHumidityStatusHumidityStatus
+#        tag: powernet_r_pdu2_sensor_temp_humidity_status_humidity_status
+#        mapping:
+#          1: not_present
+#          2: below_min
+#          3: below_low
+#          4: normal
+#          5: above_high
+#          6: above_max
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 
 metric_tags:
   - tag: powernet_r_pdu_ident_name

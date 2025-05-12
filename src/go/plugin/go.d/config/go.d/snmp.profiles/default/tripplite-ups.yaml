@@ -118,18 +118,19 @@ metrics:
         name: tlUpsInputVoltage
         description: The magnitude of the present input voltage
         unit: "V"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.850.100.1.3.2.1.1
-          name: tlUpsInputVoltageIndex
-        tag: tl_ups_input_voltage_index
-      - symbol:
-          OID: 1.3.6.1.4.1.850.100.1.3.2.1.2
-          name: tlUpsInputVoltageType
-        tag: tl_ups_input_voltage_type
-        mapping:
-          0: phase_to_neutral
-          1: phase_to_phase
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.100.1.3.2.1.1
+#          name: tlUpsInputVoltageIndex
+#        tag: tl_ups_input_voltage_index
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.100.1.3.2.1.2
+#          name: tlUpsInputVoltageType
+#        tag: tl_ups_input_voltage_type
+#        mapping:
+#          0: phase_to_neutral
+#          1: phase_to_phase
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: TRIPPLITE-12X
     table:
       OID: 1.3.6.1.4.1.850.100.1.4.7
@@ -147,16 +148,17 @@ metrics:
         name: tlUpsOutputCircuitPower
         description: The magnitude of the present power in watts
         unit: "W"
-    metric_tags:
-      - index: 1
-        tag: tl_ups_output_circuit_index
-      - symbol:
-          OID: 1.3.6.1.4.1.850.100.1.4.7.1.2
-          name: tlUpsOutputCircuitStatus
-        tag: tl_ups_output_circuit_status
-        mapping:
-          0: open
-          1: closed
+#    metric_tags:
+#      - index: 1
+#        tag: tl_ups_output_circuit_index
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.100.1.4.7.1.2
+#          name: tlUpsOutputCircuitStatus
+#        tag: tl_ups_output_circuit_status
+#        mapping:
+#          0: open
+#          1: closed
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: TRIPPLITE-12X
     table:
       OID: 1.3.6.1.4.1.850.101.2.1
@@ -164,25 +166,26 @@ metrics:
     symbols:
       - name: tlEnvContact
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.850.101.2.1.1.2
-          name: tlEnvContactName
-        tag: tl_env_contact_name
-      - symbol:
-          OID: 1.3.6.1.4.1.850.101.2.1.1.4
-          name: tlEnvContactConfig
-        tag: tl_env_contact_config
-        mapping:
-          0: normally_open
-          1: normally_closed
-      - symbol:
-          OID: 1.3.6.1.4.1.850.101.2.1.1.3
-          name: tlEnvContactStatus
-        tag: tl_env_contact_status
-        mapping:
-          0: normal
-          1: alarm
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.101.2.1.1.2
+#          name: tlEnvContactName
+#        tag: tl_env_contact_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.101.2.1.1.4
+#          name: tlEnvContactConfig
+#        tag: tl_env_contact_config
+#        mapping:
+#          0: normally_open
+#          1: normally_closed
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.101.2.1.1.3
+#          name: tlEnvContactStatus
+#        tag: tl_env_contact_status
+#        mapping:
+#          0: normal
+#          1: alarm
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: TRIPPLITE-12X
     table:
       OID: 1.3.6.1.4.1.850.100.1.10.2
@@ -199,15 +202,16 @@ metrics:
           OID: 1.3.6.1.4.1.850.100.1.11.2.1.4
           name: tlUpsOutletGroupDesc
         tag: tl_ups_outlet_group_desc
-      - symbol:
-          OID: 1.3.6.1.4.1.850.100.1.11.2.1.5
-          name: tlUpsOutletGroupState
-        tag: tl_ups_outlet_group_state
-        mapping:
-          0: unknown
-          1: off
-          2: on
-          3: mixed
+#      - symbol:
+#          OID: 1.3.6.1.4.1.850.100.1.11.2.1.5
+#          name: tlUpsOutletGroupState
+#        tag: tl_ups_outlet_group_state
+#        mapping:
+#          0: unknown
+#          1: off
+#          2: on
+#          3: mixed
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 metric_tags:
   - tag: tl_ups_ident_serial_num
     OID: 1.3.6.1.4.1.850.100.1.1.2.0

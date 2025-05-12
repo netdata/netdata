@@ -21,11 +21,12 @@ metrics:
         OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.3
         description: CPU utilization in 1 minute
         unit: "%"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.4
-          name: tpSysMonitorCpu5Minutes
-        tag: tp_sys_monitor_cpu_5_minutes
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.11863.6.4.1.1.1.1.4
+    #       name: tpSysMonitorCpu5Minutes
+    #     tag: tp_sys_monitor_cpu_5_minutes
       - index: 1  # tpSysMonitorCpuUnitNumber
         tag: cpu
   - MIB: TPLINK-SYSMONITOR-MIB

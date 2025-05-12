@@ -32,24 +32,25 @@ metrics:
         name: cikeTunOutDropPkts
         description: The total number of packets dropped by this IPsec Phase-1 IKE Tunnel during send processing.
         unit: "{packet}"
-    metric_tags:
-      - index: 1
-        tag: phase_1_tunnel_index
-      - tag: peer_local_value
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.3
-          name: cikeTunLocalValue
-      - tag: peer_remote_value
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.7
-          name: cikeTunRemoteValue
-      - tag: tunnel_status
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.35
-          name: cikeTunStatus
-        mapping:
-          1: active
-          2: destroy
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - index: 1
+    #     tag: phase_1_tunnel_index
+    #   - tag: peer_local_value
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.3
+    #       name: cikeTunLocalValue
+    #   - tag: peer_remote_value
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.7
+    #       name: cikeTunRemoteValue
+    #   - tag: tunnel_status
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.35
+    #       name: cikeTunStatus
+    #     mapping:
+    #       1: active
+    #       2: destroy
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     table:
       name: cipSecTunnelTable
@@ -99,32 +100,33 @@ metrics:
         name: cipSecTunOutEncryptFails
         description: The total number of outbound encryption's which ended in failure by this IPsec Phase-2 Tunnel.
         unit: "{encryption_failure}"
-    metric_tags:
-      - index: 1
-        tag: phase_2_tunnel_index
-      - tag: phase_1_tunnel_index
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.2
-          name: cipSecTunIkeTunnelIndex
-      - tag: tunnel_alive
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.3
-          name: cipSecTunIkeTunnelAlive
-        mapping:
-          1: true
-          2: false
-      - tag: peer_local_address
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.4
-          name: cipSecTunLocalAddr
-      - tag: peer_remote_address
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.5
-          name: cipSecTunRemoteAddr
-      - tag: tunnel_status
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.51
-          name: cipSecTunStatus
-        mapping:
-          1: active
-          2: destroy
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - index: 1
+    #     tag: phase_2_tunnel_index
+    #   - tag: phase_1_tunnel_index
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.2
+    #       name: cipSecTunIkeTunnelIndex
+    #   - tag: tunnel_alive
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.3
+    #       name: cipSecTunIkeTunnelAlive
+    #     mapping:
+    #       1: true
+    #       2: false
+    #   - tag: peer_local_address
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.4
+    #       name: cipSecTunLocalAddr
+    #   - tag: peer_remote_address
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.5
+    #       name: cipSecTunRemoteAddr
+    #   - tag: tunnel_status
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.51
+    #       name: cipSecTunStatus
+    #     mapping:
+    #       1: active
+    #       2: destroy

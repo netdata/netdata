@@ -36,61 +36,62 @@ metrics:
         constant_value_one: true
         description: "Number of tracked alerts"
         unit: "{alert}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.2
-          name: zbrTrackedAlertsSeverity
-        tag: zbr_tracked_alerts_severity
-        mapping:
-          1: other
-          3: critical
-          4: warning
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.3
-          name: zbrTrackedAlertsTrainingLevel
-        tag: zbr_tracked_alerts_training_level
-        mapping:
-          1: other
-          2: unknown
-          3: untrained
-          4: trained
-          5: field_service
-          6: management
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.4
-          name: zbrTrackedAlertsGroup
-        tag: zbr_tracked_alerts_group
-        mapping:
-          1: system
-          2: media
-          3: ribbon
-          4: printhead
-          5: rewinder
-          6: cutter
-          7: zbi
-          8: battery
-          9: rfid
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.5
-          name: zbrTrackedAlertsCode
-        tag: zbr_tracked_alerts_code
-        mapping:
-          1: paper-out
-          2: ribbon-out
-          3: head-too-hot
-          4: head-under-temp
-          5: head-open
-          6: power-supply-over-temp
-          7: motor-over-temp
-          8: ribbon-in
-          9: rewind-fault
-          10: cutter-jammed
-          11: printer-paused
-          12: head-element-bad
-          13: basic-runtime
-          14: basic-forced
-          15: power-on
-          16: battery-low
-          17: rfid-error
-          18: cold-start
-          19: ribbon-auth-error
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.10642.10.31.1.2
+    #       name: zbrTrackedAlertsSeverity
+    #     tag: zbr_tracked_alerts_severity
+    #     mapping:
+    #       1: other
+    #       3: critical
+    #       4: warning
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.10642.10.31.1.3
+    #       name: zbrTrackedAlertsTrainingLevel
+    #     tag: zbr_tracked_alerts_training_level
+    #     mapping:
+    #       1: other
+    #       2: unknown
+    #       3: untrained
+    #       4: trained
+    #       5: field_service
+    #       6: management
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.10642.10.31.1.4
+    #       name: zbrTrackedAlertsGroup
+    #     tag: zbr_tracked_alerts_group
+    #     mapping:
+    #       1: system
+    #       2: media
+    #       3: ribbon
+    #       4: printhead
+    #       5: rewinder
+    #       6: cutter
+    #       7: zbi
+    #       8: battery
+    #       9: rfid
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.10642.10.31.1.5
+    #       name: zbrTrackedAlertsCode
+    #     tag: zbr_tracked_alerts_code
+    #     mapping:
+    #       1: paper-out
+    #       2: ribbon-out
+    #       3: head-too-hot
+    #       4: head-under-temp
+    #       5: head-open
+    #       6: power-supply-over-temp
+    #       7: motor-over-temp
+    #       8: ribbon-in
+    #       9: rewind-fault
+    #       10: cutter-jammed
+    #       11: printer-paused
+    #       12: head-element-bad
+    #       13: basic-runtime
+    #       14: basic-forced
+    #       15: power-on
+    #       16: battery-low
+    #       17: rfid-error
+    #       18: cold-start
+    #       19: ribbon-auth-error

@@ -188,103 +188,104 @@ metrics:
     symbols:
       - name: fmDevice
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          name: fmDeviceEntName
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.2
-        tag: fm_device_ent_name
-      - symbol:
-          name: fmDeviceEntSn
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.3
-        tag: fm_device_ent_sn
-      - symbol:
-          name: fmDeviceEntMode
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.4
-        tag: fm_device_ent_mode
-        mapping:
-          0: unregistered
-          1: fmg
-          2: faz
-          3: fmg-faz
-      - symbol:
-          name: fmDeviceEntAdom
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.5
-        tag: fm_device_ent_adom
-      - symbol:
-          name: fmDeviceEntIp
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.6
-        tag: fm_device_ent_ip
-      - symbol:
-          name: fmDeviceEntHaMode
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.10
-        tag: fm_device_ent_ha_mode
-        mapping:
-          0: standalone
-          1: a-p
-          2: a-a
-          3: elbc
-          4: dual
-          5: fmg
-      - symbol:
-          name: fmDeviceEntHaGroup
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.11
-        tag: fm_device_ent_ha_group
-      - symbol:
-          name: fmDeviceEntDesc
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.24
-        tag: fm_device_ent_desc
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.12
-          name: fmDeviceEntConnectState
-        tag: fm_device_ent_connect_state
-        mapping:
-          0: unknown
-          1: up
-          2: down
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.13
-          name: fmDeviceEntDbState
-        tag: fm_device_ent_db_state
-        mapping:
-          0: unknown
-          1: not-modified
-          2: modified
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.14
-          name: fmDeviceEntConfigState
-        tag: fm_device_ent_config_state
-        mapping:
-          0: unknown
-          1: in-sync
-          2: out-of-sync
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.15
-          name: fmDeviceEntState
-        tag: fm_device_ent_state
-        mapping:
-          0: none
-          1: unknown
-          2: checked-in
-          3: in-progress
-          4: installed
-          5: aborted
-          6: sched
-          7: retry
-          8: canceled
-          9: pending
-          10: retrieved
-          11: changed-conf
-          12: sync-fail
-          13: timeout
-          14: rev-reverted
-          15: auto-updated
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.18
-          name: fmDeviceEntSupportState
-        tag: fm_device_ent_support_state
-        mapping:
-          0: expired
-          1: valid
+#    metric_tags:
+#      - symbol:
+#          name: fmDeviceEntName
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.2
+#        tag: fm_device_ent_name
+#      - symbol:
+#          name: fmDeviceEntSn
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.3
+#        tag: fm_device_ent_sn
+#      - symbol:
+#          name: fmDeviceEntMode
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.4
+#        tag: fm_device_ent_mode
+#        mapping:
+#          0: unregistered
+#          1: fmg
+#          2: faz
+#          3: fmg-faz
+#      - symbol:
+#          name: fmDeviceEntAdom
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.5
+#        tag: fm_device_ent_adom
+#      - symbol:
+#          name: fmDeviceEntIp
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.6
+#        tag: fm_device_ent_ip
+#      - symbol:
+#          name: fmDeviceEntHaMode
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.10
+#        tag: fm_device_ent_ha_mode
+#        mapping:
+#          0: standalone
+#          1: a-p
+#          2: a-a
+#          3: elbc
+#          4: dual
+#          5: fmg
+#      - symbol:
+#          name: fmDeviceEntHaGroup
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.11
+#        tag: fm_device_ent_ha_group
+#      - symbol:
+#          name: fmDeviceEntDesc
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.24
+#        tag: fm_device_ent_desc
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.12
+#          name: fmDeviceEntConnectState
+#        tag: fm_device_ent_connect_state
+#        mapping:
+#          0: unknown
+#          1: up
+#          2: down
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.13
+#          name: fmDeviceEntDbState
+#        tag: fm_device_ent_db_state
+#        mapping:
+#          0: unknown
+#          1: not-modified
+#          2: modified
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.14
+#          name: fmDeviceEntConfigState
+#        tag: fm_device_ent_config_state
+#        mapping:
+#          0: unknown
+#          1: in-sync
+#          2: out-of-sync
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.15
+#          name: fmDeviceEntState
+#        tag: fm_device_ent_state
+#        mapping:
+#          0: none
+#          1: unknown
+#          2: checked-in
+#          3: in-progress
+#          4: installed
+#          5: aborted
+#          6: sched
+#          7: retry
+#          8: canceled
+#          9: pending
+#          10: retrieved
+#          11: changed-conf
+#          12: sync-fail
+#          13: timeout
+#          14: rev-reverted
+#          15: auto-updated
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.6.2.1.18
+#          name: fmDeviceEntSupportState
+#        tag: fm_device_ent_support_state
+#        mapping:
+#          0: expired
+#          1: valid
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
       OID: 1.3.6.1.4.1.12356.103.7.2
@@ -294,18 +295,19 @@ metrics:
         OID: 1.3.6.1.4.1.12356.103.7.2.1.3
         description: Raid disk size in GB
         unit: "GBy"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.7.2.1.2
-          name: fmRaidDiskEntState
-        tag: fm_raid_disk_ent_state
-        mapping:
-          0: unavailable
-          1: unused
-          2: ok
-          3: rebuilding
-          4: failed
-          5: spare
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.7.2.1.2
+#          name: fmRaidDiskEntState
+#        tag: fm_raid_disk_ent_state
+#        mapping:
+#          0: unavailable
+#          1: unused
+#          2: ok
+#          3: rebuilding
+#          4: failed
+#          5: spare
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
   #   table:
   #     OID: 1.3.6.1.4.1.12356.103.8.2
@@ -347,32 +349,33 @@ metrics:
     symbols:
       - name: fmHaPeer
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          name: fmHaPeerEntIp
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.2
-        tag: fm_ha_peer_ent_ip
-      - symbol:
-          name: fmHaPeerEntSn
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.3
-        tag: fm_ha_peer_ent_sn
-      - symbol:
-          name: fmHaPeerEntHostName
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.5
-        tag: fm_ha_peer_ent_host_name
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.4
-          name: fmHaPeerEntEnabled
-        tag: fm_ha_peer_ent_enabled
-        mapping:
-          1: disabled
-          2: enabled
-      - symbol:
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.6
-          name: fmHaPeerEntState
-        tag: fm_ha_peer_ent_state
-        mapping:
-          0: down
-          1: negotiating
-          2: synchronizing
-          3: up
+#    metric_tags:
+#      - symbol:
+#          name: fmHaPeerEntIp
+#          OID: 1.3.6.1.4.1.12356.103.9.2.1.2
+#        tag: fm_ha_peer_ent_ip
+#      - symbol:
+#          name: fmHaPeerEntSn
+#          OID: 1.3.6.1.4.1.12356.103.9.2.1.3
+#        tag: fm_ha_peer_ent_sn
+#      - symbol:
+#          name: fmHaPeerEntHostName
+#          OID: 1.3.6.1.4.1.12356.103.9.2.1.5
+#        tag: fm_ha_peer_ent_host_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.9.2.1.4
+#          name: fmHaPeerEntEnabled
+#        tag: fm_ha_peer_ent_enabled
+#        mapping:
+#          1: disabled
+#          2: enabled
+#      - symbol:
+#          OID: 1.3.6.1.4.1.12356.103.9.2.1.6
+#          name: fmHaPeerEntState
+#        tag: fm_ha_peer_ent_state
+#        mapping:
+#          0: down
+#          1: negotiating
+#          2: synchronizing
+#          3: up
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.

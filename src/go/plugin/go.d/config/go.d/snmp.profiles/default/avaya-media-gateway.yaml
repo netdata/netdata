@@ -29,31 +29,32 @@ metrics:
     symbols:
       - name: avaya.avEntPhyChFru
         constant_value_one: true
-    metric_tags:
-      - index: 1
-        tag: avaya_ent_physical_index
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
-          name: avaya.avEntPhyChFruOperStat
-        tag: avaya_av_ent_phy_ch_fru_oper_stat
-        mapping:
-          1: ok
-          2: fault
-          3: not_present
-          255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
-          name: avaya.avEntPhyChFruFault
-        tag: avaya_av_ent_phy_ch_fru_fault
-        mapping:
-          1: none
-          2: mulfunction
-          3: ac_fault
-          4: malfunction_and_ac_fault
-          5: single_fan_fault
-          6: multiple_fan_fault
-          7: bad_expansion_cable
-          255: unknown
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - index: 1
+    #     tag: avaya_ent_physical_index
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
+    #       name: avaya.avEntPhyChFruOperStat
+    #     tag: avaya_av_ent_phy_ch_fru_oper_stat
+    #     mapping:
+    #       1: ok
+    #       2: fault
+    #       3: not_present
+    #       255: unknown
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
+    #       name: avaya.avEntPhyChFruFault
+    #     tag: avaya_av_ent_phy_ch_fru_fault
+    #     mapping:
+    #       1: none
+    #       2: mulfunction
+    #       3: ac_fault
+    #       4: malfunction_and_ac_fault
+    #       5: single_fan_fault
+    #       6: multiple_fan_fault
+    #       7: bad_expansion_cable
+    #       255: unknown
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSigDscp
@@ -107,36 +108,37 @@ metrics:
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.8
         description: Five-minute average occupancy of the VoIP engine
         unit: "%"
-    metric_tags:
-      - symbol:
-          name: avaya.cmgVoipCurrentIpAddress
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.4
-        tag: avaya_cmg_voip_current_ip_address
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.9
-          name: avaya.cmgVoipHyperactivity
-        tag: avaya_cmg_voip_hyperactivity
-        mapping:
-          1: normal
-          2: hyperactive
-          255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.10
-          name: avaya.cmgVoipAdminState
-        tag: avaya_cmg_voip_admin_state
-        mapping:
-          1: busy-out
-          2: release
-          3: camp-on
-          255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.12
-          name: avaya.cmgVoipDspStatus
-        tag: avaya_cmg_voip_dsp_status
-        mapping:
-          1: idle
-          2: in_use
-          3: fault
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - symbol:
+    #       name: avaya.cmgVoipCurrentIpAddress
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.4
+    #     tag: avaya_cmg_voip_current_ip_address
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.9
+    #       name: avaya.cmgVoipHyperactivity
+    #     tag: avaya_cmg_voip_hyperactivity
+    #     mapping:
+    #       1: normal
+    #       2: hyperactive
+    #       255: unknown
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.10
+    #       name: avaya.cmgVoipAdminState
+    #     tag: avaya_cmg_voip_admin_state
+    #     mapping:
+    #       1: busy-out
+    #       2: release
+    #       3: camp-on
+    #       255: unknown
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.12
+    #       name: avaya.cmgVoipDspStatus
+    #     tag: avaya_cmg_voip_dsp_status
+    #     mapping:
+    #       1: idle
+    #       2: in_use
+    #       3: fault
   - MIB: G700-MG-MIB
     table:
       name: cmgVoipDSPCoreTable
@@ -150,37 +152,38 @@ metrics:
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.3
         description: Number of channels currently in use at the DSP core
         unit: "{channel}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4
-          name: avaya.cmgDSPCoreAdminState
-        tag: avaya_cmg_dsp_core_admin_state
-        mapping:
-          1: busy-out
-          2: release
-          3: camp-on
-          255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.5
-          name: avaya.cmgDSPCoreStatus
-        tag: avaya_cmg_dsp_core_status
-        mapping:
-          1: idle
-          2: in_use
-          3: fault
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.7
-          name: avaya.cmgDSPCoreDemandTestResult
-        tag: avaya_cmg_dsp_core_demand_test_result
-        mapping:
-          1: error_code1
-          2: error_code2
-          3: error_code3
-          4: error_code4
-          5: error_code5
-          6: error_code6
-          7: not_responding
-          255: pass
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4
+    #       name: avaya.cmgDSPCoreAdminState
+    #     tag: avaya_cmg_dsp_core_admin_state
+    #     mapping:
+    #       1: busy-out
+    #       2: release
+    #       3: camp-on
+    #       255: unknown
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.5
+    #       name: avaya.cmgDSPCoreStatus
+    #     tag: avaya_cmg_dsp_core_status
+    #     mapping:
+    #       1: idle
+    #       2: in_use
+    #       3: fault
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.7
+    #       name: avaya.cmgDSPCoreDemandTestResult
+    #     tag: avaya_cmg_dsp_core_demand_test_result
+    #     mapping:
+    #       1: error_code1
+    #       2: error_code2
+    #       3: error_code3
+    #       4: error_code4
+    #       5: error_code5
+    #       6: error_code6
+    #       7: not_responding
+    #       255: pass
 metric_tags:
   - OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
     symbol: cmgHWType

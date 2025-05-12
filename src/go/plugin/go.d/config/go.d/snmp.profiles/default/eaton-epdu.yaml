@@ -48,18 +48,19 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.3
         description: Units are 0.1 Hz; divide by ten to get Hz
         unit: "Hz"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.10
-          name: eaton.epdu.inputFeedName
-        tag: eaton_epdu_input_feed_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.4
-          name: eaton.epdu.inputFrequencyStatus
-        tag: eaton_epdu_input_frequency_status
-        mapping:
-          0: good
-          1: out_of_range
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.10
+#          name: eaton.epdu.inputFeedName
+#        tag: eaton_epdu_input_feed_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.1.1.4
+#          name: eaton.epdu.inputFrequencyStatus
+#        tag: eaton_epdu_input_frequency_status
+#        mapping:
+#          0: good
+#          1: out_of_range
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: inputVoltageTable
@@ -69,21 +70,22 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.2.1.3
         description: An input voltage measurement value
         unit: "mV"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
-          name: eaton.epdu.inputPhaseDesignator
-        tag: eaton_epdu_input_description
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.2.1.4
-          name: eaton.epdu.inputVoltageThStatus
-        tag: eaton_epdu_input_voltage_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
+#          name: eaton.epdu.inputPhaseDesignator
+#        tag: eaton_epdu_input_description
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.2.1.4
+#          name: eaton.epdu.inputVoltageThStatus
+#        tag: eaton_epdu_input_voltage_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: inputCurrentTable
@@ -97,21 +99,22 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.11
         description: Current percent load based on the rated current capacity
         unit: "%"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
-          name: eaton.epdu.inputPhaseDesignator
-        tag: eaton_epdu_input_description
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.5
-          name: eaton.epdu.inputCurrentThStatus
-        tag: eaton_epdu_input_current_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
+#          name: eaton.epdu.inputPhaseDesignator
+#        tag: eaton_epdu_input_description
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.5
+#          name: eaton.epdu.inputCurrentThStatus
+#        tag: eaton_epdu_input_current_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: inputPowerTable
@@ -125,11 +128,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.3.4.1.4
         description: An input Watts value
         unit: "W"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
-          name: eaton.epdu.inputPhaseDesignator
-        tag: eaton_epdu_input_description
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.3.3.1.12
+#          name: eaton.epdu.inputPhaseDesignator
+#        tag: eaton_epdu_input_description
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: groupTable
@@ -137,30 +141,31 @@ metrics:
     symbols:
       - name: eaton.epdu.group
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
-          name: eaton.epdu.groupName
-        tag: eaton_epdu_group_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
-          name: eaton.epdu.groupType
-        tag: eaton_epdu_group_type
-        mapping:
-          0: unknown
-          1: breaker1pole
-          2: breaker2pole
-          3: breaker3pole
-          4: outlet_section
-          5: user_defined
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.5
-          name: eaton.epdu.groupBreakerStatus
-        tag: eaton_epdu_group_breaker_status
-        mapping:
-          0: not_applicable
-          1: breaker_on
-          2: breaker_off
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
+#          name: eaton.epdu.groupName
+#        tag: eaton_epdu_group_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
+#          name: eaton.epdu.groupType
+#        tag: eaton_epdu_group_type
+#        mapping:
+#          0: unknown
+#          1: breaker1pole
+#          2: breaker2pole
+#          3: breaker3pole
+#          4: outlet_section
+#          5: user_defined
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.5
+#          name: eaton.epdu.groupBreakerStatus
+#        tag: eaton_epdu_group_breaker_status
+#        mapping:
+#          0: not_applicable
+#          1: breaker_on
+#          2: breaker_off
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: groupVoltageTable
@@ -170,32 +175,33 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.5.3.1.3
         description: Units are millivolts
         unit: "mV"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
-          name: eaton.epdu.groupName
-        tag: eaton_epdu_group_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
-          name: eaton.epdu.groupType
-        tag: eaton_epdu_group_type
-        mapping:
-          0: unknown
-          1: breaker1pole
-          2: breaker2pole
-          3: breaker3pole
-          4: outlet_section
-          5: user_defined
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.3.1.4
-          name: eaton.epdu.groupVoltageThStatus
-        tag: eaton_epdu_group_voltage_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
+#          name: eaton.epdu.groupName
+#        tag: eaton_epdu_group_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
+#          name: eaton.epdu.groupType
+#        tag: eaton_epdu_group_type
+#        mapping:
+#          0: unknown
+#          1: breaker1pole
+#          2: breaker2pole
+#          3: breaker3pole
+#          4: outlet_section
+#          5: user_defined
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.3.1.4
+#          name: eaton.epdu.groupVoltageThStatus
+#        tag: eaton_epdu_group_voltage_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: groupCurrentTable
@@ -209,32 +215,33 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.10
         description: Current percent load based on the rated current capacity
         unit: "%"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
-          name: eaton.epdu.groupName
-        tag: eaton_epdu_group_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
-          name: eaton.epdu.groupType
-        tag: eaton_epdu_group_type
-        mapping:
-          0: unknown
-          1: breaker1pole
-          2: breaker2pole
-          3: breaker3pole
-          4: outlet_section
-          5: user_defined
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.4
-          name: eaton.epdu.groupCurrentThStatus
-        tag: eaton_epdu_group_current_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
+#          name: eaton.epdu.groupName
+#        tag: eaton_epdu_group_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
+#          name: eaton.epdu.groupType
+#        tag: eaton_epdu_group_type
+#        mapping:
+#          0: unknown
+#          1: breaker1pole
+#          2: breaker2pole
+#          3: breaker3pole
+#          4: outlet_section
+#          5: user_defined
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.4.1.4
+#          name: eaton.epdu.groupCurrentThStatus
+#        tag: eaton_epdu_group_current_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: groupPowerTable
@@ -248,22 +255,23 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.5.5.1.3
         description: A group Watts value
         unit: "W"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
-          name: eaton.epdu.groupName
-        tag: eaton_epdu_group_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
-          name: eaton.epdu.groupType
-        tag: eaton_epdu_group_type
-        mapping:
-          0: unknown
-          1: breaker1pole
-          2: breaker2pole
-          3: breaker3pole
-          4: outlet_section
-          5: user_defined
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
+#          name: eaton.epdu.groupName
+#        tag: eaton_epdu_group_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
+#          name: eaton.epdu.groupType
+#        tag: eaton_epdu_group_type
+#        mapping:
+#          0: unknown
+#          1: breaker1pole
+#          2: breaker2pole
+#          3: breaker3pole
+#          4: outlet_section
+#          5: user_defined
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: groupControlTable
@@ -271,31 +279,32 @@ metrics:
     symbols:
       - name: eaton.epdu.groupControl
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
-          name: eaton.epdu.groupName
-        tag: eaton_epdu_group_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
-          name: eaton.epdu.groupType
-        tag: eaton_epdu_group_type
-        mapping:
-          0: unknown
-          1: breaker1pole
-          2: breaker2pole
-          3: breaker3pole
-          4: outlet_section
-          5: user_defined
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.5.6.1.2
-          name: eaton.epdu.groupControlStatus
-        tag: eaton_epdu_group_control_status
-        mapping:
-          0: off
-          1: on
-          2: rebooting
-          3: mixed
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.3
+#          name: eaton.epdu.groupName
+#        tag: eaton_epdu_group_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.1.1.4
+#          name: eaton.epdu.groupType
+#        tag: eaton_epdu_group_type
+#        mapping:
+#          0: unknown
+#          1: breaker1pole
+#          2: breaker2pole
+#          3: breaker3pole
+#          4: outlet_section
+#          5: user_defined
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.5.6.1.2
+#          name: eaton.epdu.groupControlStatus
+#        tag: eaton_epdu_group_control_status
+#        mapping:
+#          0: off
+#          1: on
+#          2: rebooting
+#          3: mixed
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: outletVoltageTable
@@ -305,21 +314,22 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.6.3.1.2
         description: Units are millivolts
         unit: "mV"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
-          name: eaton.epdu.outletName
-        tag: eaton_epdu_outlet_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.6.3.1.3
-          name: eaton.epdu.outletVoltageThStatus
-        tag: eaton_epdu_outlet_voltage_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
+#          name: eaton.epdu.outletName
+#        tag: eaton_epdu_outlet_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.6.3.1.3
+#          name: eaton.epdu.outletVoltageThStatus
+#        tag: eaton_epdu_outlet_voltage_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: outletCurrentTable
@@ -333,21 +343,22 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.10
         description: Current percent load based on the rated current capacity
         unit: "%"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
-          name: eaton.epdu.outletName
-        tag: eaton_epdu_outlet_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.4
-          name: eaton.epdu.outletCurrentThStatus
-        tag: eaton_epdu_outlet_current_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
+#          name: eaton.epdu.outletName
+#        tag: eaton_epdu_outlet_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.6.4.1.4
+#          name: eaton.epdu.outletCurrentThStatus
+#        tag: eaton_epdu_outlet_current_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: outletPowerTable
@@ -361,11 +372,12 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.6.5.1.3
         description: An outlet Watts value
         unit: "W"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
-          name: eaton.epdu.outletName
-        tag: eaton_epdu_outlet_name
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.6.1.1.3
+#          name: eaton.epdu.outletName
+#        tag: eaton_epdu_outlet_name
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: temperatureTable
@@ -375,29 +387,30 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.4
         description: Units are in tenths of a degree according to the scale specified by temperatureScale either Fahrenheit or Celsius Divide by ten to get degrees
         unit: "Cel"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.2
-          name: eaton.epdu.temperatureName
-        tag: eaton_epdu_temperature_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.3
-          name: eaton.epdu.temperatureProbeStatus
-        tag: eaton_epdu_temperature_probe_status
-        mapping:
-          -1: bad
-          0: disconnected
-          1: connected
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.5
-          name: eaton.epdu.temperatureThStatus
-        tag: eaton_epdu_temperature_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.2
+#          name: eaton.epdu.temperatureName
+#        tag: eaton_epdu_temperature_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.3
+#          name: eaton.epdu.temperatureProbeStatus
+#        tag: eaton_epdu_temperature_probe_status
+#        mapping:
+#          -1: bad
+#          0: disconnected
+#          1: connected
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.1.1.5
+#          name: eaton.epdu.temperatureThStatus
+#        tag: eaton_epdu_temperature_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: humidityTable
@@ -407,29 +420,30 @@ metrics:
         OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.4
         description: Units are tenths of a percent relative humidity Divide the value by 10 to get %RH
         unit: "%"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.2
-          name: eaton.epdu.humidityName
-        tag: eaton_epdu_humidity_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.3
-          name: eaton.epdu.humidityProbeStatus
-        tag: eaton_epdu_humidity_probe_status
-        mapping:
-          -1: bad
-          0: disconnected
-          1: connected
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.5
-          name: eaton.epdu.humidityThStatus
-        tag: eaton_epdu_humidity_th_status
-        mapping:
-          0: good
-          1: low_warning
-          2: low_critical
-          3: high_warning
-          4: high_critical
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.2
+#          name: eaton.epdu.humidityName
+#        tag: eaton_epdu_humidity_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.3
+#          name: eaton.epdu.humidityProbeStatus
+#        tag: eaton_epdu_humidity_probe_status
+#        mapping:
+#          -1: bad
+#          0: disconnected
+#          1: connected
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.2.1.5
+#          name: eaton.epdu.humidityThStatus
+#        tag: eaton_epdu_humidity_th_status
+#        mapping:
+#          0: good
+#          1: low_warning
+#          2: low_critical
+#          3: high_warning
+#          4: high_critical
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: EATON-EPDU-MIB
     table:
       name: contactTable
@@ -437,24 +451,25 @@ metrics:
     symbols:
       - name: eaton.epdu.contact
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.2
-          name: eaton.epdu.contactName
-        tag: eaton_epdu_contact_name
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.3
-          name: eaton.epdu.contactProbeStatus
-        tag: eaton_epdu_contact_probe_status
-        mapping:
-          -1: bad
-          0: disconnected
-          1: connected
-      - symbol:
-          OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.4
-          name: eaton.epdu.contactState
-        tag: eaton_epdu_contact_state
-        mapping:
-          -1: contact_bad
-          0: contact_open
-          1: contact_closed
+#    metric_tags:
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.2
+#          name: eaton.epdu.contactName
+#        tag: eaton_epdu_contact_name
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.3
+#          name: eaton.epdu.contactProbeStatus
+#        tag: eaton_epdu_contact_probe_status
+#        mapping:
+#          -1: bad
+#          0: disconnected
+#          1: connected
+#      - symbol:
+#          OID: 1.3.6.1.4.1.534.6.6.7.7.3.1.4
+#          name: eaton.epdu.contactState
+#        tag: eaton_epdu_contact_state
+#        mapping:
+#          -1: contact_bad
+#          0: contact_open
+#          1: contact_closed
+#    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.

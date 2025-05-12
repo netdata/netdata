@@ -228,23 +228,24 @@ metrics:
     symbols:
       - name: fgVirtualDomain
         constant_value_one: true
-    metric_tags:
-      - tag: virtualdomain_index
-        symbol:
-          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
-          name: fgVdEntIndex
-      - tag: virtualdomain_name
-        symbol:
-          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
-          name: fgVdEntName
-      - tag: virtualdomain_state
-        symbol:
-          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.4
-          name: fgVdEntHaState
-        mapping:
-          1: primary
-          2: secondary
-          3: standalone
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - tag: virtualdomain_index
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
+    #       name: fgVdEntIndex
+    #   - tag: virtualdomain_name
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.12356.101.3.2.1.1.2
+    #       name: fgVdEntName
+    #   - tag: virtualdomain_state
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.12356.101.3.2.1.1.4
+    #       name: fgVdEntHaState
+    #     mapping:
+    #       1: primary
+    #       2: secondary
+    #       3: standalone
 
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -270,18 +271,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.12356.101.7.2.1.1.1
         name: fgIntfEntVdom
-    metric_tags:
-      # The virtual domain the interface belongs to. This index corresponds to the index used by fgVdTable.
-      - tag: virtualdomain_index
-        symbol:
-          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
-          name: fgVdEntIndex
-      - MIB: IF-MIB
-        symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        table: ifXTable
-        tag: interface
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   # The virtual domain the interface belongs to. This index corresponds to the index used by fgVdTable.
+    #   - tag: virtualdomain_index
+    #     symbol:
+    #       OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
+    #       name: fgVdEntIndex
+    #   - MIB: IF-MIB
+    #     symbol:
+    #       OID: 1.3.6.1.2.1.31.1.1.1.1
+    #       name: ifName
+    #     table: ifXTable
+    #     tag: interface
 
 
   ### Sessions

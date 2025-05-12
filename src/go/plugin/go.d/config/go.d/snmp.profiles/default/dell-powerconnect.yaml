@@ -131,22 +131,23 @@ metrics:
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.4
         description: "Fan speed in revolutions per minute"
         unit: "1.min"
-    metric_tags:
-      - symbol:
-          name: dell.envMonFanStatusDescr
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.2
-        tag: dell_env_mon_fan_status_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.3
-          name: dell.envMonFanState
-        tag: dell_env_mon_fan_state
-        mapping:
-          1: normal
-          2: warning
-          3: critical
-          4: shutdown
-          5: not_present
-          6: not_functioning
+#    metric_tags:
+#      - symbol:
+#          name: dell.envMonFanStatusDescr
+#          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.2
+#        tag: dell_env_mon_fan_status_descr
+#      - symbol:
+#          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.1.1.3
+#          name: dell.envMonFanState
+#        tag: dell_env_mon_fan_state
+#        mapping:
+#          1: normal
+#          2: warning
+#          3: critical
+#          4: shutdown
+#          5: not_present
+#          6: not_functioning
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - MIB: Dell-Vendor-MIB
     table:
       name: dell.envMonSupplyStatusTable
@@ -160,29 +161,30 @@ metrics:
         OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.6
         description: "Average power consumption"
         unit: "W"
-    metric_tags:
-      - symbol:
-          name: dell.envMonSupplyStatusDescr
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.2
-        tag: dell_env_mon_supply_status_descr
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.3
-          name: dell.envMonSupplyState
-        tag: dell_env_mon_supply_state
-        mapping:
-          1: normal
-          2: warning
-          3: critical
-          4: shutdown
-          5: not_present
-          6: not_functioning
-      - symbol:
-          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.4
-          name: dell.envMonSupplySource
-        tag: dell_env_mon_supply_source
-        mapping:
-          1: unknown
-          2: ac
-          3: dc
-          4: external_power_supply
-          5: internal_redundant
+#    metric_tags:
+#      - symbol:
+#          name: dell.envMonSupplyStatusDescr
+#          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.2
+#        tag: dell_env_mon_supply_status_descr
+#      - symbol:
+#          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.3
+#          name: dell.envMonSupplyState
+#        tag: dell_env_mon_supply_state
+#        mapping:
+#          1: normal
+#          2: warning
+#          3: critical
+#          4: shutdown
+#          5: not_present
+#          6: not_functioning
+#      - symbol:
+#          OID: 1.3.6.1.4.1.674.10895.3000.1.2.110.7.2.1.4
+#          name: dell.envMonSupplySource
+#        tag: dell_env_mon_supply_source
+#        mapping:
+#          1: unknown
+#          2: ac
+#          3: dc
+#          4: external_power_supply
+#          5: internal_redundant
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.

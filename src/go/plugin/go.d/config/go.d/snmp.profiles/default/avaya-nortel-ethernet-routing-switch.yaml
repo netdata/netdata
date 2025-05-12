@@ -44,45 +44,46 @@ metrics:
     symbols:
       - name: avaya.s5ChasCom
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          name: avaya.s5ChasComDescr
-          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.5
-        tag: avaya_s5_chas_com_descr
-        description: Description of the component or sub-component
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.9
-          name: avaya.s5ChasComAdminState
-        tag: avaya_s5_chas_com_admin_state
-        mapping:
-          1: other
-          2: not_avail
-          3: disable
-          4: enable
-          5: reset
-          6: test
-        description: Desired state of the component or sub-component
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.10
-          name: avaya.s5ChasComOperState
-        tag: avaya_s5_chas_com_oper_state
-        mapping:
-          1: other
-          2: not_avail
-          3: removed
-          4: disabled
-          5: normal
-          6: reset_in_prog
-          7: testing
-          8: warning
-          9: non_fatal_err
-          10: fatal_err
-          11: not_config
-          12: obsoleted
-        description: Current operational state of the component or sub-component
-        unit: "TBD"
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # metric_tags:
+    #   - symbol:
+    #       name: avaya.s5ChasComDescr
+    #       OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.5
+    #     tag: avaya_s5_chas_com_descr
+    #     description: Description of the component or sub-component
+    #     unit: "TBD"
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.9
+    #       name: avaya.s5ChasComAdminState
+    #     tag: avaya_s5_chas_com_admin_state
+    #     mapping:
+    #       1: other
+    #       2: not_avail
+    #       3: disable
+    #       4: enable
+    #       5: reset
+    #       6: test
+    #     description: Desired state of the component or sub-component
+    #     unit: "TBD"
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.10
+    #       name: avaya.s5ChasComOperState
+    #     tag: avaya_s5_chas_com_oper_state
+    #     mapping:
+    #       1: other
+    #       2: not_avail
+    #       3: removed
+    #       4: disabled
+    #       5: normal
+    #       6: reset_in_prog
+    #       7: testing
+    #       8: warning
+    #       9: non_fatal_err
+    #       10: fatal_err
+    #       11: not_config
+    #       12: obsoleted
+    #     description: Current operational state of the component or sub-component
+    #     unit: "TBD"
 
 metric_tags:
   - OID: 1.3.6.1.4.1.45.1.6.3.1.5.0

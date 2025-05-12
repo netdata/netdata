@@ -31,21 +31,22 @@ metrics:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
         tag: ap_ip_address
-      - symbol:
-          OID: 1.3.6.1.4.1.14179.2.2.1.1.6
-          name: bsnAPOperationStatus
-        mapping:
-          1: associated
-          2: disassociating
-          3: downloading
-        tag: ap_oper_status
-      - symbol:
-          OID: 1.3.6.1.4.1.14179.2.2.1.1.37
-          name: bsnAPAdminStatus
-        mapping:
-          1: enable
-          2: disable
-        tag: ap_admin_status
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14179.2.2.1.1.6
+#          name: bsnAPOperationStatus
+#        mapping:
+#          1: associated
+#          2: disassociating
+#          3: downloading
+#        tag: ap_oper_status
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14179.2.2.1.1.37
+#          name: bsnAPAdminStatus
+#        mapping:
+#          1: enable
+#          2: disable
+#        tag: ap_admin_status
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 
   # Connected APs 802.11 interfaces metrics
 
@@ -93,20 +94,21 @@ metrics:
           - start: 0
             end: 5
         tag: ap_ip_address
-      - symbol:
-          OID: 1.3.6.1.4.1.14179.2.2.2.1.12
-          name: bsnAPIfOperStatus
-        mapping:
-          1: down
-          2: up
-        tag: ap_if_oper_status
-      - symbol:
-          OID: 1.3.6.1.4.1.14179.2.2.2.1.34
-          name: bsnAPIfAdminStatus
-        mapping:
-          1: enable
-          2: disable
-        tag: ap_if_admin_status
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14179.2.2.2.1.12
+#          name: bsnAPIfOperStatus
+#        mapping:
+#          1: down
+#          2: up
+#        tag: ap_if_oper_status
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14179.2.2.2.1.34
+#          name: bsnAPIfAdminStatus
+#        mapping:
+#          1: enable
+#          2: disable
+#        tag: ap_if_admin_status
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -236,24 +238,25 @@ metrics:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.2
           name: bsnDot11EssSsid
         tag: ssid
-      - symbol:
-          OID: 1.3.6.1.4.1.14179.2.1.1.1.6
-          name: bsnDot11EssAdminStatus
-        mapping:
-          0: disable
-          1: enable
-        tag: wlan_admin_status
-      - symbol:
-          OID: 1.3.6.1.4.1.14179.2.1.1.1.60
-          name: bsnDot11EssRowStatus
-        mapping:
-          1: active
-          2: notInService
-          3: notReady
-          4: createAndGo
-          5: createAndWait
-          6: destroy
-        tag: wlan_row_status
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14179.2.1.1.1.6
+#          name: bsnDot11EssAdminStatus
+#        mapping:
+#          0: disable
+#          1: enable
+#        tag: wlan_admin_status
+#      - symbol:
+#          OID: 1.3.6.1.4.1.14179.2.1.1.1.60
+#          name: bsnDot11EssRowStatus
+#        mapping:
+#          1: active
+#          2: notInService
+#          3: notReady
+#          4: createAndGo
+#          5: createAndWait
+#          6: destroy
+#        tag: wlan_row_status
+# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:

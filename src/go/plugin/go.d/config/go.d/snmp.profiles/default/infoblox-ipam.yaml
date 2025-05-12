@@ -181,83 +181,84 @@ metrics:
     symbols:
       - name: ibMemberServiceStatus
         constant_value_one: true
-    metric_tags:
-      - symbol:
-          name: ibServiceName
-          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.1
-        tag: ib_service_name
-        mapping:
-          1: dhcp
-          2: dns
-          3: ntp
-          4: tftp
-          5: http-file-dist
-          6: ftp
-          7: bloxtools-move
-          8: bloxtools
-          9: node-status
-          10: disk-usage
-          11: enet-lan
-          12: enet-lan2
-          13: enet-ha
-          14: enet-mgmt
-          15: lcd
-          16: memory
-          17: replication
-          18: db-object
-          19: raid-summary
-          20: raid-disk1
-          21: raid-disk2
-          22: raid-disk3
-          23: raid-disk4
-          24: raid-disk5
-          25: raid-disk6
-          26: raid-disk7
-          27: raid-disk8
-          28: fan1
-          29: fan2
-          30: fan3
-          31: fan4
-          32: fan5
-          33: fan6
-          34: fan7
-          35: fan8
-          36: power-supply1
-          37: power-supply2
-          38: ntp-sync
-          39: cpu1-temp
-          40: cpu2-temp
-          41: sys-temp
-          42: raid-battery
-          43: cpu-usage
-          44: ospf
-          45: bgp
-          46: mgm-service
-          47: subgrid-conn
-          48: network-capacity
-          49: reporting
-          50: dns-cache-acceleration
-          51: ospf6
-          52: swap-usage
-          53: discovery-consolidator
-          54: discovery-collector
-          55: discovery-capacity
-          56: threat-protection
-          58: recursive-clients
-      - symbol:
-          name: ibServiceDesc
-          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.3
-        tag: ib_service_desc
-      - symbol:
-          OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.2
-          name: ibServiceStatus
-        tag: ib_service_status
-        mapping:
-          1: working
-          2: warning
-          3: failed
-          4: inactive
-          5: unknown
+    # metric_tags:
+    #   - symbol:
+    #       name: ibServiceName
+    #       OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.1
+    #     tag: ib_service_name
+    #     mapping:
+    #       1: dhcp
+    #       2: dns
+    #       3: ntp
+    #       4: tftp
+    #       5: http-file-dist
+    #       6: ftp
+    #       7: bloxtools-move
+    #       8: bloxtools
+    #       9: node-status
+    #       10: disk-usage
+    #       11: enet-lan
+    #       12: enet-lan2
+    #       13: enet-ha
+    #       14: enet-mgmt
+    #       15: lcd
+    #       16: memory
+    #       17: replication
+    #       18: db-object
+    #       19: raid-summary
+    #       20: raid-disk1
+    #       21: raid-disk2
+    #       22: raid-disk3
+    #       23: raid-disk4
+    #       24: raid-disk5
+    #       25: raid-disk6
+    #       26: raid-disk7
+    #       27: raid-disk8
+    #       28: fan1
+    #       29: fan2
+    #       30: fan3
+    #       31: fan4
+    #       32: fan5
+    #       33: fan6
+    #       34: fan7
+    #       35: fan8
+    #       36: power-supply1
+    #       37: power-supply2
+    #       38: ntp-sync
+    #       39: cpu1-temp
+    #       40: cpu2-temp
+    #       41: sys-temp
+    #       42: raid-battery
+    #       43: cpu-usage
+    #       44: ospf
+    #       45: bgp
+    #       46: mgm-service
+    #       47: subgrid-conn
+    #       48: network-capacity
+    #       49: reporting
+    #       50: dns-cache-acceleration
+    #       51: ospf6
+    #       52: swap-usage
+    #       53: discovery-consolidator
+    #       54: discovery-collector
+    #       55: discovery-capacity
+    #       56: threat-protection
+    #       58: recursive-clients
+    #   - symbol:
+    #       name: ibServiceDesc
+    #       OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.3
+    #     tag: ib_service_desc
+    #   - symbol:
+    #       OID: 1.3.6.1.4.1.7779.3.1.1.2.1.9.1.2
+    #       name: ibServiceStatus
+    #     tag: ib_service_status
+    #     mapping:
+    #       1: working
+    #       2: warning
+    #       3: failed
+    #       4: inactive
+    #       5: unknown
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
 metric_tags:
   - OID: 1.3.6.1.4.1.7779.3.1.1.2.1.4.0
     symbol: ibHardwareType
