@@ -2792,10 +2792,11 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 target_link_libraries(systemd-journal.plugin journal_reader_ffi libnetdata)
 
                 if(ENABLE_JF_BENCHMARKS)
-                        set(JF_BENCHMARK_FILES "src/crates/jf/benchmark/main.c")
+                        set(JF_BENCHMARK_FILES "src/crates/jf/benchmark/unfiltered.c")
 
                         add_executable(jfr.bench ${JF_BENCHMARK_FILES})
-                        target_compile_definitions(jfr.bench PRIVATE NETDATA_PROVIDER)
+                        target_compile_definitions(jfr.bench PRIVATE BENCH_JF)
+                        target_include_directories(jfr.bench PRIVATE "${CMAKE_SOURCE_DIR}/src")
                         target_link_libraries(jfr.bench journal_reader_ffi)
 
                         add_executable(jfc.bench ${JF_BENCHMARK_FILES})

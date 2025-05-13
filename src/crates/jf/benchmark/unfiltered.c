@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <systemd/sd-journal.h>
 
 #ifdef BENCH_JF
-#include "src/collectors/systemd-journal.plugin/netdata_provider.h"
+#include "collectors/systemd-journal.plugin/provider/netdata_provider.h"
 #else
 #include <systemd/sd-journal.h>
 #endif
@@ -28,7 +27,6 @@ static int process_file(const char *path)
     }
 
     printf("Successfully opened journal file: %s\n", path);
-    printf("Processing entries...\n");
 
     // Move to the first entry
     r = sd_journal_seek_head(j);
@@ -73,6 +71,7 @@ int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
 
+    printf("Processing entries for files...\n");
     const char *paths[] = {
         "/var/log/journal/ec2ce35ddef16e80b43d6cd9f008dcba.agent-events/system@67fcfeba8339461c9a8dc77363c2c739-00000000002b725a-0006314cd7a5cefd.journal",
         "/var/log/journal/ec2ce35ddef16e80b43d6cd9f008dcba.agent-events/system@67fcfeba8339461c9a8dc77363c2c739-00000000002c7398-00063157ce5e4da0.journal",
