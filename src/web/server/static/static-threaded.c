@@ -64,7 +64,8 @@ struct web_server_static_threaded_worker {
     ND_THREAD *thread;
 
     int id;
-    int running;
+    bool initializing;
+    SPINLOCK spinlock;
 
     size_t max_sockets;
 
@@ -274,7 +275,6 @@ static void socket_listen_main_static_threaded_worker_cleanup(void *pptr) {
             worker_private->sends
     );
 
-    worker_private->running = 0;
     worker_unregister();
 }
 
@@ -284,7 +284,7 @@ static bool web_server_should_stop(void) {
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = ptr;
-    worker_private->running = 1;
+    worker_private->initializing = false;
     worker_register("WEB");
     worker_register_job_name(WORKER_JOB_ADD_CONNECTION, "connect");
     worker_register_job_name(WORKER_JOB_DEL_COLLECTION, "disconnect");
@@ -361,6 +361,20 @@ static void socket_listen_main_static_threaded_cleanup(void *pptr) {
     listen_sockets_close(&api_sockets);
 
     netdata_log_info("all static web threads stopped.");
+
+    // Lets join all threads
+    for (int i = 0; i < static_threaded_workers_count; i++) {
+        bool initializing;
+        do {
+            spinlock_lock(&static_workers_private_data[i].spinlock);
+            initializing = static_workers_private_data[i].initializing;
+            spinlock_unlock(&static_workers_private_data[i].spinlock);
+            if (unlikely(initializing))
+                usleep(1000);
+        } while(initializing);
+        (void) nd_thread_join(static_workers_private_data[i].thread);
+    }
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -394,6 +408,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
         char tag[50 + 1];
         snprintfz(tag, sizeof(tag) - 1, "WEB[%d]", i+1);
 
+        spinlock_init(&static_workers_private_data[i].spinlock);
+        static_workers_private_data[i].initializing = true;
         static_workers_private_data[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
                                                                  socket_listen_main_static_threaded_worker,
                                                                  (void *)&static_workers_private_data[i]);

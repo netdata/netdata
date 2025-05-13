@@ -197,8 +197,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
-    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
+    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS | SERVICE_ACLK |
                         ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
+
+    service_signal_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD);
+
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
     service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 5 * USEC_PER_SEC);
@@ -206,6 +209,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
+
+    service_signal_exit(SERVICE_COLLECTORS | SERVICE_STREAMING | SERVICE_REPLICATION);
 
     stream_threads_cancel();
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 20 * USEC_PER_SEC);
@@ -234,7 +239,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     aclk_synchronization_shutdown();
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_SYNC_THREAD);
 
-    service_signal_exit(SERVICE_ACLK);
+//    service_signal_exit(SERVICE_ACLK);
 
     service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);

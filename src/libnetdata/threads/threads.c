@@ -457,10 +457,8 @@ int nd_thread_join(ND_THREAD *nti) {
     if(!nti)
         return ESRCH;
 
-    if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_JOINED)) {
-        freez(nti);
+    if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_JOINED))
         return 0;
-    }
 
     int ret;
     if((ret = uv_thread_join(&nti->thread))) {
