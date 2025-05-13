@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_client.h"
-#include "web/server/websocket-server/websocket.h"
+#include "web/websocket/websocket.h"
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers

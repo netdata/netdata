@@ -1825,39 +1825,57 @@ set(STREAMING_PLUGIN_FILES
 )
 
 set(WEB_PLUGIN_FILES
-        src/web/server/web_client.c
-        src/web/server/web_client.h
-        src/web/server/web_server.c
-        src/web/server/web_server.h
-        src/web/server/websocket-server/websocket.c
-        src/web/server/websocket-server/websocket.h
-        src/web/server/websocket-server/websocket-compression.c
-        src/web/server/websocket-server/websocket-compression.h
-        src/web/server/websocket-server/websocket-internal.h
-        src/web/server/websocket-server/websocket-jsonrpc.c
-        src/web/server/websocket-server/websocket-jsonrpc.h
-        src/web/server/websocket-server/websocket-echo.c
-        src/web/server/websocket-server/websocket-echo.h
-        src/web/server/websocket-server/websocket-message.c
-        src/web/server/websocket-server/websocket-receive.c
-        src/web/server/websocket-server/websocket-send.c
-        src/web/server/websocket-server/websocket-handshake.c
-        src/web/server/websocket-server/websocket-thread.c
-        src/web/server/websocket-server/websocket-thread.h
-        src/web/server/websocket-server/websocket-utils.c
-        src/web/server/static/static-threaded.c
-        src/web/server/static/static-threaded.h
-        src/web/server/web_client_cache.c
-        src/web/server/web_client_cache.h
-        src/web/api/v3/api_v3_stream_info.c
-        src/web/api/v3/api_v3_stream_path.c
-        src/web/api/queries/backfill.c
-        src/web/api/queries/backfill.h
         src/web/api/functions/function-metrics-cardinality.c
         src/web/api/functions/function-metrics-cardinality.h
+        src/web/api/queries/backfill.c
+        src/web/api/queries/backfill.h
         src/web/api/request_source.c
         src/web/api/request_source.h
-        src/web/server/websocket-server/websocket-buffer.h
+        src/web/api/v3/api_v3_stream_info.c
+        src/web/api/v3/api_v3_stream_path.c
+        src/web/mcp/adapters/mcp-websocket.c
+        src/web/mcp/adapters/mcp-websocket.h
+        src/web/mcp/mcp-context.c
+        src/web/mcp/mcp-context.h
+        src/web/mcp/mcp-initialize.c
+        src/web/mcp/mcp-initialize.h
+        src/web/mcp/mcp-notifications.c
+        src/web/mcp/mcp-notifications.h
+        src/web/mcp/mcp-prompts.c
+        src/web/mcp/mcp-prompts.h
+        src/web/mcp/mcp-resources.c
+        src/web/mcp/mcp-resources.h
+        src/web/mcp/mcp-system.c
+        src/web/mcp/mcp-system.h
+        src/web/mcp/mcp-tools.c
+        src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp.c
+        src/web/mcp/mcp.h
+        src/web/server/static/static-threaded.c
+        src/web/server/static/static-threaded.h
+        src/web/server/web_client.c
+        src/web/server/web_client.h
+        src/web/server/web_client_cache.c
+        src/web/server/web_client_cache.h
+        src/web/server/web_server.c
+        src/web/server/web_server.h
+        src/web/websocket/websocket-buffer.h
+        src/web/websocket/websocket-compression.c
+        src/web/websocket/websocket-compression.h
+        src/web/websocket/websocket-echo.c
+        src/web/websocket/websocket-echo.h
+        src/web/websocket/websocket-handshake.c
+        src/web/websocket/websocket-internal.h
+        src/web/websocket/websocket-jsonrpc.c
+        src/web/websocket/websocket-jsonrpc.h
+        src/web/websocket/websocket-message.c
+        src/web/websocket/websocket-receive.c
+        src/web/websocket/websocket-send.c
+        src/web/websocket/websocket-thread.c
+        src/web/websocket/websocket-thread.h
+        src/web/websocket/websocket-utils.c
+        src/web/websocket/websocket.c
+        src/web/websocket/websocket.h
 )
 
 set(CLAIM_PLUGIN_FILES

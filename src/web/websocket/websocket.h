@@ -11,6 +11,7 @@ typedef enum __attribute__((packed)) {
     WS_PROTOCOL_UNKNOWN,                                // Unknown or unsupported protocol
     WS_PROTOCOL_JSONRPC,                                // JSON-RPC protocol
     WS_PROTOCOL_ECHO,                                   // Echo protocol
+    WS_PROTOCOL_MCP,                                    // Model Context Protocol
 } WEBSOCKET_PROTOCOL;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(WEBSOCKET_PROTOCOL);
 

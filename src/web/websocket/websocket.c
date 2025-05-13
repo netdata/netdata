@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "websocket-internal.h"
+#include "websocket-echo.h"
+#include "websocket-jsonrpc.h"
+#include "../mcp/adapters/mcp-websocket.h"
 
 ENUM_STR_MAP_DEFINE(WEBSOCKET_PROTOCOL) = {
     { .id = WS_PROTOCOL_JSONRPC, .name = "jsonrpc" },
     { .id = WS_PROTOCOL_ECHO,    .name = "echo" },
+    { .id = WS_PROTOCOL_MCP,     .name = "mcp" },
     { .id = WS_PROTOCOL_UNKNOWN, .name = "unknown" },
 
     // terminator
@@ -80,13 +84,9 @@ static struct websocket_server ws_server = (struct websocket_server){
     .spinlock = SPINLOCK_INITIALIZER
 };
 
-// Forward declarations for protocol initialization
-void websocket_jsonrpc_initialize(void);
-void websocket_echo_initialize(void);
-
 // Initialize WebSocket subsystem
 void websocket_initialize(void) {
-    // debug_flags |= D_WEBSOCKET;
+    debug_flags |= D_WEBSOCKET;
 
     // Initialize thread system
     websocket_threads_init();
@@ -94,6 +94,7 @@ void websocket_initialize(void) {
     // Initialize protocol handlers
     websocket_jsonrpc_initialize();
     websocket_echo_initialize();
+    mcp_websocket_adapter_initialize();
 
     netdata_log_info("WebSocket server subsystem initialized");
 }

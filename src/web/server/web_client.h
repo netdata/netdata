@@ -4,7 +4,7 @@
 #define NETDATA_WEB_CLIENT_H 1
 
 #include "libnetdata/libnetdata.h"
-#include "web/server/websocket-server/websocket.h"
+#include "../websocket/websocket.h"
 
 struct web_client;
 

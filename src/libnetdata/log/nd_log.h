@@ -106,7 +106,8 @@ void log_stack_push(struct log_stack_entry *lgs);
 #define D_RRDENGINE         (1ULL << 23)
 #define D_ACLK              (1ULL << 24)
 #define D_WEBSOCKET         (1ULL << 25)
-#define D_SYSTEM            (1ULL << 26)
+#define D_MCP               (1ULL << 26)
+#define D_SYSTEM            (1ULL << 27)
 
 extern uint64_t debug_flags;
 extern const char *program_name;

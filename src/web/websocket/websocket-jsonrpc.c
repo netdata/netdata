@@ -2,8 +2,6 @@
 
 #include "websocket-jsonrpc.h"
 
-#include "libnetdata/json/json-c-parser-inline.h"
-
 static int websocket_client_send_json(struct websocket_server_client *wsc, struct json_object *json) {
     if (!wsc || !json)
         return -1;

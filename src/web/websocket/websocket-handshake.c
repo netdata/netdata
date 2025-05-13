@@ -4,7 +4,7 @@
 #include "websocket-internal.h"
 #include "websocket-jsonrpc.h"
 #include "websocket-echo.h"
-
+#include "../mcp/adapters/mcp-websocket.h"
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
@@ -373,6 +373,15 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_close = echo_on_close;
             wsc->on_disconnect = echo_on_disconnect;
             websocket_debug(wsc, "Setting up echo protocol callbacks");
+            break;
+
+        case WS_PROTOCOL_MCP:
+            // Set up callbacks for MCP protocol
+            wsc->on_connect = mcp_websocket_on_connect;
+            wsc->on_message = mcp_websocket_on_message;
+            wsc->on_close = mcp_websocket_on_close;
+            wsc->on_disconnect = mcp_websocket_on_disconnect;
+            websocket_debug(wsc, "Setting up MCP protocol callbacks");
             break;
 
         default:

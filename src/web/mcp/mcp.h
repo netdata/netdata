@@ -1,0 +1,125 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_MCP_H
+#define NETDATA_MCP_H
+
+#include "libnetdata/libnetdata.h"
+#include <json-c/json.h>
+
+// MCP protocol versions
+typedef enum {
+    MCP_PROTOCOL_VERSION_UNKNOWN = 0,
+    MCP_PROTOCOL_VERSION_2024_11_05 = 20241105, // Using numeric date format for natural ordering
+    MCP_PROTOCOL_VERSION_2025_03_26 = 20250326,
+    // Add future versions here
+    
+    // Always keep this pointing to the latest version
+    MCP_PROTOCOL_VERSION_LATEST = MCP_PROTOCOL_VERSION_2025_03_26
+} MCP_PROTOCOL_VERSION;
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_PROTOCOL_VERSION);
+
+// JSON-RPC error codes (standard)
+#define MCP_ERROR_PARSE_ERROR      -32700
+#define MCP_ERROR_INVALID_REQUEST  -32600
+#define MCP_ERROR_METHOD_NOT_FOUND -32601
+#define MCP_ERROR_INVALID_PARAMS   -32602
+#define MCP_ERROR_INTERNAL_ERROR   -32603
+// Server error codes (implementation-defined)
+#define MCP_ERROR_SERVER_ERROR_MIN -32099
+#define MCP_ERROR_SERVER_ERROR_MAX -32000
+
+// Content types (for messages and tool responses)
+typedef enum {
+    MCP_CONTENT_TYPE_TEXT = 0,
+    MCP_CONTENT_TYPE_IMAGE = 1,
+    MCP_CONTENT_TYPE_AUDIO = 2, // New in 2025-03-26
+} MCP_CONTENT_TYPE;
+
+// Forward declarations for transport-specific types
+struct websocket_server_client;
+struct web_client;
+
+// Transport types for MCP
+typedef enum {
+    MCP_TRANSPORT_UNKNOWN = 0,
+    MCP_TRANSPORT_WEBSOCKET,
+    MCP_TRANSPORT_HTTP,
+    // Add more as needed
+} MCP_TRANSPORT;
+
+// Transport capabilities
+typedef enum {
+    MCP_CAPABILITY_NONE = 0,
+    MCP_CAPABILITY_ASYNC_COMMUNICATION = (1 << 0),  // Can send messages at any time
+    MCP_CAPABILITY_SUBSCRIPTIONS = (1 << 1),        // Supports subscriptions
+    MCP_CAPABILITY_NOTIFICATIONS = (1 << 2),        // Supports notifications
+    // Add more as needed
+} MCP_CAPABILITY;
+
+// Response handling context
+typedef struct mcp_client {
+    // Transport type and capabilities
+    MCP_TRANSPORT transport;
+    MCP_CAPABILITY capabilities;
+    
+    // Protocol version (detected during initialization)
+    MCP_PROTOCOL_VERSION protocol_version;
+    
+    // Transport-specific context
+    union {
+        struct websocket_server_client *websocket;  // WebSocket client
+        struct web_client *http;                    // HTTP client
+        void *generic;                              // Generic context
+    };
+    
+    // Client information
+    STRING *client_name;                           // Client name (for logging, interned)
+    STRING *client_version;                        // Client version (for logging, interned)
+} MCP_CLIENT;
+
+// Helper function to convert string version to numeric version
+MCP_PROTOCOL_VERSION mcp_protocol_version_from_string(const char *version_str);
+
+// Helper function to convert numeric version to string version
+const char *mcp_protocol_version_to_string(MCP_PROTOCOL_VERSION version);
+
+// Create a response context for a transport session
+MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx);
+
+// Free a response context
+void mcp_free_client(MCP_CLIENT *mcpc);
+
+// Helper functions for creating JSON-RPC responses
+struct json_object *mcp_create_success_response(struct json_object *result, uint64_t id);
+struct json_object *mcp_create_error_response(int code, const char *message, uint64_t id);
+
+// Helper functions for sending JSON-RPC responses through the appropriate transport
+int mcp_send_success_response(MCP_CLIENT *mcpc, struct json_object *result, uint64_t id);
+int mcp_send_error_response(MCP_CLIENT *mcpc, int code, const char *message, uint64_t id);
+int mcp_send_notification(MCP_CLIENT *mcpc, const char *method, struct json_object *params);
+
+// Helper for creating content objects based on protocol version
+struct json_object *mcp_create_content_object(MCP_CLIENT *mcpc, MCP_CONTENT_TYPE type, 
+                                             const char *data, size_t data_len, const char *mime_type);
+
+// Helper for sending progress notifications
+int mcp_send_progress_notification(MCP_CLIENT *mcpc, const char *token, int progress, int total, const char *message);
+
+// Check if a capability is supported by the transport
+static inline bool mcp_has_capability(MCP_CLIENT *mcpc, MCP_CAPABILITY capability) {
+    return mcpc && (mcpc->capabilities & capability);
+}
+
+// Initialize the MCP subsystem
+void mcp_initialize_subsystem(void);
+
+// Main MCP entry point - handle a JSON-RPC request (single or batch)
+int mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request);
+
+// Handle a batch of JSON-RPC requests (internal)
+int mcp_handle_batch_request(MCP_CLIENT *mcpc, struct json_object *batch_request);
+
+// Helper function for "not implemented" methods (transport-agnostic)
+int mcp_method_not_implemented_generic(MCP_CLIENT *mcpc, const char *method_name, uint64_t id);
+
+#endif // NETDATA_MCP_H

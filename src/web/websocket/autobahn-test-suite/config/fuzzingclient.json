@@ -1,0 +1,15 @@
+{
+    "outdir": "./reports/clients",
+    "servers": [
+        {
+            "agent": "Netdata WebSocket Server",
+            "url": "ws://localhost:19999/echo",
+            "options": {
+                "version": 18
+            }
+        }
+    ],
+    "cases": ["*"],
+    "exclude-cases": [],
+    "exclude-agent-cases": {}
+}
