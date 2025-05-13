@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp\): small cleanup snmp profiles code [\#20274](https://github.com/netdata/netdata/pull/20274) ([ilyam8](https://github.com/ilyam8))
+- Switch to poll from epoll [\#20273](https://github.com/netdata/netdata/pull/20273) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump golang.org/x/net from 0.39.0 to 0.40.0 in /src/go [\#20270](https://github.com/netdata/netdata/pull/20270) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/miekg/dns from 1.1.65 to 1.1.66 in /src/go [\#20268](https://github.com/netdata/netdata/pull/20268) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update Netdata README with improved structure [\#20265](https://github.com/netdata/netdata/pull/20265) ([kanelatechnical](https://github.com/kanelatechnical))
 - Schedule journal file indexing after database file rotation [\#20264](https://github.com/netdata/netdata/pull/20264) ([stelfrag](https://github.com/stelfrag))
 - Minor fixes [\#20263](https://github.com/netdata/netdata/pull/20263) ([stelfrag](https://github.com/stelfrag))
@@ -18,9 +22,11 @@
 - fix obsolete chart cleanup to properly handle vnodes [\#20254](https://github.com/netdata/netdata/pull/20254) ([ilyam8](https://github.com/ilyam8))
 - docs: fix license link and remove GH alerts syntax from FAQ [\#20252](https://github.com/netdata/netdata/pull/20252) ([ilyam8](https://github.com/ilyam8))
 - Update Netdata README [\#20251](https://github.com/netdata/netdata/pull/20251) ([kanelatechnical](https://github.com/kanelatechnical))
+- Switch to uv threads [\#20250](https://github.com/netdata/netdata/pull/20250) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/snmp\): use 32bit counters if 64 aren't available [\#20249](https://github.com/netdata/netdata/pull/20249) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
+- SNMP first cisco yaml file pass [\#20246](https://github.com/netdata/netdata/pull/20246) ([Ancairon](https://github.com/Ancairon))
 - Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
 - Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
 - Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
@@ -465,15 +471,6 @@
 - allow insecure cloud connections [\#19736](https://github.com/netdata/netdata/pull/19736) ([ktsaou](https://github.com/ktsaou))
 - add more information about claiming failures [\#19735](https://github.com/netdata/netdata/pull/19735) ([ktsaou](https://github.com/ktsaou))
 - support https\_proxy too [\#19733](https://github.com/netdata/netdata/pull/19733) ([ktsaou](https://github.com/ktsaou))
-- fix json generation of apps.plugin processes function info [\#19732](https://github.com/netdata/netdata/pull/19732) ([ktsaou](https://github.com/ktsaou))
-- add another step when initializing web [\#19731](https://github.com/netdata/netdata/pull/19731) ([ktsaou](https://github.com/ktsaou))
-- improved descriptions of exit reasons [\#19730](https://github.com/netdata/netdata/pull/19730) ([ktsaou](https://github.com/ktsaou))
-- do not post empty reports [\#19729](https://github.com/netdata/netdata/pull/19729) ([ktsaou](https://github.com/ktsaou))
-- docs: clarify Windows Agent limits on free plans [\#19727](https://github.com/netdata/netdata/pull/19727) ([ilyam8](https://github.com/ilyam8))
-- improve status file deduplication [\#19726](https://github.com/netdata/netdata/pull/19726) ([ktsaou](https://github.com/ktsaou))
-- handle flushing state during exit [\#19725](https://github.com/netdata/netdata/pull/19725) ([ktsaou](https://github.com/ktsaou))
-- allow configuring journal v2 unmount time; turn it off for parents [\#19724](https://github.com/netdata/netdata/pull/19724) ([ktsaou](https://github.com/ktsaou))
-- minor status file annotation fixes [\#19723](https://github.com/netdata/netdata/pull/19723) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
