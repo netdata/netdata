@@ -257,7 +257,8 @@ unsafe extern "C" fn sd_journal_next(j: *mut SdJournal) -> c_int {
             }
         }
         Err(e) => {
-            debug!(path = journal.path, error = format!("{:?}", e));
+            println!("{:?}", e);
+            // debug!(path = journal.path, error = format!("{:?}", e));
             -1
         }
     }
@@ -506,7 +507,21 @@ unsafe extern "C" fn sd_journal_add_match(
     }
 
     let journal = &mut *j;
-    let data_slice = std::slice::from_raw_parts(data as *const u8, size);
+
+    // Handle the case where size is 0 (null-terminated C string)
+    let data_slice = if size == 0 {
+        // Find length of null-terminated string (excluding null terminator)
+        let mut len = 0;
+        let data_ptr = data as *const u8;
+        while *data_ptr.add(len) != 0 {
+            len += 1;
+        }
+        // Create slice excluding null terminator
+        std::slice::from_raw_parts(data as *const u8, len)
+    } else {
+        // Use provided size for the slice
+        std::slice::from_raw_parts(data as *const u8, size)
+    };
 
     debug!(
         path = journal.path,

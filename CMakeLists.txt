@@ -2792,7 +2792,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 target_link_libraries(systemd-journal.plugin journal_reader_ffi libnetdata)
 
                 if(ENABLE_JF_BENCHMARKS)
-                        set(JF_BENCHMARK_FILES "src/crates/jf/benchmark/unfiltered.c")
+                        set(JF_BENCHMARK_FILES "src/crates/jf/benchmark/main.c")
 
                         add_executable(jfr.bench ${JF_BENCHMARK_FILES})
                         target_compile_definitions(jfr.bench PRIVATE BENCH_JF)
