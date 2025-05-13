@@ -232,6 +232,8 @@ option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader 
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
 
+option(ENABLE_JF_BENCHMARKS "Enable journal file benchmarks" True)
+
 if(ENABLE_MIMALLOC)
     if(CMAKE_MINOR_VERSION LESS 18)
         message(WARNING "Mimalloc disabled: Requires CMake version 3.18 or higher.")
@@ -2788,6 +2790,17 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
                 target_compile_definitions(systemd-journal.plugin PRIVATE NETDATA_PROVIDER)
                 target_link_libraries(systemd-journal.plugin journal_reader_ffi libnetdata)
+
+                if(ENABLE_JF_BENCHMARKS)
+                        set(JF_BENCHMARK_FILES "src/crates/jf/benchmark/main.c")
+
+                        add_executable(jfr.bench ${JF_BENCHMARK_FILES})
+                        target_compile_definitions(jfr.bench PRIVATE NETDATA_PROVIDER)
+                        target_link_libraries(jfr.bench journal_reader_ffi)
+
+                        add_executable(jfc.bench ${JF_BENCHMARK_FILES})
+                        target_link_libraries(jfc.bench "${SYSTEMD_LDFLAGS}")
+                endif()
         else()
                 add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
                 target_link_libraries(systemd-journal.plugin libnetdata)
