@@ -192,6 +192,26 @@ static int process_filtered(const char *path)
     return 0;
 }
 
+long get_file_size(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    
+    if (file == NULL) {
+        abort();
+    }
+    
+    // Seek to the end of the file
+    fseek(file, 0, SEEK_END);
+    
+    // Get the current position (which is the size)
+    long size = ftell(file);
+    
+    // Close the file
+    fclose(file);
+    
+    return size;
+}
+
+
 int main(int argc, char *argv[]) {
     (void) argc;
     (void) argv;
@@ -217,7 +237,11 @@ int main(int argc, char *argv[]) {
         NULL,
     };
 
+    size_t total_size = 0;
+
     for (size_t idx = 0; idx != 10; idx++) {
+        total_size += get_file_size(paths[idx]);
+
         if (strcmp(argv[1], "filtered") == 0) {
             process_filtered(paths[idx]);
         } else if (strcmp(argv[1], "unfiltered") == 0) {
@@ -227,4 +251,6 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
+
+    fprintf(stdout, "Size of all logs: %zu MiB", total_size / (1024 * 1024));
 }
