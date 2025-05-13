@@ -203,6 +203,12 @@ modules:
               dimensions:
                 - name: paged
                 - name: pool-paged
+            - name: mem.system_page_table_entries_size
+              description: The number of page table entries not currently in used by the system.
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: pages
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibProcesses

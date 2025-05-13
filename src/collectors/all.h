@@ -127,6 +127,7 @@
 #define NETDATA_CHART_PRIO_MEM_SWAP_PAGES             1037 // Windows only
 #define NETDATA_CHART_PRIO_MEM_SWAPIO                 1038
 #define NETDATA_CHART_PRIO_MEM_SYSTEM_POOL            1039 // Windows only
+#define NETDATA_CHART_PRIO_MEM_FREE_SYSTEM_PAGE       1040 // Windows only
 #define NETDATA_CHART_PRIO_MEM_ZSWAP                  1036
 #define NETDATA_CHART_PRIO_MEM_ZSWAPIO                1037
 #define NETDATA_CHART_PRIO_MEM_ZSWAP_COMPRESS_RATIO   1038
