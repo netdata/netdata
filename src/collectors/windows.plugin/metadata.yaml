@@ -203,6 +203,12 @@ modules:
               dimensions:
                 - name: paged
                 - name: pool-paged
+            - name: mem.system_page_table_entries
+              description: Unused page table entries.
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: free
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibProcesses
@@ -298,6 +304,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: switches
+            - name: system.processor_queue_length
+              description: The number of threads in the processor queue.
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibStorage
