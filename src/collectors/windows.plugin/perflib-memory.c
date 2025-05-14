@@ -169,7 +169,7 @@ static void do_memory_page_table_entries(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             NULL,
             "mem",
             "mem.system_page_table_entries",
-            "The number of page table entries not currently in used by the system",
+            "Unused page table entries.",
             "pages",
             PLUGIN_WINDOWS_NAME,
             "PerflibMemory",

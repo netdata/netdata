@@ -204,7 +204,7 @@ modules:
                 - name: paged
                 - name: pool-paged
             - name: mem.system_page_table_entries
-              description: The number of page table entries not currently in used by the system.
+              description: Unused page table entries.
               unit: "pages"
               chart_type: line
               dimensions:
