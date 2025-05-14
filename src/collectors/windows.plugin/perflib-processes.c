@@ -17,7 +17,7 @@ static void do_processor_queue(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pO
     static RRDSET *st_queue = NULL;
     static RRDDIM *rd_queue = NULL;
     static COUNTER_DATA processorQueue = {.key = "Processor Queue Length"};
-    if (perflibGetObjectCounter(pDataBlock, pObjectType, &processorQueue))
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &processorQueue))
         return;
 
     if (!st_queue) {
