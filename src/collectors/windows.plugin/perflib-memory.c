@@ -175,7 +175,7 @@ static void do_memory_page_table_entries(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             "PerflibMemory",
             NETDATA_CHART_PRIO_MEM_FREE_SYSTEM_PAGE,
             update_every,
-            RRDSET_TYPE_STACKED);
+            RRDSET_TYPE_LINE);
 
         localPool.rd_free_system_page_table_entries =
             rrddim_add(localPool.freeSystemPageTableEntries, "pages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
