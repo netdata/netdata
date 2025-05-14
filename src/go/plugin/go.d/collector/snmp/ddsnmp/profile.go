@@ -4,12 +4,44 @@ package ddsnmp
 
 import (
 	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"gopkg.in/yaml.v2"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func Find(sysObjId string) []*Profile {
+var log = logger.New().With("component", "snmp/ddsnmp")
+
+var ddProfiles []*Profile
+
+func init() {
+	dir := getProfilesDir()
+
+	profiles, err := loadProfiles(dir)
+	if err != nil {
+		log.Errorf("failed to loadProfiles dd snmp profiles: %v", err)
+		return
+	}
+
+	if len(profiles) == 0 {
+		log.Warningf("no dd snmp profiles found in '%s'", dir)
+		return
+	}
+
+	log.Infof("found %d profiles in '%s'", len(profiles), dir)
+	ddProfiles = profiles
+
+	return
+}
+
+func FindProfiles(sysObjId string) []*Profile {
 	var profiles []*Profile
 
 	for _, prof := range ddProfiles {
@@ -41,6 +73,7 @@ func (p *Profile) clone() *Profile {
 }
 
 func (p *Profile) merge(base *Profile) {
+	// Append metrics (deep clone already handled in the Definition.Clone method)
 	p.Definition.Metrics = append(p.Definition.Metrics, base.Definition.Metrics...)
 	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
 	p.Definition.StaticTags = append(p.Definition.StaticTags, base.Definition.StaticTags...)
@@ -74,16 +107,109 @@ func (p *Profile) merge(base *Profile) {
 func (p *Profile) validate() error {
 	ddprofiledefinition.NormalizeMetrics(p.Definition.Metrics)
 
-	errs := ddprofiledefinition.ValidateEnrichMetadata(p.Definition.Metadata)
-	errs = append(errs, ddprofiledefinition.ValidateEnrichMetrics(p.Definition.Metrics)...)
-	errs = append(errs, ddprofiledefinition.ValidateEnrichMetricTags(p.Definition.MetricTags)...)
+	var errs []error
+
+	for _, err := range ddprofiledefinition.ValidateEnrichMetadata(p.Definition.Metadata) {
+		errs = append(errs, errors.New(err))
+	}
+	for _, err := range ddprofiledefinition.ValidateEnrichMetrics(p.Definition.Metrics) {
+		errs = append(errs, errors.New(err))
+	}
+	for _, err := range ddprofiledefinition.ValidateEnrichMetricTags(p.Definition.MetricTags) {
+		errs = append(errs, errors.New(err))
+	}
 	if len(errs) > 0 {
-		errList := make([]error, 0, len(errs))
-		for _, s := range errs {
-			errList = append(errList, errors.New(s))
-		}
-		return errors.Join(errList...)
+		return errors.Join(errs...)
 	}
 
 	return nil
+}
+
+func loadProfiles(dirpath string) ([]*Profile, error) {
+	var profiles []*Profile
+
+	if err := filepath.WalkDir(dirpath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
+			return nil
+		}
+
+		profile, err := loadProfile(path)
+		if err != nil {
+			log.Warningf("invalid profile '%s': %v", path, err)
+			return nil
+		}
+
+		if err := profile.validate(); err != nil {
+			log.Warningf("invalid profile '%s': %v", path, err)
+			return nil
+		}
+
+		profiles = append(profiles, profile)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return profiles, nil
+}
+
+func loadProfile(filename string) (*Profile, error) {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var prof Profile
+	if err := yaml.Unmarshal(content, &prof.Definition); err != nil {
+		return nil, err
+	}
+
+	if prof.SourceFile == "" {
+		prof.SourceFile, _ = filepath.Abs(filename)
+	}
+
+	dir := filepath.Dir(filename)
+
+	processedExtends := make(map[string]bool)
+	if err := loadProfileExtensions(&prof, dir, processedExtends); err != nil {
+		return nil, err
+	}
+
+	return &prof, nil
+}
+
+func loadProfileExtensions(profile *Profile, dir string, processedExtends map[string]bool) error {
+	for _, name := range profile.Definition.Extends {
+		if processedExtends[name] {
+			continue
+		}
+		processedExtends[name] = true
+
+		baseProf, err := loadProfile(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+
+		if err := loadProfileExtensions(baseProf, dir, processedExtends); err != nil {
+			return err
+		}
+
+		profile.merge(baseProf)
+	}
+
+	return nil
+}
+
+func getProfilesDir() string {
+	if executable.Name == "test" {
+		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
+		return dir
+	}
+	if dir := os.Getenv("NETDATA_STOCK_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "go.d/snmp.profiles/default")
+	}
+	return filepath.Join(executable.Directory, "../../../config/go.d/snmp.profiles/default")
 }
