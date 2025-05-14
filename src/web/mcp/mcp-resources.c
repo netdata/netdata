@@ -37,6 +37,7 @@
 
 #include "mcp-resources.h"
 #include "mcp-initialize.h"
+#include "database/contexts/rrdcontext.h"
 
 // Audience enum - bitmask for the intended audience of a resource
 typedef enum {
@@ -59,10 +60,61 @@ typedef struct {
     resource_read_fn read_fn;   // Callback function to read the resource
 } MCP_RESOURCE;
 
+// Resource template structure definition
+typedef struct {
+    const char *name;           // Template name
+    const char *uri_template;   // URI template following RFC 6570
+    const char *description;    // Human-readable description
+    HTTP_CONTENT_TYPE content_type; // Content type enum
+    RESOURCE_AUDIENCE audience; // Intended audience
+    double priority;            // Priority (0.0-1.0)
+} MCP_RESOURCE_TEMPLATE;
+
 // Basic implementation of the contexts resource read function
 static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
     if (!mcpc || !params || id == 0) return MCP_RC_INTERNAL_ERROR;
-    return MCP_RC_NOT_IMPLEMENTED;
+
+    // Extract URI from params to check for query parameters
+    struct json_object *uri_obj = NULL;
+    json_object_object_get_ex(params, "uri", &uri_obj);
+    const char *uri = json_object_get_string(uri_obj);
+    
+    SIMPLE_PATTERN *pattern = NULL;
+    
+    // Check if we have a query parameter
+    if (uri && strstr(uri, "?like=")) {
+        const char *like_param = strstr(uri, "?like=") + 6; // Skip past "?like="
+        
+        // Decode the query parameter
+        const char *decoded_query = mcp_uri_decode(mcpc, like_param);
+        
+        // Create a simple pattern
+        if (decoded_query && *decoded_query)
+            pattern = simple_pattern_create(decoded_query, "|", SIMPLE_PATTERN_EXACT, false);
+    }
+
+    mcp_init_success_result(mcpc, id);
+    buffer_json_member_add_object(mcpc->result, "result");
+    
+    // Add the filtered contexts
+    rrdcontext_context_registry_json_mcp_array(mcpc->result, pattern);
+    
+    // Add instructions
+    buffer_json_member_add_string(mcpc->result, "instructions",
+        "Additional information per context (like title, dimensions, unit, label\n"
+        "keys and possible values, the list of nodes collecting it, and its retention)\n"
+        "can be obtained by reading URIs in the format 'nd://contexts/{context}'\n"
+        "(like nd://context/system.cpu.user).\n\n"
+        "You can search contexts using glob-like patterns using the 'like' parameter:\n"
+        "nd://contexts?like=*sql*|*db*|*redis*|*mongo*\n"
+        "to find database-related contexts.");
+    
+    buffer_json_finalize(mcpc->result);
+    
+    if (pattern)
+        simple_pattern_free(pattern);
+
+    return MCP_RC_OK;
 }
 
 // Static array of all available resources
@@ -72,7 +124,8 @@ static const MCP_RESOURCE mcp_resources[] = {
         .uri = "nd://contexts",
         .description =
             "Primary discovery mechanism for what's being monitored.\n"
-            "Provides the most concise overview of monitoring categories.",
+            "Provides the most concise overview of monitoring categories.\n"
+            "Supports searches for contexts using glob-like patterns with the 'like=' parameter.\n",
         .content_type = CT_APPLICATION_JSON,
         .audience = RESOURCE_AUDIENCE_BOTH,
         .priority = 1.0,
@@ -88,8 +141,21 @@ static const MCP_RESOURCE mcp_resources[] = {
     // },
 };
 
-// Number of resources in the array
-#define MCP_RESOURCES_COUNT (sizeof(mcp_resources) / sizeof(MCP_RESOURCE))
+// Static array of all available resource templates
+static const MCP_RESOURCE_TEMPLATE mcp_resource_templates[] = {
+    {
+        .name = "Contexts Search",
+        .uri_template = "nd://contexts{?like}",
+        .description = 
+            "Search for monitoring contexts by matching their names against glob-like patterns.\n"
+            "The 'like' parameter accepts pipe-separated patterns with wildcards\n"
+            "(e.g., '?like=*sql*|*db*|*redis*|*mongo*' for database-related contexts).",
+        .content_type = CT_APPLICATION_JSON,
+        .audience = RESOURCE_AUDIENCE_BOTH,
+        .priority = 1.0
+    },
+    // Add more templates here as they are implemented
+};
 
 // Implementation of resources/list (transport-agnostic)
 static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
@@ -102,7 +168,7 @@ static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_o
     buffer_json_member_add_array(mcpc->result, "resources");
     
     // Iterate through our resources array and add each one
-    for (size_t i = 0; i < MCP_RESOURCES_COUNT; i++) {
+    for (size_t i = 0; i < _countof(mcp_resources); i++) {
         const MCP_RESOURCE *resource = &mcp_resources[i];
         
         buffer_json_add_array_item_object(mcpc->result);
@@ -178,11 +244,17 @@ static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_o
     netdata_log_debug(D_MCP, "MCP resources/read for URI: %s", uri);
     
     // Find the matching resource in our array
-    for (size_t i = 0; i < MCP_RESOURCES_COUNT; i++) {
+    for (size_t i = 0; i < _countof(mcp_resources); i++) {
         const MCP_RESOURCE *resource = &mcp_resources[i];
         
-        // Check if the URI matches
-        if (strcmp(resource->uri, uri) == 0) {
+        // Get the URI without query parameters for matching
+        const char *query_start = strchr(uri, '?');
+        size_t base_uri_length = query_start ? (size_t)(query_start - uri) : strlen(uri);
+        
+        // Check if the base URI matches the resource URI
+        if (strlen(resource->uri) == base_uri_length && 
+            strncmp(resource->uri, uri, base_uri_length) == 0) {
+            
             // Found matching resource, check if read function exists
             if (resource->read_fn) {
                 // Call the resource-specific read function
@@ -204,7 +276,70 @@ static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_o
 // Implementation of resources/templates/list (transport-agnostic)
 static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
     if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
-    return MCP_RC_NOT_IMPLEMENTED;
+
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
+    
+    // Create a resourceTemplates array object
+    buffer_json_member_add_object(mcpc->result, "result");
+    buffer_json_member_add_array(mcpc->result, "resourceTemplates");
+    
+    // Iterate through our templates array and add each one
+    for (size_t i = 0; i < _countof(mcp_resource_templates); i++) {
+        const MCP_RESOURCE_TEMPLATE *template = &mcp_resource_templates[i];
+        
+        buffer_json_add_array_item_object(mcpc->result);
+        
+        // Add required fields
+        buffer_json_member_add_string(mcpc->result, "name", template->name);
+        buffer_json_member_add_string(mcpc->result, "uriTemplate", template->uri_template);
+        
+        // Add optional fields
+        if (template->description) {
+            buffer_json_member_add_string(mcpc->result, "description", template->description);
+        }
+        
+        // Convert the content_type enum to string
+        const char *mime_type = content_type_id2string(template->content_type);
+        if (mime_type) {
+            buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
+        }
+        
+        // Add audience annotations if specified
+        if (template->audience != 0) {
+            buffer_json_member_add_object(mcpc->result, "annotations");
+            
+            buffer_json_member_add_array(mcpc->result, "audience");
+            
+            if (template->audience & RESOURCE_AUDIENCE_USER) {
+                buffer_json_add_array_item_string(mcpc->result, "user");
+            }
+            
+            if (template->audience & RESOURCE_AUDIENCE_ASSISTANT) {
+                buffer_json_add_array_item_string(mcpc->result, "assistant");
+            }
+            
+            buffer_json_array_close(mcpc->result); // Close audience array
+            
+            // Add priority if it's non-zero
+            if (template->priority > 0) {
+                buffer_json_member_add_double(mcpc->result, "priority", template->priority);
+            }
+            
+            buffer_json_object_close(mcpc->result); // Close annotations object
+        }
+        
+        buffer_json_object_close(mcpc->result); // Close template object
+    }
+    
+    buffer_json_array_close(mcpc->result); // Close resourceTemplates array
+    buffer_json_object_close(mcpc->result); // Close result object
+    buffer_json_finalize(mcpc->result);
+
+    // For now, no need for pagination since we have a small number of templates
+    // If we add many templates later, implement cursor-based pagination here
+    
+    return MCP_RC_OK;
 }
 
 // Implementation of resources/subscribe (transport-agnostic)

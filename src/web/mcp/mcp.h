@@ -91,6 +91,9 @@ typedef struct mcp_client {
     // Response buffers
     BUFFER *result;                                // Pre-allocated buffer for success responses
     BUFFER *error;                                 // Pre-allocated buffer for error messages
+    
+    // Utility buffers
+    BUFFER *uri;                            // Pre-allocated buffer for URI decoding
 } MCP_CLIENT;
 
 // Helper function to convert string version to numeric version
@@ -125,5 +128,7 @@ void mcp_initialize_subsystem(void);
 
 // Main MCP entry point - handle a JSON-RPC request (single or batch)
 MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request);
+
+const char *mcp_uri_decode(MCP_CLIENT *mcpc, const char *src);
 
 #endif // NETDATA_MCP_H

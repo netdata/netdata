@@ -35,8 +35,26 @@ ENUM_STR_MAP_DEFINE(MCP_RETURN_CODE) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(MCP_RETURN_CODE, MCP_RC_ERROR, "ERROR");
 
-// In the future, if needed, we would add includes for transport-specific headers
-// This would include things like the web server API for HTTP
+// Decode a URI component using mcpc's pre-allocated buffer
+// Returns a pointer to the decoded string which is valid until the next call
+const char *mcp_uri_decode(MCP_CLIENT *mcpc, const char *src) {
+    if(!mcpc || !src || !*src)
+        return src;
+
+    // Prepare the buffer
+    buffer_flush(mcpc->uri);
+    buffer_need_bytes(mcpc->uri, strlen(src) + 1);
+
+    // Perform URL decoding
+    char *d = url_decode_r(mcpc->uri->buffer, src, mcpc->uri->size);
+    if (!d || !*d)
+        return src;
+
+    // Ensure the buffer's length is updated
+    mcpc->uri->len = strlen(d);
+
+    return buffer_tostring(mcpc->uri);
+}
 
 // Create a response context for a transport session
 MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
@@ -73,6 +91,9 @@ MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
     ctx->result = buffer_create(4096, NULL);
     ctx->error = buffer_create(1024, NULL);
     
+    // Initialize utility buffers
+    ctx->uri = buffer_create(1024, NULL);
+    
     return ctx;
 }
 
@@ -85,6 +106,9 @@ void mcp_free_client(MCP_CLIENT *mcpc) {
         // Free response buffers
         buffer_free(mcpc->result);
         buffer_free(mcpc->error);
+        
+        // Free utility buffers
+        buffer_free(mcpc->uri);
         
         freez(mcpc);
     }
@@ -353,7 +377,7 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
             bool has_id = json_object_object_get_ex(req_item, "id", &id_obj);
             
             // Call the single request handler
-            MCP_RETURN_CODE rc = mcp_single_request(mcpc, req_item);
+            mcp_single_request(mcpc, req_item);
             
             // For notifications (no id), don't add to response
             if (!has_id || buffer_strlen(mcpc->result) == 0) {

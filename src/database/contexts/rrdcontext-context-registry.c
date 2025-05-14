@@ -12,11 +12,6 @@ static Pvoid_t context_registry_judyl = NULL;
 // Spinlock to protect access to the registry
 static SPINLOCK context_registry_spinlock = SPINLOCK_INITIALIZER;
 
-// Initialize the context registry
-void rrdcontext_context_registry_init(void) {
-    // Nothing to do here - context_registry_judyl is already NULL-initialized
-}
-
 // Clean up the context registry
 void rrdcontext_context_registry_destroy(void) {
     spinlock_lock(&context_registry_spinlock);
@@ -128,26 +123,35 @@ size_t rrdcontext_context_registry_unique_count(void) {
     return (size_t)count;
 }
 
-// Traverse all unique contexts in the registry
-int rrdcontext_context_registry_foreach(rrdcontext_context_registry_cb_t cb, void *data) {
-    if (unlikely(!cb))
-        return 0;
-    
-    int ret = 0;
-    
+void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *pattern) {
     spinlock_lock(&context_registry_spinlock);
-    
-    // Traverse the registry using JudyLFirst/JudyLNext
+
+    buffer_json_member_add_array(wb, "header");
+    buffer_json_add_array_item_string(wb, "context");
+    buffer_json_add_array_item_string(wb, "number_of_nodes_having_it");
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "contexts");
+
     Word_t index = 0;
-    Pvoid_t *PValue = JudyLFirst(context_registry_judyl, &index, PJE0);
-    
-    while (PValue && ret == 0) {
-        size_t count = (size_t)(Word_t)*PValue;
-        ret = cb((STRING *)index, count, data);
-        PValue = JudyLNext(context_registry_judyl, &index, PJE0);
+    bool first = true;
+    Pvoid_t *PValue;
+    while ((PValue = JudyLFirstThenNext(context_registry_judyl, &index, &first))) {
+        if (!index || !*PValue) continue;
+
+        const char *context_name = string2str((STRING *)index);
+        
+        // Skip if we have a pattern and it doesn't match
+        if (pattern && !simple_pattern_matches(pattern, context_name))
+            continue;
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, context_name);
+        buffer_json_add_array_item_uint64(wb, *(size_t *)PValue);
+        buffer_json_array_close(wb);
     }
-    
+
+    buffer_json_array_close(wb);
+
     spinlock_unlock(&context_registry_spinlock);
-    
-    return ret;
 }
