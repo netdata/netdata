@@ -6,6 +6,6 @@
 #include "mcp.h"
 
 // Notifications namespace method dispatcher (transport-agnostic)
-int mcp_notifications_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id);
+MCP_RETURN_CODE mcp_notifications_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id);
 
 #endif // NETDATA_MCP_NOTIFICATIONS_H

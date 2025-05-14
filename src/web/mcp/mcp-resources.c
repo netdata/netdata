@@ -38,119 +38,219 @@
 #include "mcp-resources.h"
 #include "mcp-initialize.h"
 
+// Audience enum - bitmask for the intended audience of a resource
+typedef enum {
+    RESOURCE_AUDIENCE_USER      = 1 << 0,  // Resource useful for users
+    RESOURCE_AUDIENCE_ASSISTANT = 1 << 1,  // Resource useful for assistants
+    RESOURCE_AUDIENCE_BOTH      = RESOURCE_AUDIENCE_USER | RESOURCE_AUDIENCE_ASSISTANT
+} RESOURCE_AUDIENCE;
+
+// Function pointer type for resource read callbacks
+typedef MCP_RETURN_CODE (*resource_read_fn)(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id);
+
+// Resource structure definition
+typedef struct {
+    const char *name;           // Resource name
+    const char *uri;            // Resource URI
+    const char *description;    // Human-readable description
+    HTTP_CONTENT_TYPE content_type; // Content type enum
+    RESOURCE_AUDIENCE audience; // Intended audience
+    double priority;            // Priority (0.0-1.0)
+    resource_read_fn read_fn;   // Callback function to read the resource
+} MCP_RESOURCE;
+
+// Basic implementation of the contexts resource read function
+static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || !params || id == 0) return MCP_RC_INTERNAL_ERROR;
+    return MCP_RC_NOT_IMPLEMENTED;
+}
+
+// Static array of all available resources
+static const MCP_RESOURCE mcp_resources[] = {
+    {
+        .name = "contexts",
+        .uri = "nd://contexts",
+        .description =
+            "Primary discovery mechanism for what's being monitored.\n"
+            "Provides the most concise overview of monitoring categories.",
+        .content_type = CT_APPLICATION_JSON,
+        .audience = RESOURCE_AUDIENCE_BOTH,
+        .priority = 1.0,
+        .read_fn = mcp_resource_read_contexts
+    },
+    // Add more resources here as the are implemented
+    // Example:
+    // {
+    //     .name = "nodes",
+    //     .uri = "nd://nodes",
+    //     .description = "Infrastructure discovery...",
+    //     ...
+    // },
+};
+
+// Number of resources in the array
+#define MCP_RESOURCES_COUNT (sizeof(mcp_resources) / sizeof(MCP_RESOURCE))
+
 // Implementation of resources/list (transport-agnostic)
-static int mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    if (!mcpc || id == 0) return -1;
+static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
 
-    struct json_object *result = json_object_new_object();
-    struct json_object *resources_array = json_object_new_array();
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
     
-    // Resource: metrics
-    struct json_object *metrics_resource = json_object_new_object();
-    json_object_object_add(metrics_resource, "name", json_object_new_string("metrics"));
-    json_object_object_add(metrics_resource, "description", json_object_new_string(
-        "Time-series metrics collected by Netdata from various sources"
-    ));
-    json_object_array_add(resources_array, metrics_resource);
+    // Create a resources array object
+    buffer_json_member_add_array(mcpc->result, "resources");
     
-    // Resource: logs
-    struct json_object *logs_resource = json_object_new_object();
-    json_object_object_add(logs_resource, "name", json_object_new_string("logs"));
-    json_object_object_add(logs_resource, "description", json_object_new_string(
-        "Log entries collected from system and application logs"
-    ));
-    json_object_array_add(resources_array, logs_resource);
+    // Iterate through our resources array and add each one
+    for (size_t i = 0; i < MCP_RESOURCES_COUNT; i++) {
+        const MCP_RESOURCE *resource = &mcp_resources[i];
+        
+        buffer_json_add_array_item_object(mcpc->result);
+        
+        // Add required fields
+        buffer_json_member_add_string(mcpc->result, "name", resource->name);
+        buffer_json_member_add_string(mcpc->result, "uri", resource->uri);
+        
+        // Add optional fields
+        if (resource->description) {
+            buffer_json_member_add_string(mcpc->result, "description", resource->description);
+        }
+        
+        // Convert the content_type enum to string
+        const char *mime_type = content_type_id2string(resource->content_type);
+        if (mime_type) {
+            buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
+        }
+        
+        // Add audience annotations if specified
+        if (resource->audience != 0) {
+            buffer_json_member_add_object(mcpc->result, "annotations");
+            
+            buffer_json_member_add_array(mcpc->result, "audience");
+            
+            if (resource->audience & RESOURCE_AUDIENCE_USER) {
+                buffer_json_add_array_item_string(mcpc->result, "user");
+            }
+            
+            if (resource->audience & RESOURCE_AUDIENCE_ASSISTANT) {
+                buffer_json_add_array_item_string(mcpc->result, "assistant");
+            }
+            
+            buffer_json_array_close(mcpc->result); // Close audience array
+            
+            // Add priority if it's non-zero
+            if (resource->priority > 0) {
+                buffer_json_member_add_double(mcpc->result, "priority", resource->priority);
+            }
+            
+            buffer_json_object_close(mcpc->result); // Close annotations object
+        }
+        
+        buffer_json_object_close(mcpc->result); // Close resource object
+    }
     
-    // Resource: alerts
-    struct json_object *alerts_resource = json_object_new_object();
-    json_object_object_add(alerts_resource, "name", json_object_new_string("alerts"));
-    json_object_object_add(alerts_resource, "description", json_object_new_string(
-        "Health monitoring alerts and notifications"
-    ));
-    json_object_array_add(resources_array, alerts_resource);
+    buffer_json_array_close(mcpc->result); // Close resources array
+    buffer_json_object_close(mcpc->result); // Close result object
     
-    // Resource: functions
-    struct json_object *functions_resource = json_object_new_object();
-    json_object_object_add(functions_resource, "name", json_object_new_string("functions"));
-    json_object_object_add(functions_resource, "description", json_object_new_string(
-        "Live infrastructure snapshots providing real-time views"
-    ));
-    json_object_array_add(resources_array, functions_resource);
+    // For now, no need for pagination since we have a small number of resources
+    // If we add many resources later, implement cursor-based pagination here
     
-    // Resource: nodes
-    struct json_object *nodes_resource = json_object_new_object();
-    json_object_object_add(nodes_resource, "name", json_object_new_string("nodes"));
-    json_object_object_add(nodes_resource, "description", json_object_new_string(
-        "Monitored infrastructure nodes with their metadata"
-    ));
-    json_object_array_add(resources_array, nodes_resource);
-    
-    // Add resources array to result
-    json_object_object_add(result, "resources", resources_array);
-    
-    // Send success response and free the result object
-    int ret = mcp_send_success_response(mcpc, result, id);
-    json_object_put(result);
-    
-    return ret;
+    return MCP_RC_OK;
 }
 
-// Stub implementations for other methods (transport-agnostic)
-static int mcp_resources_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "resources/get", id);
+// Implementation of resources/read (transport-agnostic)
+static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || id == 0 || !params) return MCP_RC_INTERNAL_ERROR;
+
+    // Extract URI from params
+    struct json_object *uri_obj = NULL;
+    if (!json_object_object_get_ex(params, "uri", &uri_obj)) {
+        buffer_strcat(mcpc->error, "Missing 'uri' parameter");
+        return MCP_RC_INVALID_PARAMS;
+    }
+    
+    const char *uri = json_object_get_string(uri_obj);
+    if (!uri) {
+        buffer_strcat(mcpc->error, "Invalid 'uri' parameter");
+        return MCP_RC_INVALID_PARAMS;
+    }
+
+    netdata_log_debug(D_MCP, "MCP resources/read for URI: %s", uri);
+    
+    // Find the matching resource in our array
+    for (size_t i = 0; i < MCP_RESOURCES_COUNT; i++) {
+        const MCP_RESOURCE *resource = &mcp_resources[i];
+        
+        // Check if the URI matches
+        if (strcmp(resource->uri, uri) == 0) {
+            // Found matching resource, check if read function exists
+            if (resource->read_fn) {
+                // Call the resource-specific read function
+                return resource->read_fn(mcpc, params, id);
+            }
+            else {
+                // No read function implemented
+                buffer_strcat(mcpc->error, "Resource reading not implemented");
+                return MCP_RC_NOT_IMPLEMENTED;
+            }
+        }
+    }
+    
+    // No matching resource found
+    buffer_sprintf(mcpc->error, "Unknown resource URI: %s", uri);
+    return MCP_RC_NOT_FOUND;
 }
 
-static int mcp_resources_method_search(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "resources/search", id);
+// Implementation of resources/templates/list (transport-agnostic)
+static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_resources_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "resources/subscribe", id);
+// Implementation of resources/subscribe (transport-agnostic)
+static MCP_RETURN_CODE mcp_resources_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || !id || !params) return MCP_RC_INTERNAL_ERROR;
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "resources/unsubscribe", id);
-}
-
-static int mcp_resources_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "resources/describe", id);
-}
-
-static int mcp_resources_method_getSchema(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "resources/getSchema", id);
+// Implementation of resources/unsubscribe (transport-agnostic)
+static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || id == 0 || !params) return MCP_RC_INTERNAL_ERROR;
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Resources namespace method dispatcher (transport-agnostic)
-int mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
-    if (!mcpc || !method) return -1;
+MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+    if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
     netdata_log_debug(D_MCP, "MCP resources method: %s", method);
 
+    // Clear previous buffers
+    buffer_flush(mcpc->result);
+    buffer_flush(mcpc->error);
+    
+    MCP_RETURN_CODE rc;
+    
     if (strcmp(method, "list") == 0) {
-        return mcp_resources_method_list(mcpc, params, id);
+        rc = mcp_resources_method_list(mcpc, params, id);
     }
-    else if (strcmp(method, "get") == 0) {
-        return mcp_resources_method_get(mcpc, params, id);
+    else if (strcmp(method, "read") == 0) { 
+        rc = mcp_resources_method_read(mcpc, params, id);
     }
-    else if (strcmp(method, "search") == 0) {
-        return mcp_resources_method_search(mcpc, params, id);
+    else if (strcmp(method, "templates/list") == 0) {
+        rc = mcp_resources_method_templates_list(mcpc, params, id);
     }
     else if (strcmp(method, "subscribe") == 0) {
-        return mcp_resources_method_subscribe(mcpc, params, id);
+        rc = mcp_resources_method_subscribe(mcpc, params, id);
     }
     else if (strcmp(method, "unsubscribe") == 0) {
-        return mcp_resources_method_unsubscribe(mcpc, params, id);
-    }
-    else if (strcmp(method, "describe") == 0) {
-        return mcp_resources_method_describe(mcpc, params, id);
-    }
-    else if (strcmp(method, "getSchema") == 0) {
-        return mcp_resources_method_getSchema(mcpc, params, id);
+        rc = mcp_resources_method_unsubscribe(mcpc, params, id);
     }
     else {
         // Method not found in resources namespace
-        char full_method[256];
-        snprintf(full_method, sizeof(full_method), "resources/%s", method);
-        return mcp_method_not_implemented_generic(mcpc, full_method, id);
+        buffer_sprintf(mcpc->error, "Method 'resources/%s' not implemented yet", method);
+        rc = MCP_RC_NOT_IMPLEMENTED;
     }
+    
+    return rc;
 }

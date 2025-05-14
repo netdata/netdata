@@ -41,78 +41,91 @@
 #include "mcp-initialize.h"
 
 // Implementation of prompts/list (transport-agnostic)
-static int mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    if (!mcpc || id == 0) return -1;
+static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    if (!mcpc || id == 0) return MCP_RC_ERROR;
 
-    // Currently we don't support prompts, so return an empty list
-    struct json_object *result = json_object_new_object();
-    struct json_object *prompts_array = json_object_new_array();
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
     
-    json_object_object_add(result, "prompts", prompts_array);
+    // Add empty prompts array
+    buffer_json_member_add_array(mcpc->result, "prompts");
+    buffer_json_array_close(mcpc->result); // Close prompts array
     
-    // Send success response (and free the result object)
-    int ret = mcp_send_success_response(mcpc, result, id);
-    json_object_put(result);
+    // Close the result object
+    buffer_json_finalize(mcpc->result);
     
-    return ret;
+    return MCP_RC_OK;
 }
 
 // Stub implementations for other prompts methods (transport-agnostic)
-static int mcp_prompts_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "prompts/execute", id);
+static MCP_RETURN_CODE mcp_prompts_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'prompts/execute' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "prompts/get", id);
+static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'prompts/get' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_prompts_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "prompts/save", id);
+static MCP_RETURN_CODE mcp_prompts_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'prompts/save' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_prompts_method_delete(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "prompts/delete", id);
+static MCP_RETURN_CODE mcp_prompts_method_delete(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'prompts/delete' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_prompts_method_getCategories(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "prompts/getCategories", id);
+static MCP_RETURN_CODE mcp_prompts_method_getCategories(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'prompts/getCategories' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_prompts_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "prompts/getHistory", id);
+static MCP_RETURN_CODE mcp_prompts_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'prompts/getHistory' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Prompts namespace method dispatcher (transport-agnostic)
-int mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
-    if (!mcpc || !method) return -1;
+MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+    if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
     
     netdata_log_debug(D_MCP, "MCP prompts method: %s", method);
     
+    // Flush previous buffers
+    buffer_flush(mcpc->result);
+    buffer_flush(mcpc->error);
+    
+    MCP_RETURN_CODE rc;
+    
     if (strcmp(method, "list") == 0) {
-        return mcp_prompts_method_list(mcpc, params, id);
+        rc = mcp_prompts_method_list(mcpc, params, id);
     }
     else if (strcmp(method, "execute") == 0) {
-        return mcp_prompts_method_execute(mcpc, params, id);
+        rc = mcp_prompts_method_execute(mcpc, params, id);
     }
     else if (strcmp(method, "get") == 0) {
-        return mcp_prompts_method_get(mcpc, params, id);
+        rc = mcp_prompts_method_get(mcpc, params, id);
     }
     else if (strcmp(method, "save") == 0) {
-        return mcp_prompts_method_save(mcpc, params, id);
+        rc = mcp_prompts_method_save(mcpc, params, id);
     }
     else if (strcmp(method, "delete") == 0) {
-        return mcp_prompts_method_delete(mcpc, params, id);
+        rc = mcp_prompts_method_delete(mcpc, params, id);
     }
     else if (strcmp(method, "getCategories") == 0) {
-        return mcp_prompts_method_getCategories(mcpc, params, id);
+        rc = mcp_prompts_method_getCategories(mcpc, params, id);
     }
     else if (strcmp(method, "getHistory") == 0) {
-        return mcp_prompts_method_getHistory(mcpc, params, id);
+        rc = mcp_prompts_method_getHistory(mcpc, params, id);
     }
     else {
         // Method not found in prompts namespace
-        char full_method[256];
-        snprintf(full_method, sizeof(full_method), "prompts/%s", method);
-        return mcp_method_not_implemented_generic(mcpc, full_method, id);
+        buffer_sprintf(mcpc->error, "Method 'prompts/%s' not implemented yet", method);
+        rc = MCP_RC_NOT_IMPLEMENTED;
     }
+    
+    return rc;
 }

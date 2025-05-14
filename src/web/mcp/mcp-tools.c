@@ -39,170 +39,180 @@
 #include "mcp-initialize.h"
 
 // Return a list of available tools (transport-agnostic)
-static int mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    if (!mcpc || id == 0) return -1;
+static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    if (!mcpc || id == 0) return MCP_RC_ERROR;
 
-    struct json_object *result = json_object_new_object();
-    struct json_object *tools_array = json_object_new_array();
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
     
-    // Tool: explore_metrics
-    struct json_object *metrics_tool = json_object_new_object();
-    json_object_object_add(metrics_tool, "name", json_object_new_string("explore_metrics"));
-    json_object_object_add(metrics_tool, "description", json_object_new_string(
-        "Explore Netdata's time-series metrics with support for high-resolution data"
-    ));
+    // Create tools array
+    buffer_json_member_add_array(mcpc->result, "tools");
     
-    // Input schema for metrics tool
-    struct json_object *metrics_schema = json_object_new_object();
-    json_object_object_add(metrics_schema, "type", json_object_new_string("object"));
-    json_object_object_add(metrics_schema, "title", json_object_new_string("MetricsQuery"));
+    // Add explore_metrics tool
+    buffer_json_add_array_item_object(mcpc->result);
+    buffer_json_member_add_string(mcpc->result, "name", "explore_metrics");
+    buffer_json_member_add_string(mcpc->result, "description", 
+        "Explore Netdata's time-series metrics with support for high-resolution data");
     
-    struct json_object *metrics_props = json_object_new_object();
+    // Add input schema for metrics tool
+    buffer_json_member_add_object(mcpc->result, "inputSchema");
+    buffer_json_member_add_string(mcpc->result, "type", "object");
+    buffer_json_member_add_string(mcpc->result, "title", "MetricsQuery");
+    
+    // Properties
+    buffer_json_member_add_object(mcpc->result, "properties");
     
     // Context property
-    struct json_object *context_prop = json_object_new_object();
-    json_object_object_add(context_prop, "type", json_object_new_string("string"));
-    json_object_object_add(context_prop, "title", json_object_new_string("Context"));
-    json_object_object_add(metrics_props, "context", context_prop);
+    buffer_json_member_add_object(mcpc->result, "context");
+    buffer_json_member_add_string(mcpc->result, "type", "string");
+    buffer_json_member_add_string(mcpc->result, "title", "Context");
+    buffer_json_object_close(mcpc->result); // Close context
     
     // After property
-    struct json_object *after_prop = json_object_new_object();
-    json_object_object_add(after_prop, "type", json_object_new_string("integer"));
-    json_object_object_add(after_prop, "title", json_object_new_string("After"));
-    json_object_object_add(metrics_props, "after", after_prop);
+    buffer_json_member_add_object(mcpc->result, "after");
+    buffer_json_member_add_string(mcpc->result, "type", "integer");
+    buffer_json_member_add_string(mcpc->result, "title", "After");
+    buffer_json_object_close(mcpc->result); // Close after
     
     // Before property
-    struct json_object *before_prop = json_object_new_object();
-    json_object_object_add(before_prop, "type", json_object_new_string("integer"));
-    json_object_object_add(before_prop, "title", json_object_new_string("Before"));
-    json_object_object_add(metrics_props, "before", before_prop);
+    buffer_json_member_add_object(mcpc->result, "before");
+    buffer_json_member_add_string(mcpc->result, "type", "integer");
+    buffer_json_member_add_string(mcpc->result, "title", "Before");
+    buffer_json_object_close(mcpc->result); // Close before
     
     // Points property
-    struct json_object *points_prop = json_object_new_object();
-    json_object_object_add(points_prop, "type", json_object_new_string("integer"));
-    json_object_object_add(points_prop, "title", json_object_new_string("Points"));
-    json_object_object_add(metrics_props, "points", points_prop);
+    buffer_json_member_add_object(mcpc->result, "points");
+    buffer_json_member_add_string(mcpc->result, "type", "integer");
+    buffer_json_member_add_string(mcpc->result, "title", "Points");
+    buffer_json_object_close(mcpc->result); // Close points
     
     // Group property
-    struct json_object *group_prop = json_object_new_object();
-    json_object_object_add(group_prop, "type", json_object_new_string("string"));
-    json_object_object_add(group_prop, "title", json_object_new_string("Group"));
-    json_object_object_add(metrics_props, "group", group_prop);
+    buffer_json_member_add_object(mcpc->result, "group");
+    buffer_json_member_add_string(mcpc->result, "type", "string");
+    buffer_json_member_add_string(mcpc->result, "title", "Group");
+    buffer_json_object_close(mcpc->result); // Close group
     
-    json_object_object_add(metrics_schema, "properties", metrics_props);
+    buffer_json_object_close(mcpc->result); // Close properties
     
     // Required properties
-    struct json_object *required = json_object_new_array();
-    json_object_array_add(required, json_object_new_string("context"));
-    json_object_object_add(metrics_schema, "required", required);
+    buffer_json_member_add_array(mcpc->result, "required");
+    buffer_json_add_array_item_string(mcpc->result, "context");
+    buffer_json_array_close(mcpc->result); // Close required
     
-    json_object_object_add(metrics_tool, "inputSchema", metrics_schema);
-    json_object_array_add(tools_array, metrics_tool);
+    buffer_json_object_close(mcpc->result); // Close inputSchema
+    buffer_json_object_close(mcpc->result); // Close explore_metrics tool
     
-    // Tool: explore_nodes
-    struct json_object *nodes_tool = json_object_new_object();
-    json_object_object_add(nodes_tool, "name", json_object_new_string("explore_nodes"));
-    json_object_object_add(nodes_tool, "description", json_object_new_string(
-        "Discover and explore all monitored nodes in your infrastructure"
-    ));
+    // Add explore_nodes tool
+    buffer_json_add_array_item_object(mcpc->result);
+    buffer_json_member_add_string(mcpc->result, "name", "explore_nodes");
+    buffer_json_member_add_string(mcpc->result, "description", 
+        "Discover and explore all monitored nodes in your infrastructure");
     
-    // Input schema for nodes tool
-    struct json_object *nodes_schema = json_object_new_object();
-    json_object_object_add(nodes_schema, "type", json_object_new_string("object"));
-    json_object_object_add(nodes_schema, "title", json_object_new_string("NodesQuery"));
+    // Add input schema for nodes tool
+    buffer_json_member_add_object(mcpc->result, "inputSchema");
+    buffer_json_member_add_string(mcpc->result, "type", "object");
+    buffer_json_member_add_string(mcpc->result, "title", "NodesQuery");
     
-    struct json_object *nodes_props = json_object_new_object();
+    // Properties
+    buffer_json_member_add_object(mcpc->result, "properties");
     
     // Filter property
-    struct json_object *filter_prop = json_object_new_object();
-    json_object_object_add(filter_prop, "type", json_object_new_string("string"));
-    json_object_object_add(filter_prop, "title", json_object_new_string("Filter"));
-    json_object_object_add(nodes_props, "filter", filter_prop);
+    buffer_json_member_add_object(mcpc->result, "filter");
+    buffer_json_member_add_string(mcpc->result, "type", "string");
+    buffer_json_member_add_string(mcpc->result, "title", "Filter");
+    buffer_json_object_close(mcpc->result); // Close filter
     
-    json_object_object_add(nodes_schema, "properties", nodes_props);
-    json_object_object_add(nodes_tool, "inputSchema", nodes_schema);
-    json_object_array_add(tools_array, nodes_tool);
+    buffer_json_object_close(mcpc->result); // Close properties
+    buffer_json_object_close(mcpc->result); // Close inputSchema
+    buffer_json_object_close(mcpc->result); // Close explore_nodes tool
     
-    // Add tools array to result
-    json_object_object_add(result, "tools", tools_array);
+    buffer_json_array_close(mcpc->result); // Close tools array
+    buffer_json_finalize(mcpc->result); // Finalize the JSON
     
-    // Send success response (and free the result object)
-    int ret = mcp_send_success_response(mcpc, result, id);
-    json_object_put(result);
-    
-    return ret;
+    return MCP_RC_OK;
 }
 
 // Stub implementations for other tools methods (transport-agnostic)
-static int mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "tools/execute", id);
+static MCP_RETURN_CODE mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'tools/execute' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "tools/cancel", id);
+static MCP_RETURN_CODE mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'tools/cancel' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "tools/status", id);
+static MCP_RETURN_CODE mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'tools/status' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "tools/validate", id);
+static MCP_RETURN_CODE mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'tools/validate' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "tools/describe", id);
+static MCP_RETURN_CODE mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'tools/describe' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_tools_method_getCapabilities(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    if (!mcpc || id == 0) return -1;
+static MCP_RETURN_CODE mcp_tools_method_getCapabilities(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    if (!mcpc || id == 0) return MCP_RC_ERROR;
     
-    // Create a result object with tool capabilities
-    struct json_object *result = json_object_new_object();
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
     
-    // Add capabilities
-    json_object_object_add(result, "listChanged", json_object_new_boolean(false));
-    json_object_object_add(result, "asyncExecution", json_object_new_boolean(true));
-    json_object_object_add(result, "batchExecution", json_object_new_boolean(true));
+    // Add capabilities as result object properties
+    buffer_json_member_add_boolean(mcpc->result, "listChanged", false);
+    buffer_json_member_add_boolean(mcpc->result, "asyncExecution", true);
+    buffer_json_member_add_boolean(mcpc->result, "batchExecution", true);
     
-    // Send success response (and free the result object)
-    int ret = mcp_send_success_response(mcpc, result, id);
-    json_object_put(result);
+    // Close the result object
+    buffer_json_finalize(mcpc->result);
     
-    return ret;
+    return MCP_RC_OK;
 }
 
 // Tools namespace method dispatcher (transport-agnostic)
-int mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
-    if (!mcpc || !method) return -1;
+MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+    if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
     netdata_log_debug(D_MCP, "MCP tools method: %s", method);
 
+    // Flush previous buffers
+    buffer_flush(mcpc->result);
+    buffer_flush(mcpc->error);
+    
+    MCP_RETURN_CODE rc;
+
     if (strcmp(method, "list") == 0) {
-        return mcp_tools_method_list(mcpc, params, id);
+        rc = mcp_tools_method_list(mcpc, params, id);
     }
     else if (strcmp(method, "execute") == 0) {
-        return mcp_tools_method_execute(mcpc, params, id);
+        rc = mcp_tools_method_execute(mcpc, params, id);
     }
     else if (strcmp(method, "cancel") == 0) {
-        return mcp_tools_method_cancel(mcpc, params, id);
+        rc = mcp_tools_method_cancel(mcpc, params, id);
     }
     else if (strcmp(method, "status") == 0) {
-        return mcp_tools_method_status(mcpc, params, id);
+        rc = mcp_tools_method_status(mcpc, params, id);
     }
     else if (strcmp(method, "validate") == 0) {
-        return mcp_tools_method_validate(mcpc, params, id);
+        rc = mcp_tools_method_validate(mcpc, params, id);
     }
     else if (strcmp(method, "describe") == 0) {
-        return mcp_tools_method_describe(mcpc, params, id);
+        rc = mcp_tools_method_describe(mcpc, params, id);
     }
     else if (strcmp(method, "getCapabilities") == 0) {
-        return mcp_tools_method_getCapabilities(mcpc, params, id);
+        rc = mcp_tools_method_getCapabilities(mcpc, params, id);
     }
     else {
         // Method not found in tools namespace
-        char full_method[256];
-        snprintf(full_method, sizeof(full_method), "tools/%s", method);
-        return mcp_method_not_implemented_generic(mcpc, full_method, id);
+        buffer_sprintf(mcpc->error, "Method 'tools/%s' not implemented yet", method);
+        rc = MCP_RC_NOT_IMPLEMENTED;
     }
+    
+    return rc;
 }

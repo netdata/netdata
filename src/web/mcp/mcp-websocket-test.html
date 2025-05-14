@@ -523,32 +523,34 @@
                         defaultRequest: {
                             jsonrpc: '2.0',
                             method: 'resources/list',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'resources/get': {
-                        name: 'resources/get',
-                        description: 'Get a specific resource',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'resources/get',
                             params: {
-                                name: 'metrics',
-                                id: 'system.cpu'
+                                // Optional pagination cursor
+                                // cursor: "pagination_token"
                             },
                             id: 1
                         }
                     },
-                    'resources/search': {
-                        name: 'resources/search',
-                        description: 'Search for resources',
+                    'resources/read': {
+                        name: 'resources/read',
+                        description: 'Read a specific resource by URI',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'resources/search',
+                            method: 'resources/read',
                             params: {
-                                name: 'metrics',
-                                query: 'cpu'
+                                uri: 'nd://contexts'
+                            },
+                            id: 1
+                        }
+                    },
+                    'resources/templates/list': {
+                        name: 'resources/templates/list',
+                        description: 'Get list of resource templates for URI construction',
+                        defaultRequest: {
+                            jsonrpc: '2.0',
+                            method: 'resources/templates/list',
+                            params: {
+                                // Optional pagination cursor
+                                // cursor: "pagination_token"
                             },
                             id: 1
                         }
@@ -560,8 +562,7 @@
                             jsonrpc: '2.0',
                             method: 'resources/subscribe',
                             params: {
-                                name: 'metrics',
-                                id: 'system.cpu'
+                                uri: 'nd://contexts'
                             },
                             id: 1
                         }
@@ -573,31 +574,7 @@
                             jsonrpc: '2.0',
                             method: 'resources/unsubscribe',
                             params: {
-                                subscriptionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'resources/describe': {
-                        name: 'resources/describe',
-                        description: 'Get detailed documentation for a resource',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'resources/describe',
-                            params: {
-                                name: 'metrics'
-                            },
-                            id: 1
-                        }
-                    },
-                    'resources/getSchema': {
-                        name: 'resources/getSchema',
-                        description: 'Get schema for a resource type',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'resources/getSchema',
-                            params: {
-                                name: 'metrics'
+                                uri: 'nd://contexts'
                             },
                             id: 1
                         }

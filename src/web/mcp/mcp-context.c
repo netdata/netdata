@@ -40,51 +40,63 @@
 #include "mcp-initialize.h"
 
 // Stub implementations for all context namespace methods (transport-agnostic)
-static int mcp_context_method_provide(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "context/provide", id);
+static MCP_RETURN_CODE mcp_context_method_provide(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'context/provide' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_context_method_clear(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "context/clear", id);
+static MCP_RETURN_CODE mcp_context_method_clear(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'context/clear' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_context_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "context/status", id);
+static MCP_RETURN_CODE mcp_context_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'context/status' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_context_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "context/save", id);
+static MCP_RETURN_CODE mcp_context_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'context/save' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static int mcp_context_method_load(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    return mcp_method_not_implemented_generic(mcpc, "context/load", id);
+static MCP_RETURN_CODE mcp_context_method_load(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+    buffer_sprintf(mcpc->error, "Method 'context/load' not implemented yet");
+    return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Context namespace method dispatcher (transport-agnostic)
-int mcp_context_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
-    if (!mcpc || !method) return -1;
+MCP_RETURN_CODE mcp_context_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+    if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
     
     netdata_log_debug(D_MCP, "MCP context method: %s", method);
     
+    // Flush previous buffers
+    buffer_flush(mcpc->result);
+    buffer_flush(mcpc->error);
+    
+    MCP_RETURN_CODE rc;
+    
     if (strcmp(method, "provide") == 0) {
-        return mcp_context_method_provide(mcpc, params, id);
+        rc = mcp_context_method_provide(mcpc, params, id);
     }
     else if (strcmp(method, "clear") == 0) {
-        return mcp_context_method_clear(mcpc, params, id);
+        rc = mcp_context_method_clear(mcpc, params, id);
     }
     else if (strcmp(method, "status") == 0) {
-        return mcp_context_method_status(mcpc, params, id);
+        rc = mcp_context_method_status(mcpc, params, id);
     }
     else if (strcmp(method, "save") == 0) {
-        return mcp_context_method_save(mcpc, params, id);
+        rc = mcp_context_method_save(mcpc, params, id);
     }
     else if (strcmp(method, "load") == 0) {
-        return mcp_context_method_load(mcpc, params, id);
+        rc = mcp_context_method_load(mcpc, params, id);
     }
     else {
         // Method not found in context namespace
-        char full_method[256];
-        snprintf(full_method, sizeof(full_method), "context/%s", method);
-        return mcp_method_not_implemented_generic(mcpc, full_method, id);
+        buffer_sprintf(mcpc->error, "Method 'context/%s' not implemented yet", method);
+        rc = MCP_RC_NOT_IMPLEMENTED;
     }
+    
+    return rc;
 }

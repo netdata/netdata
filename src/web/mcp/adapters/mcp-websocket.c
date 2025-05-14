@@ -15,14 +15,14 @@ MCP_CLIENT *mcp_websocket_get_context(struct websocket_server_client *wsc) {
     return (MCP_CLIENT *)wsc->user_data;
 }
 
-// WebSocket JSON sender function for the MCP adapter
-int mcp_websocket_send_json(struct websocket_server_client *wsc, struct json_object *json) {
-    if (!wsc || !json) return -1;
+// WebSocket buffer sender function for the MCP adapter
+int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffer) {
+    if (!wsc || !buffer) return -1;
     
-    const char *json_string = json_object_to_json_string_ext(json, JSON_C_TO_STRING_PLAIN);
-    if (!json_string) return -1;
+    const char *text = buffer_tostring(buffer);
+    if (!text || !*text) return -1;
     
-    return websocket_protocol_send_text(wsc, json_string);
+    return websocket_protocol_send_text(wsc, text);
 }
 
 // Create a response context for a WebSocket client
@@ -74,7 +74,9 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     
     if (!request || jerr != json_tokener_success) {
         websocket_debug(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
-        mcp_send_error_response(ctx, MCP_ERROR_PARSE_ERROR, "Failed to parse JSON-RPC request", 0);
+        CLEAN_BUFFER *b = buffer_create(0, NULL);
+        mcp_jsonrpc_error(b, NULL, 0, -32700);
+        mcp_websocket_send_buffer(wsc, b);
         return;
     }
     
@@ -110,22 +112,6 @@ void mcp_websocket_on_disconnect(struct websocket_server_client *wsc) {
     if (ctx) {
         mcp_free_client(ctx);
         mcp_websocket_set_context(wsc, NULL);
-    }
-}
-
-// Convenience wrapper for sending error responses
-void mcp_websocket_send_error_response(struct websocket_server_client *wsc, int code, const char *message, uint64_t id) {
-    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
-    if (ctx) {
-        mcp_send_error_response(ctx, code, message, id);
-    }
-}
-
-// Convenience wrapper for sending success responses
-void mcp_websocket_send_success_response(struct websocket_server_client *wsc, struct json_object *result, uint64_t id) {
-    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
-    if (ctx) {
-        mcp_send_success_response(ctx, result, id);
     }
 }
 

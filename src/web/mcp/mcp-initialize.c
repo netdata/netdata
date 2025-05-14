@@ -6,8 +6,11 @@
 #include "daemon/common.h"
 
 // Initialize handler - provides information about what's available (transport-agnostic)
-int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
-    if (!mcpc || id == 0) return -1;
+MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc) {
+        buffer_strcat(mcpc->error, "Invalid MCP client context");
+        return MCP_RC_ERROR;
+    }
 
     // Extract client's requested protocol version
     struct json_object *protocol_version_obj = NULL;
@@ -30,63 +33,66 @@ int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t
                       string2str(mcpc->client_name), string2str(mcpc->client_version),
                       MCP_PROTOCOL_VERSION_2str(mcpc->protocol_version));
 
-    struct json_object *result = json_object_new_object();
+    // Initialize result buffer with JSON structure
+    mcp_init_success_result(mcpc, id);
     
     // Use rrdstats_metadata_collect to get infrastructure statistics
     RRDSTATS_METADATA metadata = rrdstats_metadata_collect();
     
     // Use rrdstats_retention_collect to get retention information
     RRDSTATS_RETENTION retention = rrdstats_retention_collect();
+
+    buffer_json_member_add_object(mcpc->result, "result");
     
     // Add protocol version based on what client requested
-    json_object_object_add(result, "protocolVersion",
-                          json_object_new_string(MCP_PROTOCOL_VERSION_2str(mcpc->protocol_version)));
+    buffer_json_member_add_string(mcpc->result, "protocolVersion", 
+                                 MCP_PROTOCOL_VERSION_2str(mcpc->protocol_version));
 
     // Add server info object
-    struct json_object *server_info = json_object_new_object();
-    json_object_object_add(server_info, "name", json_object_new_string("Netdata"));
-    json_object_object_add(server_info, "version", json_object_new_string(NETDATA_VERSION));
-    json_object_object_add(result, "serverInfo", server_info);
+    buffer_json_member_add_object(mcpc->result, "serverInfo");
+    buffer_json_member_add_string(mcpc->result, "name", "Netdata");
+    buffer_json_member_add_string(mcpc->result, "version", NETDATA_VERSION);
+    buffer_json_object_close(mcpc->result); // Close serverInfo
     
     // Add capabilities object according to MCP standard
-    struct json_object *capabilities = json_object_new_object();
+    buffer_json_member_add_object(mcpc->result, "capabilities");
     
     // Tools capabilities
-    struct json_object *tools_caps = json_object_new_object();
-    json_object_object_add(tools_caps, "listChanged", json_object_new_boolean(false));
-    json_object_object_add(tools_caps, "asyncExecution", json_object_new_boolean(true));
-    json_object_object_add(tools_caps, "batchExecution", json_object_new_boolean(true));
-    json_object_object_add(capabilities, "tools", tools_caps);
+    buffer_json_member_add_object(mcpc->result, "tools");
+    buffer_json_member_add_boolean(mcpc->result, "listChanged", false);
+    buffer_json_member_add_boolean(mcpc->result, "asyncExecution", true);
+    buffer_json_member_add_boolean(mcpc->result, "batchExecution", true);
+    buffer_json_object_close(mcpc->result); // Close tools
     
     // Resources capabilities
-    struct json_object *resources_caps = json_object_new_object();
-    json_object_object_add(resources_caps, "listChanged", json_object_new_boolean(true));
-    json_object_object_add(resources_caps, "subscribe", json_object_new_boolean(true));
-    json_object_object_add(capabilities, "resources", resources_caps);
+    buffer_json_member_add_object(mcpc->result, "resources");
+    buffer_json_member_add_boolean(mcpc->result, "listChanged", true);
+    buffer_json_member_add_boolean(mcpc->result, "subscribe", true);
+    buffer_json_object_close(mcpc->result); // Close resources
     
     // Prompts capabilities
-    struct json_object *prompts_caps = json_object_new_object();
-    json_object_object_add(prompts_caps, "listChanged", json_object_new_boolean(false));
-    json_object_object_add(capabilities, "prompts", prompts_caps);
+    buffer_json_member_add_object(mcpc->result, "prompts");
+    buffer_json_member_add_boolean(mcpc->result, "listChanged", false);
+    buffer_json_object_close(mcpc->result); // Close prompts
     
-    // Notification capabilities (renamed to notifications per standard)
-    struct json_object *notifications_caps = json_object_new_object();
-    json_object_object_add(notifications_caps, "push", json_object_new_boolean(true));
-    json_object_object_add(notifications_caps, "subscription", json_object_new_boolean(true));
-    json_object_object_add(capabilities, "notifications", notifications_caps);
+    // Notification capabilities
+    buffer_json_member_add_object(mcpc->result, "notifications");
+    buffer_json_member_add_boolean(mcpc->result, "push", true);
+    buffer_json_member_add_boolean(mcpc->result, "subscription", true);
+    buffer_json_object_close(mcpc->result); // Close notifications
     
     // Add logging capabilities
-    struct json_object *logging_caps = json_object_new_object();
-    json_object_object_add(capabilities, "logging", logging_caps);
+    buffer_json_member_add_object(mcpc->result, "logging");
+    buffer_json_object_close(mcpc->result); // Close logging
     
     // Add version-specific capabilities
     if (mcpc->protocol_version >= MCP_PROTOCOL_VERSION_2025_03_26) {
         // Add completions capability - new in 2025-03-26
-        struct json_object *completions_caps = json_object_new_object();
-        json_object_object_add(capabilities, "completions", completions_caps);
+        buffer_json_member_add_object(mcpc->result, "completions");
+        buffer_json_object_close(mcpc->result); // Close completions
     }
     
-    json_object_object_add(result, "capabilities", capabilities);
+    buffer_json_object_close(mcpc->result); // Close capabilities
     
     // Add dynamic instructions based on server profile
     char instructions[1024];
@@ -114,72 +120,72 @@ int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t
             "This is Netdata on a Standalone Server.\n\n%s", common);
     }
     
-    json_object_object_add(result, "instructions", json_object_new_string(instructions));
+    buffer_json_member_add_string(mcpc->result, "instructions", instructions);
     
     // Add _meta field (optional)
-    struct json_object *meta = json_object_new_object();
-    json_object_object_add(meta, "generator", json_object_new_string("netdata"));
+    buffer_json_member_add_object(mcpc->result, "_meta");
+    buffer_json_member_add_string(mcpc->result, "generator", "netdata");
     
     // Get current time and calculate uptimes
     time_t now = now_realtime_sec();
     time_t system_uptime_seconds = now_boottime_sec();
     time_t netdata_uptime_seconds = now - netdata_start_time;
     
-    json_object_object_add(meta, "timestamp", json_object_new_int64((int64_t)now));
+    buffer_json_member_add_int64(mcpc->result, "timestamp", (int64_t)now);
     
     // Add system uptime info - both raw seconds and human-readable format
     char human_readable[128];
     duration_snprintf_time_t(human_readable, sizeof(human_readable), system_uptime_seconds);
     
-    struct json_object *system_uptime = json_object_new_object();
-    json_object_object_add(system_uptime, "seconds", json_object_new_int64((int64_t)system_uptime_seconds));
-    json_object_object_add(system_uptime, "human", json_object_new_string(human_readable));
-    json_object_object_add(meta, "system_uptime", system_uptime);
+    buffer_json_member_add_object(mcpc->result, "system_uptime");
+    buffer_json_member_add_int64(mcpc->result, "seconds", (int64_t)system_uptime_seconds);
+    buffer_json_member_add_string(mcpc->result, "human", human_readable);
+    buffer_json_object_close(mcpc->result); // Close system_uptime
     
     // Add netdata uptime info - both raw seconds and human-readable format
     duration_snprintf_time_t(human_readable, sizeof(human_readable), netdata_uptime_seconds);
     
-    struct json_object *netdata_uptime = json_object_new_object();
-    json_object_object_add(netdata_uptime, "seconds", json_object_new_int64((int64_t)netdata_uptime_seconds));
-    json_object_object_add(netdata_uptime, "human", json_object_new_string(human_readable));
-    json_object_object_add(meta, "netdata_uptime", netdata_uptime);
+    buffer_json_member_add_object(mcpc->result, "netdata_uptime");
+    buffer_json_member_add_int64(mcpc->result, "seconds", (int64_t)netdata_uptime_seconds);
+    buffer_json_member_add_string(mcpc->result, "human", human_readable);
+    buffer_json_object_close(mcpc->result); // Close netdata_uptime
 
     // Add infrastructure statistics to metadata
-    struct json_object *infrastructure = json_object_new_object();
+    buffer_json_member_add_object(mcpc->result, "infrastructure");
 
     // Add nodes statistics
-    struct json_object *nodes = json_object_new_object();
-    json_object_object_add(nodes, "total", json_object_new_int64(metadata.nodes.total));
-    json_object_object_add(nodes, "receiving_from_children", json_object_new_int64(metadata.nodes.receiving));
-    json_object_object_add(nodes, "sending_to_next_parent", json_object_new_int64(metadata.nodes.sending));
-    json_object_object_add(nodes, "archived_but_available_for_queries", json_object_new_int64(metadata.nodes.archived));
-    json_object_object_add(nodes, "info", json_object_new_string("Nodes (or hosts, or servers, or devices) are Netdata Agent installations or virtual Netdata nodes or SNMP devices."));
-    json_object_object_add(infrastructure, "nodes", nodes);
+    buffer_json_member_add_object(mcpc->result, "nodes");
+    buffer_json_member_add_int64(mcpc->result, "total", metadata.nodes.total);
+    buffer_json_member_add_int64(mcpc->result, "receiving_from_children", metadata.nodes.receiving);
+    buffer_json_member_add_int64(mcpc->result, "sending_to_next_parent", metadata.nodes.sending);
+    buffer_json_member_add_int64(mcpc->result, "archived_but_available_for_queries", metadata.nodes.archived);
+    buffer_json_member_add_string(mcpc->result, "info", "Nodes (or hosts, or servers, or devices) are Netdata Agent installations or virtual Netdata nodes or SNMP devices.");
+    buffer_json_object_close(mcpc->result); // Close nodes
 
     // Add metrics statistics
-    struct json_object *metrics = json_object_new_object();
-    json_object_object_add(metrics, "currently_being_collected", json_object_new_int64(metadata.metrics.collected));
-    json_object_object_add(metrics, "total_available_for_queries", json_object_new_int64(metadata.metrics.available));
-    json_object_object_add(metrics, "info", json_object_new_string("Metrics are unique time-series in the Netdata time-series database."));
-    json_object_object_add(infrastructure, "metrics", metrics);
+    buffer_json_member_add_object(mcpc->result, "metrics");
+    buffer_json_member_add_int64(mcpc->result, "currently_being_collected", metadata.metrics.collected);
+    buffer_json_member_add_int64(mcpc->result, "total_available_for_queries", metadata.metrics.available);
+    buffer_json_member_add_string(mcpc->result, "info", "Metrics are unique time-series in the Netdata time-series database.");
+    buffer_json_object_close(mcpc->result); // Close metrics
 
     // Add instances statistics
-    struct json_object *instances = json_object_new_object();
-    json_object_object_add(instances, "currently_being_collected", json_object_new_int64(metadata.instances.collected));
-    json_object_object_add(instances, "total_available_for_queries", json_object_new_int64(metadata.instances.available));
-    json_object_object_add(instances, "info", json_object_new_string("Instances are collections of metrics referring to a component (system, disk, network interface, application, process, container, etc)."));
-    json_object_object_add(infrastructure, "instances", instances);
+    buffer_json_member_add_object(mcpc->result, "instances");
+    buffer_json_member_add_int64(mcpc->result, "currently_being_collected", metadata.instances.collected);
+    buffer_json_member_add_int64(mcpc->result, "total_available_for_queries", metadata.instances.available);
+    buffer_json_member_add_string(mcpc->result, "info", "Instances are collections of metrics referring to a component (system, disk, network interface, application, process, container, etc).");
+    buffer_json_object_close(mcpc->result); // Close instances
 
     // Add contexts statistics
-    struct json_object *contexts = json_object_new_object();
-    json_object_object_add(contexts, "unique_across_all_nodes", json_object_new_int64(metadata.contexts.unique));
-    json_object_object_add(contexts, "info", json_object_new_string("Contexts are distinct charts shown on the Netdata dashboards, like system.cpu (system CPU utilization), or net.net (network interfaces bandwidth). When monitoring applications, the context usually includes the application name."));
-    json_object_object_add(infrastructure, "contexts", contexts);
+    buffer_json_member_add_object(mcpc->result, "contexts");
+    buffer_json_member_add_int64(mcpc->result, "unique_across_all_nodes", metadata.contexts.unique);
+    buffer_json_member_add_string(mcpc->result, "info", "Contexts are distinct charts shown on the Netdata dashboards, like system.cpu (system CPU utilization), or net.net (network interfaces bandwidth). When monitoring applications, the context usually includes the application name.");
+    buffer_json_object_close(mcpc->result); // Close contexts
 
     // Add retention information
     if (retention.storage_tiers > 0) {
-        struct json_object *retention_obj = json_object_new_object();
-        struct json_object *tiers_array = json_object_new_array();
+        buffer_json_member_add_object(mcpc->result, "retention");
+        buffer_json_member_add_array(mcpc->result, "tiers");
 
         for (size_t i = 0; i < retention.storage_tiers; i++) {
             RRD_STORAGE_TIER *tier_info = &retention.tiers[i];
@@ -188,63 +194,59 @@ int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t
             if (tier_info->metrics == 0 && tier_info->samples == 0)
                 continue;
                 
-            struct json_object *tier = json_object_new_object();
+            buffer_json_add_array_item_object(mcpc->result);
             
             // Add basic tier info
-            json_object_object_add(tier, "tier", json_object_new_int64(tier_info->tier));
-            json_object_object_add(tier, "backend", json_object_new_string(
+            buffer_json_member_add_int64(mcpc->result, "tier", tier_info->tier);
+            buffer_json_member_add_string(mcpc->result, "backend",
                 tier_info->backend == STORAGE_ENGINE_BACKEND_DBENGINE ? "dbengine" : 
-                tier_info->backend == STORAGE_ENGINE_BACKEND_RRDDIM ? "ram" : "unknown"));
-            json_object_object_add(tier, "granularity", json_object_new_int64(tier_info->group_seconds));
-            json_object_object_add(tier, "granularity_human", json_object_new_string(tier_info->granularity_human));
+                tier_info->backend == STORAGE_ENGINE_BACKEND_RRDDIM ? "ram" : "unknown");
+            buffer_json_member_add_int64(mcpc->result, "granularity", tier_info->group_seconds);
+            buffer_json_member_add_string(mcpc->result, "granularity_human", tier_info->granularity_human);
             
             // Add metrics info
-            json_object_object_add(tier, "metrics", json_object_new_int64(tier_info->metrics));
-            json_object_object_add(tier, "samples", json_object_new_int64(tier_info->samples));
+            buffer_json_member_add_int64(mcpc->result, "metrics", tier_info->metrics);
+            buffer_json_member_add_int64(mcpc->result, "samples", tier_info->samples);
             
             // Add storage info when available
             if (tier_info->disk_max > 0) {
-                json_object_object_add(tier, "disk_used", json_object_new_int64(tier_info->disk_used));
-                json_object_object_add(tier, "disk_max", json_object_new_int64(tier_info->disk_max));
+                buffer_json_member_add_int64(mcpc->result, "disk_used", tier_info->disk_used);
+                buffer_json_member_add_int64(mcpc->result, "disk_max", tier_info->disk_max);
                 // Format disk_percent to have only 2 decimal places
                 double rounded_percent = floor(tier_info->disk_percent * 100.0 + 0.5) / 100.0;
-                json_object_object_add(tier, "disk_percent", json_object_new_double(rounded_percent));
+                buffer_json_member_add_double(mcpc->result, "disk_percent", rounded_percent);
             }
             
             // Add retention info
             if (tier_info->retention > 0) {
-                json_object_object_add(tier, "first_time_s", json_object_new_int64(tier_info->first_time_s));
-                json_object_object_add(tier, "last_time_s", json_object_new_int64(tier_info->last_time_s));
-                json_object_object_add(tier, "retention", json_object_new_int64(tier_info->retention));
-                json_object_object_add(tier, "retention_human", json_object_new_string(tier_info->retention_human));
+                buffer_json_member_add_int64(mcpc->result, "first_time_s", tier_info->first_time_s);
+                buffer_json_member_add_int64(mcpc->result, "last_time_s", tier_info->last_time_s);
+                buffer_json_member_add_int64(mcpc->result, "retention", tier_info->retention);
+                buffer_json_member_add_string(mcpc->result, "retention_human", tier_info->retention_human);
                 
                 if (tier_info->requested_retention > 0) {
-                    json_object_object_add(tier, "requested_retention", json_object_new_int64(tier_info->requested_retention));
-                    json_object_object_add(tier, "requested_retention_human", json_object_new_string(tier_info->requested_retention_human));
+                    buffer_json_member_add_int64(mcpc->result, "requested_retention", tier_info->requested_retention);
+                    buffer_json_member_add_string(mcpc->result, "requested_retention_human", tier_info->requested_retention_human);
                 }
                 
                 if (tier_info->expected_retention > 0) {
-                    json_object_object_add(tier, "expected_retention", json_object_new_int64(tier_info->expected_retention));
-                    json_object_object_add(tier, "expected_retention_human", json_object_new_string(tier_info->expected_retention_human));
+                    buffer_json_member_add_int64(mcpc->result, "expected_retention", tier_info->expected_retention);
+                    buffer_json_member_add_string(mcpc->result, "expected_retention_human", tier_info->expected_retention_human);
                 }
             }
             
-            json_object_array_add(tiers_array, tier);
+            buffer_json_object_close(mcpc->result); // Close tier object
         }
         
-        json_object_object_add(retention_obj, "tiers", tiers_array);
-        json_object_object_add(retention_obj, "info", json_object_new_string("Metrics retention information for each storage tier in the Netdata database.\nHigher tiers can provide min, max, average, sum and anomaly rate with the same accuracy as tier 0.\nTiers are automatically selected during query."));
-        json_object_object_add(infrastructure, "retention", retention_obj);
+        buffer_json_array_close(mcpc->result); // Close tiers array
+        buffer_json_member_add_string(mcpc->result, "info", "Metrics retention information for each storage tier in the Netdata database.\nHigher tiers can provide min, max, average, sum and anomaly rate with the same accuracy as tier 0.\nTiers are automatically selected during query.");
+        buffer_json_object_close(mcpc->result); // Close retention
     }
 
-    json_object_object_add(meta, "infrastructure", infrastructure);
-    json_object_object_add(result, "_meta", meta);
-
-    // Send success response
-    int ret = mcp_send_success_response(mcpc, result, id);
-
-    // Free the result object (it's been copied in mcp_send_success_response)
-    json_object_put(result);
+    buffer_json_object_close(mcpc->result); // Close infrastructure
+    buffer_json_object_close(mcpc->result); // Close _meta
+    buffer_json_object_close(mcpc->result); // Close result object
+    buffer_json_finalize(mcpc->result);     // Finalize JSON
     
-    return ret;
+    return MCP_RC_OK;
 }

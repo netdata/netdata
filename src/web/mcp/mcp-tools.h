@@ -6,6 +6,6 @@
 #include "mcp.h"
 
 // Tools namespace method dispatcher (transport-agnostic)
-int mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id);
+MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id);
 
 #endif // NETDATA_MCP_TOOLS_H

@@ -56,6 +56,18 @@ typedef enum {
     // Add more as needed
 } MCP_CAPABILITY;
 
+// Return codes for MCP functions
+typedef enum {
+    MCP_RC_OK = 0,             // Success, result buffer contains valid response
+    MCP_RC_ERROR = 1,          // Generic error, error buffer contains message
+    MCP_RC_INVALID_PARAMS = 2, // Invalid parameters in request
+    MCP_RC_NOT_FOUND = 3,      // Resource or method not found
+    MCP_RC_INTERNAL_ERROR = 4, // Internal server error
+    MCP_RC_NOT_IMPLEMENTED = 5 // Method not implemented
+    // Can add more specific errors as needed
+} MCP_RETURN_CODE;
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_RETURN_CODE);
+
 // Response handling context
 typedef struct mcp_client {
     // Transport type and capabilities
@@ -75,6 +87,10 @@ typedef struct mcp_client {
     // Client information
     STRING *client_name;                           // Client name (for logging, interned)
     STRING *client_version;                        // Client version (for logging, interned)
+    
+    // Response buffers
+    BUFFER *result;                                // Pre-allocated buffer for success responses
+    BUFFER *error;                                 // Pre-allocated buffer for error messages
 } MCP_CLIENT;
 
 // Helper function to convert string version to numeric version
@@ -89,21 +105,15 @@ MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx);
 // Free a response context
 void mcp_free_client(MCP_CLIENT *mcpc);
 
-// Helper functions for creating JSON-RPC responses
-struct json_object *mcp_create_success_response(struct json_object *result, uint64_t id);
-struct json_object *mcp_create_error_response(int code, const char *message, uint64_t id);
+// Helper functions for creating and sending JSON-RPC responses
 
-// Helper functions for sending JSON-RPC responses through the appropriate transport
-int mcp_send_success_response(MCP_CLIENT *mcpc, struct json_object *result, uint64_t id);
-int mcp_send_error_response(MCP_CLIENT *mcpc, int code, const char *message, uint64_t id);
-int mcp_send_notification(MCP_CLIENT *mcpc, const char *method, struct json_object *params);
+// Functions to initialize and build MCP responses
+void mcp_init_success_result(MCP_CLIENT *mcpc, uint64_t id);
+MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, uint64_t id, MCP_RETURN_CODE rc);
+void mcp_jsonrpc_error(BUFFER *result, const char *error, uint64_t id, int jsonrpc_code);
 
-// Helper for creating content objects based on protocol version
-struct json_object *mcp_create_content_object(MCP_CLIENT *mcpc, MCP_CONTENT_TYPE type, 
-                                             const char *data, size_t data_len, const char *mime_type);
-
-// Helper for sending progress notifications
-int mcp_send_progress_notification(MCP_CLIENT *mcpc, const char *token, int progress, int total, const char *message);
+// Send prepared buffer content as response
+int mcp_send_response_buffer(MCP_CLIENT *mcpc);
 
 // Check if a capability is supported by the transport
 static inline bool mcp_has_capability(MCP_CLIENT *mcpc, MCP_CAPABILITY capability) {
@@ -114,12 +124,6 @@ static inline bool mcp_has_capability(MCP_CLIENT *mcpc, MCP_CAPABILITY capabilit
 void mcp_initialize_subsystem(void);
 
 // Main MCP entry point - handle a JSON-RPC request (single or batch)
-int mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request);
-
-// Handle a batch of JSON-RPC requests (internal)
-int mcp_handle_batch_request(MCP_CLIENT *mcpc, struct json_object *batch_request);
-
-// Helper function for "not implemented" methods (transport-agnostic)
-int mcp_method_not_implemented_generic(MCP_CLIENT *mcpc, const char *method_name, uint64_t id);
+MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request);
 
 #endif // NETDATA_MCP_H

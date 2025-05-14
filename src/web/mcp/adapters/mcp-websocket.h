@@ -17,6 +17,7 @@ void mcp_websocket_on_disconnect(struct websocket_server_client *wsc);
 
 // Helper functions for the WebSocket adapter
 int mcp_websocket_send_json(struct websocket_server_client *wsc, struct json_object *json);
+int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffer);
 
 // Get and set MCP context from a WebSocket client
 MCP_CLIENT *mcp_websocket_get_context(struct websocket_server_client *wsc);
