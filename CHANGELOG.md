@@ -31,6 +31,7 @@
 - Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
 - Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
 - Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
+- Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.1](https://github.com/netdata/netdata/tree/v2.5.1) (2025-05-08)
@@ -470,7 +471,6 @@
 - Capture deadly signals [\#19737](https://github.com/netdata/netdata/pull/19737) ([ktsaou](https://github.com/ktsaou))
 - allow insecure cloud connections [\#19736](https://github.com/netdata/netdata/pull/19736) ([ktsaou](https://github.com/ktsaou))
 - add more information about claiming failures [\#19735](https://github.com/netdata/netdata/pull/19735) ([ktsaou](https://github.com/ktsaou))
-- support https\_proxy too [\#19733](https://github.com/netdata/netdata/pull/19733) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
