@@ -208,7 +208,7 @@ modules:
               unit: "pages"
               chart_type: line
               dimensions:
-                - name: pages
+                - name: free
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibProcesses

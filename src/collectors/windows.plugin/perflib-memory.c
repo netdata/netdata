@@ -178,7 +178,7 @@ static void do_memory_page_table_entries(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             RRDSET_TYPE_LINE);
 
         localPool.rd_free_system_page_table_entries =
-            rrddim_add(localPool.freeSystemPageTableEntries, "pages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(localPool.freeSystemPageTableEntries, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
