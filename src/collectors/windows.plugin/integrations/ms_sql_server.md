@@ -38,7 +38,10 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-The collector automatically detects all of the metrics, no further configuration is required.
+The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+
+- Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
+- Configure a database connection (see Setup → Configuration → Examples).
 
 
 #### Limits
@@ -130,14 +133,51 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-No action required.
+#### Configure SQL Server for Monitoring
+
+1. **Create Monitoring User**
+
+   Create an SQL Server user with the necessary permissions to collect monitoring data:
+   
+   ```tsql
+   USE master;
+   CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
+   CREATE USER netdata_user FOR LOGIN netdata_user;
+   GRANT CONNECT SQL TO netdata_user;
+   GRANT VIEW SERVER STATE TO netdata_user;
+   GO
+   ```
+
+2. **Enable Query Store**
+
+   Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
+   
+   ```tsql
+   DECLARE @dbname NVARCHAR(max)
+   DECLARE nd_user_cursor CURSOR FOR SELECT name
+                       FROM master.dbo.sysdatabases
+                       WHERE name NOT IN ('master', 'tempdb')
+   
+   OPEN nd_user_cursor
+   FETCH NEXT FROM nd_user_cursor INTO @dbname
+   WHILE @@FETCH_STATUS = 0
+   BEGIN
+     EXECUTE ("USE "+ @dbname+"; CREATE USER netdata_user FOR LOGIN netdata_user; ALTER DATABASE "+@dbname+" SET QUERY_STORE = ON ( QUERY_CAPTURE_MODE = ALL, DATA_FLUSH_INTERVAL_SECONDS               =    900 )");
+     FETCH next FROM nd_user_cursor INTO @dbname;
+   END
+   CLOSE nd_user_cursor
+   DEALLOCATE nd_user_cursor
+   GO
+   ```
+
+
 
 ### Configuration
 
 #### File
 
 The configuration file name for this integration is `netdata.conf`.
-Configuration for this specific integration is located in the `[plugin:windows]` section within that file.
+Configuration for this specific integration is located in the `[plugin:windows:PerflibMSSQL]` section within that file.
 
 The file format is a modified INI syntax. The general structure is:
 
@@ -158,13 +198,48 @@ sudo ./edit-config netdata.conf
 ```
 #### Options
 
-
+These options allow the collector to connect to your MSSQL instance and collect transaction data from it.
 
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
-| PerflibMSSQL | An option to enable or disable the data collection. | yes | no |
+| driver | ODBC driver used to connect to the SQL Server. | SQL Server | no |
+| server | Server address or instance name. | empty | yes |
+| address | Alternative to `server`; supports named pipes if the server supports them. | empty | yes |
+| uid | SQL Server user identifier. | empty | yes |
+| pwd | Password for the specified user. | empty | yes |
+| additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
+| windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
 
 #### Examples
-There are no configuration examples.
 
+##### Single Instance
+
+An example configuration with one instance.
+
+```yaml
+[plugin:windows:PerflibMSSQL]
+   driver = SQL Server
+   server = 127.0.0.1\\Dev, 1433
+   uid = netdata_user
+   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+
+```
+##### Multiple Instances
+
+An example configuration with two instances.
+
+```yaml
+[plugin:windows:PerflibMSSQL]
+  driver = SQL Server
+  server = 127.0.0.1\\Dev, 1433
+  uid = netdata_user
+  pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+  additional instances = 1
+[plugin:windows:PerflibMSSQL1]
+  driver = SQL Server
+  server = 127.0.0.1\\Production, 1434
+  uid = netdata_user
+  pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
+
+```
 
