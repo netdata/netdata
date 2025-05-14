@@ -22,15 +22,15 @@ static void do_processor_queue(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pO
 
     if (!st_queue) {
         st_queue = rrdset_create_localhost(
-            "system"
+            "system",
             "processor_queue",
             NULL,
             "system",
             "system.processor_queue_length",
             "The number of threads in the processor queue.",
             "threads",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibMemory",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
             NETDATA_CHART_PRIO_SYSTEM_THREAD_QUEUE,
             update_every,
             RRDSET_TYPE_LINE);

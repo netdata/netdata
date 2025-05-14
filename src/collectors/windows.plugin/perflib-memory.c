@@ -53,7 +53,7 @@ void initialize_pool_keys(struct system_pool *p)
 {
     p->pagedData.key = "Pool Paged Bytes";
     p->nonPagedData.key = "Pool Nonpaged Bytes";
-    p->pageTableEntries = "Free System Page Table Entries";
+    p->pageTableEntries.key = "Free System Page Table Entries";
 }
 
 static void initialize(void)
