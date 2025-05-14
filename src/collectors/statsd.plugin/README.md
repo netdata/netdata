@@ -8,15 +8,15 @@ Learn more about the [StatsD protocol.](https://blog.netdata.cloud/introduction-
 
 ## Overview
 
-| Feature | Description |
-|---------|-------------|
-| **Metric Collection** | Collect real-time metrics from any application supporting StatsD protocol |
-| **Visualization** | View metrics as private charts (one per metric) or custom synthetic charts |
-| **Supported Metric Types** | Gauges, Counters, Meters, Timers, Histograms, Sets, Dictionaries |
-| **Transport** | Both UDP (low-overhead) and TCP (reliable, higher volume) supported |
-| **Performance** | Can collect millions of metrics per second using just 1 CPU core |
-| **Integration** | Built directly into Netdata - no extra installation needed |
-| **Language Support** | Use with Python, Node.js, Java, Go, Ruby, Shell scripts, and more |
+| Feature                    | Description                                                                |
+|----------------------------|----------------------------------------------------------------------------|
+| **Metric Collection**      | Collect real-time metrics from any application supporting StatsD protocol  |
+| **Visualization**          | View metrics as private charts (one per metric) or custom synthetic charts |
+| **Supported Metric Types** | Gauges, Counters, Meters, Timers, Histograms, Sets, Dictionaries           |
+| **Transport**              | Both UDP (low-overhead) and TCP (reliable, higher volume) supported        |
+| **Performance**            | Can collect millions of metrics per second using just 1 CPU core           |
+| **Integration**            | Built directly into Netdata - no extra installation needed                 |
+| **Language Support**       | Use with Python, Node.js, Java, Go, Ruby, Shell scripts, and more          |
 
 :::tip
 
@@ -26,15 +26,15 @@ Want a hands-on example? [Jump to the K6 StatsD Walkthrough](#step-by-step-guide
 
 ## Supported Metric Types Summary
 
-| Metric Type   | Purpose                                          | Format             | LLM Summary                                                                 |
-| ------------- | ------------------------------------------------ | ------------------ | --------------------------------------------------------------------------- |
-| Gauges        | Report current values                            | `name:value|g`      | Report latest value; can increment/decrement; supports sampling & tags.       |
-| Counters      | Count events                                     | `name:value|c/C/m`  | Report rate & event count; `:value` optional (default 1); supports sampling & tags. |
-| Meters        | Count events (rate-focused)                      | `name:value|m`      | Report rate & event count; `:value` optional (default 1); supports sampling & tags. |
-| Timers        | Statistical analysis of values (duration)        | `name:value|ms`     | Report min, max, avg, percentiles, median, stddev, count; supports sampling & tags. |
-| Histograms    | Statistical analysis of values (distribution)    | `name:value|h`      | Report min, max, avg, percentiles, median, stddev, count; supports sampling & tags. |
-| Sets          | Count unique occurrences                         | `name:value|s`      | Report unique count & event count; sampling NOT supported; values as text; supports tags. |
-| Dictionaries  | Count occurrences of distinct values             | `name:value|d`      | Report counts per value & total updates; sampling NOT supported; values as text; supports tags. |
+| Metric Type  | Purpose                                       | Format              | LLM Summary                                                                                     |
+|--------------|-----------------------------------------------|---------------------|-------------------------------------------------------------------------------------------------|
+| Gauges       | Report current values                         | `name:value\|g`     | Report latest value; can increment/decrement; supports sampling & tags.                         |
+| Counters     | Count events                                  | `name:value\|c/C/m` | Report rate & event count; `:value` optional (default 1); supports sampling & tags.             |
+| Meters       | Count events (rate-focused)                   | `name:value\|m`     | Report rate & event count; `:value` optional (default 1); supports sampling & tags.             |
+| Timers       | Statistical analysis of values (duration)     | `name:value\|ms`    | Report min, max, avg, percentiles, median, stddev, count; supports sampling & tags.             |
+| Histograms   | Statistical analysis of values (distribution) | `name:value\|h`     | Report min, max, avg, percentiles, median, stddev, count; supports sampling & tags.             |
+| Sets         | Count unique occurrences                      | `name:value\|s`     | Report unique count & event count; sampling NOT supported; values as text; supports tags.       |
+| Dictionaries | Count occurrences of distinct values          | `name:value\|d`     | Report counts per value & total updates; sampling NOT supported; values as text; supports tags. |
 
 ### How StatsD Works with Netdata
 
@@ -64,26 +64,26 @@ Since StatsD is embedded in Netdata, **you effectively have a StatsD server on e
 
 :::note
 
-**Netdata's StatsD implementation is incredibly fast.** It can collect **several million metrics per second** on modern hardware using just 1 CPU core. The implementation uses two threads: one collects metrics, and another updates charts from the collected data.
+**Netdata's StatsD implementation is incredibly fast.** It can collect **several million metrics per second** on modern hardware using just one CPU core. The implementation uses two threads: one collects metrics, and the other updates the charts.
 
 :::
 
 ## Pre-configured StatsD Applications
 
-Netdata includes **synthetic chart definitions** to automatically present application metrics in a consistent way. These are defined in configuration files that you can use as-is or customize.
+Netdata includes **synthetic chart definitions** to automatically present application metrics consistently. These are defined in configuration files that you can use as-is or customize.
 
 For synthetic charts, you can set up alerts just like with any other metric or chart.
 
 Currently available applications:
 
 - [K6 load testing tool](https://k6.io)
-  - **Description:** k6 is a developer-centric, free and open-source load testing tool for performance testing
-  - [Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/k6.md)
-  - [Configuration](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/k6.conf)
+    - **Description:** k6 is a developer-centric, free, and open-source load testing tool for performance testing
+    - [Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/k6.md)
+    - [Configuration](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/k6.conf)
 - [Asterisk](https://www.asterisk.org/)
-  - **Description:** Asterisk is an Open Source PBX and telephony toolkit
-  - [Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/asterisk.md)
-  - [Configuration](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/asterisk.conf)
+    - **Description:** Asterisk is an Open Source PBX and telephony toolkit
+    - [Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/asterisk.md)
+    - [Configuration](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/asterisk.conf)
 
 ## Supported Metric Types
 
@@ -123,6 +123,7 @@ graph TD
 - Sampling rate is supported
 - Tags can change chart units, family, and [dimension](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#d) name
 - When not collected, the last value will be shown if "show gaps" is disabled (default)
+
 </details>
 
 <details>
@@ -142,6 +143,7 @@ graph TD
 - Sampling rate is supported
 - Tags can change chart units, family, and dimension name
 - When not collected, StatsD shows zero until a new value arrives
+
 </details>
 
 <details>
@@ -159,6 +161,7 @@ graph TD
 - Sampling rate is supported
 - Tags can change chart units and family
 - When not collected, StatsD shows zero until a new value arrives
+
 </details>
 
 <details>
@@ -175,6 +178,7 @@ graph TD
 - Values are always treated as text (so `01` and `1` are different)
 - Tags can change chart units and family
 - When not collected, StatsD shows zero until a new value arrives
+
 </details>
 
 <details>
@@ -191,6 +195,7 @@ graph TD
 - Values are always treated as text (so `01` and `1` are different)
 - Tags can change chart units and family
 - When not collected, StatsD shows zero until a new value arrives
+
 </details>
 
 ## Advanced Features
@@ -216,7 +221,7 @@ You can append `|#tag1:value1,tag2:value2,tag3:value3` to metrics. Netdata curre
 
 :::tip
 
-For consistency, either send tags with every event or use the special `zinit` value to initialize charts. For example, send `my.metric:zinit|c|#units=bytes,name=size` at the beginning, then just `my.metric:VALUE|c` afterwards.
+For consistency, either send tags with every event or use the special `zinit` value to initialize charts. For example, send `my.metric:zinit|c|#units=bytes,name=size` at the beginning, then just `my.metric:VALUE|c` afterward.
 
 :::
 
@@ -297,16 +302,17 @@ graph TD
 The diagram shows how the configuration flows:
 
 1. The central `statsd.d config` connects to **three main components**:
-   - The **application** configuration
-   - The **dictionary** system
-   - **Chart definitions**
+    - The **application** configuration
+    - The **dictionary** system
+    - **Chart definitions**
 
 2. Each of these components serves a specific purpose:
-   - The **app** component handles **metric filtering**
-   - The **dictionary** manages **renaming metrics** for display
-   - **Chart definitions determine properties** like family, context, units, and priorities
+    - The **app** component handles **metric filtering**
+    - The **dictionary** manages **renaming metrics** for display
+    - **Chart definitions determine properties** like family, context, units, and priorities
 
 This structure allows for flexible and powerful metric configuration within Netdata's StatsD implementation.
+
 ### Key Configuration Options
 
 - **`enabled = yes|no`** - Controls whether StatsD is enabled
@@ -317,7 +323,7 @@ This structure allows for flexible and powerful metric configuration within Netd
 
 ## StatsD Charts
 
-Netdata can visualize StatsD collected metrics in 2 ways:
+Netdata can visualize StatsD collected metrics in two ways:
 
 1. **Private charts** - Each metric gets its own chart (default, no configuration needed)
 2. **Synthetic charts** - Combine multiple metrics into custom charts (requires configuration)
@@ -333,6 +339,7 @@ create private charts for metrics matching = !myapp.*.badmetric myapp.*
 ```
 
 You can configure a different memory mode specifically for StatsD charts:
+
 - `private charts memory mode`
 - `private charts history`
 
@@ -377,7 +384,7 @@ For ephemeral metrics, use `set charts as obsolete after` and `cleanup obsolete 
 
 ### Synthetic StatsD Charts
 
-Use synthetic charts to create dedicated sections on the dashboard to render your StatsD charts. 
+Use synthetic charts to create dedicated sections on the dashboard to render your StatsD charts.
 
 ```mermaid
 graph TD
@@ -396,9 +403,9 @@ graph TD
 
 Synthetic charts are organized in:
 
--   **Application** - Section in Netdata Dashboard
--   **Charts for each application** - Family/submenu in the Dashboard
--   **StatsD metrics for each chart** - Charts and context in the Dashboard
+- **Application** - Section in Netdata Dashboard
+- **Charts for each application** - Family/submenu in the Dashboard
+- **StatsD metrics for each chart** - Charts and context in the Dashboard
 
 #### Basic Configuration Structure
 
@@ -461,6 +468,7 @@ The `[app]` section defines the application and has these options:
 #### Dictionary Section
 
 `[dictionary]` defines name-value pairs for renaming metrics in synthetic charts. This allows you to:
+
 - Define dimension names globally for the whole app
 - Rename dimensions when using patterns
 - Create more human-readable names for technical metrics
@@ -502,7 +510,7 @@ Where:
 <summary><strong>Renaming StatsD Synthetic Charts' Metrics</strong></summary>
 <br/> 
 
-You can define a dictionary to rename metrics sent by StatsD clients. This enables you to send response `"200"` and have Netdata visualize it as `successful connection`.
+You can define a dictionary to rename metrics sent by StatsD clients. This allows you to transmit the response code `200` while Netdata displays it as `successful connection`.
 
 The `[dictionary]` section accepts any number of `name = value` pairs.
 
@@ -623,14 +631,15 @@ Using [jsocol/pystatsd](https://github.com/jsocol/pystatsd):
 
 ```python
 import statsd
+
 c = statsd.StatsClient('localhost', 8125)
-c.incr('foo') # Increment the 'foo' counter.
+c.incr('foo')  # Increment the 'foo' counter.
 for i in range(100000000):
-   c.incr('bar')
-   c.incr('foo')
-   if i % 3:
-       c.decr('bar')
-       c.timing('stats.timed', 320) # Record a 320ms 'stats.timed'.
+    c.incr('bar')
+    c.incr('foo')
+    if i % 3:
+        c.decr('bar')
+        c.timing('stats.timed', 320)  # Record a 320ms 'stats.timed'.
 ```
 
 See the [full documentation](https://statsd.readthedocs.io/en/v3.3/) for more details.
@@ -644,36 +653,37 @@ Using [sivy/node-statsd](https://github.com/sivy/node-statsd):
 
 ```javascript
   var StatsD = require('node-statsd'),
-      client = new StatsD();
+    client = new StatsD();
 
-  // Timing: sends a timing command with the specified milliseconds
-  client.timing('response_time', 42);
+// Timing: sends a timing command with the specified milliseconds
+client.timing('response_time', 42);
 
-  // Increment: Increments a stat by a value (default is 1)
-  client.increment('my_counter');
+// Increment: Increments a stat by a value (default is 1)
+client.increment('my_counter');
 
-  // Decrement: Decrements a stat by a value (default is -1)
-  client.decrement('my_counter');
+// Decrement: Decrements a stat by a value (default is -1)
+client.decrement('my_counter');
 
-  // Using the callback
-  client.set(['foo', 'bar'], 42, function(error, bytes){
+// Using the callback
+client.set(['foo', 'bar'], 42, function (error, bytes) {
     //this only gets called once after all messages have been sent
-    if(error){
-      console.error('Oh noes! There was an error:', error);
+    if (error) {
+        console.error('Oh noes! There was an error:', error);
     } else {
-      console.log('Successfully sent', bytes, 'bytes');
+        console.log('Successfully sent', bytes, 'bytes');
     }
-  });
+});
 
-  // Sampling, tags and callback are optional and could be used in any combination
-  client.histogram('my_histogram', 42, 0.25); // 25% Sample Rate
-  client.histogram('my_histogram', 42, ['tag']); // User-defined tag
-  client.histogram('my_histogram', 42, next); // Callback
-  client.histogram('my_histogram', 42, 0.25, ['tag']);
-  client.histogram('my_histogram', 42, 0.25, next);
-  client.histogram('my_histogram', 42, ['tag'], next);
-  client.histogram('my_histogram', 42, 0.25, ['tag'], next);
+// Sampling, tags and callback are optional and could be used in any combination
+client.histogram('my_histogram', 42, 0.25); // 25% Sample Rate
+client.histogram('my_histogram', 42, ['tag']); // User-defined tag
+client.histogram('my_histogram', 42, next); // Callback
+client.histogram('my_histogram', 42, 0.25, ['tag']);
+client.histogram('my_histogram', 42, 0.25, next);
+client.histogram('my_histogram', 42, ['tag'], next);
+client.histogram('my_histogram', 42, 0.25, ['tag'], next);
 ```
+
 </details>
 
 <details>
@@ -685,6 +695,7 @@ StatsD clients are available for many languages:
 - Golang: [alexcesaro/statsd](https://github.com/alexcesaro/statsd)
 - Ruby: [reinh/statsd](https://github.com/reinh/statsd)
 - Java: [DataDog/java-dogstatsd-client](https://github.com/DataDog/java-dogstatsd-client)
+
 </details>
 
 <details>
@@ -786,6 +797,7 @@ This guide demonstrates how to use Netdata's StatsD to visualize metrics from [k
 
 - A node with [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) installed
 - [k6](https://k6.io/docs/getting-started/installation) installed
+
 </details>
 
 <details>
@@ -793,14 +805,15 @@ This guide demonstrates how to use Netdata's StatsD to visualize metrics from [k
 <br/> 
 
 1. **Run an experiment** sending StatsD metrics to Netdata without configuration
-   - This creates a private chart per metric
-   - Reload the dashboard after starting to send data
-   
+    - This creates a private chart per metric
+    - Reload the dashboard after starting to send data
+
 2. **Create a configuration file** for your app:
    ```
    sudo ./edit-config statsd.d/myapp.conf
    ```
-   - This organizes metrics into meaningful sections
+    - This organizes metrics into meaningful sections
+
 </details>
 
 <details>
@@ -810,8 +823,10 @@ This guide demonstrates how to use Netdata's StatsD to visualize metrics from [k
 First, understand what metrics your application provides. For k6, check their [metrics documentation](https://k6.io/docs/using-k6/metrics/).
 
 When instrumenting your own code, you'll need to decide:
+
 - What to measure
 - Which StatsD metric type is appropriate for each measurement
+
 </details>
 
 <details>
@@ -843,6 +858,7 @@ Start with this basic configuration:
     gaps when not collected = no
     memory mode = dbengine
 ```
+
 </details>
 
 <details>
@@ -863,6 +879,7 @@ Next, decide how to organize metrics in the Netdata dashboard:
 2. **Families** - Group charts into dashboard submenus. For k6, we'll use `k6 native metrics` and `http metrics` families.
 
 3. **[Dimensions](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#d)** - Choose which metrics to show and how to group them in charts
+
 </details>
 
 <details>
@@ -984,7 +1001,7 @@ netdataDashboard.context = {
 };
 ```
 
-These descriptions help users monitoring your application, especially during incidents. The `info` field supports HTML, allowing you to embed links and instructions.
+These descriptions help users monitor your application, especially during incidents. The `info` field supports HTML, allowing you to embed links and instructions.
 </details>
 
 <details>
@@ -997,4 +1014,5 @@ Once you've created a working configuration, consider sharing it with the Netdat
 2. Fork the netdata/netdata repository
 3. Place your configuration file in `netdata/collectors/statsd.plugin`
 4. Add a reference in `netdata/collectors/statsd.plugin/Makefile.am`
+
 </details>
