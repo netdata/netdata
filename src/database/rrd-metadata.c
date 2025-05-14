@@ -3,6 +3,7 @@
 #define RRDHOST_INTERNALS
 #include "rrd.h"
 #include "rrd-metadata.h"
+#include "contexts/rrdcontext-context-registry.h"
 
 // Collect metrics metadata from all hosts
 RRDSTATS_METADATA rrdstats_metadata_collect(void) {
@@ -10,7 +11,7 @@ RRDSTATS_METADATA rrdstats_metadata_collect(void) {
         .nodes = { .total = 0, .receiving = 0, .sending = 0, .archived = 0 },
         .metrics = { .collected = 0, .available = 0 },
         .instances = { .collected = 0, .available = 0 },
-        .contexts = { .collected = 0, .available = 0 }
+        .contexts = { .collected = 0, .available = 0, .unique = 0 }
     };
 
     rrd_rdlock();
@@ -45,6 +46,9 @@ RRDSTATS_METADATA rrdstats_metadata_collect(void) {
     dfe_done(host);
 
     rrd_rdunlock();
+    
+    // Get the count of unique contexts from our registry
+    metadata.contexts.unique = rrdcontext_context_registry_unique_count();
 
     return metadata;
 }

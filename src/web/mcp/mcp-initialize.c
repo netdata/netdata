@@ -2,6 +2,8 @@
 
 #include "mcp-initialize.h"
 #include "database/rrd-metadata.h"
+#include "database/rrd-retention.h"
+#include "daemon/common.h"
 
 // Initialize handler - provides information about what's available (transport-agnostic)
 int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
@@ -32,6 +34,9 @@ int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t
     
     // Use rrdstats_metadata_collect to get infrastructure statistics
     RRDSTATS_METADATA metadata = rrdstats_metadata_collect();
+    
+    // Use rrdstats_retention_collect to get retention information
+    RRDSTATS_RETENTION retention = rrdstats_retention_collect();
     
     // Add protocol version based on what client requested
     json_object_object_add(result, "protocolVersion",
@@ -114,7 +119,30 @@ int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t
     // Add _meta field (optional)
     struct json_object *meta = json_object_new_object();
     json_object_object_add(meta, "generator", json_object_new_string("netdata"));
-    json_object_object_add(meta, "timestamp", json_object_new_int64((int64_t)now_realtime_sec()));
+    
+    // Get current time and calculate uptimes
+    time_t now = now_realtime_sec();
+    time_t system_uptime_seconds = now_boottime_sec();
+    time_t netdata_uptime_seconds = now - netdata_start_time;
+    
+    json_object_object_add(meta, "timestamp", json_object_new_int64((int64_t)now));
+    
+    // Add system uptime info - both raw seconds and human-readable format
+    char human_readable[128];
+    duration_snprintf_time_t(human_readable, sizeof(human_readable), system_uptime_seconds);
+    
+    struct json_object *system_uptime = json_object_new_object();
+    json_object_object_add(system_uptime, "seconds", json_object_new_int64((int64_t)system_uptime_seconds));
+    json_object_object_add(system_uptime, "human", json_object_new_string(human_readable));
+    json_object_object_add(meta, "system_uptime", system_uptime);
+    
+    // Add netdata uptime info - both raw seconds and human-readable format
+    duration_snprintf_time_t(human_readable, sizeof(human_readable), netdata_uptime_seconds);
+    
+    struct json_object *netdata_uptime = json_object_new_object();
+    json_object_object_add(netdata_uptime, "seconds", json_object_new_int64((int64_t)netdata_uptime_seconds));
+    json_object_object_add(netdata_uptime, "human", json_object_new_string(human_readable));
+    json_object_object_add(meta, "netdata_uptime", netdata_uptime);
 
     // Add infrastructure statistics to metadata
     struct json_object *infrastructure = json_object_new_object();
@@ -124,30 +152,90 @@ int mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t
     json_object_object_add(nodes, "total", json_object_new_int64(metadata.nodes.total));
     json_object_object_add(nodes, "receiving_from_children", json_object_new_int64(metadata.nodes.receiving));
     json_object_object_add(nodes, "sending_to_next_parent", json_object_new_int64(metadata.nodes.sending));
-    json_object_object_add(nodes, "old_but_available_for_queries", json_object_new_int64(metadata.nodes.archived));
-    json_object_object_add(nodes, "info", json_object_new_string("Nodes are Netdata Agent installations or virtual Netdata nodes or SNMP devices."));
+    json_object_object_add(nodes, "archived_but_available_for_queries", json_object_new_int64(metadata.nodes.archived));
+    json_object_object_add(nodes, "info", json_object_new_string("Nodes (or hosts, or servers, or devices) are Netdata Agent installations or virtual Netdata nodes or SNMP devices."));
     json_object_object_add(infrastructure, "nodes", nodes);
 
     // Add metrics statistics
     struct json_object *metrics = json_object_new_object();
     json_object_object_add(metrics, "currently_being_collected", json_object_new_int64(metadata.metrics.collected));
-    json_object_object_add(metrics, "old_but_available_for_queries", json_object_new_int64(metadata.metrics.available));
+    json_object_object_add(metrics, "total_available_for_queries", json_object_new_int64(metadata.metrics.available));
     json_object_object_add(metrics, "info", json_object_new_string("Metrics are unique time-series in the Netdata time-series database."));
     json_object_object_add(infrastructure, "metrics", metrics);
 
     // Add instances statistics
     struct json_object *instances = json_object_new_object();
     json_object_object_add(instances, "currently_being_collected", json_object_new_int64(metadata.instances.collected));
-    json_object_object_add(instances, "old_but_available_for_queries", json_object_new_int64(metadata.instances.available));
-    json_object_object_add(instances, "info", json_object_new_string("Instances are collections of metrics referring to a component (disk, network interface, db table, etc) or application."));
+    json_object_object_add(instances, "total_available_for_queries", json_object_new_int64(metadata.instances.available));
+    json_object_object_add(instances, "info", json_object_new_string("Instances are collections of metrics referring to a component (system, disk, network interface, application, process, container, etc)."));
     json_object_object_add(infrastructure, "instances", instances);
 
     // Add contexts statistics
     struct json_object *contexts = json_object_new_object();
-    json_object_object_add(contexts, "currently_being_collected", json_object_new_int64(metadata.contexts.collected));
-    json_object_object_add(contexts, "old_but_available_for_queries", json_object_new_int64(metadata.contexts.available));
-    json_object_object_add(contexts, "info", json_object_new_string("Contexts are unique multi-node and multi-instance charts as shown on the Netdata dashboards, like system.cpu (system CPU utilization), or cgroup.disk_io (containers disk throughput)."));
+    json_object_object_add(contexts, "unique_across_all_nodes", json_object_new_int64(metadata.contexts.unique));
+    json_object_object_add(contexts, "info", json_object_new_string("Contexts are distinct charts shown on the Netdata dashboards, like system.cpu (system CPU utilization), or net.net (network interfaces bandwidth). When monitoring applications, the context usually includes the application name."));
     json_object_object_add(infrastructure, "contexts", contexts);
+
+    // Add retention information
+    if (retention.storage_tiers > 0) {
+        struct json_object *retention_obj = json_object_new_object();
+        struct json_object *tiers_array = json_object_new_array();
+
+        for (size_t i = 0; i < retention.storage_tiers; i++) {
+            RRD_STORAGE_TIER *tier_info = &retention.tiers[i];
+            
+            // Skip empty tiers
+            if (tier_info->metrics == 0 && tier_info->samples == 0)
+                continue;
+                
+            struct json_object *tier = json_object_new_object();
+            
+            // Add basic tier info
+            json_object_object_add(tier, "tier", json_object_new_int64(tier_info->tier));
+            json_object_object_add(tier, "backend", json_object_new_string(
+                tier_info->backend == STORAGE_ENGINE_BACKEND_DBENGINE ? "dbengine" : 
+                tier_info->backend == STORAGE_ENGINE_BACKEND_RRDDIM ? "ram" : "unknown"));
+            json_object_object_add(tier, "granularity", json_object_new_int64(tier_info->group_seconds));
+            json_object_object_add(tier, "granularity_human", json_object_new_string(tier_info->granularity_human));
+            
+            // Add metrics info
+            json_object_object_add(tier, "metrics", json_object_new_int64(tier_info->metrics));
+            json_object_object_add(tier, "samples", json_object_new_int64(tier_info->samples));
+            
+            // Add storage info when available
+            if (tier_info->disk_max > 0) {
+                json_object_object_add(tier, "disk_used", json_object_new_int64(tier_info->disk_used));
+                json_object_object_add(tier, "disk_max", json_object_new_int64(tier_info->disk_max));
+                // Format disk_percent to have only 2 decimal places
+                double rounded_percent = floor(tier_info->disk_percent * 100.0 + 0.5) / 100.0;
+                json_object_object_add(tier, "disk_percent", json_object_new_double(rounded_percent));
+            }
+            
+            // Add retention info
+            if (tier_info->retention > 0) {
+                json_object_object_add(tier, "first_time_s", json_object_new_int64(tier_info->first_time_s));
+                json_object_object_add(tier, "last_time_s", json_object_new_int64(tier_info->last_time_s));
+                json_object_object_add(tier, "retention", json_object_new_int64(tier_info->retention));
+                json_object_object_add(tier, "retention_human", json_object_new_string(tier_info->retention_human));
+                
+                if (tier_info->requested_retention > 0) {
+                    json_object_object_add(tier, "requested_retention", json_object_new_int64(tier_info->requested_retention));
+                    json_object_object_add(tier, "requested_retention_human", json_object_new_string(tier_info->requested_retention_human));
+                }
+                
+                if (tier_info->expected_retention > 0) {
+                    json_object_object_add(tier, "expected_retention", json_object_new_int64(tier_info->expected_retention));
+                    json_object_object_add(tier, "expected_retention_human", json_object_new_string(tier_info->expected_retention_human));
+                }
+            }
+            
+            json_object_array_add(tiers_array, tier);
+        }
+        
+        json_object_object_add(retention_obj, "tiers", tiers_array);
+        json_object_object_add(retention_obj, "info", json_object_new_string("Metrics retention information for each storage tier in the Netdata database.\nHigher tiers can provide min, max, average, sum and anomaly rate with the same accuracy as tier 0.\nTiers are automatically selected during query."));
+        json_object_object_add(infrastructure, "retention", retention_obj);
+    }
 
     json_object_object_add(meta, "infrastructure", infrastructure);
     json_object_object_add(result, "_meta", meta);

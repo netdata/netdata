@@ -1621,6 +1621,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrd.h
         src/database/rrd-metadata.c
         src/database/rrd-metadata.h
+        src/database/rrd-retention.c
+        src/database/rrd-retention.h
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
@@ -1690,6 +1692,8 @@ set(RRD_PLUGIN_FILES
         src/database/pattern-array.c
         src/database/pattern-array.h
         src/database/contexts/rrdcontext-queues.c
+        src/database/contexts/rrdcontext-context-registry.c
+        src/database/contexts/rrdcontext-context-registry.h
 )
 
 if(ENABLE_DBENGINE)
