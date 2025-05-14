@@ -155,7 +155,8 @@ int websocket_protocol_send_frame(
         // Calculate compressed size if successful
         if (!success || total_out <= 4) {
             // Compression failed
-            websocket_error(wsc, "Compression failed: %s (ret = %d, avail_in = %d, avail_out = %d, total_in = %d, total_out = %d) - "
+            websocket_error(wsc, "Compression failed: %s "
+                                 "(ret = %d, avail_in = %u, avail_out = %u, total_in = %lu, total_out = %lu) - "
                                  "sending uncompressed payload",
                             zError(ret), ret, avail_in, avail_out, total_in, total_out);
             compress = false;
