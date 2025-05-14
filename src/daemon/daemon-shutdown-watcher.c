@@ -120,7 +120,7 @@ void *watcher_main(void *arg)
 
     // wait until the agent starts the shutdown process
     completion_wait_for(&shutdown_begin_completion);
-    netdata_log_error("Shutdown process started");
+    netdata_log_info("Shutdown process started");
 
     usec_t shutdown_start_time = now_monotonic_usec();
 
@@ -138,7 +138,6 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS, shutdown_start_time);
@@ -151,8 +150,10 @@ void *watcher_main(void *arg)
     usec_t shutdown_end_time = now_monotonic_usec();
 
     usec_t shutdown_duration = shutdown_end_time - shutdown_start_time;
-    netdata_log_error("Shutdown process ended in %llu milliseconds",
-                      shutdown_duration / USEC_PER_MS);
+
+    char shutdown_timing[64];
+    duration_snprintf(shutdown_timing, sizeof(shutdown_timing), (int64_t)shutdown_duration, "us", 1);
+    netdata_log_info("Shutdown process ended in %s", shutdown_timing);
 
     daemon_status_file_shutdown_step(NULL, buffer_tostring(steps_timings));
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
@@ -171,7 +172,6 @@ void watcher_thread_start() {
         "stop exporters, health and web servers threads";
     watcher_steps[WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS].msg = "stop collectors and streaming threads";
     watcher_steps[WATCHER_STEP_ID_STOP_REPLICATION_THREADS].msg = "stop replication threads";
-    watcher_steps[WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN].msg = "prepare metasync shutdown";
     watcher_steps[WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS].msg = "disable ML detection and training threads";
     watcher_steps[WATCHER_STEP_ID_STOP_CONTEXT_THREAD].msg = "stop context thread";
     watcher_steps[WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE].msg = "clear web client cache";
@@ -195,7 +195,7 @@ void watcher_thread_start() {
     completion_init(&shutdown_begin_completion);
     completion_init(&shutdown_end_completion);
 
-    watcher_thread = nd_thread_create("EXIT_WATCHER", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
+    watcher_thread = nd_thread_create("EXIT_WATCHER", NETDATA_THREAD_OPTION_DEFAULT, watcher_main, NULL);
 }
 
 void watcher_thread_stop() {

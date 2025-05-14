@@ -184,7 +184,7 @@ static void workers_total_spinlock_contention_chart(void) {
              wusp;
              wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
             const char *func = (const char *)idx;
-            RRDDIM *rd = rrddim_find(st, func);
+            RRDDIM *rd = rrddim_find(st, func, false);
             if(!rd) rd = rrddim_add(st, func, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(st, rd, (collected_number)wusp->locks);
         }
@@ -216,7 +216,7 @@ static void workers_total_spinlock_contention_chart(void) {
              wusp;
              wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
             const char *func = (const char *)idx;
-            RRDDIM *rd = rrddim_find(st, func);
+            RRDDIM *rd = rrddim_find(st, func, false);
             if(!rd) rd = rrddim_add(st, func, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(st, rd, (collected_number)wusp->spins);
         }
@@ -248,7 +248,7 @@ static void workers_total_spinlock_contention_chart(void) {
              wusp;
              wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
             const char *func = (const char *)idx;
-            RRDDIM *rd = rrddim_find(st, func);
+            RRDDIM *rd = rrddim_find(st, func, false);
             if(!rd) rd = rrddim_add(st, func, NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             if(!wusp->locks)
                 rrddim_set_by_pointer(st, rd, 0);

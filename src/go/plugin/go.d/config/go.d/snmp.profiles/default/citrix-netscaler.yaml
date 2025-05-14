@@ -23,10 +23,14 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.5951.4.1.1.41.1.0
+    description: CPU utilization percentage
+    unit: "%"
   - MIB: NS-ROOT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.5951.4.1.1.41.2.0
+    description: Percentage of memory utilization on NetScaler
+    unit: "%"
   # - MIB: NS-ROOT-MIB
   #   symbol:
   #     name: netscaler.sysHighAvailabilityMode
@@ -54,10 +58,14 @@ metrics:
       name: netscaler.haTotStateTransitions
       OID: 1.3.6.1.4.1.5951.4.1.1.23.4.0
     metric_type: monotonic_count
+    description: Total number of master state changes of the NetScaler appliance
+    unit: "{state_transition}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.haTimeofLastStateTransition
       OID: 1.3.6.1.4.1.5951.4.1.1.23.5.0
+    description: Time since last master state transition
+    unit: "ms"
   # - MIB: NS-ROOT-MIB
   #   symbol:
   #     name: netscaler.haCurStatus
@@ -90,172 +98,246 @@ metrics:
     symbol:
       name: netscaler.svcCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.1.0
+    description: Number of services defined on the NetScaler appliance
+    unit: "{service}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.serverCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.2.0
+    description: Number of servers defined on the NetScaler appliance
+    unit: "{server}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcgroupCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.3.0
+    description: Number of service groups defined on the NetScaler appliance
+    unit: "{service_group}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcgroupmemCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.4.0
+    description: Number of service group members defined on the NetScaler appliance
+    unit: "{service_group_member}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.syssvcCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.5.0
+    description: Number of system services
+    unit: "{service}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sysupsvcCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.6.0
+    description: Number of system up services
+    unit: "{service}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sysupsvcitmCount
       OID: 1.3.6.1.4.1.5951.4.1.2.6.7.0
+    description: Number of system up service items
+    unit: "{service_item}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.curConfigVservers
       OID: 1.3.6.1.4.1.5951.4.1.3.5.1.0
+    description: Total number of vservers configured on the NetScaler
+    unit: "{vserver}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.vsvrBindCount
       OID: 1.3.6.1.4.1.5951.4.1.3.5.2.0
+    description: Number of virtual server bindings on the NetScaler appliance
+    unit: "{binding}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.vsvrSvcGrpBindCount
       OID: 1.3.6.1.4.1.5951.4.1.3.5.3.0
+    description: Number of virtual server service group bindings on the NetScaler appliance
+    unit: "{binding}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.curConfigLbVservers
       OID: 1.3.6.1.4.1.5951.4.1.3.5.4.0
+    description: Number of load balancing vservers configured on the NetScaler
+    unit: "{vserver}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.curConfigGslbVservers
       OID: 1.3.6.1.4.1.5951.4.1.3.5.5.0
+    description: Number of GSLB vservers configured on the NetScaler
+    unit: "{vserver}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.totSpilloverCount
       OID: 1.3.6.1.4.1.5951.4.1.3.5.6.0
     metric_type: monotonic_count
+    description: Number of times spillover occurred on the NetScaler
+    unit: "{spillover}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sslCurSessions
       OID: 1.3.6.1.4.1.5951.4.1.1.47.296.0
+    description: Number of active SSL sessions on the NetScaler appliance
+    unit: "{session}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sslSessionsPerSec
       OID: 1.3.6.1.4.1.5951.4.1.1.47.3.0
+    description: SSL sessions per second between client and NetScaler appliance
+    unit: "1.s"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpCurClientConnEstablished
       OID: 1.3.6.1.4.1.5951.4.1.1.46.12.0
+    description: Current client connections in the established state
+    unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpErrAnyPortFail
       OID: 1.3.6.1.4.1.5951.4.1.1.46.69.0
     metric_type: monotonic_count
+    description: Port allocations failed on mapped IP address
+    unit: "{failure}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpErrIpPortFail
       OID: 1.3.6.1.4.1.5951.4.1.1.46.70.0
     metric_type: monotonic_count
+    description: Port allocations failed on subnet or vserver IP address
+    unit: "{failure}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpErrRetransmit
       OID: 1.3.6.1.4.1.5951.4.1.1.46.59.0
     metric_type: monotonic_count
+    description: TCP packets retransmitted
+    unit: "{packet}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpTotRxPkts
       OID: 1.3.6.1.4.1.5951.4.1.1.46.61.0
     metric_type: monotonic_count
+    description: TCP packets received
+    unit: "{packet}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpTotTxPkts
       OID: 1.3.6.1.4.1.5951.4.1.1.46.63.0
     metric_type: monotonic_count
+    description: TCP packets transmitted
+    unit: "{packet}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotGets
       OID: 1.3.6.1.4.1.5951.4.1.1.48.45.0
     metric_type: monotonic_count
+    description: HTTP requests received using the GET method
+    unit: "{request}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotPosts
       OID: 1.3.6.1.4.1.5951.4.1.1.48.46.0
     metric_type: monotonic_count
+    description: HTTP requests received using the POST method
+    unit: "{request}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotOthers
       OID: 1.3.6.1.4.1.5951.4.1.1.48.47.0
     metric_type: monotonic_count
+    description: HTTP requests received using methods other than GET and POST
+    unit: "{request}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotRxRequestBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.48.0
     metric_type: monotonic_count
+    description: Bytes of HTTP data received
+    unit: "By"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotRxResponseBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.49.0
     metric_type: monotonic_count
+    description: Bytes received as response data
+    unit: "By"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotTxRequestBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.50.0
     metric_type: monotonic_count
+    description: Bytes of HTTP data transmitted
+    unit: "By"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotTxResponseBytes
       OID: 1.3.6.1.4.1.5951.4.1.1.48.51.0
     metric_type: monotonic_count
+    description: Bytes transmitted as response data
+    unit: "By"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTot10Requests
       OID: 1.3.6.1.4.1.5951.4.1.1.48.52.0
     metric_type: monotonic_count
+    description: HTTP/1.0 requests received
+    unit: "{request}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTotResponses
       OID: 1.3.6.1.4.1.5951.4.1.1.48.53.0
     metric_type: monotonic_count
+    description: HTTP responses sent including HTTP/1.0 and HTTP/1.1 responses
+    unit: "{response}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpTot10Responses
       OID: 1.3.6.1.4.1.5951.4.1.1.48.54.0
     metric_type: monotonic_count
+    description: HTTP/1.0 responses sent
+    unit: "{response}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrIncompleteRequests
       OID: 1.3.6.1.4.1.5951.4.1.1.48.57.0
     metric_type: monotonic_count
+    description: HTTP requests received with incomplete headers
+    unit: "{request}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrIncompleteResponses
       OID: 1.3.6.1.4.1.5951.4.1.1.48.58.0
     metric_type: monotonic_count
+    description: HTTP responses received with incomplete headers
+    unit: "{response}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrIncompleteHeaders
       OID: 1.3.6.1.4.1.5951.4.1.1.48.60.0
     metric_type: monotonic_count
+    description: HTTP requests and responses with incomplete headers
+    unit: "{header}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.httpErrServerBusy
       OID: 1.3.6.1.4.1.5951.4.1.1.48.61.0
     metric_type: monotonic_count
+    description: HTTP error responses indicating server busy
+    unit: "{error}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcTotalClients
       OID: 1.3.6.1.4.1.5951.4.1.2.1.1.48.0
     metric_type: monotonic_count
+    description: Total number of established client connections
+    unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.svcTotalServers
       OID: 1.3.6.1.4.1.5951.4.1.2.1.1.49.0
     metric_type: monotonic_count
+    description: Total number of established server connections
+    unit: "{connection}"
   - MIB: NS-ROOT-MIB
     table:
       name: vserverTable
@@ -263,6 +345,8 @@ metrics:
     symbols:
       - name: netscaler.vsvrCurClntConnections
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.7
+        description: Number of current client connections
+        unit: "{connection}"
     metric_tags:
       - symbol:
           name: netscaler.vsvrName
@@ -358,12 +442,20 @@ metrics:
     symbols:
       - name: netscaler.sysHealthDiskSize
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.2
+        description: Total disk space in MBytes
+        unit: "MBy"
       - name: netscaler.sysHealthDiskAvail
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.3
+        description: Total disk space available in MBytes
+        unit: "MBy"
       - name: netscaler.sysHealthDiskUsed
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.4
+        description: Total disk space used in MBytes
+        unit: "MBy"
       - name: netscaler.sysHealthDiskPerusage
         OID: 1.3.6.1.4.1.5951.4.1.1.41.8.1.5
+        description: Percentage of disk space used
+        unit: "%"
     metric_tags:
       - symbol:
           name: netscaler.sysHealthDiskName
@@ -377,21 +469,35 @@ metrics:
       - name: netscaler.ifTotRxBytes
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.3
         metric_type: monotonic_count
+        description: Total bytes received on the specified interface
+        unit: "By"
       - name: netscaler.ifRxAvgBandwidthUsage
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.4
+        description: Average RX bandwidth on the specified interface in bits per second
+        unit: "bit/s"
       - name: netscaler.ifTotTxBytes
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.7
         metric_type: monotonic_count
+        description: Number of bytes transmitted from the specified interface
+        unit: "By"
       - name: netscaler.ifTxAvgBandwidthUsage
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.8
+        description: Average TX bandwidth on the specified interface in bits per second
+        unit: "bit/s"
       - name: netscaler.ifThroughput
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.48
+        description: Interface throughput in Mbps
+        unit: "Mbit/s"
       - name: netscaler.ifTotRxMbits
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.19
         metric_type: monotonic_count
+        description: Number of megabits received by the specified interface
+        unit: "Mbit"
       - name: netscaler.ifTotTxMbits
         OID: 1.3.6.1.4.1.5951.4.1.1.54.1.20
         metric_type: monotonic_count
+        description: Number of megabits transmitted by the specified interface
+        unit: "Mbit"
     metric_tags:
       - symbol:
           name: netscaler.ifName
@@ -409,9 +515,13 @@ metrics:
       - name: netscaler.vsvrServiceHits
         OID: 1.3.6.1.4.1.5951.4.1.3.2.1.5
         metric_type: monotonic_count
+        description: Number of times the service has been provided
+        unit: "{hit}"
       - name: netscaler.servicePersistentHits
         OID: 1.3.6.1.4.1.5951.4.1.3.2.1.6
         metric_type: monotonic_count
+        description: Total number of persistent hits
+        unit: "{hit}"
     metric_tags:
       - symbol:
           name: netscaler.vsvrServiceName
@@ -432,6 +542,8 @@ metrics:
     symbols:
       - name: netscaler.nsCPUusage
         OID: 1.3.6.1.4.1.5951.4.1.1.41.6.1.2
+        description: CPU utilization percentage
+        unit: "%"
     metric_tags:
       - symbol:
           name: netscaler.nsCPUname
@@ -441,15 +553,21 @@ metrics:
     symbol:
       name: netscaler.tcpCurClientConn
       OID: 1.3.6.1.4.1.5951.4.1.1.46.2.0
+    description: Client connections including opening, established, and closing states
+    unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.tcpCurServerConnEstablished
       OID: 1.3.6.1.4.1.5951.4.1.1.46.10.0
+    description: Current server connections in the established state
+    unit: "{connection}"
   - MIB: NS-ROOT-MIB
     symbol:
       name: netscaler.sslTotSessions
       OID: 1.3.6.1.4.1.5951.4.1.1.47.204.0
     metric_type: monotonic_count
+    description: Number of SSL sessions on the NetScaler appliance
+    unit: "{session}"
   - MIB: NS-ROOT-MIB
     table:
       name: lbvserverTable
@@ -457,10 +575,16 @@ metrics:
     symbols:
       - name: netscaler.lbvsvrPersistenceTimeOut
         OID: 1.3.6.1.4.1.5951.4.1.3.6.1.3
+        description: Timeout set for persistence
+        unit: "s"
       - name: netscaler.lbvsvrActiveConn
         OID: 1.3.6.1.4.1.5951.4.1.3.6.1.4
+        description: Number of connections currently active
+        unit: "{connection}"
       - name: netscaler.lbvsvrAvgSvrTTFB
         OID: 1.3.6.1.4.1.5951.4.1.3.6.1.5
+        description: Average time to first byte between NetScaler and server
+        unit: "ms"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.5951.4.1.3.6.1.1
@@ -591,17 +715,6 @@ metrics:
           117: mqtt_tls
           118: quic_bridge
           120: service_unknown
-      - symbol:
-          name: netscaler.svcgrpSvcGroupFullName
-          OID: 1.3.6.1.4.1.5951.4.1.2.11.1.4
-        tag: netscaler_svcgrp_svc_group_full_name
-      - symbol:
-          OID: 1.3.6.1.4.1.5951.4.1.2.11.1.3
-          name: netscaler.svcgrpSvcGroupState
-        tag: netscaler_svcgrp_svc_group_state
-        mapping:
-          0: disabled
-          1: enabled
   - MIB: NS-ROOT-MIB
     table:
       name: sslCertKeyTable
@@ -609,6 +722,8 @@ metrics:
     symbols:
       - name: netscaler.sslDaysToExpire
         OID: 1.3.6.1.4.1.5951.4.1.1.56.1.1.5
+        description: Number of days remaining for the certificate to expire
+        unit: "d"
     metric_tags:
       - symbol:
           name: netscaler.sslCertKeyName
@@ -621,45 +736,79 @@ metrics:
     symbols:
       - name: netscaler.vsvrCurSrvrConnections
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.8
+        description: Number of current connections to the actual servers behind the virtual server
+        unit: "{connection}"
       - name: netscaler.vsvrTotalRequests
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.30
         metric_type: monotonic_count
+        description: Total number of requests received on this service or virtual server
+        unit: "{request}"
       - name: netscaler.vsvrTotalRequestBytes
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.31
         metric_type: monotonic_count
+        description: Total number of request bytes received on this service or virtual server
+        unit: "By"
       - name: netscaler.vsvrTotalResponses
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.32
         metric_type: monotonic_count
+        description: Number of responses received on this service or virtual server
+        unit: "{response}"
       - name: netscaler.vsvrTotalResponseBytes
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.33
         metric_type: monotonic_count
+        description: Number of response bytes received by this service or virtual server
+        unit: "By"
       - name: netscaler.vsvrCurServicesDown
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.37
+        description: Current number of services bound to this vserver and are down
+        unit: "{service}"
       - name: netscaler.vsvrCurServicesUp
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.41
+        description: Current number of services bound to this vserver and are up
+        unit: "{service}"
       - name: netscaler.vsvrRequestRate
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.43
+        description: Request rate in requests per second for this service or virtual server
+        unit: "1.s"
       - name: netscaler.vsvrRxBytesRate
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.44
+        description: Request rate in bytes per second for this service or virtual server
+        unit: "By/s"
       - name: netscaler.vsvrTxBytesRate
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.45
+        description: Response rate in bytes per second for this service or virtual server
+        unit: "By/s"
       - name: netscaler.vsvrSynfloodRate
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.46
+        description: Rate of unacknowledged SYN packets for this service or virtual server
+        unit: "1.s"
       - name: netscaler.vsvrTotSpillOvers
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.54
         metric_type: monotonic_count
+        description: Number of times vserver experienced spill over
+        unit: "{spillover}"
       - name: netscaler.vsvrTotalClients
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.56
         metric_type: monotonic_count
+        description: Total number of established client connections
+        unit: "{connection}"
       - name: netscaler.vsvrTotalServicesBound
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.61
+        description: Current number of services bound to this vserver
+        unit: "{service}"
       - name: netscaler.vsvrHealth
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.62
+        description: Percentage of UP services bound to this vserver
+        unit: "%"
       - name: netscaler.vsvrTotalServers
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.65
         metric_type: monotonic_count
+        description: Total number of established server connections
+        unit: "{connection}"
       - name: netscaler.vsvrSoThreshold
         OID: 1.3.6.1.4.1.5951.4.1.3.1.1.70
+        description: Spillover threshold for the vserver
+        unit: "{spillover}"
     metric_tags:
       - symbol:
           name: netscaler.vsvrFullName
@@ -680,42 +829,74 @@ metrics:
     symbols:
       - name: netscaler.svcAvgTransactionTime
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.7
+        description: Average transaction time between NetScaler and the service
+        unit: "ms"
       - name: netscaler.svcEstablishedConn
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.8
+        description: Total number of connections in established state
+        unit: "{connection}"
       - name: netscaler.svcActiveConn
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.9
+        description: Number of connections currently active
+        unit: "{connection}"
       - name: netscaler.svcSurgeCount
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.10
+        description: Number of requests in the surge queue
+        unit: "{request}"
       - name: netscaler.svcTotalRequests
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.30
         metric_type: monotonic_count
+        description: Total number of requests received on this service or virtual server
+        unit: "{request}"
       - name: netscaler.svcTotalRequestBytes
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.31
         metric_type: monotonic_count
+        description: Total number of request bytes received on this service or virtual server
+        unit: "By"
       - name: netscaler.svcTotalResponses
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.32
         metric_type: monotonic_count
+        description: Number of responses received on this service or virtual server
+        unit: "{response}"
       - name: netscaler.svcTotalResponseBytes
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.33
         metric_type: monotonic_count
+        description: Number of response bytes received by this service or virtual server
+        unit: "By"
       - name: netscaler.svcTotalPktsRecvd
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.34
         metric_type: monotonic_count
+        description: Total number of packets received by this service or virtual server
+        unit: "{packet}"
       - name: netscaler.svcTotalPktsSent
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.35
         metric_type: monotonic_count
+        description: Total number of packets sent by this service or virtual server
+        unit: "{packet}"
       - name: netscaler.svcAvgSvrTTFB
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.38
+        description: Average time to first byte between NetScaler and the server
+        unit: "ms"
       - name: netscaler.svcCurClntConnections
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.41
+        description: Number of current client connections
+        unit: "{connection}"
       - name: netscaler.svcRequestRate
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.42
+        description: Request rate in requests per second for this service or virtual server
+        unit: "1.s"
       - name: netscaler.svcRxBytesRate
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.43
+        description: Request rate in bytes per second for this service or virtual server
+        unit: "By/s"
       - name: netscaler.svcTxBytesRate
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.44
+        description: Response rate in bytes per second for this service or virtual server
+        unit: "By/s"
       - name: netscaler.svcActiveTransactions
         OID: 1.3.6.1.4.1.5951.4.1.2.1.1.53
+        description: Number of active transactions handled by this service including surge queue
+        unit: "{transaction}"
     metric_tags:
       - symbol:
           name: netscaler.svcServiceName

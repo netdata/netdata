@@ -423,6 +423,14 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
             dmi_normalize_vendor_field(ds->product.vendor, sizeof(ds->product.vendor));
     }
 
+    if (!force_type &&
+        (strcasestr(ds->product.vendor, "Raspberry") != NULL ||
+        strcasestr(ds->product.vendor, "BananaPi") != NULL ||
+        strcasestr(ds->product.vendor, "OrangePi") != NULL ||
+        strcasestr(ds->product.vendor, "ODROID") != NULL)) {
+        force_type = "mini-pc";
+    }
+
     if(ds->cloud_instance_type[0] && strcasecmp(ds->cloud_instance_type, "unknown") != 0)
         safecpy(ds->product.name, ds->cloud_instance_type);
     else {

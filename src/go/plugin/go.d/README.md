@@ -190,7 +190,7 @@ Then [restart netdata](/docs/netdata-agent/start-stop-restart.md) for the change
 
 ## Troubleshooting
 
-Plugin CLI:
+### Plugin CLI
 
 ```sh
 Usage:
@@ -207,14 +207,22 @@ Help Options:
   -h, --help        Show this help message
 ```
 
-To debug specific module:
+### Debugging a Specific Module
 
-```sh
-# become user netdata
+To debug a particular module, first switch to the Netdata user:
+
+```bash
 sudo su -s /bin/bash netdata
-
-# run plugin in debug mode
-./go.d.plugin -d -m <module name>
 ```
 
-Change `<module name>` to the [module name](#available-modules) you want to debug.
+Then run the plugin in debug mode, specifying your target module:
+
+```bash
+# For standard installations
+/usr/libexec/netdata/plugins.d/go.d.plugin -d -m <module_name>
+
+# For static installations (e.g., in /opt)
+/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin -d -m <module_name>
+```
+
+Replace` <module_name>` with the [specific module](#available-modules) you wish to debug.

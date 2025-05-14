@@ -9,24 +9,44 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.1
         name: adapterRxPackets
+        description: Total number of packets received
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.2
         name: adapterTxPackets
+        description: Total number of packets transmitted
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.3
         name: adapterRxBytes
+        description: Total number of bytes received
+        unit: "By"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.4
         name: adapterTxBytes
+        description: Total number of bytes transmitted
+        unit: "By"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.5
         name: adapterRxErrors
+        description: Total number of packets received with errors (packets that failed to reach the protocol)
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.6
         name: adapterTxErrors
+        description: Total number of packets that failed to transmit
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.7
         name: adapterRxDropped
+        description: Total number of receive packets dropped due to overrun
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.8
         name: adapterTxDropped
+        description: Total number of transmit packets dropped due to successive collisions
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.9
         name: adapterRxMulticast
+        description: Total number of Multicast packets received
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.343.2.7.2.2.1.3.1.10
         name: adapterCollisions
+        description: Total number of single collisions
+        unit: "{collision}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.343.2.7.2.2.1.1.1.2

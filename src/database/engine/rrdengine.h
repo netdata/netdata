@@ -288,8 +288,9 @@ struct extent_io_descriptor {
     struct rrdengine_instance *ctx;
     void *buf;
     uint64_t pos;
-    unsigned descr_count;
-    unsigned bytes;
+    uint32_t descr_count;
+    uint32_t bytes;
+    uint32_t real_io_size;
     struct wal *wal;
     uv_file file;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
@@ -395,6 +396,7 @@ struct rrdengine_instance {
 
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
+        PAD64(bool) needs_indexing;
         PAD64(unsigned) extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
 
         PAD64(time_t) first_time_s;
@@ -463,7 +465,7 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
-void dbengine_event_loop(void *arg);
+void *dbengine_event_loop(void *arg);
 
 typedef void (*enqueue_callback_t)(struct rrdeng_cmd *cmd);
 typedef void (*dequeue_callback_t)(struct rrdeng_cmd *cmd);

@@ -1,60 +1,20 @@
 # Home tab
 
-The Home tab allows users to see an overview of their Room.
+The **Home tab** offers a **real-time overview of your Room** in Netdata Cloud. Use it to quickly assess your infrastructure’s health and key metrics at a glance.
 
-## Total nodes
+| Feature                        | Description                                                                                                                                                                                                                                                                                                                   |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Total nodes**                | Shows the total number of nodes, broken down by state: **Live**, **Offline**, or **Stale**.                                                                                                                                                                                                                                   |
+| **Active alerts**              | Displays the number of active alerts in a donut chart, with counters for both **Critical** and **Warning** alerts.                                                                                                                                                                                                            |
+| **Nodes map**                  | Interactive map with color-coded node statuses and hoverable details. Classify nodes by **Status**, **OS**, **Technology**, **Agent version**, **Replication factor**, **Cloud provider**, **Cloud region**, or **Instance type**. Configure color-coding by **Status**, **Connection stability**, or **Replication factor**. |
+| **Data replication**           | Two bar charts: (1) Node roles as **Parents**, **Children**, and **Standalone**. (2) Replication factors as **None**, **Single**, and **Multi**.                                                                                                                                                                              |
+| **Alerts overview (last 24h)** | Two views of alert activity: (1) Bar chart showing nodes with the most alerts in the last 24 hours. (2) Table of the top alerts, with instance name, number of occurrences, and duration (in seconds).                                                                                                                        |
+| **Netdata Assistant shortcut** | Button to start a conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md) for help and troubleshooting.                                                                                                                                                           |
+| **Space metrics**              | Displays key statistics: **Metrics collected**, **Charts visualized**, and **Alerts configured**.                                                                                                                                                                                                                             |
+| **Data retention per node**    | Bar chart showing the number of nodes grouped by retention period.                                                                                                                                                                                                                                                            |
 
-The total number of nodes is presented and dissected by their state, Live, Offline or Stale.
+:::tip
 
-## Active alerts
+Use the Home tab regularly to stay ahead of infrastructure issues and monitor alert trends at a glance.
 
-The number of active alerts is presented in a donut chart, while also having counters for both Critical and Warning alerts.
-
-## Nodes map
-
-A map consisting of node entries allows for quick hoverable information about each node, while also presenting node status in a color-coded way.
-
-The map classification can be altered, allowing the categorization of nodes by:
-
-- Status (e.g.,. Live)
-- OS (e.g., Ubuntu)
-- Technology (e.g., Container)
-- Agent version (e.g., v1.45.2)
-- Replication factor (e.g., Single, Multi)
-- Cloud provider (e.g., AWS)
-- Cloud region (e.g., us-east-1)
-- Instance type (e.g., c6a.xlarge)
-
-Color-coding can also be configured between:
-
-- Status (e.g., Live, Offline)
-- Connection stability (e.g., Stable, Unstable)
-- Replication factor (e.g., None, Single)
-
-## Data replication
-
-There are two views about data replication in the Home tab:
-
-The first bar chart presents the amount of **Parents**, **Children** and **Standalone** nodes.
-
-The second bar chart presents the number of nodes depending on their Replication factor, **None**, **Single** and **Multi**.
-
-## Alerts overview over the last 24h
-
-There are two views that display information about nodes that produced the most alerts and top alerts in the last 24 hours.
-
-The first bar chart presents the nodes that produced the most alerts in a time window of the last 24 hours.
-
-The second table contains the top alerts in the last 24 hours, along with their instance, the occurrences and their duration in seconds.
-
-## Netdata Assistant shortcut
-
-In the Home tab, there is a shortcut button to start an instant conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md).
-
-## Space metrics
-
-There are three key metrics that are displayed in the Home tab, **Metrics collected**, **Charts visualized** and **Alerts configured**.
-
-## Data retention per Nodes
-
-This bar chart shows the number of nodes based on their retention period.
+:::

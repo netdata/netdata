@@ -6,31 +6,30 @@
 // ----------------------------------------------------------------------------
 // traversal with loop
 
-void *dictionary_foreach_start_rw(DICTFE *dfe, DICTIONARY *dict, char rw) {
-    if(unlikely(!dfe || !dict)) return NULL;
+void *dictionary_foreach_start_rw(DICTFE *dfe) {
+    if(unlikely(!dfe || !dfe->dict)) return NULL;
 
-    DICTIONARY_STATS_TRAVERSALS_PLUS1(dict);
+    DICTIONARY_STATS_TRAVERSALS_PLUS1(dfe->dict);
 
-    if(unlikely(is_dictionary_destroyed(dict))) {
+    if(unlikely(is_dictionary_destroyed(dfe->dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_start_rw() on a destroyed dictionary");
-        dfe->counter = 0;
+        dfe->dict = NULL;
         dfe->item = NULL;
         dfe->name = NULL;
         dfe->value = NULL;
+        dfe->counter = 0;
         return NULL;
     }
 
     dfe->counter = 0;
-    dfe->dict = dict;
-    dfe->rw = rw;
     dfe->locked = true;
-    ll_recursive_lock(dict, dfe->rw);
+    ll_recursive_lock(dfe->dict, dfe->rw);
 
     // get the first item from the list
-    DICTIONARY_ITEM *item = dict->items.list;
+    DICTIONARY_ITEM *item = dfe->dict->items.list;
 
     // skip all the deleted items
-    while(item && !item_check_and_acquire(dict, item))
+    while(item && !item_check_and_acquire(dfe->dict, item))
         item = item->next;
 
     if(likely(item)) {
@@ -57,9 +56,7 @@ ALWAYS_INLINE void *dictionary_foreach_next(DICTFE *dfe) {
 
     if(unlikely(is_dictionary_destroyed(dfe->dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_foreach_next() on a destroyed dictionary");
-        dfe->item = NULL;
-        dfe->name = NULL;
-        dfe->value = NULL;
+        dictionary_foreach_done(dfe);
         return NULL;
     }
 
@@ -113,11 +110,6 @@ void dictionary_foreach_unlock(DICTFE *dfe) {
 
 void dictionary_foreach_done(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return;
-
-    if(unlikely(is_dictionary_destroyed(dfe->dict))) {
-        internal_error(true, "DICTIONARY: attempted to dictionary_foreach_next() on a destroyed dictionary");
-        return;
-    }
 
     // the item we just did
     DICTIONARY_ITEM *item = dfe->item;

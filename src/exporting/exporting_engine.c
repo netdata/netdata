@@ -131,33 +131,46 @@ static void exporting_main_cleanup(void *pptr)
 
     engine->exit = 1;
 
-    int found = 0;
-    usec_t max = 2 * USEC_PER_SEC, step = 50000;
+    size_t all = 0, exited = 0;
 
     for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
+        all++;
+
         if (!instance->exited) {
-            found++;
-            netdata_log_info("stopping worker for instance %s", instance->config.name);
-            uv_mutex_unlock(&instance->mutex);
+            netdata_log_info("EXPORTING: signaling worker '%s' to stop...", instance->config.name);
+            // Lock the mutex before signaling the condition variable
+            uv_mutex_lock(&instance->mutex);
             instance->data_is_ready = 1;
             uv_cond_signal(&instance->cond_var);
-        } else
-            netdata_log_info("found stopped worker for instance %s", instance->config.name);
+            uv_mutex_unlock(&instance->mutex);
+        }
+        else
+            netdata_log_info("EXPORTING: found worker '%s' already stopped", instance->config.name);
     }
 
-    while (found && max > 0) {
-        max -= step;
-        netdata_log_info("Waiting %d exporting connectors to finish...", found);
-        sleep_usec(step);
-        found = 0;
+    size_t iterations = 0;
+    while (exited < all) {
+        iterations++;
+        microsleep(10 * USEC_PER_MS);
 
+        exited = 0;
         for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
-            if (!instance->exited)
-                found++;
+            if (instance->exited) {
+                exited++;
+
+                if(instance->thread) {
+                    nd_thread_join(instance->thread);
+                    instance->thread = NULL;
+                }
+            }
+            else if(iterations % 100 == 0)
+                netdata_log_info("EXPORTING: still waiting for worker '%s' to exit...", instance->config.name);
         }
     }
 
+    // this must be called once all the worker thread have exited
     exporting_clean_engine();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -209,6 +222,7 @@ void *exporting_main(void *ptr)
         return NULL;
 #endif
     }
+    service_exits();
 
 cleanup:
     return NULL;

@@ -37,7 +37,7 @@ static void create_node_instance_result_job(const char *machine_guid, const char
 }
 
 struct aclk_sync_config_s {
-    uv_thread_t thread;
+    ND_THREAD *thread;
     uv_loop_t loop;
     uv_timer_t timer_req;
     uv_async_t async;
@@ -617,14 +617,14 @@ static void free_query_list(Pvoid_t JudyL)
     (!shutdown_requested || config->aclk_queries_running || config->alert_push_running ||                              \
      config->aclk_batch_job_is_running)
 
-static void aclk_synchronization_event_loop(void *arg)
+static void *aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
     config->ar = aral_by_size_acquire(sizeof(struct aclk_database_cmd));
     worker_register("ACLKSYNC");
 
-    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
+    service_register(NULL, NULL, NULL);
 
     worker_register_job_name(ACLK_DATABASE_NOOP,                "noop");
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,          "node state");
@@ -955,6 +955,7 @@ static void aclk_synchronization_event_loop(void *arg)
     worker_unregister();
     service_exits();
     netdata_log_info("ACLK SYNC: Shutting down ACLK synchronization event loop");
+    return NULL;
 }
 
 static void aclk_initialize_event_loop(void)
@@ -962,17 +963,10 @@ static void aclk_initialize_event_loop(void)
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     completion_init(&aclk_sync_config.start_stop_complete);
 
-    int retries = 0;
-    int create_uv_thread_rc = create_uv_thread(&aclk_sync_config.thread, aclk_synchronization_event_loop, &aclk_sync_config, &retries);
-    if (create_uv_thread_rc)
-        nd_log_daemon(NDLP_ERR, "Failed to create ACLK synchronization thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
+    aclk_sync_config.thread = nd_thread_create("ACLKSYNC", NETDATA_THREAD_OPTION_DEFAULT, aclk_synchronization_event_loop, &aclk_sync_config);
+    fatal_assert(NULL != aclk_sync_config.thread);
 
-    fatal_assert(0 == create_uv_thread_rc);
-
-    if (retries)
-        nd_log_daemon(NDLP_WARNING, "ACLK synchronization thread was created after %d attempts", retries);
     completion_wait_for(&aclk_sync_config.start_stop_complete);
-
     // Keep completion, just reset it for next use during shutdown
     completion_reset(&aclk_sync_config.start_stop_complete);
 }
@@ -1034,7 +1028,11 @@ void aclk_synchronization_init(void)
 
     nd_log_daemon(NDLP_INFO, "Created %d archived hosts", number_of_children);
     // Trigger host context load for hosts that have been created
-    metadata_queue_load_host_context();
+    if (unlikely(!metadata_queue_load_host_context())) {
+        nd_log_daemon(NDLP_WARNING, "Failed to queue command to load contexts for archived hosts");
+        // Reset context load flag so that contexts will be loaded on demand
+        reset_host_context_load_flag();
+    }
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
 
@@ -1070,9 +1068,9 @@ void aclk_synchronization_shutdown(void)
         completion_wait_for(&aclk_sync_config.start_stop_complete);
 
     completion_destroy(&aclk_sync_config.start_stop_complete);
-    int rc = uv_thread_join(&aclk_sync_config.thread);
+    int rc = nd_thread_join(aclk_sync_config.thread);
     if (rc)
-        nd_log_daemon(NDLP_ERR, "ACLK: Failed to join synchronization thread, error %s", uv_err_name(rc));
+        nd_log_daemon(NDLP_ERR, "ACLK: Failed to join synchronization thread");
     else
         nd_log_daemon(NDLP_INFO, "ACLK: synchronization thread shutdown completed");
 }

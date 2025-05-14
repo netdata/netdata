@@ -1,0 +1,7 @@
+type: netdataexporter
+github_project: github.com/netdata/netdata/otel-collector/exporter/netdataexporter
+
+status:
+  class: exporter
+  stability:
+    development: [metrics]

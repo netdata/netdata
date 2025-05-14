@@ -118,7 +118,7 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
 
     // lookup chart in host
 
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(vbd->host, chart_or_context);
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(vbd->host, chart_or_context, false);
     if(rsa) {
         if(variable_lookup_in_chart(vbd, rrdset_acquired_to_rrdset(rsa), false))
             found = true;

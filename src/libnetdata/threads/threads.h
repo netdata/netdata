@@ -7,15 +7,14 @@
 
 typedef enum __attribute__((packed)) {
     NETDATA_THREAD_OPTION_DEFAULT          = 0 << 0,
-    NETDATA_THREAD_OPTION_JOINABLE         = 1 << 0,
-    NETDATA_THREAD_OPTION_DONT_LOG_STARTUP = 1 << 1,
-    NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP = 1 << 2,
-    NETDATA_THREAD_STATUS_STARTED          = 1 << 3,
-    NETDATA_THREAD_STATUS_FINISHED         = 1 << 4,
-    NETDATA_THREAD_STATUS_JOINED           = 1 << 5,
+    NETDATA_THREAD_OPTION_DONT_LOG_STARTUP = 1 << 0,
+    NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP = 1 << 1,
+    NETDATA_THREAD_STATUS_STARTED          = 1 << 2,
+    NETDATA_THREAD_STATUS_FINISHED         = 1 << 3,
+    NETDATA_THREAD_STATUS_JOINED           = 1 << 4,
 } NETDATA_THREAD_OPTIONS;
 
-#define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
+#define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
 #define NETDATA_THREAD_OPTION_DONT_LOG (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
 
 #define netdata_thread_cleanup_push(func, arg) pthread_cleanup_push(func, arg)
@@ -116,6 +115,7 @@ void nd_thread_rwspinlock_write_unlocked(void);
 #endif
 
 void nd_thread_can_run_sql(bool exclude);
+void nd_thread_join_threads();
 bool nd_thread_runs_sql(void);
 
 #endif //NETDATA_THREADS_H

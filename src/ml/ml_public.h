@@ -58,6 +58,8 @@ uint64_t sqlite_get_ml_space(void);
 
 bool ml_model_received_from_child(RRDHOST *host, const char *json);
 
+void ml_host_disconnected(RRDHOST *host);
+
 #ifdef __cplusplus
 };
 #endif

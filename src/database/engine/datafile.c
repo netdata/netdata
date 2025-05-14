@@ -259,7 +259,6 @@ int create_data_file(struct rrdengine_datafile *datafile)
         return fd;
     }
     datafile->file = file;
-    __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
 
     (void)posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     memset(superblock, 0, sizeof(*superblock));
@@ -269,19 +268,28 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
-    ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
-    if (ret < 0) {
-        fatal_assert(req.result < 0);
-        netdata_log_error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
-        ctx_io_error(ctx);
+    int retries = 10;
+    ret = -1;
+    while (ret < 0 && --retries) {
+        ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
+        uv_fs_req_cleanup(&req);
+        if (ret < 0) {
+            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+                break;
+            sleep_usec(300 * USEC_PER_MS);
+        }
     }
-    uv_fs_req_cleanup(&req);
+
     posix_memalign_freez(superblock);
     if (ret < 0) {
         destroy_data_file_unsafe(datafile);
+        ctx_io_error(ctx);
+        nd_log_limit_static_global_var(dbengine_erl, 10, 0);
+        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create datafile %s", path);
         return ret;
     }
 
+    __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
     datafile->pos = sizeof(*superblock);
     ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 

@@ -43,9 +43,12 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
+    bool saved = false;
     if (async)
-        metadata_queue_ae_save(host, ae);
-    else
+        saved = metadata_queue_ae_save(host, ae);
+
+    // if not async or async failed to queue, do it now
+    if (false == saved)
         sql_health_alarm_log_save(host, ae);
 }
 
@@ -250,6 +253,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
 
     // match previous alarms
     rw_spinlock_read_lock(&host->health_log.spinlock);
+    ALARM_ENTRY *update_ae = NULL;
     for(ALARM_ENTRY *t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
             if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
@@ -261,7 +265,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
 
-                health_alarm_log_save(host, t, async);
+                update_ae = t;
             }
 
             // no need to continue
@@ -269,6 +273,8 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
         }
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
+    if (update_ae)
+        health_alarm_log_save(host, update_ae, async);
 
     health_alarm_log_save(host, ae, async);
 }
@@ -325,11 +331,14 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     if(!host->health_log.alarms)
         return;
 
+    if (!rw_spinlock_trywrite_lock(&host->health_log.spinlock)) {
+        // If we can't get the lock, just return
+        return;
+    }
+
     time_t now = now_realtime_sec();
     time_t retention = host->health_log.health_log_retention_s;
-    
-    rw_spinlock_write_lock(&host->health_log.spinlock);
-    
+
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted

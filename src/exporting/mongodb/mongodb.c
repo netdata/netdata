@@ -276,7 +276,7 @@ void mongodb_cleanup(struct instance *instance)
  *
  * @param instance_p an instance data structure.
  */
-void mongodb_connector_worker(void *instance_p)
+void *mongodb_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -284,10 +284,6 @@ void mongodb_connector_worker(void *instance_p)
 #endif
     struct mongodb_specific_data *connector_specific_data =
         (struct mongodb_specific_data *)instance->connector_specific_data;
-
-    char threadname[ND_THREAD_TAG_MAX + 1];
-    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPMNG[%zu]", instance->index);
-    uv_thread_set_name_np(threadname);
 
     while (!instance->engine->exit) {
         struct stats *stats = &instance->stats;
@@ -393,4 +389,5 @@ void mongodb_connector_worker(void *instance_p)
     }
 
     mongodb_cleanup(instance);
+    return NULL;
 }

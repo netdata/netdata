@@ -544,6 +544,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     if (!Dim) {
         pulse_ml_models_ignored();
+        json_object_put(root);
         return true;
     }
 
@@ -888,13 +889,13 @@ ml_host_detect_once(ml_host_t *host)
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
-            if (spinlock_trylock(&host->type_anomaly_rate_spinlock))
+            if (spinlock_trylock(&host->context_anomaly_rate_spinlock))
             {
-                STRING *key = rs->parts.type;
-                auto &um = host->type_anomaly_rate;
+                STRING *key = rs->context;
+                auto &um = host->context_anomaly_rate;
                 auto it = um.find(key);
                 if (it == um.end()) {
-                    um[key] = ml_type_anomaly_rate_t {
+                    um[key] = ml_context_anomaly_rate_t {
                         .rd = NULL,
                         .normal_dimensions = 0,
                         .anomalous_dimensions = 0
@@ -904,7 +905,7 @@ ml_host_detect_once(ml_host_t *host)
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
                 it->second.normal_dimensions += chart_mls.num_normal_dimensions;
-                spinlock_unlock(&host->type_anomaly_rate_spinlock);
+                spinlock_unlock(&host->context_anomaly_rate_spinlock);
             }
         }
         rrdset_foreach_done(rsp);
@@ -926,9 +927,9 @@ ml_host_detect_once(ml_host_t *host)
     } else {
         host->host_anomaly_rate = 0.0;
 
-        auto &um = host->type_anomaly_rate;
+        auto &um = host->context_anomaly_rate;
         for (auto &entry: um) {
-            entry.second = ml_type_anomaly_rate_t {
+            entry.second = ml_context_anomaly_rate_t {
                 .rd = NULL,
                 .normal_dimensions = 0,
                 .anomalous_dimensions = 0
@@ -982,6 +983,7 @@ ml_detect_main(void *arg)
         }
     }
     Cfg.training_stop = true;
+    finalize_self_prepared_sql_statements();
 
     return NULL;
 }
@@ -1210,6 +1212,7 @@ void *ml_train_main(void *arg) {
         worker_is_idle();
         std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
     }
+    finalize_self_prepared_sql_statements();
 
     return NULL;
 }

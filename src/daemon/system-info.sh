@@ -204,6 +204,17 @@ else
   fi
 fi
 
+if [ -d "/etc/pve" ] && \
+   echo "${KERNEL_VERSION}" | grep -q -- '-pve$' && \
+   command -v pveversion > /dev/null 2>&1; then
+  HOST_NAME="Proxmox VE"
+  HOST_ID="proxmox"
+  HOST_ID_LIKE="proxmox"
+  HOST_VERSION="$(pveversion | cut -f 2 -d '/')"
+  HOST_VERSION_ID="$(echo "${HOST_VERSION}" | cut -f 1 -d '.')"
+  HOST_OS_DETECTION="pveversion"
+fi
+
 # -------------------------------------------------------------------------------------------------
 # Detect information about the CPU
 

@@ -471,7 +471,7 @@
 // [ml] charts
 #define ML_CHART_PRIO_DIMENSIONS                      39181
 #define ML_CHART_PRIO_ANOMALY_RATE                    39182
-#define ML_CHART_PRIO_TYPE_ANOMALY_RATE               39183
+#define ML_CHART_PRIO_CONTEXT_ANOMALY_RATE            39183
 #define ML_CHART_PRIO_DETECTOR_EVENTS                 39184
 
 // [netdata.ml] charts

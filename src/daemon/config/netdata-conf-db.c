@@ -290,7 +290,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
         if(parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
-            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, dbengine_tier_init, &tiers_init[tier]);
+            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, dbengine_tier_init, &tiers_init[tier]);
         }
         else
             dbengine_tier_init(&tiers_init[tier]);

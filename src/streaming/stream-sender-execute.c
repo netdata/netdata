@@ -286,7 +286,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             }
             else {
 #ifdef REPLICATION_TRACKING
-                RRDSET *st = rrdset_find(s->host, chart_id);
+                RRDSET *st = rrdset_find(s->host, chart_id, true);
                 if(st)
                     st->stream.snd.who = REPLAY_WHO_ME;
 #endif

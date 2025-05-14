@@ -50,11 +50,11 @@ type (
 		// AuthProtocol must be one of: "md5", "sha", "sha224", "sha256", "sha384", "sha512" (for SNMPv3)
 		AuthProtocol string `yaml:"auth_protocol"`
 		// AuthPassphrase is the authentication passphrase (for SNMPv3)
-		AuthPassphrase string `yaml:"auth_passphrase"`
+		AuthPassphrase string `yaml:"auth_password"`
 		// PrivacyProtocol must be one of: "des", "aes", "aes192", "aes256", "aes192C", "aes256C" (for SNMPv3)
-		PrivacyProtocol string `yaml:"privacy_protocol"`
+		PrivacyProtocol string `yaml:"priv_protocol"`
 		// PrivacyPassphrase is the privacy passphrase (for SNMPv3)
-		PrivacyPassphrase string `yaml:"privacy_passphrase"`
+		PrivacyPassphrase string `yaml:"priv_password"`
 	}
 )
 

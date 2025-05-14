@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
@@ -17,25 +16,6 @@ import (
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
-
-	mx := make(map[string]int64)
-
-	if c.enableProfiles {
-		sysObjectID, err := c.getSysObjectID(snmpsd.OidSysObject)
-		if err != nil {
-			return nil, err
-		}
-
-		matchingProfiles := ddsnmp.Find(sysObjectID)
-
-		metricMap, err := c.parseMetricsFromProfiles(matchingProfiles)
-		if err != nil {
-			return nil, err
-		}
-		seen := make(map[string]bool)
-		c.makeChartsFromMetricMap(mx, metricMap, seen)
-	}
-
 	if c.sysInfo == nil {
 		si, err := snmpsd.GetSysInfo(c.snmpClient)
 		if err != nil {
@@ -48,6 +28,16 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if c.CreateVnode {
 			c.vnode = c.setupVnode(si)
 		}
+
+		if c.EnableProfiles {
+			c.snmpProfiles = ddsnmp.Find(c.sysInfo.SysObjectID)
+		}
+	}
+
+	mx := make(map[string]int64)
+
+	if err := c.collectProfiles(mx); err != nil {
+		return nil, err
 	}
 
 	if err := c.collectSysUptime(mx); err != nil {
@@ -67,45 +57,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 
 	return mx, nil
-}
-
-func (c *Collector) getSysObjectID(oid string) (string, error) {
-	resp, err := c.snmpClient.Get([]string{oid})
-	if err != nil {
-		return "", err
-	}
-	return strings.Replace(resp.Variables[0].Value.(string), ".", "", 1), nil
-}
-
-func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[string]processedMetric, seen map[string]bool) error {
-	for _, metric := range metricMap {
-		if metric.tableName == "" {
-			switch s := metric.value.(type) {
-			case int:
-				name := metric.name
-				if name == "" {
-					continue
-				}
-
-				seen[name] = true
-
-				if !c.seenMetrics[name] {
-					c.seenMetrics[name] = true
-					c.addSNMPChart(metric)
-				}
-
-				mx[metric.name] = int64(s)
-			}
-		}
-
-	}
-	for name := range c.seenMetrics {
-		if !seen[name] {
-			delete(c.seenMetrics, name)
-			c.removeSNMPChart(name)
-		}
-	}
-	return nil
 }
 
 func (c *Collector) collectSysUptime(mx map[string]int64) error {
@@ -164,28 +115,6 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 		GUID:     c.Vnode.GUID,
 		Hostname: c.Vnode.Hostname,
 		Labels:   labels,
-	}
-}
-
-func pduToString(pdu gosnmp.SnmpPDU) (string, error) {
-	switch pdu.Type {
-	case gosnmp.OctetString:
-		// TODO: this isn't reliable (e.g. physAddress we need hex.EncodeToString())
-		bs, ok := pdu.Value.([]byte)
-		if !ok {
-			return "", fmt.Errorf("OctetString is not a []byte but %T", pdu.Value)
-		}
-		return strings.ToValidUTF8(string(bs), "�"), nil
-	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32:
-		return gosnmp.ToBigInt(pdu.Value).String(), nil
-	case gosnmp.ObjectIdentifier:
-		v, ok := pdu.Value.(string)
-		if !ok {
-			return "", fmt.Errorf("ObjectIdentifier is not a string but %T", pdu.Value)
-		}
-		return strings.TrimPrefix(v, "."), nil
-	default:
-		return "", fmt.Errorf("unussported type: '%v'", pdu.Type)
 	}
 }
 

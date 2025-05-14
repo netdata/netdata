@@ -1609,34 +1609,123 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all of the metrics, no further configuration is required.
+            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+
+            - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
+            - Configure a database connection (see Setup → Configuration → Examples).
         limits:
           description: ""
         performance_impact:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Configure SQL Server for Monitoring
+            description: |
+              1. **Create Monitoring User**
+              
+                 Create an SQL Server user with the necessary permissions to collect monitoring data:
+                 
+                 ```tsql
+                 USE master;
+                 CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
+                 CREATE USER netdata_user FOR LOGIN netdata_user;
+                 GRANT CONNECT SQL TO netdata_user;
+                 GRANT VIEW SERVER STATE TO netdata_user;
+                 GO
+                 ```
+              
+              2. **Enable Query Store**
+              
+                 Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
+                 
+                 ```tsql
+                 DECLARE @dbname NVARCHAR(max)
+                 DECLARE nd_user_cursor CURSOR FOR SELECT name
+                                     FROM master.dbo.sysdatabases
+                                     WHERE name NOT IN ('master', 'tempdb')
+                 
+                 OPEN nd_user_cursor
+                 FETCH NEXT FROM nd_user_cursor INTO @dbname
+                 WHILE @@FETCH_STATUS = 0
+                 BEGIN
+                   EXECUTE ("USE "+ @dbname+"; CREATE USER netdata_user FOR LOGIN netdata_user; ALTER DATABASE "+@dbname+" SET QUERY_STORE = ON ( QUERY_CAPTURE_MODE = ALL, DATA_FLUSH_INTERVAL_SECONDS               =    900 )");
+                   FETCH next FROM nd_user_cursor INTO @dbname;
+                 END
+                 CLOSE nd_user_cursor
+                 DEALLOCATE nd_user_cursor
+                 GO
+                 ```
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibMSSQL]"
           description: "The Netdata main configuration file"
         options:
-          description: ""
+          description: "These options allow the collector to connect to your MSSQL instance and collect transaction data from it."
           folding:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibMSSQL
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: driver
+              description: ODBC driver used to connect to the SQL Server.
+              default_value: SQL Server
+              required: false
+            - name: server
+              description: Server address or instance name.
+              default_value: empty
+              required: true
+            - name: address
+              description: Alternative to `server`; supports named pipes if the server supports them.
+              default_value: empty
+              required: true
+            - name: uid
+              description: SQL Server user identifier.
+              default_value: empty
+              required: true
+            - name: pwd
+              description: Password for the specified user.
+              default_value: empty
+              required: true
+            - name: additional instances
+              description: Number of additional SQL Server instances to monitor.
+              default_value: 0
+              required: false
+            - name: windows authentication
+              description: Set to yes to use Windows credentials instead of SQL Server authentication.
+              default_value: no
               required: false
         examples:
           folding:
             enabled: true
             title: ""
-          list: []
+          list:
+            - name: Single Instance
+              description: An example configuration with one instance.
+              folding:
+                enabled: false
+              config: |
+                [plugin:windows:PerflibMSSQL]
+                   driver = SQL Server
+                   server = 127.0.0.1\\Dev, 1433
+                   uid = netdata_user
+                   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+            - name: Multiple Instances
+              description: An example configuration with two instances.
+              folding:
+                enabled: false
+              config: |
+                [plugin:windows:PerflibMSSQL]
+                  driver = SQL Server
+                  server = 127.0.0.1\\Dev, 1433
+                  uid = netdata_user
+                  pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+                  additional instances = 1
+                [plugin:windows:PerflibMSSQL1]
+                  driver = SQL Server
+                  server = 127.0.0.1\\Production, 1434
+                  uid = netdata_user
+                  pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
     troubleshooting:
       problems:
         list: []
@@ -1751,8 +1840,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: benefit
-            - name: mssql.instance_locks_deadlocks
-              description: Lock requests that resulted in deadlock
+            - name: mssql.instance_resource_deadlocks
+              description: Active lock requests that resulted in deadlock per resource
               unit: deadlocks/s
               chart_type: line
               dimensions:
@@ -1770,8 +1859,8 @@ modules:
                 - name: rid
                 - name: row_group
                 - name: xact
-            - name: mssql.instance_locks_lock_wait
-              description: Lock requests that required the caller to wait
+            - name: mssql.instance_resource_lock_wait
+              description: Active lock requests that required the caller to wait
               unit: locks/s
               chart_type: line
               dimensions:
@@ -1821,6 +1910,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: write
+            - name: mssql.database_lockwait
+              description: Lock requests that required the caller to wait.
+              unit: locks/s
+              chart_type: line
+              dimensions:
+                - name: lock
+            - name: mssql.database_deadlocks
+              description: Lock requests that resulted in deadlock.
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: deadlocks
+            - name: mssql.database_lock_timeouts
+              description: Lock that timed out.
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: mssql.database_lock_requests
+              description: Number of new locks and lock conversions requested.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
             - name: mssql.database_backup_restore_operations
               description: Backup IO per database
               unit: operations/s
@@ -1839,6 +1952,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: flushed
+            - name: mssql.database_data_files_size
+              description: Current database size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework

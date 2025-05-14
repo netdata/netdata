@@ -77,6 +77,11 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.21"
+    support_type: Core
+    notes: ''
+    eol_check: true
+  - <<: *alpine
     version: "3.20"
     support_type: Core
     notes: ''
@@ -141,8 +146,8 @@ include:
 
   - &centos_stream
     distro: centos-stream
-    base_image: 'quay.io/centos/centos:stream9'
-    version: '9'
+    base_image: 'quay.io/centos/centos:stream10'
+    version: '10'
     support_type: 'Community'
     notes: ''
     jsonc_removal: |
@@ -151,13 +156,19 @@ include:
     bundle_sentry: *default_sentry
     packages: &cs_packages
       type: rpm
-      repo_distro: el/c9s
+      repo_distro: el/c10s
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+  - <<: *centos_stream
+    base_image: 'quay.io/centos/centos:stream9'
+    version: '9'
+    packages:
+      <<: *cs_packages
+      repo_distro: el/c9s
 
   - &debian
     distro: debian
@@ -196,7 +207,7 @@ include:
 
   - &fedora
     distro: fedora
-    version: "41"
+    version: "42"
     support_type: Core
     notes: ''
     eol_check: true
@@ -205,11 +216,18 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/41
+      repo_distro: fedora/42
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "41"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/41
     test:
       ebpf-core: true
   - <<: *fedora
@@ -319,6 +337,11 @@ include:
         - arm64
     test:
       ebpf-core: true
+  - <<: *ubuntu
+    version: "25.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/plucky
   - <<: *ubuntu
     version: "24.10"
     packages:

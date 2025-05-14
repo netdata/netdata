@@ -3,42 +3,62 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.2021.10.1.5.1
+      description: The 1,5 and 15 minute load averages as an integer
+      unit: "{load_average}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.2021.4.5.0
+      description: The total amount of real/physical memory installed on this host
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.2021.4.6.0
+      description: The amount of real/physical memory currently unused or available
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memTotalSwap
       OID: 1.3.6.1.4.1.2021.4.3.0
+      description: The total amount of swap space configured for this host
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memAvailSwap
       OID: 1.3.6.1.4.1.2021.4.4.0
+      description: The amount of swap space currently unused or available
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memTotalFree
       OID: 1.3.6.1.4.1.2021.4.11.0
+      description: The total amount of memory free or available for use on this host
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memMinimumSwap
       OID: 1.3.6.1.4.1.2021.4.12.0
+      description: The minimum amount of swap space expected to be kept free or available during normal operation of this host
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memShared
       OID: 1.3.6.1.4.1.2021.4.13.0
+      description: The total amount of real or virtual memory currently allocated for use as shared memory
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memBuffer
       OID: 1.3.6.1.4.1.2021.4.14.0
+      description: The total amount of real or virtual memory currently allocated for use as memory buffers
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.memCached
       OID: 1.3.6.1.4.1.2021.4.15.0
+      description: The total amount of real or virtual memory currently allocated for use as cached memory
+      unit: "kBy"
   - MIB: UCD-SNMP-MIB
     table:
       OID: 1.3.6.1.4.1.2021.9
@@ -46,14 +66,24 @@ metrics:
     symbols:
       - name: ucd.dskTotal
         OID: 1.3.6.1.4.1.2021.9.1.6
+        description: Total size of the disk/partion (kBytes)
+        unit: "kBy"
       - name: ucd.dskAvail
         OID: 1.3.6.1.4.1.2021.9.1.7
+        description: Available space on the disk
+        unit: "kBy"
       - name: ucd.dskUsed
         OID: 1.3.6.1.4.1.2021.9.1.8
+        description: Used space on the disk
+        unit: "kBy"
       - name: ucd.dskPercent
         OID: 1.3.6.1.4.1.2021.9.1.9
+        description: Percentage of space used on disk
+        unit: "%"
       - name: ucd.dskPercentNode
         OID: 1.3.6.1.4.1.2021.9.1.10
+        description: Percentage of inodes used on disk
+        unit: "%"
     metric_tags:
       - tag: ucd_dsk_path
         symbol:
@@ -78,21 +108,35 @@ metrics:
       - name: ucd.diskIOReads
         OID: 1.3.6.1.4.1.2021.13.15.1.1.5
         metric_type: monotonic_count
+        description: The number of read accesses from this device since boot
+        unit: "{read_access}"
       - name: ucd.diskIOWrites
         OID: 1.3.6.1.4.1.2021.13.15.1.1.6
         metric_type: monotonic_count
+        description: The number of write accesses to this device since boot
+        unit: "{write_access}"
       - name: ucd.diskIOLA1
         OID: 1.3.6.1.4.1.2021.13.15.1.1.9
+        description: The 1 minute average load of disk (%)
+        unit: "%"
       - name: ucd.diskIOLA5
         OID: 1.3.6.1.4.1.2021.13.15.1.1.10
+        description: The 5 minute average load of disk (%)
+        unit: "%"
       - name: ucd.diskIOLA15
         OID: 1.3.6.1.4.1.2021.13.15.1.1.11
+        description: The 15 minute average load of disk (%)
+        unit: "%"
       - name: ucd.diskIONReadX
         OID: 1.3.6.1.4.1.2021.13.15.1.1.12
         metric_type: monotonic_count
+        description: The number of bytes read from this device since boot
+        unit: "By"
       - name: ucd.diskIONWrittenX
         OID: 1.3.6.1.4.1.2021.13.15.1.1.13
         metric_type: monotonic_count
+        description: The number of bytes written to this device since boot
+        unit: "By"
     metric_tags:
       - tag: ucd_disk_io_device
         symbol:
@@ -102,46 +146,66 @@ metrics:
     symbol:
       name: ucd.ssCpuUser
       OID: 1.3.6.1.4.1.2021.11.9.0
+      description: The percentage of CPU time spent processing user-level code, calculated over the last minute
+      unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuSystem
       OID: 1.3.6.1.4.1.2021.11.10.0
+      description: The percentage of CPU time spent processing system-level code, calculated over the last minute
+      unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuIdle
       OID: 1.3.6.1.4.1.2021.11.11.0
+      description: The percentage of processor time spent idle, calculated over the last minute
+      unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawUser
       OID: 1.3.6.1.4.1.2021.11.50.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent processing user-level code
+    unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawNice
       OID: 1.3.6.1.4.1.2021.11.51.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent processing reduced-priority code
+    unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawSystem
       OID: 1.3.6.1.4.1.2021.11.52.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent processing system-level code
+    unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawIdle
       OID: 1.3.6.1.4.1.2021.11.53.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent idle
+    unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawWait
       OID: 1.3.6.1.4.1.2021.11.54.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent waiting for IO
+    unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawKernel
       OID: 1.3.6.1.4.1.2021.11.55.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent processing kernel-level code
+    unit: "{tick}"
   - MIB: UCD-SNMP-MIB
     symbol:
       name: ucd.ssCpuRawInterrupt
       OID: 1.3.6.1.4.1.2021.11.56.0
     metric_type: monotonic_count
+    description: The number of 'ticks' spent processing hardware interrupts
+    unit: "{tick}"

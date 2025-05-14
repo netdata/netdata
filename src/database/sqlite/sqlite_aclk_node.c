@@ -154,7 +154,7 @@ void aclk_check_node_info_and_collectors(void)
         if(replicating_rcv)
             continue;
 
-        bool pp_queue_empty = !(host->rrdctx.pp_queue && dictionary_entries(host->rrdctx.pp_queue));
+        bool pp_queue_empty = !rrdcontext_queue_entries(&host->rrdctx.pp_queue);
 
         if (!pp_queue_empty && (aclk_host_config->node_info_send_time || aclk_host_config->node_collectors_send)) {
             context_pp++;

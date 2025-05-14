@@ -5,6 +5,24 @@
 #define MAX_USEC 512 // Maximum backoff limit in microseconds
 
 // ----------------------------------------------------------------------------
+// Deadlock detection function
+void spinlock_deadlock_detect(usec_t *timestamp, const char *type, const char *func) {
+    if (!*timestamp) {
+        // First time checking - initialize the timestamp
+        *timestamp = now_monotonic_usec();
+        return;
+    }
+
+    // Check if we've exceeded the timeout
+    usec_t now = now_monotonic_usec();
+    if (now - *timestamp >= SPINLOCK_DEADLOCK_TIMEOUT_SEC * USEC_PER_SEC) {
+        // We've been spinning for too long - likely deadlock
+        fatal("DEADLOCK DETECTED: %s in function '%s' could not be acquired for %"PRIi64" seconds",
+              type, func, (int64_t)((now - *timestamp) / USEC_PER_SEC));
+    }
+}
+
+// ----------------------------------------------------------------------------
 // spinlock implementation
 // https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
 
@@ -17,6 +35,7 @@ ALWAYS_INLINE void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func
 ALWAYS_INLINE void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
     size_t spins = 0;
     usec_t usec = 1;
+    usec_t deadlock_timestamp = 0;
 
     while (true) {
         if (!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
@@ -27,6 +46,12 @@ ALWAYS_INLINE void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func
 
         // Backoff strategy with exponential growth
         spins++;
+        
+        // Check for deadlock every SPINS_BEFORE_DEADLOCK_CHECK iterations
+        if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0) {
+            spinlock_deadlock_detect(&deadlock_timestamp, "spinlock", func);
+        }
+        
         microsleep(usec);
         usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
     }

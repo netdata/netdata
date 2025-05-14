@@ -73,30 +73,44 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.12356.103.2.1.1.0
+    description: Current CPU usage (percentage)
+    unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.4.1.12356.103.2.1.2.0
+    description: Current memory used
+    unit: "kBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.12356.103.2.1.3.0
+    description: Total physical and swap memory installed
+    unit: "kBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmSysDiskUsage
       OID: 1.3.6.1.4.1.12356.103.2.1.4.0
+    description: Current hard disk usage
+    unit: "MBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmSysDiskCapacity
       OID: 1.3.6.1.4.1.12356.103.2.1.5.0
+    description: Total hard disk capacity
+    unit: "MBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmSysCpuUsageExcludedNice
       OID: 1.3.6.1.4.1.12356.103.2.1.6.0
+    description: Current CPU usage excluded nice processes usage (percentage)
+    unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmLogRate
       OID: 1.3.6.1.4.1.12356.103.2.1.9.0
+    description: Log receiving rate in number of logs per second
+    unit: "{log}"
   # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
   #   symbol:
   #     name: fmRaidLevel
@@ -137,10 +151,14 @@ metrics:
     symbol:
       name: fmRaidSize
       OID: 1.3.6.1.4.1.12356.103.7.1.3.0
+    description: Raid size in GB
+    unit: "GBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmRaidDiskNumber
       OID: 1.3.6.1.4.1.12356.103.7.1.4.0
+    description: Disk numbers in the Raid
+    unit: "{disk}"
   # - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
   #   symbol:
   #     name: fmHaMode
@@ -155,10 +173,14 @@ metrics:
     symbol:
       name: fmHaClusterId
       OID: 1.3.6.1.4.1.12356.103.9.1.2.0
+    description: Ha cluster ID
+    unit: "TBD"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmHaPeerNumber
       OID: 1.3.6.1.4.1.12356.103.9.1.3.0
+    description: Peer numbers in the Ha
+    unit: "{peer}"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
       OID: 1.3.6.1.4.1.12356.103.6.2
@@ -270,6 +292,8 @@ metrics:
     symbols:
       - name: fmRaidDiskEntSize
         OID: 1.3.6.1.4.1.12356.103.7.2.1.3
+        description: Raid disk size in GB
+        unit: "GBy"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.12356.103.7.2.1.2

@@ -71,7 +71,7 @@ LOG_FORWARDER *log_forwarder_start(void) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to set non-blocking mode");
 
     lf->running = true;
-    lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_JOINABLE, log_forwarder_thread_func, lf);
+    lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_DEFAULT, log_forwarder_thread_func, lf);
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: created thread pointer: %p", lf->thread);
 

@@ -13,10 +13,14 @@ metrics:
     symbol:
       name: servertech.sentry3.systemTotalPower
       OID: 1.3.6.1.4.1.1718.3.1.6.0
+      description: Total power consumption of the system
+      unit: "W"
   - MIB: SENTRY3-MIB
     symbol:
       name: servertech.sentry3.systemConfigModifiedCount
       OID: 1.3.6.1.4.1.1718.3.1.15.0
+      description: Count of system configuration modifications
+      unit: "{modification}"
   - MIB: SENTRY3-MIB
     table:
       name: towerTable
@@ -24,20 +28,36 @@ metrics:
     symbols:
       - name: servertech.sentry3.towerInfeedCount
         OID: 1.3.6.1.4.1.1718.3.2.1.1.5
+        description: Number of tower infeeds
+        unit: "{infeed}"
       - name: servertech.sentry3.towerVACapacity
         OID: 1.3.6.1.4.1.1718.3.2.1.1.9
+        description: Tower VA capacity
+        unit: "VA"
       - name: servertech.sentry3.towerVACapacityUsed
         OID: 1.3.6.1.4.1.1718.3.2.1.1.10
+        description: Used tower VA capacity
+        unit: "VA"
       - name: servertech.sentry3.towerActivePower
         OID: 1.3.6.1.4.1.1718.3.2.1.1.11
+        description: Tower active power
+        unit: "W"
       - name: servertech.sentry3.towerApparentPower
         OID: 1.3.6.1.4.1.1718.3.2.1.1.12
+        description: Tower apparent power
+        unit: "VA"
       - name: servertech.sentry3.towerPowerFactor
         OID: 1.3.6.1.4.1.1718.3.2.1.1.13
+        description: Tower power factor
+        unit: "%"
       - name: servertech.sentry3.towerEnergy
         OID: 1.3.6.1.4.1.1718.3.2.1.1.14
+        description: Tower energy consumption
+        unit: "Wh"
       - name: servertech.sentry3.towerLineFrequency
         OID: 1.3.6.1.4.1.1718.3.2.1.1.15
+        description: Tower line frequency
+        unit: "Hz"
     metric_tags:
       - symbol:
           name: servertech.sentry3.towerID
@@ -73,22 +93,40 @@ metrics:
     symbols:
       - name: servertech.sentry3.infeedLoadValue
         OID: 1.3.6.1.4.1.1718.3.2.2.1.7
+        description: Infeed load value
+        unit: "W"
       - name: servertech.sentry3.infeedOutletCount
         OID: 1.3.6.1.4.1.1718.3.2.2.1.9
+        description: Number of outlets on infeed
+        unit: "{outlet}"
       - name: servertech.sentry3.infeedCapacity
         OID: 1.3.6.1.4.1.1718.3.2.2.1.10
+        description: Infeed capacity
+        unit: "VA"
       - name: servertech.sentry3.infeedVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.11
+        description: Infeed voltage
+        unit: "V"
       - name: servertech.sentry3.infeedPower
         OID: 1.3.6.1.4.1.1718.3.2.2.1.12
+        description: Infeed power
+        unit: "W"
       - name: servertech.sentry3.infeedEnergy
         OID: 1.3.6.1.4.1.1718.3.2.2.1.16
+        description: Infeed energy consumption
+        unit: "Wh"
       - name: servertech.sentry3.infeedPhaseVoltage
         OID: 1.3.6.1.4.1.1718.3.2.2.1.18
+        description: Infeed phase voltage
+        unit: "V"
       - name: servertech.sentry3.infeedPhaseCurrent
         OID: 1.3.6.1.4.1.1718.3.2.2.1.19
+        description: Infeed phase current
+        unit: "A"
       - name: servertech.sentry3.infeedCapacityUsed
         OID: 1.3.6.1.4.1.1718.3.2.2.1.20
+        description: Used infeed capacity
+        unit: "VA"
     metric_tags:
       - symbol:
           name: servertech.sentry3.infeedID
@@ -239,8 +277,12 @@ metrics:
     symbols:
       - name: servertech.sentry3.tempHumidSensorTempValue
         OID: 1.3.6.1.4.1.1718.3.2.5.1.6
+        description: Temperature value from sensor
+        unit: "Cel"
       - name: servertech.sentry3.tempHumidSensorHumidValue
         OID: 1.3.6.1.4.1.1718.3.2.5.1.10
+        description: Humidity value from sensor
+        unit: "%"
     metric_tags:
       - symbol:
           name: servertech.sentry3.tempHumidSensorID

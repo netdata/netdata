@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -66,8 +67,6 @@ type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
-	enableProfiles bool
-
 	vnode *vnodes.VirtualNode
 
 	charts      *module.Charts
@@ -87,6 +86,8 @@ type Collector struct {
 	sysInfo *snmpsd.SysInfo
 
 	customOids []string
+
+	snmpProfiles []*ddsnmp.Profile
 }
 
 func (c *Collector) Configuration() any {

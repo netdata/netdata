@@ -1194,7 +1194,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
 
     if(!rq->st) {
         if(likely(workers)) worker_is_busy(WORKER_JOB_FIND_CHART);
-        rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+        rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id), true);
         if(!rq->st) {
             __atomic_add_fetch(&replication_globals.atomic.error_not_found, 1, __ATOMIC_RELAXED);
             nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -1554,7 +1554,7 @@ static int replication_pipeline_execute_next(void) {
             if(!rq->start_streaming) {
                 if (!rq->st) {
                     worker_is_busy(WORKER_JOB_FIND_CHART);
-                    rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+                    rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id), true);
                 }
 
                 if (rq->st && !rq->q) {
@@ -1719,7 +1719,7 @@ void *replication_thread_main(void *ptr) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLAY[%zu]", i + 2);
             __atomic_add_fetch(&replication_buffers_allocated, sizeof(ND_THREAD *), __ATOMIC_RELAXED);
-            replication_globals.main_thread.threads_ptrs[i] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+            replication_globals.main_thread.threads_ptrs[i] = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
                                                                                replication_worker_thread, NULL);
         }
     }
