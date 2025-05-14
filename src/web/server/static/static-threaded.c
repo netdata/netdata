@@ -284,7 +284,9 @@ static bool web_server_should_stop(void) {
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_private = ptr;
+    spinlock_lock(&worker_private->spinlock);
     worker_private->initializing = false;
+    spinlock_unlock(&worker_private->spinlock);
     worker_register("WEB");
     worker_register_job_name(WORKER_JOB_ADD_CONNECTION, "connect");
     worker_register_job_name(WORKER_JOB_DEL_COLLECTION, "disconnect");
