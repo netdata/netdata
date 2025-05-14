@@ -272,6 +272,7 @@ void nd_thread_join_threads()
         if (nti) {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
             nti->list = ND_THREAD_LIST_NONE;
+            nd_log_daemon(NDLP_DEBUG, "nd_thread_join_threads: Joining thread with id %d (%s) during shutdown", nti->tid, nti->tag);
         }
 
         spinlock_unlock(&threads_globals.exited.spinlock);
