@@ -365,7 +365,7 @@ static void socket_listen_main_static_threaded_cleanup(void *pptr) {
     netdata_log_info("all static web threads stopped.");
 
     // Lets join all threads
-    for (int i = 0; i < static_threaded_workers_count; i++) {
+    for (int i = 1; i < static_threaded_workers_count; i++) {
         bool initializing;
         do {
             spinlock_lock(&static_workers_private_data[i].spinlock);
@@ -403,6 +403,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
                                           sizeof(struct web_server_static_threaded_worker));
 
     int i;
+    spinlock_init(&static_workers_private_data[0].spinlock);
+    static_workers_private_data[0].initializing = true;
     for (i = 1; i < static_threaded_workers_count; i++) {
         static_workers_private_data[i].id = i;
         static_workers_private_data[i].max_sockets = max_sockets / static_threaded_workers_count;
