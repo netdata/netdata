@@ -168,7 +168,7 @@ static void do_memory_page_table_entries(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             "free_system_page_table_entries",
             NULL,
             "mem",
-            "mem.system_page_table_entries_size",
+            "mem.system_page_table_entries",
             "The number of page table entries not currently in used by the system",
             "pages",
             PLUGIN_WINDOWS_NAME,
