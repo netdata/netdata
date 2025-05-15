@@ -22,6 +22,9 @@ int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffe
     const char *text = buffer_tostring(buffer);
     if (!text || !*text) return -1;
     
+    // Log the raw outgoing message
+    netdata_log_debug(D_MCP, "SND: %s", text);
+    
     return websocket_protocol_send_text(wsc, text);
 }
 
@@ -51,7 +54,11 @@ void mcp_websocket_on_connect(struct websocket_server_client *wsc) {
 
 // WebSocket message handler for MCP - receives message and routes to MCP
 void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *message, size_t length, WEBSOCKET_OPCODE opcode) {
-    if (!wsc || !message || length == 0) return;
+    if (!wsc || !message || length == 0)
+        return;
+    
+    // Log the raw incoming message
+    netdata_log_debug(D_MCP, "RCV: %s", message);
     
     // Only handle text messages
     if (opcode != WS_OPCODE_TEXT) {
@@ -60,8 +67,8 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     }
     
     // Get the MCP context
-    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
-    if (!ctx) {
+    MCP_CLIENT *mcpc = mcp_websocket_get_context(wsc);
+    if (!mcpc) {
         websocket_debug(wsc, "MCP context not found");
         websocket_protocol_send_close(wsc, WS_CLOSE_INTERNAL_ERROR, "MCP context not found");
         return;
@@ -81,7 +88,7 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     }
     
     // Pass the request to the MCP handler
-    mcp_handle_request(ctx, request);
+    mcp_handle_request(mcpc, request);
     
     // Free the request object
     json_object_put(request);
@@ -117,8 +124,6 @@ void mcp_websocket_on_disconnect(struct websocket_server_client *wsc) {
 
 // Register WebSocket callbacks for MCP
 void mcp_websocket_adapter_initialize(void) {
-    // Initialize the MCP subsystem
     mcp_initialize_subsystem();
-    
     netdata_log_info("MCP WebSocket adapter initialized");
 }
