@@ -372,7 +372,7 @@ static void socket_listen_main_static_threaded_cleanup(void *pptr) {
             initializing = static_workers_private_data[i].initializing;
             spinlock_unlock(&static_workers_private_data[i].spinlock);
             if (unlikely(initializing))
-                usleep(1000);
+                sleep_usec(1000);
         } while(initializing);
         (void) nd_thread_join(static_workers_private_data[i].thread);
     }

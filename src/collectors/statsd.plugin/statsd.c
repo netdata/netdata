@@ -2404,7 +2404,7 @@ static void statsd_main_cleanup(void *pptr) {
                 initializing = statsd.collection_threads_status[i].initializing;
                 spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
                 if (unlikely(initializing))
-                    usleep(1000);
+                    sleep_usec(1000);
             } while(initializing);
 
             (void) nd_thread_join(statsd.collection_threads_status[i].thread);
