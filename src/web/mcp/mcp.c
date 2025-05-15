@@ -169,7 +169,8 @@ MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, uint64_t id, MCP_RETURN_CODE 
 
 // Send the content of a buffer using the appropriate transport
 int mcp_send_response_buffer(MCP_CLIENT *mcpc) {
-    if (!mcpc || !mcpc->result || !buffer_strlen(mcpc->result)) return -1;
+    if (!mcpc || !mcpc->result || !buffer_strlen(mcpc->result))
+        return -1;
     
     switch (mcpc->transport) {
         case MCP_TRANSPORT_WEBSOCKET:
@@ -339,7 +340,8 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
 
 // Main MCP entry point - handle a JSON-RPC request (can be single or batch)
 MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request) {
-    if (!mcpc || !request) return MCP_RC_INTERNAL_ERROR;
+    if (!mcpc || !request)
+        return MCP_RC_INTERNAL_ERROR;
     
     // Clear previous response buffers
     buffer_flush(mcpc->result);
@@ -433,4 +435,6 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
 // Initialize the MCP subsystem
 void mcp_initialize_subsystem(void) {
     netdata_log_info("MCP subsystem initialized");
+
+    debug_flags |= D_MCP;
 }
