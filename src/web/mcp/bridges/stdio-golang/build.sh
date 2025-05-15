@@ -38,7 +38,6 @@ go build -o nd-mcp nd-mcp.go
 chmod +x nd-mcp
 
 # Get the full path to the executable
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXECUTABLE_PATH="$SCRIPT_DIR/nd-mcp"
 
 echo "Build complete!"

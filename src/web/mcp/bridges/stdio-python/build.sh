@@ -47,7 +47,6 @@ else
 fi
 
 # Get the full path to the script and venv
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="$SCRIPT_DIR/nd-mcp.py"
 VENV_PYTHON="$SCRIPT_DIR/venv/bin/python"
 VENV_ACTIVATE="$SCRIPT_DIR/venv/bin/activate"
