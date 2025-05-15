@@ -2,6 +2,7 @@
 
 #include "mcp.h"
 #include "mcp-initialize.h"
+#include "mcp-ping.h"
 #include "mcp-tools.h"
 #include "mcp-resources.h"
 #include "mcp-prompts.h"
@@ -94,6 +95,10 @@ MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
     // Initialize utility buffers
     ctx->uri = buffer_create(1024, NULL);
     
+    // Initialize request IDs tracking
+    ctx->request_id_counter = 0;
+    ctx->request_ids = NULL;
+    
     return ctx;
 }
 
@@ -109,6 +114,9 @@ void mcp_free_client(MCP_CLIENT *mcpc) {
         
         // Free utility buffers
         buffer_free(mcpc->uri);
+        
+        // Free request IDs
+        mcp_request_id_cleanup_all(mcpc);
         
         freez(mcpc);
     }
@@ -133,39 +141,45 @@ static int mcp_map_return_code_to_jsonrpc_error(MCP_RETURN_CODE rc) {
     }
 }
 
-void mcp_init_success_result(MCP_CLIENT *mcpc, uint64_t id) {
-    buffer_flush(mcpc->result);;
+void mcp_init_success_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id) {
+    buffer_flush(mcpc->result);
     buffer_json_initialize(mcpc->result, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(mcpc->result, "jsonrpc", "2.0");
 
-    if(id)
-        buffer_json_member_add_uint64(mcpc->result, "id", id);
+    // Add the ID using our request ID system
+    mcp_request_id_to_buffer(mcpc, mcpc->result, "id", id);
+    buffer_json_member_add_object(mcpc->result, "result");
 
     buffer_flush(mcpc->error);
 }
 
-void mcp_jsonrpc_error(BUFFER *result, const char *error, uint64_t id, int jsonrpc_code) {
-    buffer_flush(result);
-    buffer_json_initialize(result, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_string(result, "jsonrpc", "2.0");
+MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id, MCP_RETURN_CODE rc) {
+    if (!mcpc) return rc;
     
-    if (id)
-        buffer_json_member_add_uint64(result, "id", id);
+    buffer_flush(mcpc->result);
+    buffer_json_initialize(mcpc->result, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_string(mcpc->result, "jsonrpc", "2.0");
+    
+    // Add the ID using our request ID system
+    mcp_request_id_to_buffer(mcpc, mcpc->result, "id", id);
 
-    buffer_json_member_add_int64(result, "error", jsonrpc_code);
-
-    if(error && *error)
-        buffer_json_member_add_string(result, "message", error);
-
-    buffer_json_finalize(result);
-}
-
-MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, uint64_t id, MCP_RETURN_CODE rc) {
-    mcp_jsonrpc_error(mcpc->result,
-                      buffer_strlen(mcpc->error) ? buffer_tostring(mcpc->error) : MCP_RETURN_CODE_2str(rc),
-                      id, mcp_map_return_code_to_jsonrpc_error(rc));
+    buffer_json_member_add_object(mcpc->result, "error");
+    buffer_json_member_add_int64(mcpc->result, "code", mcp_map_return_code_to_jsonrpc_error(rc));
+    
+    const char *error_message = buffer_strlen(mcpc->error) 
+                              ? buffer_tostring(mcpc->error) 
+                              : MCP_RETURN_CODE_2str(rc);
+    
+    if(error_message && *error_message)
+        buffer_json_member_add_string(mcpc->result, "message", error_message);
+    
+    buffer_json_object_close(mcpc->result); // Close error
+    
+    buffer_json_finalize(mcpc->result);
     return rc;
 }
+
+// No longer needed - we're using mcp_request_id_del directly in mcp_single_request
 
 // Send the content of a buffer using the appropriate transport
 int mcp_send_response_buffer(MCP_CLIENT *mcpc) {
@@ -219,7 +233,6 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     // Extract JSON-RPC fields
     struct json_object *method_obj = NULL;
     struct json_object *params_obj = NULL;
-    struct json_object *id_obj = NULL;
     struct json_object *jsonrpc_obj = NULL;
     
     // Validate jsonrpc version
@@ -251,29 +264,16 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
         params_obj = json_object_new_object();
     }
     
-    // Extract ID (optional, for notifications)
-    uint64_t id = 0;
-    bool has_id = json_object_object_get_ex(request, "id", &id_obj);
-    
+    // Extract and register the request ID
+    MCP_REQUEST_ID id = mcp_request_id_add(mcpc, request);
+    bool has_id = (id != 0);
+
+    // If we have a request ID, log it
     if (has_id) {
-        if (json_object_get_type(id_obj) == json_type_int) {
-            id = json_object_get_int64(id_obj);
-        }
-        else if (json_object_get_type(id_obj) == json_type_string) {
-            const char *id_str = json_object_get_string(id_obj);
-            char *endptr;
-            id = strtoull(id_str, &endptr, 10);
-            if (*endptr != '\0') {
-                // If the string is not a number, use a hash of the string as the ID
-                id = 0;
-                while (*id_str) {
-                    id = id * 31 + (*id_str++);
-                }
-            }
-        }
+        netdata_log_debug(D_WEB_CLIENT, "MCP: Handling method call: %s (request_id: %zu)", method, id);
+    } else {
+        netdata_log_debug(D_WEB_CLIENT, "MCP: Handling notification: %s (no id)", method);
     }
-    
-    netdata_log_debug(D_WEB_CLIENT, "MCP: Handling method call: %s (id: %"PRIu64")", method, id);
     
     // Handle method calls based on namespace
     MCP_RETURN_CODE rc;
@@ -315,6 +315,10 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
         // Handle initialize method
         rc = mcp_method_initialize(mcpc, params_obj, id);
     }
+    else if (strcmp(method, "ping") == 0) {
+        // Handle ping method - simple connection health check
+        rc = mcp_method_ping(mcpc, params_obj, id);
+    }
     else {
         buffer_sprintf(mcpc->error, "Method '%s' not found", method);
         rc = MCP_RC_NOT_FOUND;
@@ -334,6 +338,9 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
         buffer_strcat(mcpc->error, "method generated empty result");
         mcp_error_result(mcpc, id, MCP_RC_INTERNAL_ERROR);
     }
+
+    // Clean up the request ID
+    mcp_request_id_del(mcpc, id);
 
     return rc;
 }
@@ -364,7 +371,7 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
         buffer_strcat(batch_buffer, "[");
         
         // Track if we've added any responses (for comma handling)
-        bool has_responses = false;
+        size_t responses_added = 0;
         
         // Process each request in the batch
         for (int i = 0; i < array_len; i++) {
@@ -374,30 +381,26 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
             buffer_flush(mcpc->result);
             buffer_flush(mcpc->error);
             
-            // Extract ID to determine if it's a request or notification
-            struct json_object *id_obj = NULL;
-            bool has_id = json_object_object_get_ex(req_item, "id", &id_obj);
-            
             // Call the single request handler
             mcp_single_request(mcpc, req_item);
             
             // For notifications (no id), don't add to response
-            if (!has_id || buffer_strlen(mcpc->result) == 0) {
+            if (buffer_strlen(mcpc->result) == 0) {
                 continue;
             }
             
             // Add comma if this isn't the first response
-            if (has_responses) {
+            if (responses_added) {
                 buffer_strcat(batch_buffer, ", ");
             }
             
             // Add the response to the batch
             buffer_strcat(batch_buffer, buffer_tostring(mcpc->result));
-            has_responses = true;
+            responses_added++;
         }
         
         // If no responses were added (all notifications), don't send anything per JSON-RPC spec
-        if (!has_responses) {
+        if (!responses_added) {
             buffer_free(batch_buffer);
             return MCP_RC_OK;
         }
@@ -418,16 +421,7 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
     else {
         // Handle single request
         MCP_RETURN_CODE rc = mcp_single_request(mcpc, request);
-        
-        // Extract ID to determine if it's a request or notification
-        struct json_object *id_obj = NULL;
-        bool has_id = json_object_object_get_ex(request, "id", &id_obj);
-        
-        // Only send responses for requests with IDs, not for notifications
-        if (has_id && buffer_strlen(mcpc->result) > 0) {
-            mcp_send_response_buffer(mcpc);
-        }
-        
+        mcp_send_response_buffer(mcpc);
         return rc;
     }
 }

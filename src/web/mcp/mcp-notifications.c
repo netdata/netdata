@@ -42,7 +42,7 @@
 #include "mcp-initialize.h"
 
 // Implementation of notifications/initialized (transport-agnostic)
-static MCP_RETURN_CODE mcp_notifications_method_initialized(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_notifications_method_initialized(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
     // This is just a notification, just log it
     netdata_log_debug(D_MCP, "Client sent notifications/initialized notification");
     
@@ -57,38 +57,38 @@ static MCP_RETURN_CODE mcp_notifications_method_initialized(MCP_CLIENT *mcpc, st
 }
 
 // Stub implementations for other notifications methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_notifications_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_notifications_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'notifications/subscribe' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_notifications_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_notifications_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'notifications/unsubscribe' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_notifications_method_acknowledge(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_notifications_method_acknowledge(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'notifications/acknowledge' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_notifications_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_notifications_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'notifications/getHistory' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_notifications_method_send(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_notifications_method_send(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'notifications/send' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_notifications_method_getSettings(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_notifications_method_getSettings(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'notifications/getSettings' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Notifications namespace method dispatcher (transport-agnostic)
-MCP_RETURN_CODE mcp_notifications_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+MCP_RETURN_CODE mcp_notifications_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
     
     netdata_log_debug(D_MCP, "MCP notifications method: %s", method);

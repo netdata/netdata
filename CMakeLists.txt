@@ -1867,6 +1867,10 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-system.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp-request-id.c
+        src/web/mcp/mcp-request-id.h
+        src/web/mcp/mcp-ping.c
+        src/web/mcp/mcp-ping.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c
