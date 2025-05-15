@@ -204,26 +204,26 @@ metrics:
     symbols:
       - name: fanSpeedSensor
         constant_value_one: true
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
-    #       name: fanSpeedSensorStatus
-    #     tag: fan_speed_sensor_status
-    #     # mapping from description:
-    #     #   Sensor is out of range TRUE(1), FALSE(0), READING ERROR(2)
-    #     mapping:
-    #       0: false
-    #       1: true
-    #       2: reading_error
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
-    #       name: fanSpeedSensorIndex
-    #     tag: sensor_index
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.2
-    #       name: fanSpeedSensorName
-    #     tag: sensor_name
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
+          name: fanSpeedSensorStatus
+        tag: fan_speed_sensor_status
+        # mapping from description:
+        #   Sensor is out of range TRUE(1), FALSE(0), READING ERROR(2)
+        mapping:
+          0: false
+          1: true
+          2: reading_error
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
+          name: fanSpeedSensorIndex
+        tag: sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.2
+          name: fanSpeedSensorName
+        tag: sensor_name
   - MIB: CHECKPOINT-MIB
     metric_tags:
       - symbol:

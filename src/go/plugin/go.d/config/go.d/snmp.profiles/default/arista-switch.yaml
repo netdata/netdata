@@ -204,56 +204,56 @@ metrics:
         OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
         description: "The remote autonomous system number received in the BGP OPEN message."
         unit: "1"
-#    metric_tags:
-#      - symbol:
-#          name: aristaBgp4V2PeerLocalAddr
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
-#          format: ip_address
-#        tag: arista_bgp4_v2_peer_local_addr
-#      - symbol:
-#          name: aristaBgp4V2PeerLocalIdentifier
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8
-#          format: ip_address
-#        tag: arista_bgp4_v2_peer_local_identifier
-#      - symbol:
-#          name: aristaBgp4V2PeerRemoteIdentifier
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11
-#          format: ip_address
-#        tag: arista_bgp4_v2_peer_remote_identifier
-#      - symbol:
-#          name: aristaBgp4V2PeerDescription
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
-#        tag: arista_bgp4_v2_peer_description
-#      - symbol:
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.2
-#          name: aristaBgp4V2PeerLocalAddrType
-#        tag: arista_bgp4_v2_peer_local_addr_type
-#        mapping:
-#          0: unknown
-#          1: ipv4
-#          2: ipv6
-#          3: ipv4z
-#          4: ipv6z
-#          16: dns
-#      - symbol:
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
-#          name: aristaBgp4V2PeerAdminStatus
-#        tag: arista_bgp4_v2_peer_admin_status
-#        mapping:
-#          1: halted
-#          2: running
-#      - symbol:
-#          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
-#          name: aristaBgp4V2PeerState
-#        tag: arista_bgp4_v2_peer_state
-#        mapping:
-#          1: idle
-#          2: connect
-#          3: active
-#          4: opensent
-#          5: openconfirm
-#          6: established
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: aristaBgp4V2PeerLocalAddr
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
+          format: ip_address
+        tag: arista_bgp4_v2_peer_local_addr
+      - symbol:
+          name: aristaBgp4V2PeerLocalIdentifier
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8
+          format: ip_address
+        tag: arista_bgp4_v2_peer_local_identifier
+      - symbol:
+          name: aristaBgp4V2PeerRemoteIdentifier
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11
+          format: ip_address
+        tag: arista_bgp4_v2_peer_remote_identifier
+      - symbol:
+          name: aristaBgp4V2PeerDescription
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
+        tag: arista_bgp4_v2_peer_description
+      - symbol:
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.2
+          name: aristaBgp4V2PeerLocalAddrType
+        tag: arista_bgp4_v2_peer_local_addr_type
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - symbol:
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
+          name: aristaBgp4V2PeerAdminStatus
+        tag: arista_bgp4_v2_peer_admin_status
+        mapping:
+          1: halted
+          2: running
+      - symbol:
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
+          name: aristaBgp4V2PeerState
+        tag: arista_bgp4_v2_peer_state
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
   - MIB: ARISTA-IF-MIB
     table:
       name: aristaIfTable

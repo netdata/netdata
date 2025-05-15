@@ -36,10 +36,10 @@ metrics:
         name: cpu.usage
         description: The overall CPU busy percentage in the last 1 minute period
         unit: "%"
-    # metric_tags:
-    #   - index: 1  # cpmCPUTotalIndex
-    #     tag: cpu
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - index: 1  # cpmCPUTotalIndex
+        tag: cpu
   - MIB: CISCO-ENHANCED-MEMPOOL-MIB
     symbol:
       name: memory.used

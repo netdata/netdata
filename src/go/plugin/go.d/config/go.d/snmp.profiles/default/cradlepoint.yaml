@@ -84,50 +84,50 @@ metrics:
         OID: 1.3.6.1.4.1.20992.1.2.2.1.15
         description: The cellular modems RSRQ given in dBm's.
         unit: "dBm"
-#    metric_tags:
-#      - symbol:
-#          name: cradlepoint.mdmDescr
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.2
-#        tag: cradlepoint_mdm_descr
-#      - symbol:
-#          name: cradlepoint.mdmPort
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.3
-#        tag: cradlepoint_mdm_port
-#      - symbol:
-#          name: cradlepoint.mdmRFBAND
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.17
-#        tag: cradlepoint_mdm_rfband
-#      - symbol:
-#          name: cradlepoint.mdmHOMECARRIER
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.18
-#        tag: cradlepoint_mdm_homecarrier
-#      - symbol:
-#          name: cradlepoint.mdmAPN
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.21
-#        tag: cradlepoint_mdm_apn
-#      - symbol:
-#          name: cradlepoint.mdmRFCHANNEL
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.22
-#        tag: cradlepoint_mdm_rfchannel
-#      - symbol:
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.5
-#          name: cradlepoint.mdmStatus
-#        tag: cradlepoint_mdm_status
-#        mapping:
-#          1: established
-#          2: establishing
-#          3: ready
-#          4: error
-#          5: disconnected
-#          6: disconnecting
-#          7: suspended
-#          8: empty
-#          9: notconfigured
-#          10: userstopped
-#      - symbol:
-#          OID: 1.3.6.1.4.1.20992.1.2.2.1.16
-#          name: cradlepoint.mdmROAM
-#        tag: cradlepoint_mdm_roam
-#        description: The cellular modems Roaming Status.
-#        unit: "TBD"
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: cradlepoint.mdmDescr
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.2
+        tag: cradlepoint_mdm_descr
+      - symbol:
+          name: cradlepoint.mdmPort
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.3
+        tag: cradlepoint_mdm_port
+      - symbol:
+          name: cradlepoint.mdmRFBAND
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.17
+        tag: cradlepoint_mdm_rfband
+      - symbol:
+          name: cradlepoint.mdmHOMECARRIER
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.18
+        tag: cradlepoint_mdm_homecarrier
+      - symbol:
+          name: cradlepoint.mdmAPN
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.21
+        tag: cradlepoint_mdm_apn
+      - symbol:
+          name: cradlepoint.mdmRFCHANNEL
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.22
+        tag: cradlepoint_mdm_rfchannel
+      - symbol:
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.5
+          name: cradlepoint.mdmStatus
+        tag: cradlepoint_mdm_status
+        mapping:
+          1: established
+          2: establishing
+          3: ready
+          4: error
+          5: disconnected
+          6: disconnecting
+          7: suspended
+          8: empty
+          9: notconfigured
+          10: userstopped
+      - symbol:
+          OID: 1.3.6.1.4.1.20992.1.2.2.1.16
+          name: cradlepoint.mdmROAM
+        tag: cradlepoint_mdm_roam
+        description: The cellular modems Roaming Status.
+        unit: "TBD"

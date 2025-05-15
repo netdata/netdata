@@ -81,19 +81,19 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         description: Size of the storage filesystem in MB
         unit: "MBy"
-    # metric_tags:
-    #   - symbol:
-    #       name: sysXStorageType
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.2
-    #     tag: sys_x_storage_type
-    #     mapping:
-    #       1: ram
-    #       2: flash_memory
-    #   - symbol:
-    #       name: sysXStorageName
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.5
-    #     tag: sys_x_storage_name
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: sysXStorageType
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.2
+        tag: sys_x_storage_type
+        mapping:
+          1: ram
+          2: flash_memory
+      - symbol:
+          name: sysXStorageName
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.5
+        tag: sys_x_storage_name
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSwitchAccessPointTable
@@ -107,38 +107,38 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.14
         description: Signal to noise ratio for the BSSID
         unit: "dB"
-    # metric_tags:
-    #   - symbol:
-    #       name: apESSID
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.2
-    #     tag: ap_essid
-    #   - symbol:
-    #       name: apPhyType
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.6
-    #     tag: ap_phy_type
-    #     mapping:
-    #       1: dot11a
-    #       2: dot11b
-    #       3: dot11g
-    #   - symbol:
-    #       name: apType
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.7
-    #     tag: ap_type
-    #     mapping:
-    #       1: ap
-    #       2: am
-    #   - symbol:
-    #       name: apCurrentChannel
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.8
-    #     tag: ap_current_channel
-    #   - symbol:
-    #       name: apLoadBalancing
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.12
-    #     tag: ap_load_balancing
-    #     mapping:
-    #       1: 'true'
-    #       2: 'false'
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: apESSID
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.2
+        tag: ap_essid
+      - symbol:
+          name: apPhyType
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.6
+        tag: ap_phy_type
+        mapping:
+          1: dot11a
+          2: dot11b
+          3: dot11g
+      - symbol:
+          name: apType
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.7
+        tag: ap_type
+        mapping:
+          1: ap
+          2: am
+      - symbol:
+          name: apCurrentChannel
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.8
+        tag: ap_current_channel
+      - symbol:
+          name: apLoadBalancing
+          OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.12
+        tag: ap_load_balancing
+        mapping:
+          1: 'true'
+          2: 'false'
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSwitchAccessPointStatsTable
@@ -286,14 +286,14 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.4
         description: Number of AP hbt GRE tunnels
         unit: "{tunnel}"
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.20.1.1.1.2
-    #       name: haMembership
-    #     table: wlsxHighAvalabilityConfigTable
-    #     tag: ha_membership
-    #     # The actual index of the table is haProfileName that is not accessible
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.14823.2.2.1.20.1.1.1.2
+          name: haMembership
+        table: wlsxHighAvalabilityConfigTable
+        tag: ha_membership
+        # The actual index of the table is haProfileName that is not accessible
   - MIB: WLSX-WLAN-MIB
     table:
       name: wlsxWlanStationTable
@@ -315,62 +315,62 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.17
         description: Transmit rate code of the station
         unit: "TBD"
-    # metric_tags:
-    #   - symbol:
-    #       name: wlanStaPhyType
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.3
-    #     tag: wlan_sta_phy_type
-    #     mapping:
-    #       1: dot11a
-    #       2: dot11b
-    #       3: dot11g
-    #       4: dot11ag
-    #       5: wired
-    #   - symbol:
-    #       name: wlanStaAccessPointESSID
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.12
-    #     tag: wlan_sta_access_point_essid
-    #   - symbol:
-    #       name: wlanStaChannel
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.6
-    #     tag: wlan_sta_channel
-    #   - symbol:
-    #       name: wlanStaVlanId
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.7
-    #     tag: wlan_sta_vlan_id
-    #   - symbol:
-    #       name: wlanStaIsAuthenticated
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.4
-    #     tag: wlan_sta_is_authenticated
-    #     mapping:
-    #       1: 'true'
-    #       2: 'false'
-    #   - symbol:
-    #       name: wlanStaIsAssociated
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.5
-    #     tag: wlan_sta_is_associated
-    #     mapping:
-    #       1: 'true'
-    #       2: 'false'
-    #   - symbol:
-    #       name: wlanStaHTMode
-    #       OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.16
-    #     tag: wlan_sta_ht_mode
-    #     mapping:
-    #       1: none
-    #       2: ht20
-    #       3: ht40
-    #       4: vht20
-    #       5: vht40
-    #       6: vht80
-    #       7: vht160
-    #       8: vht80plus80
-    #       9: he20
-    #       10: he40
-    #       11: he80
-    #       12: he160
-    #       13: he80plus80
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: wlanStaPhyType
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.3
+        tag: wlan_sta_phy_type
+        mapping:
+          1: dot11a
+          2: dot11b
+          3: dot11g
+          4: dot11ag
+          5: wired
+      - symbol:
+          name: wlanStaAccessPointESSID
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.12
+        tag: wlan_sta_access_point_essid
+      - symbol:
+          name: wlanStaChannel
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.6
+        tag: wlan_sta_channel
+      - symbol:
+          name: wlanStaVlanId
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.7
+        tag: wlan_sta_vlan_id
+      - symbol:
+          name: wlanStaIsAuthenticated
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.4
+        tag: wlan_sta_is_authenticated
+        mapping:
+          1: 'true'
+          2: 'false'
+      - symbol:
+          name: wlanStaIsAssociated
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.5
+        tag: wlan_sta_is_associated
+        mapping:
+          1: 'true'
+          2: 'false'
+      - symbol:
+          name: wlanStaHTMode
+          OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.16
+        tag: wlan_sta_ht_mode
+        mapping:
+          1: none
+          2: ht20
+          3: ht40
+          4: vht20
+          5: vht40
+          6: vht80
+          7: vht160
+          8: vht80plus80
+          9: he20
+          10: he40
+          11: he80
+          12: he160
+          13: he80plus80
   - MIB: WLSX-WLAN-MIB
     table:
       name: wlsxWlanStationStatsTable
