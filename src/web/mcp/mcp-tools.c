@@ -39,7 +39,7 @@
 #include "mcp-initialize.h"
 
 // Return a list of available tools (transport-agnostic)
-static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0) return MCP_RC_ERROR;
 
     // Initialize success response
@@ -133,32 +133,32 @@ static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_objec
 }
 
 // Stub implementations for other tools methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/execute' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/cancel' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/status' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/validate' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/describe' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_getCapabilities(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_getCapabilities(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0) return MCP_RC_ERROR;
     
     // Initialize success response
@@ -176,7 +176,7 @@ static MCP_RETURN_CODE mcp_tools_method_getCapabilities(MCP_CLIENT *mcpc, struct
 }
 
 // Tools namespace method dispatcher (transport-agnostic)
-MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
     netdata_log_debug(D_MCP, "MCP tools method: %s", method);

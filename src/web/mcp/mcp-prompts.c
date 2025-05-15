@@ -41,7 +41,7 @@
 #include "mcp-initialize.h"
 
 // Implementation of prompts/list (transport-agnostic)
-static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0) return MCP_RC_ERROR;
 
     // Initialize success response
@@ -58,38 +58,38 @@ static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_obj
 }
 
 // Stub implementations for other prompts methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_prompts_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/execute' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/get' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_prompts_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/save' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_prompts_method_delete(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_delete(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/delete' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_prompts_method_getCategories(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_getCategories(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/getCategories' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_prompts_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/getHistory' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Prompts namespace method dispatcher (transport-agnostic)
-MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
     
     netdata_log_debug(D_MCP, "MCP prompts method: %s", method);
