@@ -40,41 +40,41 @@ metrics:
         constant_value_one: true
         description: FRU power status constant value one
         unit: "TBD"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - index: 1
-    #     tag: fru
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
-    #       name: cefcFRUPowerAdminStatus
-    #       description: Administratively desired FRU power state
-    #       unit: "{power_state}"
-    #     tag: power_admin_status
-    #     mapping:
-    #       1: on
-    #       2: off
-    #       3: inline_auto
-    #       4: inline_on
-    #       5: power_cycle
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
-    #       name: cefcFRUPowerOperStatus
-    #       description: Operational FRU power state
-    #       unit: "{power_state}"
-    #     tag: power_oper_status
-    #     mapping:
-    #       1: off_env_other
-    #       2: on
-    #       3: off_admin
-    #       4: off_denied
-    #       5: off_env_power
-    #       6: off_env_temp
-    #       7: off_env_fan
-    #       8: failed
-    #       9: on_but_fan_fail
-    #       10: off_cooling
-    #       11: off_connector_rating
-    #       12: on_but_inline_power_fail
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - index: 1
+        tag: fru
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
+          name: cefcFRUPowerAdminStatus
+          description: Administratively desired FRU power state
+          unit: "{power_state}"
+        tag: power_admin_status
+        mapping:
+          1: on
+          2: off
+          3: inline_auto
+          4: inline_on
+          5: power_cycle
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
+          name: cefcFRUPowerOperStatus
+          description: Operational FRU power state
+          unit: "{power_state}"
+        tag: power_oper_status
+        mapping:
+          1: off_env_other
+          2: on
+          3: off_admin
+          4: off_denied
+          5: off_env_power
+          6: off_env_temp
+          7: off_env_fan
+          8: failed
+          9: on_but_fan_fail
+          10: off_cooling
+          11: off_connector_rating
+          12: on_but_inline_power_fail
   - MIB: CISCO-PROCESS-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.109.1.1.1
@@ -125,21 +125,21 @@ metrics:
         name: ciscoEnvMonTemperatureStatusValue
         description: Current measurement of the testpoint being instrumented
         unit: "Cel"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - tag: temp_state
-    #     symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.3.1.6
-    #       name: ciscoEnvMonTemperatureState
-    #     mapping:
-    #       1: normal
-    #       2: warning
-    #       3: critical
-    #       4: shutdown
-    #       5: not_present
-    #       6: not_functioning
-    #   - tag: temp_index
-    #     index: 1
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: temp_state
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.3.1.6
+          name: ciscoEnvMonTemperatureState
+        mapping:
+          1: normal
+          2: warning
+          3: critical
+          4: shutdown
+          5: not_present
+          6: not_functioning
+      - tag: temp_index
+        index: 1
   - MIB: CISCO-ENVMON-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.13.1.5
@@ -149,22 +149,22 @@ metrics:
         name: ciscoEnvMonSupplyState
         description: Current state of the power supply being instrumented
         unit: "{power_state}"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.5.1.4
-    #       name: ciscoEnvMonSupplySource
-    #     tag: power_source
-    #     mapping:
-    #       1: unknown
-    #       2: ac
-    #       3: dc
-    #       4: external_power_supply
-    #       5: internal_redundant
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.5.1.2
-    #       name: ciscoEnvMonSupplyStatusDescr
-    #     tag: power_status_descr
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.5.1.4
+          name: ciscoEnvMonSupplySource
+        tag: power_source
+        mapping:
+          1: unknown
+          2: ac
+          3: dc
+          4: external_power_supply
+          5: internal_redundant
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.5.1.2
+          name: ciscoEnvMonSupplyStatusDescr
+        tag: power_status_descr
 
   - MIB: CISCO-ENVMON-MIB
     table:
@@ -175,35 +175,35 @@ metrics:
         constant_value_one: true
         description: Power supply status constant value one
         unit: "TBD"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
-    #       name: ciscoEnvMonSupplyState
-    #       description: Current state of the power supply being instrumented
-    #       unit: "{power_state}"
-    #     tag: cisco_env_mon_supply_state
-    #     mapping:
-    #       1: normal
-    #       2: warning
-    #       3: critical
-    #       4: shutdown
-    #       5: not_present
-    #       6: not_functioning
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.5.1.4
-    #       name: ciscoEnvMonSupplySource
-    #     tag: power_source
-    #     mapping:
-    #       1: unknown
-    #       2: ac
-    #       3: dc
-    #       4: external_power_supply
-    #       5: internal_redundant
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.5.1.2
-    #       name: ciscoEnvMonSupplyStatusDescr
-    #     tag: power_status_descr
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
+          name: ciscoEnvMonSupplyState
+          description: Current state of the power supply being instrumented
+          unit: "{power_state}"
+        tag: cisco_env_mon_supply_state
+        mapping:
+          1: normal
+          2: warning
+          3: critical
+          4: shutdown
+          5: not_present
+          6: not_functioning
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.5.1.4
+          name: ciscoEnvMonSupplySource
+        tag: power_source
+        mapping:
+          1: unknown
+          2: ac
+          3: dc
+          4: external_power_supply
+          5: internal_redundant
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.5.1.2
+          name: ciscoEnvMonSupplyStatusDescr
+        tag: power_status_descr
 
   - MIB: CISCO-ENVMON-MIB
     table:
@@ -229,29 +229,29 @@ metrics:
         constant_value_one: true
         description: Fan status constant value one
         unit: "TBD"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
-    #       name: ciscoEnvMonFanState
-    #       description: Current state of the fan being instrumented
-    #       unit: "{fan_state}"
-    #     tag: fan_state
-    #     mapping:
-    #       1: normal
-    #       2: warning
-    #       3: critical
-    #       4: shutdown
-    #       5: not_present
-    #       6: not_functioning
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.4.1.2
-    #       name: ciscoEnvMonFanStatusDescr
-    #     tag: fan_status_descr
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.13.1.4.1.1
-    #       name: ciscoEnvMonFanStatusIndex
-    #     tag: fan_status_index
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
+          name: ciscoEnvMonFanState
+          description: Current state of the fan being instrumented
+          unit: "{fan_state}"
+        tag: fan_state
+        mapping:
+          1: normal
+          2: warning
+          3: critical
+          4: shutdown
+          5: not_present
+          6: not_functioning
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.4.1.2
+          name: ciscoEnvMonFanStatusDescr
+        tag: fan_status_descr
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.13.1.4.1.1
+          name: ciscoEnvMonFanStatusIndex
+        tag: fan_status_index
 
   #  stackport specific info - every physical stackport has an entry in ifTable
   - MIB: CISCO-STACKWISE-MIB
@@ -303,37 +303,37 @@ metrics:
         constant_value_one: true
         description: Switch info constant value one
         unit: "TBD"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - tag: mac_addr
-    #     symbol:
-    #       OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.7
-    #       name: cswSwitchMacAddress
-    #       format: mac_address
-    #   - MIB: ENTITY-MIB
-    #     symbol:
-    #       OID: 1.3.6.1.2.1.47.1.1.1.1.7
-    #       name: entPhysicalName
-    #     table: entPhysicalTable
-    #     tag: entity_physical_name
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
-    #       name: cswSwitchState
-    #       description: Current state of a switch
-    #       unit: "{switch_state}"
-    #     tag: switch_state
-    #     mapping:
-    #       1: waiting
-    #       2: progressing
-    #       3: added
-    #       4: ready
-    #       5: sdm_mismatch
-    #       6: ver_mismatch
-    #       7: feature_mismatch
-    #       8: new_master_init
-    #       9: provisioned
-    #       10: invalid
-    #       11: removed
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: mac_addr
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.7
+          name: cswSwitchMacAddress
+          format: mac_address
+      - MIB: ENTITY-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.7
+          name: entPhysicalName
+        table: entPhysicalTable
+        tag: entity_physical_name
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
+          name: cswSwitchState
+          description: Current state of a switch
+          unit: "{switch_state}"
+        tag: switch_state
+        mapping:
+          1: waiting
+          2: progressing
+          3: added
+          4: ready
+          5: sdm_mismatch
+          6: ver_mismatch
+          7: feature_mismatch
+          8: new_master_init
+          9: provisioned
+          10: invalid
+          11: removed
   - MIB: CISCO-ENTITY-FRU-CONTROL-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.117.1.4.1
@@ -356,29 +356,29 @@ metrics:
         constant_value_one: true
         description: Fan tray status constant value one
         unit: "TBD"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - index: 1
-    #     tag: fru
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
-    #       name: cefcFanTrayOperStatus
-    #       description: Operational state of the fan or fan tray
-    #       unit: "{fan_state}"
-    #     tag: cefc_fan_tray_oper_status
-    #     mapping:
-    #       1: unknown
-    #       2: up
-    #       3: down
-    #       4: warning
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.2
-    #       name: cefcFanTrayDirection
-    #     tag: cefc_fan_tray_direction
-    #     mapping:
-    #       1: unknown
-    #       2: front_to_back
-    #       3: back_to_front
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - index: 1
+        tag: fru
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
+          name: cefcFanTrayOperStatus
+          description: Operational state of the fan or fan tray
+          unit: "{fan_state}"
+        tag: cefc_fan_tray_oper_status
+        mapping:
+          1: unknown
+          2: up
+          3: down
+          4: warning
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.2
+          name: cefcFanTrayDirection
+        tag: cefc_fan_tray_direction
+        mapping:
+          1: unknown
+          2: front_to_back
+          3: back_to_front
   - MIB: CISCO-MEMORY-POOL-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.48.1.1
@@ -411,20 +411,20 @@ metrics:
         name: cfwConnectionStatCount
         description: Integer value containing the resource statistic count
         unit: "{connection_statistic}"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.2
-    #       name: cfwConnectionStatType
-    #     tag: connection_type
-    #     mapping:
-    #       1: other
-    #       2: total_open
-    #       3: current_open
-    #       4: current_closing
-    #       5: current_half_open
-    #       6: current_in_use
-    #       7: high
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.2
+          name: cfwConnectionStatType
+        tag: connection_type
+        mapping:
+          1: other
+          2: total_open
+          3: current_open
+          4: current_closing
+          5: current_half_open
+          6: current_in_use
+          7: high
   - MIB: CISCO-FIREWALL-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.147.1.2.1.1
@@ -471,90 +471,90 @@ metrics:
         name: rttMonLatestRttOperSense
         description: Sense code for the completion status of the latest RTT operation
         unit: "{sense_code}"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
-    #       name: rttMonCtrlOperState
-    #     table: rttMonCtrlOperTable
-    #     tag: rtt_state
-    #     mapping:
-    #       1: reset
-    #       2: orderly_stop
-    #       3: immediate_stop
-    #       4: pending
-    #       5: inactive
-    #       6: active
-    #       7: restart
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.4
-    #       name: rttMonCtrlAdminRttType
-    #     table: rttMonCtrlAdminTable
-    #     tag: rtt_type
-    #     mapping:
-    #       1: echo
-    #       2: path_echo
-    #       3: file_io
-    #       4: script
-    #       5: udp_echo
-    #       6: tcp_connect
-    #       7: http
-    #       8: dns
-    #       9: jitter
-    #       10: dlsw
-    #       11: dhcp
-    #       12: ftp
-    #       13: voip
-    #       14: rtp
-    #       15: lsp_group
-    #       16: icmpjitter
-    #       17: lsp_ping
-    #       18: lsp_trace
-    #       19: ethernet_ping
-    #       20: ethernet_jitter
-    #       21: lsp_ping_pseudowire
-    #       22: video
-    #       23: y1731_delay
-    #       24: y1731_loss
-    #       25: mcast_jitter
-    #       26: fabric_path_echo
-    #   - index: 1
-    #     tag: rtt_index
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.6
-    #       name: rttMonEchoAdminSourceAddress
-    #       format: ip_address
-    #     table: rttMonEchoAdminTable
-    #     tag: rtt_source_address
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.2
-    #       name: rttMonEchoAdminTargetAddress
-    #       format: ip_address
-    #     table: rttMonEchoAdminTable
-    #     tag: rtt_target_address
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.2
-    #       name: rttMonLatestRttOperSense
-    #     table: rttMonLatestRttOperTable
-    #     tag: rtt_sense
-    #     mapping:
-    #       0: other
-    #       1: ok
-    #       2: disconnected
-    #       3: over_threshold
-    #       4: timeout
-    #       5: busy
-    #       6: not_connected
-    #       7: dropped
-    #       8: sequence_error
-    #       9: verify_error
-    #       10: application_specific
-    #       11: dns_server_timeout
-    #       12: tcp_connect_timeout
-    #       13: http_transaction_timeout
-    #       14: dns_query_error
-    #       15: http_error
-    #       16: error
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
+          name: rttMonCtrlOperState
+        table: rttMonCtrlOperTable
+        tag: rtt_state
+        mapping:
+          1: reset
+          2: orderly_stop
+          3: immediate_stop
+          4: pending
+          5: inactive
+          6: active
+          7: restart
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.4
+          name: rttMonCtrlAdminRttType
+        table: rttMonCtrlAdminTable
+        tag: rtt_type
+        mapping:
+          1: echo
+          2: path_echo
+          3: file_io
+          4: script
+          5: udp_echo
+          6: tcp_connect
+          7: http
+          8: dns
+          9: jitter
+          10: dlsw
+          11: dhcp
+          12: ftp
+          13: voip
+          14: rtp
+          15: lsp_group
+          16: icmpjitter
+          17: lsp_ping
+          18: lsp_trace
+          19: ethernet_ping
+          20: ethernet_jitter
+          21: lsp_ping_pseudowire
+          22: video
+          23: y1731_delay
+          24: y1731_loss
+          25: mcast_jitter
+          26: fabric_path_echo
+      - index: 1
+        tag: rtt_index
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.6
+          name: rttMonEchoAdminSourceAddress
+          format: ip_address
+        table: rttMonEchoAdminTable
+        tag: rtt_source_address
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.2
+          name: rttMonEchoAdminTargetAddress
+          format: ip_address
+        table: rttMonEchoAdminTable
+        tag: rtt_target_address
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.2
+          name: rttMonLatestRttOperSense
+        table: rttMonLatestRttOperTable
+        tag: rtt_sense
+        mapping:
+          0: other
+          1: ok
+          2: disconnected
+          3: over_threshold
+          4: timeout
+          5: busy
+          6: not_connected
+          7: dropped
+          8: sequence_error
+          9: verify_error
+          10: application_specific
+          11: dns_server_timeout
+          12: tcp_connect_timeout
+          13: http_transaction_timeout
+          14: dns_query_error
+          15: http_error
+          16: error
 
   - MIB: CISCO-RTTMON-MIB
     table:
@@ -565,71 +565,71 @@ metrics:
         name: rttMonCtrlOperTimeoutOccurred
         description: Indicates if a timeout occurred for the RTT operation
         unit: "1"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
-    #       name: rttMonCtrlOperState
-    #     tag: rtt_state
-    #     mapping:
-    #       1: reset
-    #       2: orderly_stop
-    #       3: immediate_stop
-    #       4: pending
-    #       5: inactive
-    #       6: active
-    #       7: restart
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.4
-    #       name: rttMonCtrlAdminRttType
-    #     table: rttMonCtrlAdminTable
-    #     tag: rtt_type
-    #     mapping:
-    #       1: echo
-    #       2: path_echo
-    #       3: file_io
-    #       4: script
-    #       5: udp_echo
-    #       6: tcp_connect
-    #       7: http
-    #       8: dns
-    #       9: jitter
-    #       10: dlsw
-    #       11: dhcp
-    #       12: ftp
-    #       13: voip
-    #       14: rtp
-    #       15: lsp_group
-    #       16: icmpjitter
-    #       17: lsp_ping
-    #       18: lsp_trace
-    #       19: ethernet_ping
-    #       20: ethernet_jitter
-    #       21: lsp_ping_pseudowire
-    #       22: video
-    #       23: y1731_delay
-    #       24: y1731_loss
-    #       25: mcast_jitter
-    #       26: fabric_path_echo
-    #   - index: 1
-    #     tag: rtt_index
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.6
-    #       name: rttMonEchoAdminSourceAddress
-    #       format: ip_address
-    #     table: rttMonEchoAdminTable
-    #     tag: rtt_source_address
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.2
-    #       name: rttMonEchoAdminTargetAddress
-    #       format: ip_address
-    #     table: rttMonEchoAdminTable
-    #     tag: rtt_target_address
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.6
-    #       name: rttMonCtrlOperTimeoutOccurred
-    #     name: rttMonCtrlOperTable
-    #     tag: rtt_timeout
-    #     mapping:
-    #       1: true
-    #       2: false
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
+          name: rttMonCtrlOperState
+        tag: rtt_state
+        mapping:
+          1: reset
+          2: orderly_stop
+          3: immediate_stop
+          4: pending
+          5: inactive
+          6: active
+          7: restart
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.4
+          name: rttMonCtrlAdminRttType
+        table: rttMonCtrlAdminTable
+        tag: rtt_type
+        mapping:
+          1: echo
+          2: path_echo
+          3: file_io
+          4: script
+          5: udp_echo
+          6: tcp_connect
+          7: http
+          8: dns
+          9: jitter
+          10: dlsw
+          11: dhcp
+          12: ftp
+          13: voip
+          14: rtp
+          15: lsp_group
+          16: icmpjitter
+          17: lsp_ping
+          18: lsp_trace
+          19: ethernet_ping
+          20: ethernet_jitter
+          21: lsp_ping_pseudowire
+          22: video
+          23: y1731_delay
+          24: y1731_loss
+          25: mcast_jitter
+          26: fabric_path_echo
+      - index: 1
+        tag: rtt_index
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.6
+          name: rttMonEchoAdminSourceAddress
+          format: ip_address
+        table: rttMonEchoAdminTable
+        tag: rtt_source_address
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.2.1.2
+          name: rttMonEchoAdminTargetAddress
+          format: ip_address
+        table: rttMonEchoAdminTable
+        tag: rtt_target_address
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.6
+          name: rttMonCtrlOperTimeoutOccurred
+        name: rttMonCtrlOperTable
+        tag: rtt_timeout
+        mapping:
+          1: true
+          2: false

@@ -123,17 +123,17 @@ metrics:
         name: ipSystemStatsHCOutBcastPkts
         description: The number of IP broadcast datagrams transmitted
         unit: "{datagram}"
-    # metric_tags:
-    #   - index: 1
-    #     tag: ipversion
-    #     mapping:
-    #       0: unknown
-    #       1: ipv4
-    #       2: ipv6
-    #       3: ipv4z
-    #       4: ipv6z
-    #       16: dns
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - index: 1
+        tag: ipversion
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
   - MIB: IP-MIB
     table:
       OID: 1.3.6.1.2.1.4.31.3
@@ -248,16 +248,16 @@ metrics:
         name: ipIfStatsHCOutBcastPkts
         description: The number of IP broadcast datagrams transmitted
         unit: "{datagram}"
-    # metric_tags:
-    #   - index: 1
-    #     tag: ipversion
-    #     mapping:
-    #       0: unknown
-    #       1: ipv4
-    #       2: ipv6
-    #       3: ipv4z
-    #       4: ipv6z
-    #       16: dns
-    #   - index: 2
-    #     tag: interface
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - index: 1
+        tag: ipversion
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - index: 2
+        tag: interface
