@@ -48,19 +48,19 @@ metrics:
         metric_type: monotonic_count
         description: Total cumulative number of Write I/Os.
         unit: "{write_io}"
-#    metric_tags:
-#      - symbol:
-#          OID: 1.3.6.1.4.1.37447.1.2.1.3
-#          name: nimble.volName
-#        tag: nimble_vol_name
-#      - symbol:
-#          OID: 1.3.6.1.4.1.37447.1.2.1.10
-#          name: nimble.volOnline
-#        tag: nimble_vol_online
-#        mapping:
-#          1: 'true'
-#          2: 'false'
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.37447.1.2.1.3
+          name: nimble.volName
+        tag: nimble_vol_name
+      - symbol:
+          OID: 1.3.6.1.4.1.37447.1.2.1.10
+          name: nimble.volOnline
+        tag: nimble_vol_online
+        mapping:
+          1: 'true'
+          2: 'false'
   - MIB: NIMBLE-MIB
     symbol:
       OID: 1.3.6.1.4.1.37447.1.3.2.0

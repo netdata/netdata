@@ -25,58 +25,58 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.13
         description: The voltage for the entity
         unit: "V"
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - symbol:
-#          name: huawei.hwEntityBoardName
-#          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.43
-#        tag: huawei_hw_entity_board_name
-#      - symbol:
-#          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.1
-#          name: huawei.hwEntityAdminStatus
-#        tag: huawei_hw_entity_admin_status
-#        mapping:
-#          1: not_supported
-#          2: locked
-#          3: shutting_down
-#          4: unlocked
-#          11: up
-#          12: down
-#          13: loopback
-#      - symbol:
-#          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.2
-#          name: huawei.hwEntityOperStatus
-#        tag: huawei_hw_entity_oper_status
-#        mapping:
-#          1: not_supported
-#          2: disabled
-#          3: enabled
-#          4: offline
-#          11: up
-#          12: down
-#          13: connect
-#          15: protocol_up
-#          16: link_up
-#          17: link_down
-#          18: present
-#          19: absent
-#      - symbol:
-#          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.3
-#          name: huawei.hwEntityStandbyStatus
-#        tag: huawei_hw_entity_standby_status
-#        mapping:
-#          1: not_supported
-#          2: hot_standby
-#          3: cold_standby
-#          4: providing_service
-#      - symbol:
-#          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.42
-#          name: huawei.hwEntityFaultLight
-#        tag: huawei_hw_entity_fault_light
-#        mapping:
-#          1: not_supported
-#          2: normal
-#          3: under_repair
+    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: huawei.hwEntityBoardName
+          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.43
+        tag: huawei_hw_entity_board_name
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.1
+          name: huawei.hwEntityAdminStatus
+        tag: huawei_hw_entity_admin_status
+        mapping:
+          1: not_supported
+          2: locked
+          3: shutting_down
+          4: unlocked
+          11: up
+          12: down
+          13: loopback
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.2
+          name: huawei.hwEntityOperStatus
+        tag: huawei_hw_entity_oper_status
+        mapping:
+          1: not_supported
+          2: disabled
+          3: enabled
+          4: offline
+          11: up
+          12: down
+          13: connect
+          15: protocol_up
+          16: link_up
+          17: link_down
+          18: present
+          19: absent
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.3
+          name: huawei.hwEntityStandbyStatus
+        tag: huawei_hw_entity_standby_status
+        mapping:
+          1: not_supported
+          2: hot_standby
+          3: cold_standby
+          4: providing_service
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.42
+          name: huawei.hwEntityFaultLight
+        tag: huawei_hw_entity_fault_light
+        mapping:
+          1: not_supported
+          2: normal
+          3: under_repair
   - MIB: HUAWEI-ENTITY-EXTENT-MIB
     table:
       name: hwFanStatusTable

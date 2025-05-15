@@ -162,12 +162,12 @@ metrics:
         name: sysMultiHostCpuIowait
         description: The average time spent by the specified processor waiting for external I/O to complete for the associated host
         unit: "%"
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - symbol:
-#          OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
-#          name: sysMultiHostCpuId
-#        tag: cpu
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
+          name: sysMultiHostCpuId
+        tag: cpu
 
   # TCP stats
   - MIB: F5-BIGIP-SYSTEM-MIB
@@ -329,12 +329,12 @@ metrics:
         name: ltmVirtualServConnLimit
         description: The maximum number of connections the specified virtual server is allowed to have open at one time
         unit: "{connection}"
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - tag: server
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.1
-#          name: ltmVirtualServName
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: server
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.1.2.1.1
+          name: ltmVirtualServName
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -344,25 +344,25 @@ metrics:
       # Gauges
       - name: ltmVsStatus
         constant_value_one: true
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - tag: ltm_vs_status_avail_state
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.2
-#          name: ltmVsStatusAvailState
-#      - tag: ltm_vs_status_name
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.1
-#          name: ltmVsStatusName
-#      - tag: ltm_vs_status_enabled_state
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.3
-#          name: ltmVsStatusEnabledState
-#        mapping:
-#          0: none
-#          1: enabled
-#          2: disabled
-#          3: disabledbyparent
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: ltm_vs_status_avail_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.2
+          name: ltmVsStatusAvailState
+      - tag: ltm_vs_status_name
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.1
+          name: ltmVsStatusName
+      - tag: ltm_vs_status_enabled_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.10.13.2.1.3
+          name: ltmVsStatusEnabledState
+        mapping:
+          0: none
+          1: enabled
+          2: disabled
+          3: disabledbyparent
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.10.2.3
@@ -501,53 +501,53 @@ metrics:
       # Gauges
       - name: ltmNodeAddr
         constant_value_one: true
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - tag: node
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
-#          name: ltmNodeAddrName
-#      - tag: monitor_state
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
-#          name: ltmNodeAddrMonitorState
-#        mapping:
-#          0: unchecked
-#          1: checking
-#          2: inband
-#          3: forced_up
-#          4: up
-#          19: down
-#          20: forced_down
-#          22: irule_down
-#          23: inband_down
-#          24: down_manual_resume
-#          25: disabled
-#          26: fqdn_checking
-#          27: fqdn_down
-#          28: fqdn_up
-#          29: fqdn_up_no_address
-#      - tag: monitor_status
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
-#          name: ltmNodeAddrMonitorStatus
-#        mapping:
-#          0: unchecked
-#          1: checking
-#          2: inband
-#          3: forced_up
-#          4: up
-#          18: addr_down
-#          19: down
-#          20: forced_down
-#          21: maint
-#          22: irule_down
-#          23: inband_down
-#          24: down_manual_resume
-#          26: fqdn_checking
-#          27: fqdn_down
-#          28: fqdn_up
-#          29: fqdn_up_no_address
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.17
+          name: ltmNodeAddrName
+      - tag: monitor_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.6
+          name: ltmNodeAddrMonitorState
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          19: down
+          20: forced_down
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          25: disabled
+          26: fqdn_checking
+          27: fqdn_down
+          28: fqdn_up
+          29: fqdn_up_no_address
+      - tag: monitor_status
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.4.1.2.1.7
+          name: ltmNodeAddrMonitorStatus
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          18: addr_down
+          19: down
+          20: forced_down
+          21: maint
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          26: fqdn_checking
+          27: fqdn_down
+          28: fqdn_up
+          29: fqdn_up_no_address
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.4.2.3
@@ -754,16 +754,16 @@ metrics:
         name: ltmPoolMemberSessionStatus
         description: The hierarchical status of the session including parent status for the specified pool member
         unit: "TBD"
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - tag: pool
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
-#          name: ltmPoolMemberPoolName
-#      - tag: node
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
-#          name: ltmPoolMemberNodeName
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
+          name: ltmPoolMemberPoolName
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
+          name: ltmPoolMemberNodeName
 
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
@@ -773,32 +773,32 @@ metrics:
       # Gauges
       - name: ltmPoolMember
         constant_value_one: true
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#    metric_tags:
-#      - tag: pool
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
-#          name: ltmPoolMemberPoolName
-#      - tag: node
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
-#          name: ltmPoolMemberNodeName
-#      - tag: monitor_state
-#        symbol:
-#          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
-#          name: ltmPoolMemberMonitorState
-#        mapping:
-#          0: unchecked
-#          1: checking
-#          2: inband
-#          3: forced_up
-#          4: up
-#          19: down
-#          20: forced_down
-#          22: irule_down
-#          23: inband_down
-#          24: down_manual_resume
-#          25: disabled
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - tag: pool
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.1
+          name: ltmPoolMemberPoolName
+      - tag: node
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.19
+          name: ltmPoolMemberNodeName
+      - tag: monitor_state
+        symbol:
+          OID: 1.3.6.1.4.1.3375.2.2.5.3.2.1.10
+          name: ltmPoolMemberMonitorState
+        mapping:
+          0: unchecked
+          1: checking
+          2: inband
+          3: forced_up
+          4: up
+          19: down
+          20: forced_down
+          22: irule_down
+          23: inband_down
+          24: down_manual_resume
+          25: disabled
   - MIB: F5-BIGIP-LOCAL-MIB
     table:
       OID: 1.3.6.1.4.1.3375.2.2.5.4.3

@@ -29,41 +29,41 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.7
         description: The counter that records the times the remote BGP peer is correctly connected.
         unit: "s"
-    # metric_tags:
-    #   - symbol:
-    #       name: huawei.hwBgpPeerVrfName
-    #       OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
-    #     tag: huawei_hw_bgp_peer_vrf_name
-    #   - symbol:
-    #       name: huawei.hwBgpPeerRemoteAddr
-    #       OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
-    #       format: ip_address
-    #     tag: huawei_hw_bgp_peer_remote_addr
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5
-    #       name: huawei.hwBgpPeerState
-    #     tag: huawei_hw_bgp_peer_state
-    #     mapping:
-    #       1: idle
-    #       2: connect
-    #       3: active
-    #       4: opensent
-    #       5: openconfirm
-    #       6: established
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.10
-    #       name: huawei.hwBgpPeerUnAvaiReason
-    #     tag: huawei_hw_bgp_peer_un_avai_reason
-    #     mapping:
-    #       1: configuration_lead_peer_down
-    #       2: receive_notification
-    #       3: receive_error_packet
-    #       4: hold_timer_expire
-    #       5: remote_peer_not_reachable
-    #       6: direct_connect_interface_down
-    #       7: route_limit
-    #       # the mapping is defined in the metric description
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: huawei.hwBgpPeerVrfName
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6
+        tag: huawei_hw_bgp_peer_vrf_name
+      - symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+        tag: huawei_hw_bgp_peer_remote_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.5
+          name: huawei.hwBgpPeerState
+        tag: huawei_hw_bgp_peer_state
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.10
+          name: huawei.hwBgpPeerUnAvaiReason
+        tag: huawei_hw_bgp_peer_un_avai_reason
+        mapping:
+          1: configuration_lead_peer_down
+          2: receive_notification
+          3: receive_error_packet
+          4: hold_timer_expire
+          5: remote_peer_not_reachable
+          6: direct_connect_interface_down
+          7: route_limit
+          # the mapping is defined in the metric description
   - MIB: HUAWEI-BGP-VPN-MIB
     table:
       name: hwBgpPeerRouteTable
@@ -296,65 +296,65 @@ metrics:
     symbols:
       - name: huawei.hwNatSession
         constant_value_one: true
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.1
-    #       name: huawei.hwNatSessionSrcLocalAddr
-    #     tag: huawei_hw_nat_session_src_local_addr
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.2
-    #       name: huawei.hwNatSessionDstLocalAddr
-    #     tag: huawei_hw_nat_session_dst_local_addr
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.3
-    #       name: huawei.hwNatSessionSrcLocalPort
-    #     tag: huawei_hw_nat_session_src_local_port
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.4
-    #       name: huawei.hwNatSessionDstLocalPort
-    #     tag: huawei_hw_nat_session_dst_local_port
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.6
-    #       name: huawei.hwNatSessionSrcGlobalAddr
-    #     tag: huawei_hw_nat_session_src_global_addr
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.7
-    #       name: huawei.hwNatSessionDstGlobalAddr
-    #     tag: huawei_hw_nat_session_dst_global_addr
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.8
-    #       name: huawei.hwNatSessionSrcGlobalPort
-    #     tag: huawei_hw_nat_session_src_global_port
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.9
-    #       name: huawei.hwNatSessionDstGlobalPort
-    #     tag: huawei_hw_nat_session_dst_global_port
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.5
-    #       name: huawei.hwNatSessionProtocol
-    #     tag: huawei_hw_nat_session_protocol
-    #     mapping:
-    #       1: other
-    #       2: icmp
-    #       3: udp
-    #       4: tcp
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.10
-    #       name: huawei.hwNatSessionSrcVPN
-    #     tag: huawei_hw_nat_session_src_vpn
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.11
-    #       name: huawei.hwNatSessionDstVPN
-    #     tag: huawei_hw_nat_session_dst_vpn
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.12
-    #       name: huawei.hwNatSessionStatus
-    #     tag: huawei_hw_nat_session_status
-    #     mapping:
-    #       1: active
-    #       2: not_in_service
-    #       3: not_ready
-    #       4: create_and_go
-    #       5: create_and_wait
-    #       6: destroy
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.1
+          name: huawei.hwNatSessionSrcLocalAddr
+        tag: huawei_hw_nat_session_src_local_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.2
+          name: huawei.hwNatSessionDstLocalAddr
+        tag: huawei_hw_nat_session_dst_local_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.3
+          name: huawei.hwNatSessionSrcLocalPort
+        tag: huawei_hw_nat_session_src_local_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.4
+          name: huawei.hwNatSessionDstLocalPort
+        tag: huawei_hw_nat_session_dst_local_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.6
+          name: huawei.hwNatSessionSrcGlobalAddr
+        tag: huawei_hw_nat_session_src_global_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.7
+          name: huawei.hwNatSessionDstGlobalAddr
+        tag: huawei_hw_nat_session_dst_global_addr
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.8
+          name: huawei.hwNatSessionSrcGlobalPort
+        tag: huawei_hw_nat_session_src_global_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.9
+          name: huawei.hwNatSessionDstGlobalPort
+        tag: huawei_hw_nat_session_dst_global_port
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.5
+          name: huawei.hwNatSessionProtocol
+        tag: huawei_hw_nat_session_protocol
+        mapping:
+          1: other
+          2: icmp
+          3: udp
+          4: tcp
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.10
+          name: huawei.hwNatSessionSrcVPN
+        tag: huawei_hw_nat_session_src_vpn
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.11
+          name: huawei.hwNatSessionDstVPN
+        tag: huawei_hw_nat_session_dst_vpn
+      - symbol:
+          OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.12
+          name: huawei.hwNatSessionStatus
+        tag: huawei_hw_nat_session_status
+        mapping:
+          1: active
+          2: not_in_service
+          3: not_ready
+          4: create_and_go
+          5: create_and_wait
+          6: destroy
