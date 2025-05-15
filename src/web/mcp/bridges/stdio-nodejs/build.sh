@@ -43,7 +43,6 @@ else
 fi
 
 # Get the full path to the script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="$SCRIPT_DIR/nd-mcp.js"
 
 # Make sure the script is executable
