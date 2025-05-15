@@ -85,9 +85,10 @@ void cancel_main_threads(void) {
     }
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        struct netdata_static_thread *st = &static_threads[i];
-        if(st->thread && !nd_thread_is_me(static_threads[i].thread))
-            nd_thread_join(st->thread);
+        if(static_threads[i].thread && !nd_thread_is_me(static_threads[i].thread)) {
+            if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+                nd_thread_join(static_threads[i].thread);
+        }
     }
     netdata_log_info("All threads finished.");
 
