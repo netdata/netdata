@@ -1705,7 +1705,8 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics,
+            the size of all the data files, and the wait stats in the database you must:
 
             - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
             - Configure a database connection (see Setup → Configuration → Examples).
