@@ -14,4 +14,7 @@ size_t rrdcontext_context_registry_unique_count(void);
 
 void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *pattern);
 
+// Helper function to get context categories (extracts prefixes before the last dot)
+void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PATTERN *pattern);
+
 #endif // NETDATA_RRDCONTEXT_CONTEXT_REGISTRY_H

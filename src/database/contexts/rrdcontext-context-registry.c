@@ -155,3 +155,91 @@ void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *patt
 
     spinlock_unlock(&context_registry_spinlock);
 }
+
+// Implementation to extract and output unique context categories
+void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PATTERN *pattern) {
+    spinlock_lock(&context_registry_spinlock);
+
+    // JudyL array to store unique category STRINGs as keys and counts as values
+    Pvoid_t categories_judyl = NULL;
+    
+    // Header information
+    buffer_json_member_add_array(wb, "header");
+    buffer_json_add_array_item_string(wb, "category");
+    buffer_json_add_array_item_string(wb, "number_of_contexts");
+    buffer_json_array_close(wb);
+    
+    buffer_json_member_add_array(wb, "categories");
+    
+    // First pass: count occurrences of each category
+    Word_t index = 0;
+    bool first = true;
+    Pvoid_t *PValue;
+    while ((PValue = JudyLFirstThenNext(context_registry_judyl, &index, &first))) {
+        if (!index || !*PValue) continue;
+        
+        const char *context_name = string2str((STRING *)index);
+        
+        // Find the last dot in the context name
+        const char *last_dot = strrchr(context_name, '.');
+        
+        // Create a STRING for the category (everything up to the last dot)
+        STRING *category_str;
+        if (last_dot) {
+            // Create a STRING with the part before the last dot
+            category_str = string_strndupz(context_name, last_dot - context_name);
+        } else {
+            // No dots, use the entire context as the category
+            category_str = string_strdupz(context_name);
+        }
+        
+        if (!category_str) continue;
+        
+        // Get or insert a slot for this category
+        Pvoid_t *CategoryValue = JudyLIns(&categories_judyl, (Word_t)category_str, PJE0);
+        
+        if (CategoryValue) {
+            // Check if this is a new entry
+            size_t count = (size_t)(Word_t)*CategoryValue;
+            if (count > 0) {
+                // Already exists, free our reference (JudyL already has one)
+                string_freez(category_str);
+            }
+            // Increment the count
+            *CategoryValue = (void *)(Word_t)(count + 1);
+        } else {
+            // Failed to insert, free the STRING
+            string_freez(category_str);
+        }
+    }
+    
+    // Second pass: output the unique categories and their counts
+    index = 0;
+    first = true;
+    while ((PValue = JudyLFirstThenNext(categories_judyl, &index, &first))) {
+        if (!index) continue;
+        
+        STRING *category_str = (STRING *)index;
+        const char *category = string2str(category_str);
+        
+        // Apply pattern filtering here, on the category itself
+        if (!pattern || simple_pattern_matches(pattern, category)) {
+            size_t count = (size_t)(Word_t)*PValue;
+            
+            buffer_json_add_array_item_array(wb);
+            buffer_json_add_array_item_string(wb, category);
+            buffer_json_add_array_item_uint64(wb, count);
+            buffer_json_array_close(wb);
+        }
+        
+        // Free the STRING object as we go
+        string_freez(category_str);
+    }
+    
+    buffer_json_array_close(wb);
+    
+    // Free the JudyL array (values were already freed in the loop above)
+    JudyLFreeArray(&categories_judyl, PJE0);
+    
+    spinlock_unlock(&context_registry_spinlock);
+}

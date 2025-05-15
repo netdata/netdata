@@ -49,6 +49,9 @@ typedef enum {
 // Function pointer type for resource read callbacks
 typedef MCP_RETURN_CODE (*resource_read_fn)(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id);
 
+// Function pointer type for resource size callbacks
+typedef size_t (*resource_size_fn)(void);
+
 // Resource structure definition
 typedef struct {
     const char *name;           // Resource name
@@ -58,6 +61,7 @@ typedef struct {
     RESOURCE_AUDIENCE audience; // Intended audience
     double priority;            // Priority (0.0-1.0)
     resource_read_fn read_fn;   // Callback function to read the resource
+    resource_size_fn size_fn;   // Optional callback function to return approximate size in bytes
 } MCP_RESOURCE;
 
 // Resource template structure definition
@@ -107,7 +111,8 @@ static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_
         "(like nd://context/system.cpu.user).\n\n"
         "You can search contexts using glob-like patterns using the 'like' parameter:\n"
         "nd://contexts?like=*sql*|*db*|*redis*|*mongo*\n"
-        "to find database-related contexts.");
+        "to find postgresql, mysql, mariadb and mongodb related contexts.\n\n"
+        "For a high-level overview of monitoring categories, use nd://context-categories");
     
     buffer_json_finalize(mcpc->result);
     
@@ -117,6 +122,72 @@ static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_
     return MCP_RC_OK;
 }
 
+// Implementation of the context categories resource read function
+static MCP_RETURN_CODE mcp_resource_read_context_categories(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+    if (!mcpc || !params || id == 0) return MCP_RC_INTERNAL_ERROR;
+
+    // Extract URI from params to check for query parameters
+    struct json_object *uri_obj = NULL;
+    json_object_object_get_ex(params, "uri", &uri_obj);
+    const char *uri = json_object_get_string(uri_obj);
+    
+    SIMPLE_PATTERN *pattern = NULL;
+    
+    // Check if we have a query parameter
+    if (uri && strstr(uri, "?like=")) {
+        const char *like_param = strstr(uri, "?like=") + 6; // Skip past "?like="
+        
+        // Decode the query parameter
+        const char *decoded_query = mcp_uri_decode(mcpc, like_param);
+        
+        // Create a simple pattern
+        if (decoded_query && *decoded_query)
+            pattern = simple_pattern_create(decoded_query, "|", SIMPLE_PATTERN_EXACT, false);
+    }
+
+    mcp_init_success_result(mcpc, id);
+    buffer_json_member_add_object(mcpc->result, "result");
+    
+    // Add the filtered context categories
+    rrdcontext_context_registry_json_mcp_categories_array(mcpc->result, pattern);
+    
+    // Add instructions
+    buffer_json_member_add_string(mcpc->result, "instructions",
+        "Context categories provide a high-level overview of what's being monitored.\n"
+        "Each category represents a group of related contexts (e.g., 'system.cpu' for CPU metrics).\n\n"
+        "To explore all contexts within a specific category, use the pattern:\n"
+        "nd://contexts?like={category}.*\n\n"
+        "For example, if the cateogy is 'redis' to see all Redis-related contexts:\n"
+        "nd://contexts?like=redis.*\n\n"
+        "You can search categories using glob-like patterns with the 'like' parameter:\n"
+        "nd://context-categories?like=*sql*|*db*|*mongo*\n"
+        "to find postgresql, mysql, mariadb and mongodb related categories.");
+    
+    buffer_json_finalize(mcpc->result);
+    
+    if (pattern)
+        simple_pattern_free(pattern);
+
+    return MCP_RC_OK;
+}
+
+// Size estimation functions for resources
+static size_t mcp_resource_contexts_size(void) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    rrdcontext_context_registry_json_mcp_array(wb, NULL);
+    buffer_json_finalize(wb);
+    return buffer_strlen(wb);
+}
+
+static size_t mcp_resource_context_categories_size(void) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    rrdcontext_context_registry_json_mcp_categories_array(wb, NULL);
+    buffer_json_finalize(wb);
+    return buffer_strlen(wb);
+}
+
 // Static array of all available resources
 static const MCP_RESOURCE mcp_resources[] = {
     {
@@ -124,14 +195,29 @@ static const MCP_RESOURCE mcp_resources[] = {
         .uri = "nd://contexts",
         .description =
             "Primary discovery mechanism for what's being monitored.\n"
-            "Provides the most concise overview of monitoring categories.\n"
+            "Contexts are the equivalent of charts in Netdata dashboards and they are multi-node and multi-instance.\n"
+            "Usually contexts have the same set of label keys and common or similar dimensions.\n"
             "Supports searches for contexts using glob-like patterns with the 'like=' parameter.\n",
         .content_type = CT_APPLICATION_JSON,
         .audience = RESOURCE_AUDIENCE_BOTH,
         .priority = 1.0,
-        .read_fn = mcp_resource_read_contexts
+        .read_fn = mcp_resource_read_contexts,
+        .size_fn = mcp_resource_contexts_size
     },
-    // Add more resources here as the are implemented
+    {
+        .name = "context-categories",
+        .uri = "nd://context-categories",
+        .description =
+            "High-level categories of contexts being monitored.\n"
+            "Provides a summarized view of monitoring domains by grouping contexts by their prefix.\n"
+            "Useful for getting a quick overview of what's being monitored without detailed breakdown.\n",
+        .content_type = CT_APPLICATION_JSON,
+        .audience = RESOURCE_AUDIENCE_BOTH,
+        .priority = 0.9,
+        .read_fn = mcp_resource_read_context_categories,
+        .size_fn = mcp_resource_context_categories_size
+    },
+    // Add more resources here as they are implemented
     // Example:
     // {
     //     .name = "nodes",
@@ -149,10 +235,21 @@ static const MCP_RESOURCE_TEMPLATE mcp_resource_templates[] = {
         .description = 
             "Search for monitoring contexts by matching their names against glob-like patterns.\n"
             "The 'like' parameter accepts pipe-separated patterns with wildcards\n"
-            "(e.g., '?like=*sql*|*db*|*redis*|*mongo*' for database-related contexts).",
+            "(e.g., '?like=*sql*|*db*|*redis*|*mongo*|*{db-name}*' for common database-related contexts).",
         .content_type = CT_APPLICATION_JSON,
         .audience = RESOURCE_AUDIENCE_BOTH,
         .priority = 1.0
+    },
+    {
+        .name = "Context Categories Search",
+        .uri_template = "nd://context-categories{?like}",
+        .description = 
+            "Search for high-level context categories by matching their names against glob-like patterns.\n"
+            "The 'like' parameter accepts pipe-separated patterns with wildcards\n"
+            "(e.g., '?like=*sql*|*db*|*redis*|*mongo*|*{db-name}*' for common database-related categories).",
+        .content_type = CT_APPLICATION_JSON,
+        .audience = RESOURCE_AUDIENCE_BOTH,
+        .priority = 0.9
     },
     // Add more templates here as they are implemented
 };
@@ -186,6 +283,14 @@ static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_o
         const char *mime_type = content_type_id2string(resource->content_type);
         if (mime_type) {
             buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
+        }
+        
+        // Add size information if available
+        if (resource->size_fn) {
+            size_t size = resource->size_fn();
+            if (size > 0) {
+                buffer_json_member_add_uint64(mcpc->result, "size", size);
+            }
         }
         
         // Add audience annotations if specified
