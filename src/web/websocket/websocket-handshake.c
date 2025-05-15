@@ -357,6 +357,7 @@ short int websocket_handle_handshake(struct web_client *w) {
 
     // Set up protocol-specific callbacks based on the selected protocol
     switch (wsc->protocol) {
+#ifdef NETDATA_INTERNAL_CHECKS
         case WS_PROTOCOL_JSONRPC:
             // Set up callbacks for jsonrpc protocol
             wsc->on_connect = jsonrpc_on_connect;
@@ -383,6 +384,7 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_disconnect = mcp_websocket_on_disconnect;
             websocket_debug(wsc, "Setting up MCP protocol callbacks");
             break;
+#endif
 
         default:
             // No protocol handler available - this shouldn't happen as we check earlier
