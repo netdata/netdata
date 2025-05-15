@@ -6,9 +6,8 @@
 #include "mcp-tools.h"
 #include "mcp-resources.h"
 #include "mcp-prompts.h"
-#include "mcp-notifications.h"
-#include "mcp-context.h"
-#include "mcp-system.h"
+#include "mcp-logging.h"
+#include "mcp-completion.h"
 #include "adapters/mcp-websocket.h"
 
 // Define the enum to string mapping for protocol versions
@@ -30,11 +29,29 @@ ENUM_STR_MAP_DEFINE(MCP_RETURN_CODE) = {
     { .id = MCP_RC_NOT_FOUND, .name = "NOT_FOUND" },
     { .id = MCP_RC_INTERNAL_ERROR, .name = "INTERNAL_ERROR" },
     { .id = MCP_RC_NOT_IMPLEMENTED, .name = "NOT_IMPLEMENTED" },
+    { .id = MCP_RC_BAD_REQUEST, .name = "BAD_REQUEST" },
     
     // terminator
     { .name = NULL, .id = 0 }
 };
 ENUM_STR_DEFINE_FUNCTIONS(MCP_RETURN_CODE, MCP_RC_ERROR, "ERROR");
+
+// Define the enum to string mapping for logging levels
+ENUM_STR_MAP_DEFINE(MCP_LOGGING_LEVEL) = {
+    { .id = MCP_LOGGING_LEVEL_DEBUG, .name = "debug" },
+    { .id = MCP_LOGGING_LEVEL_INFO, .name = "info" },
+    { .id = MCP_LOGGING_LEVEL_NOTICE, .name = "notice" },
+    { .id = MCP_LOGGING_LEVEL_WARNING, .name = "warning" },
+    { .id = MCP_LOGGING_LEVEL_ERROR, .name = "error" },
+    { .id = MCP_LOGGING_LEVEL_CRITICAL, .name = "critical" },
+    { .id = MCP_LOGGING_LEVEL_ALERT, .name = "alert" },
+    { .id = MCP_LOGGING_LEVEL_EMERGENCY, .name = "emergency" },
+    { .id = MCP_LOGGING_LEVEL_UNKNOWN, .name = "unknown" },
+    
+    // terminator
+    { .name = NULL, .id = 0 }
+};
+ENUM_STR_DEFINE_FUNCTIONS(MCP_LOGGING_LEVEL, MCP_LOGGING_LEVEL_UNKNOWN, "unknown");
 
 // Decode a URI component using mcpc's pre-allocated buffer
 // Returns a pointer to the decoded string which is valid until the next call
@@ -59,47 +76,50 @@ const char *mcp_uri_decode(MCP_CLIENT *mcpc, const char *src) {
 
 // Create a response context for a transport session
 MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
-    MCP_CLIENT *ctx = callocz(1, sizeof(MCP_CLIENT));
-    
-    ctx->transport = transport;
-    ctx->protocol_version = MCP_PROTOCOL_VERSION_UNKNOWN; // Will be set during initialization
+    MCP_CLIENT *mcpc = callocz(1, sizeof(MCP_CLIENT));
+
+    mcpc->transport = transport;
+    mcpc->protocol_version = MCP_PROTOCOL_VERSION_UNKNOWN; // Will be set during initialization
     
     // Set capabilities based on transport type
     switch (transport) {
         case MCP_TRANSPORT_WEBSOCKET:
-            ctx->websocket = (struct websocket_server_client *)transport_ctx;
-            ctx->capabilities = MCP_CAPABILITY_ASYNC_COMMUNICATION | 
+            mcpc->websocket = (struct websocket_server_client *)transport_ctx;
+            mcpc->capabilities = MCP_CAPABILITY_ASYNC_COMMUNICATION |
                                MCP_CAPABILITY_SUBSCRIPTIONS | 
                                MCP_CAPABILITY_NOTIFICATIONS;
             break;
             
         case MCP_TRANSPORT_HTTP:
-            ctx->http = (struct web_client *)transport_ctx;
-            ctx->capabilities = MCP_CAPABILITY_NONE; // HTTP has no special capabilities
+            mcpc->http = (struct web_client *)transport_ctx;
+            mcpc->capabilities = MCP_CAPABILITY_NONE; // HTTP has no special capabilities
             break;
             
         default:
-            ctx->generic = transport_ctx;
-            ctx->capabilities = MCP_CAPABILITY_NONE;
+            mcpc->generic = transport_ctx;
+            mcpc->capabilities = MCP_CAPABILITY_NONE;
             break;
     }
     
     // Default client info (will be updated later from actual client)
-    ctx->client_name = string_strdupz("unknown");
-    ctx->client_version = string_strdupz("0.0.0");
+    mcpc->client_name = string_strdupz("unknown");
+    mcpc->client_version = string_strdupz("0.0.0");
+    
+    // Set default logging level to info
+    mcpc->logging_level = MCP_LOGGING_LEVEL_INFO;
     
     // Initialize response buffers
-    ctx->result = buffer_create(4096, NULL);
-    ctx->error = buffer_create(1024, NULL);
+    mcpc->result = buffer_create(4096, NULL);
+    mcpc->error = buffer_create(1024, NULL);
     
     // Initialize utility buffers
-    ctx->uri = buffer_create(1024, NULL);
+    mcpc->uri = buffer_create(1024, NULL);
     
     // Initialize request IDs tracking
-    ctx->request_id_counter = 0;
-    ctx->request_ids = NULL;
+    mcpc->request_id_counter = 0;
+    mcpc->request_ids = NULL;
     
-    return ctx;
+    return mcpc;
 }
 
 // Free a response context
@@ -135,6 +155,8 @@ static int mcp_map_return_code_to_jsonrpc_error(MCP_RETURN_CODE rc) {
             return -32603; // JSON-RPC Internal error
         case MCP_RC_NOT_IMPLEMENTED:
             return -32601; // Use method not found for not implemented
+        case MCP_RC_BAD_REQUEST:
+            return -32600; // JSON-RPC Invalid request
         case MCP_RC_ERROR:
         default:
             return -32000; // JSON-RPC Server error
@@ -201,8 +223,8 @@ int mcp_send_response_buffer(MCP_CLIENT *mcpc) {
 }
 
 // Parse and extract client info from initialize request params
-static void mcp_extract_client_info(MCP_CLIENT *ctx, struct json_object *params) {
-    if (!ctx || !params) return;
+static void mcp_extract_client_info(MCP_CLIENT *mcpc, struct json_object *params) {
+    if (!mcpc || !params) return;
     
     struct json_object *client_info_obj = NULL;
     struct json_object *client_name_obj = NULL;
@@ -210,12 +232,12 @@ static void mcp_extract_client_info(MCP_CLIENT *ctx, struct json_object *params)
     
     if (json_object_object_get_ex(params, "clientInfo", &client_info_obj)) {
         if (json_object_object_get_ex(client_info_obj, "name", &client_name_obj)) {
-            string_freez(ctx->client_name);
-            ctx->client_name = string_strdupz(json_object_get_string(client_name_obj));
+            string_freez(mcpc->client_name);
+            mcpc->client_name = string_strdupz(json_object_get_string(client_name_obj));
         }
         if (json_object_object_get_ex(client_info_obj, "version", &client_version_obj)) {
-            string_freez(ctx->client_version);
-            ctx->client_version = string_strdupz(json_object_get_string(client_version_obj));
+            string_freez(mcpc->client_version);
+            mcpc->client_version = string_strdupz(json_object_get_string(client_version_obj));
         }
     }
 }
@@ -290,21 +312,17 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
         // Resources namespace
         rc = mcp_resources_route(mcpc, method + 10, params_obj, id);
     }
-    else if (strncmp(method, "notifications/", 14) == 0) {
-        // Notifications namespace
-        rc = mcp_notifications_route(mcpc, method + 14, params_obj, id);
-    }
     else if (strncmp(method, "prompts/", 8) == 0) {
         // Prompts namespace
         rc = mcp_prompts_route(mcpc, method + 8, params_obj, id);
     }
-    else if (strncmp(method, "context/", 8) == 0) {
-        // Context namespace
-        rc = mcp_context_route(mcpc, method + 8, params_obj, id);
+    else if (strncmp(method, "logging/", 8) == 0) {
+        // Logging namespace
+        rc = mcp_logging_route(mcpc, method + 8, params_obj, id);
     }
-    else if (strncmp(method, "system/", 7) == 0) {
-        // System namespace
-        rc = mcp_system_route(mcpc, method + 7, params_obj, id);
+    else if (strncmp(method, "completion/", 11) == 0) {
+        // Completion namespace
+        rc = mcp_completion_route(mcpc, method + 11, params_obj, id);
     }
     else if (strcmp(method, "initialize") == 0) {
         // Extract client info from initialize request

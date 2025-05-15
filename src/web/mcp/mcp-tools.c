@@ -9,21 +9,16 @@
  * Tools are model-controlled actions - meaning the AI decides when and how to use them based on context.
  * Each tool has a defined input schema that specifies required and optional parameters.
  * 
- * Key features of the tools namespace:
+ * Standard methods in the MCP specification:
  * 
- * 1. Tool Discovery:
- *    - Clients can list available tools (tools/list)
- *    - Get detailed descriptions of specific tools (tools/describe)
- *    - Understand what parameters a tool requires (through JSON Schema)
+ * 1. tools/list - Lists available tools with their schemas and metadata
+ *    - Returns a list of all available tools
+ *    - Includes each tool's name, description, and input schema
  * 
- * 2. Tool Execution:
- *    - Execute tools with specific parameters (tools/execute)
- *    - Validate parameters without execution (tools/validate)
- *    - Asynchronous execution is supported for long-running tools
- * 
- * 3. Execution Management:
- *    - Check execution status (tools/status)
- *    - Cancel running executions (tools/cancel)
+ * 2. tools/call - Executes a specific tool with provided parameters
+ *    - Takes a tool name and arguments
+ *    - Returns the result of the tool execution
+ *    - May include resource references, text, images, or other content types
  * 
  * In the Netdata context, tools provide access to operations like:
  *    - Exploring metrics and their relationships
@@ -31,14 +26,151 @@
  *    - Finding correlations between metrics
  *    - Root cause analysis for anomalies
  *    - Summarizing system health
- * 
- * Each tool execution is assigned a unique ID, allowing clients to track and manage executions.
  */
 
 #include "mcp-tools.h"
 #include "mcp-initialize.h"
 
-// Return a list of available tools (transport-agnostic)
+// Tool handler function prototypes
+typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
+typedef void (*mcp_tool_schema_t)(BUFFER *schema_buffer);
+
+// Tool definition structure
+typedef struct {
+    const char *name;         // Tool name
+    const char *description;  // Tool description
+    mcp_tool_execute_t execute_callback;  // Tool execution callback
+    mcp_tool_schema_t schema_callback;    // Tool schema definition callback
+    
+    // UI/UX annotations
+    const char *title;        // Human-readable title
+    bool read_only_hint;      // If true, tool doesn't modify state
+    bool open_world_hint;     // If true, tool interacts with external world
+} MCP_TOOL_DEF;
+
+// Tool schema generator functions
+static void mcp_tool_list_netdata_metrics_schema(BUFFER *buffer);
+
+// Tool execution functions
+static MCP_RETURN_CODE mcp_tool_list_netdata_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
+
+// Static array of tool definitions
+static const MCP_TOOL_DEF mcp_tools[] = {
+    {
+        .name = "list_netdata_metrics",
+        .description = "List available metric contexts and context categories with optional pattern matching",
+        .execute_callback = mcp_tool_list_netdata_metrics_execute,
+        .schema_callback = mcp_tool_list_netdata_metrics_schema,
+        .title = "Metric Contexts and Categories",
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    
+    // Add more tools here
+    
+    // Terminator
+    {
+        .name = NULL
+    }
+};
+
+// Define schema for the list_netdata_metrics tool
+static void mcp_tool_list_netdata_metrics_schema(BUFFER *buffer) {
+    // Tool input schema
+    buffer_json_member_add_object(buffer, "inputSchema");
+    buffer_json_member_add_string(buffer, "type", "object");
+    buffer_json_member_add_string(buffer, "title", "MetricsQuery");
+    
+    // Properties
+    buffer_json_member_add_object(buffer, "properties");
+    
+    // Like property (optional)
+    buffer_json_member_add_object(buffer, "like");
+    buffer_json_member_add_string(buffer, "type", "string");
+    buffer_json_member_add_string(buffer, "title", "Pattern");
+    buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on context and category names");
+    buffer_json_object_close(buffer); // Close like
+    
+    buffer_json_object_close(buffer); // Close properties
+    
+    // No required fields
+    buffer_json_object_close(buffer); // Close inputSchema
+}
+
+// Implementation of the list_netdata_metrics tool
+static MCP_RETURN_CODE mcp_tool_list_netdata_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    if (!mcpc || id == 0) return MCP_RC_ERROR;
+    
+    // Extract the 'like' parameter if present
+    const char *like_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "like", NULL)) {
+        struct json_object *like_obj = NULL;
+        json_object_object_get_ex(params, "like", &like_obj);
+        if (like_obj && json_object_is_type(like_obj, json_type_string)) {
+            like_pattern = json_object_get_string(like_obj);
+        }
+    }
+    
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
+    
+    // Start building content array for the result
+    buffer_json_member_add_array(mcpc->result, "content");
+    
+    // Build query string for resource URIs
+    char query_param[256] = "";
+    if (like_pattern && *like_pattern) {
+        snprintfz(query_param, sizeof(query_param), "?like=%s", like_pattern);
+    }
+    
+    // Instead of returning embedded resources, let's return a text explanation
+    // that will be more compatible with most LLM clients
+    buffer_json_add_array_item_object(mcpc->result);
+    buffer_json_member_add_string(mcpc->result, "type", "text");
+    
+    // Format an explanatory message with information about both resources
+    char explanation[1024];
+    snprintfz(explanation, sizeof(explanation), 
+              "Available Netdata metrics information:\n\n"
+              "1. Context list - Shows all available metric contexts in the system\n"
+              "   URI: nd://contexts%s\n\n"
+              "2. Context categories - Shows how metrics are organized by category\n"
+              "   URI: nd://context_categories%s\n\n"
+              "These metrics are used to monitor system performance and health.",
+              query_param, query_param);
+    
+    buffer_json_member_add_string(mcpc->result, "text", explanation);
+    buffer_json_object_close(mcpc->result); // Close text content
+    
+    // Still include the resources for clients that support them
+    // Add resource reference for contexts
+    buffer_json_add_array_item_object(mcpc->result);
+    buffer_json_member_add_string(mcpc->result, "type", "resource");
+    buffer_json_member_add_object(mcpc->result, "resource");
+    char contexts_uri[300];
+    snprintfz(contexts_uri, sizeof(contexts_uri), "nd://contexts%s", query_param);
+    buffer_json_member_add_string(mcpc->result, "uri", contexts_uri);
+    buffer_json_object_close(mcpc->result); // Close resource object
+    buffer_json_object_close(mcpc->result); // Close first resource content
+    
+    // Add resource reference for context categories
+    buffer_json_add_array_item_object(mcpc->result);
+    buffer_json_member_add_string(mcpc->result, "type", "resource");
+    buffer_json_member_add_object(mcpc->result, "resource");
+    char categories_uri[300];
+    snprintfz(categories_uri, sizeof(categories_uri), "nd://context_categories%s", query_param);
+    buffer_json_member_add_string(mcpc->result, "uri", categories_uri);
+    buffer_json_object_close(mcpc->result); // Close resource object
+    buffer_json_object_close(mcpc->result); // Close second resource content
+    
+    buffer_json_array_close(mcpc->result); // Close content array
+    buffer_json_object_close(mcpc->result); // Close result object
+    buffer_json_finalize(mcpc->result); // Finalize the JSON
+    
+    return MCP_RC_OK;
+}
+
+// Return a list of available tools
 static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0) return MCP_RC_ERROR;
 
@@ -48,83 +180,31 @@ static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_objec
     // Create tools array
     buffer_json_member_add_array(mcpc->result, "tools");
     
-    // Add explore_metrics tool
-    buffer_json_add_array_item_object(mcpc->result);
-    buffer_json_member_add_string(mcpc->result, "name", "explore_metrics");
-    buffer_json_member_add_string(mcpc->result, "description", 
-        "Explore Netdata's time-series metrics with support for high-resolution data");
-    
-    // Add input schema for metrics tool
-    buffer_json_member_add_object(mcpc->result, "inputSchema");
-    buffer_json_member_add_string(mcpc->result, "type", "object");
-    buffer_json_member_add_string(mcpc->result, "title", "MetricsQuery");
-    
-    // Properties
-    buffer_json_member_add_object(mcpc->result, "properties");
-    
-    // Context property
-    buffer_json_member_add_object(mcpc->result, "context");
-    buffer_json_member_add_string(mcpc->result, "type", "string");
-    buffer_json_member_add_string(mcpc->result, "title", "Context");
-    buffer_json_object_close(mcpc->result); // Close context
-    
-    // After property
-    buffer_json_member_add_object(mcpc->result, "after");
-    buffer_json_member_add_string(mcpc->result, "type", "integer");
-    buffer_json_member_add_string(mcpc->result, "title", "After");
-    buffer_json_object_close(mcpc->result); // Close after
-    
-    // Before property
-    buffer_json_member_add_object(mcpc->result, "before");
-    buffer_json_member_add_string(mcpc->result, "type", "integer");
-    buffer_json_member_add_string(mcpc->result, "title", "Before");
-    buffer_json_object_close(mcpc->result); // Close before
-    
-    // Points property
-    buffer_json_member_add_object(mcpc->result, "points");
-    buffer_json_member_add_string(mcpc->result, "type", "integer");
-    buffer_json_member_add_string(mcpc->result, "title", "Points");
-    buffer_json_object_close(mcpc->result); // Close points
-    
-    // Group property
-    buffer_json_member_add_object(mcpc->result, "group");
-    buffer_json_member_add_string(mcpc->result, "type", "string");
-    buffer_json_member_add_string(mcpc->result, "title", "Group");
-    buffer_json_object_close(mcpc->result); // Close group
-    
-    buffer_json_object_close(mcpc->result); // Close properties
-    
-    // Required properties
-    buffer_json_member_add_array(mcpc->result, "required");
-    buffer_json_add_array_item_string(mcpc->result, "context");
-    buffer_json_array_close(mcpc->result); // Close required
-    
-    buffer_json_object_close(mcpc->result); // Close inputSchema
-    buffer_json_object_close(mcpc->result); // Close explore_metrics tool
-    
-    // Add explore_nodes tool
-    buffer_json_add_array_item_object(mcpc->result);
-    buffer_json_member_add_string(mcpc->result, "name", "explore_nodes");
-    buffer_json_member_add_string(mcpc->result, "description", 
-        "Discover and explore all monitored nodes in your infrastructure");
-    
-    // Add input schema for nodes tool
-    buffer_json_member_add_object(mcpc->result, "inputSchema");
-    buffer_json_member_add_string(mcpc->result, "type", "object");
-    buffer_json_member_add_string(mcpc->result, "title", "NodesQuery");
-    
-    // Properties
-    buffer_json_member_add_object(mcpc->result, "properties");
-    
-    // Filter property
-    buffer_json_member_add_object(mcpc->result, "filter");
-    buffer_json_member_add_string(mcpc->result, "type", "string");
-    buffer_json_member_add_string(mcpc->result, "title", "Filter");
-    buffer_json_object_close(mcpc->result); // Close filter
-    
-    buffer_json_object_close(mcpc->result); // Close properties
-    buffer_json_object_close(mcpc->result); // Close inputSchema
-    buffer_json_object_close(mcpc->result); // Close explore_nodes tool
+    // Iterate through all defined tools and add them to the response
+    for (size_t i = 0; mcp_tools[i].name != NULL; i++) {
+        const MCP_TOOL_DEF *tool = &mcp_tools[i];
+        
+        // Add tool object
+        buffer_json_add_array_item_object(mcpc->result);
+        
+        // Add basic properties
+        buffer_json_member_add_string(mcpc->result, "name", tool->name);
+        buffer_json_member_add_string(mcpc->result, "description", tool->description);
+        
+        // Add schema using the tool's schema callback
+        tool->schema_callback(mcpc->result);
+        
+        // Add annotations if available
+        buffer_json_member_add_object(mcpc->result, "annotations");
+        if (tool->title) {
+            buffer_json_member_add_string(mcpc->result, "title", tool->title);
+        }
+        buffer_json_member_add_boolean(mcpc->result, "readOnlyHint", tool->read_only_hint);
+        buffer_json_member_add_boolean(mcpc->result, "openWorldHint", tool->open_world_hint);
+        buffer_json_object_close(mcpc->result); // Close annotations
+        
+        buffer_json_object_close(mcpc->result); // Close tool object
+    }
     
     buffer_json_array_close(mcpc->result); // Close tools array
     buffer_json_finalize(mcpc->result); // Finalize the JSON
@@ -132,48 +212,43 @@ static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_objec
     return MCP_RC_OK;
 }
 
-// Stub implementations for other tools methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'tools/execute' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
-
-static MCP_RETURN_CODE mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'tools/cancel' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
-
-static MCP_RETURN_CODE mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'tools/status' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
-
-static MCP_RETURN_CODE mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'tools/validate' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
-
-static MCP_RETURN_CODE mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'tools/describe' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
-
-static MCP_RETURN_CODE mcp_tools_method_getCapabilities(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0) return MCP_RC_ERROR;
+// Main execute method that routes to specific tool handlers
+static MCP_RETURN_CODE mcp_tools_method_call(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    if (!mcpc || !params || id == 0) return MCP_RC_ERROR;
     
-    // Initialize success response
-    mcp_init_success_result(mcpc, id);
+    // Extract tool name
+    struct json_object *name_obj = NULL;
+    if (!json_object_object_get_ex(params, "name", &name_obj)) {
+        buffer_sprintf(mcpc->error, "Missing required parameter 'name'");
+        return MCP_RC_BAD_REQUEST;
+    }
     
-    // Add capabilities as result object properties
-    buffer_json_member_add_boolean(mcpc->result, "listChanged", false);
-    buffer_json_member_add_boolean(mcpc->result, "asyncExecution", true);
-    buffer_json_member_add_boolean(mcpc->result, "batchExecution", true);
+    if (!json_object_is_type(name_obj, json_type_string)) {
+        buffer_sprintf(mcpc->error, "Parameter 'name' must be a string");
+        return MCP_RC_BAD_REQUEST;
+    }
     
-    // Close the result object
-    buffer_json_finalize(mcpc->result);
+    const char *tool_name = json_object_get_string(name_obj);
     
-    return MCP_RC_OK;
+    // Get arguments if present
+    struct json_object *args_obj = NULL;
+    json_object_object_get_ex(params, "arguments", &args_obj);
+    
+    // Search for the tool in our static array
+    for (size_t i = 0; mcp_tools[i].name != NULL; i++) {
+        if (strcmp(tool_name, mcp_tools[i].name) == 0) {
+            // Found the tool, execute its callback
+            return mcp_tools[i].execute_callback(mcpc, args_obj, id);
+        }
+    }
+    
+    // Tool not found
+    buffer_sprintf(mcpc->error, "Unknown tool: %s", tool_name);
+    return MCP_RC_BAD_REQUEST;
 }
+
+// The MCP specification only defines list and call methods for tools
+// Other methods are not part of the standard specification
 
 // Tools namespace method dispatcher (transport-agnostic)
 MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
@@ -188,29 +263,16 @@ MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct jso
     MCP_RETURN_CODE rc;
 
     if (strcmp(method, "list") == 0) {
+        // List available tools - standard method in MCP specification
         rc = mcp_tools_method_list(mcpc, params, id);
     }
-    else if (strcmp(method, "execute") == 0) {
-        rc = mcp_tools_method_execute(mcpc, params, id);
-    }
-    else if (strcmp(method, "cancel") == 0) {
-        rc = mcp_tools_method_cancel(mcpc, params, id);
-    }
-    else if (strcmp(method, "status") == 0) {
-        rc = mcp_tools_method_status(mcpc, params, id);
-    }
-    else if (strcmp(method, "validate") == 0) {
-        rc = mcp_tools_method_validate(mcpc, params, id);
-    }
-    else if (strcmp(method, "describe") == 0) {
-        rc = mcp_tools_method_describe(mcpc, params, id);
-    }
-    else if (strcmp(method, "getCapabilities") == 0) {
-        rc = mcp_tools_method_getCapabilities(mcpc, params, id);
+    else if (strcmp(method, "call") == 0) {
+        // Execute a tool - standard method in MCP specification
+        rc = mcp_tools_method_call(mcpc, params, id);
     }
     else {
         // Method not found in tools namespace
-        buffer_sprintf(mcpc->error, "Method 'tools/%s' not implemented yet", method);
+        buffer_sprintf(mcpc->error, "Method 'tools/%s' not supported. The MCP specification only defines 'list' and 'call' methods.", method);
         rc = MCP_RC_NOT_IMPLEMENTED;
     }
     

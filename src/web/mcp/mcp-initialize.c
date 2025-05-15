@@ -1,5 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/**
+ * MCP Initialize Method
+ * 
+ * The initialize method is a core part of the Model Context Protocol (MCP),
+ * serving as the initial handshake between client and server.
+ * 
+ * According to the MCP specification:
+ * 
+ * 1. Purpose:
+ *    - Establishes the protocol version to use for communication
+ *    - Provides information about server capabilities
+ *    - Exchanges client and server metadata
+ *    - Sets up the foundation for subsequent interactions
+ * 
+ * 2. Protocol flow:
+ *    - The client sends an initialize request with its supported protocol version
+ *    - The server responds with its capabilities and selected protocol version
+ *    - After successful initialization, other methods become available
+ * 
+ * 3. Key components in the response:
+ *    - protocolVersion: The protocol version the server will use
+ *    - capabilities: A structured object describing supported features
+ *    - serverInfo: Information about the server implementation
+ * 
+ * This method must be called before any other MCP method, and handles
+ * protocol version negotiation and capability discovery.
+ */
+
 #include "mcp-initialize.h"
 #include "database/rrd-metadata.h"
 #include "database/rrd-retention.h"

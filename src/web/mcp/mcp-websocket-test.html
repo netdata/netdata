@@ -76,6 +76,13 @@
             background-color: #d0e8f2;
             font-weight: bold;
         }
+        .method-item.dynamic {
+            border-left: 3px solid #0088cc;
+            background-color: #f0f8ff;
+        }
+        .method-item.dynamic:hover {
+            background-color: #e0f0ff;
+        }
         #jsonEditor {
             width: 100%;
             height: 100%;
@@ -195,12 +202,12 @@
             <h3 class="column-header">Flows</h3>
             <div class="column-content" id="flowsContainer">
                 <div class="flow-item active" data-flow="initialize-flow">Initialize</div>
+                <div class="flow-item" data-flow="ping-flow">Ping</div>
                 <div class="flow-item" data-flow="tools-flow">Tools</div>
                 <div class="flow-item" data-flow="resources-flow">Resources</div>
                 <div class="flow-item" data-flow="prompts-flow">Prompts</div>
-                <div class="flow-item" data-flow="notifications-flow">Notifications</div>
-                <div class="flow-item" data-flow="context-flow">Context</div>
-                <div class="flow-item" data-flow="system-flow">System</div>
+                <div class="flow-item" data-flow="logging-flow">Logging</div>
+                <div class="flow-item" data-flow="completion-flow">Completion</div>
             </div>
         </div>
         
@@ -271,6 +278,11 @@
         let requestId = 1;
         let isConnected = false;
         let requestTimestamp = null;
+        
+        // Flags to track dynamic items
+        let dynamicToolsLoaded = false;
+        let dynamicResourcesLoaded = false;
+        let dynamicPromptsLoaded = false;
         
         // Function to highlight JSON syntax with colors
         function syntaxHighlightJson(json) {
@@ -436,79 +448,18 @@
                             id: 1
                         }
                     },
-                    'tools/execute': {
-                        name: 'tools/execute',
+                    'tools/call': {
+                        name: 'tools/call',
                         description: 'Execute a tool with parameters',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'tools/execute',
+                            method: 'tools/call',
                             params: {
-                                name: 'explore_metrics',
-                                input: {
-                                    context: 'system.cpu'
+                                name: 'contexts',
+                                arguments: {
+                                    like: 'system.*'
                                 }
                             },
-                            id: 1
-                        }
-                    },
-                    'tools/cancel': {
-                        name: 'tools/cancel',
-                        description: 'Cancel a running tool execution',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/cancel',
-                            params: {
-                                executionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/status': {
-                        name: 'tools/status',
-                        description: 'Get status of a tool execution',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/status',
-                            params: {
-                                executionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/validate': {
-                        name: 'tools/validate',
-                        description: 'Validate parameters for a tool',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/validate',
-                            params: {
-                                name: 'explore_metrics',
-                                input: {
-                                    context: 'system.cpu'
-                                }
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/describe': {
-                        name: 'tools/describe',
-                        description: 'Get detailed documentation for a tool',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/describe',
-                            params: {
-                                name: 'explore_metrics'
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/getCapabilities': {
-                        name: 'tools/getCapabilities',
-                        description: 'Get capabilities of the tools subsystem',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/getCapabilities',
-                            params: {},
                             id: 1
                         }
                     }
@@ -594,22 +545,6 @@
                             id: 1
                         }
                     },
-                    'prompts/execute': {
-                        name: 'prompts/execute',
-                        description: 'Execute a prompt',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/execute',
-                            params: {
-                                name: 'analyze_metrics',
-                                input: {
-                                    context: 'system.cpu',
-                                    timeframe: '1h'
-                                }
-                            },
-                            id: 1
-                        }
-                    },
                     'prompts/get': {
                         name: 'prompts/get',
                         description: 'Get a specific prompt',
@@ -622,267 +557,65 @@
                             id: 1
                         }
                     },
-                    'prompts/save': {
-                        name: 'prompts/save',
-                        description: 'Save a prompt',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/save',
-                            params: {
-                                name: 'my_custom_prompt',
-                                description: 'A custom prompt for analysis',
-                                template: 'Analyze the following metrics: {{context}}'
-                            },
-                            id: 1
-                        }
-                    },
-                    'prompts/delete': {
-                        name: 'prompts/delete',
-                        description: 'Delete a prompt',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/delete',
-                            params: {
-                                name: 'my_custom_prompt'
-                            },
-                            id: 1
-                        }
-                    },
-                    'prompts/getCategories': {
-                        name: 'prompts/getCategories',
-                        description: 'Get categories of prompts',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/getCategories',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'prompts/getHistory': {
-                        name: 'prompts/getHistory',
-                        description: 'Get history of prompt executions',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/getHistory',
-                            params: {
-                                limit: 10
-                            },
-                            id: 1
-                        }
-                    }
                 }
             },
-            'notifications-flow': {
-                name: 'Notifications',
+            'ping-flow': {
+                name: 'Ping',
                 methods: {
-                    'notifications/initialized': {
-                        name: 'notifications/initialized',
-                        description: 'Notify server that client is initialized',
+                    'ping': {
+                        name: 'ping',
+                        description: 'Simple health check to ensure server is responsive',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'notifications/initialized'
-                            // No id for notifications
-                        }
-                    },
-                    'notifications/subscribe': {
-                        name: 'notifications/subscribe',
-                        description: 'Subscribe to notifications',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/subscribe',
-                            params: {
-                                type: 'alerts'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/unsubscribe': {
-                        name: 'notifications/unsubscribe',
-                        description: 'Unsubscribe from notifications',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/unsubscribe',
-                            params: {
-                                subscriptionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/acknowledge': {
-                        name: 'notifications/acknowledge',
-                        description: 'Acknowledge a notification',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/acknowledge',
-                            params: {
-                                notificationId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/getHistory': {
-                        name: 'notifications/getHistory',
-                        description: 'Get history of notifications',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/getHistory',
-                            params: {
-                                limit: 10
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/send': {
-                        name: 'notifications/send',
-                        description: 'Send a notification',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/send',
-                            params: {
-                                type: 'message',
-                                content: 'Test notification from client'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/getSettings': {
-                        name: 'notifications/getSettings',
-                        description: 'Get notification settings',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/getSettings',
+                            method: 'ping',
                             params: {},
                             id: 1
                         }
                     }
                 }
             },
-            'context-flow': {
-                name: 'Context',
+            'logging-flow': {
+                name: 'Logging',
                 methods: {
-                    'context/provide': {
-                        name: 'context/provide',
-                        description: 'Provide context to the server',
+                    'logging/setLevel': {
+                        name: 'logging/setLevel',
+                        description: 'Set the logging level for the server',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'context/provide',
+                            method: 'logging/setLevel',
                             params: {
-                                context: {
-                                    user: 'admin',
-                                    preferences: {
-                                        theme: 'dark'
-                                    }
+                                level: 'info'
+                            },
+                            id: 1
+                        }
+                    }
+                }
+            },
+            'completion-flow': {
+                name: 'Completion',
+                methods: {
+                    'completion/complete': {
+                        name: 'completion/complete',
+                        description: 'Request completions for an argument',
+                        defaultRequest: {
+                            jsonrpc: '2.0',
+                            method: 'completion/complete',
+                            params: {
+                                argument: {
+                                    name: 'test',
+                                    value: 'test'
+                                },
+                                ref: {
+                                    type: 'ref/prompt',
+                                    name: 'test-prompt'
                                 }
                             },
-                            id: 1
-                        }
-                    },
-                    'context/clear': {
-                        name: 'context/clear',
-                        description: 'Clear context',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/clear',
-                            params: {
-                                keys: ['preferences']
-                            },
-                            id: 1
-                        }
-                    },
-                    'context/status': {
-                        name: 'context/status',
-                        description: 'Get context status',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/status',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'context/save': {
-                        name: 'context/save',
-                        description: 'Save context for future use',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/save',
-                            params: {
-                                name: 'my_saved_context'
-                            },
-                            id: 1
-                        }
-                    },
-                    'context/load': {
-                        name: 'context/load',
-                        description: 'Load a saved context',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/load',
-                            params: {
-                                name: 'my_saved_context'
-                            },
-                            id: 1
-                        }
-                    }
-                }
-            },
-            'system-flow': {
-                name: 'System',
-                methods: {
-                    'system/health': {
-                        name: 'system/health',
-                        description: 'Get system health information',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/health',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'system/version': {
-                        name: 'system/version',
-                        description: 'Get detailed version information',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/version',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'system/metrics': {
-                        name: 'system/metrics',
-                        description: 'Get system performance metrics',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/metrics',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'system/restart': {
-                        name: 'system/restart',
-                        description: 'Request system restart',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/restart',
-                            params: {
-                                force: false
-                            },
-                            id: 1
-                        }
-                    },
-                    'system/status': {
-                        name: 'system/status',
-                        description: 'Get system status',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/status',
-                            params: {},
                             id: 1
                         }
                     }
                 }
             }
-            // Additional flows can be added here later
+            // End of standard MCP flows
         };
         
         // Initialize UI
@@ -913,7 +646,7 @@
             Object.keys(flow.methods).forEach(methodId => {
                 const method = flow.methods[methodId];
                 const methodElement = document.createElement('div');
-                methodElement.className = 'method-item';
+                methodElement.className = method.dynamic ? 'method-item dynamic' : 'method-item';
                 methodElement.dataset.method = methodId;
                 methodElement.dataset.flow = flowId;
                 
@@ -1150,6 +883,43 @@
                             methodState.get(key).response = response;
                             methodState.get(key).responseTimestamp = responseTimestamp;
                             methodState.get(key).commLog = commLog.innerHTML;
+                            
+                            // Check for special responses that need dynamic processing
+                            if (currentFlow && currentMethod) {
+                                // Define which responses we should process dynamically
+                                const dynamicResponseHandlers = {
+                                    'tools-flow': {
+                                        'tools/list': {
+                                            property: 'tools',
+                                            processor: processDynamicList
+                                        }
+                                    },
+                                    'resources-flow': {
+                                        'resources/list': {
+                                            property: 'resources',
+                                            processor: processDynamicList
+                                        }
+                                    },
+                                    'prompts-flow': {
+                                        'prompts/list': {
+                                            property: 'prompts',
+                                            processor: processDynamicList
+                                        }
+                                    }
+                                };
+                                
+                                // Check if we have a handler for this flow and method
+                                if (dynamicResponseHandlers[currentFlow] && 
+                                    dynamicResponseHandlers[currentFlow][currentMethod]) {
+                                    
+                                    const handler = dynamicResponseHandlers[currentFlow][currentMethod];
+                                    const items = response.result && response.result[handler.property];
+                                    
+                                    if (items) {
+                                        handler.processor(currentFlow, items);
+                                    }
+                                }
+                            }
                         }
                     } catch (error) {
                         // If parse fails, display the raw data
@@ -1234,6 +1004,208 @@
                 console.error('Send error:', error);
             }
         });
+        
+        // Configuration for dynamic item processing
+        const dynamicItemConfig = {
+            'tools-flow': {
+                itemPrefix: 'tool:',
+                displayProperty: 'name',
+                requiredProperty: 'name',
+                removePredicate: (methodId) => !(methodId === 'tools/list' || methodId === 'tools/call'),
+                createDefaultRequest: (item) => ({
+                    jsonrpc: '2.0',
+                    method: 'tools/call',
+                    params: {
+                        name: item.name,
+                        arguments: createDefaultInputFromSchema(item.inputSchema)
+                    },
+                    id: 1
+                })
+            },
+            'resources-flow': {
+                itemPrefix: 'resource:',
+                displayProperty: (item) => item.uri.replace('nd://', '').split('?')[0],
+                requiredProperty: 'uri',
+                removePredicate: (methodId) => methodId.startsWith('resource:'),
+                createDefaultRequest: (item) => ({
+                    jsonrpc: '2.0',
+                    method: 'resources/read',
+                    params: {
+                        uri: item.uri
+                    },
+                    id: 1
+                })
+            },
+            'prompts-flow': {
+                itemPrefix: 'prompt:',
+                displayProperty: 'name',
+                requiredProperty: 'name',
+                removePredicate: (methodId) => methodId.startsWith('prompt:'),
+                createDefaultRequest: (item) => ({
+                    jsonrpc: '2.0',
+                    method: 'prompts/get',
+                    params: {
+                        name: item.name
+                    },
+                    id: 1
+                })
+            }
+        };
+        
+        // Unified function to process dynamic lists
+        function processDynamicList(flowId, items) {
+            console.log(`Processing ${flowId} list:`, items);
+            
+            // Get config for this flow
+            const config = dynamicItemConfig[flowId];
+            if (!config) return;
+            
+            // Remove existing dynamic methods
+            removeExistingDynamicItems(flowId);
+            
+            // Add each item as a separate method
+            items.forEach(item => {
+                // Check if the item has the required property
+                const requiredProp = typeof config.requiredProperty === 'function' 
+                    ? config.requiredProperty(item) 
+                    : item[config.requiredProperty];
+                    
+                if (requiredProp) {
+                    addDynamicMethod(flowId, item);
+                }
+            });
+            
+            // Refresh the methods view
+            loadMethodsForFlow(flowId);
+            
+            // Set the loaded flag for this type
+            if (flowId === 'tools-flow') dynamicToolsLoaded = true;
+            else if (flowId === 'resources-flow') dynamicResourcesLoaded = true;
+            else if (flowId === 'prompts-flow') dynamicPromptsLoaded = true;
+        }
+        
+        // Remove existing dynamic methods based on flow
+        function removeExistingDynamicItems(flowId) {
+            const flow = flows[flowId];
+            const config = dynamicItemConfig[flowId];
+            
+            if (!flow || !config) return;
+            
+            // Keep only the fixed methods based on the predicate
+            const fixedMethods = {};
+            Object.keys(flow.methods).forEach(methodId => {
+                if (!config.removePredicate(methodId)) {
+                    fixedMethods[methodId] = flow.methods[methodId];
+                }
+            });
+            
+            // Replace with just the fixed methods
+            flows[flowId].methods = fixedMethods;
+        }
+        
+        // Add a dynamic method based on flow and item
+        function addDynamicMethod(flowId, item) {
+            const config = dynamicItemConfig[flowId];
+            if (!config) return;
+            
+            // Get display name based on configuration
+            const displayName = typeof config.displayProperty === 'function' 
+                ? config.displayProperty(item) 
+                : item[config.displayProperty];
+                
+            const methodId = `${config.itemPrefix}${displayName}`;
+            
+            // Create dynamic method entry
+            flows[flowId].methods[methodId] = {
+                name: displayName,
+                description: item.description || `Execute the '${displayName}' ${flowId.replace('-flow', '')}`,
+                dynamic: true, // Mark as dynamically created
+                defaultRequest: config.createDefaultRequest(item)
+            };
+            
+            console.log(`Added dynamic method to ${flowId}: ${methodId}`, flows[flowId].methods[methodId]);
+        }
+        
+        // Create default input values based on JSON schema
+        function createDefaultInputFromSchema(schema) {
+            // Default empty object
+            const input = {};
+            
+            // If we have properties in the schema, populate with defaults
+            if (schema && schema.properties) {
+                const properties = schema.properties;
+                
+                Object.keys(properties).forEach(propName => {
+                    // Try to create sensible defaults based on property type
+                    const property = properties[propName];
+                    const type = property.type;
+                    
+                    if (type === 'string') {
+                        // If there's an example, use it
+                        if (property.examples && property.examples.length > 0) {
+                            input[propName] = property.examples[0];
+                        } 
+                        // If there's a format, create a placeholder for it
+                        else if (property.format) {
+                            switch (property.format) {
+                                case 'date-time':
+                                    input[propName] = new Date().toISOString();
+                                    break;
+                                case 'date':
+                                    input[propName] = new Date().toISOString().split('T')[0];
+                                    break;
+                                case 'time':
+                                    input[propName] = new Date().toISOString().split('T')[1].split('.')[0];
+                                    break;
+                                case 'email':
+                                    input[propName] = "user@example.com";
+                                    break;
+                                case 'hostname':
+                                    input[propName] = "example.com";
+                                    break;
+                                case 'ipv4':
+                                    input[propName] = "192.168.1.1";
+                                    break;
+                                case 'ipv6':
+                                    input[propName] = "2001:db8::1";
+                                    break;
+                                case 'uri':
+                                    input[propName] = "https://example.com";
+                                    break;
+                                default:
+                                    input[propName] = "";
+                            }
+                        } 
+                        // Otherwise use an empty string
+                        else {
+                            input[propName] = "";
+                        }
+                    } 
+                    else if (type === 'number' || type === 'integer') {
+                        // Use default if provided, otherwise 0
+                        input[propName] = property.default !== undefined ? property.default : 0;
+                    } 
+                    else if (type === 'boolean') {
+                        // Use default if provided, otherwise false
+                        input[propName] = property.default !== undefined ? property.default : false;
+                    } 
+                    else if (type === 'array') {
+                        // Use empty array
+                        input[propName] = [];
+                    } 
+                    else if (type === 'object') {
+                        // Use empty object
+                        input[propName] = {};
+                    } 
+                    else {
+                        // For any other type, just use null
+                        input[propName] = null;
+                    }
+                });
+            }
+            
+            return input;
+        }
         
         // Load saved state from localStorage
         function loadSavedState() {
