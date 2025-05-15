@@ -86,7 +86,7 @@ static struct websocket_server ws_server = (struct websocket_server){
 
 // Initialize WebSocket subsystem
 void websocket_initialize(void) {
-    debug_flags |= D_WEBSOCKET;
+    // debug_flags |= D_WEBSOCKET;
 
     // Initialize thread system
     websocket_threads_init();
