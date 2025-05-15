@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Improved StatsD documentation [\#20282](https://github.com/netdata/netdata/pull/20282) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#20279](https://github.com/netdata/netdata/pull/20279) ([netdatabot](https://github.com/netdatabot))
+- docs: update mssql meta [\#20278](https://github.com/netdata/netdata/pull/20278) ([ilyam8](https://github.com/ilyam8))
+- New Windows Metrics \(CPU and Memory\) [\#20277](https://github.com/netdata/netdata/pull/20277) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): small cleanup snmp profiles code [\#20274](https://github.com/netdata/netdata/pull/20274) ([ilyam8](https://github.com/ilyam8))
 - Switch to poll from epoll [\#20273](https://github.com/netdata/netdata/pull/20273) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump golang.org/x/net from 0.39.0 to 0.40.0 in /src/go [\#20270](https://github.com/netdata/netdata/pull/20270) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -318,7 +322,6 @@
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 - Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
 - ebpf.plugin: rework memory [\#19844](https://github.com/netdata/netdata/pull/19844) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add Docker tags for the last few nightly builds. [\#19734](https://github.com/netdata/netdata/pull/19734) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
@@ -465,12 +468,6 @@
 - more strict parsing of the output of system-info.sh [\#19745](https://github.com/netdata/netdata/pull/19745) ([ktsaou](https://github.com/ktsaou))
 - pass NULL to sensors\_init\(\) when the standard files exist in /etc/ [\#19744](https://github.com/netdata/netdata/pull/19744) ([ktsaou](https://github.com/ktsaou))
 - allow coredumps to be generated [\#19743](https://github.com/netdata/netdata/pull/19743) ([ktsaou](https://github.com/ktsaou))
-- work on agent-events crashes [\#19741](https://github.com/netdata/netdata/pull/19741) ([ktsaou](https://github.com/ktsaou))
-- zero mtime when a fallback check fails [\#19740](https://github.com/netdata/netdata/pull/19740) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d\): ignore sigpipe to exit gracefully [\#19739](https://github.com/netdata/netdata/pull/19739) ([ilyam8](https://github.com/ilyam8))
-- Capture deadly signals [\#19737](https://github.com/netdata/netdata/pull/19737) ([ktsaou](https://github.com/ktsaou))
-- allow insecure cloud connections [\#19736](https://github.com/netdata/netdata/pull/19736) ([ktsaou](https://github.com/ktsaou))
-- add more information about claiming failures [\#19735](https://github.com/netdata/netdata/pull/19735) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
