@@ -82,8 +82,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_member_add_array(wb, "db_size");
         for (size_t i = 0; i < retention.storage_tiers; i++) {
             RRD_STORAGE_TIER *tier_info = &retention.tiers[i];
-            STORAGE_ENGINE *eng = localhost->db[tier_info->tier].eng;
-            if (!eng) continue;
+            if (!tier_info->backend || tier_info->tier != i)
+                continue;
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier_info->tier);
