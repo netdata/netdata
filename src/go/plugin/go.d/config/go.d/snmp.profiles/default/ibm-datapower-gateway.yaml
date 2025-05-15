@@ -242,21 +242,21 @@ metrics:
         metric_type: monotonic_count
         description: Number of log target events pending
         unit: "{event}"
-#    metric_tags:
-#      - symbol:
-#          name: ibm.dpStatusLogTargetStatusLogTarget
-#          OID: 1.3.6.1.4.1.14685.3.1.28.1.1
-#        tag: ibm_dp_status_log_target_status_log_target
-#      - symbol:
-#          OID: 1.3.6.1.4.1.14685.3.1.28.1.2
-#          name: ibm.dpStatusLogTargetStatusStatus
-#        tag: ibm_dp_status_log_target_status_status
-#        mapping:
-#          1: active
-#          2: warning
-#          3: failure
-#          4: suspended
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: ibm.dpStatusLogTargetStatusLogTarget
+          OID: 1.3.6.1.4.1.14685.3.1.28.1.1
+        tag: ibm_dp_status_log_target_status_log_target
+      - symbol:
+          OID: 1.3.6.1.4.1.14685.3.1.28.1.2
+          name: ibm.dpStatusLogTargetStatusStatus
+        tag: ibm_dp_status_log_target_status_status
+        mapping:
+          1: active
+          2: warning
+          3: failure
+          4: suspended
 #      - symbol:
 #          OID: 1.3.6.1.4.1.14685.3.1.28.1.6
 #          name: ibm.dpStatusLogTargetStatusErrorInfo
@@ -307,60 +307,60 @@ metrics:
         metric_type: monotonic_count
         description: Number of transmitted packets dropped
         unit: "{packet}"
-#    metric_tags:
-#      - symbol:
-#          name: ibm.dpStatusNetworkInterfaceStatusInterfaceType
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.2
-#        tag: ibm_dp_status_network_interface_status_interface_type
-#        mapping:
-#          1: other
-#          6: ethernet
-#          131: tunnel
-#          135: vlan
-#          161: aggregate
-#      - symbol:
-#          name: ibm.dpStatusNetworkInterfaceStatusName
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.3
-#        tag: ibm_dp_status_network_interface_status_name
-#      - symbol:
-#          name: ibm.dpStatusNetworkInterfaceStatusIPType
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.6
-#        tag: ibm_dp_status_network_interface_status_ip_type
-#        mapping:
-#          0: unknown
-#          1: ipv4
-#          2: ipv6
-#          3: ipv4z
-#          4: ipv6z
-#          16: dns
-#          25: l2vpn
-#      - symbol:
-#          name: ibm.dpStatusNetworkInterfaceStatusIP
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.7
-#          format: ip_address
-#        tag: ibm_dp_status_network_interface_status_ip
-#      - symbol:
-#          name: ibm.dpStatusNetworkInterfaceStatusMACAddress
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.9
-#          format: mac_address
-#        tag: ibm_dp_status_network_interface_status_mac_address
-#      - symbol:
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.4
-#          name: ibm.dpStatusNetworkInterfaceStatusAdminStatus
-#        tag: ibm_dp_status_network_interface_status_admin_status
-#        mapping:
-#          1: up
-#          2: down
-#      - symbol:
-#          OID: 1.3.6.1.4.1.14685.3.1.124.1.5
-#          name: ibm.dpStatusNetworkInterfaceStatusOperStatus
-#        tag: ibm_dp_status_network_interface_status_oper_status
-#        mapping:
-#          1: up
-#          2: down
-#          3: testing
-#          4: unknown
-#          5: dormant
-#          6: not_present
-#          7: lower_layer_down
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusInterfaceType
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.2
+        tag: ibm_dp_status_network_interface_status_interface_type
+        mapping:
+          1: other
+          6: ethernet
+          131: tunnel
+          135: vlan
+          161: aggregate
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusName
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.3
+        tag: ibm_dp_status_network_interface_status_name
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusIPType
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.6
+        tag: ibm_dp_status_network_interface_status_ip_type
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+          25: l2vpn
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusIP
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.7
+          format: ip_address
+        tag: ibm_dp_status_network_interface_status_ip
+      - symbol:
+          name: ibm.dpStatusNetworkInterfaceStatusMACAddress
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.9
+          format: mac_address
+        tag: ibm_dp_status_network_interface_status_mac_address
+      - symbol:
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.4
+          name: ibm.dpStatusNetworkInterfaceStatusAdminStatus
+        tag: ibm_dp_status_network_interface_status_admin_status
+        mapping:
+          1: up
+          2: down
+      - symbol:
+          OID: 1.3.6.1.4.1.14685.3.1.124.1.5
+          name: ibm.dpStatusNetworkInterfaceStatusOperStatus
+        tag: ibm_dp_status_network_interface_status_oper_status
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: not_present
+          7: lower_layer_down
