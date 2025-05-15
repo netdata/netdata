@@ -23,7 +23,7 @@ function add_netdata_to_proxmox_conf_files_group() {
     fi
   fi
 
-  if ! getent group "${group_guid}" | grep -q netdata; then
+  if ! getent group "${group_guid}" | grep -q "^netdata:"; then
     echo "Assign netdata user to group ${group_guid}"
     if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
       echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
@@ -80,7 +80,21 @@ if [ "${EUID}" -eq 0 ]; then
 
   if [ -n "${PGID}" ]; then
     echo "Creating docker group ${PGID}"
-    addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
+    if getent group "${PGID}" >/dev/null && ! getent group "${PGID}" | grep -q "^docker:"; then
+      # A group with PGID already exists and is not named docker
+      if ! getent group "docker" >/dev/null; then
+        # A group named docker does not exist yet, create it
+        addgroup --quiet --system "docker"
+      fi
+      # Alias the docker group to the existing PGID group
+      groupmod --non-unique --gid "${PGID}" "docker"
+    elif getent group "docker" >/dev/null; then
+      # The docker group exists, change it to PGID
+      groupmod --gid "${PGID}" "docker"
+    else
+      # A group named docker does not exist yet, create it with PGID
+      addgroup --quiet --gid "${PGID}" "docker"
+    fi
     echo "Assign netdata user to docker group ${PGID}"
     usermod --append --groups "docker" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
   fi
