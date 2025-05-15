@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "daemon/static_threads.h"
 #include "libnetdata/libnetdata.h"
 
 static inline void poll_process_updated_events(POLLINFO *pi) {
-    if(pi->events != pi->events_we_wait_for) {
+    if(pi->events != pi->events_we_wait_for && !(pi->flags & POLLINFO_FLAG_REMOVED_FROM_POLL)) {
         if(!nd_poll_upd(pi->p->ndpl, pi->fd, pi->events))
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to update socket %d to nd_poll", pi->fd);
         pi->events_we_wait_for = pi->events;
@@ -72,15 +73,26 @@ POLLINFO *poll_add_fd(POLLJOB *p
     return pi;
 }
 
+void poll_process_remove_from_poll(POLLINFO *pi) {
+    POLLJOB *p = pi->p;
+
+    if(!nd_poll_del(p->ndpl, pi->fd))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to delete socket %d from nd_poll() - is the socket already closed?", pi->fd);
+    else
+        pi->flags |= POLLINFO_FLAG_REMOVED_FROM_POLL;
+}
+
 static inline void poll_close_fd(POLLINFO *pi, const char *func) {
     POLLJOB *p = pi->p;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
-    if(!nd_poll_del(p->ndpl, pi->fd))
-        // this is ok, if the socket is already closed
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+    if(!(pi->flags & POLLINFO_FLAG_REMOVED_FROM_POLL) && !nd_poll_del(p->ndpl, pi->fd))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
                "Failed to delete socket %d from nd_poll() - called from %s() - is the socket already closed?",
                pi->fd, func);
+    else
+        pi->flags |= POLLINFO_FLAG_REMOVED_FROM_POLL;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);
@@ -394,6 +406,14 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     CLEANUP_FUNCTION_REGISTER(poll_events_cleanup) cleanup_ptr = &p;
 
+    size_t iteration_counter = 0,
+            timeout_counter = 0,
+            errors_counter = 0,
+            read_counter = 0,
+            writes_counter = 0,
+            unhandled_counter = 0,
+            cleanup_counter = 0;
+
     while(!check_to_stop_callback() && !nd_thread_signaled_to_cancel()) {
         if(unlikely(timer_usec)) {
             now_usec = now_boottime_usec();
@@ -424,6 +444,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
         nd_poll_result_t result;
         retval = nd_poll_wait(p.ndpl, ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS, &result);
+        iteration_counter++;
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
@@ -431,20 +452,23 @@ void poll_events(LISTEN_SOCKETS *sockets
             break;
         }
         else if(unlikely(!retval)) {
+            timeout_counter++;
             // timeout
             ;
         }
         else {
             POLLINFO *pi = (POLLINFO *)result.data;
 
-            if(result.events & (ND_POLL_HUP | ND_POLL_INVALID | ND_POLL_ERROR))
+            if(result.events & (ND_POLL_HUP | ND_POLL_INVALID | ND_POLL_ERROR)) {
+                errors_counter++;
                 poll_process_error(pi, result.events);
-
+            }
             else if(result.events & ND_POLL_WRITE) {
+                writes_counter++;
                 poll_process_send(pi, now);
             }
-
             else if(result.events & ND_POLL_READ) {
+                read_counter++;
                 if (pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
                     if (pi->socktype == SOCK_DGRAM)
                         poll_process_udp_read(pi, now);
@@ -496,6 +520,8 @@ void poll_events(LISTEN_SOCKETS *sockets
                 }
             }
             else {
+                unhandled_counter++;
+
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "POLLFD: LISTENER: socket slot %zu (fd %d) client %s port %s unhandled event id %d."
                        , i
@@ -510,6 +536,8 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
 
         if(unlikely(p.checks_every > 0 && now - last_check > p.checks_every)) {
+            cleanup_counter++;
+
             last_check = now;
 
             // cleanup old sockets

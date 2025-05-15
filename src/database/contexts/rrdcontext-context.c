@@ -28,6 +28,9 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
     rc->rrdhost = host;
     rc->flags = rc->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS; // no need for atomics at constructor
+    
+    // Add the context to the registry to track unique contexts
+    rrdcontext_context_registry_add(rc->id);
 
     if(rc->hub.version) {
         // we are loading data from the SQL database
@@ -95,6 +98,9 @@ static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
     // update the count of contexts
     __atomic_sub_fetch(&rc->rrdhost->rrdctx.contexts_count, 1, __ATOMIC_RELAXED);
+    
+    // Remove the context from the registry
+    rrdcontext_context_registry_remove(rc->id);
 
     rrdcontext_del_from_hub_queue(rc, false);
     rrdcontext_del_from_pp_queue(rc, false);
