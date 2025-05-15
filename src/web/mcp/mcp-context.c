@@ -40,27 +40,27 @@
 #include "mcp-initialize.h"
 
 // Stub implementations for all context namespace methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_context_method_provide(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_context_method_provide(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'context/provide' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_context_method_clear(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_context_method_clear(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'context/clear' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_context_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_context_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'context/status' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_context_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_context_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'context/save' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_context_method_load(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_context_method_load(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'context/load' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }

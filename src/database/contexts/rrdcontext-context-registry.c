@@ -181,13 +181,13 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
         const char *context_name = string2str((STRING *)index);
         
         // Find the last dot in the context name
-        const char *last_dot = strrchr(context_name, '.');
+        const char *first_dot = strchr(context_name, '.');
         
         // Create a STRING for the category (everything up to the last dot)
         STRING *category_str;
-        if (last_dot) {
+        if (first_dot) {
             // Create a STRING with the part before the last dot
-            category_str = string_strndupz(context_name, last_dot - context_name);
+            category_str = string_strndupz(context_name, first_dot - context_name);
         } else {
             // No dots, use the entire context as the category
             category_str = string_strdupz(context_name);

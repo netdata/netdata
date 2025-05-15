@@ -133,27 +133,27 @@ static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_objec
 }
 
 // Stub implementations for other tools methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/execute' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_cancel(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/cancel' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/status' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_validate(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/validate' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_tools_method_describe(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'tools/describe' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
