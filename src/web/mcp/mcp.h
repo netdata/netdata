@@ -5,6 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include <json-c/json.h>
+#include "mcp-request-id.h"
 
 // MCP protocol versions
 typedef enum {
@@ -93,7 +94,11 @@ typedef struct mcp_client {
     BUFFER *error;                                 // Pre-allocated buffer for error messages
     
     // Utility buffers
-    BUFFER *uri;                            // Pre-allocated buffer for URI decoding
+    BUFFER *uri;                                  // Pre-allocated buffer for URI decoding
+    
+    // Request IDs tracking
+    size_t request_id_counter;                     // Counter for generating sequential request IDs
+    Pvoid_t request_ids;                          // JudyL array for mapping internal IDs to client IDs
 } MCP_CLIENT;
 
 // Helper function to convert string version to numeric version
@@ -111,9 +116,8 @@ void mcp_free_client(MCP_CLIENT *mcpc);
 // Helper functions for creating and sending JSON-RPC responses
 
 // Functions to initialize and build MCP responses
-void mcp_init_success_result(MCP_CLIENT *mcpc, uint64_t id);
-MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, uint64_t id, MCP_RETURN_CODE rc);
-void mcp_jsonrpc_error(BUFFER *result, const char *error, uint64_t id, int jsonrpc_code);
+void mcp_init_success_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id);
+MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id, MCP_RETURN_CODE rc);
 
 // Send prepared buffer content as response
 int mcp_send_response_buffer(MCP_CLIENT *mcpc);
