@@ -1853,24 +1853,22 @@ set(WEB_PLUGIN_FILES
         src/web/api/v3/api_v3_stream_path.c
         src/web/mcp/adapters/mcp-websocket.c
         src/web/mcp/adapters/mcp-websocket.h
-        src/web/mcp/mcp-context.c
-        src/web/mcp/mcp-context.h
         src/web/mcp/mcp-initialize.c
         src/web/mcp/mcp-initialize.h
-        src/web/mcp/mcp-notifications.c
-        src/web/mcp/mcp-notifications.h
         src/web/mcp/mcp-prompts.c
         src/web/mcp/mcp-prompts.h
         src/web/mcp/mcp-resources.c
         src/web/mcp/mcp-resources.h
-        src/web/mcp/mcp-system.c
-        src/web/mcp/mcp-system.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
         src/web/mcp/mcp-request-id.c
         src/web/mcp/mcp-request-id.h
         src/web/mcp/mcp-ping.c
         src/web/mcp/mcp-ping.h
+        src/web/mcp/mcp-logging.c
+        src/web/mcp/mcp-logging.h
+        src/web/mcp/mcp-completion.c
+        src/web/mcp/mcp-completion.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c

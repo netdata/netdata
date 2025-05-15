@@ -7,32 +7,41 @@
  * In the MCP protocol, resources are application-controlled data stores that provide context to the model.
  * Resources are passive, meaning they provide data but don't perform actions on their own.
  * 
- * Key features of the resources namespace:
+ * Standard methods in the MCP specification:
  * 
- * 1. Resource Discovery:
- *    - Clients can list available resources (resources/list)
- *    - Get detailed descriptions and schemas (resources/describe, resources/getSchema)
- *    - Search for resources matching specific criteria (resources/search)
- * 
- * 2. Resource Access:
- *    - Retrieve specific resources or portions of resources (resources/get)
- *    - Access resources by ID or path
- *    - Resources can be structured or unstructured
- * 
- * 3. Resource Subscriptions:
- *    - Subscribe to updates for specific resources (resources/subscribe)
- *    - Unsubscribe from resources (resources/unsubscribe)
- *    - Get real-time updates when subscribed resources change
+ * 1. resources/list - Lists available resources
+ *    - Returns a collection of resources the server can provide
+ *    - May include resource metadata such as name, description, and URI
+ *    - Can be paginated for large resource collections
+ *
+ * 2. resources/read - Reads a specific resource by URI
+ *    - Takes a resource URI and returns its contents
+ *    - Contents can be text, binary data, or structured information
+ *    - URIs follow a standard format, typically with a scheme prefix
+ *
+ * 3. resources/templates/list - Lists available resource templates
+ *    - Returns a collection of URI templates for constructing resource URIs
+ *    - Templates describe how to construct valid resource URIs
+ *    - May include template descriptions and parameter information
+ *
+ * 4. resources/subscribe - Subscribes to changes in a resource
+ *    - Takes a resource URI and registers for change notifications
+ *    - When the resource changes, the server sends notifications
+ *    - Allows clients to maintain up-to-date views of resources
+ *
+ * 5. resources/unsubscribe - Unsubscribes from a resource
+ *    - Takes a resource URI and removes the subscription
+ *    - Stops receiving notifications for that resource
  * 
  * In the Netdata context, resources include:
  *    - metrics: Time-series data collected from various sources
  *    - logs: Log entries from system and application logs
  *    - alerts: Health monitoring alerts and notifications
- *    - functions: Live infrastructure snapshots providing real-time views
+ *    - contexts: Hierarchical organization of metrics and their metadata
  *    - nodes: Monitored infrastructure nodes with their metadata
  * 
- * Resources can be hierarchical or flat, and may support different access patterns
- * (e.g., time-based querying for metrics, full-text search for logs).
+ * Resources are identified by URIs (e.g., "nd://contexts") and can be hierarchical or flat,
+ * supporting different access patterns like time-based querying for metrics.
  */
 
 #include "mcp-resources.h"

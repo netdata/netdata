@@ -19,22 +19,26 @@ typedef enum {
 } MCP_PROTOCOL_VERSION;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_PROTOCOL_VERSION);
 
-// JSON-RPC error codes (standard)
-#define MCP_ERROR_PARSE_ERROR      -32700
-#define MCP_ERROR_INVALID_REQUEST  -32600
-#define MCP_ERROR_METHOD_NOT_FOUND -32601
-#define MCP_ERROR_INVALID_PARAMS   -32602
-#define MCP_ERROR_INTERNAL_ERROR   -32603
-// Server error codes (implementation-defined)
-#define MCP_ERROR_SERVER_ERROR_MIN -32099
-#define MCP_ERROR_SERVER_ERROR_MAX -32000
-
 // Content types (for messages and tool responses)
 typedef enum {
     MCP_CONTENT_TYPE_TEXT = 0,
     MCP_CONTENT_TYPE_IMAGE = 1,
     MCP_CONTENT_TYPE_AUDIO = 2, // New in 2025-03-26
 } MCP_CONTENT_TYPE;
+
+// Logging levels (as defined in MCP schema)
+typedef enum {
+    MCP_LOGGING_LEVEL_UNKNOWN = 0,
+    MCP_LOGGING_LEVEL_DEBUG,
+    MCP_LOGGING_LEVEL_INFO,
+    MCP_LOGGING_LEVEL_NOTICE,
+    MCP_LOGGING_LEVEL_WARNING,
+    MCP_LOGGING_LEVEL_ERROR,
+    MCP_LOGGING_LEVEL_CRITICAL,
+    MCP_LOGGING_LEVEL_ALERT,
+    MCP_LOGGING_LEVEL_EMERGENCY
+} MCP_LOGGING_LEVEL;
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_LOGGING_LEVEL);
 
 // Forward declarations for transport-specific types
 struct websocket_server_client;
@@ -64,7 +68,8 @@ typedef enum {
     MCP_RC_INVALID_PARAMS = 2, // Invalid parameters in request
     MCP_RC_NOT_FOUND = 3,      // Resource or method not found
     MCP_RC_INTERNAL_ERROR = 4, // Internal server error
-    MCP_RC_NOT_IMPLEMENTED = 5 // Method not implemented
+    MCP_RC_NOT_IMPLEMENTED = 5, // Method not implemented
+    MCP_RC_BAD_REQUEST = 6      // Bad or malformed request
     // Can add more specific errors as needed
 } MCP_RETURN_CODE;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_RETURN_CODE);
@@ -88,6 +93,9 @@ typedef struct mcp_client {
     // Client information
     STRING *client_name;                           // Client name (for logging, interned)
     STRING *client_version;                        // Client version (for logging, interned)
+    
+    // Logging configuration
+    MCP_LOGGING_LEVEL logging_level;              // Current logging level set by client
     
     // Response buffers
     BUFFER *result;                                // Pre-allocated buffer for success responses

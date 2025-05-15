@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /**
- * MCP Ping Functionality
+ * MCP Ping Method
  * 
- * This implements the ping functionality for the Model Context Protocol (MCP).
- * Ping is a simple request/response mechanism that allows either the client or server
- * to verify that their counterpart is still responsive and the connection is alive.
+ * The ping method is a core part of the Model Context Protocol (MCP),
+ * allowing connection health checks between client and server.
+ * 
+ * Standard method in the MCP specification:
+ * 
+ * 1. ping - Simple connection health check
+ *    - Takes no parameters (empty params object)
+ *    - The receiver must respond promptly with an empty result object
+ *    - Either client or server can initiate a ping
+ *    - If no response is received within a reasonable timeout, the connection may be considered stale
  * 
  * According to the MCP specification:
- * 1. Either client or server can initiate a ping by sending a ping request
- * 2. The receiver must respond promptly with an empty result
- * 3. If no response is received within a reasonable timeout, the connection may be considered stale
+ * - The ping method is mandatory for all MCP implementations
+ * - It serves as a basic mechanism to verify the connection is still active
+ * - Implementations should handle ping requests promptly to ensure accurate health checks
  * 
  * This implementation provides a simple handler for ping requests that responds with an
  * empty result object, as required by the specification.
