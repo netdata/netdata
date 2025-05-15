@@ -68,11 +68,11 @@ if [ "${EUID}" -eq 0 ]; then
   re='^[0-9]+$'
   if [[ $BALENA_PGID =~ $re ]]; then
     echo "Netdata detected balena-engine.sock"
-    DOCKER_HOST='/var/run/balena-engine.sock'
+    DOCKER_HOST='unix:///var/run/balena-engine.sock'
     PGID="$BALENA_PGID"
   elif [[ $DOCKER_PGID =~ $re ]]; then
     echo "Netdata detected docker.sock"
-    DOCKER_HOST="/var/run/docker.sock"
+    DOCKER_HOST="unix:///var/run/docker.sock"
     PGID="$DOCKER_PGID"
   fi
   export PGID
