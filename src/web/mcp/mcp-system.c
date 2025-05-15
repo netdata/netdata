@@ -40,7 +40,7 @@
 #include "config.h" // Include config.h for NETDATA_VERSION
 
 // Stub implementations for system methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_system_method_health(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_system_method_health(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'system/health' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
@@ -62,17 +62,17 @@ static MCP_RETURN_CODE mcp_system_method_version(MCP_CLIENT *mcpc, struct json_o
     return MCP_RC_OK;
 }
 
-static MCP_RETURN_CODE mcp_system_method_metrics(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_system_method_metrics(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'system/metrics' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_system_method_restart(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_system_method_restart(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'system/restart' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_system_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
+static MCP_RETURN_CODE mcp_system_method_status(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'system/status' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
