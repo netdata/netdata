@@ -171,6 +171,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     
     w->websocket.ext_flags = WS_EXTENSION_NONE;
     w->websocket.protocol = WS_PROTOCOL_DEFAULT;
+    w->websocket.client_max_window_bits = 0;
+    w->websocket.server_max_window_bits = 0;
 
     // if we had enabled compression, release it
     if(w->response.zinitialized) {
