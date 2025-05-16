@@ -220,6 +220,24 @@ void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t durati
         buffer_json_agent_status_id(wb, 0, duration_ut);
 }
 
+void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_unused, usec_t duration_ut, bool status) {
+    buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
+
+    if(!UUIDiszero(host->node_id))
+        buffer_json_member_add_uuid(wb, "node_id", host->node_id.uuid);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+
+    buffer_json_member_add_string(wb, "relationship",
+                                  host == localhost ? "localhost" :
+                                  (rrdhost_is_virtual(host) ? "virtual" : "child"));
+
+    buffer_json_member_add_boolean(wb, "connected", rrdhost_is_online(host));
+
+    if(status)
+        buffer_json_agent_status_id(wb, 0, duration_ut);
+}
+
 static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
     buffer_json_member_add_object(wb, key);
     {
@@ -368,7 +386,12 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
 
 static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdcontext_to_json_v2_data *ctl, size_t node_id) {
     buffer_json_add_array_item_object(wb); // this node
-    buffer_json_node_add_v2(wb, host, node_id, 0,
+
+    if(ctl->mode & CONTEXTS_V2_MCP)
+        buffer_json_node_add_v2_mcp(wb, host, node_id, 0,
+                                    (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
+    else
+        buffer_json_node_add_v2(wb, host, node_id, 0,
                             (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
 
     if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)) {
@@ -824,7 +847,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     buffer_json_initialize(wb, "\"", "\"", 0, true,
                            ((req->options & CONTEXTS_OPTION_MINIFY) && !(req->options & CONTEXTS_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_member_add_uint64(wb, "api", 2);
+    if(!(mode & CONTEXTS_V2_MCP))
+        buffer_json_member_add_uint64(wb, "api", 2);
 
     if(req->options & CONTEXTS_OPTION_DEBUG) {
         buffer_json_member_add_object(wb, "request");
@@ -981,8 +1005,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         buffer_json_member_add_boolean(wb, "live", collected);
 
                         if(mode & CONTEXTS_V2_MCP) {
-                            buffer_json_member_add_uint64(wb, "nodes_having_this_context", z->nodes);
-                            buffer_json_member_add_uint64(wb, "instances_of_this_context", z->instances);
+                            buffer_json_member_add_uint64(wb, "nodes_count", z->nodes);
+                            buffer_json_member_add_uint64(wb, "instances_count", z->instances);
                         }
 
                         if (mode & CONTEXTS_V2_SEARCH)
@@ -1015,7 +1039,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true);
     }
 
-    buffer_json_cloud_timings(wb, "timings", &ctl.timings);
+    if(!(mode & CONTEXTS_V2_MCP))
+        buffer_json_cloud_timings(wb, "timings", &ctl.timings);
 
     buffer_json_finalize(wb);
 

@@ -1861,6 +1861,12 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-resources.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp-tools-metric-contexts.c
+        src/web/mcp/mcp-tools-metric-context-categories.c
+        src/web/mcp/mcp-tools-context-details.c
+        src/web/mcp/mcp-tools-contexts-search.c
+        src/web/mcp/mcp-tools-list-nodes.c
+        src/web/mcp/mcp-tools-node-details.c
         src/web/mcp/mcp-request-id.c
         src/web/mcp/mcp-request-id.h
         src/web/mcp/mcp-ping.c
