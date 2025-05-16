@@ -23,8 +23,14 @@ func generateWebSocketKey() string {
 }
 
 func main() {
+	// Get program name for logs
+	programName := "nd-mcp-golang"
+	if len(os.Args) > 0 {
+		programName = os.Args[0]
+	}
+
 	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s ws://host/path\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "%s: Usage: %s ws://host/path\n", programName, programName)
 		os.Exit(1)
 	}
 
@@ -40,8 +46,12 @@ func main() {
 		CompressionMode: websocket.CompressionContextTakeover,
 		HTTPHeader:      header,
 	})
+	
+	// Increase the read limit to match Netdata's WS_MAX_INCOMING_FRAME_SIZE (16MB)
+	conn.SetReadLimit(16 * 1024 * 1024)
 	if err != nil {
-		log.Fatalf("websocket connection failed: %v", err)
+		fmt.Fprintf(os.Stderr, "%s: ERROR: websocket connection failed: %v\n", programName, err)
+		os.Exit(1)
 	}
 	defer conn.Close(websocket.StatusInternalError, "closing")
 
@@ -79,7 +89,8 @@ func main() {
 	}()
 
 	if err := <-errc; err != nil {
-		log.Fatalf("error: %v", err)
+		fmt.Fprintf(os.Stderr, "%s: ERROR: %v\n", programName, err)
+		os.Exit(1)
 	}
 	conn.Close(websocket.StatusNormalClosure, "")
 }

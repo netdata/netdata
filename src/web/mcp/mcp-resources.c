@@ -45,7 +45,6 @@
  */
 
 #include "mcp-resources.h"
-#include "mcp-initialize.h"
 #include "database/contexts/rrdcontext.h"
 
 // Audience enum - bitmask for the intended audience of a resource
