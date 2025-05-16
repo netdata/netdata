@@ -31,6 +31,14 @@ metrics:
           OID: 1.3.6.1.4.1.21239.5.1.2.1.2
           name: vertiv.internalSerial
         tag: vertiv_internal_serial
+      #      - symbol:
+      #          OID: 1.3.6.1.4.1.21239.5.1.1.7.0
+      #          name: vertiv.temperatureUnits
+      #        tag: vertiv_temperature_units
+      #        mapping:
+      #          0: fahrenheit
+      #          1: celsius
+      # TODO : Add this tag back when tagging by scalar symbol is implemented NDM-2247
       - symbol:
           OID: 1.3.6.1.4.1.21239.5.1.2.1.4
           name: vertiv.internalAvail

@@ -166,19 +166,20 @@ metrics:
         tag: netbotz_temp_sensor_enc_id
         description: The id of the physical enclosure containing the sensor
         unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.3
-#          name: tempSensorErrorStatus
-#        tag: netbotz_temp_sensor_error_status
-#        mapping:
-#          0: normal
-#          1: info
-#          2: warning
-#          3: error
-#          4: critical
-#          5: failure
-#        description: The error status of the sensor
-#        unit: "TBD"
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.1.1.3
+          name: tempSensorErrorStatus
+        tag: netbotz_temp_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+        description: The error status of the sensor
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.4.1.2
@@ -211,19 +212,20 @@ metrics:
         tag: netbotz_humi_sensor_enc_id
         description: The id of the physical enclosure containing the sensor
         unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.3
-#          name: humiSensorErrorStatus
-#        tag: netbotz_humi_sensor_error_status
-#        mapping:
-#          0: normal
-#          1: info
-#          2: warning
-#          3: error
-#          4: critical
-#          5: failure
-#        description: The error status of the sensor
-#        unit: "TBD"
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.2.1.3
+          name: humiSensorErrorStatus
+        tag: netbotz_humi_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+        description: The error status of the sensor
+        unit: "TBD"
   - MIB: NETBOTZ410-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.4.1.3
@@ -296,19 +298,20 @@ metrics:
         tag: netbotz_other_numeric_sensor_units
         description: The unit of measure for the sensor value
         unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.3
-#          name: otherNumericSensorErrorStatus
-#        tag: netbotz_other_numeric_sensor_error_status
-#        mapping:
-#          0: normal
-#          1: info
-#          2: warning
-#          3: error
-#          4: critical
-#          5: failure
-#        description: The operational status of the sensor
-#        unit: "TBD"
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.1.10.1.3
+          name: otherNumericSensorErrorStatus
+        tag: netbotz_other_numeric_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+        description: The operational status of the sensor
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.4.2.2

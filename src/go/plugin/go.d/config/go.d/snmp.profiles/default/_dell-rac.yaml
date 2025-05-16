@@ -1063,22 +1063,23 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.2
           name: coolingDeviceIndex
         tag: cooling_device_name
-      # - symbol:
-      #     OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.7
-      #     name: coolingDeviceType
-      #   tag: cooling_device_type
-      #   mapping:
-      #     1: cooling_device_type_is_other
-      #     2: cooling_device_type_is_unknown
-      #     3: cooling_device_type_is_a_fan
-      #     4: cooling_device_type_is_a_blower
-      #     5: cooling_device_type_is_a_chip_fan
-      #     6: cooling_device_type_is_a_cabinet_fan
-      #     7: cooling_device_type_is_a_power_supply_fan
-      #     8: cooling_device_type_is_a_heat_pipe
-      #     9: cooling_device_type_is_refrigeration
-      #     10: cooling_device_type_is_active_cooling
-      #     11: cooling_device_type_is_passive_cooling
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.7
+          name: coolingDeviceType
+        tag: cooling_device_type
+        mapping:
+          1: cooling_device_type_is_other
+          2: cooling_device_type_is_unknown
+          3: cooling_device_type_is_a_fan
+          4: cooling_device_type_is_a_blower
+          5: cooling_device_type_is_a_chip_fan
+          6: cooling_device_type_is_a_cabinet_fan
+          7: cooling_device_type_is_a_power_supply_fan
+          8: cooling_device_type_is_a_heat_pipe
+          9: cooling_device_type_is_refrigeration
+          10: cooling_device_type_is_active_cooling
+          11: cooling_device_type_is_passive_cooling
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.8
           name: coolingDeviceLocationName
@@ -1113,15 +1114,16 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.2
           name: temperatureProbeIndex
         tag: temperature_probe_index
-      # - symbol:
-      #     OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.7
-      #     name: temperatureProbeType
-      #   tag: temperature_probe_type
-      #   mapping:
-      #     1: temperature_probe_type_is_other
-      #     2: temperature_probe_type_is_unknown
-      #     3: temperature_probe_type_is_ambient_esm
-      #     16: temperature_probe_type_is_discrete
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - symbol:
+          OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.7
+          name: temperatureProbeType
+        tag: temperature_probe_type
+        mapping:
+          1: temperature_probe_type_is_other
+          2: temperature_probe_type_is_unknown
+          3: temperature_probe_type_is_ambient_esm
+          16: temperature_probe_type_is_discrete
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.8
           name: temperatureProbeLocationName
@@ -1202,7 +1204,7 @@ metrics:
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7
-          name: device_type
+          name: memoryDeviceType
         tag: device_type
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.2
