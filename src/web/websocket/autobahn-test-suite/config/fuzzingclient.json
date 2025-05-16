@@ -3,7 +3,7 @@
     "servers": [
         {
             "agent": "Netdata WebSocket Server",
-            "url": "ws://localhost:19999/echo",
+            "url": "ws://10.20.4.205:19999/echo?max_frame_size=32768",
             "options": {
                 "version": 18
             }
