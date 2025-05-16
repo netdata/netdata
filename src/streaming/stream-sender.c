@@ -448,6 +448,8 @@ static void stream_sender_move_running_to_connector_or_remove_internal(struct st
 
     stream_sender_log_disconnection(sth, s, reason, receiver_reason);
 
+    // IMPORTANT: make sure it REMOVED from nd_poll() before closing the socket
+    // otherwise, undefined things will happen due to socket reuse and epoll()
     nd_sock_close(&s->sock);
 
     stream_parent_set_host_disconnect_reason(s->host, reason, now_realtime_sec());

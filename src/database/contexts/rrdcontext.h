@@ -760,5 +760,7 @@ static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);
 int32_t rrdcontext_queue_entries(RRDCONTEXT_QUEUE_JudyLSet *queue);
 
+#include "rrdcontext-context-registry.h"
+
 #endif // NETDATA_RRDCONTEXT_H
 

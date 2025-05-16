@@ -35,6 +35,7 @@ metrics:
     symbols:
       - name: hawk.i2.ipCont
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: hawk.i2.ipContName
@@ -69,6 +70,7 @@ metrics:
         constant_value_one: true
         description: Output constant value one.
         unit: "{output}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: hawk.i2.opName

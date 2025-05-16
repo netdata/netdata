@@ -31,6 +31,7 @@ metrics:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
         tag: ap_ip_address
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.6
           name: bsnAPOperationStatus
@@ -93,6 +94,7 @@ metrics:
           - start: 0
             end: 5
         tag: ap_ip_address
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.12
           name: bsnAPIfOperStatus
@@ -236,6 +238,7 @@ metrics:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.2
           name: bsnDot11EssSsid
         tag: ssid
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.6
           name: bsnDot11EssAdminStatus

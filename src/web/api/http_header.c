@@ -62,6 +62,10 @@ static void http_header_origin(struct web_client *w, const char *v, size_t len _
 static void http_header_connection(struct web_client *w, const char *v, size_t len __maybe_unused) {
     if(strcasestr(v, "keep-alive"))
         web_client_enable_keepalive(w);
+    
+    // Check for WebSocket upgrade request
+    if(strcasestr(v, "upgrade"))
+        web_client_set_websocket_handshake(w);
 }
 
 static void http_header_dnt(struct web_client *w, const char *v, size_t len __maybe_unused) {
@@ -175,6 +179,130 @@ static void http_header_x_netdata_auth(struct web_client *w, const char *v, size
     }
 }
 
+// Handle WebSocket-specific headers
+static void http_header_upgrade(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    if(strcasecmp(v, "websocket") == 0) {
+        web_client_set_websocket(w);
+    }
+}
+
+static void http_header_sec_websocket_key(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    if(web_client_is_websocket(w)) {
+        // Store the websocket key for later use in the handshake
+        freez(w->websocket.key);
+        w->websocket.key = strdupz(v);
+    }
+}
+
+static void http_header_sec_websocket_version(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    if(web_client_is_websocket(w)) {
+        // We only support version 13, which will be checked during handshake
+        // No need to store this as we only accept one version
+        if(strcmp(v, "13") != 0) {
+            netdata_log_debug(D_WEB_CLIENT, "%llu: WebSocket version %s not supported, only version 13 is supported", w->id, v);
+            web_client_clear_websocket(w);
+        }
+    }
+}
+
+static void http_header_sec_websocket_protocol(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    if(web_client_is_websocket(w)) {
+        // Store the requested protocols for later evaluation during handshake
+        w->websocket.protocol = WEBSOCKET_PROTOCOL_2id(v);
+    }
+}
+
+static void http_header_sec_websocket_extensions(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    if(web_client_is_websocket(w)) {
+        // Reset extension flags
+        w->websocket.ext_flags = WS_EXTENSION_NONE;
+        
+        // Check if "permessage-deflate" is requested
+        if (strstr(v, "permessage-deflate") != NULL) {
+            // Parse extension parameters
+            char extension_copy[1024];
+            strncpy(extension_copy, v, sizeof(extension_copy) - 1);
+            extension_copy[sizeof(extension_copy) - 1] = '\0';
+
+            char *token, *saveptr;
+            token = strtok_r(extension_copy, ",", &saveptr);
+
+            while (token) {
+                // Trim leading/trailing spaces
+                char *ext = token;
+                while (*ext && isspace(*ext)) ext++;
+                char *end = ext + strlen(ext) - 1;
+                while (end > ext && isspace(*end)) *end-- = '\0';
+
+                // Check if this is permessage-deflate extension
+                if (strncmp(ext, "permessage-deflate", 18) == 0) {
+                    w->websocket.ext_flags |= WS_EXTENSION_PERMESSAGE_DEFLATE;
+
+                    // Parse parameters
+                    char *params = ext + 18;
+                    if (*params == ';') {
+                        params++;
+
+                        char *param, *param_saveptr;
+                        param = strtok_r(params, ";", &param_saveptr);
+
+                        while (param) {
+                            // Trim leading/trailing spaces
+                            while (*param && isspace(*param)) param++;
+                            end = param + strlen(param) - 1;
+                            while (end > param && isspace(*end)) *end-- = '\0';
+
+                            // Client no context takeover
+                            if (strcmp(param, "client_no_context_takeover") == 0)
+                                w->websocket.ext_flags |= WS_EXTENSION_CLIENT_NO_CONTEXT_TAKEOVER;
+
+                            // Server no context takeover
+                            else if (strcmp(param, "server_no_context_takeover") == 0)
+                                w->websocket.ext_flags |= WS_EXTENSION_SERVER_NO_CONTEXT_TAKEOVER;
+
+                            // Server max window bits
+                            else if (strncmp(param, "server_max_window_bits=", 23) == 0) {
+                                w->websocket.server_max_window_bits = str2u(param + 23);
+                                if(w->websocket.server_max_window_bits >= 8 && w->websocket.server_max_window_bits <= 15)
+                                    w->websocket.ext_flags |= WS_EXTENSION_SERVER_MAX_WINDOW_BITS;
+                            }
+                            // Server max window bits without value
+                            else if (strcmp(param, "server_max_window_bits") == 0) {
+                                w->websocket.ext_flags |= WS_EXTENSION_SERVER_MAX_WINDOW_BITS;
+                                w->websocket.server_max_window_bits = 0; // Default
+                            }
+
+                            // Client max window bits with value
+                            else if (strncmp(param, "client_max_window_bits=", 23) == 0) {
+                                w->websocket.client_max_window_bits = str2u(param + 23);
+                                if(w->websocket.client_max_window_bits >= 8 && w->websocket.client_max_window_bits <= 15)
+                                    w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
+                            }
+                            // Client max window bits without value
+                            else if (strcmp(param, "client_max_window_bits") == 0) {
+                                w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
+                                w->websocket.client_max_window_bits = 0; // Default
+                            }
+
+                            param = strtok_r(NULL, ";", &param_saveptr);
+                        }
+                    }
+
+                    break;  // Found and parsed permessage-deflate
+                }
+
+                token = strtok_r(NULL, ",", &saveptr);
+            }
+        }
+
+        netdata_log_debug(D_WEB_CLIENT, "%llu: Client requested WebSocket extensions: %s, "
+                                        "enabled flags: %u, client_max_window_bits: %u, server_max_window_bits: %u",
+                          w->id, v, w->websocket.ext_flags,
+                          w->websocket.client_max_window_bits,
+                          w->websocket.server_max_window_bits);
+    }
+}
+
 struct {
     uint32_t hash;
     const char *key;
@@ -195,6 +323,13 @@ struct {
     { .hash = 0, .key = "X-Netdata-Permissions", .cb = http_header_x_netdata_permissions },
     { .hash = 0, .key = "X-Netdata-User-Name",   .cb = http_header_x_netdata_user_name },
     { .hash = 0, .key = "X-Netdata-Auth",        .cb = http_header_x_netdata_auth },
+
+    // WebSocket headers
+    { .hash = 0, .key = "Upgrade",               .cb = http_header_upgrade },
+    { .hash = 0, .key = "Sec-WebSocket-Key",     .cb = http_header_sec_websocket_key },
+    { .hash = 0, .key = "Sec-WebSocket-Version", .cb = http_header_sec_websocket_version },
+    { .hash = 0, .key = "Sec-WebSocket-Protocol",.cb = http_header_sec_websocket_protocol },
+    { .hash = 0, .key = "Sec-WebSocket-Extensions",.cb = http_header_sec_websocket_extensions },
 
     // for historical reasons.
     // there are a few nightly versions of netdata UI that incorrectly use this instead of X-Netdata-Auth

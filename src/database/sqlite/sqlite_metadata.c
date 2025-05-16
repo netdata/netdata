@@ -1935,7 +1935,8 @@ static void ctx_hosts_load(uv_work_t *req)
             __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
             hclt[thread_index].host = host;
             hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
-            async_exec += (hclt[thread_index].thread != NULL);
+            rc = (hclt[thread_index].thread == NULL);
+            async_exec += (rc == 0);
             // if it failed, mark the thread slot as free
             if (rc)
                 __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);

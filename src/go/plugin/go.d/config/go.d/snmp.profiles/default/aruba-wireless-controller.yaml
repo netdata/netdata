@@ -81,6 +81,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         description: Size of the storage filesystem in MB
         unit: "MBy"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: sysXStorageType
@@ -106,6 +107,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.14
         description: Signal to noise ratio for the BSSID
         unit: "dB"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: apESSID
@@ -284,6 +286,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.20.1.5.1.4
         description: Number of AP hbt GRE tunnels
         unit: "{tunnel}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.20.1.1.1.2
@@ -291,7 +294,6 @@ metrics:
         table: wlsxHighAvalabilityConfigTable
         tag: ha_membership
         # The actual index of the table is haProfileName that is not accessible
-
   - MIB: WLSX-WLAN-MIB
     table:
       name: wlsxWlanStationTable
@@ -313,6 +315,7 @@ metrics:
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.17
         description: Transmit rate code of the station
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: wlanStaPhyType

@@ -106,6 +106,7 @@ static void exporting_clean_engine()
         instance = instance->next;
 
         clean_instance(current_instance);
+        freez(current_instance);
     }
 
     freez((void *)engine->config.hostname);

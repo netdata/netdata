@@ -29,6 +29,7 @@ metrics:
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.7
         description: The counter that records the times the remote BGP peer is correctly connected.
         unit: "s"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: huawei.hwBgpPeerVrfName
@@ -295,6 +296,7 @@ metrics:
     symbols:
       - name: huawei.hwNatSession
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2011.5.25.226.2.14.2.1.1
