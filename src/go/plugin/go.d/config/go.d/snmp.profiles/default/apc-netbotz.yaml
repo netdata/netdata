@@ -15,49 +15,49 @@ metrics:
     symbols:
       - name: netbotz.enclosure
         constant_value_one: true
-#    metric_tags:
-#      TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.2.1.1.7
-#          name: enclosureIndex
-#        tag: netbotz_enclosure_index
-#        description: The index of the physical enclosure
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.2.1.1.1
-#          name: enclosureId
-#        tag: netbotz_enclosure_id
-#        description: The id of the physical enclosure
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.2.1.1.4
-#          name: enclosureLabel
-#        tag: netbotz_enclosure_label
-#        description: The unique label assigned to the enclosure or pod
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.2.1.1.2
-#          name: enclosureStatus
-#        tag: netbotz_enclosure_status
-#        mapping:
-#          0: disconnected
-#          1: error
-#          2: normal
-#        description: The operational status of the enclosure
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.2.1.1.3
-#          name: enclosureErrorStatus
-#        tag: netbotz_enclosure_error_status
-#        mapping:
-#          0: normal
-#          1: info
-#          2: warning
-#          3: error
-#          4: critical
-#          5: failure
-#        description: The error status of the enclosure
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.7
+          name: enclosureIndex
+        tag: netbotz_enclosure_index
+        description: The index of the physical enclosure
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.1
+          name: enclosureId
+        tag: netbotz_enclosure_id
+        description: The id of the physical enclosure
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.4
+          name: enclosureLabel
+        tag: netbotz_enclosure_label
+        description: The unique label assigned to the enclosure or pod
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.2
+          name: enclosureStatus
+        tag: netbotz_enclosure_status
+        mapping:
+          0: disconnected
+          1: error
+          2: normal
+        description: The operational status of the enclosure
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.2.1.1.3
+          name: enclosureErrorStatus
+        tag: netbotz_enclosure_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+        description: The error status of the enclosure
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.3.1
@@ -65,30 +65,30 @@ metrics:
     symbols:
       - name: netbotz.dinPort
         constant_value_one: true
-#    metric_tags:
-#      TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.1.1.9
-#          name: dinPortIndex
-#        tag: netbotz_din_port_index
-#        description: The index of the port
-#        unit: "{port}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.1.1.1
-#          name: dinPortId
-#        tag: netbotz_din_port_id
-#        description: The unique id of the port
-#        unit: "{port}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.1.1.2
-#          name: dinPortStatus
-#        tag: netbotz_din_port_status
-#        mapping:
-#          0: disconnected
-#          1: error
-#          2: normal
-#        description: The operational status of the port
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.1.1.9
+          name: dinPortIndex
+        tag: netbotz_din_port_index
+        description: The index of the port
+        unit: "{port}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.1.1.1
+          name: dinPortId
+        tag: netbotz_din_port_id
+        description: The unique id of the port
+        unit: "{port}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.1.1.2
+          name: dinPortStatus
+        tag: netbotz_din_port_status
+        mapping:
+          0: disconnected
+          1: error
+          2: normal
+        description: The operational status of the port
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.3.10
@@ -96,42 +96,42 @@ metrics:
     symbols:
       - name: netbotz.otherPort
         constant_value_one: true
-#    metric_tags:
-#      TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.10.1.5
-#          name: otherPortIndex
-#        tag: netbotz_other_port_index
-#        description: The index of the port
-#        unit: "{port}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.10.1.1
-#          name: otherPortId
-#        tag: netbotz_other_port_id
-#        description: The unique id of the port
-#        unit: "{port}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.10.1.3
-#          name: otherPortLabel
-#        tag: netbotz_other_port_label
-#        description: The unique label assigned to the port
-#        unit: "{port}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.10.1.4
-#          name: otherPortEncId
-#        tag: netbotz_other_port_enc_id
-#        description: The id of the physical enclosure containing the port
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.3.10.1.2
-#          name: otherPortStatus
-#        tag: netbotz_other_port_status
-#        mapping:
-#          0: disconnected
-#          1: error
-#          2: normal
-#        description: The operational status of the port
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.5
+          name: otherPortIndex
+        tag: netbotz_other_port_index
+        description: The index of the port
+        unit: "{port}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.1
+          name: otherPortId
+        tag: netbotz_other_port_id
+        description: The unique id of the port
+        unit: "{port}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.3
+          name: otherPortLabel
+        tag: netbotz_other_port_label
+        description: The unique label assigned to the port
+        unit: "{port}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.4
+          name: otherPortEncId
+        tag: netbotz_other_port_enc_id
+        description: The id of the physical enclosure containing the port
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.3.10.1.2
+          name: otherPortStatus
+        tag: netbotz_other_port_status
+        mapping:
+          0: disconnected
+          1: error
+          2: normal
+        description: The operational status of the port
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.4.1.1
@@ -316,48 +316,48 @@ metrics:
     symbols:
       - name: netbotz.doorSwitchSensor
         constant_value_one: true
-#    metric_tags:
-#      TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.8
-#          name: doorSwitchSensorIndex
-#        tag: netbotz_door_switch_sensor_index
-#        description: The index of the sensor
-#        unit: "{sensor}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.1
-#          name: doorSwitchSensorId
-#        tag: netbotz_door_switch_sensor_id
-#        description: The unique id of the sensor
-#        unit: "{sensor}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.4
-#          name: doorSwitchSensorLabel
-#        tag: netbotz_door_switch_sensor_label
-#        description: The unique label assigned to the sensor
-#        unit: "{sensor}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.5
-#          name: doorSwitchSensorEncId
-#        tag: netbotz_door_switch_sensor_enc_id
-#        description: The id of the physical enclosure containing the sensor
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.7
-#          name: doorSwitchSensorValueStr
-#        tag: netbotz_door_switch_sensor_value_str
-#        description: The enum value label for the state reported by the sensor
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.2
-#          name: doorSwitchSensorValue
-#        tag: netbotz_door_switch_sensor_value
-#        mapping:
-#          -1: 'null'
-#          0: open
-#          1: closed
-#        description: Whether the door is open or closed
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.8
+          name: doorSwitchSensorIndex
+        tag: netbotz_door_switch_sensor_index
+        description: The index of the sensor
+        unit: "{sensor}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.1
+          name: doorSwitchSensorId
+        tag: netbotz_door_switch_sensor_id
+        description: The unique id of the sensor
+        unit: "{sensor}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.4
+          name: doorSwitchSensorLabel
+        tag: netbotz_door_switch_sensor_label
+        description: The unique label assigned to the sensor
+        unit: "{sensor}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.5
+          name: doorSwitchSensorEncId
+        tag: netbotz_door_switch_sensor_enc_id
+        description: The id of the physical enclosure containing the sensor
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.7
+          name: doorSwitchSensorValueStr
+        tag: netbotz_door_switch_sensor_value_str
+        description: The enum value label for the state reported by the sensor
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.2.1.2
+          name: doorSwitchSensorValue
+        tag: netbotz_door_switch_sensor_value
+        mapping:
+          -1: 'null'
+          0: open
+          1: closed
+        description: Whether the door is open or closed
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.4.2.10
@@ -365,45 +365,45 @@ metrics:
     symbols:
       - name: netbotz.otherStateSensor
         constant_value_one: true
-#    metric_tags:
-#      TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.4
-#          name: otherStateSensorLabel
-#        tag: netbotz_other_state_sensor_label
-#        description: The unique label assigned to the sensor
-#        unit: "{sensor}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.5
-#          name: otherStateSensorEncId
-#        tag: netbotz_other_state_sensor_enc_id
-#        description: The id of the physical enclosure containing the sensor
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.7
-#          name: otherStateSensorValueStr
-#        tag: netbotz_other_state_sensor_value_str
-#        description: The enum value label for the state reported by the sensor
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.1
-#          name: otherStateSensorId
-#        tag: netbotz_other_state_sensor_id
-#        description: The unique id of the sensor
-#        unit: "{sensor}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.3
-#          name: otherStateSensorErrorStatus
-#        tag: netbotz_other_state_sensor_error_status
-#        mapping:
-#          0: normal
-#          1: info
-#          2: warning
-#          3: error
-#          4: critical
-#          5: failure
-#        description: The operational status of the sensor
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.4
+          name: otherStateSensorLabel
+        tag: netbotz_other_state_sensor_label
+        description: The unique label assigned to the sensor
+        unit: "{sensor}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.5
+          name: otherStateSensorEncId
+        tag: netbotz_other_state_sensor_enc_id
+        description: The id of the physical enclosure containing the sensor
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.7
+          name: otherStateSensorValueStr
+        tag: netbotz_other_state_sensor_value_str
+        description: The enum value label for the state reported by the sensor
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.1
+          name: otherStateSensorId
+        tag: netbotz_other_state_sensor_id
+        description: The unique id of the sensor
+        unit: "{sensor}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.4.2.10.1.3
+          name: otherStateSensorErrorStatus
+        tag: netbotz_other_state_sensor_error_status
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+        description: The operational status of the sensor
+        unit: "TBD"
   - MIB: NETBOTZV2-MIB
     table:
       OID: 1.3.6.1.4.1.5528.100.5.1
@@ -411,58 +411,58 @@ metrics:
     symbols:
       - name: netbotz.errorCond
         constant_value_one: true
-#    metric_tags:
-#      TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.12
-#          name: errorCondIndex
-#        tag: netbotz_error_cond_index
-#        description: The index of the error condition
-#        unit: "{error_condition}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.1
-#          name: errorCondId
-#        tag: netbotz_error_cond_id
-#        description: The unique id of the error condition
-#        unit: "{error_condition}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.3
-#          name: errorCondTypeId
-#        tag: netbotz_error_cond_type_id
-#        description: The error type id reported for the error condition
-#        unit: "{error_type}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.9
-#          name: errorCondEncId
-#        tag: netbotz_error_cond_enc_id
-#        description: The id of the physical enclosure associated with the error
-#        unit: "{enclosure}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.11
-#          name: errorCondSensorId
-#        tag: netbotz_error_cond_sensor_id
-#        description: The id of the sensor associated with the error
-#        unit: "{sensor}"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.2
-#          name: errorCondSeverity
-#        tag: netbotz_error_cond_severity
-#        mapping:
-#          0: normal
-#          1: info
-#          2: warning
-#          3: error
-#          4: critical
-#          5: failure
-#        description: The relative severity of the error condition
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.5528.100.5.1.1.6
-#          name: errorCondResolved
-#        tag: netbotz_error_cond_resolved
-#        mapping:
-#          0: no
-#          1: yes
-#          2: 'null'
-#        description: Whether the error condition was resolved
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.12
+          name: errorCondIndex
+        tag: netbotz_error_cond_index
+        description: The index of the error condition
+        unit: "{error_condition}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.1
+          name: errorCondId
+        tag: netbotz_error_cond_id
+        description: The unique id of the error condition
+        unit: "{error_condition}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.3
+          name: errorCondTypeId
+        tag: netbotz_error_cond_type_id
+        description: The error type id reported for the error condition
+        unit: "{error_type}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.9
+          name: errorCondEncId
+        tag: netbotz_error_cond_enc_id
+        description: The id of the physical enclosure associated with the error
+        unit: "{enclosure}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.11
+          name: errorCondSensorId
+        tag: netbotz_error_cond_sensor_id
+        description: The id of the sensor associated with the error
+        unit: "{sensor}"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.2
+          name: errorCondSeverity
+        tag: netbotz_error_cond_severity
+        mapping:
+          0: normal
+          1: info
+          2: warning
+          3: error
+          4: critical
+          5: failure
+        description: The relative severity of the error condition
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.5528.100.5.1.1.6
+          name: errorCondResolved
+        tag: netbotz_error_cond_resolved
+        mapping:
+          0: no
+          1: yes
+          2: 'null'
+        description: Whether the error condition was resolved
+        unit: "TBD"

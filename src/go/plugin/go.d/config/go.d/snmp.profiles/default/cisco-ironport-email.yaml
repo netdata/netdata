@@ -77,33 +77,34 @@ metrics:
         constant_value_one: true
     description: A table of one or power supply entries.
     unit: "{power_supply}"
-#    metric_tags:
-#      - symbol:
-#          name: ironport.powerSupplyName
-#          OID: 1.3.6.1.4.1.15497.1.1.1.8.1.4
-#        tag: ironport_power_supply_name
-#        description: A textual name for a power supply.
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.15497.1.1.1.8.1.2
-#          name: ironport.powerSupplyStatus
-#        tag: ironport_power_supply_status
-#        mapping:
-#          1: power_supply_not_installed
-#          2: power_supply_healthy
-#          3: power_supply_no_ac
-#          4: power_supply_faulty
-#        description: Represents the status of a power supply. powerSupplyNotInstalled - The power supply is not detected by the chassis as being physically present. powerSupplyHealthy - The power supply is physically present and is actively servicing the appliance with power. powerSupplyNoAC - The power supply is physically present but is not actively servicing the appliance with power. powerSupplyFaulty - The power supply is failed per the vendor defined operating specifications for the power supply.
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.15497.1.1.1.8.1.3
-#          name: ironport.powerSupplyRedundancy
-#        tag: ironport_power_supply_redundancy
-#        mapping:
-#          1: power_supply_redundancy_ok
-#          2: power_supply_redundancy_lost
-#        description: Represents the status of a collection of one or more power supplies. powerSupplyRedundancyOK - All power supplies are in a powerSupplyHealthy state. powerSupplyRedundancyLost - One or more power supplies are in a powerSupplyNotInstalled, powerSupplyNoAC, or powerSupplyFaulty state.
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: ironport.powerSupplyName
+          OID: 1.3.6.1.4.1.15497.1.1.1.8.1.4
+        tag: ironport_power_supply_name
+        description: A textual name for a power supply.
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.15497.1.1.1.8.1.2
+          name: ironport.powerSupplyStatus
+        tag: ironport_power_supply_status
+        mapping:
+          1: power_supply_not_installed
+          2: power_supply_healthy
+          3: power_supply_no_ac
+          4: power_supply_faulty
+        description: Represents the status of a power supply. powerSupplyNotInstalled - The power supply is not detected by the chassis as being physically present. powerSupplyHealthy - The power supply is physically present and is actively servicing the appliance with power. powerSupplyNoAC - The power supply is physically present but is not actively servicing the appliance with power. powerSupplyFaulty - The power supply is failed per the vendor defined operating specifications for the power supply.
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.15497.1.1.1.8.1.3
+          name: ironport.powerSupplyRedundancy
+        tag: ironport_power_supply_redundancy
+        mapping:
+          1: power_supply_redundancy_ok
+          2: power_supply_redundancy_lost
+        description: Represents the status of a collection of one or more power supplies. powerSupplyRedundancyOK - All power supplies are in a powerSupplyHealthy state. powerSupplyRedundancyLost - One or more power supplies are in a powerSupplyNotInstalled, powerSupplyNoAC, or powerSupplyFaulty state.
+        unit: "TBD"
   - MIB: ASYNCOS-MAIL-MIB
     table:
       name: temperatureTable
@@ -157,22 +158,23 @@ metrics:
         unit: "s"
     description: A table of Feature Key expiration entries.
     unit: "{feature_key_expiration_entry}"
-#    metric_tags:
-#      - symbol:
-#          name: ironport.keyDescription
-#          OID: 1.3.6.1.4.1.15497.1.1.1.12.1.2
-#        tag: ironport_key_description
-#        description: Textual description for a Feature Key applicable to the appliance.
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.15497.1.1.1.12.1.3
-#          name: ironport.keyIsPerpetual
-#        tag: ironport_key_is_perpetual
-#        mapping:
-#          1: 'true'
-#          2: 'false'
-#        description: Boolean value represented by True if Feature Key is perpetual, or False if the Feature Key is normal or expired.
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: ironport.keyDescription
+          OID: 1.3.6.1.4.1.15497.1.1.1.12.1.2
+        tag: ironport_key_description
+        description: Textual description for a Feature Key applicable to the appliance.
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.15497.1.1.1.12.1.3
+          name: ironport.keyIsPerpetual
+        tag: ironport_key_is_perpetual
+        mapping:
+          1: 'true'
+          2: 'false'
+        description: Boolean value represented by True if Feature Key is perpetual, or False if the Feature Key is normal or expired.
+        unit: "TBD"
   - MIB: ASYNCOS-MAIL-MIB
     table:
       name: updateTable
@@ -222,29 +224,30 @@ metrics:
         constant_value_one: true
     description: Unique index for a drive being instrumented in the appliance. This index is for SNMP purposes only; it has no intrinsic value.
     unit: "{raid_drive}"
-#    metric_tags:
-#      - symbol:
-#          name: ironport.raidID
-#          OID: 1.3.6.1.4.1.15497.1.1.1.18.1.3
-#        tag: ironport_raid_id
-#        description: A textual name for a drive attached to a RAID controller in the appliance.
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.15497.1.1.1.18.1.2
-#          name: ironport.raidStatus
-#        tag: ironport_raid_status
-#        mapping:
-#          1: drive_healthy
-#          2: drive_failure
-#          3: drive_rebuild
-#        description: Represents the status of a a drive attached to a RAID controller in the appliance. driveHealthy - The corresponding drive is connected to the RAID controller and functioning as a healthy member in the RAID volume. driveFailure - The drive is either disconnected from the RAID controller, or has failed to operate within thresholds defined in vendor specifications for the drive and the controller. driveRebuild - The corresponding drive is connected to the RAID controller. It is being rebuilt according to the RAID controller specific rebuild algorithm for the current operating mode of the RAID volume.
-#        unit: "TBD"
-#      - symbol:
-#          OID: 1.3.6.1.4.1.15497.1.1.1.18.1.4
-#          name: ironport.raidLastError
-#        tag: ironport_raid_last_error
-#        description: The textual description of the last error message reported by the RAID controller or corresponding driver if one has occurred. This is 'No Error' if the corresponding drive's state is driveHealthy, or a controller or driver defined specific textual description if the drive's state is not driveHealthy.
-#        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: ironport.raidID
+          OID: 1.3.6.1.4.1.15497.1.1.1.18.1.3
+        tag: ironport_raid_id
+        description: A textual name for a drive attached to a RAID controller in the appliance.
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.15497.1.1.1.18.1.2
+          name: ironport.raidStatus
+        tag: ironport_raid_status
+        mapping:
+          1: drive_healthy
+          2: drive_failure
+          3: drive_rebuild
+        description: Represents the status of a a drive attached to a RAID controller in the appliance. driveHealthy - The corresponding drive is connected to the RAID controller and functioning as a healthy member in the RAID volume. driveFailure - The drive is either disconnected from the RAID controller, or has failed to operate within thresholds defined in vendor specifications for the drive and the controller. driveRebuild - The corresponding drive is connected to the RAID controller. It is being rebuilt according to the RAID controller specific rebuild algorithm for the current operating mode of the RAID volume.
+        unit: "TBD"
+      - symbol:
+          OID: 1.3.6.1.4.1.15497.1.1.1.18.1.4
+          name: ironport.raidLastError
+        tag: ironport_raid_last_error
+        description: The textual description of the last error message reported by the RAID controller or corresponding driver if one has occurred. This is 'No Error' if the corresponding drive's state is driveHealthy, or a controller or driver defined specific textual description if the drive's state is not driveHealthy.
+        unit: "TBD"
   - MIB: ASYNCOS-MAIL-MIB
     symbol:
       name: ironport.openFilesOrSockets

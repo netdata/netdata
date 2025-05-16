@@ -26,15 +26,16 @@ metrics:
 #    symbols:
 #      - OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.3.1
 #        name: cpu.usage
-#    metric_tags:
-#      - index: 1
-#        tag: cpu
-#      - symbol:
-#          OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.2.1
-#          name: loadDescr
-#          match_attributes:
-#            - 1 Minute Average
-#        tag: load_descr
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - index: 1
+        tag: cpu
+      - symbol:
+          OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.2.1
+          name: loadDescr
+          match_attributes:
+            - 1 Minute Average
+        tag: load_descr
   - MIB: UBNT-UniFi-MIB
     table:
       OID: 1.3.6.1.4.1.41112.1.6.1.1
