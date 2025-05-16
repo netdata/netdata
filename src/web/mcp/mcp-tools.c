@@ -30,6 +30,7 @@
 
 #include "mcp-tools.h"
 #include "mcp-initialize.h"
+#include "database/contexts/rrdcontext.h"
 
 // Tool handler function prototypes
 typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
@@ -49,19 +50,22 @@ typedef struct {
 } MCP_TOOL_DEF;
 
 // Tool schema generator functions
-static void mcp_tool_list_netdata_metrics_schema(BUFFER *buffer);
+static void mcp_tool_metric_contexts_schema(BUFFER *buffer);
 
 // Tool execution functions
-static MCP_RETURN_CODE mcp_tool_list_netdata_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
+static MCP_RETURN_CODE
+mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 
 // Static array of tool definitions
 static const MCP_TOOL_DEF mcp_tools[] = {
     {
-        .name = "list_netdata_metrics",
-        .description = "List available metric contexts and context categories with optional pattern matching",
-        .execute_callback = mcp_tool_list_netdata_metrics_execute,
-        .schema_callback = mcp_tool_list_netdata_metrics_schema,
-        .title = "Metric Contexts and Categories",
+        .name = "metric_contexts",
+        .title = "Primary discovery mechanism for what's being monitored by Netdata.",
+        .description = "Metric Contexts are the equivalent of Charts on Netdata dashboards.\n"
+                       "Contexts are multi-node, multi-instance and multi-dimensional, usually\n"
+                       "aggregating metrics with common/similar labels and dimensions.\n",
+        .execute_callback = mcp_tool_metric_contexts_execute,
+        .schema_callback = mcp_tool_metric_contexts_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
@@ -75,7 +79,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
 };
 
 // Define schema for the list_netdata_metrics tool
-static void mcp_tool_list_netdata_metrics_schema(BUFFER *buffer) {
+static void mcp_tool_metric_contexts_schema(BUFFER *buffer) {
     // Tool input schema
     buffer_json_member_add_object(buffer, "inputSchema");
     buffer_json_member_add_string(buffer, "type", "object");
@@ -98,7 +102,7 @@ static void mcp_tool_list_netdata_metrics_schema(BUFFER *buffer) {
 }
 
 // Implementation of the list_netdata_metrics tool
-static MCP_RETURN_CODE mcp_tool_list_netdata_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+static MCP_RETURN_CODE mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0) return MCP_RC_ERROR;
     
     // Extract the 'like' parameter if present
@@ -111,59 +115,33 @@ static MCP_RETURN_CODE mcp_tool_list_netdata_metrics_execute(MCP_CLIENT *mcpc, s
         }
     }
     
+    CLEAN_BUFFER *t = buffer_create(0, NULL);
+    buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    SIMPLE_PATTERN *pattern = NULL;
+    if(like_pattern && *like_pattern)
+        pattern = simple_pattern_create(like_pattern, "|", SIMPLE_PATTERN_EXACT, false);
+
+    rrdcontext_context_registry_json_mcp_array(t, pattern);
+    buffer_json_finalize(t);
+
     // Initialize success response
     mcp_init_success_result(mcpc, id);
-    
-    // Start building content array for the result
-    buffer_json_member_add_array(mcpc->result, "content");
-    
-    // Build query string for resource URIs
-    char query_param[256] = "";
-    if (like_pattern && *like_pattern) {
-        snprintfz(query_param, sizeof(query_param), "?like=%s", like_pattern);
+    {
+        // Start building content array for the result
+        buffer_json_member_add_array(mcpc->result, "content");
+        {
+            // Instead of returning embedded resources, let's return a text explanation
+            // that will be more compatible with most LLM clients
+            buffer_json_add_array_item_object(mcpc->result);
+            {
+                buffer_json_member_add_string(mcpc->result, "type", "text");
+                buffer_json_member_add_string(mcpc->result, "txt", buffer_tostring(t));
+            }
+            buffer_json_object_close(mcpc->result); // Close text content
+        }
+        buffer_json_array_close(mcpc->result);  // Close content array
     }
-    
-    // Instead of returning embedded resources, let's return a text explanation
-    // that will be more compatible with most LLM clients
-    buffer_json_add_array_item_object(mcpc->result);
-    buffer_json_member_add_string(mcpc->result, "type", "text");
-    
-    // Format an explanatory message with information about both resources
-    char explanation[1024];
-    snprintfz(explanation, sizeof(explanation), 
-              "Available Netdata metrics information:\n\n"
-              "1. Context list - Shows all available metric contexts in the system\n"
-              "   URI: nd://contexts%s\n\n"
-              "2. Context categories - Shows how metrics are organized by category\n"
-              "   URI: nd://context_categories%s\n\n"
-              "These metrics are used to monitor system performance and health.",
-              query_param, query_param);
-    
-    buffer_json_member_add_string(mcpc->result, "text", explanation);
-    buffer_json_object_close(mcpc->result); // Close text content
-    
-    // Still include the resources for clients that support them
-    // Add resource reference for contexts
-    buffer_json_add_array_item_object(mcpc->result);
-    buffer_json_member_add_string(mcpc->result, "type", "resource");
-    buffer_json_member_add_object(mcpc->result, "resource");
-    char contexts_uri[300];
-    snprintfz(contexts_uri, sizeof(contexts_uri), "nd://contexts%s", query_param);
-    buffer_json_member_add_string(mcpc->result, "uri", contexts_uri);
-    buffer_json_object_close(mcpc->result); // Close resource object
-    buffer_json_object_close(mcpc->result); // Close first resource content
-    
-    // Add resource reference for context categories
-    buffer_json_add_array_item_object(mcpc->result);
-    buffer_json_member_add_string(mcpc->result, "type", "resource");
-    buffer_json_member_add_object(mcpc->result, "resource");
-    char categories_uri[300];
-    snprintfz(categories_uri, sizeof(categories_uri), "nd://context_categories%s", query_param);
-    buffer_json_member_add_string(mcpc->result, "uri", categories_uri);
-    buffer_json_object_close(mcpc->result); // Close resource object
-    buffer_json_object_close(mcpc->result); // Close second resource content
-    
-    buffer_json_array_close(mcpc->result); // Close content array
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
     
