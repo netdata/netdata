@@ -2,6 +2,101 @@
 
 #include "websocket-internal.h"
 
+/**
+ * @brief Compresses a message into the client's c_payload buffer
+ * 
+ * This function compresses the given data using the client's deflate stream
+ * and stores the result in the client's c_payload buffer.
+ * 
+ * @param wsc WebSocket client
+ * @param data Data to compress
+ * @param length Length of the data
+ * @return true if compression was successful, false otherwise
+ */
+bool websocket_client_compress_message(WS_CLIENT *wsc, const char *data, size_t length) {
+    if (!wsc || !data || !length || !wsc->compression.enabled || !wsc->compression.deflate_stream)
+        return false;
+        
+    if (length < WS_COMPRESS_MIN_SIZE)
+        return false;  // Too small to benefit from compression
+        
+    // Clear and prepare the compression buffer
+    wsb_reset(&wsc->c_payload);
+    
+    z_stream *zstrm = wsc->compression.deflate_stream;
+    
+    // Calculate maximum possible compressed size
+    uLong max_compressed_size = deflateBound(zstrm, length) + 4;  // +4 for Z_SYNC_FLUSH trailer
+    
+    // Ensure the buffer has enough capacity
+    wsb_need_bytes(&wsc->c_payload, max_compressed_size);
+
+    // Set up the deflate stream
+    zstrm->next_in = (Bytef *)data;
+    zstrm->avail_in = length;
+    zstrm->next_out = (Bytef *)wsb_data(&wsc->c_payload);
+    zstrm->avail_out = wsb_size(&wsc->c_payload);
+    zstrm->total_in = 0;
+    zstrm->total_out = 0;
+    
+    // Compress with sync flush
+    int ret = deflate(zstrm, Z_SYNC_FLUSH);
+    
+    bool success = false;
+    if (ret == Z_STREAM_END || (ret == Z_OK && zstrm->avail_in == 0 && zstrm->avail_out > 0))
+        success = true;
+    else if (ret == Z_OK && zstrm->avail_in == 0 && zstrm->avail_out == 0) {
+        unsigned pending = 0;
+        int bits = 0;
+        if(deflatePending(zstrm, &pending, &bits) == Z_OK &&
+            (pending == 0 && bits == 0))
+            success = true;
+    }
+    
+    uLong total_out = zstrm->total_out;
+    
+    // Reset the stream for future use
+    if (deflateReset(zstrm) != Z_OK) {
+        websocket_error(wsc, "Deflate reset failed");
+        
+        // Clear pointers for safety
+        zstrm->next_in = NULL;
+        zstrm->avail_in = 0;
+        zstrm->next_out = NULL;
+        zstrm->avail_out = 0;
+        zstrm->total_in = 0;
+        zstrm->total_out = 0;
+        
+        return false;
+    }
+    
+    // Clear all pointers for safety
+    zstrm->next_in = NULL;
+    zstrm->avail_in = 0;
+    zstrm->next_out = NULL;
+    zstrm->avail_out = 0;
+    zstrm->total_in = 0;
+    zstrm->total_out = 0;
+    
+    if (!success || total_out <= 4) {
+        // Compression failed or didn't save space
+        websocket_debug(wsc, "Compression not beneficial (in=%zu, out=%lu) - not using compression",
+                     length, total_out);
+        return false;
+    }
+    
+    // As per RFC 7692, remove trailing 4 bytes (00 00 FF FF) from Z_SYNC_FLUSH
+    size_t compressed_size = total_out - 4;
+    
+    // Update the buffer's length
+    wsb_set_length(&wsc->c_payload, compressed_size);
+    
+    websocket_debug(wsc, "Compressed message from %zu to %zu bytes (%.1f%%)",
+                 length, compressed_size, (double)compressed_size * 100.0 / (double)length);
+    
+    return true;
+}
+
 // Initialize compression resources using the parsed options
 bool websocket_compression_init(WS_CLIENT *wsc) {
     internal_fatal(wsc->wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );

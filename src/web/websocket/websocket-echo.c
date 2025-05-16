@@ -22,7 +22,8 @@ void echo_on_message_callback(struct websocket_server_client *wsc, const char *m
                     length);
 
     // Simply echo back the same message with the same opcode
-    websocket_protocol_send_frame(wsc, message, length, opcode, true);
+    // Use send_payload to automatically handle large messages with fragmentation
+    websocket_protocol_send_payload(wsc, message, length, opcode, true);
 }
 
 // Called before sending a close frame to the client

@@ -57,16 +57,28 @@ static inline size_t select_header_size(size_t payload_len) {
         return 10;
 }
 
-// Create and send a WebSocket frame
-int websocket_protocol_send_frame(
+/**
+ * @brief Create and send a WebSocket frame
+ * 
+ * Creates a WebSocket frame with the given payload and sends it.
+ * This function directly creates a frame with the specified FIN and RSV1 bits.
+ * 
+ * @param wsc WebSocket client
+ * @param payload Payload data to send
+ * @param payload_len Length of the payload
+ * @param opcode WebSocket opcode (text, binary, continuation, etc.)
+ * @param compressed Whether the payload is already compressed (RSV1 bit)
+ * @param final Whether this is the final frame in a message (FIN bit)
+ * @return Number of bytes sent or -1 on error
+ */
+static int websocket_protocol_send_frame(
     WS_CLIENT *wsc, const char *payload, size_t payload_len,
-    WEBSOCKET_OPCODE opcode, bool use_compression) {
+    WEBSOCKET_OPCODE opcode, bool compressed, bool final) {
 
     if(!wsc)
         return -1;
 
     const char *disconnect_msg = "";
-    z_stream *zstrm = wsc->compression.deflate_stream;
 
     if (wsc->sock.fd < 0) {
         disconnect_msg = "Client not connected";
@@ -79,35 +91,30 @@ int websocket_protocol_send_frame(
         goto abnormal_disconnect;
     }
     
-    // Check if we should actually use compression
-    bool compress = !websocket_frame_is_control_opcode(opcode) &&
-                    use_compression &&
-                    payload && payload_len &&
-                    wsc->compression.enabled &&
-                    zstrm &&
-                    payload_len >= WS_COMPRESS_MIN_SIZE;
-
-    // Calculate maximum possible compressed size using deflateBound
-    size_t max_compressed_size = payload_len;
-    if (compress) {
-        // Use deflateBound to accurately calculate maximum possible size
-        max_compressed_size = deflateBound(zstrm, payload_len);
-
-        // Add 4 bytes for Z_SYNC_FLUSH trailer (will be removed later)
-        max_compressed_size += 4;
-
-        // Ensure the destination can fit the uncompressed data too
-        max_compressed_size = MAX(payload_len, max_compressed_size);
+    // Control frames must not be fragmented
+    if (websocket_frame_is_control_opcode(opcode) && !final) {
+        disconnect_msg = "Control frames cannot be fragmented";
+        goto abnormal_disconnect;
     }
+    
+    // Control frames cannot be compressed
+    if (websocket_frame_is_control_opcode(opcode) && compressed) {
+        disconnect_msg = "Control frames cannot be compressed";
+        goto abnormal_disconnect;
+    }
+    
+    // For compressed payloads, we already did the compression outside this function
+    // so we don't need to compress again, just use the provided payload directly
+    size_t final_payload_len = payload_len;
 
-    // Determine header size based on maximum potential size
-    size_t header_size = select_header_size(max_compressed_size);
+    // Determine header size based on payload length
+    size_t header_size = select_header_size(final_payload_len);
 
-    // Calculate maximum potential frame size
-    size_t max_frame_size = header_size + max_compressed_size;
+    // Calculate frame size
+    size_t frame_size = header_size + final_payload_len;
 
     // Reserve space in the circular buffer for the entire frame
-    unsigned char *header_dst = (unsigned char *)cbuffer_reserve_unsafe(&wsc->out_buffer, max_frame_size);
+    unsigned char *header_dst = (unsigned char *)cbuffer_reserve_unsafe(&wsc->out_buffer, frame_size);
     if (!header_dst) {
         disconnect_msg = "Buffer full - too much outgoing data";
         goto abnormal_disconnect;
@@ -115,89 +122,17 @@ int websocket_protocol_send_frame(
 
     // The payload will be written directly after the header in our reserved buffer
     char *payload_dst = (char *)(header_dst + header_size);
-    size_t final_payload_len = 0;
 
-    if (compress) {
-        // Setup temporary parameters for the compressor to use
-        // We'll use the space after our header for the compressed data
-        zstrm->next_in = (Bytef *)payload;
-        zstrm->avail_in = payload_len;
-        zstrm->next_out = (Bytef *)payload_dst;
-        zstrm->avail_out = max_compressed_size;
-        zstrm->total_in = 0;
-        zstrm->total_out = 0;
-
-        // Compress with sync flush to ensure data is flushed
-        int ret = deflate(zstrm, Z_SYNC_FLUSH);
-
-        bool success = false;
-        if (ret == Z_STREAM_END || (ret == Z_OK && zstrm->avail_in == 0 && zstrm->avail_out > 0))
-            success = true;
-        else if (ret == Z_OK && zstrm->avail_in == 0 && zstrm->avail_out == 0) {
-            unsigned pending = Z_NULL;
-            int bits = Z_NULL;
-            if(deflatePending(zstrm, &pending, &bits) == Z_OK &&
-                (pending == Z_NULL && bits == Z_NULL))
-                success = true;
-        }
-
-        uInt avail_in = zstrm->avail_in;
-        uInt avail_out = zstrm->avail_out;
-        uLong total_in = zstrm->total_in;
-        uLong total_out = zstrm->total_out;
-
-        // we are done - reset the stream to avoid heap-use-after-free issues later
-        if (deflateReset(zstrm) != Z_OK) {
-            disconnect_msg = "Deflate reset failed";
-            goto abnormal_disconnect;
-        }
-
-        // Calculate compressed size if successful
-        if (!success || total_out <= 4) {
-            // Compression failed
-            websocket_error(wsc, "Compression failed: %s "
-                                 "(ret = %d, avail_in = %u, avail_out = %u, total_in = %lu, total_out = %lu) - "
-                                 "sending uncompressed payload",
-                            zError(ret), ret, avail_in, avail_out, total_in, total_out);
-            compress = false;
-        }
-        else {
-            // As per RFC 7692, remove trailing 4 bytes (00 00 FF FF) from Z_SYNC_FLUSH
-            final_payload_len = max_compressed_size - avail_out - 4;
-
-            websocket_debug(wsc, "Compressed payload from %zu to %zu bytes (%.1f%%)",
-                            payload_len, final_payload_len,
-                            (double)final_payload_len * 100.0 / (double)payload_len);
-
-            // we may have selected a bigger header size than needed
-            // so we need to move the payload to the right place
-            size_t optimal_header_size = select_header_size(final_payload_len);
-            if(optimal_header_size < header_size) {
-                char *dst = (char *)header_dst + optimal_header_size;
-                char *src = payload_dst;
-                memmove(dst, src, final_payload_len);
-                payload_dst = dst;
-                header_size = optimal_header_size;
-            }
-        }
-
-        // ensure all pointer values are NULL, so that there is no trace back to this compression
-        zstrm->next_in = NULL;
-        zstrm->avail_in = 0;
-        zstrm->next_out = NULL;
-        zstrm->avail_out = 0;
-        zstrm->total_in = 0;
-        zstrm->total_out = 0;
-    }
-
-    if(!compress && payload && payload_len > 0) {
+    // Copy payload data to our buffer
+    if (payload && payload_len > 0) {
         memcpy(payload_dst, payload, payload_len);
-        final_payload_len = payload_len;
     }
 
     // Write the header
-    // First byte: FIN(1) + RSV1(compress) + RSV2(0) + RSV3(0) + OPCODE(4)
-    header_dst[0] = 0x80 | (compress ? 0x40 : 0) | (opcode & 0x0F);
+    // First byte: FIN bit, RSV1 bit (compression), and opcode
+    // Only set FIN bit if this is the final frame
+    // Only set RSV1 if this frame uses compression
+    header_dst[0] = (final ? 0x80 : 0) | (compressed ? 0x40 : 0) | (opcode & 0x0F);
 
     // Write payload length with the appropriate format
     switch(header_size) {
@@ -242,9 +177,11 @@ int websocket_protocol_send_frame(
     }
 
     websocket_debug(wsc,
-                    "TX FRAME: OPCODE=0x%x, FIN=%s, RSV1=%d, RSV2=%d, RSV3=%d, MASK=%s, LEN=%d, "
+                    "TX FRAME: OPCODE=0x%x (%s), FIN=%s, RSV1=%d, RSV2=%d, RSV3=%d, MASK=%s, LEN=%d, "
                     "PAYLOAD_LEN=%zu, HEADER_SIZE=%zu, FRAME_SIZE=%zu, MASK=%02x%02x%02x%02x",
-                    header.opcode, header.fin ? "True" : "False", header.rsv1, header.rsv2, header.rsv3,
+                    header.opcode,
+                    WEBSOCKET_OPCODE_2str(opcode),
+                    header.fin ? "True" : "False", header.rsv1, header.rsv2, header.rsv3,
                     header.mask ? "True" : "False", header.len,
                     header.payload_length, header.header_size, header.frame_size,
                     header.mask_key[0], header.mask_key[1], header.mask_key[2], header.mask_key[3]);
@@ -267,19 +204,114 @@ abnormal_disconnect:
 //    return -1;
 }
 
-// Send a text message
+/**
+ * @brief Send a potentially large payload with automatic fragmentation
+ * 
+ * This function handles large message fragmentation to ensure browser compatibility.
+ * It compresses the message if requested and then splits it into fragments
+ * that are smaller than WS_MAX_OUTGOING_FRAME_SIZE.
+ * 
+ * @param wsc WebSocket client
+ * @param payload Payload data to send
+ * @param payload_len Length of the payload
+ * @param opcode WebSocket opcode (text, binary)
+ * @param use_compression Whether to attempt compression
+ * @return Total number of bytes sent or -1 on error
+ */
+int websocket_protocol_send_payload(
+    WS_CLIENT *wsc, const char *payload, size_t payload_len,
+    WEBSOCKET_OPCODE opcode, bool use_compression) {
+    
+    if (!wsc || wsc->sock.fd < 0)
+        return -1;
+    
+    // Control frames should never use this function as they can't be fragmented
+    if (websocket_frame_is_control_opcode(opcode) || !payload || !payload_len) {
+        return websocket_protocol_send_frame(wsc, payload, payload_len, opcode, false, true);
+    }
+    
+    // Attempt compression if requested and conditions are met
+    bool compressed = false;
+    const char *data_to_send = payload;
+    size_t data_len = payload_len;
+    
+    if (use_compression) {
+        compressed = websocket_client_compress_message(wsc, payload, payload_len);
+        if (compressed) {
+            data_to_send = wsb_data(&wsc->c_payload);
+            data_len = wsb_length(&wsc->c_payload);
+            
+            websocket_debug(wsc, "Using compressed payload for transmission (%zu -> %zu bytes)",
+                           payload_len, data_len);
+        }
+    }
+    
+    // Check if we need to fragment the message
+    if (data_len <= wsc->max_outbound_frame_size) {
+        // Small enough to send in a single frame
+        return websocket_protocol_send_frame(wsc, data_to_send, data_len, opcode, compressed, true);
+    }
+    
+    // We need to fragment the message
+    websocket_debug(wsc, "Fragmenting large message (%zu bytes) into frames of max %zu bytes",
+                   data_len, wsc->max_outbound_frame_size);
+    
+    size_t total_sent = 0;
+    size_t bytes_remaining = data_len;
+    size_t offset = 0;
+    bool first_frame = true;
+    
+    // Send fragments
+    while (bytes_remaining > 0) {
+        // Determine size for this fragment
+        size_t fragment_size = MIN(bytes_remaining, wsc->max_outbound_frame_size);
+        bool is_final = (fragment_size == bytes_remaining);
+        
+        // First frame uses original opcode, subsequent frames use continuation
+        WEBSOCKET_OPCODE frame_opcode = first_frame ? opcode : WS_OPCODE_CONTINUATION;
+        
+        // Compression flag is only set on the first frame
+        bool frame_compressed = compressed && first_frame;
+        
+        // Send this fragment
+        int result = websocket_protocol_send_frame(
+            wsc, 
+            data_to_send + offset, 
+            fragment_size, 
+            frame_opcode, 
+            frame_compressed,
+            is_final
+        );
+        
+        if (result < 0) {
+            // Failed to send frame
+            websocket_error(wsc, "Failed to send message fragment at offset %zu", offset);
+            return -1;
+        }
+        
+        // Update counters for next iteration
+        total_sent += result;
+        offset += fragment_size;
+        bytes_remaining -= fragment_size;
+        first_frame = false;
+    }
+    
+    websocket_debug(wsc, "Successfully sent fragmented message in multiple frames, total bytes: %zu", total_sent);
+    return total_sent;
+}
+
+/**
+ * @brief Send a text message with automatic fragmentation
+ * 
+ * This function sends a WebSocket text message with automatic compression and fragmentation.
+ * 
+ * @param wsc WebSocket client
+ * @param text Text to send
+ * @return Number of bytes sent or -1 on error
+ */
 int websocket_protocol_send_text(WS_CLIENT *wsc, const char *text) {
     if (!wsc)
         return -1;
-
-    // Special handling for null or empty text message
-    if (!text || text[0] == '\0') {
-        websocket_debug(wsc, "Sending empty text message");
-
-        // Use an empty buffer for zero-length text messages
-        static const char empty_data[1] = {0};
-        return websocket_protocol_send_frame(wsc, empty_data, 0, WS_OPCODE_TEXT, false);
-    }
 
     size_t text_len = strlen(text);
 
@@ -288,30 +320,31 @@ int websocket_protocol_send_text(WS_CLIENT *wsc, const char *text) {
     // Dump text message for debugging
     websocket_dump_debug(wsc, text, text_len, "TX TEXT MSG");
 
-    // Enable compression for text messages by default
-    return websocket_protocol_send_frame(wsc, text, text_len, WS_OPCODE_TEXT, true);
+    // Enable compression for text messages by default, with automatic fragmentation
+    return websocket_protocol_send_payload(wsc, text, text_len, WS_OPCODE_TEXT, true);
 }
 
-// Send a binary message
+/**
+ * @brief Send a binary message with automatic fragmentation
+ * 
+ * This function sends a WebSocket binary message with automatic compression and fragmentation.
+ * 
+ * @param wsc WebSocket client
+ * @param data Binary data to send
+ * @param length Length of the binary data
+ * @return Number of bytes sent or -1 on error
+ */
 int websocket_protocol_send_binary(WS_CLIENT *wsc, const void *data, size_t length) {
     if (!wsc)
         return -1;
-
-    // Special handling for empty binary message
-    if (!data || length == 0) {
-        websocket_debug(wsc, "Sending empty binary message");
-
-        // Use an empty buffer for zero-length binary messages
-        static const char empty_data[1] = {0};
-        return websocket_protocol_send_frame(wsc, empty_data, 0, WS_OPCODE_BINARY, false);
-    }
 
     websocket_debug(wsc, "Sending binary message, length=%zu", length);
 
     // Dump binary message for debugging
     websocket_dump_debug(wsc, data, length, "TX BIN MSG");
 
-    return websocket_protocol_send_frame(wsc, data, length, WS_OPCODE_BINARY, true);
+    // Enable compression for binary messages by default, with automatic fragmentation
+    return websocket_protocol_send_payload(wsc, data, length, WS_OPCODE_BINARY, true);
 }
 
 // Send a close frame
@@ -360,8 +393,8 @@ int websocket_protocol_send_close(WS_CLIENT *wsc, WEBSOCKET_CLOSE_CODE code, con
     if(wsc->on_close)
         wsc->on_close(wsc, WS_CLOSE_GOING_AWAY, reason);
 
-    // Send close frame (never compressed)
-    int result = websocket_protocol_send_frame(wsc, payload, payload_len, WS_OPCODE_CLOSE, false);
+    // Send close frame (never compressed, always final)
+    int result = websocket_protocol_send_frame(wsc, payload, payload_len, WS_OPCODE_CLOSE, false, true);
 
     return result;
 }
@@ -384,8 +417,8 @@ int websocket_protocol_send_ping(WS_CLIENT *wsc, const char *data, size_t length
         length = 0;
     }
     
-    // Send ping frame (never compressed)
-    return websocket_protocol_send_frame(wsc, data, length, WS_OPCODE_PING, false);
+    // Send ping frame (never compressed, always final)
+    return websocket_protocol_send_frame(wsc, data, length, WS_OPCODE_PING, false, true);
 }
 
 // Send a pong frame
@@ -406,6 +439,6 @@ int websocket_protocol_send_pong(WS_CLIENT *wsc, const char *data, size_t length
         length = 0;
     }
     
-    // Send pong frame (never compressed)
-    return websocket_protocol_send_frame(wsc, data, length, WS_OPCODE_PONG, false);
+    // Send pong frame (never compressed, always final)
+    return websocket_protocol_send_frame(wsc, data, length, WS_OPCODE_PONG, false, true);
 }
