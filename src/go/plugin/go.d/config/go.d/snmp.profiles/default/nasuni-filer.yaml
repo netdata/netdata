@@ -353,80 +353,80 @@ metrics:
         name: nasuni.volumeTableNumFtpdirs
         description: Number of FTP directories in volume table
         unit: "{directory}"
-#  metric_tags:
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.2
-#        name: volumeTableDescription
-#      tag: volume_table_description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.3
-#        name: volumeTableProvider
-#      tag: volume_table_provider
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.4
-#        name: volumeTableProtocol
-#      tag: volume_table_protocol
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.12
-#        name: volumeTableIsActive
-#      tag: volume_table_is_active
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.13
-#        name: volumeTableIsShared
-#      tag: volume_table_is_shared
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.14
-#        name: volumeTableIsReadOnly
-#      tag: volume_table_is_read_only
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.15
-#        name: volumeTableIsPinned
-#      tag: volume_table_is_pinned
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.16
-#        name: volumeTableIsRemote
-#      tag: volume_table_is_remote
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.17
-#        name: volumeTableAvEnabled
-#      tag: volume_table_av_enabled
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.18
-#        name: volumeTableRemoteAccessEnabled
-#      tag: volume_table_remote_access_enabled
-#      mapping:
-#        0: 'false'
-#        1: 'true'
-#        # mapping in the metric description
-#    - symbol:
-#        OID: 1.3.6.1.4.1.42040.2.2.1.5
-#        name: volumeTableStatus
-#      tag: volume_table_status
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.2
+          name: volumeTableDescription
+        tag: volume_table_description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.3
+          name: volumeTableProvider
+        tag: volume_table_provider
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.4
+          name: volumeTableProtocol
+        tag: volume_table_protocol
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.12
+          name: volumeTableIsActive
+        tag: volume_table_is_active
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.13
+          name: volumeTableIsShared
+        tag: volume_table_is_shared
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.14
+          name: volumeTableIsReadOnly
+        tag: volume_table_is_read_only
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.15
+          name: volumeTableIsPinned
+        tag: volume_table_is_pinned
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.16
+          name: volumeTableIsRemote
+        tag: volume_table_is_remote
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.17
+          name: volumeTableAvEnabled
+        tag: volume_table_av_enabled
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.18
+          name: volumeTableRemoteAccessEnabled
+        tag: volume_table_remote_access_enabled
+        mapping:
+          0: 'false'
+          1: 'true'
+          # mapping in the metric description
+      - symbol:
+          OID: 1.3.6.1.4.1.42040.2.2.1.5
+          name: volumeTableStatus
+        tag: volume_table_status
 metric_tags:
   - OID: 1.3.6.1.4.1.42040.1.1.0
     symbol: filerIdentifier

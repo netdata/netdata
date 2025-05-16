@@ -99,31 +99,31 @@ metrics:
         OID: 1.3.6.1.4.1.6574.2.1.1.6
         description: The temperature of each disk uses Celsius degree
         unit: "Cel"
-#    metric_tags:
-#      - symbol:
-#          name: synology.diskID
-#          OID: 1.3.6.1.4.1.6574.2.1.1.2
-#        tag: synology_disk_id
-#      - symbol:
-#          name: synology.diskModel
-#          OID: 1.3.6.1.4.1.6574.2.1.1.3
-#        tag: synology_disk_model
-#      - symbol:
-#          name: synology.diskType
-#          OID: 1.3.6.1.4.1.6574.2.1.1.4
-#        tag: synology_disk_type
-#      - symbol:
-#          OID: 1.3.6.1.4.1.6574.2.1.1.5
-#          name: synology.diskStatus
-#        tag: synology_disk_status
-#        mapping:
-#          1: normal
-#          2: initialized
-#          3: not_initialized
-#          4: system_partition_failed
-#          5: crashed
-#          # mapping in the metric description
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: synology.diskID
+          OID: 1.3.6.1.4.1.6574.2.1.1.2
+        tag: synology_disk_id
+      - symbol:
+          name: synology.diskModel
+          OID: 1.3.6.1.4.1.6574.2.1.1.3
+        tag: synology_disk_model
+      - symbol:
+          name: synology.diskType
+          OID: 1.3.6.1.4.1.6574.2.1.1.4
+        tag: synology_disk_type
+      - symbol:
+          OID: 1.3.6.1.4.1.6574.2.1.1.5
+          name: synology.diskStatus
+        tag: synology_disk_status
+        mapping:
+          1: normal
+          2: initialized
+          3: not_initialized
+          4: system_partition_failed
+          5: crashed
+          # mapping in the metric description
   - MIB: SYNOLOGY-RAID-MIB
     table:
       name: raidTable
@@ -139,39 +139,39 @@ metrics:
         metric_type: monotonic_count
         description: The total size of raid
         unit: "By"
-#    metric_tags:
-#      - symbol:
-#          name: synology.raid.raidName
-#          OID: 1.3.6.1.4.1.6574.3.1.1.2
-#        tag: synology_raid_name
-#      - symbol:
-#          OID: 1.3.6.1.4.1.6574.3.1.1.3
-#          name: synology.raid.raidStatus
-#        tag: synology_raid_status
-#        mapping:
-#          1: normal
-#          2: repairing
-#          3: migrating
-#          4: expanding
-#          5: deleting
-#          6: creating
-#          7: raid_syncing
-#          8: raid_parity_checking
-#          9: raid_assembling
-#          10: canceling
-#          11: degrade
-#          12: crashed
-#          13: data_scrubbing
-#          14: raid_deploying
-#          15: raid_un_deploying
-#          16: raid_mount_cache
-#          17: raid_unmount_cache
-#          18: raid_expanding_unfinished_shr
-#          19: raid_convert_shr_to_pool
-#          20: raid_migrate_shr1_to_shr2
-#          21: raid_unknown_status
-#          # full list of mappings here https://global.download.synology.com/download/Document/Software/DeveloperGuide/Firmware/DSM/All/enu/Synology_DiskStation_MIB_Guide.pdf
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: synology.raid.raidName
+          OID: 1.3.6.1.4.1.6574.3.1.1.2
+        tag: synology_raid_name
+      - symbol:
+          OID: 1.3.6.1.4.1.6574.3.1.1.3
+          name: synology.raid.raidStatus
+        tag: synology_raid_status
+        mapping:
+          1: normal
+          2: repairing
+          3: migrating
+          4: expanding
+          5: deleting
+          6: creating
+          7: raid_syncing
+          8: raid_parity_checking
+          9: raid_assembling
+          10: canceling
+          11: degrade
+          12: crashed
+          13: data_scrubbing
+          14: raid_deploying
+          15: raid_un_deploying
+          16: raid_mount_cache
+          17: raid_unmount_cache
+          18: raid_expanding_unfinished_shr
+          19: raid_convert_shr_to_pool
+          20: raid_migrate_shr1_to_shr2
+          21: raid_unknown_status
+          # full list of mappings here https://global.download.synology.com/download/Document/Software/DeveloperGuide/Firmware/DSM/All/enu/Synology_DiskStation_MIB_Guide.pdf
   - MIB: SYNOLOGY-SMART-MIB
     table:
       name: diskSMARTTable
@@ -185,24 +185,24 @@ metrics:
         OID: 1.3.6.1.4.1.6574.5.1.1.7
         description: SMART attribute threshold value
         unit: "1"
-#    metric_tags:
-#      - symbol:
-#          name: synology.diskSMARTInfoDevName
-#          OID: 1.3.6.1.4.1.6574.5.1.1.2
-#        tag: synology_disk_smart_info_dev_name
-#      - symbol:
-#          name: synology.diskSMARTAttrName
-#          OID: 1.3.6.1.4.1.6574.5.1.1.3
-#        tag: synology_disk_smart_attr_name
-#      - symbol:
-#          name: synology.diskSMARTAttrId
-#          OID: 1.3.6.1.4.1.6574.5.1.1.4
-#        tag: synology_disk_smart_attr_id
-#      - symbol:
-#          OID: 1.3.6.1.4.1.6574.5.1.1.9
-#          name: synology.diskSMARTAttrStatus
-#        tag: synology_disk_smart_attr_status
-# TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: synology.diskSMARTInfoDevName
+          OID: 1.3.6.1.4.1.6574.5.1.1.2
+        tag: synology_disk_smart_info_dev_name
+      - symbol:
+          name: synology.diskSMARTAttrName
+          OID: 1.3.6.1.4.1.6574.5.1.1.3
+        tag: synology_disk_smart_attr_name
+      - symbol:
+          name: synology.diskSMARTAttrId
+          OID: 1.3.6.1.4.1.6574.5.1.1.4
+        tag: synology_disk_smart_attr_id
+      - symbol:
+          OID: 1.3.6.1.4.1.6574.5.1.1.9
+          name: synology.diskSMARTAttrStatus
+        tag: synology_disk_smart_attr_status
   - MIB: SYNOLOGY-SERVICES-MIB
     table:
       name: serviceTable

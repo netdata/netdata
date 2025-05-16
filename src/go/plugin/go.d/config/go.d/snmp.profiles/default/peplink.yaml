@@ -55,19 +55,19 @@ metrics:
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.5
         description: Device psu percentage
         unit: "%"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.1
-    #       name: devicePSUId
-    #     tag: device_psu_id
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.2
-    #       name: devicePSUStatus
-    #     tag: device_psu_status
-    #     mapping:
-    #       0: error
-    #       1: on
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.1
+          name: devicePSUId
+        tag: device_psu_id
+      - symbol:
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.1.1.2
+          name: devicePSUStatus
+        tag: device_psu_status
+        mapping:
+          0: error
+          1: on
   - MIB: PEPLINK-DEVICE
     table:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2
@@ -77,19 +77,19 @@ metrics:
         OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.3
         description: Device fan speed
         unit: "1.s"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.1
-    #       name: deviceFanId
-    #     tag: device_fan_id
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.2
-    #       name: deviceFanStatus
-    #     tag: device_fan_status
-    #     mapping:
-    #       0: error
-    #       1: on
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.1
+          name: deviceFanId
+        tag: device_fan_id
+      - symbol:
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.2.1.2
+          name: deviceFanStatus
+        tag: device_fan_status
+        mapping:
+          0: error
+          1: on
   - MIB: PEPLINK-DEVICE
     table:
       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3
@@ -99,23 +99,23 @@ metrics:
         constant_value_one: true
         description: Device power source
         unit: "{power_source}"
-    # TODO: Commented out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    # metric_tags:
-    #   - symbol:
-    #       name: devicePowerSourceId
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.1
-    #     tag: device_power_source_id
-    #   - symbol:
-    #       name: devicePowerSourceName
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.2
-    #     tag: device_power_source_name
-    #   - symbol:
-    #       OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.3
-    #       name: devicePowerSourceStatus
-    #     tag: device_power_source_status
-    #     mapping:
-    #       0: no_cable_detected
-    #       1: connected
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+    metric_tags:
+      - symbol:
+          name: devicePowerSourceId
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.1
+        tag: device_power_source_id
+      - symbol:
+          name: devicePowerSourceName
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.2
+        tag: device_power_source_name
+      - symbol:
+          OID: 1.3.6.1.4.1.23695.200.1.1.1.4.3.1.3
+          name: devicePowerSourceStatus
+        tag: device_power_source_status
+        mapping:
+          0: no_cable_detected
+          1: connected
   # - MIB: PEPLINK-BALANCE-MIB # TODO: Handle string for "up"/"down"
   #   symbol:
   #     name: peplink.balLanStatus
