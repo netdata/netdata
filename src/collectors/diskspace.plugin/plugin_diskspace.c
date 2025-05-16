@@ -873,7 +873,7 @@ void *diskspace_main(void *ptr) {
 
     diskspace_slow_thread = nd_thread_create(
         "P[diskspace slow]",
-        NETDATA_THREAD_OPTION_JOINABLE,
+        NETDATA_THREAD_OPTION_DEFAULT,
         diskspace_slow_worker,
         &slow_worker_data);
 

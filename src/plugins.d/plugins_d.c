@@ -400,7 +400,7 @@ void *pluginsd_main(void *ptr) {
                         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PD[%s]", pluginname);
 
                         // spawn a new thread for it
-                        cd->unsafe.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+                        cd->unsafe.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
                                                              pluginsd_worker_thread, cd);
                     }
                 }

@@ -32,6 +32,7 @@ metrics:
         name: netgear.readynasos.diskTemperature
         description: Disk temperature
         unit: "Cel"
+        # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: netgear_readynasos_disk_id
         symbol:
@@ -123,6 +124,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.4526.22.7.1.2
           name: netgear.readynasos.volumeName
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.4526.22.7.1.4
           name: netgear.readynasos.volumeStatus
@@ -149,6 +151,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.4526.22.8.1.2
           name: netgear.readynasos.psuDesc
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.4526.22.8.1.3
           name: netgear.readynasos.psuStatus

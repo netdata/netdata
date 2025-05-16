@@ -20,6 +20,7 @@ metrics:
     symbols:
       - name: cucsComputeBoard
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsComputeBoardDn
@@ -283,6 +284,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.49
         description: "Total memory"
         unit: "By"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsComputeRackUnitDn
@@ -555,6 +557,7 @@ metrics:
     symbols:
       - name: cucsEquipmentFan
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsEquipmentFanDn
@@ -718,6 +721,7 @@ metrics:
     symbols:
       - name: cucsEquipmentPsu
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsEquipmentPsuDn
@@ -891,6 +895,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.6
         description: "Capacity of the memory unit"
         unit: "By"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsMemoryUnitDn
@@ -1109,6 +1114,7 @@ metrics:
     symbols:
       - name: cucsProcessorUnit
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsProcessorUnitDn
@@ -1317,6 +1323,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.26
         description: "Write io error count"
         unit: "{error}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsStorageFlexFlashCardDn
@@ -1481,6 +1488,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.18
         description: "Size of the flex flash drive"
         unit: "By"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsStorageFlexFlashDriveDn

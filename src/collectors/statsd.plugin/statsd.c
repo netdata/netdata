@@ -234,7 +234,7 @@ typedef struct statsd_app {
 
 struct collection_thread_status {
     SPINLOCK spinlock;
-    bool running;
+    bool initializing;
     uint32_t max_sockets;
 
     ND_THREAD *thread;
@@ -1083,10 +1083,6 @@ void statsd_collector_thread_cleanup(void *pptr) {
     struct statsd_udp *d = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!d) return;
 
-    spinlock_lock(&d->status->spinlock);
-    d->status->running = false;
-    spinlock_unlock(&d->status->spinlock);
-
 #ifdef HAVE_RECVMMSG
     size_t i;
     for (i = 0; i < d->size; i++)
@@ -1107,7 +1103,7 @@ static bool statsd_should_stop(void) {
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
     spinlock_lock(&status->spinlock);
-    status->running = true;
+    status->initializing = false;
     spinlock_unlock(&status->spinlock);
 
     worker_register("STATSD");
@@ -2402,17 +2398,18 @@ static void statsd_main_cleanup(void *pptr) {
     if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
-            spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+            bool initializing;
+            do {
+                spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+                initializing = statsd.collection_threads_status[i].initializing;
+                spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
+                if (unlikely(initializing))
+                    sleep_usec(1000);
+            } while(initializing);
 
-            if(statsd.collection_threads_status[i].running) {
-                collector_info("STATSD: signalling data collection thread %d to stop...", i + 1);
-                nd_thread_signal_cancel(statsd.collection_threads_status[i].thread);
-            }
-            else
-                collector_info("STATSD: data collection thread %d found stopped.", i + 1);
-
-            spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
+            (void) nd_thread_join(statsd.collection_threads_status[i].thread);
         }
+        freez(statsd.collection_threads_status);
     }
 
     collector_info("STATSD: closing sockets...");
@@ -2613,7 +2610,8 @@ void *statsd_main(void *ptr) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
         spinlock_init(&statsd.collection_threads_status[i].spinlock);
-        statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+        statsd.collection_threads_status[i].initializing = true;
+        statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
                                                                       statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 

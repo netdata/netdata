@@ -1532,7 +1532,7 @@ void *ebpf_dcstat_thread(void *ptr)
     pthread_mutex_unlock(&lock);
 
     ebpf_read_dcstat.thread =
-        nd_thread_create(ebpf_read_dcstat.name, NETDATA_THREAD_OPTION_JOINABLE, ebpf_read_dcstat_thread, em);
+        nd_thread_create(ebpf_read_dcstat.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_dcstat_thread, em);
 
     dcstat_collector(em);
 

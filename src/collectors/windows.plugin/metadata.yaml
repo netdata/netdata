@@ -203,6 +203,12 @@ modules:
               dimensions:
                 - name: paged
                 - name: pool-paged
+            - name: mem.system_page_table_entries
+              description: Unused page table entries.
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: free
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibProcesses
@@ -298,6 +304,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: switches
+            - name: system.processor_queue_length
+              description: The number of threads in the processor queue.
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibStorage
@@ -1609,34 +1621,123 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all of the metrics, no further configuration is required.
+            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+
+            - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
+            - Configure a database connection (see Setup → Configuration → Examples).
         limits:
           description: ""
         performance_impact:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Configure SQL Server for Monitoring
+            description: |
+              1. **Create Monitoring User**
+              
+                 Create an SQL Server user with the necessary permissions to collect monitoring data:
+                 
+                 ```tsql
+                 USE master;
+                 CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
+                 CREATE USER netdata_user FOR LOGIN netdata_user;
+                 GRANT CONNECT SQL TO netdata_user;
+                 GRANT VIEW SERVER STATE TO netdata_user;
+                 GO
+                 ```
+              
+              2. **Enable Query Store**
+              
+                 Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
+                 
+                 ```tsql
+                 DECLARE @dbname NVARCHAR(max)
+                 DECLARE nd_user_cursor CURSOR FOR SELECT name
+                                     FROM master.dbo.sysdatabases
+                                     WHERE name NOT IN ('master', 'tempdb')
+                 
+                 OPEN nd_user_cursor
+                 FETCH NEXT FROM nd_user_cursor INTO @dbname
+                 WHILE @@FETCH_STATUS = 0
+                 BEGIN
+                   EXECUTE ("USE "+ @dbname+"; CREATE USER netdata_user FOR LOGIN netdata_user; ALTER DATABASE "+@dbname+" SET QUERY_STORE = ON ( QUERY_CAPTURE_MODE = ALL, DATA_FLUSH_INTERVAL_SECONDS               =    900 )");
+                   FETCH next FROM nd_user_cursor INTO @dbname;
+                 END
+                 CLOSE nd_user_cursor
+                 DEALLOCATE nd_user_cursor
+                 GO
+                 ```
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows]"
+          section_name: "[plugin:windows:PerflibMSSQL]"
           description: "The Netdata main configuration file"
         options:
-          description: ""
+          description: "These options allow the collector to connect to your MSSQL instance and collect transaction data from it."
           folding:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibMSSQL
-              description: An option to enable or disable the data collection.
-              default_value: yes
+            - name: driver
+              description: ODBC driver used to connect to the SQL Server.
+              default_value: SQL Server
+              required: false
+            - name: server
+              description: Server address or instance name.
+              default_value: empty
+              required: true
+            - name: address
+              description: Alternative to `server`; supports named pipes if the server supports them.
+              default_value: empty
+              required: true
+            - name: uid
+              description: SQL Server user identifier.
+              default_value: empty
+              required: true
+            - name: pwd
+              description: Password for the specified user.
+              default_value: empty
+              required: true
+            - name: additional instances
+              description: Number of additional SQL Server instances to monitor.
+              default_value: 0
+              required: false
+            - name: windows authentication
+              description: Set to yes to use Windows credentials instead of SQL Server authentication.
+              default_value: no
               required: false
         examples:
           folding:
             enabled: true
             title: ""
-          list: []
+          list:
+            - name: Single Instance
+              description: An example configuration with one instance.
+              folding:
+                enabled: false
+              config: |
+                [plugin:windows:PerflibMSSQL]
+                   driver = SQL Server
+                   server = 127.0.0.1\\Dev, 1433
+                   uid = netdata_user
+                   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+            - name: Multiple Instances
+              description: An example configuration with two instances.
+              folding:
+                enabled: false
+              config: |
+                [plugin:windows:PerflibMSSQL]
+                  driver = SQL Server
+                  server = 127.0.0.1\\Dev, 1433
+                  uid = netdata_user
+                  pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+                  additional instances = 1
+                [plugin:windows:PerflibMSSQL1]
+                  driver = SQL Server
+                  server = 127.0.0.1\\Production, 1434
+                  uid = netdata_user
+                  pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
     troubleshooting:
       problems:
         list: []

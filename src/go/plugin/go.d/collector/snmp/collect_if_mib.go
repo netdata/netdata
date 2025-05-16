@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -82,7 +83,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfIndex:
 			iface.ifIndex, err = pduToInt(pdu)
 		case oidIfDescr:
-			iface.ifDescr, err = pduToString(pdu)
+			iface.ifDescr, err = snmpsd.PduToString(pdu)
 		case oidIfType:
 			iface.ifType, err = pduToInt(pdu)
 		case oidIfMtu:
@@ -116,7 +117,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfOutErrors:
 			iface.ifOutErrors, err = pduToInt(pdu)
 		case oidIfName:
-			iface.ifName, err = pduToString(pdu)
+			iface.ifName, err = snmpsd.PduToString(pdu)
 		case oidIfInMulticastPkts:
 			iface.ifInMulticastPkts, err = pduToInt(pdu)
 		case oidIfInBroadcastPkts:
@@ -144,7 +145,7 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		case oidIfHighSpeed:
 			iface.ifHighSpeed, err = pduToInt(pdu)
 		case oidIfAlias:
-			iface.ifAlias, err = pduToString(pdu)
+			iface.ifAlias, err = snmpsd.PduToString(pdu)
 		default:
 			continue
 		}
@@ -158,6 +159,9 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 	}
 
 	for _, iface := range c.netInterfaces {
+		if iface.ifName == "" {
+			iface.ifName = iface.ifDescr
+		}
 		if iface.ifName == "" {
 			continue
 		}
@@ -180,14 +184,25 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		}
 
 		px := fmt.Sprintf("net_iface_%s_", iface.ifName)
-		mx[px+"traffic_in"] = iface.ifHCInOctets * 8 / 1000   // kilobits
-		mx[px+"traffic_out"] = iface.ifHCOutOctets * 8 / 1000 // kilobits
-		mx[px+"ucast_in"] = iface.ifHCInUcastPkts
-		mx[px+"ucast_out"] = iface.ifHCOutUcastPkts
-		mx[px+"mcast_in"] = iface.ifHCInMulticastPkts
-		mx[px+"mcast_out"] = iface.ifHCOutMulticastPkts
-		mx[px+"bcast_in"] = iface.ifHCInBroadcastPkts
-		mx[px+"bcast_out"] = iface.ifHCOutBroadcastPkts
+		if len(ifMibXTable) == 0 {
+			mx[px+"traffic_in"] = iface.ifInOctets * 8 / 1000   // kilobits
+			mx[px+"traffic_out"] = iface.ifOutOctets * 8 / 1000 // kilobits
+			mx[px+"ucast_in"] = iface.ifInUcastPkts
+			mx[px+"ucast_out"] = iface.ifOutUcastPkts
+			mx[px+"mcast_in"] = iface.ifInMulticastPkts
+			mx[px+"mcast_out"] = iface.ifOutMulticastPkts
+			mx[px+"bcast_in"] = iface.ifInBroadcastPkts
+			mx[px+"bcast_out"] = iface.ifOutBroadcastPkts
+		} else {
+			mx[px+"traffic_in"] = iface.ifHCInOctets * 8 / 1000   // kilobits
+			mx[px+"traffic_out"] = iface.ifHCOutOctets * 8 / 1000 // kilobits
+			mx[px+"ucast_in"] = iface.ifHCInUcastPkts
+			mx[px+"ucast_out"] = iface.ifHCOutUcastPkts
+			mx[px+"mcast_in"] = iface.ifHCInMulticastPkts
+			mx[px+"mcast_out"] = iface.ifHCOutMulticastPkts
+			mx[px+"bcast_in"] = iface.ifHCInBroadcastPkts
+			mx[px+"bcast_out"] = iface.ifHCOutBroadcastPkts
+		}
 		mx[px+"errors_in"] = iface.ifInErrors
 		mx[px+"errors_out"] = iface.ifOutErrors
 		mx[px+"discards_in"] = iface.ifInDiscards

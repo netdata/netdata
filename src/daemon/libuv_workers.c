@@ -26,7 +26,6 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN, "flushed to open");
 
     // datafile full
-    worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT, "jv2 index wait");
     worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX, "jv2 indexing");
 
     // db rotation related
@@ -108,24 +107,6 @@ void register_libuv_worker_jobs() {
 
     registered = true;
     register_libuv_worker_jobs_internal();
-}
-
-// utils
-#define MAX_THREAD_CREATE_RETRIES (10)
-#define MAX_THREAD_CREATE_WAIT_MS (1000)
-
-int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
-{
-    int err;
-
-    do {
-        err = uv_thread_create(thread, thread_func, arg);
-        if (err == 0)
-            break;
-        sleep_usec(MAX_THREAD_CREATE_WAIT_MS * USEC_PER_MS);
-    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
-
-    return err;
 }
 
 void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)

@@ -105,7 +105,7 @@ int init_connectors(struct engine *engine)
         char threadname[ND_THREAD_TAG_MAX + 1];
         snprintfz(threadname, ND_THREAD_TAG_MAX, "%s[%zu]", instance->config.thread_tag, instance->index);
         
-        instance->thread = nd_thread_create(threadname, NETDATA_THREAD_OPTION_JOINABLE, instance->worker, instance);
+        instance->thread = nd_thread_create(threadname, NETDATA_THREAD_OPTION_DEFAULT, instance->worker, instance);
         if (!instance->thread) {
             netdata_log_error("EXPORTING: cannot create thread worker for instance %s", instance->config.name);
             instance->exited = 1;

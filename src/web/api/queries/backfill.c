@@ -232,7 +232,7 @@ void *backfill_thread(void *ptr) {
     for(size_t t = 0; t < threads - 1 ;t++) {
         char tag[15];
         snprintfz(tag, sizeof(tag), "BACKFILL[%zu]", t + 1);
-        th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
+        th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, backfill_worker_thread, NULL);
     }
 
     backfill_worker_thread((void *)0x01);

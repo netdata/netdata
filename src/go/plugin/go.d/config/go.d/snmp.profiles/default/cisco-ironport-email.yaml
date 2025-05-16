@@ -77,6 +77,7 @@ metrics:
         constant_value_one: true
     description: A table of one or power supply entries.
     unit: "{power_supply}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: ironport.powerSupplyName
@@ -157,6 +158,7 @@ metrics:
         unit: "s"
     description: A table of Feature Key expiration entries.
     unit: "{feature_key_expiration_entry}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: ironport.keyDescription
@@ -222,6 +224,7 @@ metrics:
         constant_value_one: true
     description: Unique index for a drive being instrumented in the appliance. This index is for SNMP purposes only; it has no intrinsic value.
     unit: "{raid_drive}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: ironport.raidID

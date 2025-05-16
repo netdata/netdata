@@ -24,7 +24,6 @@ enum event_loop_job {
     UV_EVENT_DBENGINE_FLUSHED_TO_OPEN,
 
     // datafile full
-    UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT,
     UV_EVENT_DBENGINE_JOURNAL_INDEX,
 
     // db rotation related
@@ -88,7 +87,6 @@ enum event_loop_job {
 };
 
 void register_libuv_worker_jobs();
-int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries);
 void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused);
 
 #endif //NETDATA_EVENT_LOOP_H

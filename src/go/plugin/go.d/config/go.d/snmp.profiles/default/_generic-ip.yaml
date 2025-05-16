@@ -123,6 +123,7 @@ metrics:
         name: ipSystemStatsHCOutBcastPkts
         description: The number of IP broadcast datagrams transmitted
         unit: "{datagram}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: ipversion
@@ -247,6 +248,7 @@ metrics:
         name: ipIfStatsHCOutBcastPkts
         description: The number of IP broadcast datagrams transmitted
         unit: "{datagram}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: ipversion

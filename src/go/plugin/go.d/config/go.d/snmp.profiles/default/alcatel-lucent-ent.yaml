@@ -44,6 +44,7 @@ metrics:
         constant_value_one: true
         description: Physical entity constant value one
         unit: "{physical_entity}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
@@ -280,6 +281,7 @@ metrics:
         OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.1
         description: Current temperature of the physical entity
         unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
@@ -342,6 +344,7 @@ metrics:
         OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.4
         description: Fan speed in revolutions per minute
         unit: "1.min"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.2
@@ -371,6 +374,7 @@ metrics:
           name: alcatel.ent.alaChasBpsPowerSupplySerialNum
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.8
         tag: ala_chas_bps_power_supply_serial_num
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.10
           name: alcatel.ent.alaChasBpsPowerSupplyOperStatus

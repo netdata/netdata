@@ -7,6 +7,7 @@ metrics:
       - name: lldpRem
         constant_value_one: true
     metric_tags:
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.6
           name: lldpRemPortIdSubtype

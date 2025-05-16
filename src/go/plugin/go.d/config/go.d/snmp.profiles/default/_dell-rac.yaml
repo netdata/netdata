@@ -70,6 +70,7 @@ metrics:
     symbols:
       - name: dell.systemState
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.200.10.1.1
@@ -279,6 +280,7 @@ metrics:
     symbols:
       - name: dell.physicalDisk
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.4
@@ -336,6 +338,7 @@ metrics:
     symbols:
       - name: enclosurePowerSupply
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.4
@@ -386,6 +389,7 @@ metrics:
     symbols:
       - name: dell.battery
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.4
@@ -450,6 +454,7 @@ metrics:
     symbols:
       - name: dell.controller
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.37
@@ -513,6 +518,7 @@ metrics:
     symbols:
       - name: dell.pCIDevice
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.5
@@ -560,6 +566,7 @@ metrics:
     symbols:
       - name: dell.systemSlot
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1200.10.1.5
@@ -611,6 +618,7 @@ metrics:
     symbols:
       - name: dell.networkDevice
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.90.1.3
@@ -666,6 +674,7 @@ metrics:
     symbols:
       - name: dell.systemBIOS
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.300.50.1.1
@@ -798,6 +807,7 @@ metrics:
     symbols:
       - name: dell.amperageProbe
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.30.1.7
@@ -924,6 +934,7 @@ metrics:
     symbols:
       - name: dell.voltageProbe
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.600.20.1.1
@@ -1052,6 +1063,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.2
           name: coolingDeviceIndex
         tag: cooling_device_name
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.12.1.7
           name: coolingDeviceType
@@ -1102,6 +1114,7 @@ metrics:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.2
           name: temperatureProbeIndex
         tag: temperature_probe_index
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.700.20.1.7
           name: temperatureProbeType
@@ -1208,6 +1221,7 @@ metrics:
     symbols:
       - name: dell.memoryDevice
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.7

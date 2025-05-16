@@ -12,6 +12,37 @@ static void initialize(void)
     ;
 }
 
+static void do_processor_queue(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static RRDSET *st_queue = NULL;
+    static RRDDIM *rd_queue = NULL;
+    static COUNTER_DATA processorQueue = {.key = "Processor Queue Length"};
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &processorQueue))
+        return;
+
+    if (!st_queue) {
+        st_queue = rrdset_create_localhost(
+            "system",
+            "processor_queue",
+            NULL,
+            "system",
+            "system.processor_queue_length",
+            "The number of threads in the processor queue.",
+            "threads",
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            NETDATA_CHART_PRIO_SYSTEM_THREAD_QUEUE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_queue = rrddim_add(st_queue, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_queue, rd_queue, (collected_number)processorQueue.current.Data);
+
+    rrdset_done(st_queue);
+}
+
 static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "System");
@@ -36,6 +67,8 @@ static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every)
         ULONGLONG totalThreads = threads.current.Data;
         common_system_threads(totalThreads, update_every);
     }
+
+    do_processor_queue(pDataBlock, pObjectType, update_every);
     return true;
 }
 

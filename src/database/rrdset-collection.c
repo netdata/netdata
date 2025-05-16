@@ -682,7 +682,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             collected_total += rd->collector.collected_value;
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
-                netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE or ARCHIVED flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
+                netdata_log_error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
                 if(!spinlock_trylock(&rd->destroy_lock))
                     fatal("RRDSET: dimension '%s' of chart '%s' of host '%s' is being collected while is being destroyed.", rrddim_id(rd), rrdset_id(st), rrdhost_hostname(st->rrdhost));
 

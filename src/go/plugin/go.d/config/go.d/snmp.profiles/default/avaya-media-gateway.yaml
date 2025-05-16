@@ -29,6 +29,7 @@ metrics:
     symbols:
       - name: avaya.avEntPhyChFru
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: avaya_ent_physical_index
@@ -107,6 +108,7 @@ metrics:
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.8
         description: Five-minute average occupancy of the VoIP engine
         unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: avaya.cmgVoipCurrentIpAddress
@@ -150,6 +152,7 @@ metrics:
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.3
         description: Number of channels currently in use at the DSP core
         unit: "{channel}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4

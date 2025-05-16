@@ -5,9 +5,10 @@
 
 #include "nd-poll.h"
 
-#define POLLINFO_FLAG_SERVER_SOCKET 0x00000001
-#define POLLINFO_FLAG_CLIENT_SOCKET 0x00000002
-#define POLLINFO_FLAG_DONT_CLOSE    0x00000004
+#define POLLINFO_FLAG_SERVER_SOCKET     (1U << 0)
+#define POLLINFO_FLAG_CLIENT_SOCKET     (1U << 1)
+#define POLLINFO_FLAG_DONT_CLOSE        (1U << 2)
+#define POLLINFO_FLAG_REMOVED_FROM_POLL (1U << 3)
 
 typedef struct poll POLLJOB;
 typedef struct pollinfo POLLINFO;
@@ -79,6 +80,8 @@ int poll_default_snd_callback(POLLINFO *pi, nd_poll_event_t *events);
 int poll_default_rcv_callback(POLLINFO *pi, nd_poll_event_t *events);
 void poll_default_del_callback(POLLINFO *pi);
 void *poll_default_add_callback(POLLINFO *pi, nd_poll_event_t *events, void *data);
+
+void poll_process_remove_from_poll(POLLINFO *pi);
 
 POLLINFO *poll_add_fd(POLLJOB *p
                       , int fd

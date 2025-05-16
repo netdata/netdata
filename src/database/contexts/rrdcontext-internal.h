@@ -4,6 +4,7 @@
 #define NETDATA_RRDCONTEXT_INTERNAL_H 1
 
 #include "rrdcontext.h"
+#include "rrdcontext-context-registry.h"
 #include "../sqlite/sqlite_context.h"
 #include "../../aclk/schema-wrappers/rrdcontext-context.h"
 #include "../../aclk/aclk_contexts_api.h"
