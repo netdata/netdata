@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20284](https://github.com/netdata/netdata/pull/20284) ([netdatabot](https://github.com/netdatabot))
 - Improved StatsD documentation [\#20282](https://github.com/netdata/netdata/pull/20282) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20279](https://github.com/netdata/netdata/pull/20279) ([netdatabot](https://github.com/netdatabot))
 - docs: update mssql meta [\#20278](https://github.com/netdata/netdata/pull/20278) ([ilyam8](https://github.com/ilyam8))
@@ -31,6 +33,7 @@
 - fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
 - SNMP first cisco yaml file pass [\#20246](https://github.com/netdata/netdata/pull/20246) ([Ancairon](https://github.com/Ancairon))
+- Model Context Protocol Server \(MCP\) for Netdata Part 1 [\#20244](https://github.com/netdata/netdata/pull/20244) ([ktsaou](https://github.com/ktsaou))
 - Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
 - Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
 - Let the user override the default stack size [\#20236](https://github.com/netdata/netdata/pull/20236) ([stelfrag](https://github.com/stelfrag))
@@ -463,11 +466,6 @@
 - build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.3 to 0.2.5 in /src/go [\#19750](https://github.com/netdata/netdata/pull/19750) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/likexian/whois from 1.15.5 to 1.15.6 in /src/go [\#19749](https://github.com/netdata/netdata/pull/19749) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.2 to 1.17.3 in /src/go [\#19748](https://github.com/netdata/netdata/pull/19748) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/gosnmp/gosnmp from 1.38.0 to 1.39.0 in /src/go [\#19747](https://github.com/netdata/netdata/pull/19747) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 28.0.0+incompatible to 28.0.1+incompatible in /src/go [\#19746](https://github.com/netdata/netdata/pull/19746) ([dependabot[bot]](https://github.com/apps/dependabot))
-- more strict parsing of the output of system-info.sh [\#19745](https://github.com/netdata/netdata/pull/19745) ([ktsaou](https://github.com/ktsaou))
-- pass NULL to sensors\_init\(\) when the standard files exist in /etc/ [\#19744](https://github.com/netdata/netdata/pull/19744) ([ktsaou](https://github.com/ktsaou))
-- allow coredumps to be generated [\#19743](https://github.com/netdata/netdata/pull/19743) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
