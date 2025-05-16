@@ -357,9 +357,12 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->stream.snd.status.replication.charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->stream.snd.status.replication.charts), 0, __ATOMIC_RELAXED))
 
+#define rrdhost_is_virtual(host)                                                                                \
+    rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)
+
 #define rrdhost_is_local(host)  ( \
     (host) == localhost ||                                                                                      \
-    rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)                                                     \
+    rrdhost_is_virtual(host)                                                                                    \
     )
 
 #define rrdhost_is_online_flags(flags) ((flags & RRDHOST_FLAG_COLLECTOR_ONLINE) && !(flags & RRDHOST_FLAG_ORPHAN))
