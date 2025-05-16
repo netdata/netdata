@@ -112,7 +112,7 @@ metrics:
           1: no_load_alarm
           2: under_current_alarm
           3: near_over_current_alarm
-          4: over_current_alarm 
+          4: over_current_alarm
   # - MIB: CPS-MIB  # All three metric tags are scalar metrics with enums. Not supported yet.
   #   table:
   #     OID: 1.3.6.1.4.1.3808.1.1.3.3.6.1
