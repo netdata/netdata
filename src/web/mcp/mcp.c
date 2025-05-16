@@ -80,6 +80,7 @@ MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
 
     mcpc->transport = transport;
     mcpc->protocol_version = MCP_PROTOCOL_VERSION_UNKNOWN; // Will be set during initialization
+    mcpc->ready = false; // Client is not ready until initialized notification is received
     
     // Set capabilities based on transport type
     switch (transport) {
@@ -300,29 +301,52 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     // Handle method calls based on namespace
     MCP_RETURN_CODE rc;
 
-    if(!method || !*method) {
+    // Check for notifications/initialized method which marks client as ready
+    if (strcmp(method, "notifications/initialized") == 0) {
+        mcpc->ready = true;
+        netdata_log_debug(D_WEB_CLIENT, "MCP client %s v%s is now ready", 
+                         string2str(mcpc->client_name), string2str(mcpc->client_version));
+        rc = MCP_RC_OK;
+    }
+    else if(!method || !*method) {
         buffer_strcat(mcpc->error, "Empty method name");
         rc = MCP_RC_INVALID_PARAMS;
     }
     else if (strncmp(method, "tools/", 6) == 0) {
         // Tools namespace
         rc = mcp_tools_route(mcpc, method + 6, params_obj, id);
+        // Mark client as ready if not already
+        if (!mcpc->ready) {
+            mcpc->ready = true;
+        }
     }
     else if (strncmp(method, "resources/", 10) == 0) {
         // Resources namespace
         rc = mcp_resources_route(mcpc, method + 10, params_obj, id);
+        // Mark client as ready if not already
+        if (!mcpc->ready) {
+            mcpc->ready = true;
+        }
     }
     else if (strncmp(method, "prompts/", 8) == 0) {
         // Prompts namespace
         rc = mcp_prompts_route(mcpc, method + 8, params_obj, id);
+        // Mark client as ready if not already
+        if (!mcpc->ready) {
+            mcpc->ready = true;
+        }
     }
     else if (strncmp(method, "logging/", 8) == 0) {
-        // Logging namespace
+        // Logging namespace - don't alter ready state
         rc = mcp_logging_route(mcpc, method + 8, params_obj, id);
     }
     else if (strncmp(method, "completion/", 11) == 0) {
         // Completion namespace
         rc = mcp_completion_route(mcpc, method + 11, params_obj, id);
+        // Mark client as ready if not already
+        if (!mcpc->ready) {
+            mcpc->ready = true;
+        }
     }
     else if (strcmp(method, "initialize") == 0) {
         // Extract client info from initialize request
@@ -335,11 +359,13 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     }
     else if (strcmp(method, "ping") == 0) {
         // Handle ping method - simple connection health check
+        // Don't alter ready state for ping requests
         rc = mcp_method_ping(mcpc, params_obj, id);
     }
     else {
         buffer_sprintf(mcpc->error, "Method '%s' not found", method);
         rc = MCP_RC_NOT_FOUND;
+        // Method not found shouldn't alter ready state
     }
 
     // If this is a notification (no ID), don't generate a response

@@ -49,54 +49,47 @@ typedef struct {
     bool open_world_hint;     // If true, tool interacts with external world
 } MCP_TOOL_DEF;
 
-// Tool schema generator functions
-static void mcp_tool_metric_contexts_schema(BUFFER *buffer);
-
-// Tool execution functions
-static MCP_RETURN_CODE
-mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-// Static array of tool definitions
-static const MCP_TOOL_DEF mcp_tools[] = {
-    {
-        .name = "metric_contexts",
-        .title = "Primary discovery mechanism for what's being monitored by Netdata.",
-        .description = "Metric Contexts are the equivalent of Charts on Netdata dashboards.\n"
-                       "Contexts are multi-node, multi-instance and multi-dimensional, usually\n"
-                       "aggregating metrics with common/similar labels and dimensions.\n",
-        .execute_callback = mcp_tool_metric_contexts_execute,
-        .schema_callback = mcp_tool_metric_contexts_schema,
-        .read_only_hint = true,
-        .open_world_hint = false
-    },
-    
-    // Add more tools here
-    
-    // Terminator
-    {
-        .name = NULL
-    }
-};
-
 // Define schema for the list_netdata_metrics tool
 static void mcp_tool_metric_contexts_schema(BUFFER *buffer) {
     // Tool input schema
     buffer_json_member_add_object(buffer, "inputSchema");
     buffer_json_member_add_string(buffer, "type", "object");
-    buffer_json_member_add_string(buffer, "title", "MetricsQuery");
-    
+    buffer_json_member_add_string(buffer, "title", "Filter Metric Contexts");
+
     // Properties
     buffer_json_member_add_object(buffer, "properties");
-    
+
     // Like property (optional)
     buffer_json_member_add_object(buffer, "like");
     buffer_json_member_add_string(buffer, "type", "string");
     buffer_json_member_add_string(buffer, "title", "Pattern");
     buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on context and category names");
     buffer_json_object_close(buffer); // Close like
-    
+
     buffer_json_object_close(buffer); // Close properties
-    
+
+    // No required fields
+    buffer_json_object_close(buffer); // Close inputSchema
+}
+
+static void mcp_tool_metric_context_categories_schema(BUFFER *buffer) {
+    // Tool input schema
+    buffer_json_member_add_object(buffer, "inputSchema");
+    buffer_json_member_add_string(buffer, "type", "object");
+    buffer_json_member_add_string(buffer, "title", "Filter Metric Context Categories");
+
+    // Properties
+    buffer_json_member_add_object(buffer, "properties");
+
+    // Like property (optional)
+    buffer_json_member_add_object(buffer, "like");
+    buffer_json_member_add_string(buffer, "type", "string");
+    buffer_json_member_add_string(buffer, "title", "Pattern");
+    buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on context and category names");
+    buffer_json_object_close(buffer); // Close like
+
+    buffer_json_object_close(buffer); // Close properties
+
     // No required fields
     buffer_json_object_close(buffer); // Close inputSchema
 }
@@ -104,7 +97,7 @@ static void mcp_tool_metric_contexts_schema(BUFFER *buffer) {
 // Implementation of the list_netdata_metrics tool
 static MCP_RETURN_CODE mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0) return MCP_RC_ERROR;
-    
+
     // Extract the 'like' parameter if present
     const char *like_pattern = NULL;
     if (params && json_object_object_get_ex(params, "like", NULL)) {
@@ -114,7 +107,7 @@ static MCP_RETURN_CODE mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct
             like_pattern = json_object_get_string(like_obj);
         }
     }
-    
+
     CLEAN_BUFFER *t = buffer_create(0, NULL);
     buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -136,7 +129,7 @@ static MCP_RETURN_CODE mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct
             buffer_json_add_array_item_object(mcpc->result);
             {
                 buffer_json_member_add_string(mcpc->result, "type", "text");
-                buffer_json_member_add_string(mcpc->result, "txt", buffer_tostring(t));
+                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(t));
             }
             buffer_json_object_close(mcpc->result); // Close text content
         }
@@ -144,9 +137,399 @@ static MCP_RETURN_CODE mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct
     }
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
-    
+
+    simple_pattern_free(pattern);
+
     return MCP_RC_OK;
 }
+
+static MCP_RETURN_CODE mcp_tool_metric_context_categories_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    if (!mcpc || id == 0) return MCP_RC_ERROR;
+
+    // Extract the 'like' parameter if present
+    const char *like_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "like", NULL)) {
+        struct json_object *like_obj = NULL;
+        json_object_object_get_ex(params, "like", &like_obj);
+        if (like_obj && json_object_is_type(like_obj, json_type_string)) {
+            like_pattern = json_object_get_string(like_obj);
+        }
+    }
+
+    CLEAN_BUFFER *t = buffer_create(0, NULL);
+    buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    SIMPLE_PATTERN *pattern = NULL;
+    if(like_pattern && *like_pattern)
+        pattern = simple_pattern_create(like_pattern, "|", SIMPLE_PATTERN_EXACT, false);
+
+    rrdcontext_context_registry_json_mcp_categories_array(t, pattern);
+    buffer_json_finalize(t);
+
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
+    {
+        // Start building content array for the result
+        buffer_json_member_add_array(mcpc->result, "content");
+        {
+            // Instead of returning embedded resources, let's return a text explanation
+            // that will be more compatible with most LLM clients
+            buffer_json_add_array_item_object(mcpc->result);
+            {
+                buffer_json_member_add_string(mcpc->result, "type", "text");
+                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(t));
+            }
+            buffer_json_object_close(mcpc->result); // Close text content
+        }
+        buffer_json_array_close(mcpc->result);  // Close content array
+    }
+    buffer_json_object_close(mcpc->result); // Close result object
+    buffer_json_finalize(mcpc->result); // Finalize the JSON
+
+    simple_pattern_free(pattern);
+
+    return MCP_RC_OK;
+}
+
+static void mcp_tool_context_details_schema(BUFFER *buffer) {
+    // Tool input schema
+    buffer_json_member_add_object(buffer, "inputSchema");
+    buffer_json_member_add_string(buffer, "type", "object");
+    buffer_json_member_add_string(buffer, "title", "Filter metric contexts");
+
+    // Properties
+    buffer_json_member_add_object(buffer, "properties");
+
+    buffer_json_member_add_object(buffer, "contexts");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Pipe separated list of contexts or context patterns to be returned");
+        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on context names. Examples: context1|context2, or even *word1*|*word2*, to match against contexts identifiers.");
+        buffer_json_member_add_string(buffer, "default", "*");
+    }
+    buffer_json_object_close(buffer); // contexts
+
+    buffer_json_member_add_object(buffer, "nodes");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Pipe separated list of nodes or node patterns, for which the contexts should be returned");
+        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on nodes for slicing the metadata database of Netdata. Examples: node1|node2, or even *db*|*dns*, to match against hostnames");
+        buffer_json_member_add_string(buffer, "default", "*");
+    }
+    buffer_json_object_close(buffer); // nodes
+
+    buffer_json_member_add_object(buffer, "after");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Unix Epoch Timestamp, or negative number of seconds relative to parameter before");
+        buffer_json_member_add_string(buffer, "description", "Limit the results to contexts that were collected after this timestamp. If negative, it will be interpreted as a number of seconds relative to the before parameter");
+        buffer_json_member_add_int64(buffer, "default", 0);
+    }
+    buffer_json_object_close(buffer); // after
+
+    buffer_json_member_add_object(buffer, "before");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Unix Epoch Timestamp, or negative number of seconds relative to now");
+        buffer_json_member_add_string(buffer, "description", "Limit the results to contexts that were collected before this timestamp. If negative, it will be interpreted as a number of seconds relative now");
+        buffer_json_member_add_int64(buffer, "default", 0);
+    }
+    buffer_json_object_close(buffer); // before
+
+    buffer_json_object_close(buffer); // properties
+
+    // No required fields
+    buffer_json_object_close(buffer); // inputSchema
+}
+
+static void mcp_tool_contexts_search_schema(BUFFER *buffer) {
+    // Tool input schema
+    buffer_json_member_add_object(buffer, "inputSchema");
+    buffer_json_member_add_string(buffer, "type", "object");
+    buffer_json_member_add_string(buffer, "title", "Filter metric contexts");
+
+    // Properties
+    buffer_json_member_add_object(buffer, "properties");
+
+    buffer_json_member_add_object(buffer, "q");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Pipe separated glob-like patterns to search for in all metadata");
+        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching any string related to contexts, including contexts, titles, instances, dimensions, label keys, label values, families. Examples: *eth0*|*sda*, to find all charts related to network interface eth0 and disk sda.");
+        buffer_json_member_add_string(buffer, "default", "*");
+    }
+    buffer_json_object_close(buffer); // q
+
+    buffer_json_member_add_object(buffer, "contexts");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Pipe separated list of contexts or context patterns to be returned");
+        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on context names. Examples: context1|context2, or even *word1*|*word2*, to match against contexts identifiers.");
+        buffer_json_member_add_string(buffer, "default", "*");
+    }
+    buffer_json_object_close(buffer); // contexts
+
+    buffer_json_member_add_object(buffer, "nodes");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Pipe separated list of nodes or node patterns, for which the contexts should be returned");
+        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on nodes for slicing the metadata database of Netdata. Examples: node1|node2, or even *db*|*dns*, to match against hostnames");
+        buffer_json_member_add_string(buffer, "default", "*");
+    }
+    buffer_json_object_close(buffer); // nodes
+
+    buffer_json_member_add_object(buffer, "after");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Unix Epoch Timestamp, or negative number of seconds relative to parameter before");
+        buffer_json_member_add_string(buffer, "description", "Limit the results to contexts that were collected after this timestamp. If negative, it will be interpreted as a number of seconds relative to the before parameter");
+        buffer_json_member_add_int64(buffer, "default", 0);
+    }
+    buffer_json_object_close(buffer); // after
+
+    buffer_json_member_add_object(buffer, "before");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Unix Epoch Timestamp, or negative number of seconds relative to now");
+        buffer_json_member_add_string(buffer, "description", "Limit the results to contexts that were collected before this timestamp. If negative, it will be interpreted as a number of seconds relative now");
+        buffer_json_member_add_int64(buffer, "default", 0);
+    }
+    buffer_json_object_close(buffer); // before
+
+    buffer_json_object_close(buffer); // properties
+
+    // No required fields
+    buffer_json_object_close(buffer); // inputSchema
+}
+
+static MCP_RETURN_CODE mcp_tool_context_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
+{
+    if (!mcpc || id == 0)
+        return MCP_RC_ERROR;
+
+    // Extract the 'like' parameter if present
+    const char *contexts_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "contexts", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "contexts", &obj);
+        if (obj && json_object_is_type(obj, json_type_string)) {
+            contexts_pattern = json_object_get_string(obj);
+        }
+    }
+
+    const char *nodes_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "nodes", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "nodes", &obj);
+        if (obj && json_object_is_type(obj, json_type_string)) {
+            nodes_pattern = json_object_get_string(obj);
+        }
+    }
+
+    time_t after = 0;
+    if (params && json_object_object_get_ex(params, "after", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "after", &obj);
+        if (obj && json_object_is_type(obj, json_type_int)) {
+            after = json_object_get_int64(obj);
+        }
+    }
+
+    time_t before = 0;
+    if (params && json_object_object_get_ex(params, "before", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "before", &obj);
+        if (obj && json_object_is_type(obj, json_type_int)) {
+            before = json_object_get_int64(obj);
+        }
+    }
+
+    CLEAN_BUFFER *t = buffer_create(0, NULL);
+    buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    struct api_v2_contexts_request req = {
+        .scope_nodes = nodes_pattern,
+        .scope_contexts = contexts_pattern,
+        .after = after,
+        .before = before,
+    };
+
+    int code = rrdcontext_to_json_v2(t, &req, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_CONTEXT_TITLES | CONTEXTS_V2_MCP);
+    if (code != HTTP_RESP_OK) {
+        buffer_sprintf(mcpc->error, "Failed to fetch contexts, query returned http error code %d", code);
+        return MCP_RC_ERROR;
+    }
+
+    buffer_json_finalize(t);
+
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
+    {
+        // Start building content array for the result
+        buffer_json_member_add_array(mcpc->result, "content");
+        {
+            // Instead of returning embedded resources, let's return a text explanation
+            // that will be more compatible with most LLM clients
+            buffer_json_add_array_item_object(mcpc->result);
+            {
+                buffer_json_member_add_string(mcpc->result, "type", "text");
+                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(t));
+            }
+            buffer_json_object_close(mcpc->result); // Close text content
+        }
+        buffer_json_array_close(mcpc->result);  // Close content array
+    }
+    buffer_json_object_close(mcpc->result); // Close result object
+    buffer_json_finalize(mcpc->result); // Finalize the JSON
+
+    return MCP_RC_OK;
+}
+
+static MCP_RETURN_CODE mcp_tool_contexts_search_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
+{
+    if (!mcpc || id == 0)
+        return MCP_RC_ERROR;
+
+    const char *q = NULL;
+    if (params && json_object_object_get_ex(params, "q", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "q", &obj);
+        if (obj && json_object_is_type(obj, json_type_string)) {
+            q = json_object_get_string(obj);
+        }
+    }
+
+    const char *contexts_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "contexts", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "contexts", &obj);
+        if (obj && json_object_is_type(obj, json_type_string)) {
+            contexts_pattern = json_object_get_string(obj);
+        }
+    }
+
+    const char *nodes_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "nodes", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "nodes", &obj);
+        if (obj && json_object_is_type(obj, json_type_string)) {
+            nodes_pattern = json_object_get_string(obj);
+        }
+    }
+
+    time_t after = 0;
+    if (params && json_object_object_get_ex(params, "after", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "after", &obj);
+        if (obj && json_object_is_type(obj, json_type_int)) {
+            after = json_object_get_int64(obj);
+        }
+    }
+
+    time_t before = 0;
+    if (params && json_object_object_get_ex(params, "before", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "before", &obj);
+        if (obj && json_object_is_type(obj, json_type_int)) {
+            before = json_object_get_int64(obj);
+        }
+    }
+
+    CLEAN_BUFFER *t = buffer_create(0, NULL);
+    buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    struct api_v2_contexts_request req = {
+        .scope_nodes = nodes_pattern,
+        .scope_contexts = contexts_pattern,
+        .after = after,
+        .before = before,
+        .q = q,
+    };
+
+    int code = rrdcontext_to_json_v2(t, &req, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_CONTEXT_TITLES | CONTEXTS_V2_MCP | CONTEXTS_V2_SEARCH);
+    if (code != HTTP_RESP_OK) {
+        buffer_sprintf(mcpc->error, "Failed to fetch contexts, query returned http error code %d", code);
+        return MCP_RC_ERROR;
+    }
+
+    buffer_json_finalize(t);
+
+    // Initialize success response
+    mcp_init_success_result(mcpc, id);
+    {
+        // Start building content array for the result
+        buffer_json_member_add_array(mcpc->result, "content");
+        {
+            // Instead of returning embedded resources, let's return a text explanation
+            // that will be more compatible with most LLM clients
+            buffer_json_add_array_item_object(mcpc->result);
+            {
+                buffer_json_member_add_string(mcpc->result, "type", "text");
+                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(t));
+            }
+            buffer_json_object_close(mcpc->result); // Close text content
+        }
+        buffer_json_array_close(mcpc->result);  // Close content array
+    }
+    buffer_json_object_close(mcpc->result); // Close result object
+    buffer_json_finalize(mcpc->result); // Finalize the JSON
+
+    return MCP_RC_OK;
+}
+
+// Static array of tool definitions
+static const MCP_TOOL_DEF mcp_tools[] = {
+    {
+        .name = "list_metric_context_categories",
+        .title = "Aggregated view of what's being monitored by Netdata.",
+        .description = "Metric Contexts are the equivalent of Charts on Netdata dashboards.\n"
+                       "Provides a summarized view of monitoring domains by grouping contexts by their prefix.\n"
+                       "Useful for getting a quick overview of what's being monitored without fetching the whole list.\n",
+        .execute_callback = mcp_tool_metric_context_categories_execute,
+        .schema_callback = mcp_tool_metric_context_categories_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_LIST_METRIC_CONTEXTS_METHOD,
+        .title = "Primary discovery mechanism for what's being monitored by Netdata.",
+        .description = "Metric Contexts are the equivalent of Charts on Netdata dashboards.\n"
+                       "Contexts are multi-node, multi-instance and multi-dimensional, usually\n"
+                       "aggregating metrics with common/similar labels and dimensions.\n",
+        .execute_callback = mcp_tool_metric_contexts_execute,
+        .schema_callback = mcp_tool_metric_contexts_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_CONTEXT_DETAILS_METHOD,
+        .title = "Get additional information for specific metric contexts.",
+        .description = "Given a time-frame, a list of nodes and contexts, this tool\n"
+                       "provides their names, titles, families, units, retention,\n"
+                       "and whether they are currently collected or not.\n",
+        .execute_callback = mcp_tool_context_details_execute,
+        .schema_callback = mcp_tool_context_details_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_CONTEXT_SEARCH_METHOD,
+        .title = "Find relevant metric contexts using full text search",
+        .description = "Search for contexts given search pattern matching context names, instances,\n"
+                       "dimensions, label keys, label values, titles and related metadata.\n",
+        .execute_callback = mcp_tool_contexts_search_execute,
+        .schema_callback = mcp_tool_contexts_search_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+
+    // Add more tools here
+    
+    // Terminator
+    {
+        .name = NULL
+    }
+};
 
 // Return a list of available tools
 static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {

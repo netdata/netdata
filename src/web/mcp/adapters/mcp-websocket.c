@@ -3,26 +3,6 @@
 #include "mcp-websocket.h"
 #include "web/websocket/websocket-internal.h"
 
-// Create a JSON-RPC error response
-static void mcp_websocket_jsonrpc_error(BUFFER *result, const char *error, MCP_REQUEST_ID id, int jsonrpc_code) {
-    buffer_flush(result);
-    buffer_json_initialize(result, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_string(result, "jsonrpc", "2.0");
-    
-    if(id)
-        buffer_json_member_add_uint64(result, "id", id);
-
-    buffer_json_member_add_object(result, "error");
-    buffer_json_member_add_int64(result, "code", jsonrpc_code);
-
-    if(error && *error)
-        buffer_json_member_add_string(result, "message", error);
-
-    buffer_json_object_close(result); // Close error
-
-    buffer_json_finalize(result);
-}
-
 // Store the MCP context in the WebSocket client's data field
 void mcp_websocket_set_context(struct websocket_server_client *wsc, MCP_CLIENT *ctx) {
     if (!wsc) return;
@@ -82,15 +62,14 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     
     // Only handle text messages
     if (opcode != WS_OPCODE_TEXT) {
-        websocket_debug(wsc, "Ignoring binary message");
+        websocket_error(wsc, "Ignoring binary message - mcp supports only TEXT messages");
         return;
     }
     
     // Get the MCP context
     MCP_CLIENT *mcpc = mcp_websocket_get_context(wsc);
     if (!mcpc) {
-        websocket_debug(wsc, "MCP context not found");
-        websocket_protocol_send_close(wsc, WS_CLOSE_INTERNAL_ERROR, "MCP context not found");
+        websocket_error(wsc, "MCP context not found");
         return;
     }
     
@@ -100,11 +79,7 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     request = json_tokener_parse_verbose(message, &jerr);
     
     if (!request || jerr != json_tokener_success) {
-        websocket_debug(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
-        CLEAN_BUFFER *b = buffer_create(0, NULL);
-        mcp_websocket_jsonrpc_error(b, "Parse error", 0, -32700);
-        mcp_websocket_send_buffer(wsc, b);
-        buffer_free(b);
+        websocket_error(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
         return;
     }
     

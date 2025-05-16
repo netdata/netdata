@@ -58,11 +58,14 @@ struct function_v2_entry {
 struct context_v2_entry {
     size_t count;
     STRING *id;
+    STRING *title;
     STRING *family;
     STRING *units;
     uint32_t priority;
     time_t first_time_s;
     time_t last_time_s;
+    size_t nodes;
+    size_t instances;
     RRD_FLAGS flags;
     FTS_MATCH match;
 };
@@ -175,12 +178,15 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
         struct context_v2_entry t = {
                 .count = 1,
                 .id = rc->id,
-                .family = string_dup(rc->family),
+                .title = string_dup(rc->title),
+                .family = ctl->mode & CONTEXTS_V2_CONTEXT_TITLES ? string_dup(rc->family) : NULL,
                 .units = string_dup(rc->units),
                 .priority = rc->priority,
                 .first_time_s = rc->first_time_s,
                 .last_time_s = rc->last_time_s,
                 .flags = rc->flags,
+                .nodes = 1,
+                .instances = dictionary_entries(rc->rrdinstances),
                 .match = match,
         };
 
@@ -633,6 +639,26 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
     o->count++;
 
+    o->nodes += n->nodes;
+    o->instances += n->instances;
+
+    if(o->title != n->title) {
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep old
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+            // keep new
+            SWAP(o->title, n->title);
+        }
+        else {
+            // merge
+            STRING *old_title = o->title;
+            o->title = string_2way_merge(o->title, n->title);
+            string_freez(old_title);
+            // n->title will be freed below
+        }
+    }
+
     if(o->family != n->family) {
         if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
             // keep old
@@ -689,6 +715,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     o->flags |= n->flags;
     o->match = MIN(o->match, n->match);
 
+    string_freez(n->title);
     string_freez(n->units);
     string_freez(n->family);
 
@@ -697,6 +724,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
 static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct context_v2_entry *z = value;
+    string_freez(z->title);
     string_freez(z->family);
     string_freez((z->units));
 }
@@ -711,7 +739,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(mode & (CONTEXTS_V2_AGENTS_INFO))
         mode |= CONTEXTS_V2_AGENTS;
 
-    if(mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES))
+    if(!(mode & CONTEXTS_V2_MCP) && (mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)))
         mode |= CONTEXTS_V2_NODES;
 
     if(mode & CONTEXTS_V2_ALERTS) {
@@ -738,7 +766,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .nodes.pattern = string_to_simple_pattern(req->nodes),
             .contexts.pattern = string_to_simple_pattern(req->contexts),
             .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
-            .q.pattern = string_to_simple_pattern_nocase(req->q),
+            .q.pattern = string_to_simple_pattern_nocase_substring(req->q),
             .alerts.alert_name_pattern = string_to_simple_pattern(req->alerts.alert),
             .window = {
                     .enabled = false,
@@ -939,12 +967,24 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
                     buffer_json_member_add_object(wb, string2str(z->id));
                     {
+                        if(mode & CONTEXTS_V2_CONTEXT_TITLES)
+                            buffer_json_member_add_string(wb, "title", string2str(z->title));
+                        
                         buffer_json_member_add_string(wb, "family", string2str(z->family));
                         buffer_json_member_add_string(wb, "units", string2str(z->units));
-                        buffer_json_member_add_uint64(wb, "priority", z->priority);
+
+                        if(mode & CONTEXTS_V2_CONTEXT_PRIORITIES)
+                            buffer_json_member_add_uint64(wb, "priority", z->priority);
+
                         buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
                         buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
                         buffer_json_member_add_boolean(wb, "live", collected);
+
+                        if(mode & CONTEXTS_V2_MCP) {
+                            buffer_json_member_add_uint64(wb, "nodes_having_this_context", z->nodes);
+                            buffer_json_member_add_uint64(wb, "instances_of_this_context", z->instances);
+                        }
+
                         if (mode & CONTEXTS_V2_SEARCH)
                             buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
                     }

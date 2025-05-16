@@ -38,6 +38,17 @@ This configuration allows Claude Desktop to communicate directly with your Netda
 
 For detailed instructions specific to each implementation, refer to the README.md in the corresponding subdirectory.
 
+## Connection Reliability
+
+All bridge implementations include robust connection handling features:
+
+- **Automatic Reconnection**: If the WebSocket connection is lost for any reason, the bridges will automatically attempt to reconnect
+- **Exponential Backoff**: Reconnection attempts use exponential backoff with jitter to avoid overwhelming the server
+- **Message Queuing**: Messages sent while disconnected are queued and delivered once reconnected
+- **Connection Status Logging**: All bridges log connection status to stderr for monitoring
+
+These features ensure that temporary network issues or Netdata server restarts don't disrupt your AI model's integration, providing a resilient connection that automatically recovers from failures.
+
 ## Protocol Compatibility
 
 Netdata MCP implements the JSON-RPC 2.0 protocol for communication. The bridges pass messages directly between the AI model's standard I/O and the WebSocket connection without modification.

@@ -7,6 +7,10 @@
 #include <json-c/json.h>
 #include "mcp-request-id.h"
 
+#define MCP_LIST_METRIC_CONTEXTS_METHOD "list_metric_contexts"
+#define MCP_CONTEXT_DETAILS_METHOD "context_details"
+#define MCP_CONTEXT_SEARCH_METHOD "context_full_text_search"
+
 // MCP protocol versions
 typedef enum {
     MCP_PROTOCOL_VERSION_UNKNOWN = 0,
@@ -82,6 +86,9 @@ typedef struct mcp_client {
     
     // Protocol version (detected during initialization)
     MCP_PROTOCOL_VERSION protocol_version;
+    
+    // Client state
+    bool ready;                                    // Set to true when client is ready for normal operations
     
     // Transport-specific context
     union {
