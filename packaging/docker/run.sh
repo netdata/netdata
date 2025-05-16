@@ -23,7 +23,7 @@ function add_netdata_to_proxmox_conf_files_group() {
     fi
   fi
 
-  if ! getent group "${group_guid}" | grep -q "^netdata:"; then
+  if ! getent group "${group_guid}" | grep -q netdata; then
     echo "Assign netdata user to group ${group_guid}"
     if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
       echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
