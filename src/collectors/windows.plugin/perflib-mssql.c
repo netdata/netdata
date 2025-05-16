@@ -54,6 +54,21 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_METRICS_END
 };
 
+struct mssql_db_waits {
+    const char *wait_type;
+    const char *wait_category;
+
+    RRDDIM *rd_total_wait;
+    RRDDIM *rd_wait_time_msec;
+    RRDDIM *rd_max_wait_time_msec;
+    RRDDIM *rd_signal_wait_msec;
+
+    COUNTER_DATA MSSQLDatabaseTotalWait;
+    COUNTER_DATA MSSQLDatabaseWaitTimeMSec;
+    COUNTER_DATA MSSQLDatabaseMaxWaitTimeMSec;
+    COUNTER_DATA MSSQLDatabaseSignalWaitMSec;
+};
+
 struct mssql_instance {
     char *instanceID;
 
@@ -118,6 +133,12 @@ struct mssql_instance {
 
     RRDSET *st_mem_tot_server;
     RRDDIM *rd_mem_tot_server;
+
+    DICTIONARY *waits;
+    RRDSET *st_total_wait;
+    RRDSET *st_wait_time_msec;
+    RRDSET *st_max_wait_time_msec;
+    RRDSET *st_signal_wait_msec;
 
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBufferCacheHits;
@@ -748,6 +769,16 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     ptr->resourceID = strdupz(resource);
 }
 
+void dict_mssql_insert_wait_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    const char *type = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+
+    struct mssql_db_waits *mdw = value;
+
+    mdw->wait_type = strdupz(type);
+    mdw->wait_category = NULL;
+}
+
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
@@ -857,6 +888,12 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
         mi->databases = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_db_instance));
         dictionary_register_insert_callback(mi->databases, dict_mssql_insert_databases_cb, NULL);
+    }
+
+    if (!mi->waits) {
+        mi->waits = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                NULL, sizeof(struct mssql_db_waits));
+        dictionary_register_insert_callback(mi->waits, dict_mssql_insert_wait_cb, NULL);
     }
 
     initialize_mssql_objects(mi, instance);
