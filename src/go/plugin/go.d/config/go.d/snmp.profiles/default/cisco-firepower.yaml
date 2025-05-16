@@ -73,6 +73,7 @@ metrics:
         constant_value_one: true
         description: Fan equipment presence indicator
         unit: "{fan}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: cfpr_equipment_fan_dn
         symbol:
@@ -122,6 +123,7 @@ metrics:
         constant_value_one: true
         description: Power supply unit equipment presence indicator
         unit: "{power_supply}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: cfpr_equipment_psu_dn
         symbol:

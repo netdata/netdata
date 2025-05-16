@@ -18,6 +18,7 @@ metrics:
         constant_value_one: true
         description: "Constant value one"
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4UnitID
@@ -112,6 +113,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.12
         description: "Out of balance measurement of the input cord"
         unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4InputCordID
@@ -325,6 +327,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.4.1.4.3.1.5
         description: "Utilized current of the line"
         unit: "A"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4LineID
@@ -437,6 +440,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.13
         description: "Energy consumed by the phase"
         unit: "Wh"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4PhaseID
@@ -561,6 +565,7 @@ metrics:
         constant_value_one: true
         description: "Constant value one"
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4OcpID
@@ -637,6 +642,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.4.1.7.3.1.5
         description: "Utilized current of the branch"
         unit: "A"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4BranchID
@@ -733,6 +739,7 @@ metrics:
         constant_value_one: true
         description: "Constant value one"
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4OutletID
@@ -822,6 +829,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.4.1.9.3.1.1
         description: "Temperature sensor value"
         unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4TempSensorID
@@ -875,6 +883,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.4.1.10.3.1.1
         description: "Humidity sensor value"
         unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4HumidSensorID

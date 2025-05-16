@@ -72,6 +72,7 @@ metrics:
         name: bgpPeerMinASOriginationInterval
         description: Time interval in seconds for the MinASOriginationInterval timer
         unit: "s"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: remote_as
         symbol:

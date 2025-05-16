@@ -19,6 +19,7 @@ metrics:
         name: powernet.rPDULoadStatusLoad
         description: Load status of the PDU
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: powernet_r_pdu_load_status_index
         symbol:
@@ -42,6 +43,7 @@ metrics:
         name: powernet.rPDUOutletStatusLoad
         description: Load status of the PDU outlet
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: powernet_r_pdu_outlet_status_index
         symbol:
@@ -92,6 +94,7 @@ metrics:
         constant_value_one: true
         description: Status of the PDU bank
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: powernet_r_pdu_status_bank_index
         symbol:
@@ -119,6 +122,7 @@ metrics:
         constant_value_one: true
         description: Status of the PDU phase
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: powernet_r_pdu_status_phase_index
         symbol:
@@ -146,6 +150,7 @@ metrics:
         constant_value_one: true
         description: Status of the PDU outlet
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: powernet_r_pdu_status_outlet_index
         symbol:
@@ -181,6 +186,7 @@ metrics:
         name: powernet.rPDU2SensorTempHumidityStatusRelativeHumidity
         description: Relative humidity percentage
         unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: powernet_r_pdu2_sensor_temp_humidity_status_name
         symbol:

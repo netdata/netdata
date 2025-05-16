@@ -58,6 +58,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.1.1.15
         description: Tower line frequency
         unit: "Hz"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry3.towerID
@@ -127,6 +128,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.2.1.20
         description: Used infeed capacity
         unit: "VA"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry3.infeedID
@@ -192,6 +194,7 @@ metrics:
     symbols:
       - name: servertech.sentry3.outlet
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry3.outletID
@@ -254,6 +257,7 @@ metrics:
     symbols:
       - name: servertech.sentry3.envMon
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry3.envMonID
@@ -283,6 +287,7 @@ metrics:
         OID: 1.3.6.1.4.1.1718.3.2.5.1.10
         description: Humidity value from sensor
         unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry3.tempHumidSensorID

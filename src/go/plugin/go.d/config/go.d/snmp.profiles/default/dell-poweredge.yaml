@@ -94,6 +94,7 @@ metrics:
     symbols:
       - name: systemState
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.200.10.1.9
@@ -153,6 +154,7 @@ metrics:
         name: batteryReading
         description: Reading value of the battery
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.50.1.1
@@ -215,6 +217,7 @@ metrics:
         name: intrusionReading
         description: Reading value of the intrusion
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.300.70.1.1
@@ -241,6 +244,7 @@ metrics:
         name: voltageProbeReading
         description: Reading value of the voltage probe
         unit: "V"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.20.1.1
@@ -287,6 +291,7 @@ metrics:
         name: amperageProbeReading
         description: Reading value of the amperage probe
         unit: "A"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.30.1.7
@@ -343,6 +348,7 @@ metrics:
         name: powerSupplyCurrentInputVoltage
         description: Current input voltage of the power supply
         unit: "V"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.12.1.1
@@ -361,6 +367,7 @@ metrics:
         name: powerUsageStatus
         description: Status of the power usage
         unit: "{power_usage}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.600.60.1.1
@@ -387,6 +394,7 @@ metrics:
         name: coolingUnitStatus
         description: Status of the cooling unit
         unit: "{cooling_unit}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.700.10.1.1
@@ -417,6 +425,7 @@ metrics:
         name: coolingDeviceDiscreteReading
         description: Discrete reading of the cooling device
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.700.12.1.1
@@ -460,6 +469,7 @@ metrics:
         name: temperatureProbeReading
         description: Reading value of the temperature probe
         unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.700.20.1.1
@@ -496,6 +506,7 @@ metrics:
         name: processorDeviceThreadCount
         description: Number of threads in the processor device
         unit: "{thread}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.1
@@ -518,6 +529,7 @@ metrics:
         name: processorDeviceStatusReading
         description: Reading value of the processor device status
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.1
@@ -549,6 +561,7 @@ metrics:
         name: cacheDeviceCurrentSize
         description: Current size of the cache device
         unit: "By"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.1
@@ -579,6 +592,7 @@ metrics:
         # (4),-- ECC multibit fault encountered
         # (8) -- ECC single bit correction logging disabled
         # (16) -- device disabled because of spare activation
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.1
@@ -616,6 +630,7 @@ metrics:
         name: systemSlotStatus
         description: Status of the system slot
         unit: "{system_slot}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.1200.10.1.8
@@ -634,6 +649,7 @@ metrics:
         name: fruInformationStatus
         description: Status of the field replaceable unit information
         unit: "{fru_information}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.674.10892.1.2000.10.1.1
