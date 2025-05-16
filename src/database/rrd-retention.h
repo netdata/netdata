@@ -6,9 +6,6 @@
 #include "libnetdata/libnetdata.h"
 #include "storage-engine.h"
 
-// Maximum number of storage tiers the system supports
-#define RRD_MAX_STORAGE_TIERS 32
-
 // Structure to hold information about each storage tier
 typedef struct rrd_storage_tier {
     size_t tier;                      // Tier number
@@ -38,7 +35,7 @@ typedef struct rrd_storage_tier {
 // Main structure to hold retention information across all tiers
 typedef struct rrdstats_retention {
     size_t storage_tiers;                             // Number of available storage tiers
-    RRD_STORAGE_TIER tiers[RRD_MAX_STORAGE_TIERS];    // Array of tier information
+    RRD_STORAGE_TIER tiers[RRD_STORAGE_TIERS];    // Array of tier information
 } RRDSTATS_RETENTION;
 
 // Function to collect retention statistics
