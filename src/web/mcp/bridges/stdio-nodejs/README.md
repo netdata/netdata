@@ -69,6 +69,19 @@ The bridge:
 2. Reads from standard input and sends to the WebSocket
 3. Receives messages from the WebSocket and writes to standard output
 4. Handles both directions simultaneously
+5. Automatically reconnects if the connection is lost, with exponential backoff
+
+## Connection Reliability
+
+This bridge implements robust connection handling:
+
+- **Automatic Reconnection**: If the WebSocket connection is lost, the bridge will automatically attempt to reconnect
+- **Exponential Backoff**: Reconnection attempts use exponential backoff with jitter to avoid overwhelming the server
+- **Message Queuing**: Messages sent while disconnected are queued and delivered once reconnected
+- **Connection Status Logging**: The bridge logs connection status to stderr for monitoring
+- **SIGINT Handling**: Properly closes the WebSocket connection on CTRL+C
+
+The reconnection algorithm starts with a 1-second delay and doubles the wait time with each attempt, up to a maximum of 60 seconds. Random jitter is added to prevent connection storms.
 
 ## Protocol Compatibility
 

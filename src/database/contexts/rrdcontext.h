@@ -617,11 +617,11 @@ struct alert_transitions_facets {
 extern struct alert_transitions_facets alert_transition_facets[];
 
 struct api_v2_contexts_request {
-    char *scope_nodes;
-    char *scope_contexts;
-    char *nodes;
-    char *contexts;
-    char *q;
+    const char *scope_nodes;
+    const char *scope_contexts;
+    const char *nodes;
+    const char *contexts;
+    const char *q;
 
     CONTEXTS_OPTIONS options;
 
@@ -656,6 +656,9 @@ typedef enum __attribute__ ((__packed__)) {
     CONTEXTS_V2_FUNCTIONS           = (1 << 10),
     CONTEXTS_V2_ALERTS              = (1 << 11),
     CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 12),
+    CONTEXTS_V2_MCP                 = (1 << 13),
+    CONTEXTS_V2_CONTEXT_TITLES      = (1 << 14),
+    CONTEXTS_V2_CONTEXT_PRIORITIES  = (1 << 15),
 } CONTEXTS_V2_MODE;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);
