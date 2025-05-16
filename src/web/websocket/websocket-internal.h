@@ -39,15 +39,13 @@ struct websocket_thread;
 #define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 // WebSocket frame constants
-#define WS_FIN                     0x80  // Final frame bit
-#define WS_RSV1                    0x40  // Reserved bit 1 (used for compression)
-#define WS_MASK                    0x80  // Mask bit
-// Frame size limit - affects fragmentation but not total message size
-#define WS_MAX_FRAME_LENGTH        (20 * 1024 * 1024) // 20MB max frame size
+#define WS_FIN                      0x80  // Final frame bit
+#define WS_RSV1                     0x40  // Reserved bit 1 (used for compression)
+#define WS_MASK                     0x80  // Mask bit
 
-// Total message size limits - these prevent resource exhaustion
-#define WEBSOCKET_MAX_COMPRESSED_SIZE    (20ULL * 1024 * 1024) // 20MB max compressed message
-#define WEBSOCKET_MAX_UNCOMPRESSED_SIZE  (200ULL * 1024 * 1024) // 200MB max uncompressed message
+// these limits protect against DoS attacks (inbound only - outbound is not limited)
+#define WS_MAX_INCOMING_FRAME_SIZE  (20 * 1024 * 1024) // 20MB max frame size (browsers have ~16MiB)
+#define WS_MAX_DECOMPRESSED_SIZE    (200ULL * 1024 * 1024) // 200MB max inbound uncompressed message
 
 // WebSocket frame header structure - used for processing frame headers
 typedef struct websocket_frame_header {

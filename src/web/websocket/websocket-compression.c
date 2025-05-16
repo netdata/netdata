@@ -202,8 +202,8 @@ bool websocket_client_decompress_message(WS_CLIENT *wsc) {
 
         // Check if we need more output space
         if (!success && (ret == Z_BUF_ERROR || ret == Z_OK)) {
-            wanted_size = MIN(wanted_size * 2, WEBSOCKET_MAX_UNCOMPRESSED_SIZE);
-            if (wanted_size == WEBSOCKET_MAX_UNCOMPRESSED_SIZE && wanted_size == wsb_size(&wsc->u_payload))
+            wanted_size = MIN(wanted_size * 2, WS_MAX_DECOMPRESSED_SIZE);
+            if (wanted_size == WS_MAX_DECOMPRESSED_SIZE && wanted_size == wsb_size(&wsc->u_payload))
                 break; // we cannot resize more
         }
     } while (!success && retries-- > 0);
