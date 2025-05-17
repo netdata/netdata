@@ -3,6 +3,8 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+#include "perflib-mssql-queries.h"
+
 #include <sqlext.h>
 #include <sqltypes.h>
 #include <sql.h>
@@ -318,17 +320,6 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
     return (ULONGLONG)(db_size * MEGA_FACTOR);
 }
 
-#define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
-
-// https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
-#define NETDATA_QUERY_DATA_FILE_SIZE_MASK "SELECT size * 8/1024 FROM %s.sys.database_files WHERE type = 0;"
-
-// https://learn.microsoft.com/en-us/sql/relational-databases/system-compatibility-views/sys-sysprocesses-transact-sql?view=sql-server-ver16
-// SQL SERVER BEFORE 2008 DOES NOT HAVE DATA IN THIS TABLE
-// https://github.com/influxdata/telegraf/blob/081dfa26e80d8764fb7f9aac5230e81584b62b56/plugins/inputs/sqlserver/sqlqueriesV2.go#L1259
-#define NETDATA_QUERY_TRANSACTIONS_MASK                                                                                \
-    "select counter_name, cntr_value from %s.sys.dm_os_performance_counters where instance_name = '%s' and counter_name in ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec', 'Lock Timeouts/sec', 'Lock Requests/sec');"
-
 #define NETDATA_MSSQL_ACTIVE_TRANSACTIONS_METRIC "Active Transactions"
 #define NETDATA_MSSQL_TRANSACTION_PER_SEC_METRIC "Transactions/sec"
 #define NETDATA_MSSQL_WRITE_TRANSACTIONS_METRIC "Write Transactions/sec"
@@ -431,9 +422,6 @@ endtransactions:
     netdata_MSSQL_release_results(mdi->parent->conn.dbTransactionSTMT);
 }
 
-// https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-tran-locks-transact-sql?view=sql-server-ver16
-#define NETDATA_QUERY_LOCKS_MASK                                                                                       \
-    "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
 void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 {
 #define NETDATA_MSSQL_MAX_RESOURCE_TYPE (60)
@@ -522,8 +510,6 @@ enddrunquery:
     return 1;
 }
 
-#define NETDATA_QUERY_CHECK_PERM                                                                                       \
-    "SELECT CASE WHEN IS_SRVROLEMEMBER('sysadmin') = 1 OR HAS_PERMS_BY_NAME(null, null, 'VIEW SERVER STATE') = 1 THEN 1 ELSE 0 END AS has_permission;"
 long metdata_mssql_check_permission(struct mssql_instance *mi)
 {
     static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
