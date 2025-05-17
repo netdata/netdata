@@ -82,7 +82,9 @@ if [ "${EUID}" -eq 0 ]; then
     echo "Creating docker group ${PGID}"
     addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, probably one already exists"
     echo "Assign netdata user to docker group ${PGID}"
-    usermod --append --groups "$(getent group "${PGID}" | cut -d: -f1)" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
+    GROUP_NAME=$(getent group "${PGID}" | cut -d: -f1)
+    echo "Assign netdata user to group ${GROUP_NAME} (GID: ${PGID})"
+    usermod --append --groups "${GROUP_NAME}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group ${GROUP_NAME} with ID ${PGID}"
   fi
 
   if [ -d "/host/etc/pve" ]; then
