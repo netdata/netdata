@@ -24,7 +24,7 @@ function add_netdata_to_proxmox_conf_files_group() {
   fi
 
   if ! getent group "${group_guid}" | grep -q "${DOCKER_USR}"; then
-    echo "Assign ${DOCKER_USR} user to group ${group_guid}"
+    echo "Assigning ${DOCKER_USR} user to group ${group_guid}"
     if ! usermod --apend --groups "${group_guid}" "${DOCKER_USR}"; then
       echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_guid}."
       return
@@ -81,7 +81,7 @@ if [ "${EUID}" -eq 0 ]; then
   if [ -n "${PGID}" ]; then
     echo "Creating docker group ${PGID} with GID ${PGID}"
     addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with GID ${PGID}, probably one already exists"
-    echo "Assign ${DOCKER_USR} user to group with GID ${PGID}"
+    echo "Assigning ${DOCKER_USR} user to group with GID ${PGID}"
     usermod --append --groups "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add ${DOCKER_USR} user to group with GID ${PGID}"
   fi
 
