@@ -17,7 +17,7 @@ function add_netdata_to_proxmox_conf_files_group() {
 
   if ! getent group "${group_guid}" >/dev/null; then
     echo "Creating proxmox-etc-pve group with GID ${group_guid}"
-    if ! addgroup -g "${group_guid}" "proxmox-etc-pve"; then
+    if ! addgroup --gid "${group_guid}" "proxmox-etc-pve"; then
       echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
       return
     fi
@@ -25,7 +25,7 @@ function add_netdata_to_proxmox_conf_files_group() {
 
   if ! getent group "${group_guid}" | grep -q "${DOCKER_USR}"; then
     echo "Assign ${DOCKER_USR} user to group ${group_guid}"
-    if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
+    if ! usermod --apend --groups "${group_guid}" "${DOCKER_USR}"; then
       echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_guid}."
       return
     fi
