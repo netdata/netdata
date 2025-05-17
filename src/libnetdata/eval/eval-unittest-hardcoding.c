@@ -11,7 +11,7 @@ typedef struct {
     NETDATA_DOUBLE hardcode_value;  // Value to hardcode (NAN for testing NaN)
     const char *expected_source;    // Expected expression source after hardcoding
     NETDATA_DOUBLE expected_result; // Expected result after evaluation
-    int expected_error;             // Expected error code (EVAL_ERROR_OK if no error)
+    EVAL_ERROR expected_error;      // Expected error code (EVAL_ERROR_OK if no error)
 } HardcodeTestCase;
 
 int eval_hardcode_unittest(void) {
@@ -166,12 +166,12 @@ int eval_hardcode_unittest(void) {
         
         // Parse the expression
         const char *failed_at = NULL;
-        int error = 0;
+        EVAL_ERROR error = EVAL_ERROR_OK;
         EVAL_EXPRESSION *exp = expression_parse(tc->expression, &failed_at, &error);
         
         if (!exp) {
             printf("  FAILED: Could not parse expression, error: %d (%s)\n", 
-                   error, expression_strerror(error));
+                   (int)error, expression_strerror(error));
             failed++;
             continue;
         }
@@ -206,9 +206,9 @@ int eval_hardcode_unittest(void) {
         bool error_correct = (exp->error == tc->expected_error);
         if (!error_correct) {
             printf("  FAILED: Error code doesn't match expected.\n");
-            printf("  Expected error: %d (%s)\n", 
+            printf("  Expected error: %u (%s)\n",
                   tc->expected_error, expression_strerror(tc->expected_error));
-            printf("  Actual error:   %d (%s)\n", 
+            printf("  Actual error:   %u (%s)\n",
                   exp->error, expression_strerror(exp->error));
         }
         
