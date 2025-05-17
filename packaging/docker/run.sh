@@ -23,10 +23,10 @@ function add_netdata_to_proxmox_conf_files_group() {
     fi
   fi
 
-  if ! getent group "${group_guid}" | grep -q netdata; then
-    echo "Assign netdata user to group ${group_guid}"
+  if ! getent group "${group_guid}" | grep -q "${DOCKER_USR}"; then
+    echo "Assign ${DOCKER_USR} user to group ${group_guid}"
     if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
-      echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
+      echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_guid}."
       return
     fi
   fi
@@ -79,12 +79,11 @@ if [ "${EUID}" -eq 0 ]; then
   export DOCKER_HOST
 
   if [ -n "${PGID}" ]; then
-    echo "Creating docker group ${PGID}"
-    addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, probably one already exists"
-    echo "Assign netdata user to docker group ${PGID}"
-    GROUP_NAME=$(getent group "${PGID}" | cut -d: -f1)
-    echo "Assign netdata user to group ${GROUP_NAME} (GID: ${PGID})"
-    usermod --append --groups "${GROUP_NAME}" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group ${GROUP_NAME} with ID ${PGID}"
+    echo "Creating docker group ${PGID} with GID ${PGID}"
+    addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with GID ${PGID}, probably one already exists"
+    PGROUPNAME=$(getent group "${PGID}" | cut -d: -f1)
+    echo "Assign ${DOCKER_USR} user to group ${PGROUPNAME} with GID ${PGID}"
+    usermod --append --groups "${PGROUPNAME}" "${DOCKER_USR}" || echo >&2 "Could not add ${DOCKER_USR} user to group ${PGROUPNAME} with GID ${PGID}"
   fi
 
   if [ -d "/host/etc/pve" ]; then
