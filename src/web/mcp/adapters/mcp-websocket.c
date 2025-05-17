@@ -33,6 +33,10 @@ static MCP_CLIENT *mcp_websocket_create_context(struct websocket_server_client *
     if (!wsc) return NULL;
 
     MCP_CLIENT *ctx = mcp_create_client(MCP_TRANSPORT_WEBSOCKET, wsc);
+    if (ctx) {
+        // Set pointer to the websocket client's user_auth
+        ctx->user_auth = &wsc->user_auth;
+    }
     mcp_websocket_set_context(wsc, ctx);
     
     return ctx;

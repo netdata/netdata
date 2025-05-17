@@ -342,7 +342,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
 
     nd_sock_init(&rpt->sock, netdata_ssl_web_server_ctx, false);
-    rpt->remote_ip = strdupz(w->client_ip);
+    rpt->remote_ip = strdupz(w->user_auth.client_ip);
     rpt->remote_port = strdupz(w->client_port);
 
     rpt->config.update_every = nd_profile.update_every;
@@ -530,7 +530,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         return stream_receiver_response_permission_denied(w);
     }
 
-    if(!stream_conf_api_key_allows_client(rpt->key, w->client_ip)) {
+    if(!stream_conf_api_key_allows_client(rpt->key, w->user_auth.client_ip)) {
         stream_receiver_log_status(
             rpt,
             "rejecting streaming connection; API key is not allowed from this IP",
@@ -562,7 +562,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         return stream_receiver_response_permission_denied(w);
     }
 
-    if(!stream_conf_api_key_allows_client(rpt->machine_guid, w->client_ip)) {
+    if(!stream_conf_api_key_allows_client(rpt->machine_guid, w->user_auth.client_ip)) {
         stream_receiver_log_status(
             rpt,
             "rejecting streaming connection; machine UUID is not allowed from this IP",

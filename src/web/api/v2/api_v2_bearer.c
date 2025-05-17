@@ -132,8 +132,8 @@ int api_v2_bearer_get_token(RRDHOST *host, struct web_client *w, char *url) {
         claim_id,
         machine_guid,
         node_id,
-        w->user_role,
-        w->access,
-        w->auth.cloud_account_id,
-        w->auth.client_name);
+        w->user_auth.user_role,
+        w->user_auth.access,
+        w->user_auth.cloud_account_id.uuid,
+        w->user_auth.client_name);
 }
