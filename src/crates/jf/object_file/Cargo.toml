@@ -1,0 +1,12 @@
+[package]
+name = "object_file"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+memmap2 = { workspace = true }
+zerocopy = { workspace =  true }
+error = { path = "../error" }
+window_manager = { path = "../window_manager" }
+siphasher = { workspace = true }
+twox-hash = { workspace = true }

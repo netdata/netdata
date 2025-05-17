@@ -1,0 +1,18 @@
+[package]
+name = "journal_reader_ffi"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+error = { path = "../error" }
+journal_reader = { path = "../journal_reader" }
+object_file = { path = "../object_file" }
+memmap2 = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+cbindgen = "0.28.0"
+
+[lib]
+crate-type = ["staticlib"]

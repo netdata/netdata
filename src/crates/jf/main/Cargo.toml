@@ -1,0 +1,13 @@
+[package]
+name = "main"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+object_file = { path = "../object_file" }
+journal_reader = { path = "../journal_reader" }
+journal_logger = { path = "../journal_logger" }
+zerocopy = { workspace = true }
+error = { path = "../error" }
+window_manager = { path = "../window_manager" }
+chrono = "0.4"
