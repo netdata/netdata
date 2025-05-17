@@ -36,6 +36,7 @@ struct netdata_mssql_conn {
     SQLHSTMT databaseListSTMT;
     SQLHSTMT dataFileSizeSTMT;
     SQLHSTMT dbTransactionSTMT;
+    SQLHSTMT dbWaitsSTMT;
     SQLHSTMT dbLocksSTMT;
 
     BOOL is_connected;
@@ -678,6 +679,10 @@ static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbLocksSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
             retConn = FALSE;
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbWaitsSTMT);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+            retConn = FALSE;
     }
 
     return retConn;
@@ -840,6 +845,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     dbconn->databaseListSTMT = NULL;
     dbconn->dataFileSizeSTMT = NULL;
     dbconn->dbTransactionSTMT = NULL;
+    dbconn->dbWaitsSTMT = NULL;
     dbconn->dbLocksSTMT = NULL;
 
     dbconn->is_connected = FALSE;
