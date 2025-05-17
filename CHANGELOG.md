@@ -6,14 +6,20 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/prometheus/common from 0.63.0 to 0.64.0 in /src/go [\#20296](https://github.com/netdata/netdata/pull/20296) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump k8s.io/client-go from 0.33.0 to 0.33.1 in /src/go [\#20295](https://github.com/netdata/netdata/pull/20295) ([dependabot[bot]](https://github.com/apps/dependabot))
+- fix\(go.d\): sanitize vnode labels before creating vnode [\#20293](https://github.com/netdata/netdata/pull/20293) ([ilyam8](https://github.com/ilyam8))
+- Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
 - add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20284](https://github.com/netdata/netdata/pull/20284) ([netdatabot](https://github.com/netdatabot))
 - Improved StatsD documentation [\#20282](https://github.com/netdata/netdata/pull/20282) ([kanelatechnical](https://github.com/kanelatechnical))
+- Improve agent shutdown [\#20280](https://github.com/netdata/netdata/pull/20280) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#20279](https://github.com/netdata/netdata/pull/20279) ([netdatabot](https://github.com/netdatabot))
 - docs: update mssql meta [\#20278](https://github.com/netdata/netdata/pull/20278) ([ilyam8](https://github.com/ilyam8))
 - New Windows Metrics \(CPU and Memory\) [\#20277](https://github.com/netdata/netdata/pull/20277) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): small cleanup snmp profiles code [\#20274](https://github.com/netdata/netdata/pull/20274) ([ilyam8](https://github.com/ilyam8))
 - Switch to poll from epoll [\#20273](https://github.com/netdata/netdata/pull/20273) ([stelfrag](https://github.com/stelfrag))
+- comment metric tags that could be metrics [\#20272](https://github.com/netdata/netdata/pull/20272) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump golang.org/x/net from 0.39.0 to 0.40.0 in /src/go [\#20270](https://github.com/netdata/netdata/pull/20270) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/miekg/dns from 1.1.65 to 1.1.66 in /src/go [\#20268](https://github.com/netdata/netdata/pull/20268) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update Netdata README with improved structure [\#20265](https://github.com/netdata/netdata/pull/20265) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -459,13 +465,6 @@
 - fix\(go.d/nvidia\_smi\): handle xml gpu\_power\_readings change [\#19759](https://github.com/netdata/netdata/pull/19759) ([ilyam8](https://github.com/ilyam8))
 - status file timings per step [\#19758](https://github.com/netdata/netdata/pull/19758) ([ktsaou](https://github.com/ktsaou))
 - improvement\(go.d/sd/snmp\): support device cache ttl 0 [\#19756](https://github.com/netdata/netdata/pull/19756) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/sd/snmp\): comment out  defaults in snmp.conf [\#19755](https://github.com/netdata/netdata/pull/19755) ([ilyam8](https://github.com/ilyam8))
-- Add documentation outlining how to use custom CA certificates with Netdata. [\#19754](https://github.com/netdata/netdata/pull/19754) ([Ferroin](https://github.com/Ferroin))
-- status file version 8 [\#19753](https://github.com/netdata/netdata/pull/19753) ([ktsaou](https://github.com/ktsaou))
-- status file improvements \(dedup and signal handler use\) [\#19751](https://github.com/netdata/netdata/pull/19751) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.3 to 0.2.5 in /src/go [\#19750](https://github.com/netdata/netdata/pull/19750) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/likexian/whois from 1.15.5 to 1.15.6 in /src/go [\#19749](https://github.com/netdata/netdata/pull/19749) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.2 to 1.17.3 in /src/go [\#19748](https://github.com/netdata/netdata/pull/19748) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
