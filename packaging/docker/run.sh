@@ -84,6 +84,7 @@ if [ "${EUID}" -eq 0 ]; then
     PGROUPNAME=$(getent group "${PGID}" | cut -d: -f1)
     echo "Assign ${DOCKER_USR} user to group ${PGROUPNAME} with GID ${PGID}"
     usermod --append --groups "${PGROUPNAME}" "${DOCKER_USR}" || echo >&2 "Could not add ${DOCKER_USR} user to group ${PGROUPNAME} with GID ${PGID}"
+    unset PGROUPNAME
   fi
 
   if [ -d "/host/etc/pve" ]; then
