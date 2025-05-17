@@ -80,9 +80,9 @@ if [ "${EUID}" -eq 0 ]; then
 
   if [ -n "${PGID}" ]; then
     echo "Creating docker group ${PGID} with GID ${PGID}"
-    addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with GID ${PGID}, probably one already exists"
+    addgroup --gid "${PGID}" "docker" || echo >&2 "Failed to add group docker with GID ${PGID}, probably one already exists."
     echo "Assigning ${DOCKER_USR} user to group with GID ${PGID}"
-    usermod --append --groups "${PGID}" "${DOCKER_USR}" || echo >&2 "Could not add ${DOCKER_USR} user to group with GID ${PGID}"
+    usermod --append --groups "${PGID}" "${DOCKER_USR}" || echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${PGID}."
   fi
 
   if [ -d "/host/etc/pve" ]; then
