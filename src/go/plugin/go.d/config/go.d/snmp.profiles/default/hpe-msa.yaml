@@ -20,6 +20,7 @@ metrics:
 #      - OID: 1.3.6.1.3.94.1.8.1.6
 #        name: hpe.fibrechannel.connUnitSensorMessage
 # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.3.94.1.8.1.3
@@ -63,6 +64,7 @@ metrics:
     symbols:
       - name: hpe.fibrechannel.connUnitPort
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.3
@@ -142,6 +144,7 @@ metrics:
         tag: hpe_fibrechannel_conn_unit_port_name
         description: String describing the addressed port
         unit: "{port}"
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.3.94.1.10.1.6
           name: connUnitPortState

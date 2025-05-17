@@ -44,6 +44,7 @@ metrics:
         constant_value_one: true
         description: Operational status of the FxPort.
         unit: "{status}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1  # fcFeModuleIndex is index #1 of fcFxPortEntry
         tag: fc_fe_module_index
@@ -77,6 +78,7 @@ metrics:
         constant_value_one: true
         description: Physical status of the FxPort.
         unit: "{status}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1  # fcFeModuleIndex is index #1 of fcFxPortEntry
         tag: fc_fe_module_index

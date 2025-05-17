@@ -64,6 +64,7 @@ metrics:
         constant_value_one: true
         description: Meraki dev constant value one
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       # devMac is part of the devTable index
       - symbol:

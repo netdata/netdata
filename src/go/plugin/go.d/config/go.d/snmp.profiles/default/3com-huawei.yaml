@@ -42,6 +42,7 @@ metrics:
         constant_value_one: true
         description: Fan status indicator
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: fan_num
@@ -63,6 +64,7 @@ metrics:
         constant_value_one: true
         description: Power status indicator
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: power_num

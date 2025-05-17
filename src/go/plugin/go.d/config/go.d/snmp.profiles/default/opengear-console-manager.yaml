@@ -24,6 +24,7 @@ metrics:
         metric_type: monotonic_count
         description: Number of bytes transmitted on the serial port
         unit: "By"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1  # ogSerialPortIndex
         tag: og_serial_port_index
@@ -130,6 +131,7 @@ metrics:
         metric_type: monotonic_count
         description: Number of cell modem events counted
         unit: "{event}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1  # ogCellModemIndex
         tag: og_cell_modem_index

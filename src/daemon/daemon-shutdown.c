@@ -85,9 +85,10 @@ void cancel_main_threads(void) {
     }
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        struct netdata_static_thread *st = &static_threads[i];
-        if(st->thread && !nd_thread_is_me(static_threads[i].thread))
-            nd_thread_join(st->thread);
+        if(static_threads[i].thread && !nd_thread_is_me(static_threads[i].thread)) {
+            if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+                nd_thread_join(static_threads[i].thread);
+        }
     }
     netdata_log_info("All threads finished.");
 
@@ -197,8 +198,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
-    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
+    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS | SERVICE_ACLK |
                         ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
+
+    service_signal_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD);
+
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
     service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 5 * USEC_PER_SEC);

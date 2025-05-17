@@ -29,6 +29,7 @@ metrics:
           name: vmwHbaDeviceName
           OID: 1.3.6.1.4.1.6876.3.5.2.1.2
         tag: vmw_hba_device_name
+        # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.6876.3.5.2.1.4
           name: vmwHbaStatus
@@ -50,6 +51,7 @@ metrics:
         constant_value_one: true
         description: "Hardware environment"
         unit: "{hardware_environment}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: vmwSubsystemType

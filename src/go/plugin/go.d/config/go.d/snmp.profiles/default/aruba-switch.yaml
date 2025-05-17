@@ -97,6 +97,7 @@ metrics:
         constant_value_one: true
         description: Fan constant value one
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: fan_index
         symbol:

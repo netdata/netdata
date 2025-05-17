@@ -204,7 +204,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
         .session_id = aclk_session_newarch,
-        .capabilities = aclk_get_agent_capas()
+        .capabilities = aclk_get_agent_capas(),
     };
 
     CLAIM_ID claim_id = claim_id_get();

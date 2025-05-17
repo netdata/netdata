@@ -242,6 +242,7 @@ metrics:
         metric_type: monotonic_count
         description: Number of log target events pending
         unit: "{event}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: ibm.dpStatusLogTargetStatusLogTarget
@@ -306,6 +307,7 @@ metrics:
         metric_type: monotonic_count
         description: Number of transmitted packets dropped
         unit: "{packet}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: ibm.dpStatusNetworkInterfaceStatusInterfaceType
