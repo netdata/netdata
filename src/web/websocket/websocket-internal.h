@@ -108,6 +108,9 @@ struct websocket_server_client {
     char client_port[NI_MAXSERV];
     WEBSOCKET_PROTOCOL protocol; // The negotiated subprotocol
 
+    // Authentication info
+    USER_AUTH user_auth;          // Authentication information copied from web_client
+
     // Thread management
     struct websocket_thread *wth; // The thread handling this client
     struct websocket_server_client *prev; // Linked list for thread's client management

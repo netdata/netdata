@@ -55,8 +55,8 @@ static void dyncfg_log_user_action(DYNCFG *df, struct dyncfg_call *dc) {
             break;
     }
 
-    PARSED_REQUEST_SOURCE req;
-    if(!parse_request_source(dc->source, &req)) {
+    USER_AUTH req;
+    if(!user_auth_from_source(dc->source, &req)) {
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_MODULE, "DYNCFG"),
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, localhost->hostname),

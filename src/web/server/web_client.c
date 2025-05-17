@@ -32,16 +32,16 @@ void web_client_set_conn_webrtc(struct web_client *w) {
 }
 
 void web_client_reset_permissions(struct web_client *w) {
-    web_client_flags_clear_auth(w);
-    w->access = HTTP_ACCESS_NONE;
-    w->user_role = HTTP_USER_ROLE_NONE;
+    w->user_auth.method = USER_AUTH_METHOD_NONE;
+    w->user_auth.access = HTTP_ACCESS_NONE;
+    w->user_auth.user_role = HTTP_USER_ROLE_NONE;
 }
 
-void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth) {
+void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, USER_AUTH_METHOD type) {
     web_client_reset_permissions(w);
-    web_client_flag_set(w, auth & WEB_CLIENT_FLAG_ALL_AUTHS);
-    w->access = access;
-    w->user_role = role;
+    w->user_auth.method = type;
+    w->user_auth.access = access;
+    w->user_auth.user_role = role;
 }
 
 inline int web_client_permission_denied_acl(struct web_client *w) {
@@ -56,14 +56,14 @@ inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
 
-    if(w->access & HTTP_ACCESS_SIGNED_ID)
+    if(w->user_auth.access & HTTP_ACCESS_SIGNED_ID)
         buffer_strcat(w->response.data,
                       "You don't have enough permissions to access this resource");
     else
         buffer_strcat(w->response.data,
                       "You need to be authorized to access this resource");
 
-    w->response.code = HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(w->access);
+    w->response.code = HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(w->user_auth.access);
     return w->response.code;
 }
 
@@ -153,9 +153,6 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     freez(w->forwarded_host);
     w->forwarded_host = NULL;
 
-    freez(w->forwarded_for);
-    w->forwarded_for = NULL;
-
     freez(w->origin);
     w->origin = NULL;
 
@@ -189,6 +186,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 
     memset(w->transaction, 0, sizeof(w->transaction));
     memset(&w->auth, 0, sizeof(w->auth));
+    memset(&w->user_auth, 0, sizeof(w->user_auth));
 
     web_client_reset_permissions(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
@@ -219,13 +217,13 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_TOTAL_TIME_USEC, total_ut),
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->user_auth.client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
-            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
-            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
-            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
-            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->user_auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_auth.user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->user_auth.access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -538,19 +536,19 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
 
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment) {
     ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->user_auth.client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
-            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
-            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
-            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
-            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->user_auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_auth.user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->user_auth.access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -560,7 +558,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
         query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                        buffer_tostring(w->url_as_received),
                                        w->payload,
-                                       w->forwarded_for ? w->forwarded_for : w->client_ip);
+                                       w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
     }
 
     // get the api version
@@ -1060,10 +1058,10 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
-            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
-            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
-            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->user_auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_auth.user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->user_auth.access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1281,19 +1279,19 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, web_server_log_transport, w),
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->user_auth.client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
-            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
-            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
-            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
-            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->user_auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_auth.user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->user_auth.access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1312,7 +1310,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                                buffer_tostring(w->url_as_received),
                                                w->payload,
-                                               w->forwarded_for ? w->forwarded_for : w->client_ip);
+                                               w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
             }
 
             // Check if this is a WebSocket upgrade request

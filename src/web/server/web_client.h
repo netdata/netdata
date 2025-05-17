@@ -49,7 +49,7 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_CONN_CLOUD              = (1 << 13), // the client is using Netdata Cloud
     WEB_CLIENT_FLAG_CONN_WEBRTC             = (1 << 14), // the client is using WebRTC
 
-    // streaming
+    // streaming and websocket
     WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET       = (1 << 15), // don't close the socket when cleaning up
 
     // dashboard version
@@ -60,17 +60,12 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 20), // the path has a trailing hash
     WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 21), // the path ends with a filename extension
 
-    // authorization
-    WEB_CLIENT_FLAG_AUTH_CLOUD              = (1 << 22),
-    WEB_CLIENT_FLAG_AUTH_BEARER             = (1 << 23),
-    WEB_CLIENT_FLAG_AUTH_GOD                = (1 << 24),
-
     // transient settings
-    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 25), // flag to avoid redoing progress work
+    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 22), // flag to avoid redoing progress work
     
     // websocket flags
-    WEB_CLIENT_FLAG_WEBSOCKET_CLIENT        = (1 << 26), // this is a websocket client
-    WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE     = (1 << 27), // websocket handshake detected
+    WEB_CLIENT_FLAG_WEBSOCKET_CLIENT        = (1 << 23), // this is a websocket client
+    WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE     = (1 << 24), // websocket handshake detected
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
@@ -117,10 +112,6 @@ typedef enum __attribute__((packed)) {
 #define web_client_check_conn_webrtc(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_WEBRTC)
 #define web_client_flags_clear_conn(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_CONN_TCP | WEB_CLIENT_FLAG_CONN_UNIX | WEB_CLIENT_FLAG_CONN_CLOUD | WEB_CLIENT_FLAG_CONN_WEBRTC)
 
-#define WEB_CLIENT_FLAG_ALL_AUTHS (WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER | WEB_CLIENT_FLAG_AUTH_GOD)
-#define web_client_flags_check_auth(w) web_client_flag_check(w, WEB_CLIENT_FLAG_ALL_AUTHS)
-#define web_client_flags_clear_auth(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_ALL_AUTHS)
-
 #define web_client_is_websocket(w) web_client_flag_check(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT)
 #define web_client_set_websocket(w) web_client_flag_set(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT)
 #define web_client_clear_websocket(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT)
@@ -130,7 +121,7 @@ typedef enum __attribute__((packed)) {
 #define web_client_clear_websocket_handshake(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE)
 
 void web_client_reset_permissions(struct web_client *w);
-void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth);
+void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, USER_AUTH_METHOD type);
 
 void web_client_set_conn_tcp(struct web_client *w);
 void web_client_set_conn_unix(struct web_client *w);
@@ -146,8 +137,6 @@ void web_client_set_conn_webrtc(struct web_client *w);
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_MAX_SIZE (128 * 1024)
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
-
-#define CLOUD_CLIENT_NAME_LENGTH 64
 
 struct response {
     BUFFER *header;         // our response header
@@ -178,13 +167,13 @@ struct web_client {
     HTTP_ACL acl;                       // the access list of the client
     HTTP_ACL port_acl;                  // the operations permitted on the port the client connected to
     HTTP_ACCESS access;                 // the access permissions of the client
-    HTTP_USER_ROLE user_role;           // the user role of the client
     size_t header_parse_tries;
     size_t header_parse_last_size;
 
     int fd;
 
-    char client_ip[INET6_ADDRSTRLEN];   // Defined buffer sizes include null-terminators
+    USER_AUTH user_auth;                // the user authentication data
+
     char client_port[NI_MAXSERV];
     char client_host[NI_MAXHOST];
 
@@ -196,7 +185,6 @@ struct web_client {
     char *auth_bearer_token;            // the Bearer auth token (if sent)
     char *server_host;                  // the Host: header
     char *forwarded_host;               // the X-Forwarded-Host: header
-    char *forwarded_for;                // the X-Forwarded-For: header
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
 
@@ -215,8 +203,6 @@ struct web_client {
 
     struct {
         nd_uuid_t bearer_token;
-        nd_uuid_t cloud_account_id;
-        char client_name[CLOUD_CLIENT_NAME_LENGTH];
     } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped

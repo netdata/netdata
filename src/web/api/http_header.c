@@ -113,10 +113,9 @@ static void http_header_x_forwarded_host(struct web_client *w, const char *v, si
 }
 
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
-    char buffer[NI_MAXHOST];
-    strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
-    freez(w->forwarded_for);
-    w->forwarded_for = strdupz(buffer);
+    if(len)
+        strncpyz(w->user_auth.forwarded_for, v,
+                 (len < sizeof(w->user_auth.forwarded_for) - 1 ? len : sizeof(w->user_auth.forwarded_for) - 1));
 }
 
 static void http_header_x_transaction_id(struct web_client *w, const char *v, size_t len) {
@@ -129,7 +128,7 @@ static void http_header_x_netdata_account_id(struct web_client *w, const char *v
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         char buffer[UUID_STR_LEN * 2];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
-        (void) uuid_parse_flexi(buffer, w->auth.cloud_account_id); // will not alter w->cloud_account_id if it fails
+        (void) uuid_parse_flexi(buffer, w->user_auth.cloud_account_id.uuid); // will not alter w->cloud_account_id if it fails
     }
 }
 
@@ -138,32 +137,32 @@ static void http_header_x_netdata_role(struct web_client *w, const char *v, size
         char buffer[100];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
         if (strcasecmp(buffer, "admin") == 0)
-            w->user_role = HTTP_USER_ROLE_ADMIN;
+            w->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
         else if(strcasecmp(buffer, "manager") == 0)
-            w->user_role = HTTP_USER_ROLE_MANAGER;
+            w->user_auth.user_role = HTTP_USER_ROLE_MANAGER;
         else if(strcasecmp(buffer, "troubleshooter") == 0)
-            w->user_role = HTTP_USER_ROLE_TROUBLESHOOTER;
+            w->user_auth.user_role = HTTP_USER_ROLE_TROUBLESHOOTER;
         else if(strcasecmp(buffer, "observer") == 0)
-            w->user_role = HTTP_USER_ROLE_OBSERVER;
+            w->user_auth.user_role = HTTP_USER_ROLE_OBSERVER;
         else if(strcasecmp(buffer, "member") == 0)
-            w->user_role = HTTP_USER_ROLE_MEMBER;
+            w->user_auth.user_role = HTTP_USER_ROLE_MEMBER;
         else if(strcasecmp(buffer, "billing") == 0)
-            w->user_role = HTTP_USER_ROLE_BILLING;
+            w->user_auth.user_role = HTTP_USER_ROLE_BILLING;
         else
-            w->user_role = HTTP_USER_ROLE_MEMBER;
+            w->user_auth.user_role = HTTP_USER_ROLE_MEMBER;
     }
 }
 
 static void http_header_x_netdata_permissions(struct web_client *w, const char *v, size_t len __maybe_unused) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         HTTP_ACCESS access = http_access_from_hex(v);
-        web_client_set_permissions(w, access, w->user_role, WEB_CLIENT_FLAG_AUTH_CLOUD);
+        web_client_set_permissions(w, access, w->user_auth.user_role, USER_AUTH_METHOD_CLOUD);
     }
 }
 
 static void http_header_x_netdata_user_name(struct web_client *w, const char *v, size_t len) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
-        strncpyz(w->auth.client_name, v, (len < sizeof(w->auth.client_name) - 1 ? len : sizeof(w->auth.client_name) - 1));
+        strncpyz(w->user_auth.client_name, v, (len < sizeof(w->user_auth.client_name) - 1 ? len : sizeof(w->user_auth.client_name) - 1));
     }
 }
 

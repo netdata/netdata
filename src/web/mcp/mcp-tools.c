@@ -55,6 +55,9 @@ extern MCP_RETURN_CODE mcp_tool_list_nodes_execute(MCP_CLIENT *mcpc, struct json
 extern void mcp_tool_node_details_schema(BUFFER *buffer);
 extern MCP_RETURN_CODE mcp_tool_node_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 
+extern void mcp_tool_execute_function_schema(BUFFER *buffer);
+extern MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
+
 // Tool definition structure
 typedef struct {
     const char *name;         // Tool name
@@ -133,6 +136,19 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .execute_callback = mcp_tool_node_details_execute,
         .schema_callback = mcp_tool_node_details_schema,
         .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = "execute_function",
+        .title = "Execute a function on a specific node",
+        .description = "Allows the execution of registered functions on a specific node.\n"
+                       "These functions provide various operations and capabilities defined by the node.\n"
+                       "Use node_details tool to discover available functions on each node.\n"
+                       "Functions accept parameters, so run them with the 'help' parameter to find out\n"
+                       "which parameters they accept.",
+        .execute_callback = mcp_tool_execute_function_execute,
+        .schema_callback = mcp_tool_execute_function_schema,
+        .read_only_hint = false, // This tool can modify state
         .open_world_hint = false
     },
 
