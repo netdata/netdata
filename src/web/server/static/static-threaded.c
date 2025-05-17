@@ -32,11 +32,11 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
     w = web_client_get_from_cache();
     w->fd = pi->fd;
 
-    strncpyz(w->client_ip,   pi->client_ip,   sizeof(w->client_ip) - 1);
+    strncpyz(w->user_auth.client_ip,   pi->client_ip,   sizeof(w->user_auth.client_ip) - 1);
     strncpyz(w->client_port, pi->client_port, sizeof(w->client_port) - 1);
     strncpyz(w->client_host, pi->client_host, sizeof(w->client_host) - 1);
 
-    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+    if(unlikely(!*w->user_auth.client_ip))   strcpy(w->user_auth.client_ip,   "-");
     if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
 	w->port_acl = pi->port_acl;
 

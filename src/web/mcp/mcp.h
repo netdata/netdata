@@ -97,6 +97,9 @@ typedef struct mcp_client {
         void *generic;                              // Generic context
     };
     
+    // Authentication and authorization
+    USER_AUTH *user_auth;                          // Pointer to user auth from the underlying transport
+    
     // Client information
     STRING *client_name;                           // Client name (for logging, interned)
     STRING *client_version;                        // Client version (for logging, interned)

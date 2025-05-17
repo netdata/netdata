@@ -287,6 +287,8 @@ static bool websocket_send_first_response(WS_CLIENT *wsc, const char *accept_key
 
 // Handle the WebSocket handshake procedure
 short int websocket_handle_handshake(struct web_client *w) {
+    web_client_ensure_proper_authorization(w);
+
     if (!websocket_detect_handshake_request(w))
         return HTTP_RESP_BAD_REQUEST;
 
@@ -299,8 +301,11 @@ short int websocket_handle_handshake(struct web_client *w) {
     WS_CLIENT *wsc = websocket_client_create();
 
     // Copy client information
-    strncpyz(wsc->client_ip, w->client_ip, sizeof(wsc->client_ip));
+    strncpyz(wsc->client_ip, w->user_auth.client_ip, sizeof(wsc->client_ip));
     strncpyz(wsc->client_port, w->client_port, sizeof(wsc->client_port));
+
+    // Copy user authentication and authorization information
+    wsc->user_auth = w->user_auth;
 
     // Check for max_frame_size parameter in the URL query string
     if (w->url_query_string_decoded && buffer_strlen(w->url_query_string_decoded) > 0) {
