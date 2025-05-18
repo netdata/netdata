@@ -300,10 +300,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
 
     websocket_threads_join();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
+
     nd_thread_join_threads();
+    watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
+
     sqlite_close_databases();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
 
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
