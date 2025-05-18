@@ -99,32 +99,32 @@ void web_client_update_acl_matches(struct web_client *w) {
 
     if(!(w->port_acl & HTTP_ACL_TRANSPORTS_WITHOUT_CLIENT_IP_VALIDATION)) {
         if (!web_allow_dashboard_from ||
-            connection_allowed(w->fd, w->client_ip, w->client_host, sizeof(w->client_host),
+            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                                web_allow_dashboard_from, "dashboard", web_allow_dashboard_dns))
             w->acl |= HTTP_ACL_DASHBOARD;
 
         if (!web_allow_registry_from ||
-            connection_allowed(w->fd, w->client_ip, w->client_host, sizeof(w->client_host),
+            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                                web_allow_registry_from, "registry", web_allow_registry_dns))
             w->acl |= HTTP_ACL_REGISTRY;
 
         if (!web_allow_badges_from ||
-            connection_allowed(w->fd, w->client_ip, w->client_host, sizeof(w->client_host),
+            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                                web_allow_badges_from, "badges", web_allow_badges_dns))
             w->acl |= HTTP_ACL_BADGES;
 
         if (!web_allow_mgmt_from ||
-            connection_allowed(w->fd, w->client_ip, w->client_host, sizeof(w->client_host),
+            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                                web_allow_mgmt_from, "management", web_allow_mgmt_dns))
             w->acl |= HTTP_ACL_MANAGEMENT;
 
         if (!web_allow_streaming_from ||
-            connection_allowed(w->fd, w->client_ip, w->client_host, sizeof(w->client_host),
+            connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                                web_allow_streaming_from, "streaming", web_allow_streaming_dns))
             w->acl |= HTTP_ACL_STREAMING;
 
         if (!web_allow_netdataconf_from ||
-           connection_allowed(w->fd, w->client_ip, w->client_host, sizeof(w->client_host),
+           connection_allowed(w->fd, w->user_auth.client_ip, w->client_host, sizeof(w->client_host),
                               web_allow_netdataconf_from, "netdata.conf", web_allow_netdataconf_dns))
             w->acl |= HTTP_ACL_NETDATACONF;
     }
@@ -139,13 +139,13 @@ void web_server_log_connection(struct web_client *w, const char *msg) {
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, SSL_connection(&w->ssl) ? "https" : "http"),
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->user_auth.client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
-            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    nd_log(NDLS_ACCESS, NDLP_DEBUG, "[%s]:%s %s", w->client_ip, w->client_port, msg);
+    nd_log(NDLS_ACCESS, NDLP_DEBUG, "[%s]:%s %s", w->user_auth.client_ip, w->client_port, msg);
 }

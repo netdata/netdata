@@ -317,9 +317,9 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
         if(item) {
             struct bearer_token *bt = dictionary_acquired_item_value(item);
             if (bt->expires_s > now_realtime_sec()) {
-                strncpyz(w->auth.client_name, bt->client_name, sizeof(w->auth.client_name) - 1);
-                uuid_copy(w->auth.cloud_account_id, bt->cloud_account_id);
-                web_client_set_permissions(w, bt->access, bt->user_role, WEB_CLIENT_FLAG_AUTH_BEARER);
+                strncpyz(w->user_auth.client_name, bt->client_name, sizeof(w->user_auth.client_name) - 1);
+                uuid_copy(w->user_auth.cloud_account_id.uuid, bt->cloud_account_id);
+                web_client_set_permissions(w, bt->access, bt->user_role, USER_AUTH_METHOD_BEARER);
                 rc = true;
             }
 
@@ -349,7 +349,7 @@ void bearer_tokens_destroy(void) {
 }
 
 bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
-    if(!web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER) || dst_len != UUID_STR_LEN)
+    if(w->user_auth.method != USER_AUTH_METHOD_BEARER || dst_len != UUID_STR_LEN)
         return false;
 
     uuid_unparse_lower(w->auth.bearer_token, dst);

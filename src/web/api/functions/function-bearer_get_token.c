@@ -27,7 +27,7 @@ static bool bearer_parse_json_payload(json_object *jobj, void *data, BUFFER *err
 }
 
 int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload, const char *source) {
-    if(!request_source_is_cloud(source))
+    if(!user_auth_source_is_cloud(source))
         return rrd_call_function_error(
             wb, "Bearer tokens can only be provided via NC.", HTTP_RESP_BAD_REQUEST);
 
@@ -62,19 +62,19 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
     buffer_json_member_add_string(payload, "claim_id", claim_id);
     buffer_json_member_add_string(payload, "machine_guid", machine_guid);
     buffer_json_member_add_string(payload, "node_id", node_id);
-    buffer_json_member_add_string(payload, "user_role", http_id2user_role(w->user_role));
-    http_access2buffer_json_array(payload, "access", w->access);
-    buffer_json_member_add_uuid(payload, "cloud_account_id", w->auth.cloud_account_id);
-    buffer_json_member_add_string(payload, "client_name", w->auth.client_name);
+    buffer_json_member_add_string(payload, "user_role", http_id2user_role(w->user_auth.user_role));
+    http_access2buffer_json_array(payload, "access", w->user_auth.access);
+    buffer_json_member_add_uuid(payload, "cloud_account_id", w->user_auth.cloud_account_id.uuid);
+    buffer_json_member_add_string(payload, "client_name", w->user_auth.client_name);
     buffer_json_finalize(payload);
 
     CLEAN_BUFFER *source = buffer_create(0, NULL);
-    web_client_api_request_vX_source_to_buffer(w, source);
+    user_auth_to_source_buffer(&w->user_auth, source);
 
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction_str);
     return rrd_function_run(host, w->response.data, 10,
-                            w->access, RRDFUNCTIONS_BEARER_GET_TOKEN, true,
+                            w->user_auth.access, RRDFUNCTIONS_BEARER_GET_TOKEN, true,
                             transaction_str, NULL, NULL,
                             NULL, NULL,
                             NULL, NULL,

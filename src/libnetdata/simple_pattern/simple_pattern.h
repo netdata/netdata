@@ -55,5 +55,6 @@ char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 
 #define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true) : NULL)
 #define string_to_simple_pattern_nocase(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, false) : NULL)
+#define string_to_simple_pattern_nocase_substring(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_SUBSTRING, false) : NULL)
 
 #endif //NETDATA_SIMPLE_PATTERN_H

@@ -7,36 +7,44 @@
  * In the MCP protocol, resources are application-controlled data stores that provide context to the model.
  * Resources are passive, meaning they provide data but don't perform actions on their own.
  * 
- * Key features of the resources namespace:
+ * Standard methods in the MCP specification:
  * 
- * 1. Resource Discovery:
- *    - Clients can list available resources (resources/list)
- *    - Get detailed descriptions and schemas (resources/describe, resources/getSchema)
- *    - Search for resources matching specific criteria (resources/search)
- * 
- * 2. Resource Access:
- *    - Retrieve specific resources or portions of resources (resources/get)
- *    - Access resources by ID or path
- *    - Resources can be structured or unstructured
- * 
- * 3. Resource Subscriptions:
- *    - Subscribe to updates for specific resources (resources/subscribe)
- *    - Unsubscribe from resources (resources/unsubscribe)
- *    - Get real-time updates when subscribed resources change
+ * 1. resources/list - Lists available resources
+ *    - Returns a collection of resources the server can provide
+ *    - May include resource metadata such as name, description, and URI
+ *    - Can be paginated for large resource collections
+ *
+ * 2. resources/read - Reads a specific resource by URI
+ *    - Takes a resource URI and returns its contents
+ *    - Contents can be text, binary data, or structured information
+ *    - URIs follow a standard format, typically with a scheme prefix
+ *
+ * 3. resources/templates/list - Lists available resource templates
+ *    - Returns a collection of URI templates for constructing resource URIs
+ *    - Templates describe how to construct valid resource URIs
+ *    - May include template descriptions and parameter information
+ *
+ * 4. resources/subscribe - Subscribes to changes in a resource
+ *    - Takes a resource URI and registers for change notifications
+ *    - When the resource changes, the server sends notifications
+ *    - Allows clients to maintain up-to-date views of resources
+ *
+ * 5. resources/unsubscribe - Unsubscribes from a resource
+ *    - Takes a resource URI and removes the subscription
+ *    - Stops receiving notifications for that resource
  * 
  * In the Netdata context, resources include:
  *    - metrics: Time-series data collected from various sources
  *    - logs: Log entries from system and application logs
  *    - alerts: Health monitoring alerts and notifications
- *    - functions: Live infrastructure snapshots providing real-time views
+ *    - contexts: Hierarchical organization of metrics and their metadata
  *    - nodes: Monitored infrastructure nodes with their metadata
  * 
- * Resources can be hierarchical or flat, and may support different access patterns
- * (e.g., time-based querying for metrics, full-text search for logs).
+ * Resources are identified by URIs (e.g., "nd://contexts") and can be hierarchical or flat,
+ * supporting different access patterns like time-based querying for metrics.
  */
 
 #include "mcp-resources.h"
-#include "mcp-initialize.h"
 #include "database/contexts/rrdcontext.h"
 
 // Audience enum - bitmask for the intended audience of a resource
@@ -47,7 +55,7 @@ typedef enum {
 } RESOURCE_AUDIENCE;
 
 // Function pointer type for resource read callbacks
-typedef MCP_RETURN_CODE (*resource_read_fn)(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id);
+typedef MCP_RETURN_CODE (*resource_read_fn)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 
 // Function pointer type for resource size callbacks
 typedef size_t (*resource_size_fn)(void);
@@ -75,7 +83,7 @@ typedef struct {
 } MCP_RESOURCE_TEMPLATE;
 
 // Basic implementation of the contexts resource read function
-static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !params || id == 0) return MCP_RC_INTERNAL_ERROR;
 
     // Extract URI from params to check for query parameters
@@ -98,8 +106,7 @@ static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_
     }
 
     mcp_init_success_result(mcpc, id);
-    buffer_json_member_add_object(mcpc->result, "result");
-    
+
     // Add the filtered contexts
     rrdcontext_context_registry_json_mcp_array(mcpc->result, pattern);
     
@@ -123,7 +130,7 @@ static MCP_RETURN_CODE mcp_resource_read_contexts(MCP_CLIENT *mcpc, struct json_
 }
 
 // Implementation of the context categories resource read function
-static MCP_RETURN_CODE mcp_resource_read_context_categories(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+static MCP_RETURN_CODE mcp_resource_read_context_categories(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !params || id == 0) return MCP_RC_INTERNAL_ERROR;
 
     // Extract URI from params to check for query parameters
@@ -146,8 +153,7 @@ static MCP_RETURN_CODE mcp_resource_read_context_categories(MCP_CLIENT *mcpc, st
     }
 
     mcp_init_success_result(mcpc, id);
-    buffer_json_member_add_object(mcpc->result, "result");
-    
+
     // Add the filtered context categories
     rrdcontext_context_registry_json_mcp_categories_array(mcpc->result, pattern);
     
@@ -254,8 +260,8 @@ static const MCP_RESOURCE_TEMPLATE mcp_resource_templates[] = {
     // Add more templates here as they are implemented
 };
 
-// Implementation of resources/list (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+// Implementation of resources/list
+static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
 
     // Initialize success response
@@ -263,74 +269,71 @@ static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_o
     
     // Create a resources array object
     buffer_json_member_add_array(mcpc->result, "resources");
-    
-    // Iterate through our resources array and add each one
-    for (size_t i = 0; i < _countof(mcp_resources); i++) {
-        const MCP_RESOURCE *resource = &mcp_resources[i];
-        
-        buffer_json_add_array_item_object(mcpc->result);
-        
-        // Add required fields
-        buffer_json_member_add_string(mcpc->result, "name", resource->name);
-        buffer_json_member_add_string(mcpc->result, "uri", resource->uri);
-        
-        // Add optional fields
-        if (resource->description) {
-            buffer_json_member_add_string(mcpc->result, "description", resource->description);
-        }
-        
-        // Convert the content_type enum to string
-        const char *mime_type = content_type_id2string(resource->content_type);
-        if (mime_type) {
-            buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
-        }
-        
-        // Add size information if available
-        if (resource->size_fn) {
-            size_t size = resource->size_fn();
-            if (size > 0) {
-                buffer_json_member_add_uint64(mcpc->result, "size", size);
+    {
+        // Iterate through our resources array and add each one
+        for (size_t i = 0; i < _countof(mcp_resources); i++) {
+            const MCP_RESOURCE *resource = &mcp_resources[i];
+
+            buffer_json_add_array_item_object(mcpc->result);
+
+            // Add required fields
+            buffer_json_member_add_string(mcpc->result, "name", resource->name);
+            buffer_json_member_add_string(mcpc->result, "uri", resource->uri);
+
+            // Add optional fields
+            if (resource->description) {
+                buffer_json_member_add_string(mcpc->result, "description", resource->description);
             }
+
+            // Convert the content_type enum to string
+            const char *mime_type = content_type_id2string(resource->content_type);
+            if (mime_type) {
+                buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
+            }
+
+            // Add size information if available
+            if (resource->size_fn) {
+                size_t size = resource->size_fn();
+                if (size > 0) {
+                    buffer_json_member_add_uint64(mcpc->result, "size", size);
+                }
+            }
+
+            // Add audience annotations if specified
+            if (resource->audience != 0) {
+                buffer_json_member_add_object(mcpc->result, "annotations");
+                {
+                    buffer_json_member_add_array(mcpc->result, "audience");
+                    {
+                        if (resource->audience & RESOURCE_AUDIENCE_USER) {
+                            buffer_json_add_array_item_string(mcpc->result, "user");
+                        }
+
+                        if (resource->audience & RESOURCE_AUDIENCE_ASSISTANT) {
+                            buffer_json_add_array_item_string(mcpc->result, "assistant");
+                        }
+                    }
+                    buffer_json_array_close(mcpc->result); // Close audience array
+
+                    // Add priority if it's non-zero
+                    if (resource->priority > 0) {
+                        buffer_json_member_add_double(mcpc->result, "priority", resource->priority);
+                    }
+                }
+                buffer_json_object_close(mcpc->result); // Close annotations object
+            }
+
+            buffer_json_object_close(mcpc->result); // Close resource object
         }
-        
-        // Add audience annotations if specified
-        if (resource->audience != 0) {
-            buffer_json_member_add_object(mcpc->result, "annotations");
-            
-            buffer_json_member_add_array(mcpc->result, "audience");
-            
-            if (resource->audience & RESOURCE_AUDIENCE_USER) {
-                buffer_json_add_array_item_string(mcpc->result, "user");
-            }
-            
-            if (resource->audience & RESOURCE_AUDIENCE_ASSISTANT) {
-                buffer_json_add_array_item_string(mcpc->result, "assistant");
-            }
-            
-            buffer_json_array_close(mcpc->result); // Close audience array
-            
-            // Add priority if it's non-zero
-            if (resource->priority > 0) {
-                buffer_json_member_add_double(mcpc->result, "priority", resource->priority);
-            }
-            
-            buffer_json_object_close(mcpc->result); // Close annotations object
-        }
-        
-        buffer_json_object_close(mcpc->result); // Close resource object
     }
-    
     buffer_json_array_close(mcpc->result); // Close resources array
-    buffer_json_object_close(mcpc->result); // Close result object
-    
-    // For now, no need for pagination since we have a small number of resources
-    // If we add many resources later, implement cursor-based pagination here
-    
+
+    buffer_json_finalize(mcpc->result);
     return MCP_RC_OK;
 }
 
-// Implementation of resources/read (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+// Implementation of resources/read
+static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0 || !params) return MCP_RC_INTERNAL_ERROR;
 
     // Extract URI from params
@@ -378,89 +381,83 @@ static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_o
     return MCP_RC_NOT_FOUND;
 }
 
-// Implementation of resources/templates/list (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+// Implementation of resources/templates/list
+static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
     // Create a resourceTemplates array object
-    buffer_json_member_add_object(mcpc->result, "result");
     buffer_json_member_add_array(mcpc->result, "resourceTemplates");
-    
-    // Iterate through our templates array and add each one
-    for (size_t i = 0; i < _countof(mcp_resource_templates); i++) {
-        const MCP_RESOURCE_TEMPLATE *template = &mcp_resource_templates[i];
-        
-        buffer_json_add_array_item_object(mcpc->result);
-        
-        // Add required fields
-        buffer_json_member_add_string(mcpc->result, "name", template->name);
-        buffer_json_member_add_string(mcpc->result, "uriTemplate", template->uri_template);
-        
-        // Add optional fields
-        if (template->description) {
-            buffer_json_member_add_string(mcpc->result, "description", template->description);
-        }
-        
-        // Convert the content_type enum to string
-        const char *mime_type = content_type_id2string(template->content_type);
-        if (mime_type) {
-            buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
-        }
-        
-        // Add audience annotations if specified
-        if (template->audience != 0) {
-            buffer_json_member_add_object(mcpc->result, "annotations");
-            
-            buffer_json_member_add_array(mcpc->result, "audience");
-            
-            if (template->audience & RESOURCE_AUDIENCE_USER) {
-                buffer_json_add_array_item_string(mcpc->result, "user");
-            }
-            
-            if (template->audience & RESOURCE_AUDIENCE_ASSISTANT) {
-                buffer_json_add_array_item_string(mcpc->result, "assistant");
-            }
-            
-            buffer_json_array_close(mcpc->result); // Close audience array
-            
-            // Add priority if it's non-zero
-            if (template->priority > 0) {
-                buffer_json_member_add_double(mcpc->result, "priority", template->priority);
-            }
-            
-            buffer_json_object_close(mcpc->result); // Close annotations object
-        }
-        
-        buffer_json_object_close(mcpc->result); // Close template object
-    }
-    
-    buffer_json_array_close(mcpc->result); // Close resourceTemplates array
-    buffer_json_object_close(mcpc->result); // Close result object
-    buffer_json_finalize(mcpc->result);
+    {
+        // Iterate through our templates array and add each one
+        for (size_t i = 0; i < _countof(mcp_resource_templates); i++) {
+            const MCP_RESOURCE_TEMPLATE *template = &mcp_resource_templates[i];
 
-    // For now, no need for pagination since we have a small number of templates
-    // If we add many templates later, implement cursor-based pagination here
-    
+            buffer_json_add_array_item_object(mcpc->result);
+
+            // Add required fields
+            buffer_json_member_add_string(mcpc->result, "name", template->name);
+            buffer_json_member_add_string(mcpc->result, "uriTemplate", template->uri_template);
+
+            // Add optional fields
+            if (template->description) {
+                buffer_json_member_add_string(mcpc->result, "description", template->description);
+            }
+
+            // Convert the content_type enum to string
+            const char *mime_type = content_type_id2string(template->content_type);
+            if (mime_type) {
+                buffer_json_member_add_string(mcpc->result, "mimeType", mime_type);
+            }
+
+            // Add audience annotations if specified
+            if (template->audience != 0) {
+                buffer_json_member_add_object(mcpc->result, "annotations");
+                {
+                    buffer_json_member_add_array(mcpc->result, "audience");
+                    {
+                        if (template->audience & RESOURCE_AUDIENCE_USER) {
+                            buffer_json_add_array_item_string(mcpc->result, "user");
+                        }
+
+                        if (template->audience & RESOURCE_AUDIENCE_ASSISTANT) {
+                            buffer_json_add_array_item_string(mcpc->result, "assistant");
+                        }
+                    }
+                    buffer_json_array_close(mcpc->result); // Close audience array
+
+                    // Add priority if it's non-zero
+                    if (template->priority > 0) {
+                        buffer_json_member_add_double(mcpc->result, "priority", template->priority);
+                    }
+                }
+                buffer_json_object_close(mcpc->result); // Close annotations object
+            }
+
+            buffer_json_object_close(mcpc->result); // Close template object
+        }
+    }
+
+    buffer_json_finalize(mcpc->result);
     return MCP_RC_OK;
 }
 
 // Implementation of resources/subscribe (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+static MCP_RETURN_CODE mcp_resources_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !id || !params) return MCP_RC_INTERNAL_ERROR;
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Implementation of resources/unsubscribe (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
+static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0 || !params) return MCP_RC_INTERNAL_ERROR;
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Resources namespace method dispatcher (transport-agnostic)
-MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
     netdata_log_debug(D_MCP, "MCP resources method: %s", method);

@@ -39,15 +39,14 @@ struct websocket_thread;
 #define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 // WebSocket frame constants
-#define WS_FIN                     0x80  // Final frame bit
-#define WS_RSV1                    0x40  // Reserved bit 1 (used for compression)
-#define WS_MASK                    0x80  // Mask bit
-// Frame size limit - affects fragmentation but not total message size
-#define WS_MAX_FRAME_LENGTH        (20 * 1024 * 1024) // 20MB max frame size
+#define WS_FIN                      0x80  // Final frame bit
+#define WS_RSV1                     0x40  // Reserved bit 1 (used for compression)
+#define WS_MASK                     0x80  // Mask bit
 
-// Total message size limits - these prevent resource exhaustion
-#define WEBSOCKET_MAX_COMPRESSED_SIZE    (20ULL * 1024 * 1024) // 20MB max compressed message
-#define WEBSOCKET_MAX_UNCOMPRESSED_SIZE  (200ULL * 1024 * 1024) // 200MB max uncompressed message
+// Frame size limits for protection against DoS and browser compatibility
+#define WS_MAX_INCOMING_FRAME_SIZE  (20ULL * 1024 * 1024) // 20MB max incoming frame size (browsers have ~16MiB)
+#define WS_MAX_OUTGOING_FRAME_SIZE  (4ULL * 1024 * 1024)  // 4MB max outgoing frame size for browser compatibility
+#define WS_MAX_DECOMPRESSED_SIZE    (200ULL * 1024 * 1024) // 200MB max inbound uncompressed message
 
 // WebSocket frame header structure - used for processing frame headers
 typedef struct websocket_frame_header {
@@ -95,6 +94,7 @@ struct websocket_server_client {
     ND_SOCK sock;        // Socket with SSL abstraction
     uint32_t id;         // Unique client ID
     size_t max_message_size;
+    size_t max_outbound_frame_size;     // Maximum size of outgoing frames for this client
     time_t connected_t;  // Connection timestamp
     time_t last_activity_t; // Last activity timestamp
 
@@ -108,6 +108,9 @@ struct websocket_server_client {
     char client_port[NI_MAXSERV];
     WEBSOCKET_PROTOCOL protocol; // The negotiated subprotocol
 
+    // Authentication info
+    USER_AUTH user_auth;          // Authentication information copied from web_client
+
     // Thread management
     struct websocket_thread *wth; // The thread handling this client
     struct websocket_server_client *prev; // Linked list for thread's client management
@@ -116,6 +119,7 @@ struct websocket_server_client {
     // Message processing state
     WS_BUF payload;                     // Pre-allocated buffer for message data
     WS_BUF u_payload;                   // Pre-allocated buffer for uncompressed message data
+    WS_BUF c_payload;                   // Pre-allocated buffer for outbound compressed data
     WEBSOCKET_OPCODE opcode;            // Current message opcode
     bool is_compressed;                 // Whether the current message is compressed
     bool message_complete;              // Whether the current message is complete
@@ -229,8 +233,8 @@ void websocket_protocol_exception(WS_CLIENT *wsc, WEBSOCKET_CLOSE_CODE reason_co
 // Protocol receiver functions - websocket-protocol-rcv.c
 ssize_t websocket_protocol_got_data(WS_CLIENT *wsc, char *data, size_t length);
 
-// Protocol sender functions - websocket-protocol-snd.c
-int websocket_protocol_send_frame(
+// Payload sender - breaks large messages into multiple frames
+int websocket_protocol_send_payload(
     WS_CLIENT *wsc, const char *payload,
                                   size_t payload_len, WEBSOCKET_OPCODE opcode, bool use_compression);
 int websocket_protocol_send_text(WS_CLIENT *wsc, const char *text);

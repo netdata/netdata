@@ -8,26 +8,30 @@ void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {
     buffer_json_object_close(wb);
 }
 
-int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
-    buffer_no_cacheable(w->response.data);
-
-    internal_fatal(web_client_flags_check_auth(w) && !(w->access & HTTP_ACCESS_SIGNED_ID),
+void web_client_ensure_proper_authorization(struct web_client *w) {
+    internal_fatal(w->user_auth.method != USER_AUTH_METHOD_NONE && !(w->user_auth.access & HTTP_ACCESS_SIGNED_ID),
                    "signed-in permission should be set, but is missing");
 
-    internal_fatal(!web_client_flags_check_auth(w) && (w->access & HTTP_ACCESS_SIGNED_ID),
+    internal_fatal(w->user_auth.method == USER_AUTH_METHOD_NONE && (w->user_auth.access & HTTP_ACCESS_SIGNED_ID),
                    "signed-in permission is set, but it shouldn't");
 
 #ifdef NETDATA_GOD_MODE
-    web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, WEB_CLIENT_FLAG_AUTH_GOD);
+    web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, USER_AUTH_METHOD_GOD);
 #else
-    if(!web_client_flags_check_auth(w)) {
+    if(w->user_auth.method == USER_AUTH_METHOD_NONE) {
         web_client_set_permissions(
             w,
             (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA,
             (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY,
-            0);
+            USER_AUTH_METHOD_NONE);
     }
 #endif
+}
+
+int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
+    buffer_no_cacheable(w->response.data);
+
+    web_client_ensure_proper_authorization(w);
 
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
         buffer_flush(w->response.data);
@@ -63,7 +67,7 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
                 return web_client_permission_denied_acl(w);
 
             bool permissions_allows =
-                http_access_user_has_enough_access_level_for_endpoint(w->access, api_commands[i].access);
+                http_access_user_has_enough_access_level_for_endpoint(w->user_auth.access, api_commands[i].access);
             if(!permissions_allows)
                 return web_client_permission_denied(w);
 

@@ -912,8 +912,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/string/utf8.h
         src/libnetdata/worker_utilization/worker_utilization.c
         src/libnetdata/worker_utilization/worker_utilization.h
-        src/libnetdata/http/http_access.c
-        src/libnetdata/http/http_access.h
+        src/libnetdata/user-auth/http-access.c
+        src/libnetdata/user-auth/http-access.h
+        src/libnetdata/user-auth/user-auth.c
+        src/libnetdata/user-auth/user-auth.h
         src/libnetdata/http/http_defs.c
         src/libnetdata/http/http_defs.h
         src/libnetdata/http/content_type.c
@@ -1833,26 +1835,33 @@ set(WEB_PLUGIN_FILES
         src/web/api/functions/function-metrics-cardinality.h
         src/web/api/queries/backfill.c
         src/web/api/queries/backfill.h
-        src/web/api/request_source.c
-        src/web/api/request_source.h
         src/web/api/v3/api_v3_stream_info.c
         src/web/api/v3/api_v3_stream_path.c
         src/web/mcp/adapters/mcp-websocket.c
         src/web/mcp/adapters/mcp-websocket.h
-        src/web/mcp/mcp-context.c
-        src/web/mcp/mcp-context.h
         src/web/mcp/mcp-initialize.c
         src/web/mcp/mcp-initialize.h
-        src/web/mcp/mcp-notifications.c
-        src/web/mcp/mcp-notifications.h
         src/web/mcp/mcp-prompts.c
         src/web/mcp/mcp-prompts.h
         src/web/mcp/mcp-resources.c
         src/web/mcp/mcp-resources.h
-        src/web/mcp/mcp-system.c
-        src/web/mcp/mcp-system.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp-tools-metric-contexts.c
+        src/web/mcp/mcp-tools-metric-context-categories.c
+        src/web/mcp/mcp-tools-context-details.c
+        src/web/mcp/mcp-tools-contexts-search.c
+        src/web/mcp/mcp-tools-list-nodes.c
+        src/web/mcp/mcp-tools-node-details.c
+        src/web/mcp/mcp-tools-execute-function.c
+        src/web/mcp/mcp-request-id.c
+        src/web/mcp/mcp-request-id.h
+        src/web/mcp/mcp-ping.c
+        src/web/mcp/mcp-ping.h
+        src/web/mcp/mcp-logging.c
+        src/web/mcp/mcp-logging.h
+        src/web/mcp/mcp-completion.c
+        src/web/mcp/mcp-completion.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c
