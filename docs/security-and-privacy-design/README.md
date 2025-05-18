@@ -218,7 +218,7 @@ Request a BAA through Netdata Support if required.
 
 ### SOC 2 Compliance
 
-Netdata is SOC2 Type 1 compliant as of 14-May-2025 across the following Service Criteria:
+Netdata achieved SOC2 Type 1 compliance on May 14, 2025 for these Service Criteria:
 
 | **Principle**        | **Practices**                            |
 |:---------------------|:-----------------------------------------|
