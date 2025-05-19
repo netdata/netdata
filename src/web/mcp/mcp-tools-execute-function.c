@@ -934,9 +934,11 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     uuid_generate(transaction_uuid);
     uuid_unparse_lower(transaction_uuid, transaction);
 
+#if 0
     mcpc->user_auth->access = HTTP_ACCESS_ALL;
     mcpc->user_auth->method = USER_AUTH_METHOD_CLOUD;
     mcpc->user_auth->user_role = HTTP_USER_ROLE_ADMIN;
+#endif
 
     // Create source buffer from user_auth
     CLEAN_BUFFER *source = buffer_create(0, NULL);
