@@ -49,6 +49,7 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_SQL_ERRORS,
     NETDATA_MSSQL_DATABASE,
     NETDATA_MSSQL_LOCKS,
+    NETDATA_MSSQL_WAITS,
     NETDATA_MSSQL_MEMORY,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
@@ -500,65 +501,55 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
     SQLBIGINT waiting_tasks = 0;
     int success = 0;
     SQLLEN col_wait_type_len = 0, col_total_wait_len = 0, col_resource_wait_len = 0, col_signal_wait_len = 0,
-    col_max_wait_len = 0, col_waiting_tasks_len = 0, col_wait_category_len = 0;
+           col_max_wait_len = 0, col_waiting_tasks_len = 0, col_wait_category_len = 0;
 
     SQLRETURN ret = SQLExecDirect(mi->conn.dbWaitsSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_WAITS, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn.dbWaitsSTMT, 1, SQL_C_CHAR, wait_type, sizeof(wait_type), &col_wait_type_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto endwait;
+    }
+
+    ret = SQLBindCol(mi->conn.dbWaitsSTMT, 2, SQL_C_LONG, &total_wait, sizeof(total_wait), &col_total_wait_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret =
-        SQLBindCol(mi->conn.dbWaitsSTMT, 2, SQL_C_LONG, &total_wait, sizeof(total_wait), &col_total_wait_len);
+        SQLBindCol(mi->conn.dbWaitsSTMT, 3, SQL_C_LONG, &resource_wait, sizeof(resource_wait), &col_resource_wait_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
-    ret = SQLBindCol(
-        mi->conn.dbWaitsSTMT, 3, SQL_C_LONG, &resource_wait, sizeof(resource_wait), &col_resource_wait_len);
+    ret = SQLBindCol(mi->conn.dbWaitsSTMT, 4, SQL_C_LONG, &signal_wait, sizeof(signal_wait), &col_signal_wait_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
-        goto endwait;
-    }
-
-    ret = SQLBindCol(
-        mi->conn.dbWaitsSTMT, 4, SQL_C_LONG, &signal_wait, sizeof(signal_wait), &col_signal_wait_len);
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn.dbWaitsSTMT, 5, SQL_C_LONG, &max_wait, sizeof(max_wait), &col_max_wait_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
-    ret = SQLBindCol(
-        mi->conn.dbWaitsSTMT, 6, SQL_C_LONG, &waiting_tasks, sizeof(waiting_tasks), &col_waiting_tasks_len);
+    ret =
+        SQLBindCol(mi->conn.dbWaitsSTMT, 6, SQL_C_LONG, &waiting_tasks, sizeof(waiting_tasks), &col_waiting_tasks_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn.dbWaitsSTMT, 7, SQL_C_CHAR, wait_category, sizeof(wait_category), &col_wait_category_len);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
@@ -821,6 +812,9 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
     strncpyz(&name[length], "Locks", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_LOCKS] = strdupz(name);
 
+    strncpyz(&name[length], "Wait Statistics", sizeof(name) - length);
+    mi->objectName[NETDATA_MSSQL_WAITS] = strdupz(name);
+
     strncpyz(&name[length], "Access Methods", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_ACCESS_METHODS] = strdupz(name);
 
@@ -877,6 +871,8 @@ void dict_mssql_insert_wait_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
     mdw->wait_type = strdupz(type);
     mdw->wait_category = NULL;
+    mdw->rd_total_wait = mdw->rd_max_wait_time_msec = mdw->rd_resource_wait_msec = mdw->rd_signal_wait_msec =
+        mdw->rd_waiting_tasks = NULL;
 }
 
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1637,6 +1633,92 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
         rrdset_done(mi->st_deadLocks);
 }
 
+void mssql_total_wait_charts(struct mssql_instance *mi, int update_every)
+{
+    if (!mi->st_total_wait) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_total_wait", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_total_wait = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.instance_total_wait",
+            "Number of waits on this wait type.",
+            "waits/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_WAITS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mi->st_total_wait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+}
+
+void mssql_resource_wait_charts(struct mssql_instance *mi, int update_every)
+{
+    if (!mi->st_resource_wait_msec) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_resource_wait", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_resource_wait_msec = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.instance_resource_wait",
+            "Time waiting for another resource.",
+            "ms",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_RESOURCE_WAIT,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mi->st_resource_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+}
+
+int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    const char *dimension = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    struct mssql_db_waits *mdw = value;
+    struct mssql_instance *mi = data;
+
+    if (!mdw->rd_total_wait)
+        mdw->rd_total_wait = rrddim_add(mi->st_total_wait, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    if (!mdw->rd_resource_wait_msec)
+        mdw->rd_resource_wait_msec =
+            rrddim_add(mi->st_resource_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    rrddim_set_by_pointer(
+        mi->st_total_wait, mdw->rd_total_wait, (collected_number)mdw->MSSQLDatabaseTotalWait.current.Data);
+    rrddim_set_by_pointer(
+        mi->st_resource_wait_msec,
+        mdw->rd_resource_wait_msec,
+        (collected_number)mdw->MSSQLDatabaseResourceWaitMSec.current.Data);
+
+    return 1;
+}
+
+static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+{
+    mssql_total_wait_charts(mi, update_every);
+    mssql_resource_wait_charts(mi, update_every);
+
+    dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
+
+    if (mi->st_total_wait)
+        rrdset_done(mi->st_total_wait);
+
+    if (mi->st_resource_wait_msec)
+        rrdset_done(mi->st_resource_wait_msec);
+}
+
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
     if (unlikely(!mdi->parent->conn.is_connected))
@@ -2262,6 +2344,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_errors,
         do_mssql_databases,
         do_mssql_locks,
+        do_mssql_waits,
         do_mssql_memory_mgr,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
