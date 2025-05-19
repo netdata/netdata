@@ -1683,6 +1683,31 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
+void mssql_signal_wait_charts(struct mssql_instance *mi, int update_every)
+{
+    if (!mi->st_signal_wait_msec) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_signal_wait", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_signal_wait_msec = rrdset_create_localhost(
+            "mssql",
+            id,
+            NULL,
+            "locks",
+            "mssql.instance_signal_wait",
+            "Difference between the time that the waiting thread was signaled and when it started running.",
+            "ms",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_SIGNAL_WAIT,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mi->st_signal_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+}
+
 int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     const char *dimension = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
@@ -1691,16 +1716,27 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
     if (!mdw->rd_total_wait)
         mdw->rd_total_wait = rrddim_add(mi->st_total_wait, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
     if (!mdw->rd_resource_wait_msec)
         mdw->rd_resource_wait_msec =
             rrddim_add(mi->st_resource_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
+    if (!mdw->rd_signal_wait_msec)
+        mdw->rd_signal_wait_msec =
+            rrddim_add(mi->st_signal_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
     rrddim_set_by_pointer(
         mi->st_total_wait, mdw->rd_total_wait, (collected_number)mdw->MSSQLDatabaseTotalWait.current.Data);
+
     rrddim_set_by_pointer(
         mi->st_resource_wait_msec,
         mdw->rd_resource_wait_msec,
         (collected_number)mdw->MSSQLDatabaseResourceWaitMSec.current.Data);
+
+    rrddim_set_by_pointer(
+        mi->st_signal_wait_msec,
+        mdw->rd_signal_wait_msec,
+        (collected_number)mdw->MSSQLDatabaseSignalWaitMSec.current.Data);
 
     return 1;
 }
@@ -1709,6 +1745,7 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 {
     mssql_total_wait_charts(mi, update_every);
     mssql_resource_wait_charts(mi, update_every);
+    mssql_signal_wait_charts(mi, update_every);
 
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
 
@@ -1717,6 +1754,9 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
     if (mi->st_resource_wait_msec)
         rrdset_done(mi->st_resource_wait_msec);
+
+    if (mi->st_signal_wait_msec)
+        rrdset_done(mi->st_signal_wait_msec);
 }
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
