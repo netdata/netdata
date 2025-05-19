@@ -41,7 +41,7 @@ graph TD
     C --> C1[Systems divided<br>by region/service/team]
     D --> D1[Centralization points<br>share data with each other]
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 class A default;
 class B,C,D,B1,C1,D1 green;
@@ -72,7 +72,7 @@ graph TD
     S3 -.-> CP1
     S4 -.-> CP1
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 classDef blue fill:#2196F3,stroke:#333,stroke-width:1px,color:white;
 class CP1,CP2 default;

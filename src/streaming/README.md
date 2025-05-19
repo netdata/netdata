@@ -26,7 +26,7 @@ graph TD
     C -->|Replicates historical data| B
     B -->|Presents unified dashboard| D[Monitoring User]
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 class A,C green;
 class B,D default;
@@ -114,7 +114,7 @@ graph TD
     D --> D1[Enable encryption<br>and authentication]
     E --> E1[Regular log and<br>metric reviews]
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 class A default;
 class B,C,D,E,B1,C1,D1,E1 green;

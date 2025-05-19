@@ -32,13 +32,13 @@ flowchart TD
     E --> F[_is_ephemeral<br>Label Applied]
     F --> G[Label Propagates to Parents<br>and Cloud]
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style A fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
     style B fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style C fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style D fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style E fill:#ffeb3b,stroke:#333,stroke-width:1px,color:black
-    style F fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style G fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style F fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
+    style G fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
 ```
 
 By default, Netdata treats all nodes as permanent. To mark a node as ephemeral:
@@ -75,13 +75,13 @@ flowchart TD
     G -->|Yes, without config| H[Reverts to<br> Permanent Status]
     G -->|No| I[Remains Ephemeral]
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style A fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
     style B fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style C fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style D fill:#ffeb3b,stroke:#333,stroke-width:1px,color:black
-    style E fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style F fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style G fill:#f9f9f9,stroke:#333,stroke-width:1px,color:black
+    style E fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
+    style F fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
+    style G fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
     style H fill:#f44336,stroke:#333,stroke-width:1px,color:white
     style I fill:#ffeb3b,stroke:#333,stroke-width:1px,color:black
 ```
@@ -114,8 +114,8 @@ flowchart TD
     style B fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style C fill:#4caf50,stroke:#333,stroke-width:1px,color:white
     style D fill:#f44336,stroke:#333,stroke-width:1px,color:white
-    style E fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style F fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style E fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
+    style F fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
 ```
 
 To fully remove permanently offline nodes:
@@ -146,13 +146,13 @@ flowchart TD
     G -->|If All Parents Remove Node| I[Node Removed from Cloud]
     
     style A fill:#4caf50,stroke:#333,stroke-width:1px,color:white
-    style B fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style C fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style D fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style B fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
+    style C fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
+    style D fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
     style E fill:#ffeb3b,stroke:#333,stroke-width:1px,color:black
     style F fill:#f9f9f9,stroke:#333,stroke-width:1px,color:black
     style G fill:#f44336,stroke:#333,stroke-width:1px,color:white
-    style H fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style H fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333
     style I fill:#f44336,stroke:#333,stroke-width:1px,color:white
 ```
 

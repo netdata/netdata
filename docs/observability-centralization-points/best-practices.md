@@ -21,7 +21,7 @@ graph TD
     C --> C1[Bandwidth and<br>resource allocation]
     D --> D1[Regional, service, or<br>team-based isolation]
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 class A default;
 class B,C,D,B1,C1,D1 green;
@@ -50,7 +50,7 @@ graph TD
     D --> D1[Based on access needs,<br>retention policies,<br>and compliance]
     E --> E1[Unique settings for<br>different teams or services]
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 class A default;
 class B,C,D,E,B1,C1,D1,E1 green;
@@ -85,7 +85,7 @@ graph TD
     F --> F1[Data remains within<br>your infrastructure]
     G --> G1[Unified view with<br>tailored segments]
     
-classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#333;
 classDef green fill:#4caf50,stroke:#333,stroke-width:1px,color:black;
 class A default;
 class B,C,D,E,F,G,B1,C1,D1,E1,F1,G1 green;
