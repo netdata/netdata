@@ -1747,7 +1747,7 @@ void mssql_waiting_count_charts(struct mssql_instance *mi, int update_every)
             "locks",
             "mssql.instance_waiting_count",
             "Number of waits on this wait type.",
-            "ms",
+            "waits",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_WAITING_COUNT,
@@ -1777,11 +1777,11 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
     if (!mdw->rd_max_wait_time_msec)
         mdw->rd_max_wait_time_msec =
-            rrddim_add(mi->st_max_wait_time_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(mi->st_max_wait_time_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     if (!mdw->rd_waiting_tasks)
         mdw->rd_waiting_tasks =
-            rrddim_add(mi->st_waiting_tasks, dimension, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(mi->st_waiting_tasks, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     rrddim_set_by_pointer(
         mi->st_total_wait, mdw->rd_total_wait, (collected_number)mdw->MSSQLDatabaseTotalWait.current.Data);
