@@ -669,7 +669,6 @@ The parent node receives and stores metrics from child nodes.
    [11111111-2222-3333-4444-555555555555]
        enabled = yes
        allow from = *
-       default memory mode = dbengine
    ```
 
 3. Save and close the file
@@ -811,18 +810,7 @@ Add the following to the child's `[stream]` section:
 
 ### Optimizing Data Retention (Storage Strategy)
 
-On the parent node, you can configure different retention settings for different types of data:
-
-```ini
-[API_KEY]
-    # Use different retention for different types of metrics
-    memory mode = dbengine
-    
-    # In netdata.conf, not stream.conf
-    # [db]
-    # dbengine multihost disk space MB = 1024
-    # dbengine page cache size MB = 128
-```
+On the parent node, you can [configure retention settings](/src/database/CONFIGURATION.md#retention-settings) to control how long metrics are stored.
 
 :::tip
 
