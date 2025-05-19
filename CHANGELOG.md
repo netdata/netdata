@@ -6,10 +6,13 @@
 
 **Merged pull requests:**
 
+- Updating SOC2 compliance status [\#20300](https://github.com/netdata/netdata/pull/20300) ([shyamvalsan](https://github.com/shyamvalsan))
+- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.4 to 5.7.5 in /src/go [\#20299](https://github.com/netdata/netdata/pull/20299) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/prometheus/common from 0.63.0 to 0.64.0 in /src/go [\#20296](https://github.com/netdata/netdata/pull/20296) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.33.0 to 0.33.1 in /src/go [\#20295](https://github.com/netdata/netdata/pull/20295) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(go.d\): sanitize vnode labels before creating vnode [\#20293](https://github.com/netdata/netdata/pull/20293) ([ilyam8](https://github.com/ilyam8))
 - Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
+- Fix when docker socket group id points to an existing group in container [\#20288](https://github.com/netdata/netdata/pull/20288) ([felipecrs](https://github.com/felipecrs))
 - add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20284](https://github.com/netdata/netdata/pull/20284) ([netdatabot](https://github.com/netdatabot))
 - Improved StatsD documentation [\#20282](https://github.com/netdata/netdata/pull/20282) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -462,9 +465,6 @@
 - fix invalid free [\#19763](https://github.com/netdata/netdata/pull/19763) ([ktsaou](https://github.com/ktsaou))
 - make status file use fixed size character arrays [\#19761](https://github.com/netdata/netdata/pull/19761) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/sd/snmp\): use rescan and cache ttl only when set [\#19760](https://github.com/netdata/netdata/pull/19760) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/nvidia\_smi\): handle xml gpu\_power\_readings change [\#19759](https://github.com/netdata/netdata/pull/19759) ([ilyam8](https://github.com/ilyam8))
-- status file timings per step [\#19758](https://github.com/netdata/netdata/pull/19758) ([ktsaou](https://github.com/ktsaou))
-- improvement\(go.d/sd/snmp\): support device cache ttl 0 [\#19756](https://github.com/netdata/netdata/pull/19756) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
