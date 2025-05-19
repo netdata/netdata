@@ -4,7 +4,7 @@
 
 This guide covers Netdata's advanced streaming and replication capabilities, which allow you to build centralized observability points across your infrastructure.
 
-**[Streaming and replication](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#r)** work together to send metrics data from one Netdata Agent (child) to another Netdata Agent (parent). Streaming sends metrics in real-time, while replication ensures historical data is copied as well, maintaining complete data integrity even after connection interruptions.
+**[Streaming and replication](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#r)** work together to send metrics data from one Netdata Agent (child) to another Netdata Agent (parent). Streaming sends metrics in real-time, while replication ensures historical data is copied, as well, maintaining complete data integrity even after connection interruptions.
 
 ::: tip
 
@@ -380,7 +380,7 @@ Manage database settings for data storage and retention.
     db = dbengine
 ```
 
-**First parent node's configuration for streaming to second parent:**
+**First parent node's configuration for streaming to the second parent:**
 
 ```ini
 [stream]
@@ -389,7 +389,7 @@ Manage database settings for data storage and retention.
     api key = 22222222-3333-4444-5555-666666666666
 ```
 
-**Second parent node's configuration for streaming to first parent:**
+**Second parent node's configuration for streaming to the first parent:**
 
 ```ini
 [stream]
@@ -470,7 +470,7 @@ Slow network connections or high-latency links can cause the streaming buffer to
 
 **Symptoms:**
 
-- Child can't establish connection to parent
+- Child can't establish a connection to a parent
 - Repeated reconnection attempts
 
 **Child logs:**
@@ -485,8 +485,8 @@ This error indicates network connectivity problems between the child and parent 
 **Solutions:**
 
 - Verify firewalls allow traffic on port 19999 (or your custom port)
-- Check parent node is running and listening on the correct interface
-- Verify IP address/hostname is correct in child's configuration
+- Check that the parent node is running and listening on the correct interface
+- Verify that the IP address/hostname is correct in child's configuration
 - Test basic connectivity with tools like `ping` or `telnet`
 - Check network routing between the nodes
 
@@ -512,8 +512,8 @@ The parent node is rejecting the connection because the API key doesn't match or
 
 **Solutions:**
 
-- Verify API key matches exactly between parent and child
-- Check `allow from` setting permits the child's IP address
+- Verify if the API key matches exactly between parent and child
+- Check that the `allow from` setting permits the child's IP address
 - Ensure GUID formats are valid
 - Check for whitespace or invisible characters in the API key
 - Remember that API keys are case-sensitive
@@ -540,7 +540,7 @@ The child node is connecting to the destination, but the server is not respondin
 **Solutions:**
 
 - Check SSL settings in the destination URL (add or remove `:SSL` as needed)
-- Verify you're connecting to a Netdata server and not another service
+- Verify that you're connecting to a Netdata server and not another service
 - Ensure both nodes are running compatible Netdata versions
 - Check if a proxy or firewall is altering the connection
 
@@ -588,7 +588,7 @@ When you re-establish a connection, your child node will replicate historical da
 <summary><strong>How much bandwidth does streaming use?</strong></summary>
 <br/>
 
-Your streaming setup will be very efficient, especially with compression enabled. Typically, it uses about 10-20 KB/s for a moderately active node. The actual bandwidth depends on the number of metrics and collection frequency you've configured.
+Your streaming setup will be very efficient, especially with compression enabled. Typically, it uses about 10–20 KB/s for a moderately active node. The actual bandwidth depends on the number of metrics and collection frequency you've configured.
 </details>
 
 <details>
@@ -622,7 +622,7 @@ This guide will walk you through setting up Netdata streaming between nodes. **B
 
 Before configuring streaming, ensure you have:
 
-1. At least two Netdata instances installed (one to act as parent, one as child)
+1. At least two Netdata instances are installed (one to act as parent, one as child)
 2. Network connectivity between the instances
 3. Administrative access to edit configuration files on both systems
 
@@ -807,7 +807,7 @@ Add the following to the child's `[stream]` section:
        destination = PARENT1_IP:19999 PARENT2_IP:19999
    ```
 
-2. The child will connect to the first available parent, and automatically switch if that connection fails
+2. The child will connect to the first available parent and automatically switch if that connection fails
 
 ### Optimizing Data Retention (Storage Strategy)
 
