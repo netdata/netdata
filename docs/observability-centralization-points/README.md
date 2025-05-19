@@ -5,6 +5,7 @@
 Observability Centralization Points are specialized Netdata installations that you can configure to **receive, store, and process** observability data (metrics and logs) from multiple other systems in your infrastructure.
 
 These centralization points give you several core functions:
+
 * **Receiving and storing** metrics and logs from multiple systems
 * **Processing and analyzing** your collected data
 * **Running health checks and alerts**
@@ -15,20 +16,20 @@ This **distributed yet centralized** approach gives you the benefits of both dec
 
 ## Why Use Centralization Points?
 
-| Use Case | Description | Benefits |
-|----------|-------------|---------| 
-| **Ephemeral Systems** | Ideal for your Kubernetes nodes or temporary VMs that frequently go offline | You retain metrics and logs for analysis and troubleshooting even after node termination |
-| **Limited Resources** | Offloads observability tasks from your systems with low disk space, CPU, RAM, or I/O bandwidth | Your production systems run efficiently without performance trade-offs |
-| **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
-| **Restricted Netdata Cloud Access** | Acts as a bridge when your monitored systems can't connect to Netdata Cloud | You can still use Cloud features despite firewall restrictions or security policies |
+| Use Case                                        | Description                                                                                    | Benefits                                                                                      |
+|-------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------| 
+| **Ephemeral Systems**                           | Ideal for your Kubernetes nodes or temporary VMs that frequently go offline                    | You retain metrics and logs for analysis and troubleshooting even after node termination      |
+| **Limited Resources**                           | Offloads observability tasks from your systems with low disk space, CPU, RAM, or I/O bandwidth | Your production systems run efficiently without performance trade-offs                        |
+| **Multi-Node Dashboards Without Netdata Cloud** | Aggregates data from all your nodes for centralized dashboards                                 | You get Cloud-like functionality in environments that prefer or require on-premises solutions |
+| **Restricted Netdata Cloud Access**             | Acts as a bridge when your monitored systems can't connect to Netdata Cloud                    | You can still use Cloud features despite firewall restrictions or security policies           |
 
 ## How Multiple Centralization Points Work
 
-| Scenario | Operation | Advantages |
-|----------|-----------|------------|
-| **With Netdata Cloud** | Queries all your centralization points in parallel for a unified view | You get a seamless experience regardless of your underlying architecture |
-| **Without Netdata Cloud** | Your centralization points consolidate data from connected systems | You have a local view of metrics and logs without external dependencies |
-| **High Availability Setup** | Your centralization points share data with each other, forming a cluster | You won't lose data if one centralization point fails |
+| Scenario                    | Operation                                                                | Advantages                                                               |
+|-----------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| **With Netdata Cloud**      | Queries all your centralization points in parallel for a unified view    | You get a seamless experience regardless of your underlying architecture |
+| **Without Netdata Cloud**   | Your centralization points consolidate data from connected systems       | You have a local view of metrics and logs without external dependencies  |
+| **High Availability Setup** | Your centralization points share data with each other, forming a cluster | You won't lose data if one centralization point fails                    |
 
 ```mermaid
 graph TD

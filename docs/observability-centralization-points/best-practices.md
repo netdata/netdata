@@ -4,12 +4,12 @@
 
 When setting up Observability Centralization Points, consider the following:
 
-| Factor | Description | Impact |
-|--------|-------------|--------|
-| **System Volume** | The number of monitored systems | Larger infrastructures may need multiple centralization points to maintain performance |
-| **Data Transfer Costs** | Bandwidth usage between environments | Strategic placement reduces egress bandwidth costs in multi-cloud or hybrid environments |
-| **Usability Without Netdata Cloud** | Standalone operation considerations | Fewer centralization points simplifies access and management |
-| **Optimized Deployment with Netdata Cloud** | Cloud integration benefits | Provides complete infrastructure view with optimized security, cost, and operational controls |
+| Factor                                      | Description                          | Impact                                                                                        |
+|---------------------------------------------|--------------------------------------|-----------------------------------------------------------------------------------------------|
+| **System Volume**                           | The number of monitored systems      | Larger infrastructures may need multiple centralization points to maintain performance        |
+| **Data Transfer Costs**                     | Bandwidth usage between environments | Strategic placement reduces egress bandwidth costs in multi-cloud or hybrid environments      |
+| **Usability Without Netdata Cloud**         | Standalone operation considerations  | Fewer centralization points simplifies access and management                                  |
+| **Optimized Deployment with Netdata Cloud** | Cloud integration benefits           | Provides complete infrastructure view with optimized security, cost, and operational controls |
 
 ```mermaid
 graph TD
@@ -31,12 +31,12 @@ class B,C,D,B1,C1,D1 green;
 
 Netdata is designed to keep observability efficient and cost-effective. To manage costs:
 
-| Strategy | Description | Benefit |
-|----------|-------------|---------|
-| **Scale Out** | Use multiple smaller centralization points | Improves efficiency and performance across distributed systems |
-| **Use Existing Resources** | Leverage spare capacity | Minimize additional hardware costs by using available resources |
-| **Centralized or Separate Logs & Metrics** | Choose storage approach based on needs | Optimize based on access patterns, retention policies, and compliance requirements |
-| **Flexible Configuration Management** | Customize each centralization point | Control costs with unique retention and alert settings tailored for different teams or services |
+| Strategy                                   | Description                                | Benefit                                                                                         |
+|--------------------------------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------|
+| **Scale Out**                              | Use multiple smaller centralization points | Improves efficiency and performance across distributed systems                                  |
+| **Use Existing Resources**                 | Leverage spare capacity                    | Minimize additional hardware costs by using available resources                                 |
+| **Centralized or Separate Logs & Metrics** | Choose storage approach based on needs     | Optimize based on access patterns, retention policies, and compliance requirements              |
+| **Flexible Configuration Management**      | Customize each centralization point        | Control costs with unique retention and alert settings tailored for different teams or services |
 
 ```mermaid
 graph TD
@@ -60,14 +60,14 @@ class B,C,D,E,B1,C1,D1,E1 green;
 
 Netdata provides several benefits over other observability solutions:
 
-| Advantage | Description | Value |
-|-----------|-------------|-------|
-| **Scalability & Flexibility** | Multiple independent centralization points | Customized observability by region, service, or team |
-| **Resilience & Reliability** | Built-in replication | Observability continues even if a centralization point fails |
-| **Optimized Cost & Performance** | Distributed workloads | Prevents bottlenecks and improves resource efficiency |
-| **Ease of Use** | Minimal setup and maintenance | Reduces complexity and operational overhead |
-| **On-Prem Control** | Data remains within your infrastructure | Enhanced security and compliance, even when using Netdata Cloud |
-| **Comprehensive Observability** | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning |
+| Advantage                        | Description                                | Value                                                                 |
+|----------------------------------|--------------------------------------------|-----------------------------------------------------------------------|
+| **Scalability & Flexibility**    | Multiple independent centralization points | Customized observability by region, service, or team                  |
+| **Resilience & Reliability**     | Built-in replication                       | Observability continues even if a centralization point fails          |
+| **Optimized Cost & Performance** | Distributed workloads                      | Prevents bottlenecks and improves resource efficiency                 |
+| **Ease of Use**                  | Minimal setup and maintenance              | Reduces complexity and operational overhead                           |
+| **On-Prem Control**              | Data remains within your infrastructure    | Enhanced security and compliance, even when using Netdata Cloud       |
+| **Comprehensive Observability**  | Segmented infrastructure with unified view | Deep visibility with tailored retention, alerts, and machine learning |
 
 ```mermaid
 graph TD

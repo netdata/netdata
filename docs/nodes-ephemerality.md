@@ -4,10 +4,10 @@
 
 Netdata categorizes nodes into two types:
 
-| Type | Description | Common Use Cases |
-|------|-------------|------------------|
+| Type          | Description                                    | Common Use Cases                                                                                                                                                         |
+|---------------|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Ephemeral** | Expected to disconnect or reconnect frequently | • Auto-scaling cloud instances<br>• Dynamic containers and VMs<br>• IoT devices with intermittent connectivity<br>• Development/test environments with frequent restarts |
-| **Permanent** | Expected to maintain continuous connectivity | • Production servers<br>• Core infrastructure nodes<br>• Critical monitoring systems<br>• Stable database servers |
+| **Permanent** | Expected to maintain continuous connectivity   | • Production servers<br>• Core infrastructure nodes<br>• Critical monitoring systems<br>• Stable database servers                                                        |
 
 :::note
 
@@ -57,10 +57,10 @@ This setting applies the `_is_ephemeral` host label, which propagates to your Ne
 
 Netdata v2.3.0 introduces two new alerts specifically for permanent nodes:
 
-| Alert | Trigger Condition |
-|-------|-------------------|
+| Alert                       | Trigger Condition                                         |
+|-----------------------------|-----------------------------------------------------------|
 | `streaming_never_connected` | A permanent node has never connected to a Netdata Parent. |
-| `streaming_disconnected` | A previously connected permanent node has disconnected. |
+| `streaming_disconnected`    | A previously connected permanent node has disconnected.   |
 
 ## Monitoring Child Node Status
 

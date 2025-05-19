@@ -56,12 +56,12 @@ class B,D default;
 
 ## Quick Reference
 
-| Task | Configuration | Example |
-|------|--------------|---------|
-| Enable streaming on a child | Set `enabled = yes` in `[stream]` section | `[stream]`<br>`enabled = yes`<br>`destination = 192.168.1.5` |
-| Configure a parent to accept connections | Create an `[API_KEY]` section | `[API_KEY]`<br>`enabled = yes`<br>`allow from = *` |
-| Set up high availability | Configure multiple destinations on child | `[stream]`<br>`destination = parent1:19999 parent2:19999` |
-| Filter which metrics to send | Use `send charts matching` setting | `send charts matching = system.* !system.uptime` |
+| Task                                     | Configuration                             | Example                                                      |
+|------------------------------------------|-------------------------------------------|--------------------------------------------------------------|
+| Enable streaming on a child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br>`enabled = yes`<br>`destination = 192.168.1.5` |
+| Configure a parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br>`enabled = yes`<br>`allow from = *`           |
+| Set up high availability                 | Configure multiple destinations on child  | `[stream]`<br>`destination = parent1:19999 parent2:19999`    |
+| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`             |
 
 ## Configuration Overview
 
@@ -337,6 +337,7 @@ Manage database settings for data storage and retention.
 ### Basic Parent-Child Setup
 
 **Parent node configuration (stream.conf):**
+
 ```ini
 # Generate a random UUID first: uuidgen
 [11111111-2222-3333-4444-555555555555]
@@ -349,6 +350,7 @@ Manage database settings for data storage and retention.
 ```
 
 **Child node configuration (stream.conf):**
+
 ```ini
 [stream]
     # Enable streaming on this node
@@ -362,6 +364,7 @@ Manage database settings for data storage and retention.
 ### High Availability Setup with Multiple Parents
 
 **Parent nodes configuration (stream.conf on both parents):**
+
 ```ini
 # Configuration for accepting metrics from children
 [11111111-2222-3333-4444-555555555555]
@@ -378,6 +381,7 @@ Manage database settings for data storage and retention.
 ```
 
 **First parent node's configuration for streaming to second parent:**
+
 ```ini
 [stream]
     enabled = yes
@@ -386,6 +390,7 @@ Manage database settings for data storage and retention.
 ```
 
 **Second parent node's configuration for streaming to first parent:**
+
 ```ini
 [stream]
     enabled = yes
@@ -394,6 +399,7 @@ Manage database settings for data storage and retention.
 ```
 
 **Child node configuration:**
+
 ```ini
 [stream]
     enabled = yes
@@ -429,16 +435,19 @@ Both parent and child nodes log information in `/var/log/netdata/error.log`.
 <br/>
 
 **Symptoms:**
+
 - Buffer overflow errors
 - Connection resets
 - Partial message errors
 
 **Child logs:**
+
 ```
 netdata ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM CHILD HOSTNAME [send to PARENT IP:PARENT PORT]: too many data pending - buffer is X bytes long, Y unsent - we have sent Z bytes in total, W on this connection. Closing connection to flush the data.
 ```
 
 **Parent logs:**
+
 ```
 netdata ERROR : STREAM_PARENT[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : read failed: end of file
 ```
@@ -447,10 +456,12 @@ netdata ERROR : STREAM_PARENT[CHILD HOSTNAME,[CHILD IP]:CHILD PORT] : read faile
 Slow network connections or high-latency links can cause the streaming buffer to fill up faster than it can be transmitted. When the buffer reaches its maximum size, Netdata closes the connection to flush the pending data, then re-establishes the connection. This can lead to data gaps or inconsistencies if it happens frequently.
 
 **Solutions:**
+
 - Increase buffer size in `stream.conf`: `buffer size bytes = 20971520` (20MB)
 - Check network bandwidth and latency between nodes
 - Consider reducing the collection frequency on high-volume metrics
 - If possible, place parent nodes closer (network-wise) to child nodes
+
 </details>
 
 <details>
@@ -458,10 +469,12 @@ Slow network connections or high-latency links can cause the streaming buffer to
 <br/>
 
 **Symptoms:**
+
 - Child can't establish connection to parent
 - Repeated reconnection attempts
 
 **Child logs:**
+
 ```
 ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'PARENT IP', port 'PARENT PORT' (errno 113, No route to host)
 ```
@@ -470,11 +483,13 @@ ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'PARENT IP', port 'PARENT
 This error indicates network connectivity problems between the child and parent nodes. It could be due to firewall rules, incorrect IP addresses, or the parent node not running.
 
 **Solutions:**
+
 - Verify firewalls allow traffic on port 19999 (or your custom port)
 - Check parent node is running and listening on the correct interface
 - Verify IP address/hostname is correct in child's configuration
 - Test basic connectivity with tools like `ping` or `telnet`
 - Check network routing between the nodes
+
 </details>
 
 <details>
@@ -482,10 +497,12 @@ This error indicates network connectivity problems between the child and parent 
 <br/>
 
 **Symptoms:**
+
 - Connection established but immediately rejected
 - "Forbidding access" errors
 
 **Parent logs:**
+
 ```
 STREAM [receive from [child HOSTNAME]:child IP]: `API key 'VALUE' is not allowed`. Forbidding access.
 ```
@@ -494,11 +511,13 @@ STREAM [receive from [child HOSTNAME]:child IP]: `API key 'VALUE' is not allowed
 The parent node is rejecting the connection because the API key doesn't match or the child's IP address is not allowed by the `allow from` setting.
 
 **Solutions:**
+
 - Verify API key matches exactly between parent and child
 - Check `allow from` setting permits the child's IP address
 - Ensure GUID formats are valid
 - Check for whitespace or invisible characters in the API key
 - Remember that API keys are case-sensitive
+
 </details>
 
 <details>
@@ -506,9 +525,11 @@ The parent node is rejecting the connection because the API key doesn't match or
 <br/>
 
 **Symptoms:**
+
 - Child tries to connect but receives an unexpected response
 
 **Child logs:**
+
 ```
 ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM child HOSTNAME [send to PARENT HOSTNAME:PARENT PORT]: server is not replying properly (is it a netdata?).
 ```
@@ -517,10 +538,12 @@ ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM child HOSTNAME [send to PARENT HO
 The child node is connecting to the destination, but the server is not responding with the expected Netdata streaming protocol. This commonly occurs when there's a mismatch in SSL/TLS settings or when the destination is not a Netdata server.
 
 **Solutions:**
+
 - Check SSL settings in the destination URL (add or remove `:SSL` as needed)
 - Verify you're connecting to a Netdata server and not another service
 - Ensure both nodes are running compatible Netdata versions
 - Check if a proxy or firewall is altering the connection
+
 </details>
 
 <details>
@@ -528,6 +551,7 @@ The child node is connecting to the destination, but the server is not respondin
 <br/>
 
 **Symptoms:**
+
 - Data inconsistencies between parent and child
 - Gaps in metrics collection
 
@@ -535,11 +559,13 @@ The child node is connecting to the destination, but the server is not respondin
 When the database settings between parent and child nodes don't match, it can cause inconsistencies in how data is stored and displayed. The most common cause is different memory modes or retention settings.
 
 **Solutions:**
-- Check for mismatch in the `[db].db` settings between the parent and child 
+
+- Check for mismatch in the `[db].db` settings between the parent and child
 - Ensure database retention settings are compatible
 - Verify replication is enabled and properly configured
 - Make sure both nodes are using the same (or compatible) database engine
 - Check that clocks are synchronized between nodes
+
 </details>
 
 ## FAQ
@@ -599,6 +625,7 @@ Before configuring streaming, ensure you have:
 1. At least two Netdata instances installed (one to act as parent, one as child)
 2. Network connectivity between the instances
 3. Administrative access to edit configuration files on both systems
+
 </details>
 
 <details>
@@ -620,6 +647,7 @@ The API key is used to authenticate the connection between parent and child node
    ```
 
 3. Copy the generated UUID (it should look like `11111111-2222-3333-4444-555555555555`)
+
 </details>
 
 <details>
@@ -652,7 +680,7 @@ The parent node receives and stores metrics from child nodes.
    sudo systemctl restart netdata
    ```
 
-:::tip 
+:::tip
 
 **Deployment Strategy**
 For critical environments, consider setting up at least two parent nodes for redundancy. Each parent should have enough disk space for your required retention period.
@@ -691,7 +719,7 @@ The child node streams its metrics to the parent node.
    sudo systemctl restart netdata
    ```
 
-:::tip 
+:::tip
 
 **Security**
 
@@ -729,7 +757,7 @@ Check that streaming is working properly between your nodes.
 
 4. Open the Netdata dashboard on the parent node (http://PARENT_IP:19999) and look for the child node's hostname in the menu
 
-:::tip 
+:::tip
 
 **Performance**
 Monitor the connection logs for the first few hours to ensure there are no buffer overflow issues or frequent disconnections.
@@ -796,7 +824,7 @@ On the parent node, you can configure different retention settings for different
     # dbengine page cache size MB = 128
 ```
 
-:::tip 
+:::tip
 
 **Advanced**
 For large-scale deployments, consider setting up parent-to-parent streaming to create a hierarchical architecture that balances local responsiveness with centralized monitoring.
@@ -812,10 +840,12 @@ For large-scale deployments, consider setting up parent-to-parent streaming to c
 <br/>
 
 Verify that:
+
 - Firewalls allow traffic on port 19999
 - Both Netdata instances are running
 - The API key matches exactly on both systems
 - The parent IP address is correct
+
 </details>
 
 <details>
@@ -823,9 +853,11 @@ Verify that:
 <br/>
 
 Verify that:
+
 - The connection is established (check logs)
 - The child node hasn't been excluded with `allow from` settings
 - The metrics aren't being filtered out with `send charts matching`
+
 </details>
 
 <details>
@@ -833,9 +865,11 @@ Verify that:
 <br/>
 
 If you're using SSL encryption:
+
 - Make sure both `:SSL` is added to the destination on the child node
 - Set `ssl skip certificate verification = yes` if using self-signed certificates
 - Check that certificate paths are correct if using custom certificates
+
 </details>
 
 <details>
@@ -843,7 +877,9 @@ If you're using SSL encryption:
 <br/>
 
 If streaming is slow or unstable:
+
 - Increase the buffer size: `buffer size bytes = 20971520` (20MB)
 - Check network quality between nodes
 - Consider streaming fewer metrics with `send charts matching`
+
 </details>
