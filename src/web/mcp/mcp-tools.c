@@ -141,11 +141,11 @@ static const MCP_TOOL_DEF mcp_tools[] = {
     {
         .name = "execute_function",
         .title = "Execute a function on a specific node",
-        .description = "Allows the execution of registered functions on a specific node.\n"
-                       "These functions provide various operations and capabilities defined by the node.\n"
-                       "Use node_details tool to discover available functions on each node.\n"
-                       "Functions accept parameters, so run them with the 'help' parameter to find out\n"
-                       "which parameters they accept.",
+        .description = "Execute a registered function on a specific node to get live information from it.\n"
+                       "The node needs to be online/live/reachable.\n"
+                       "Functions usually include `processes`, `network-connections`, `mount-points`, \n"
+                       "`containers-vms`, `netdata-streaming` and more.\n"
+                       "Use the `node_details` tool to discover available functions for each each node.",
         .execute_callback = mcp_tool_execute_function_execute,
         .schema_callback = mcp_tool_execute_function_schema,
         .read_only_hint = false, // This tool can modify state
