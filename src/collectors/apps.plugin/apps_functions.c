@@ -78,7 +78,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
 void function_processes(const char *transaction, char *function,
                                usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                                BUFFER *payload __maybe_unused, HTTP_ACCESS access,
-                               const char *source, void *data __maybe_unused) {
+                               const char *source __maybe_unused, void *data __maybe_unused) {
     time_t now_s = now_realtime_sec();
     struct pid_stat *p;
 
