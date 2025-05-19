@@ -9,7 +9,7 @@
 RRDHOST *localhost = NULL;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-RRDHOST *rrdhost_find_by_node_id(char *node_id) {
+RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 
     ND_UUID node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid.uuid)))
