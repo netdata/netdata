@@ -959,6 +959,7 @@ void rrdhost_stream_parents_free(RRDHOST *host, bool having_write_lock) {
     }
 
     host->stream.snd.parents.all = NULL;
+    host->stream.snd.parents.current = NULL;
 
     if(!having_write_lock)
         rw_spinlock_write_unlock(&host->stream.snd.parents.spinlock);

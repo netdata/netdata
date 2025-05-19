@@ -92,6 +92,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     host->sender = NULL;
 
     sender_host_buffer_free(host);
+    rrdhost_stream_parents_free(host, false);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_SENDER_INITIALIZED);
 }
