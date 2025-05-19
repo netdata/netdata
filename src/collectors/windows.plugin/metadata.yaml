@@ -1983,12 +1983,18 @@ modules:
                 - name: blocked
             - name: mssql.instance_total_wait
               description: Number of waits on this wait type.
-              unit: ms
+              unit: waits/s
               chart_type: line
               dimensions:
                 - name: wait_types
             - name: mssql.instance_resource_wait
               description: Time waiting for another resource.
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: wait_types
+            - name: mssql.instance_signal_wait
+              description: Difference between the time that the waiting thread was signaled and when it started running.
               unit: ms
               chart_type: line
               dimensions:
