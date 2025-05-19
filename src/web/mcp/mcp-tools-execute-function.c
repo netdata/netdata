@@ -926,7 +926,7 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     }
 
     // Create a buffer for function result
-    BUFFER *result_buffer = buffer_create(0, NULL);
+    CLEAN_BUFFER *result_buffer = buffer_create(0, NULL);
     
     // Create a unique transaction ID
     char transaction[UUID_STR_LEN];
@@ -965,10 +965,15 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         false
     );
 
-    if (ret != 200) {
-        buffer_sprintf(mcpc->error, "Failed to execute function: %s on node %s, error code %d", 
-                       function_name, node_name, ret);
-        buffer_free(result_buffer);
+    if (ret != HTTP_RESP_OK) {
+        buffer_sprintf(mcpc->error,
+                       "Failed to execute function '%s' on node '%s', "
+                       "http error code %d (%s):\n"
+                       "```json\n%s\n```",
+                       function_name, node_name, ret,
+                       http_response_code2string(ret),
+                       buffer_tostring(result_buffer));
+
         return MCP_RC_ERROR;
     }
 
@@ -1055,7 +1060,7 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     
     // Process and filter the results if needed
     const size_t max_size_threshold = 20UL * 1024;
-    BUFFER *processed_result = mcp_process_table_result(
+    CLEAN_BUFFER *processed_result = mcp_process_table_result(
         result_buffer, 
         columns_array, 
         sort_column_param,
@@ -1087,8 +1092,5 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
 
-    buffer_free(processed_result);
-    buffer_free(result_buffer);
-    
     return MCP_RC_OK;
 }
