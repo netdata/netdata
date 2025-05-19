@@ -392,7 +392,7 @@ void rrdhost_acquired_release(RRDHOST_ACQUIRED *rha);
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
-RRDHOST *rrdhost_find_by_node_id(char *node_id);
+RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
