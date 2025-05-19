@@ -34,14 +34,6 @@ enum aclk_database_opcode {
     ACLK_MAX_ENUMERATIONS_DEFINED
 };
 
-//struct aclk_database_cmd {
-//    int opcode;
-//    union {
-//        void *param[2];
-//        char data[32];
-//    };
-//};
-
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
     uv_timer_t timer;
@@ -63,7 +55,6 @@ void aclk_synchronization_shutdown(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
-void cancel_node_update_timer(const RRDHOST *host, struct completion *completion);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
 
 bool test_cmd_pool_fifo();
