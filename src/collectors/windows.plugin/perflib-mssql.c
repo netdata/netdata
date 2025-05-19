@@ -1708,7 +1708,7 @@ void mssql_signal_wait_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
-void mssql_signal_wait_charts(struct mssql_instance *mi, int update_every)
+void mssql_max_wait_charts(struct mssql_instance *mi, int update_every)
 {
     if (!mi->st_max_wait_time_msec) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1812,6 +1812,7 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
     mssql_total_wait_charts(mi, update_every);
     mssql_resource_wait_charts(mi, update_every);
     mssql_signal_wait_charts(mi, update_every);
+    mssql_max_wait_charts(mi, update_every);
     mssql_waiting_count_charts(mi, update_every);
 
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
