@@ -1999,6 +1999,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: wait_types
+            - name: mssql.instance_max_wait
+              description: Maximum wait time on this wait type.
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: wait_types
         - name: Database
           description: "These metrics refer to Microsoft SQL Server databases."
           labels:
