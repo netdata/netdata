@@ -376,7 +376,7 @@ Manage database settings for data storage and retention.
 [22222222-3333-4444-5555-666666666666]
     enabled = yes
     # Only allow the other parent's IP
-    allow from = 192.168.1.6
+    allow from = 192.168.1.5 192.168.1.6
     db = dbengine
 ```
 
