@@ -1614,6 +1614,24 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, int update_every)
     }
 }
 
+int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    const char *dimension = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    struct mssql_lock_instance *mli = value;
+    struct mssql_instance *mi = data;
+
+    if (!mli->rd_lockWait)
+        mli->rd_lockWait = rrddim_add(mi->st_lockWait, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    if (!mli->rd_deadLocks)
+        mli->rd_deadLocks = rrddim_add(mi->st_deadLocks, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    rrddim_set_by_pointer(mi->st_lockWait, mli->rd_lockWait, (collected_number)mli->lockWait.current.Data);
+    rrddim_set_by_pointer(mi->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
+
+    return 1;
+}
+
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_LOCKS]);
@@ -1625,6 +1643,8 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
     dict_mssql_locks_wait_charts(mi, update_every);
     dict_mssql_dead_locks_charts(mi, update_every);
+
+    dictionary_sorted_walkthrough_read(mi->locks_instances, dict_mssql_locks_charts_cb, mi);
 
     if (mi->st_lockWait)
         rrdset_done(mi->st_lockWait);
@@ -1780,8 +1800,7 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
             rrddim_add(mi->st_max_wait_time_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     if (!mdw->rd_waiting_tasks)
-        mdw->rd_waiting_tasks =
-            rrddim_add(mi->st_waiting_tasks, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdw->rd_waiting_tasks = rrddim_add(mi->st_waiting_tasks, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     rrddim_set_by_pointer(
         mi->st_total_wait, mdw->rd_total_wait, (collected_number)mdw->MSSQLDatabaseTotalWait.current.Data);
