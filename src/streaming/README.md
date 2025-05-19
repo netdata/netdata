@@ -56,12 +56,12 @@ class B,D default;
 
 ## Quick Reference
 
-| Task                                     | Configuration                             | Example                                                        |
-|------------------------------------------|-------------------------------------------|----------------------------------------------------------------|
-| Enable streaming on a child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br\>`enabled = yes`<br\>`destination = 192.168.1.5` |
-| Configure a parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br\>`enabled = yes`<br\>`allow from = *`           |
-| Set up high availability                 | Configure multiple destinations on child  | `[stream]`<br\>`destination = parent1:19999 parent2:19999`     |
-| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`               |
+| Task                                     | Configuration                             | Example                                                          |
+|------------------------------------------|-------------------------------------------|------------------------------------------------------------------|
+| Enable streaming on a child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br />`enabled = yes`<br />`destination = 192.168.1.5` |
+| Configure a parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br />`enabled = yes`<br />`allow from = *`           |
+| Set up high availability                 | Configure multiple destinations on child  | `[stream]`<br />`destination = parent1:19999 parent2:19999`      |
+| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`                 |
 
 ## Configuration Overview
 
