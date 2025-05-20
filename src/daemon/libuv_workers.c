@@ -274,10 +274,10 @@ int test_cmd_pool_fifo()
 
         release_cmd_pool(&pool);
         if (args.failed) {
-            fprintf(stderr, "❌ FIFO test failed with %d errors.\n", args.failed);
+            fprintf(stderr, "Multithreaded FIFO test failed with %d errors.\n", args.failed);
             return 1;
         }
     }
-    fprintf(stderr, "✅ Multithreaded FIFO test passed.\n");
+    fprintf(stderr, "Multithreaded FIFO test passed.\n");
     return 0;
 }
