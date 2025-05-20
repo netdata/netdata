@@ -1388,14 +1388,14 @@ static inline void w3svc_w3wp_active_threads(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPActiveThreads)) {
         if (!p->st_wescv_w3wp_active_threads) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_active_threads", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_active_threads", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_active_threads = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_active_threads",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_active_threads",
                 "Threads actively processing requests in the worker process.",
                 "threads",
                 PLUGIN_WINDOWS_NAME,
@@ -1429,14 +1429,14 @@ static inline void w3svc_w3wp_requests_active(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPRequestActive)) {
         if (!p->st_wescv_w3wp_requests_active) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_requests_active", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_requests_active", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_requests_active = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_requests_active",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_requests_active",
                 "Current number of requests being processed by the worker process.",
                 "requests",
                 PLUGIN_WINDOWS_NAME,
@@ -1470,14 +1470,14 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFileCacheMemUsage)) {
         if (!p->st_wescv_w3wp_file_cache_mem_usage) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_file_cache_mem_usage", windows_shared_buffer);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_file_cache_mem_usage", windows_shared_buffer);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_file_cache_mem_usage = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_file_cache_mem_usage",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_file_cache_mem_usage",
                 "Current memory usage by the worker process.",
                 "bytes",
                 PLUGIN_WINDOWS_NAME,
@@ -1511,14 +1511,14 @@ static inline void w3svc_w3wp_files_cached_total(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFilesCachedTotal)) {
         if (!p->st_wescv_w3wp_files_cache_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_files_cache_total", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_files_cache_total", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_files_cache_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_files_cache_total",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_files_cache_total",
                 "Total number of files whose contents were ever added to the cache.",
                 "files/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1552,14 +1552,14 @@ static inline void w3svc_w3wp_files_flushed_total(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPFilesFlushedTotal)) {
         if (!p->st_wescv_w3wp_files_flushed_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_files_flushed_total", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_files_flushed_total", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_files_flushed_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_files_flushed_total",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_files_flushed_total",
                 "Total number of file handles that have been removed from the cache.",
                 "files/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1593,14 +1593,14 @@ static inline void w3svc_w3wp_uri_cached_flushed(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPURICachedFlushed)) {
         if (!p->st_wescv_w3wp_uri_cache_flushed) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_uri_cache_flushed", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_uri_cache_flushed", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_uri_cache_flushed = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_uri_cache_flushed",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_uri_cache_flushed",
                 "Total number of URI cache flushes.",
                 "flushes/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1634,14 +1634,14 @@ static inline void w3svc_w3wp_total_uri_cached(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalURICached)) {
         if (!p->st_wescv_w3wp_total_uri_cached) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_total_uri_cached", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_total_uri_cached", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_total_uri_cached = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_total_uri_cached",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_total_uri_cached",
                 "Total number of URI information blocks added to the cache.",
                 "blocks/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1675,14 +1675,14 @@ static inline void w3svc_w3wp_total_metadata_cached(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalMetadataCached)) {
         if (!p->st_wescv_w3wp_total_metadata_cache) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_total_metadata_cache", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_total_metadata_cache", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_total_metadata_cache = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_total_metadata_cache",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_total_metadata_cache",
                 "Number of metadata information blocks currently present in user-mode cache.",
                 "blocks",
                 PLUGIN_WINDOWS_NAME,
@@ -1716,14 +1716,14 @@ static inline void w3svc_w3wp_total_metadata_flushed(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPTotalMetadataFlushed)) {
         if (!p->st_wescv_w3wp_total_metadata_flushed) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_total_metadata_flushed", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_total_metadata_flushed", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_total_metadata_flushed = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_total_metadata_flushed",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_total_metadata_flushed",
                 "Total number of user-mode metadata cache flushed.",
                 "flushes/s",
                 PLUGIN_WINDOWS_NAME,
@@ -1757,14 +1757,14 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheActiveFlushedItens)) {
         if (!p->st_wescv_w3wp_output_cache_active_flushed_items) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_output_cache_active_flushed_items", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_active_flushed_items", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_output_cache_active_flushed_items = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_output_cache_active_flushed_items",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_output_cache_active_flushed_items",
                 "Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.",
                 "items",
                 PLUGIN_WINDOWS_NAME,
@@ -1799,14 +1799,14 @@ static inline void w3svc_w3wp_output_cache_memory_usage(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheMemoryUsage)) {
         if (!p->st_wescv_w3wp_output_cache_memory_usage) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_output_cache_memory_usage", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_memory_usage", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_output_cache_memory_usage = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_output_cache_memory_usage",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_output_cache_memory_usage",
                 "Current number of bytes used by output cache.",
                 "bytes",
                 PLUGIN_WINDOWS_NAME,
@@ -1840,14 +1840,14 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
     if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->WESCVW3WPOutputCacheFlushesTotal)) {
         if (!p->st_wescv_w3wp_output_cache_flushed_total) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "w3scv_w3wp_%s_output_cache_flushed_total", app_name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "w3svc_w3wp_%s_output_cache_flushed_total", app_name);
             netdata_fix_chart_name(id);
             p->st_wescv_w3wp_output_cache_flushed_total = rrdset_create_localhost(
                 "iis",
                 id,
                 NULL,
-                "w3scv w3wp",
-                "iis.w3scv_w3wp_output_cache_flushed_total",
+                "w3svc w3wp",
+                "iis.w3svc_w3wp_output_cache_flushed_total",
                 "Total number of flushes of output cache.",
                 "flushes/s",
                 PLUGIN_WINDOWS_NAME,

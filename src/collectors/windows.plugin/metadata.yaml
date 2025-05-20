@@ -1226,79 +1226,79 @@ modules:
             - name: pid
               description: Current PID of the process.
           metrics:
-            - name: iis.w3scv_w3wp_active_threads
+            - name: iis.w3svc_w3wp_active_threads
               description: Threads actively processing requests in the worker process.
               unit: "threads"
               chart_type: line
               dimensions:
                 - name: threads
-            - name: iis.w3scv_w3wp_requests_total
+            - name: iis.w3svc_w3wp_requests_total
               description: Maximum number of threads to which the thread pool can grow as needed.
               unit: "requests"
               chart_type: line
               dimensions:
                 - name: requests
-            - name: iis.w3scv_w3wp_requests_active
+            - name: iis.w3svc_w3wp_requests_active
               description: Current number of requests being processed by the worker process.
               unit: "requests"
               chart_type: line
               dimensions:
                 - name: requests
-            - name: iis.w3scv_w3wp_file_cache_mem_usage
+            - name: iis.w3svc_w3wp_file_cache_mem_usage
               description: Current memory usage by the worker process.
               unit: "bytes"
               chart_type: line
               dimensions:
                 - name: used
-            - name: iis.w3scv_w3wp_files_cache_total
+            - name: iis.w3svc_w3wp_files_cache_total
               description: Total number of files whose contents were ever added to the cache.
               unit: "files/s"
               chart_type: line
               dimensions:
                 - name: files
-            - name: iis.w3scv_w3wp_files_flushed_total
+            - name: iis.w3svc_w3wp_files_flushed_total
               description: Total number of file handles that have been removed from the cache.
               unit: "files/s"
               chart_type: line
               dimensions:
                 - name: files
-            - name: iis.w3scv_w3wp_uri_cache_flushed
+            - name: iis.w3svc_w3wp_uri_cache_flushed
               description: Total number of URI cache flushes.
               unit: "flushes/s"
               chart_type: line
               dimensions:
                 - name: flushes
-            - name: iis.w3scv_w3wp_total_uri_cached
+            - name: iis.w3svc_w3wp_total_uri_cached
               description: Total number of URI information blocks added to the cache.
               unit: "blocks/s"
               chart_type: line
               dimensions:
                 - name: blocks
-            - name: iis.w3scv_w3wp_total_metadata_cache
+            - name: iis.w3svc_w3wp_total_metadata_cache
               description: Number of metadata information blocks currently present in user-mode cache.
               unit: "blocks"
               chart_type: line
               dimensions:
                 - name: blocks
-            - name: iis.w3scv_w3wp_total_metadata_flushed
+            - name: iis.w3svc_w3wp_total_metadata_flushed
               description: Total number of user-mode metadata cache flushed.
               unit: "flushes/s"
               chart_type: line
               dimensions:
                 - name: flushes
-            - name: iis.w3scv_w3wp_output_cache_active_flushed_items
+            - name: iis.w3svc_w3wp_output_cache_active_flushed_items
               description: Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.
               unit: "items"
               chart_type: line
               dimensions:
                 - name: items
-            - name: iis.w3scv_w3wp_output_cache_memory_usage
+            - name: iis.w3svc_w3wp_output_cache_memory_usage
               description: Current number of bytes used by output cache.
               unit: "bytes"
               chart_type: line
               dimensions:
                 - name: used
-            - name: iis.w3scv_w3wp_output_cache_flushed_total
+            - name: iis.w3svc_w3wp_output_cache_flushed_total
               description: Total number of flushes of output cache.
               unit: "flushes"
               chart_type: line
