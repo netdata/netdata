@@ -46,7 +46,7 @@ void rrdr_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS
 void web_client_api_request_data_vX_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
 void rrdr_options_init(void);
 
-RRDR_OPTIONS rrdr_options_parse(char *o);
+RRDR_OPTIONS rrdr_options_parse(const char *options_str);
 RRDR_OPTIONS rrdr_options_parse_one(const char *o);
 
 #endif //NETDATA_RRDR_OPTIONS_H

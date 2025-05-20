@@ -1460,6 +1460,8 @@ set(API_PLUGIN_FILES
         src/web/api/queries/des/des.h
         src/web/api/queries/trimmed_mean/trimmed_mean.c
         src/web/api/queries/trimmed_mean/trimmed_mean.h
+        src/web/api/queries/extremes/extremes.c
+        src/web/api/queries/extremes/extremes.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
@@ -1864,12 +1866,21 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
         src/web/mcp/mcp-tools-metric-contexts.c
+        src/web/mcp/mcp-tools-metric-contexts.h
         src/web/mcp/mcp-tools-metric-context-categories.c
+        src/web/mcp/mcp-tools-metric-context-categories.h
         src/web/mcp/mcp-tools-context-details.c
+        src/web/mcp/mcp-tools-context-details.h
         src/web/mcp/mcp-tools-contexts-search.c
+        src/web/mcp/mcp-tools-contexts-search.h
         src/web/mcp/mcp-tools-list-nodes.c
+        src/web/mcp/mcp-tools-list-nodes.h
         src/web/mcp/mcp-tools-node-details.c
+        src/web/mcp/mcp-tools-node-details.h
         src/web/mcp/mcp-tools-execute-function.c
+        src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-metrics-query.c
+        src/web/mcp/mcp-tools-metrics-query.h
         src/web/mcp/mcp-request-id.c
         src/web/mcp/mcp-request-id.h
         src/web/mcp/mcp-ping.c

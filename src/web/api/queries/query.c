@@ -16,6 +16,7 @@
 #include "des/des.h"
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
+#include "extremes/extremes.h"
 
 #define QUERY_PLAN_MIN_POINTS 10
 #define POINTS_TO_EXPAND_QUERY 5
@@ -540,6 +541,18 @@ static struct {
                 .flush = tg_stddev_coefficient_of_variation_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
+        {.name = "coefficient-of-variation", // alias of 'cv'
+                .hash  = 0,
+                .value = RRDR_GROUPING_CV,
+                .add_flush = RRDR_GROUPING_CV,
+                .init  = NULL,
+                .create= tg_stddev_create, // not an error, stddev calculates this too
+                .reset = tg_stddev_reset,  // not an error, stddev calculates this too
+                .free  = tg_stddev_free,   // not an error, stddev calculates this too
+                .add   = tg_stddev_add,    // not an error, stddev calculates this too
+                .flush = tg_stddev_coefficient_of_variation_flush,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+        },
 
         // single exponential smoothing
         {.name = "ses",
@@ -603,6 +616,19 @@ static struct {
                 .free  = tg_countif_free,
                 .add   = tg_countif_add,
                 .flush = tg_countif_flush,
+                .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+        },
+        
+        {.name = "extremes", 
+                .hash  = 0,
+                .value = RRDR_GROUPING_EXTREMES,
+                .add_flush = RRDR_GROUPING_EXTREMES,
+                .init  = NULL,
+                .create= tg_extremes_create,
+                .reset = tg_extremes_reset,
+                .free  = tg_extremes_free,
+                .add   = tg_extremes_add,
+                .flush = tg_extremes_flush,
                 .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
         },
 
@@ -734,6 +760,10 @@ static void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GRO
         case RRDR_GROUPING_COUNTIF:
             tg_countif_add(r, value);
             break;
+            
+        case RRDR_GROUPING_EXTREMES:
+            tg_extremes_add(r, value);
+            break;
 
         case RRDR_GROUPING_TRIMMED_MEAN:
             tg_trimmed_mean_add(r, value);
@@ -787,6 +817,9 @@ static NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_
 
         case RRDR_GROUPING_COUNTIF:
             return tg_countif_flush(r, rrdr_value_options_ptr);
+            
+        case RRDR_GROUPING_EXTREMES:
+            return tg_extremes_flush(r, rrdr_value_options_ptr);
 
         case RRDR_GROUPING_TRIMMED_MEAN:
             return tg_trimmed_mean_flush(r, rrdr_value_options_ptr);
@@ -808,7 +841,11 @@ static NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_
     }
 }
 
-RRDR_GROUP_BY group_by_parse(char *s) {
+RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
+    char src[strlen(group_by_txt) + 1];
+    strcatz(src, 0, group_by_txt, sizeof(src));
+    char *s = src;
+
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
 
     while(s) {
@@ -899,6 +936,9 @@ RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
 
     if(strcmp(s, "percentage") == 0)
         return RRDR_GROUP_BY_FUNCTION_PERCENTAGE;
+        
+    if(strcmp(s, "extremes") == 0)
+        return RRDR_GROUP_BY_FUNCTION_EXTREMES;
 
     return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 }
@@ -920,6 +960,9 @@ const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_b
 
         case RRDR_GROUP_BY_FUNCTION_PERCENTAGE:
             return "percentage";
+            
+        case RRDR_GROUP_BY_FUNCTION_EXTREMES:
+            return "extremes";
     }
 }
 
@@ -3002,6 +3045,12 @@ static void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp,
 
             case RRDR_GROUP_BY_FUNCTION_MAX:
                 if(isnan(*cn) || n_tmp > *cn)
+                    *cn = n_tmp;
+                break;
+                
+            case RRDR_GROUP_BY_FUNCTION_EXTREMES:
+                // For extremes, we need to keep track of the value with the maximum absolute value
+                if(isnan(*cn) || fabsndd(n_tmp) > fabsndd(*cn))
                     *cn = n_tmp;
                 break;
         }

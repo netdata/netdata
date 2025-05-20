@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mcp-tools.h"
+#include "mcp-tools-list-nodes.h"
 #include "database/contexts/rrdcontext.h"
 
 void mcp_tool_list_nodes_schema(BUFFER *buffer) {

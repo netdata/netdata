@@ -7,9 +7,15 @@
 #include <json-c/json.h>
 #include "mcp-request-id.h"
 
-#define MCP_LIST_METRIC_CONTEXTS_METHOD "list_metric_contexts"
-#define MCP_CONTEXT_DETAILS_METHOD "context_details"
-#define MCP_CONTEXT_SEARCH_METHOD "context_full_text_search"
+// MCP tool names - use these constants when referring to tools
+#define MCP_TOOL_METRIC_CONTEXT_CATEGORIES "list_metric_context_categories"
+#define MCP_TOOL_METRIC_CONTEXTS "list_metric_contexts"
+#define MCP_TOOL_CONTEXT_DETAILS "context_details"
+#define MCP_TOOL_CONTEXT_SEARCH "context_full_text_search"
+#define MCP_TOOL_LIST_NODES "list_nodes"
+#define MCP_TOOL_NODE_DETAILS "node_details"
+#define MCP_TOOL_EXECUTE_FUNCTION "execute_function"
+#define MCP_TOOL_METRICS_QUERY "metrics_query"
 
 // MCP protocol versions
 typedef enum {

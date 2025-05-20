@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mcp-tools.h"
+#include "mcp-tools-contexts-search.h"
 #include "database/contexts/rrdcontext.h"
 
 void mcp_tool_contexts_search_schema(BUFFER *buffer) {

@@ -47,6 +47,7 @@ typedef enum rrdr_time_grouping {
     RRDR_GROUPING_SES,
     RRDR_GROUPING_DES,
     RRDR_GROUPING_COUNTIF,
+    RRDR_GROUPING_EXTREMES,
 } RRDR_TIME_GROUPING;
 
 const char *time_grouping_id2txt(RRDR_TIME_GROUPING group);
@@ -81,7 +82,7 @@ typedef enum rrdr_group_by {
 
 struct web_buffer;
 
-RRDR_GROUP_BY group_by_parse(char *s);
+RRDR_GROUP_BY group_by_parse(const char *group_by_txt);
 void buffer_json_group_by_to_array(struct web_buffer *wb, RRDR_GROUP_BY group_by);
 
 typedef enum rrdr_group_by_function {
@@ -90,6 +91,7 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_MAX,
     RRDR_GROUP_BY_FUNCTION_SUM,
     RRDR_GROUP_BY_FUNCTION_PERCENTAGE,
+    RRDR_GROUP_BY_FUNCTION_EXTREMES,
 } RRDR_GROUP_BY_FUNCTION;
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);

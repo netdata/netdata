@@ -22,10 +22,10 @@ typedef enum {
     DATASOURCE_JSON2,
 } DATASOURCE_FORMAT;
 
-DATASOURCE_FORMAT datasource_format_str_to_id(char *name);
+DATASOURCE_FORMAT datasource_format_str_to_id(const char *name);
 const char *rrdr_format_to_string(DATASOURCE_FORMAT format);
 
-DATASOURCE_FORMAT google_data_format_str_to_id(char *name);
+DATASOURCE_FORMAT google_data_format_str_to_id(const char *name);
 
 void datasource_formats_init(void);
 
