@@ -55,13 +55,11 @@ Netdata Assistant is designed to reduce your troubleshooting time by providing c
 
 :::
 
-<div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-<p><strong>🔍 Immediate Alert Context</strong> - Get explanations of what alerts mean without searching online</p>
-<p><strong>⚠️ Impact Assessment</strong> - Understand why the alert matters to your system's health</p>
-<p><strong>🛠️ Guided Troubleshooting</strong> - Receive customized steps for your specific situation</p>
-<p><strong>📚 Curated Resources</strong> - Access relevant documentation for deeper investigation</p>
-<p><strong>🔄 Persistent Assistance</strong> - Keep the Assistant window with you throughout your troubleshooting journey</p>
-</div>
+- 🔍 **Immediate Alert Context** - Get clear explanations of alerts without searching documentation or forums
+- ⚠️ **Impact Assessment** - Understand the severity and potential consequences of issues on your system's performance and stability.
+- 🛠️ **Guided Troubleshooting** - Receive customized steps for your specific situation.
+- 📚 **Curated Resources** - Access relevant documentation for deeper investigation.
+- 🔄 **Persistent Assistance**- Keep the Assistant window with you throughout your troubleshooting journey.
 
 ## Practical Example
 
