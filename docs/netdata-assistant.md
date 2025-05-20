@@ -80,11 +80,12 @@ flowchart LR
     
     B --> D["🕰️ Time wasted<br/>Stress increased"]
     
-    C --> E["📊 Explanation of<br/>system load cause"]
-    E --> F["🛠️ Specific troubleshooting<br/>steps provided"]
-    F --> G["🔄 Assistant follows as<br/>you check metrics"]
-    G --> H["📚 Quick access to<br/>additional resources"]
-    H --> I["⚡ Issue resolved faster<br/>with confidence"]
+    subgraph AssistantProcess ["Assistant Process"]
+        direction LR
+        E["📊 Explanation of<br/>system load cause"] --> F["🛠️ Specific troubleshooting<br/>steps provided"] --> G["🔄 Assistant follows as<br/>you check metrics"] --> H["📚 Quick access to<br/>additional resources"] --> I["⚡ Issue resolved faster<br/>with confidence"]
+    end
+    
+    C --> E
     
     %% Apply styles
     class A,B,D danger
