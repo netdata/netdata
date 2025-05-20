@@ -57,6 +57,4 @@ void schedule_node_state_update(RRDHOST *host, uint64_t delay);
 void unregister_node(const char *machine_guid);
 void aclk_queue_node_info(RRDHOST *host, bool immediate);
 
-bool test_cmd_pool_fifo();
-
 #endif //NETDATA_SQLITE_ACLK_H

@@ -108,11 +108,12 @@ typedef struct {
     int top;  // Stack pointer
 } WorkerPool;
 
-typedef struct cmd_data {
+typedef struct {
     uint8_t opcode;
+    uint8_t padding[sizeof(void *) - sizeof(uint8_t)]; // Padding to align the union
     union {
         void *param[2];
-        char data[16];
+        char data[sizeof(void *) * 2];
     };
 } cmd_data_t;
 
@@ -139,5 +140,6 @@ void init_cmd_pool(CmdPool *pool, int size);
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full);
 bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd);
 void release_cmd_pool(CmdPool *pool);
+int test_cmd_pool_fifo();
 
 #endif //NETDATA_EVENT_LOOP_H

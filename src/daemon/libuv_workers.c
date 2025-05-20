@@ -210,3 +210,74 @@ void release_cmd_pool(CmdPool *pool) {
     uv_mutex_destroy(&pool->lock);
     uv_cond_destroy(&pool->not_full);
 }
+
+/// Test
+
+typedef struct {
+    CmdPool *pool;
+    int total;
+    int failed;
+} ThreadArgs;
+
+void push_thread(void *arg) {
+    ThreadArgs *args = (ThreadArgs *)arg;
+    CmdPool *pool = args->pool;
+    for (int i = 0; i < args->total; ++i) {
+        cmd_data_t cmd;
+        snprintf(cmd.data, sizeof(cmd.data), "cmd-%d", i);
+        push_cmd(pool, &cmd, true);
+    }
+    fprintf(stderr, "PUSHED: %d commands\n", args->total);
+}
+
+void pop_thread(void *arg) {
+    ThreadArgs *args = (ThreadArgs *)arg;
+    CmdPool *pool = args->pool;
+
+    cmd_data_t cmd;
+    for (int i = 0; i < args->total; ) {
+        bool got = pop_cmd(pool, &cmd);
+        if (got) {
+            char expected[64];
+            snprintf(expected, sizeof(expected), "cmd-%d", i);
+            if (strcmp(cmd.data, expected) != 0) {
+                fprintf(stderr, "POPPED: %s --- EXPECTED %s FAILED\n", cmd.data, expected);
+                args->failed++;
+            }
+            i++;
+        } else {
+            uv_sleep(1);  // avoid busy spin
+        }
+    }
+    fprintf(stderr, "POPPED: %d commands\n", args->total);
+}
+
+int test_cmd_pool_fifo()
+{
+    CmdPool pool;
+
+    int pool_sizes[] = {32, 64, 128, 256};
+
+    for (int i = 0; i < sizeof(pool_sizes) / sizeof(pool_sizes[0]); ++i) {
+        int pool_size = pool_sizes[i];
+        init_cmd_pool(&pool, pool_size);
+
+        ThreadArgs args = {.pool = &pool, .total = 1000, .failed = 0};
+        uv_thread_t producer, consumer;
+        fprintf(stderr, "Testing pool size %d\n", pool_size);
+
+        uv_thread_create(&producer, push_thread, &args);
+        uv_thread_create(&consumer, pop_thread, &args);
+
+        uv_thread_join(&producer);
+        uv_thread_join(&consumer);
+
+        release_cmd_pool(&pool);
+        if (args.failed) {
+            fprintf(stderr, "❌ FIFO test failed with %d errors.\n", args.failed);
+            return 1;
+        }
+    }
+    fprintf(stderr, "✅ Multithreaded FIFO test passed.\n");
+    return 0;
+}
