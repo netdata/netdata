@@ -108,6 +108,34 @@ Metrics:
 | iis.application_pool_recycles | recycles | recycles/s |
 | iis.application_pool_uptime | uptime | seconds |
 
+### Per IIS W3SCV W3MP
+
+These metrics refer to the World Wide Web Publishing Service, the service responsible for hosting and serving web content.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app | Application name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| iis.w3svc_w3wp_active_threads | threads | threads |
+| iis.w3svc_w3wp_requests_total | requests | requests/s |
+| iis.w3svc_w3wp_requests_active | requests | requests |
+| iis.w3svc_w3wp_file_cache_mem_usage | used | bytes |
+| iis.w3svc_w3wp_files_cache_total | cached_files | files/s |
+| iis.w3svc_w3wp_files_flushed_total | file_handles | flushes/s |
+| iis.w3svc_w3wp_uri_cache_flushed | cached_uris | flushes/s |
+| iis.w3svc_w3wp_total_uri_cached | uri_cache_blocks | blocks/s |
+| iis.w3svc_w3wp_total_metadata_cached | metadata_blocks | blocks/s |
+| iis.w3svc_w3wp_total_metadata_flushed | metadata_blocks | flushes/s |
+| iis.w3svc_w3wp_output_cache_active_flushed_items | used | items |
+| iis.w3svc_w3wp_output_cache_memory_usage | used | bytes |
+| iis.w3svc_w3wp_output_cache_flushed_total | output_cache_entries | flushes |
+
 
 
 ## Alerts
