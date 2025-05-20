@@ -839,6 +839,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/bitmap/bitmap64.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
+        src/libnetdata/buffer/functions_fields.c
+        src/libnetdata/buffer/functions_fields.h
         src/libnetdata/ringbuffer/ringbuffer.c
         src/libnetdata/ringbuffer/ringbuffer.h
         src/libnetdata/circular_buffer/circular_buffer.c
