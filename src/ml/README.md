@@ -6,7 +6,7 @@ You can leverage machine learning to detect patterns and anomalies in your large
 
 Netdata offers **Anomaly Advisor**, a tool designed to improve your troubleshooting experience, reduce mean time to resolution, and prevent issues from escalating. You can access it through the [Netdata dashboard](/docs/dashboards-and-charts/README.md).
 
-::: tip
+:::tip
 
 To configure ML on your nodes, check the [ML configuration documentation](/src/ml/ml-configuration.md).
 
