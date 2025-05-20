@@ -16,14 +16,14 @@ To configure ML on your nodes, check the [ML configuration documentation](/src/m
 
 When you use Netdata's machine learning models, you benefit from these key principles:
 
-| Principle                  | Description                                                                                                              |
-|----------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| **Unsupervised Learning**  | Models operate independently without requiring your input                                                                |
-| **Real-time Performance**  | While ML impacts CPU usage, you won't experience any compromise to Netdata's high-fidelity, real-time monitoring        |
-| **Seamless Integration**   | ML-based insights are fully embedded into your existing Netdata infrastructure monitoring and troubleshooting workflow   |
+| Principle                  | Description                                                                                                                |
+|----------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| **Unsupervised Learning**  | Models operate independently without requiring your input                                                                  |
+| **Real-time Performance**  | While ML impacts CPU usage, you won't experience any compromise to Netdata's high-fidelity, real-time monitoring           |
+| **Seamless Integration**   | ML-based insights are fully embedded into your existing Netdata infrastructure monitoring and troubleshooting workflow     |
 | **Assistance Over Alerts** | ML helps you investigate potential issues rather than triggering unnecessary alerts - no 3 AM wake-ups for minor anomalies |
 | **Many Light Models**      | Netdata uses many lightweight models instead of a few heavy ones, optimizing for resource usage while maintaining accuracy |
-| **Scalable Architecture**  | The system is designed to handle thousands of metrics simultaneously, scoring each one every second with minimal latency |
+| **Scalable Architecture**  | The system is designed to handle thousands of metrics simultaneously, scoring each one every second with minimal latency   |
 
 :::note
 
@@ -33,13 +33,13 @@ Netdata deliberately avoids using deep learning models, as they would introduce 
 
 ## Types of Anomalies You Can Detect
 
-| Anomaly Type | Description | Business Impact |
-|--------------|-------------|-----------------|
-| **Point Anomalies** | Unusually high or low values compared to historical data | Early warning of service degradation |
-| **Contextual Anomalies** | Sequences of values that deviate from expected patterns | Identification of unusual usage patterns |
-| **Collective Anomalies** | Multivariate anomalies where a combination of metrics appears off | Detection of complex system issues |
-| **Concept Drifts** | Gradual shifts leading to a new baseline | Recognition of evolving system behavior |
-| **Change Points** | Sudden shifts resulting in a new normal state | Identification of system changes |
+| Anomaly Type             | Description                                                       | Business Impact                          |
+|--------------------------|-------------------------------------------------------------------|------------------------------------------|
+| **Point Anomalies**      | Unusually high or low values compared to historical data          | Early warning of service degradation     |
+| **Contextual Anomalies** | Sequences of values that deviate from expected patterns           | Identification of unusual usage patterns |
+| **Collective Anomalies** | Multivariate anomalies where a combination of metrics appears off | Detection of complex system issues       |
+| **Concept Drifts**       | Gradual shifts leading to a new baseline                          | Recognition of evolving system behavior  |
+| **Change Points**        | Sudden shifts resulting in a new normal state                     | Identification of system changes         |
 
 ## How Netdata ML Works
 

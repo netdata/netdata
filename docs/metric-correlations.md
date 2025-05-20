@@ -20,7 +20,7 @@ When viewing the [Metrics tab or a single-node dashboard](/docs/dashboards-and-c
 1. Click **Metric Correlations**.
 2. Highlight a selection of metrics on a single chart. **The selected timeframe must be at least 15 seconds**.
 3. The menu displays details about your selected area and reference baseline. Metric Correlations compares your highlighted window to a reference baseline, which is four times its length and precedes it immediately.
-4. Click **Find Correlations**. 
+4. Click **Find Correlations**.
 
 :::note
 
@@ -30,6 +30,7 @@ This button is only active if you've selected a valid timeframe.
 
 5. **The process evaluates all your available metrics and returns a filtered Netdata dashboard** showing only the most changed metrics between the baseline and your highlighted window.
 6. If needed, select another window and press **Find Correlations** again to refine your analysis.
+
 </details>
 
 ## Integration with Anomaly Detection
@@ -85,23 +86,58 @@ https://your-netdata-node/api/v1/data?chart=system.cpu&dimensions=user&after=-60
 ```
 
 Sample response:
+
 ```json
 {
-  "labels": ["time", "user"],
+  "labels": [
+    "time",
+    "user"
+  ],
   "data": [
-    [1684852570, 0],
-    [1684852569, 0],
-    [1684852568, 0],
-    [1684852567, 0],
-    [1684852566, 0],
-    [1684852565, 0],
-    [1684852564, 0],
-    [1684852563, 0],
-    [1684852562, 0],
-    [1684852561, 0]
+    [
+      1684852570,
+      0
+    ],
+    [
+      1684852569,
+      0
+    ],
+    [
+      1684852568,
+      0
+    ],
+    [
+      1684852567,
+      0
+    ],
+    [
+      1684852566,
+      0
+    ],
+    [
+      1684852565,
+      0
+    ],
+    [
+      1684852564,
+      0
+    ],
+    [
+      1684852563,
+      0
+    ],
+    [
+      1684852562,
+      0
+    ],
+    [
+      1684852561,
+      0
+    ]
   ]
 }
 ```
+
 </details>
 
 <details>
@@ -114,23 +150,58 @@ https://your-netdata-node/api/v1/data?chart=system.cpu&dimensions=user&after=-60
 ```
 
 Sample response showing the percentage of time each metric was anomalous:
+
 ```json
 {
-  "labels": ["time", "user"],
+  "labels": [
+    "time",
+    "user"
+  ],
   "data": [
-    [1684852770, 0],
-    [1684852710, 20],
-    [1684852650, 0],
-    [1684852590, 10],
-    [1684852530, 0],
-    [1684852470, 0],
-    [1684852410, 30],
-    [1684852350, 0],
-    [1684852290, 0],
-    [1684852230, 0]
+    [
+      1684852770,
+      0
+    ],
+    [
+      1684852710,
+      20
+    ],
+    [
+      1684852650,
+      0
+    ],
+    [
+      1684852590,
+      10
+    ],
+    [
+      1684852530,
+      0
+    ],
+    [
+      1684852470,
+      0
+    ],
+    [
+      1684852410,
+      30
+    ],
+    [
+      1684852350,
+      0
+    ],
+    [
+      1684852290,
+      0
+    ],
+    [
+      1684852230,
+      0
+    ]
   ]
 }
 ```
+
 </details>
 
 :::tip
@@ -150,6 +221,7 @@ Two algorithms are available for scoring metrics based on changes between the ba
 
 * **`KS2` (Kolmogorov-Smirnov Test)**: A statistical method comparing distributions between the highlighted and baseline windows to detect significant changes. [Implementation details](https://github.com/netdata/netdata/blob/d917f9831c0a1638ef4a56580f321eb6c9a88037/database/metric_correlations.c#L212).
 * **`Volume`**: A heuristic approach based on percentage change in averages, designed to handle edge cases. [Implementation details](https://github.com/netdata/netdata/blob/d917f9831c0a1638ef4a56580f321eb6c9a88037/database/metric_correlations.c#L516).
+
 </details>
 
 <details>
@@ -165,6 +237,7 @@ Netdata assigns an [Anomaly Bit](https://github.com/netdata/netdata/tree/master/
 
 * **`Metrics`**: Runs Metric Correlations on your raw metric values.
 * **`Anomaly Rate`**: Runs Metric Correlations on anomaly rates for each of your metrics.
+
 </details>
 
 ## Metric Correlations on the Agent
@@ -186,12 +259,12 @@ When you use Metric Correlations together with Anomaly Detection, you'll want to
 
 Here's how to interpret different scenarios:
 
-| Anomaly Rate | Metric Correlation | Interpretation |
-|--------------|-------------------|----------------|
-| High | Strong | Likely a significant issue affecting system behavior |
-| High | Weak | Possible edge case or intermittent issue |
-| Low | Strong | Normal but significant change in system behavior |
-| Low | Weak | Likely normal system operation |
+| Anomaly Rate | Metric Correlation | Interpretation                                       |
+|--------------|--------------------|------------------------------------------------------|
+| High         | Strong             | Likely a significant issue affecting system behavior |
+| High         | Weak               | Possible edge case or intermittent issue             |
+| Low          | Strong             | Normal but significant change in system behavior     |
+| Low          | Weak               | Likely normal system operation                       |
 
 :::tip
 
@@ -204,15 +277,18 @@ By examining both the anomaly rate and the correlation strength, you can priorit
 :::tip
 
 When running Metric Correlations from the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) across multiple nodes, refine your results by grouping by node:
+
 1. Run MC on all your nodes if you're unsure which ones are relevant.
 2. Group the most interesting charts by node to determine whether changes affect all your nodes or just a subset.
 3. If a subset of your nodes stands out, filter for those nodes and rerun MC to get more precise results.
 
 Choose the **`Volume`** algorithm for sparse metrics (e.g., request latency with few requests). Otherwise, use **`KS2`**.
+
 - **`KS2`** is ideal for detecting complex distribution changes in your metrics, such as shifts in variance.
 - **`Volume`** is better for detecting your metrics that were inactive and then spiked (or vice versa).
 
 **Example:**
+
 - `Volume` can highlight network traffic suddenly turning on in your system.
 - `KS2` can detect entropy distribution changes in your data missed by `Volume`.
 

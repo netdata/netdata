@@ -1,16 +1,16 @@
 # Alert Troubleshooting with Netdata Assistant
 
-**The Netdata Assistant leverages large language models and community knowledge** to simplify alert troubleshooting and root cause analysis. 
+**The Netdata Assistant leverages large language models and community knowledge** to simplify alert troubleshooting and root cause analysis.
 
 This AI-powered tool helps you understand alerts quickly, **especially during critical situations**.
 
-| Feature | Benefit |
-|---------|---------|
-| **Follows Your Workflow** | The Assistant window stays with you as you navigate through Netdata dashboards during your troubleshooting process. |
-| **Works at Any Hour** | Especially valuable during after-hours emergencies when you might not have team support available. |
-| **Contextual Knowledge** | Combines Netdata's community expertise with the power of large language models to provide relevant advice. |
-| **Time-Saving** | Eliminates the need for searches across multiple documentation sources or community forums. |
-| **Non-Intrusive** | Provides helpful guidance without taking control away from you - you remain in charge of the troubleshooting process. |
+| Feature                   | Benefit                                                                                                               |
+|---------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| **Follows Your Workflow** | The Assistant window stays with you as you navigate through Netdata dashboards during your troubleshooting process.   |
+| **Works at Any Hour**     | Especially valuable during after-hours emergencies when you might not have team support available.                    |
+| **Contextual Knowledge**  | Combines Netdata's community expertise with the power of large language models to provide relevant advice.            |
+| **Time-Saving**           | Eliminates the need for searches across multiple documentation sources or community forums.                           |
+| **Non-Intrusive**         | Provides helpful guidance without taking control away from you - you remain in charge of the troubleshooting process. |
 
 ## Using Netdata Assistant
 
@@ -25,6 +25,7 @@ This AI-powered tool helps you understand alerts quickly, **especially during cr
 3. Click the **Assistant** button to open a floating window with tailored troubleshooting insights.
 
 4. If there are no active alerts, you can still access the Assistant from the **Alert Configuration** view.
+
 </details>
 
 <details>
@@ -33,7 +34,7 @@ This AI-powered tool helps you understand alerts quickly, **especially during cr
 When you open the Assistant, you'll see:
 
 1. **Alert Context**: Explanation of what the alert means and why it's occurring
-   
+
    ![Netdata Assistant popup](https://github-production-user-asset-6210df.s3.amazonaws.com/24860547/253559645-62850c7b-cd1d-45f2-b2dd-474ecbf2b713.png)
 
 2. **Troubleshooting Steps**: Recommended actions to address the issue
@@ -41,8 +42,9 @@ When you open the Assistant, you'll see:
 3. **Importance Level**: Context on how critical this alert is for your system
 
 4. **Resource Links**: Curated documentation and external resources for further investigation
-   
+
    ![useful resources](https://github-production-user-asset-6210df.s3.amazonaws.com/24860547/253560071-e768fa6d-6c9a-4504-bb1f-17d5f4707627.png)
+
 </details>
 
 ## How Netdata Assistant Helps You
