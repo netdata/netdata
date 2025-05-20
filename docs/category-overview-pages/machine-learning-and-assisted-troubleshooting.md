@@ -25,11 +25,11 @@ Our ML-powered anomaly detection works silently in the background, monitoring yo
 | **Node-Level Anomaly Detection** | Identifies when your entire system is behaving unusually                     |
 | **Metric Correlations**          | Helps you find relationships between metrics to pinpoint root causes         |
 
-Learn more in the [Machine Learning and Anomaly Detection](/docs/machine-learning-and-anomaly-detection/ml-and-anomaly-detection.md) documentation.
+Learn more in the [Machine Learning and Anomaly Detection](/src/ml/README.md) documentation.
 
 ## Netdata Assistant
 
-When alerts fire or anomalies appear, Netdata Assistant is your AI-powered troubleshooting companion.
+When alerts trigger or anomalies emerge, Netdata Assistant serves as your AI-powered troubleshooting companion.
 
 | Feature                    | What It Does For You                                                  |
 |----------------------------|-----------------------------------------------------------------------|

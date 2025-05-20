@@ -107,7 +107,7 @@ To reduce false positives in your environment, Netdata trains multiple models pe
 
 :::
 
-The anomaly detection algorithm uses the [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance) between recent metric patterns and the learned cluster centers. If this distance exceeds a threshold based on the 99th percentile of training data, the metric is considered anomalous by that model.
+The anomaly detection algorithm uses the [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance) between recent metric patterns and the learned cluster centers. If this distance exceeds a threshold based on the 99th percentile of training data, that model considers the metric anomalous.
 
 ### Anomaly Bit
 
@@ -175,4 +175,4 @@ With Netdata ML, you get reliable, real-time anomaly detection with minimal fals
 For more information:
 
 - [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md)
-- [ML Configuiration Guide](/src/ml/ml-configuration.md)
+- [ML Configuration Guide](/src/ml/ml-configuration.md)

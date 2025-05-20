@@ -4,7 +4,7 @@ The **Metric Correlations** feature helps you quickly identify metrics and chart
 
 :::tip
 
-By filtering your standard Netdata dashboard to **display only the most relevant charts**, Metric Correlations makes it easier for you to pinpoint anomalies and investigate issues.
+By filtering your standard Netdata dashboard to **display only the most relevant charts**, Metric Correlations make it easier for you to pinpoint anomalies and investigate issues.
 
 :::
 
@@ -212,7 +212,7 @@ You can programmatically access this data to build custom dashboards or alerts b
 
 ## Metric Correlations Options
 
-Metric Correlations offers adjustable parameters for deeper data exploration. Since different data types and incidents require different approaches, **these settings allow for flexible analysis**.
+Metric Correlations offer adjustable parameters for deeper data exploration. Since different data types and incidents require different approaches, **these settings allow for flexible analysis**.
 
 <details>
 <summary><strong>Method</strong></summary><br/>

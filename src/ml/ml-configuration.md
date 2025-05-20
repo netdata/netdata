@@ -208,7 +208,7 @@ When configuring machine learning, it's important to understand the resource imp
 
 :::note
 
-Netdata's ML is designed to be lightweight, using approximately 1-2% of a single CPU core under default settings on a typical system.
+Netdata's ML is designed to be lightweight, using approximately 1–2% of a single CPU core under default settings on a typical system.
 
 :::
 
