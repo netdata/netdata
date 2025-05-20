@@ -680,7 +680,7 @@ void rrd_function_progress(const char *transaction) {
     functions_stop_monotonic_update_on_progress(&r->stop_monotonic_ut);
 
     if(r->progresser.cb)
-        r->progresser.cb(r->progresser.data);
+        r->progresser.cb(transaction, r->progresser.data);
 
     rrd_collector_dispatcher_release(r->rdcf->collector);
 
@@ -689,6 +689,9 @@ cleanup:
 }
 
 void rrd_function_call_progresser(nd_uuid_t *transaction) {
+    if(uuid_is_null(*transaction))
+        return;
+
     char str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(*transaction, str);
     rrd_function_progress(str);

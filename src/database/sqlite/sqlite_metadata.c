@@ -2723,12 +2723,17 @@ void metadata_sync_shutdown(void)
 {
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    nd_log_daemon(NDLP_DEBUG, "METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
-    metadata_enq_cmd(&cmd);
 
-    /* wait for metadata thread to shut down */
-    nd_log_daemon(NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
+    // if we can't sent command return
+    // This should not happen but if we wait we may not get a completion
+    // and shutdown will timeout
+    if (!metadata_enq_cmd(&cmd)) {
+        nd_log_daemon(NDLP_WARNING, "METADATA: Failed to send a shutdown command");
+        return;
+    }
+    nd_log_daemon(NDLP_INFO, "METADATA: Submitted shutdown command, waiting for ACK");
+
     completion_wait_for(&meta_config.start_stop_complete);
     completion_destroy(&meta_config.start_stop_complete);
 

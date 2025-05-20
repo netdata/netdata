@@ -169,35 +169,57 @@ static void pluginsd_function_cancel(void *data) {
                "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
 }
 
-static void pluginsd_function_progress_to_plugin(void *data) {
-    struct inflight_function *look_for = data, *t;
+static void pluginsd_function_progress_to_plugin(const char *transaction, void *data) {
+    PARSER *parser = data;
 
-    if (unlikely(!look_for || !look_for->parser || !look_for->parser->inflight.functions))
-        fatal("PLUGINSD: function progress to plugin called with invalid data.");
-
-    bool sent = false;
-    dfe_start_read(look_for->parser->inflight.functions, t) {
-        if(look_for == t) {
-            const char *transaction = t_dfe.name;
-
-            internal_error(true, "PLUGINSD: sending function progress to plugin for transaction '%s'", transaction);
-
-            char buffer[2048];
-            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_PROGRESS " %s\n", transaction);
-
-            // send the command to the plugin
-            ssize_t ret = send_to_plugin(buffer, t->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
-            if(ret < 0)
-                sent = true;
-
-            break;
-        }
+    if(!transaction || !*transaction) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "PLUGINSD: FUNCTION_PROGRESS request without transaction!");
+        return;
     }
-    dfe_done(t);
 
-    if(sent <= 0)
+    if(!parser) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "PLUGINSD: FUNCTION_PROGRESS request without parser!");
+        return;
+    }
+
+    DICTIONARY *dict = parser->inflight.functions;
+
+    if(!dict) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "PLUGINSD: FUNCTION_PROGRESS request without inflight functions dictionary!");
+        return;
+    }
+
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict, transaction);
+    if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                "PLUGINSD: FUNCTION_PROGRESS request didn't match any pending function requests in pluginsd.d.");
+               "PLUGINSD: FUNCTION_PROGRESS request for transaction '%s' that is not in progress!", transaction);
+        return;
+    }
+
+    struct inflight_function *t = dictionary_acquired_item_value(item);
+    if(t->parser != parser) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "PLUGINSD: FUNCTION_PROGRESS request for transaction '%s' parser mismatch!", transaction);
+        dictionary_acquired_item_release(dict, item);
+        return;
+    }
+
+    internal_error(true, "PLUGINSD: sending function progress to plugin for transaction '%s'", transaction);
+
+    char buffer[512];
+    snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_PROGRESS " %s\n", transaction);
+
+    // send the command to the plugin
+    ssize_t ret = send_to_plugin(buffer, t->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+    if(ret != (ssize_t)strlen(buffer)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "PLUGINSD: FUNCTION_PROGRESS request failed to send to plugin for transaction '%s'", transaction);
+    }
+
+    dictionary_acquired_item_release(dict, item);
 }
 
 // this is the function called from
@@ -256,7 +278,7 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
         if (rfe->register_progresser.cb &&
             (parser->repertoire == PARSER_INIT_PLUGINSD || (parser->repertoire == PARSER_INIT_STREAMING &&
                                                             stream_has_capability(&parser->user, STREAM_CAP_PROGRESS))))
-            rfe->register_progresser.cb(rfe->register_progresser.data, pluginsd_function_progress_to_plugin, t);
+            rfe->register_progresser.cb(rfe->register_progresser.data, pluginsd_function_progress_to_plugin, t->parser);
 
         if (!parser->inflight.smaller_monotonic_timeout_ut ||
             *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)

@@ -216,19 +216,15 @@ Request a BAA through Netdata Support if required.
 
 ---
 
-### SOC 2 Alignment
+### SOC 2 Compliance
 
-Netdata’s operations align with SOC 2 Trust Service Criteria:
+Netdata achieved SOC2 Type 1 compliance on May 14, 2025 for these Service Criteria:
 
 | **Principle**        | **Practices**                            |
 |:---------------------|:-----------------------------------------|
 | Security             | TLS encryption, strict access controls   |
 | Availability         | Resilient systems, continuous monitoring |
-| Processing Integrity | Reliable metric collection               |
 | Confidentiality      | Metadata isolation, role-based access    |
-| Privacy              | GDPR and CCPA-compliant data handling    |
-
-Netdata is not currently SOC 2 certified but applies equivalent controls.
 
 ---
 

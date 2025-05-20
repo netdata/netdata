@@ -37,7 +37,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
     retention.storage_tiers = nd_profile.storage_tiers;
 
     // Iterate through all available storage tiers
-    for(size_t tier = 0; tier < retention.storage_tiers && tier < RRD_MAX_STORAGE_TIERS; tier++) {
+    for(size_t tier = 0; tier < retention.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if(!eng) 
             continue;

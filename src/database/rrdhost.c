@@ -782,7 +782,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
     freez(host->cache_dir);
-    rrdhost_stream_parents_free(host, false);
     simple_pattern_free(host->stream.snd.charts_matching);
     rrdhost_system_info_free(host->system_info);
 
