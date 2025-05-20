@@ -363,6 +363,7 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.1
           name: cfwConnectionStatService
+        tag: conn_stat_id
         mapping:
           1: otherFWService
           2: fileXferFtp
