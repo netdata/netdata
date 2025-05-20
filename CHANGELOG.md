@@ -6,11 +6,17 @@
 
 **Merged pull requests:**
 
+- fix use after free of streaming current parent [\#20305](https://github.com/netdata/netdata/pull/20305) ([ktsaou](https://github.com/ktsaou))
+- fix heap-use-after-free in plugins.d inflight functions [\#20304](https://github.com/netdata/netdata/pull/20304) ([ktsaou](https://github.com/ktsaou))
+- Improve metasync shutdown [\#20303](https://github.com/netdata/netdata/pull/20303) ([stelfrag](https://github.com/stelfrag))
+- docs: fix `<br>` in streaming [\#20302](https://github.com/netdata/netdata/pull/20302) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/snmp\): replace newline control chars with spaces in system info [\#20301](https://github.com/netdata/netdata/pull/20301) ([ilyam8](https://github.com/ilyam8))
 - Updating SOC2 compliance status [\#20300](https://github.com/netdata/netdata/pull/20300) ([shyamvalsan](https://github.com/shyamvalsan))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.4 to 5.7.5 in /src/go [\#20299](https://github.com/netdata/netdata/pull/20299) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/prometheus/common from 0.63.0 to 0.64.0 in /src/go [\#20296](https://github.com/netdata/netdata/pull/20296) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.33.0 to 0.33.1 in /src/go [\#20295](https://github.com/netdata/netdata/pull/20295) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(go.d\): sanitize vnode labels before creating vnode [\#20293](https://github.com/netdata/netdata/pull/20293) ([ilyam8](https://github.com/ilyam8))
+- docs: Observability centralization points [\#20292](https://github.com/netdata/netdata/pull/20292) ([kanelatechnical](https://github.com/kanelatechnical))
 - Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
 - Fix when docker socket group id points to an existing group in container [\#20288](https://github.com/netdata/netdata/pull/20288) ([felipecrs](https://github.com/felipecrs))
 - add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
@@ -461,10 +467,6 @@
 - copy fields only when the source is valid [\#19768](https://github.com/netdata/netdata/pull/19768) ([ktsaou](https://github.com/ktsaou))
 - detect crashes during status file processing [\#19767](https://github.com/netdata/netdata/pull/19767) ([ktsaou](https://github.com/ktsaou))
 - post status syncrhonously [\#19766](https://github.com/netdata/netdata/pull/19766) ([ktsaou](https://github.com/ktsaou))
-- enable libunwind in static builds [\#19764](https://github.com/netdata/netdata/pull/19764) ([ktsaou](https://github.com/ktsaou))
-- fix invalid free [\#19763](https://github.com/netdata/netdata/pull/19763) ([ktsaou](https://github.com/ktsaou))
-- make status file use fixed size character arrays [\#19761](https://github.com/netdata/netdata/pull/19761) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/sd/snmp\): use rescan and cache ttl only when set [\#19760](https://github.com/netdata/netdata/pull/19760) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
