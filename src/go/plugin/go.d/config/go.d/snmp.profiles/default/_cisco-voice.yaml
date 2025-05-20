@@ -187,6 +187,7 @@ metrics:
         OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.4
         description: Last known status of the enterprise contact center application peripheral interface manager functional component.
         unit: "1"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.1

@@ -162,6 +162,7 @@ metrics:
         name: sysMultiHostCpuIowait
         description: The average time spent by the specified processor waiting for external I/O to complete for the associated host
         unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.3
@@ -328,6 +329,7 @@ metrics:
         name: ltmVirtualServConnLimit
         description: The maximum number of connections the specified virtual server is allowed to have open at one time
         unit: "{connection}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: server
         symbol:
@@ -342,6 +344,7 @@ metrics:
       # Gauges
       - name: ltmVsStatus
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: ltm_vs_status_avail_state
         symbol:
@@ -498,6 +501,7 @@ metrics:
       # Gauges
       - name: ltmNodeAddr
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: node
         symbol:
@@ -750,6 +754,7 @@ metrics:
         name: ltmPoolMemberSessionStatus
         description: The hierarchical status of the session including parent status for the specified pool member
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: pool
         symbol:
@@ -768,6 +773,7 @@ metrics:
       # Gauges
       - name: ltmPoolMember
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: pool
         symbol:

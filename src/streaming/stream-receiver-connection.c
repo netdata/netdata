@@ -137,6 +137,7 @@ static int stream_receiver_response_too_busy_now(struct web_client *w) {
 }
 
 static void stream_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
+    // Set the file descriptor and ssl from the web client
     rpt->sock.fd = w->fd;
     rpt->sock.ssl = w->ssl;
 
@@ -151,6 +152,8 @@ static void stream_receiver_takeover_web_connection(struct web_client *w, struct
         w->fd = -1;
 
     buffer_flush(w->response.data);
+
+    web_server_remove_current_socket_from_poll();
 }
 
 static void stream_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {

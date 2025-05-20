@@ -188,6 +188,7 @@ metrics:
     symbols:
       - name: fmDevice
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: fmDeviceEntName
@@ -294,6 +295,7 @@ metrics:
         OID: 1.3.6.1.4.1.12356.103.7.2.1.3
         description: Raid disk size in GB
         unit: "GBy"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.12356.103.7.2.1.2
@@ -347,6 +349,7 @@ metrics:
     symbols:
       - name: fmHaPeer
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: fmHaPeerEntIp

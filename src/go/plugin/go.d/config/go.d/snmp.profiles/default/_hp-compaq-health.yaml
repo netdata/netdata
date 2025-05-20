@@ -232,6 +232,7 @@ metrics:
         name: cpqHeFltTolPowerSupplyStatus
         description: Status of the fault tolerant power supply
         unit: "{instance}"
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.1
@@ -253,6 +254,7 @@ metrics:
         name: cpqHeFltTolPowerSupplyCapacityMaximum
         description: Maximum capacity of the power supply in watts
         unit: "W"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.232.6.2.9.3.1.5

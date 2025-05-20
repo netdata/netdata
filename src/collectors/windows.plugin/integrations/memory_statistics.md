@@ -71,6 +71,7 @@ Metrics:
 | mem.swap_iops | read, write | operations/s |
 | mem.swap_pages_io | read, write | pages/s |
 | mem.system_pool_size | paged, pool-paged | bytes |
+| mem.system_page_table_entries | free | pages |
 
 
 

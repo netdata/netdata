@@ -1342,6 +1342,9 @@ static void cgroup_main_cleanup(void *pptr) {
             sleep_usec(step);
         }
     }
+    // We should be done, but just in case, avoid blocking shutdown
+    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED))
+        (void) nd_thread_join(discovery_thread.thread);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }

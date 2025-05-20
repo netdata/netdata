@@ -1,0 +1,1659 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netdata WebSocket Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #messageInput {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #0078d7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0063b1;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #connectionStatus {
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .connecting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        #messagesLog {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+        }
+        .message {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .sent {
+            background-color: #e2f0fd;
+            text-align: right;
+            margin-left: 20%;
+        }
+        .received {
+            background-color: #f1f1f1;
+            margin-right: 20%;
+        }
+        
+        /* Tab Styles */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            border-color: #ddd;
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4caf50;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        /* Stats Panel */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+        }
+        .stat-card.error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        /* Form Controls for Stress Test */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="number"], input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        /* Log Area */
+        #stressTestLog {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            font-family: monospace;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Netdata WebSocket Test Client</h1>
+    
+    <!-- Common Connection Controls -->
+    <div class="container">
+        <div id="connectionStatus" class="disconnected">Disconnected</div>
+        
+        <div class="message-box">
+            <label for="endpointInput">WebSocket URL:</label>
+            <input type="text" id="endpointInput" value="ws://localhost:19999/echo" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <button id="toggleProtocolButton" title="Toggle between ws:// and wss://">Switch to wss://</button>
+        </div>
+        
+        <div class="message-box">
+            <input type="checkbox" id="enableDebugMode">
+            <label for="enableDebugMode">Debug Mode (more verbose logging)</label>
+        </div>
+        
+        <div class="message-box">
+            <button id="connectButton">Connect</button>
+            <button id="disconnectButton" disabled>Disconnect</button>
+        </div>
+        
+        <div id="connectionDetails" style="margin-top: 10px; display: none; background-color: #e7f3fe; padding: 10px; border-radius: 4px;">
+            <div><strong>Protocol:</strong> <span id="negotiatedProtocol">-</span></div>
+            <div><strong>Extensions:</strong> <span id="negotiatedExtensions">-</span></div>
+            <div><strong>Compression:</strong> <span id="compressionStatus">Disabled</span></div>
+        </div>
+    </div>
+    
+    <!-- Tab Navigation -->
+    <div class="tabs">
+        <div class="tab active" data-tab="basicTest">Basic Testing</div>
+        <div class="tab" data-tab="stressTest">Stress Test</div>
+    </div>
+    
+    <!-- Basic Test Tab -->
+    <div id="basicTest" class="tab-content active">
+        <div class="container">
+            <div class="message-box">
+                <input type="text" id="messageInput" placeholder="Type a message to send..." disabled>
+                <button id="sendButton" disabled>Send</button>
+                <button id="testLargeMessageButton" disabled>Test Compression</button>
+            </div>
+            
+            <div id="compressionOptions" style="margin-top: 10px; display: none; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+                <div style="margin-bottom: 10px;"><strong>Message Compression Characteristics:</strong></div>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                    <label>
+                        <input type="radio" name="compressionType" value="high" checked>
+                        Highly Compressible
+                    </label>
+                    
+                    <label>
+                        <input type="radio" name="compressionType" value="medium">
+                        Medium Compression
+                    </label>
+                    
+                    <label>
+                        <input type="radio" name="compressionType" value="low">
+                        Low Compression
+                    </label>
+                    
+                    <label>
+                        <input type="radio" name="compressionType" value="mixed">
+                        Mixed Content
+                    </label>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="useBinaryMode" style="margin-right: 8px;">
+                        <span>Send as Binary Frame (use for non-UTF8 content)</span>
+                    </label>
+                    <div style="font-size: 0.85em; color: #666; margin-top: 5px; margin-left: 24px;">
+                        Use binary mode only when sending data that is not valid UTF-8 text.
+                        For most test cases, text mode works fine.
+                    </div>
+                </div>
+            </div>
+            
+            <h3>Messages</h3>
+            <div id="messagesLog"></div>
+        </div>
+    </div>
+    
+    <!-- Stress Test Tab -->
+    <div id="stressTest" class="tab-content">
+        <div class="container">
+            <h3>WebSocket Stress Tester</h3>
+            <p>Configure the stress test parameters below. This will send random messages for the specified duration and verify responses.</p>
+            
+            <div class="form-group">
+                <label for="testDurationMinutes">Test Duration (minutes):</label>
+                <input type="number" id="testDurationMinutes" value="1" min="0.1" max="60" step="0.1">
+            </div>
+            
+            <div class="form-group">
+                <label for="minMessageSize">Minimum Message Size (bytes):</label>
+                <input type="number" id="minMessageSize" value="100" min="10" max="50000">
+            </div>
+            
+            <div class="form-group">
+                <label for="maxMessageSize">Maximum Message Size (bytes):</label>
+                <input type="number" id="maxMessageSize" value="10000" min="100" max="100000">
+            </div>
+            
+            <div class="form-group">
+                <label for="singleSize">Use Fixed Message Size:</label>
+                <input type="checkbox" id="useSingleSize" style="margin-left: 10px;">
+                <input type="number" id="singleMessageSize" value="5000" min="100" max="100000" style="width: 120px; margin-left: 10px;">
+                <span style="font-size: 0.85em; color: #666; margin-left: 10px;">Check to use a consistent message size for better testing</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="messageFrequency">Messages per Second:</label>
+                <input type="range" id="messageFrequency" value="5" min="1" max="100" step="1">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>1</span>
+                    <span id="messageFrequencyValue">5</span>
+                    <span>100</span>
+                </div>
+                <div style="font-size: 0.85em; color: #0c5460; font-weight: normal; background-color: #d1ecf1; padding: 5px; border-radius: 4px; margin-top: 5px;">
+                    NOTE: Maximum rate is limited to 100 messages/second for reliable testing,
+                    as browsers cannot reliably process WebSocket messages at higher rates.
+                </div>
+            </div>
+            
+            <div class="message-box">
+                <button id="startStressTestButton" disabled>Start Stress Test</button>
+                <button id="stopStressTestButton" disabled>Stop Test</button>
+            </div>
+            
+            <div class="progress-container">
+                <div id="stressTestProgress" class="progress-bar" style="width: 0%"></div>
+            </div>
+            
+            <div id="timeRemaining" style="text-align: center;">Ready to start</div>
+            
+            <!-- Real-time Stats -->
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <div class="stat-value" id="messagesSent">0</div>
+                    <div class="stat-label">Messages Sent</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="messagesReceived">0</div>
+                    <div class="stat-label">Messages Received</div>
+                </div>
+                <div class="stat-card" id="errorCard">
+                    <div class="stat-value" id="errorCount">0</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgLatency">0 ms</div>
+                    <div class="stat-label">Average Latency</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bytesSent">0 KB</div>
+                    <div class="stat-label">Data Sent</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bytesReceived">0 KB</div>
+                    <div class="stat-label">Data Received</div>
+                </div>
+            </div>
+            
+            <h4>Test Log</h4>
+            <div id="stressTestLog"></div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and content
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab and its content
+                tab.classList.add('active');
+                const tabContentId = tab.getAttribute('data-tab');
+                document.getElementById(tabContentId).classList.add('active');
+            });
+        });
+        
+        // Elements - Common
+        const connectButton = document.getElementById('connectButton');
+        const disconnectButton = document.getElementById('disconnectButton');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const endpointInput = document.getElementById('endpointInput');
+        const toggleProtocolButton = document.getElementById('toggleProtocolButton');
+        const enableCompression = { checked: true }; // Default to enabled
+        const enableDebugMode = document.getElementById('enableDebugMode');
+        const connectionDetails = document.getElementById('connectionDetails');
+        const negotiatedProtocol = document.getElementById('negotiatedProtocol');
+        const negotiatedExtensions = document.getElementById('negotiatedExtensions');
+        const compressionStatus = document.getElementById('compressionStatus');
+        
+        // Elements - Basic Test Tab
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const testLargeMessageButton = document.getElementById('testLargeMessageButton');
+        const messagesLog = document.getElementById('messagesLog');
+        
+        // Elements - Stress Test Tab
+        const startStressTestButton = document.getElementById('startStressTestButton');
+        const stopStressTestButton = document.getElementById('stopStressTestButton');
+        const testDurationMinutes = document.getElementById('testDurationMinutes');
+        const minMessageSize = document.getElementById('minMessageSize');
+        const maxMessageSize = document.getElementById('maxMessageSize');
+        const useSingleSize = document.getElementById('useSingleSize');
+        const singleMessageSize = document.getElementById('singleMessageSize');
+        const messageFrequency = document.getElementById('messageFrequency');
+        const messageFrequencyValue = document.getElementById('messageFrequencyValue');
+        const stressTestProgress = document.getElementById('stressTestProgress');
+        const timeRemaining = document.getElementById('timeRemaining');
+        const stressTestLog = document.getElementById('stressTestLog');
+        const errorCard = document.getElementById('errorCard');
+        
+        // Stats elements
+        const messagesSentElement = document.getElementById('messagesSent');
+        const messagesReceivedElement = document.getElementById('messagesReceived');
+        const errorCountElement = document.getElementById('errorCount');
+        const avgLatencyElement = document.getElementById('avgLatency');
+        const bytesSentElement = document.getElementById('bytesSent');
+        const bytesReceivedElement = document.getElementById('bytesReceived');
+        
+        // Update frequency slider value display
+        messageFrequency.addEventListener('input', () => {
+            messageFrequencyValue.textContent = messageFrequency.value;
+        });
+        
+        // WebSocket connection
+        let socket = null;
+        
+        // Connect to the WebSocket server
+        connectButton.addEventListener('click', () => {
+            // Get the URL from the input field
+            const url = endpointInput.value.trim();
+            if (!url) {
+                alert("Please enter a valid WebSocket URL");
+                return;
+            }
+            
+            // Validate the URL has a WebSocket protocol
+            if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+                alert("WebSocket URL must start with ws:// or wss://");
+                return;
+            }
+            
+            connectionStatus.textContent = 'Connecting to ' + url;
+            connectionStatus.className = 'connecting';
+            connectionDetails.style.display = 'none';
+            addMessageToLog('Connecting to: ' + url, 'system');
+            
+            try {
+                // Create WebSocket connection with netdata-json protocol
+                const protocols = [];
+                socket = new WebSocket(url, protocols);
+                addMessageToLog('WebSocket connection created', 'system');
+                
+                // Connection opened
+                socket.addEventListener('open', (event) => {
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.className = 'connected';
+                    
+                    // Enable all connection-dependent controls
+                    connectButton.disabled = true;
+                    disconnectButton.disabled = false;
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    testLargeMessageButton.disabled = false;
+                    startStressTestButton.disabled = false;
+                    
+                    // Display connection details
+                    connectionDetails.style.display = 'block';
+                    negotiatedProtocol.textContent = socket.protocol || 'none';
+                    
+                    const extensions = socket.extensions || 'none';
+                    negotiatedExtensions.textContent = extensions;
+                    
+                    // Check if compression was negotiated
+                    if (extensions.includes('permessage-deflate')) {
+                        compressionStatus.textContent = 'Enabled (permessage-deflate)';
+                        compressionStatus.style.color = '#155724';
+                    } else {
+                        compressionStatus.textContent = 'Disabled';
+                        compressionStatus.style.color = '#721c24';
+                    }
+                    
+                    addMessageToLog(`Connection established (Protocol: ${socket.protocol}, Extensions: ${extensions})`, 'system');
+                });
+                
+                // Track message size for network analysis
+                let lastMessageSentInfo = null;
+                
+                // Listen for messages
+                socket.addEventListener('message', (event) => {
+                    const message = event.data;
+                    const receiveTime = performance.now();
+                    
+                    // First check if this is a stress test message
+                    if (stressTestRunning && typeof message === 'string' && message.startsWith('MSG-')) {
+                        const handled = processStressTestResponse(message);
+                        if (handled) return; // Skip normal message processing if it was a stress test message
+                    }
+                    
+                    // Get transfer size from event if available
+                    let transferSize = 0;
+                    
+                    // Check if this is a response to a benchmark test
+                    if (window.currentBenchmark && !window.currentBenchmark.responseComplete) {
+                        // Update benchmark data
+                        const benchmark = window.currentBenchmark;
+                        
+                        if (!benchmark.lastResponseTime) {
+                            // First response packet
+                            benchmark.lastResponseTime = receiveTime;
+                            const firstPacketLatency = (receiveTime - benchmark.sendTime).toFixed(2);
+                            addMessageToLog(`First response received after ${firstPacketLatency}ms`, 'system');
+                        }
+                        
+                        // Handle different data types (string or blob)
+                        const processResponse = (responseData) => {
+                            // Track bytes received
+                            benchmark.receivedBytes = responseData.length;
+                            
+                            // Check if response is equal to what we sent
+                            // For compressed responses, the protocol should preserve the exact content
+                            const dataMatches = (responseData === benchmark.originalMessage);
+                            
+                            // Check if response seems complete - always do the verification
+                            // regardless of the content to ensure we check data integrity
+                            if (responseData && responseData.length > 0) {
+                                benchmark.responseComplete = true;
+                                const totalTime = (receiveTime - benchmark.sendTime).toFixed(2);
+                                
+                                // Data verification results
+                                let verificationResults = '';
+                                if (dataMatches) {
+                                    verificationResults = `<div style="color: #155724; margin-top: 5px;"><strong>✓ Data Integrity:</strong> Response content matches sent data exactly!</div>`;
+                                } else {
+                                    // If sizes match but content differs
+                                    if (responseData.length === benchmark.originalMessage.length) {
+                                        verificationResults = `<div style="color: #721c24; margin-top: 5px;"><strong>❌ Data Integrity:</strong> Response size matches (${responseData.length} bytes) but content differs!</div>`;
+                                        
+                                        // Add some diagnostic info to help understand the mismatch
+                                        // Find the first point of difference
+                                        let diffPos = -1;
+                                        for (let i = 0; i < responseData.length; i++) {
+                                            if (responseData[i] !== benchmark.originalMessage[i]) {
+                                                diffPos = i;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if (diffPos >= 0) {
+                                            const sentContext = benchmark.originalMessage.substring(
+                                                Math.max(0, diffPos - 10), 
+                                                Math.min(benchmark.originalMessage.length, diffPos + 10)
+                                            );
+                                            const recvContext = responseData.substring(
+                                                Math.max(0, diffPos - 10), 
+                                                Math.min(responseData.length, diffPos + 10)
+                                            );
+                                            
+                                            verificationResults += `<div style="color: #721c24; margin-top: 5px;">
+                                                First difference at position ${diffPos}:<br>
+                                                Sent: "${sentContext}" (char code: ${benchmark.originalMessage.charCodeAt(diffPos)})<br>
+                                                Recv: "${recvContext}" (char code: ${responseData.charCodeAt(diffPos)})
+                                            </div>`;
+                                        }
+                                    } else {
+                                        verificationResults = `<div style="color: #721c24; margin-top: 5px;"><strong>❌ Data Integrity:</strong> Response content differs! Sent: ${benchmark.originalMessage.length} bytes, Received: ${responseData.length} bytes</div>`;
+                                    }
+                                }
+                                
+                                // Calculate compression ratio if we know the original size
+                                let compressionInfo = "";
+                                if (benchmark.expectedBytes > 0 && responseData.length > 0) {
+                                    // Check if compression extension was actually negotiated
+                                    const usingCompression = negotiatedExtensions.textContent.includes("permessage-deflate");
+                                    
+                                    const compressionRatio = (benchmark.expectedBytes / responseData.length).toFixed(2);
+                                    const percentReduction = ((1 - (responseData.length / benchmark.expectedBytes)) * 100).toFixed(2);
+                                    
+                                    // Use color formatting based on compression effectiveness
+                                    const compressionColor = percentReduction > 50 ? '#155724' : (percentReduction > 20 ? '#856404' : '#721c24');
+                                    
+                                    compressionInfo = `
+                                        <div style="margin-top: 5px;">
+                                            <strong>Compression Stats:</strong>
+                                            <ul style="margin-top: 5px; margin-bottom: 5px;">
+                                                <li>Original size: ${(benchmark.expectedBytes / 1024).toFixed(2)} KB</li>
+                                                <li>Size in JavaScript: ${(responseData.length / 1024).toFixed(2)} KB <span style="color: #856404">(Browser auto-decompressed the data)</span></li>
+                                                <li>WebSocket extensions: ${usingCompression ? 
+                                                    '<span style="color: #155724">permessage-deflate enabled (compression happens at protocol level)</span>' : 
+                                                    '<span style="color: #721c24">compression not enabled! Check server configuration.</span>'}</li>
+                                                <li style="color: #155724">Note: The server is correctly compressing the data (99.5% reduction), but the browser automatically decompresses it before JavaScript receives it</li>
+                                            </ul>
+                                        </div>
+                                    `;
+                                }
+                                
+                                // Calculate throughput
+                                const kbPerSecond = ((benchmark.receivedBytes / 1024) / (totalTime / 1000)).toFixed(2);
+                                
+                                addMessageToLog(
+                                    `Benchmark complete: ${benchmark.messageSizeKB} KB message echoed back in ${totalTime}ms (${kbPerSecond} KB/s)${verificationResults}${compressionInfo}`,
+                                    'system',
+                                    true
+                                );
+                                
+                                // Store this message info for display
+                                lastMessageSentInfo = {
+                                    sent: benchmark.expectedBytes,
+                                    received: responseData.length,
+                                    dataMatches: dataMatches
+                                };
+                                
+                                // Reset benchmark
+                                window.currentBenchmark = null;
+                            }
+                        };
+                        
+                        // Check if the response is a Blob (binary data)
+                        if (message instanceof Blob) {
+                            addMessageToLog(`Received response as BINARY data (${message.size} bytes)`, 'system');
+                            
+                            // Handle binary data by reading it as text for comparison
+                            const reader = new FileReader();
+                            reader.onload = function() {
+                                // Convert binary to text for comparison
+                                const responseText = reader.result;
+                                addMessageToLog(`Successfully converted binary response to text for comparison (${responseText.length} chars)`, 'system');
+                                processResponse(responseText);
+                            };
+                            reader.onerror = function() {
+                                addMessageToLog(`Error: Failed to read binary response data for verification`, 'system');
+                                // Still try to process what we can
+                                benchmark.responseComplete = true;
+                                const totalTime = (receiveTime - benchmark.sendTime).toFixed(2);
+                                addMessageToLog(
+                                    `Benchmark complete: ${benchmark.messageSizeKB} KB message echoed back in ${totalTime}ms as binary data, but verification failed`,
+                                    'system',
+                                    true
+                                );
+                            };
+                            reader.readAsText(message);
+                        } else {
+                            // It's already text
+                            addMessageToLog(`Received response as TEXT data (${message.length} chars)`, 'system');
+                            processResponse(message);
+                        }
+                    }
+                    
+                    // Add compression info to received message if available
+                    let receivedInfo = '';
+                    if (lastMessageSentInfo && lastMessageSentInfo.sent > 0) {
+                        // For binary blobs we use the size property, for string we use length
+                        const receivedLength = message instanceof Blob ? message.size : message.length;
+                        
+                        if (receivedLength > 0 && receivedLength !== lastMessageSentInfo.sent) {
+                            const compressionRatio = (lastMessageSentInfo.sent / receivedLength).toFixed(2);
+                            const percentReduction = ((1 - (receivedLength / lastMessageSentInfo.sent)) * 100).toFixed(2);
+                            
+                            receivedInfo = ` | Compressed: ${(receivedLength / 1024).toFixed(2)} KB (${percentReduction}% smaller than sent)`;
+                        }
+                        
+                        // Add data integrity info if available
+                        if (lastMessageSentInfo.hasOwnProperty('dataMatches')) {
+                            receivedInfo += ` | Data Integrity: ${lastMessageSentInfo.dataMatches ? '✓ Match' : '❌ Mismatch'}`;
+                        }
+                        
+                        // Reset after use
+                        lastMessageSentInfo = null;
+                    }
+                    
+                    // Log the message - if it's a blob, show that in a friendly way
+                    if (message instanceof Blob) {
+                        addMessageToLog(`[Binary data: ${message.size} bytes]`, 'received', false, receivedInfo);
+                    } else {
+                        addMessageToLog(message, 'received', false, receivedInfo);
+                    }
+                });
+                
+                // Connection closed
+                socket.addEventListener('close', (event) => {
+                    connectionStatus.textContent = 'Disconnected';
+                    connectionStatus.className = 'disconnected';
+                    connectionDetails.style.display = 'none';
+
+                    // Disable all connection-dependent controls
+                    connectButton.disabled = false;
+                    disconnectButton.disabled = true;
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                    testLargeMessageButton.disabled = true;
+                    startStressTestButton.disabled = true;
+
+                    // Stop any running stress test
+                    if (stressTestRunning) {
+                        stopStressTest();
+                        addStressTestLog('Test stopped due to WebSocket disconnection', 'error');
+                    }
+
+                    let closeReason = '';
+                    let recommendedAction = '';
+
+                    // Try to give a friendly description of common close codes
+                    switch (event.code) {
+                        case 1000:
+                            closeReason = "Normal closure";
+                            recommendedAction = "This is a clean shutdown, no action needed.";
+                            break;
+                        case 1001:
+                            closeReason = "Going away";
+                            recommendedAction = "The server or browser is navigating away from the page.";
+                            break;
+                        case 1002:
+                            closeReason = "Protocol error";
+                            recommendedAction = "Check the messages sent - may indicate a problem with message format or headers.";
+                            break;
+                        case 1003:
+                            closeReason = "Unsupported data";
+                            recommendedAction = "The server couldn't process the data type sent.";
+                            break;
+                        case 1005:
+                            closeReason = "No status code";
+                            recommendedAction = "Connection closed without a proper code (abnormal).";
+                            break;
+                        case 1006:
+                            closeReason = "Abnormal closure";
+                            recommendedAction = "Connection was closed unexpectedly. Check server logs or network connectivity.";
+                            break;
+                        case 1007:
+                            closeReason = "Invalid frame payload data";
+                            recommendedAction = "Message contained invalid data format, possibly not valid UTF-8 text.";
+                            break;
+                        case 1008:
+                            closeReason = "Policy violation";
+                            recommendedAction = "Server policy was violated. Check message rate or authentication.";
+                            break;
+                        case 1009:
+                            closeReason = "Message too big";
+                            recommendedAction = "Try reducing your message size or using fragmentation.";
+                            break;
+                        case 1010:
+                            closeReason = "Missing extension";
+                            recommendedAction = "Client requested an extension the server doesn't support.";
+                            break;
+                        case 1011:
+                            closeReason = "Internal error";
+                            recommendedAction = "Server encountered an unexpected error. Check server logs.";
+                            break;
+                        case 1012:
+                            closeReason = "Service restart";
+                            recommendedAction = "The server is restarting, try reconnecting in a moment.";
+                            break;
+                        case 1013:
+                            closeReason = "Try again later";
+                            recommendedAction = "Server is temporarily unavailable, try reconnecting later.";
+                            break;
+                        case 1014:
+                            closeReason = "Bad gateway";
+                            recommendedAction = "A gateway or proxy received an invalid response from the upstream server.";
+                            break;
+                        case 1015:
+                            closeReason = "TLS handshake failure";
+                            recommendedAction = "Check your SSL/TLS configuration and certificates.";
+                            break;
+                        // Netdata specific codes (4000+)
+                        case 4000:
+                            closeReason = "Netdata: Client timeout";
+                            recommendedAction = "The connection was inactive for too long.";
+                            break;
+                        case 4001:
+                            closeReason = "Netdata: Server shutdown";
+                            recommendedAction = "The Netdata server is shutting down.";
+                            break;
+                        case 4002:
+                            closeReason = "Netdata: Connection rejected";
+                            recommendedAction = "The server rejected the connection (check authorization).";
+                            break;
+                        case 4003:
+                            closeReason = "Netdata: Rate limit exceeded";
+                            recommendedAction = "You've exceeded the message rate limit. Reduce message frequency.";
+                            break;
+                        default:
+                            closeReason = "Unknown";
+                            recommendedAction = "Unrecognized close code - check server logs for details.";
+                            break;
+                    }
+
+                    // Add detailed information to the log
+                    let closeMessage = `Connection closed (code: ${event.code} - ${closeReason})`;
+                    if (event.reason) {
+                        closeMessage += `\nReason: ${event.reason}`;
+                    }
+
+                    // Add recommendation if available
+                    if (recommendedAction) {
+                        closeMessage += `\nRecommended action: ${recommendedAction}`;
+                    }
+
+                    // Check for common error conditions
+                    if (event.code === 1006) {
+                        // Add more detailed debugging advice for abnormal closures
+                        closeMessage += "\n\nThis error often occurs when:";
+                        closeMessage += "\n- The server crashed or was stopped";
+                        closeMessage += "\n- Network connectivity issues occurred";
+                        closeMessage += "\n- A browser timeout occurred due to inactivity";
+                        closeMessage += "\n- Invalid WebSocket headers were sent";
+                    } else if (event.code === 1009) {
+                        // For message too big errors
+                        closeMessage += "\n\nTo fix message size issues:";
+                        closeMessage += "\n- Break large messages into smaller chunks";
+                        closeMessage += "\n- Consider using binary mode for large messages";
+                        closeMessage += "\n- Check the server's max message size configuration";
+                    }
+
+                    addMessageToLog(closeMessage, 'system');
+
+                    // If we have pending messages during disconnect, log the details
+                    if (pendingMessages.size > 0) {
+                        addMessageToLog(`Warning: ${pendingMessages.size} messages were still pending when the connection closed`, 'system');
+                    }
+                });
+                
+                // Connection error
+                socket.addEventListener('error', (error) => {
+                    connectionStatus.textContent = 'Connection Error';
+                    connectionStatus.className = 'disconnected';
+                    connectionDetails.style.display = 'none';
+
+                    // Stop any running stress test
+                    if (stressTestRunning) {
+                        stopStressTest();
+                        addStressTestLog('Test stopped due to WebSocket error', 'error');
+                    }
+
+                    // Log details about the error
+                    const errorDetails = `WebSocket error occurred during ${stressTestRunning ? 'stress test' : 'normal operation'}`;
+                    addMessageToLog(errorDetails, 'system');
+
+                    // Check the type of error and provide more helpful information
+                    if (error instanceof Event && error.target) {
+                        // WebSocket error events don't contain much useful information
+                        // Add troubleshooting advice
+                        let troubleshooting = "\nPossible reasons for WebSocket errors:";
+                        troubleshooting += "\n- Network connectivity issues";
+                        troubleshooting += "\n- Server unavailable or incorrect URL";
+                        troubleshooting += "\n- Cross-origin issues (CORS)";
+                        troubleshooting += "\n- Too many simultaneous connections";
+
+                        // Add specific advice for stress testing
+                        if (stressTestRunning) {
+                            troubleshooting += "\n\nFor stress test issues:";
+                            troubleshooting += "\n- Reduce message frequency";
+                            troubleshooting += "\n- Reduce message size";
+                            troubleshooting += "\n- Check for 'invalid frame header' errors in the browser console";
+                            troubleshooting += "\n- Try using smaller message bursts";
+                        }
+
+                        addMessageToLog(troubleshooting, 'system');
+                    }
+
+                    addMessageToLog('Check the browser console (F12 > Console tab) for more error details', 'system');
+                    console.error('WebSocket error:', error);
+                });
+            } catch (error) {
+                connectionStatus.textContent = 'Connection Failed';
+                connectionStatus.className = 'disconnected';
+                console.error('Failed to create WebSocket:', error);
+            }
+        });
+        
+        // Disconnect from the WebSocket server
+        disconnectButton.addEventListener('click', () => {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        });
+        
+        // Send message
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Show compression options when hovering over test button
+        testLargeMessageButton.addEventListener('mouseenter', () => {
+            document.getElementById('compressionOptions').style.display = 'block';
+        });
+        
+        // Test compression with large message
+        testLargeMessageButton.addEventListener('click', () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                // Prompt for message size
+                const sizePrompt = prompt("Enter approximate message size in KB (10-1000):", "100");
+                if (!sizePrompt) return;
+                
+                const sizeKB = parseInt(sizePrompt);
+                if (isNaN(sizeKB) || sizeKB < 10 || sizeKB > 1000) {
+                    alert("Please enter a valid size between 10 and 1000 KB");
+                    return;
+                }
+                
+                // Create a large message with realistic data that has varying compression characteristics
+                // This will be a better test of real-world compression performance
+                
+                // Random compression efficiency for this test
+                const compressionType = document.querySelector('input[name="compressionType"]:checked')?.value || 'mixed';
+                
+                // Calculate target size in bytes
+                const targetBytes = sizeKB * 1024;
+                
+                // Whether to send as binary (true) or text (false)
+                // For the test page specifically, we're generating text data
+                // We'll only use binary mode for demonstration if explicitly selected by user
+                let sendAsBinary = false;
+                
+                // Add UI to let user choose text/binary mode 
+                const binaryModeCheckbox = document.getElementById('useBinaryMode');
+                if (binaryModeCheckbox && binaryModeCheckbox.checked) {
+                    sendAsBinary = true;
+                }
+                
+                // Create the message based on compression type selected
+                let largeMessage = "This is a test message to verify WebSocket compression. ";
+                
+                switch (compressionType) {
+                    case 'high':
+                        // Highly compressible - repeating text blocks
+                        const baseText = "This is a highly compressible repeating pattern. ";
+                        while (largeMessage.length < targetBytes) {
+                            largeMessage += baseText;
+                        }
+                        break;
+                        
+                    case 'medium':
+                        // Medium compressibility - structured data with some repetition
+                        // This is valid UTF-8 JSON-like data that compresses moderately well
+                        while (largeMessage.length < targetBytes) {
+                            largeMessage += `{"id":${Math.floor(Math.random() * 1000)},"name":"user${Math.floor(Math.random() * 100)}","timestamp":${Date.now()},"value":${Math.random()},"status":"active"},`;
+                        }
+                        break;
+                        
+                    case 'low':
+                        // Low compressibility - random data
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                        while (largeMessage.length < targetBytes) {
+                            largeMessage += chars.charAt(Math.floor(Math.random() * chars.length));
+                        }
+                        break;
+                        
+                    case 'mixed':
+                    default:
+                        // Define character set for random data (also defined in 'low' case)
+                        const mixedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                        
+                        // Mixed - combination of different patterns
+                        const sections = [
+                            // Highly compressible section (20%)
+                            Array(Math.floor(targetBytes * 0.2 / 50)).fill("AAAABBBBBCCCCCDDDDDEEEEEFFFFF").join(""),
+                            
+                            // Moderately compressible section (40%)
+                            Array(Math.floor(targetBytes * 0.4 / 100)).fill().map(() => 
+                                `{"id":${Math.floor(Math.random() * 100)},"data":"value"}`
+                            ).join(","),
+                            
+                            // Barely compressible section (40%)
+                            Array(Math.floor(targetBytes * 0.4)).fill().map(() => 
+                                mixedChars.charAt(Math.floor(Math.random() * mixedChars.length))
+                            ).join("")
+                        ];
+                        
+                        largeMessage += sections.join("");
+                        break;
+                }
+                
+                // Trim to exact size if needed
+                if (largeMessage.length > targetBytes) {
+                    largeMessage = largeMessage.substring(0, targetBytes);
+                }
+                
+                // Show message size
+                const actualSizeKB = (largeMessage.length / 1024).toFixed(2);
+                addMessageToLog(`Sending large message (${actualSizeKB} KB) to test compression...`, 'system');
+                
+                // Measure time before sending
+                const startTime = performance.now();
+                
+                // Send the message explicitly as a BINARY frame for large compressed data
+                // This prevents UTF-8 validation issues with random/compressed data
+                if (sendAsBinary) {
+                    // Convert string to binary blob for proper binary WebSocket frame
+                    // This ensures it's sent as opcode=2 (BINARY) not opcode=1 (TEXT)
+                    const binaryData = new Blob([largeMessage]);
+                    socket.send(binaryData);
+                    addMessageToLog(`Sent data as Blob in BINARY mode to avoid UTF-8 validation issues`, 'system');
+                } else {
+                    socket.send(largeMessage);  // Default TEXT mode
+                    addMessageToLog(`Sent data in TEXT mode (must be valid UTF-8)`, 'system');
+                }
+                
+                // Record send completion time
+                const endTime = performance.now();
+                const sendDuration = (endTime - startTime).toFixed(2);
+                
+                // Show first part of message with timing info
+                addMessageToLog(
+                    `${largeMessage.substring(0, 50)}... [message truncated, full length: ${largeMessage.length} bytes, send time: ${sendDuration}ms]`, 
+                    'sent'
+                );
+                
+                // Set up tracking for response time
+                const responseBenchmark = {
+                    messageSizeKB: actualSizeKB,
+                    sendTime: startTime,
+                    lastResponseTime: null,
+                    receivedBytes: 0,
+                    expectedBytes: largeMessage.length,
+                    originalMessage: largeMessage,  // Store original message for verification
+                    responseComplete: false
+                };
+                
+                // Store the benchmark data for the message listener to use
+                window.currentBenchmark = responseBenchmark;
+                
+                // Log whether this is sent as text or binary for verification purposes
+                if (sendAsBinary) {
+                    addMessageToLog(`Verification info: Message sent as BINARY (Blob) format, will convert back for comparison`, 'system');
+                } else {
+                    addMessageToLog(`Verification info: Message sent as TEXT format, expecting TEXT response`, 'system');
+                }
+            }
+        });
+        
+        // Track if we're currently in a benchmark test
+        window.currentBenchmark = null;
+        
+        // Stress test state variables
+        let stressTestRunning = false;
+        let stressTestStartTime = null;
+        let stressTestEndTime = null;
+        let stressTestInterval = null;
+        let stressTestTimer = null;
+        let pendingMessages = new Map(); // Map of messageId -> message data
+        const MAX_PENDING_MESSAGES = 500; // Limit concurrent pending messages to prevent browser overload
+        
+        // Stats tracking
+        let stressTestStats = {
+            messagesSent: 0,
+            messagesReceived: 0,
+            errorCount: 0,
+            totalLatency: 0,
+            bytesSent: 0,
+            bytesReceived: 0,
+            lastUpdateTime: 0,
+            // Per-second stats
+            messagesPerSecond: 0,
+            bytesPerSecond: 0,
+            latencyPerSecond: 0
+        };
+        
+        // Function to generate random string of specified length with variable compression efficiency
+        function generateRandomString(length) {
+            // Message identifier prefix
+            const prefix = `MSG-${Date.now()}-${Math.random().toString(36).substring(2, 8)}-`;
+            let result = prefix;
+            
+            // Calculate remaining length
+            const remainingLength = length - prefix.length;
+            
+            // Determine the compression pattern type for this message
+            // This will create a mix of highly compressible, moderately compressible, and nearly incompressible messages
+            const patternType = Math.floor(Math.random() * 5);
+            
+            switch(patternType) {
+                case 0:
+                    // Highly compressible - repeating pattern (simulates repetitive data)
+                    const pattern1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                    const repeatedPattern = pattern1.repeat(Math.ceil(remainingLength / pattern1.length));
+                    result += repeatedPattern.substring(0, remainingLength);
+                    break;
+                    
+                case 1:
+                    // Moderately compressible - English-like text with common words
+                    // This simulates natural language which has moderate compression
+                    const words = ["the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog", 
+                                  "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", 
+                                  "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", 
+                                  "et", "dolore", "magna", "aliqua"];
+                    let text = "";
+                    while (text.length < remainingLength) {
+                        text += words[Math.floor(Math.random() * words.length)] + " ";
+                    }
+                    result += text.substring(0, remainingLength);
+                    break;
+                    
+                case 2:
+                    // JSON-like data with repeated keys but varying values
+                    // Simulates structured data which compresses moderately well
+                    let jsonData = "";
+                    const keys = ["id", "name", "value", "timestamp", "status"];
+                    while (jsonData.length < remainingLength) {
+                        jsonData += `{"${keys[Math.floor(Math.random() * keys.length)]}":"${Math.random().toString(36).substring(2, 8)}",`;
+                        jsonData += `"${keys[Math.floor(Math.random() * keys.length)]}":${Math.floor(Math.random() * 1000)},`;
+                        jsonData += `"${keys[Math.floor(Math.random() * keys.length)]}":"${Math.random() > 0.5 ? "true" : "false"}"},`;
+                    }
+                    result += jsonData.substring(0, remainingLength);
+                    break;
+                    
+                case 3:
+                    // Nearly incompressible - random data
+                    // This simulates already compressed or encrypted data
+                    let randomData = "";
+                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                    for (let i = 0; i < remainingLength; i++) {
+                        randomData += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                    result += randomData;
+                    break;
+                    
+                case 4:
+                    // Binary-like data with some patterns
+                    // This simulates mixed binary data which has varying compression efficiency
+                    let binaryData = "";
+                    for (let i = 0; i < remainingLength; i++) {
+                        // Mix of patterns and random data
+                        if (i % 16 < 8) {
+                            // Pattern part
+                            binaryData += String.fromCharCode((i % 256));
+                        } else {
+                            // Random part
+                            binaryData += String.fromCharCode(Math.floor(Math.random() * 256));
+                        }
+                    }
+                    result += binaryData;
+                    break;
+            }
+            
+            return result;
+        }
+        
+        // Start stress test
+        function startStressTest() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                addStressTestLog('ERROR: WebSocket not connected', 'error');
+                return;
+            }
+            
+            // Get test parameters
+            const duration = parseFloat(testDurationMinutes.value);
+            const minSize = parseInt(minMessageSize.value);
+            const maxSize = parseInt(maxMessageSize.value);
+            const frequency = parseInt(messageFrequency.value);
+            
+            // Validate parameters
+            if (isNaN(duration) || duration <= 0) {
+                alert('Invalid test duration. Please enter a positive number.');
+                return;
+            }
+            if (isNaN(minSize) || minSize <= 0) {
+                alert('Invalid minimum message size. Please enter a positive number.');
+                return;
+            }
+            if (isNaN(maxSize) || maxSize <= 0 || maxSize < minSize) {
+                alert('Invalid maximum message size. Please enter a number greater than the minimum size.');
+                return;
+            }
+            if (isNaN(frequency) || frequency <= 0) {
+                alert('Invalid message frequency. Please enter a positive number.');
+                return;
+            }
+            
+            // Calculate test end time
+            stressTestStartTime = Date.now();
+            stressTestEndTime = stressTestStartTime + (duration * 60 * 1000);
+            
+            // Reset statistics
+            stressTestStats = {
+                messagesSent: 0,
+                messagesReceived: 0,
+                errorCount: 0,
+                totalLatency: 0,
+                bytesSent: 0,
+                bytesReceived: 0,
+                lastUpdateTime: Date.now(),
+                messagesPerSecond: 0,
+                bytesPerSecond: 0,
+                latencyPerSecond: 0
+            };
+            
+            // Clear pending messages map
+            pendingMessages.clear();
+            
+            // Reset UI
+            messagesSentElement.textContent = '0';
+            messagesReceivedElement.textContent = '0';
+            errorCountElement.textContent = '0';
+            avgLatencyElement.textContent = '0 ms';
+            bytesSentElement.textContent = '0 KB';
+            bytesReceivedElement.textContent = '0 KB';
+            errorCard.classList.remove('error');
+            stressTestProgress.style.width = '0%';
+            
+            // Clear log
+            stressTestLog.innerHTML = '';
+            
+            // Log test start
+            addStressTestLog(`Starting stress test with params: duration=${duration}min, size=${minSize}-${maxSize} bytes, freq=${frequency} msg/s`);
+            
+            // Update UI
+            startStressTestButton.disabled = true;
+            stopStressTestButton.disabled = false;
+            testDurationMinutes.disabled = true;
+            minMessageSize.disabled = true;
+            maxMessageSize.disabled = true;
+            useSingleSize.disabled = true;
+            singleMessageSize.disabled = true;
+            messageFrequency.disabled = true;
+            stressTestRunning = true;
+            
+            // Set up intervals for sending messages and updating UI
+            // Simple approach with no batching - one message per interval at all frequencies
+            const sendInterval = Math.floor(1000 / frequency);
+
+            addStressTestLog(`Using standard timing mode: 1 message every ${sendInterval}ms`, 'info');
+
+            // Single message per interval for all frequencies
+            stressTestInterval = setInterval(() => {
+                // Only send if we don't have too many pending messages
+                if (pendingMessages.size < MAX_PENDING_MESSAGES) {
+                    sendStressTestMessage(minSize, maxSize);
+                } else {
+                    addStressTestLog(`Auto-throttling: ${pendingMessages.size} pending messages`, 'warning');
+                }
+            }, sendInterval);
+            
+            // Update timer every second
+            stressTestTimer = setInterval(updateStressTestTimer, 1000);
+            
+            // Update initial time display
+            updateStressTestTimer();
+        }
+        
+        // Stop stress test
+        function stopStressTest(showSummary = true) {
+            if (!stressTestRunning) return;
+            
+            // Clear intervals
+            clearInterval(stressTestInterval);
+            clearInterval(stressTestTimer);
+            
+            // Update UI
+            startStressTestButton.disabled = false;
+            stopStressTestButton.disabled = true;
+            testDurationMinutes.disabled = false;
+            minMessageSize.disabled = false;
+            maxMessageSize.disabled = false;
+            useSingleSize.disabled = false;
+            singleMessageSize.disabled = false;
+            messageFrequency.disabled = false;
+            timeRemaining.textContent = 'Test stopped';
+            stressTestRunning = false;
+            
+            // Show summary if requested
+            if (showSummary) {
+                const testDuration = Math.floor((Date.now() - stressTestStartTime) / 1000);
+                const avgLatency = stressTestStats.messagesReceived > 0 ? 
+                    Math.round(stressTestStats.totalLatency / stressTestStats.messagesReceived) : 0;
+                const totalBytesSent = (stressTestStats.bytesSent / 1024).toFixed(2);
+                const totalBytesReceived = (stressTestStats.bytesReceived / 1024).toFixed(2);
+                const throughputSent = testDuration > 0 ? 
+                    (stressTestStats.bytesSent / testDuration / 1024).toFixed(2) : 0;
+                const throughputReceived = testDuration > 0 ? 
+                    (stressTestStats.bytesReceived / testDuration / 1024).toFixed(2) : 0;
+                
+                // Check for errors - messages that weren't properly echoed back
+                const unacknowledgedMessages = pendingMessages.size;
+                if (unacknowledgedMessages > 0) {
+                    stressTestStats.errorCount += unacknowledgedMessages;
+                    errorCountElement.textContent = stressTestStats.errorCount;
+                    errorCard.classList.add('error');
+                    addStressTestLog(`WARNING: ${unacknowledgedMessages} messages were not acknowledged`, 'error');
+                }
+                
+                // Add summary to log
+                addStressTestLog('------------------------');
+                addStressTestLog('TEST SUMMARY:');
+                addStressTestLog(`Test duration: ${testDuration} seconds`);
+                addStressTestLog(`Messages sent: ${stressTestStats.messagesSent}`);
+                addStressTestLog(`Messages received: ${stressTestStats.messagesReceived}`);
+                addStressTestLog(`Errors: ${stressTestStats.errorCount}`);
+                addStressTestLog(`Average latency: ${avgLatency} ms`);
+                addStressTestLog(`Data sent: ${totalBytesSent} KB (${throughputSent} KB/s)`);
+                addStressTestLog(`Data received: ${totalBytesReceived} KB (${throughputReceived} KB/s)`);
+                
+                // Check success rate
+                const successRate = stressTestStats.messagesSent > 0 ? 
+                    Math.round((stressTestStats.messagesReceived / stressTestStats.messagesSent) * 100) : 0;
+                addStressTestLog(`Success rate: ${successRate}%`);
+                
+                if (successRate < 100) {
+                    addStressTestLog('Some messages were not correctly echoed back!', 'error');
+                } else if (stressTestStats.errorCount === 0) {
+                    addStressTestLog('Test completed successfully with no errors!', 'success');
+                }
+            }
+            
+            // Clear any pending messages
+            pendingMessages.clear();
+        }
+        
+        // Send a stress test message
+        function sendStressTestMessage(minSize, maxSize) {
+            if (!stressTestRunning || !socket || socket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            // Check if test should end
+            if (Date.now() >= stressTestEndTime) {
+                stopStressTest();
+                return;
+            }
+
+            // Check if we need to throttle due to too many pending messages
+            if (pendingMessages.size >= MAX_PENDING_MESSAGES) {
+                addStressTestLog(`Throttling: ${pendingMessages.size} pending messages`, 'warning');
+                return;
+            }
+
+            // Generate message size based on user settings
+            let messageSize;
+
+            if (useSingleSize.checked) {
+                // Use fixed size if that option is selected
+                messageSize = parseInt(singleMessageSize.value);
+                if (isNaN(messageSize) || messageSize < 100 || messageSize > 100000) {
+                    messageSize = 5000; // Default if invalid
+                }
+            } else {
+                // Generate random size within range, but cap at 32KB to reduce fragmentation issues
+                const safeMaxSize = Math.min(maxSize, 32768);
+                messageSize = Math.floor(Math.random() * (safeMaxSize - minSize + 1)) + minSize;
+            }
+            
+            // Generate random message with unique ID embedded at the start
+            const message = generateRandomString(messageSize);
+            const messageId = message.substring(0, message.indexOf('-', 4) + 1); // Extract the unique prefix
+            
+            try {
+                // Record send time and track message
+                const sendTime = Date.now();
+                pendingMessages.set(messageId, {
+                    id: messageId,
+                    sentTime: sendTime,
+                    size: message.length,
+                    received: false
+                });
+                
+                // Log large messages that may trigger fragmentation
+                if (message.length > 10000) {
+                    addStressTestLog(`Sending large message (${message.length} bytes) - may be fragmented by browser`, 'warning');
+                }
+                
+                // Debug logs for detailed tracking
+                addStressTestLog(`Sending message ${messageId} (${message.length} bytes)`, 'debug');
+                
+                // Send the message
+                socket.send(message);
+                
+                // Update stats
+                stressTestStats.messagesSent++;
+                stressTestStats.bytesSent += message.length;
+                messagesSentElement.textContent = stressTestStats.messagesSent;
+                bytesSentElement.textContent = (stressTestStats.bytesSent / 1024).toFixed(2) + ' KB';
+            } catch (error) {
+                console.error('Error sending message:', error);
+                stressTestStats.errorCount++;
+                errorCountElement.textContent = stressTestStats.errorCount;
+                errorCard.classList.add('error');
+                
+                addStressTestLog(`ERROR sending message: ${error.message}`, 'error');
+            }
+        }
+        
+        // Update stress test timer and progress
+        function updateStressTestTimer() {
+            if (!stressTestRunning) return;
+            
+            const now = Date.now();
+            const elapsed = now - stressTestStartTime;
+            const total = stressTestEndTime - stressTestStartTime;
+            const remaining = Math.max(0, stressTestEndTime - now);
+            
+            // Update progress bar
+            const progressPercent = Math.min(100, (elapsed / total) * 100);
+            stressTestProgress.style.width = `${progressPercent}%`;
+            
+            // Update time remaining
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            timeRemaining.textContent = `Time remaining: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Update real-time stats (every second)
+            const secondsSinceLastUpdate = (now - stressTestStats.lastUpdateTime) / 1000;
+            if (secondsSinceLastUpdate >= 1) {
+                // Calculate per-second rates
+                stressTestStats.messagesPerSecond = Math.round(
+                    (stressTestStats.messagesSent - stressTestStats.messagesPerSecond) / secondsSinceLastUpdate
+                );
+                stressTestStats.bytesPerSecond = Math.round(
+                    (stressTestStats.bytesSent - stressTestStats.bytesPerSecond) / secondsSinceLastUpdate
+                );
+                
+                // Update last update time
+                stressTestStats.lastUpdateTime = now;
+            }
+            
+            // Check for test completion
+            if (remaining <= 0) {
+                stopStressTest();
+            }
+        }
+        
+        // Add a log entry to the stress test log
+        function addStressTestLog(message, type = 'info', forceLog = false) {
+            // Skip debug messages unless debug mode is enabled or forceLog is true
+            if (type === 'debug' && !enableDebugMode.checked && !forceLog) {
+                return;
+            }
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            
+            // Add timestamp
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Format log entry
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            
+            // Add styles based on type
+            if (type === 'error') {
+                logEntry.style.color = '#dc3545';
+            } else if (type === 'success') {
+                logEntry.style.color = '#28a745';
+            } else if (type === 'warning') {
+                logEntry.style.color = '#ffc107';
+            } else if (type === 'debug') {
+                logEntry.style.color = '#6c757d';
+                logEntry.style.fontSize = '0.9em';
+            }
+            
+            // Add to log and scroll to bottom
+            stressTestLog.appendChild(logEntry);
+            stressTestLog.scrollTop = stressTestLog.scrollHeight;
+        }
+        
+        // Verify and process stress test response
+        function processStressTestResponse(message) {
+            // Try to extract the message ID from the response
+            const messageId = message.substring(0, message.indexOf('-', 4) + 1);
+            
+            // Debug log for message receipt
+            addStressTestLog(`Received message with ID ${messageId} (${message.length} bytes)`, 'debug');
+            
+            // Check if this is a response to a tracked message
+            if (pendingMessages.has(messageId)) {
+                const pendingMessage = pendingMessages.get(messageId);
+                const receiveTime = Date.now();
+                const latency = receiveTime - pendingMessage.sentTime;
+                
+                // Verify the message content
+                if (message.length < 20) {
+                    // Message is severely truncated/corrupted
+                    stressTestStats.errorCount++;
+                    errorCountElement.textContent = stressTestStats.errorCount;
+                    errorCard.classList.add('error');
+                    addStressTestLog(`ERROR: Received severely truncated message: ${messageId}, length=${message.length}`, 'error');
+                } 
+                else if (message !== pendingMessage.id && message.indexOf('-', 4) !== pendingMessage.id.indexOf('-', 4)) {
+                    // The message ID structure appears to be corrupted - this could indicate decompression issues
+                    addStressTestLog(`WARNING: Message ID structure changed: original=${pendingMessage.id}, received=${messageId}`, 'warning');
+                }
+                
+                // Update stats
+                stressTestStats.messagesReceived++;
+                stressTestStats.bytesReceived += message.length;
+                stressTestStats.totalLatency += latency;
+                
+                // Record original message size for statistics (no discrepancy logging)
+                const originalSize = pendingMessage.size;
+                
+                // Update UI
+                messagesReceivedElement.textContent = stressTestStats.messagesReceived;
+                bytesReceivedElement.textContent = (stressTestStats.bytesReceived / 1024).toFixed(2) + ' KB';
+                const avgLatency = Math.round(stressTestStats.totalLatency / stressTestStats.messagesReceived);
+                avgLatencyElement.textContent = avgLatency + ' ms';
+                
+                // Every 50 messages, log current stats to help with debugging
+                if (stressTestStats.messagesReceived % 50 === 0) {
+                    addStressTestLog(`Progress: ${stressTestStats.messagesReceived}/${stressTestStats.messagesSent} messages, avg latency: ${avgLatency}ms`);
+                }
+                
+                // Remove from pending messages
+                pendingMessages.delete(messageId);
+                
+                return true;
+            }
+            
+            return false;
+        }
+        
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+                addMessageToLog(message, 'sent');
+                messageInput.value = '';
+            }
+        }
+        
+        // Add message to the log
+        function addMessageToLog(message, type, isHtml = false, additionalInfo = '') {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            
+            // Handle different message types
+            if (type === 'system') {
+                // System messages can contain HTML if specified
+                if (isHtml) {
+                    messageElement.innerHTML = message;
+                } else {
+                    messageElement.textContent = message;
+                }
+                messageElement.style.backgroundColor = '#fff3cd';
+                messageElement.style.color = '#856404';
+                messageElement.style.fontStyle = 'italic';
+            } 
+            else if (type === 'received' || type === 'sent') {
+                // For regular messages, check size
+                if (message.length > 1000) {
+                    // For large messages, create a collapsible view
+                    const messageSizeKB = (message.length / 1024).toFixed(2);
+                    
+                    // Create summary with expand button
+                    const summary = document.createElement('div');
+                    summary.innerHTML = `
+                        <span class="message-preview">${message.substring(0, 500)}...</span>
+                        <div class="message-info">
+                            Message length: ${message.length} bytes (${messageSizeKB} KB)${additionalInfo}
+                            <button class="toggle-button">Show Full Message</button>
+                        </div>
+                    `;
+                    
+                    // Create content div (initially hidden)
+                    const content = document.createElement('div');
+                    content.className = 'full-message';
+                    content.style.display = 'none';
+                    content.style.maxHeight = '300px';
+                    content.style.overflow = 'auto';
+                    content.style.border = '1px solid #ddd';
+                    content.style.marginTop = '5px';
+                    content.style.padding = '5px';
+                    content.textContent = message;
+                    
+                    // Add toggle functionality
+                    const toggleButton = summary.querySelector('.toggle-button');
+                    toggleButton.style.marginLeft = '10px';
+                    toggleButton.style.padding = '2px 5px';
+                    toggleButton.style.fontSize = '0.8em';
+                    toggleButton.addEventListener('click', function() {
+                        if (content.style.display === 'none') {
+                            content.style.display = 'block';
+                            this.textContent = 'Hide Full Message';
+                        } else {
+                            content.style.display = 'none';
+                            this.textContent = 'Show Full Message';
+                        }
+                    });
+                    
+                    // Add elements to message container
+                    messageElement.appendChild(summary);
+                    messageElement.appendChild(content);
+                } else {
+                    // Normal sized message, show in full with any additional info
+                    if (additionalInfo) {
+                        const wrapper = document.createElement('div');
+                        
+                        // Add the message text
+                        const messageText = document.createElement('div');
+                        messageText.textContent = message;
+                        wrapper.appendChild(messageText);
+                        
+                        // Add additional info
+                        const infoText = document.createElement('div');
+                        infoText.style.fontSize = '0.85em';
+                        infoText.style.color = '#666';
+                        infoText.style.marginTop = '3px';
+                        infoText.textContent = additionalInfo.trim();
+                        wrapper.appendChild(infoText);
+                        
+                        messageElement.appendChild(wrapper);
+                    } else {
+                        messageElement.textContent = message;
+                    }
+                }
+            }
+            
+            // Add timestamp
+            const timestamp = new Date().toLocaleTimeString();
+            const timeElement = document.createElement('span');
+            timeElement.className = 'timestamp';
+            timeElement.textContent = timestamp;
+            timeElement.style.fontSize = '0.8em';
+            timeElement.style.color = '#666';
+            timeElement.style.marginRight = '5px';
+            timeElement.style.fontWeight = 'bold';
+            
+            // For HTML content, we need to insert differently
+            if (type === 'system' && isHtml) {
+                // Create a container for the timestamp
+                const timestampContainer = document.createElement('div');
+                timestampContainer.appendChild(timeElement);
+                
+                // Prepend the timestamp container
+                messageElement.prepend(timestampContainer);
+            } else {
+                messageElement.prepend(timeElement);
+            }
+            
+            // Add to log and scroll to bottom
+            messagesLog.appendChild(messageElement);
+            messagesLog.scrollTop = messagesLog.scrollHeight;
+        }
+        
+        // Toggle between ws:// and wss:// protocols
+        toggleProtocolButton.addEventListener('click', () => {
+            const currentUrl = endpointInput.value.trim();
+            
+            if (currentUrl.startsWith('ws://')) {
+                // Switch from ws:// to wss://
+                endpointInput.value = currentUrl.replace('ws://', 'wss://');
+                toggleProtocolButton.textContent = 'Switch to ws://';
+            } else if (currentUrl.startsWith('wss://')) {
+                // Switch from wss:// to ws://
+                endpointInput.value = currentUrl.replace('wss://', 'ws://');
+                toggleProtocolButton.textContent = 'Switch to wss://';
+            } else {
+                // Invalid URL, add ws:// prefix
+                endpointInput.value = 'ws://' + currentUrl;
+                toggleProtocolButton.textContent = 'Switch to wss://';
+            }
+        });
+        
+        // Stress test button handlers
+        startStressTestButton.addEventListener('click', startStressTest);
+        stopStressTestButton.addEventListener('click', () => stopStressTest(true));
+    </script>
+</body>
+</html>

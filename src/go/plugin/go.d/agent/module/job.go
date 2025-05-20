@@ -497,6 +497,9 @@ func (j *Job) sendVnodeHostInfo() {
 	if _, ok := j.vnode.Labels["_hostname"]; !ok {
 		j.vnode.Labels["_hostname"] = j.vnode.Hostname
 	}
+	for k, v := range j.vnode.Labels {
+		j.vnode.Labels[k] = lblReplacer.Replace(v)
+	}
 
 	j.api.HOSTINFO(netdataapi.HostInfo{
 		GUID:     j.vnode.GUID,

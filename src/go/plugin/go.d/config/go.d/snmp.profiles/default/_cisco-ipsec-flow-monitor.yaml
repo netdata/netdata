@@ -32,6 +32,7 @@ metrics:
         name: cikeTunOutDropPkts
         description: The total number of packets dropped by this IPsec Phase-1 IKE Tunnel during send processing.
         unit: "{packet}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: phase_1_tunnel_index
@@ -99,6 +100,7 @@ metrics:
         name: cipSecTunOutEncryptFails
         description: The total number of outbound encryption's which ended in failure by this IPsec Phase-2 Tunnel.
         unit: "{encryption_failure}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: phase_2_tunnel_index

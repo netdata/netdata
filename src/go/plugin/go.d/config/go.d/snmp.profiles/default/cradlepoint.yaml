@@ -84,6 +84,7 @@ metrics:
         OID: 1.3.6.1.4.1.20992.1.2.2.1.15
         description: The cellular modems RSRQ given in dBm's.
         unit: "dBm"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cradlepoint.mdmDescr

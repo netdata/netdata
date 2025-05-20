@@ -1935,7 +1935,8 @@ static void ctx_hosts_load(uv_work_t *req)
             __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
             hclt[thread_index].host = host;
             hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
-            async_exec += (hclt[thread_index].thread != NULL);
+            rc = (hclt[thread_index].thread == NULL);
+            async_exec += (rc == 0);
             // if it failed, mark the thread slot as free
             if (rc)
                 __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
@@ -2722,12 +2723,17 @@ void metadata_sync_shutdown(void)
 {
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
-    nd_log_daemon(NDLP_DEBUG, "METADATA: Sending a shutdown command");
     cmd.opcode = METADATA_SYNC_SHUTDOWN;
-    metadata_enq_cmd(&cmd);
 
-    /* wait for metadata thread to shut down */
-    nd_log_daemon(NDLP_DEBUG, "METADATA: Waiting for shutdown ACK");
+    // if we can't sent command return
+    // This should not happen but if we wait we may not get a completion
+    // and shutdown will timeout
+    if (!metadata_enq_cmd(&cmd)) {
+        nd_log_daemon(NDLP_WARNING, "METADATA: Failed to send a shutdown command");
+        return;
+    }
+    nd_log_daemon(NDLP_INFO, "METADATA: Submitted shutdown command, waiting for ACK");
+
     completion_wait_for(&meta_config.start_stop_complete);
     completion_destroy(&meta_config.start_stop_complete);
 

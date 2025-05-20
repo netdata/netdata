@@ -32,6 +32,7 @@ metrics:
         name: entSensorValue
         description: Most recent measurement seen by the sensor
         unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1

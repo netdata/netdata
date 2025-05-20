@@ -17,16 +17,16 @@ function add_netdata_to_proxmox_conf_files_group() {
 
   if ! getent group "${group_guid}" >/dev/null; then
     echo "Creating proxmox-etc-pve group with GID ${group_guid}"
-    if ! addgroup -g "${group_guid}" "proxmox-etc-pve"; then
+    if ! addgroup --gid "${group_guid}" "proxmox-etc-pve"; then
       echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
       return
     fi
   fi
 
-  if ! getent group "${group_guid}" | grep -q netdata; then
-    echo "Assign netdata user to group ${group_guid}"
-    if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
-      echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
+  if ! getent group "${group_guid}" | grep -q "${DOCKER_USR}"; then
+    echo "Assigning ${DOCKER_USR} user to group ${group_guid}"
+    if ! usermod --apend --groups "${group_guid}" "${DOCKER_USR}"; then
+      echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_guid}."
       return
     fi
   fi
@@ -68,21 +68,21 @@ if [ "${EUID}" -eq 0 ]; then
   re='^[0-9]+$'
   if [[ $BALENA_PGID =~ $re ]]; then
     echo "Netdata detected balena-engine.sock"
-    DOCKER_HOST='/var/run/balena-engine.sock'
+    DOCKER_HOST='unix:///var/run/balena-engine.sock'
     PGID="$BALENA_PGID"
   elif [[ $DOCKER_PGID =~ $re ]]; then
     echo "Netdata detected docker.sock"
-    DOCKER_HOST="/var/run/docker.sock"
+    DOCKER_HOST="unix:///var/run/docker.sock"
     PGID="$DOCKER_PGID"
   fi
   export PGID
   export DOCKER_HOST
 
   if [ -n "${PGID}" ]; then
-    echo "Creating docker group ${PGID}"
-    addgroup --gid "${PGID}" "docker" || echo >&2 "Could not add group docker with ID ${PGID}, its already there probably"
-    echo "Assign netdata user to docker group ${PGID}"
-    usermod --append --groups "docker" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
+    echo "Creating docker group with GID ${PGID}"
+    addgroup --gid "${PGID}" "docker" || echo >&2 "Failed to add group docker with GID ${PGID}, probably one already exists."
+    echo "Assigning ${DOCKER_USR} user to group with GID ${PGID}"
+    usermod --append --groups "${PGID}" "${DOCKER_USR}" || echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${PGID}."
   fi
 
   if [ -d "/host/etc/pve" ]; then
