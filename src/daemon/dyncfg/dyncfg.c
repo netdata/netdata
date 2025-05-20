@@ -91,11 +91,23 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     dyncfg_normalize(nv);
 
     if(!UUIDeq(v->host_uuid, nv->host_uuid)) {
+        char u1[UUID_STR_LEN], u2[UUID_STR_LEN];
+        nd_uuid_unparse_lower(v->host_uuid.uuid, u1);
+        nd_uuid_unparse_lower(nv->host_uuid.uuid, u2);
+
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "DYNCFG: configuration '%s' changed host id from '%s' to '%s'",
+               dictionary_acquired_item_name(item), u1, u2);
+
         SWAP(v->host_uuid, nv->host_uuid);
         changes++;
     }
 
     if(v->path != nv->path) {
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "DYNCFG: configuration '%s' changed path from '%s' to '%s'",
+               dictionary_acquired_item_name(item), string2str(v->path), string2str(nv->path));
+
         SWAP(v->path, nv->path);
         changes++;
     }

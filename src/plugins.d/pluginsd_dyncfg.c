@@ -6,7 +6,8 @@
 // ----------------------------------------------------------------------------
 
 PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
-    RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CONFIG);
+    // config command is only available to localhost
+    RRDHOST *host = localhost; /* pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CONFIG);*/
     if(!host) return PARSER_RC_ERROR;
 
     size_t i = 1;
