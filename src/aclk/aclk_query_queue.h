@@ -86,15 +86,4 @@ void aclk_add_job(aclk_query_t *query);
         }                                                                                                              \
     } while (0)
 
-#define MAX_QUERY_ENTRIES (128)
-
-typedef struct {
-    aclk_query_t query_workers[MAX_QUERY_ENTRIES];
-    int free_stack[MAX_QUERY_ENTRIES];
-    int top;
-    SPINLOCK spinlock;
-} QueryPool;
-
-void init_query_pool();
-
 #endif /* NETDATA_ACLK_QUERY_QUEUE_H */

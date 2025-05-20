@@ -50,7 +50,6 @@ struct aclk_sync_config_s {
     struct completion start_stop_complete;
     CmdPool cmd_pool;
     WorkerPool worker_pool;
-    QueryPool queryPool;
 } aclk_sync_config = { 0 };
 
 static cmd_data_t aclk_database_deq_cmd(void)
@@ -953,7 +952,6 @@ static void aclk_initialize_event_loop(void)
     completion_init(&aclk_sync_config.start_stop_complete);
 
     init_worker_pool(&aclk_sync_config.worker_pool);
-    init_query_pool(&aclk_sync_config.queryPool);
 
     aclk_sync_config.thread = nd_thread_create("ACLKSYNC", NETDATA_THREAD_OPTION_DEFAULT, aclk_synchronization_event_loop, &aclk_sync_config);
     fatal_assert(NULL != aclk_sync_config.thread);

@@ -2,14 +2,22 @@
 
 #include "aclk_query_queue.h"
 
-QueryPool queryPool;
+#define MAX_QUERY_ENTRIES (512)
+
+struct {
+    aclk_query_t query_workers[MAX_QUERY_ENTRIES];
+    int free_stack[MAX_QUERY_ENTRIES];
+    int top;
+    SPINLOCK spinlock;
+} queryPool;
 
 // Initialize the query pool
-void init_query_pool()
+__attribute__((constructor)) void init_query_pool()
 {
     spinlock_init(&queryPool.spinlock);
     for (int i = 0; i < MAX_QUERY_ENTRIES; i++) {
         queryPool.free_stack[i] = i;
+        queryPool.query_workers[i].allocated = false;
     }
     queryPool.top = MAX_QUERY_ENTRIES;
 }
