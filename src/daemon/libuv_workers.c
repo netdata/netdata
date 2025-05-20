@@ -123,6 +123,7 @@ void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
 // Initialize the worker pool
 void init_worker_pool(WorkerPool *pool) {
     for (int i = 0; i < MAX_ACTIVE_WORKERS; i++) {
+        pool->workers[i].allocated = false;
         pool->free_stack[i] = i;  // Fill the stack with indices
     }
     pool->top = MAX_ACTIVE_WORKERS;  // All workers are initially free
