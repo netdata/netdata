@@ -9,9 +9,6 @@
 
 static const char *fts_match_to_string(FTS_MATCH match) {
     switch(match) {
-        case FTS_MATCHED_HOST:
-            return "HOST";
-
         case FTS_MATCHED_CONTEXT:
             return "CONTEXT";
 
@@ -161,7 +158,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rc->first_time_s, (rc->flags & RRD_FLAG_COLLECTED) ? ctl->now : rc->last_time_s, 0))
         return 0; // continue to next context
 
-    FTS_MATCH match = ctl->q.host_match;
+    FTS_MATCH match = FTS_MATCHED_NONE;
     if((ctl->mode & CONTEXTS_V2_SEARCH) && ctl->q.pattern) {
         match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
 
@@ -497,33 +494,11 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
     bool host_matched = (ctl->mode & CONTEXTS_V2_NODES);
     bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_ALERTS));
 
-    ctl->q.host_match = FTS_MATCHED_NONE;
-    if((ctl->mode & CONTEXTS_V2_SEARCH)) {
-        // check if we match the host itself
-        if(ctl->q.pattern && (
-                full_text_search_string(&ctl->q.fts, ctl->q.pattern, host->hostname) ||
-                full_text_search_char(&ctl->q.fts, ctl->q.pattern, host->machine_guid) ||
-                (ctl->q.pattern && full_text_search_char(&ctl->q.fts, ctl->q.pattern, ctl->q.host_node_id_str)))) {
-            ctl->q.host_match = FTS_MATCHED_HOST;
-            do_contexts = true;
-        }
-    }
-
     if(do_contexts) {
-        // save it
-        SIMPLE_PATTERN *old_q = ctl->q.pattern;
-
-        if(ctl->q.host_match == FTS_MATCHED_HOST)
-            // do not do pattern matching on contexts - we matched the host itself
-            ctl->q.pattern = NULL;
-
         ssize_t added = query_scope_foreach_context(
                 host, ctl->request->scope_contexts,
                 ctl->contexts.scope_pattern, ctl->contexts.pattern,
                 rrdcontext_to_json_v2_add_context, queryable_host, ctl);
-
-        // restore it
-        ctl->q.pattern = old_q;
 
         if(unlikely(added < 0))
             return -1; // stop the query
