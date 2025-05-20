@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mcp-tools.h"
+#include "mcp-tools-execute-function.h"
 #include "database/contexts/rrdcontext.h"
 #include "database/rrdfunctions.h"
 

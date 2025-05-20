@@ -32,31 +32,19 @@
 #include "mcp-initialize.h"
 #include "database/contexts/rrdcontext.h"
 
+// Include tool-specific header files
+#include "mcp-tools-metric-contexts.h"
+#include "mcp-tools-metric-context-categories.h"
+#include "mcp-tools-context-details.h"
+#include "mcp-tools-contexts-search.h"
+#include "mcp-tools-list-nodes.h"
+#include "mcp-tools-node-details.h"
+#include "mcp-tools-execute-function.h"
+#include "mcp-tools-metrics-query.h"
+
 // Tool handler function prototypes
 typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 typedef void (*mcp_tool_schema_t)(BUFFER *schema_buffer);
-
-// Import function declarations from individual tool files
-extern void mcp_tool_metric_contexts_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_metric_contexts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-extern void mcp_tool_metric_context_categories_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_metric_context_categories_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-extern void mcp_tool_context_details_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_context_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-extern void mcp_tool_contexts_search_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_contexts_search_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-extern void mcp_tool_list_nodes_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_list_nodes_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-extern void mcp_tool_node_details_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_node_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
-
-extern void mcp_tool_execute_function_schema(BUFFER *buffer);
-extern MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 
 // Tool definition structure
 typedef struct {
@@ -74,7 +62,7 @@ typedef struct {
 // Static array of tool definitions
 static const MCP_TOOL_DEF mcp_tools[] = {
     {
-        .name = "list_metric_context_categories",
+        .name = MCP_TOOL_METRIC_CONTEXT_CATEGORIES,
         .title = "Aggregated view of what's being monitored by Netdata.",
         .description = "Metric Contexts are the equivalent of Charts on Netdata dashboards.\n"
                        "Provides a summarized view of monitoring domains by grouping contexts by their prefix.\n"
@@ -85,7 +73,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = MCP_LIST_METRIC_CONTEXTS_METHOD,
+        .name = MCP_TOOL_METRIC_CONTEXTS,
         .title = "Primary discovery mechanism for what's being monitored by Netdata.",
         .description = "Metric Contexts are the equivalent of Charts on Netdata dashboards.\n"
                        "Contexts are multi-node, multi-instance and multi-dimensional, usually\n"
@@ -96,7 +84,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = MCP_CONTEXT_DETAILS_METHOD,
+        .name = MCP_TOOL_CONTEXT_DETAILS,
         .title = "Get additional information for specific metric contexts.",
         .description = "Given a time-frame, a list of nodes and contexts, this tool\n"
                        "provides their names, titles, families, units, retention,\n"
@@ -107,7 +95,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = MCP_CONTEXT_SEARCH_METHOD,
+        .name = MCP_TOOL_CONTEXT_SEARCH,
         .title = "Find relevant metric contexts using full text search",
         .description = "Search for contexts given search pattern matching context names, instances,\n"
                        "dimensions, label keys, label values, titles and related metadata.\n",
@@ -117,7 +105,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = "list_nodes",
+        .name = MCP_TOOL_LIST_NODES,
         .title = "List all monitored nodes in the Netdata ecosystem",
         .description = "Provides a list of all nodes/agents in the Netdata infrastructure.\n"
                        "Includes information such as node IDs, hostnames, and connection status.\n"
@@ -128,7 +116,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = "node_details",
+        .name = MCP_TOOL_NODE_DETAILS,
         .title = "Get detailed information about monitored nodes",
         .description = "Provides detailed information about nodes/agents in the Netdata infrastructure.\n"
                        "Includes comprehensive node metadata, system information, and configuration details.\n"
@@ -139,16 +127,29 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = "execute_function",
+        .name = MCP_TOOL_EXECUTE_FUNCTION,
         .title = "Execute a function on a specific node",
         .description = "Execute a registered function on a specific node to get live information from it.\n"
                        "The node needs to be online/live/reachable.\n"
                        "Functions usually include `processes`, `network-connections`, `mount-points`, \n"
                        "`containers-vms`, `netdata-streaming` and more.\n"
-                       "Use the `node_details` tool to discover available functions for each each node.",
+                       "Use the " MCP_TOOL_NODE_DETAILS " tool to discover available functions for each node.",
         .execute_callback = mcp_tool_execute_function_execute,
         .schema_callback = mcp_tool_execute_function_schema,
         .read_only_hint = false, // This tool can modify state
+        .open_world_hint = false
+    },
+    
+    {
+        .name = MCP_TOOL_METRICS_QUERY,
+        .title = "Query metrics data",
+        .description = "Query time-series metrics data from Netdata's database.\n"
+                       "Provides querying capabilities with filtering by nodes, instances, and dimensions for a specific context.\n"
+                       "Supports various data formats, time aggregation, and grouping options similar to the API v3 data endpoint.\n"
+                       "NOTE: You must first use the " MCP_TOOL_METRIC_CONTEXTS " tool to discover available contexts.",
+        .execute_callback = mcp_tool_metrics_query_execute,
+        .schema_callback = mcp_tool_metrics_query_schema,
+        .read_only_hint = true,
         .open_world_hint = false
     },
 

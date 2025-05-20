@@ -68,7 +68,11 @@ RRDR_OPTIONS rrdr_options_parse_one(const char *o) {
     return ret;
 }
 
-RRDR_OPTIONS rrdr_options_parse(char *o) {
+RRDR_OPTIONS rrdr_options_parse(const char *options_str) {
+    char src[strlen(options_str) + 1];
+    strcatz(src, 0, options_str, sizeof(src));
+    char *o = src;
+
     RRDR_OPTIONS ret = 0;
     char *tok;
 

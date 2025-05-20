@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mcp-tools.h"
+#include "mcp-tools-metric-contexts.h"
 #include "database/contexts/rrdcontext.h"
 
 // Define schema for the list_netdata_metrics tool
