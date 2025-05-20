@@ -1,19 +1,54 @@
-# Machine Learning and Anomaly Detection
+# Netdata AI
 
-Netdata includes advanced Machine Learning capabilities to help you detect and resolve anomalies in your infrastructure before they escalate into critical issues. These features provide real-time insights and proactive monitoring to improve system reliability.
+Boost your monitoring and troubleshooting capabilities with Netdata's AI-powered features.
 
-## Key Features
+Netdata AI helps you **detect anomalies, understand metric relationships, and resolve issues quickly** with intelligent assistance all designed to make your infrastructure management smarter, faster, and bulletproof.
 
-### Anomaly Detection with K-Means Clustering
+## What Can Netdata AI Do For You?
 
-Netdata trains K-means clustering models to detect anomalies in your infrastructure. These models power the [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md), which visually highlights anomalies on the dashboard, allowing you to quickly identify and investigate unexpected behavior.
+Netdata AI combines powerful machine learning capabilities with intuitive interfaces to help you:
 
-### Metric Correlations
+1. **Detect anomalies automatically** before they escalate into critical issues
+2. **Understand relationships** between metrics during troubleshooting
+3. **Get expert guidance** when resolving alerts and performance problems
 
-Netdata enables metric correlation analysis through the dashboard. This feature uses the [Two-sample Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test) and volume heuristic measures to help you understand relationships between different metrics and identify potential causes of anomalies.
+## Machine Learning and Anomaly Detection
 
-### Netdata Assistant for Troubleshooting
+Our ML-powered anomaly detection works silently in the background, monitoring your metrics and identifying unusual patterns.
 
-The [Netdata Assistant](/docs/netdata-assistant.md) provides AI-driven assistance for troubleshooting alerts and anomalies. You can interact with it directly to get explanations, recommendations, and next steps based on detected anomalies and system behavior.
+| Feature                          | What It Does For You                                                         |
+|----------------------------------|------------------------------------------------------------------------------|
+| **Unsupervised Learning**        | Works automatically without requiring manual training or labeling of data    |
+| **Multiple Model Consensus**     | Reduces false positives by 99% by requiring agreement across multiple models |
+| **Real-time Anomaly Bits**       | Flags unusual metrics instantly, with zero storage overhead                  |
+| **Anomaly Rate Visualization**   | Highlights anomalous time periods in your dashboard for quick investigation  |
+| **Node-Level Anomaly Detection** | Identifies when your entire system is behaving unusually                     |
+| **Metric Correlations**          | Helps you find relationships between metrics to pinpoint root causes         |
 
-These Machine Learning features enhance observability and streamline incident response, helping you maintain system health with greater efficiency.
+Learn more in the [Machine Learning and Anomaly Detection](/src/ml/README.md) documentation.
+
+## Netdata Assistant
+
+When alerts trigger or anomalies emerge, Netdata Assistant serves as your AI-powered troubleshooting companion.
+
+| Feature                    | What It Does For You                                                  |
+|----------------------------|-----------------------------------------------------------------------|
+| **Alert Context**          | Explains what each alert means and why you should care about it       |
+| **Guided Troubleshooting** | Offers step-by-step instructions tailored to your specific situation  |
+| **Persistent Window**      | Follows you throughout your dashboards as you investigate issues      |
+| **Curated Resources**      | Provides links to relevant documentation to deepen your understanding |
+| **Time-Saving**            | Eliminates the need for searching documentation or online forums      |
+
+Learn more about [Netdata Assistant](/docs/netdata-assistant.md) and how it helps streamline your troubleshooting workflow.
+
+## Getting Started
+
+Netdata AI features are enabled by default with the standard installation. The machine learning capabilities require the `dbengine` database mode, which is the default setting.
+
+To start exploring:
+
+1. **Anomaly Detection**: Check the [Anomaly Advisor tab](/docs/dashboards-and-charts/anomaly-advisor-tab.md) to see detected anomalies
+2. **Metric Correlations**: Use the Metric Correlations button in the dashboard to analyze relationships between metrics
+3. **Netdata Assistant**: Click the Assistant button in the Alerts tab when troubleshooting alerts
+
+These AI features work seamlessly with Netdata's other capabilities, enhancing your overall monitoring and troubleshooting experience without requiring any AI expertise.
