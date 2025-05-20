@@ -1396,7 +1396,7 @@ static inline void w3svc_w3wp_active_threads(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_active_threads",
-                "Threads actively processing requests in the worker process.",
+                "Threads actively processing requests in the worker process",
                 "threads",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1405,7 +1405,7 @@ static inline void w3svc_w3wp_active_threads(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_active_threads =
-                rrddim_add(p->st_wescv_w3wp_active_threads, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_wescv_w3wp_active_threads, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(p->st_wescv_w3wp_active_threads->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1437,8 +1437,8 @@ static inline void w3svc_w3wp_requests_total(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_requests_total",
-                "Total number of HTTP requests served by the worker process.",
-                "requests",
+                "HTTP requests served by the worker process.",
+                "requests/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_REQUESTS_TOTAL,
@@ -1478,7 +1478,7 @@ static inline void w3svc_w3wp_requests_active(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_requests_active",
-                "Current number of requests being processed by the worker process.",
+                "Current number of requests being processed by the worker process",
                 "requests",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1487,7 +1487,7 @@ static inline void w3svc_w3wp_requests_active(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_requests_active =
-                rrddim_add(p->st_wescv_w3wp_requests_active, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_requests_active, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(p->st_wescv_w3wp_requests_active->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1525,7 +1525,7 @@ static inline void w3svc_w3wp_file_cache_mem_usage(
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_FILE_CACHE_MEM_USAGE,
                 update_every,
-                RRDSET_TYPE_LINE);
+                RRDSET_TYPE_AREA);
 
             p->rd_wescv_w3wp_file_cache_mem_usage =
                 rrddim_add(p->st_wescv_w3wp_file_cache_mem_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1560,7 +1560,7 @@ static inline void w3svc_w3wp_files_cached_total(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_files_cache_total",
-                "Total number of files whose contents were ever added to the cache.",
+                "Files whose contents were ever added to the cache",
                 "files/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1569,7 +1569,7 @@ static inline void w3svc_w3wp_files_cached_total(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_files_cache_total =
-                rrddim_add(p->st_wescv_w3wp_files_cache_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_files_cache_total, "cached_files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_files_cache_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1601,8 +1601,8 @@ static inline void w3svc_w3wp_files_flushed_total(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_files_flushed_total",
-                "Total number of file handles that have been removed from the cache.",
-                "files/s",
+                "File handles that have been removed from the cache",
+                "flushes/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_FILE_FLUSHED_TOTAL,
@@ -1610,7 +1610,7 @@ static inline void w3svc_w3wp_files_flushed_total(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_files_flushed_total =
-                rrddim_add(p->st_wescv_w3wp_files_flushed_total, "files", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_files_flushed_total, "file_handles", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_files_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1642,7 +1642,7 @@ static inline void w3svc_w3wp_uri_cached_flushed(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_uri_cache_flushed",
-                "Total number of URI cache flushes.",
+                "URI cache flushes",
                 "flushes/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1651,7 +1651,7 @@ static inline void w3svc_w3wp_uri_cached_flushed(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_uri_cache_flushed =
-                rrddim_add(p->st_wescv_w3wp_uri_cache_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_uri_cache_flushed, "cached_uris", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_uri_cache_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1683,7 +1683,7 @@ static inline void w3svc_w3wp_total_uri_cached(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_total_uri_cached",
-                "Total number of URI information blocks added to the cache.",
+                "URI information blocks added to the cache",
                 "blocks/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1692,7 +1692,7 @@ static inline void w3svc_w3wp_total_uri_cached(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_total_uri_cached =
-                rrddim_add(p->st_wescv_w3wp_total_uri_cached, "blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_total_uri_cached, "uri_cache_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_total_uri_cached->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1723,9 +1723,9 @@ static inline void w3svc_w3wp_total_metadata_cached(
                 id,
                 NULL,
                 "w3svc w3wp",
-                "iis.w3svc_w3wp_total_metadata_cache",
-                "Number of metadata information blocks currently present in user-mode cache.",
-                "blocks",
+                "iis.w3svc_w3wp_total_metadata_cached",
+                "Metadata information blocks added to the user-mode cache",
+                "blocks/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_METADATA_CACHED,
@@ -1733,7 +1733,7 @@ static inline void w3svc_w3wp_total_metadata_cached(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_total_metadata_cache =
-                rrddim_add(p->st_wescv_w3wp_total_metadata_cache, "blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_total_metadata_cache, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_total_metadata_cache->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1765,7 +1765,7 @@ static inline void w3svc_w3wp_total_metadata_flushed(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_total_metadata_flushed",
-                "Total number of user-mode metadata cache flushed.",
+                "User-mode metadata cache flushed",
                 "flushes/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1774,7 +1774,7 @@ static inline void w3svc_w3wp_total_metadata_flushed(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_total_metadata_flushed =
-                rrddim_add(p->st_wescv_w3wp_total_metadata_flushed, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_total_metadata_flushed, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_total_metadata_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1806,7 +1806,7 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_output_cache_active_flushed_items",
-                "Number of items that have been flushed from output cache but are still being used by outgoing responses so are still taking up memory.",
+                "Items flushed but still in memory for active responses",
                 "items",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1815,7 +1815,7 @@ static inline void w3svc_w3wp_output_cache_active_flushed_items(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_output_cache_active_flushed_items = rrddim_add(
-                p->st_wescv_w3wp_output_cache_active_flushed_items, "items", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->st_wescv_w3wp_output_cache_active_flushed_items, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(
                 p->st_wescv_w3wp_output_cache_active_flushed_items->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
@@ -1848,16 +1848,16 @@ static inline void w3svc_w3wp_output_cache_memory_usage(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_output_cache_memory_usage",
-                "Current number of bytes used by output cache.",
+                "Current number of bytes used by output cache",
                 "bytes",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
                 PRIO_W3SVC_W3WP_OUTPUT_CACHE_MEMORY_USAGE,
                 update_every,
-                RRDSET_TYPE_LINE);
+                RRDSET_TYPE_AREA);
 
             p->rd_wescv_w3wp_output_cache_memory_usage =
-                rrddim_add(p->st_wescv_w3wp_output_cache_memory_usage, "used", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_wescv_w3wp_output_cache_memory_usage, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(p->st_wescv_w3wp_output_cache_memory_usage->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1889,7 +1889,7 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
                 NULL,
                 "w3svc w3wp",
                 "iis.w3svc_w3wp_output_cache_flushed_total",
-                "Total number of flushes of output cache.",
+                "Flushes of output cache",
                 "flushes/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibWebService",
@@ -1898,7 +1898,7 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
                 RRDSET_TYPE_LINE);
 
             p->rd_wescv_w3wp_output_cache_flushed_total = rrddim_add(
-                p->st_wescv_w3wp_output_cache_flushed_total, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->st_wescv_w3wp_output_cache_flushed_total, "output_cache_entries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_wescv_w3wp_output_cache_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
