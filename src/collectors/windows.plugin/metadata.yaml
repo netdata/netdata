@@ -1721,7 +1721,7 @@ modules:
               1. **Create Monitoring User**
               
                  Create an SQL Server user with the necessary permissions to collect monitoring data:
-              
+
                  ```tsql
                  USE master;
                  CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
@@ -1734,13 +1734,13 @@ modules:
               2. **Enable Query Store**
               
                  Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
-              
+
                  ```tsql
                  DECLARE @dbname NVARCHAR(max)
                  DECLARE nd_user_cursor CURSOR FOR SELECT name
                                      FROM master.dbo.sysdatabases
                                      WHERE name NOT IN ('master', 'tempdb')
-              
+
                  OPEN nd_user_cursor
                  FETCH NEXT FROM nd_user_cursor INTO @dbname
                  WHILE @@FETCH_STATUS = 0
