@@ -258,7 +258,7 @@ int test_cmd_pool_fifo()
 
     int pool_sizes[] = {32, 64, 128, 256};
 
-    for (int i = 0; i < sizeof(pool_sizes) / sizeof(pool_sizes[0]); ++i) {
+    for (size_t i = 0; i < sizeof(pool_sizes) / sizeof(pool_sizes[0]); ++i) {
         int pool_size = pool_sizes[i];
         init_cmd_pool(&pool, pool_size);
 
