@@ -1218,6 +1218,90 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: IIS W3SCV W3MP
+          description: "These metrics refer to the World Wide Web Publishing Service, the service responsible for hosting and serving web content."
+          labels:
+            - name: app
+              description: Application name.
+          metrics:
+            - name: iis.w3svc_w3wp_active_threads
+              description: Threads actively processing requests in the worker process
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: iis.w3svc_w3wp_requests_total
+              description: HTTP requests served by the worker process
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.w3svc_w3wp_requests_active
+              description: Current number of requests being processed by the worker process
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.w3svc_w3wp_file_cache_mem_usage
+              description: Current memory usage by the worker process
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: iis.w3svc_w3wp_files_cache_total
+              description: Files whose contents were ever added to the cache
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: cached_files
+            - name: iis.w3svc_w3wp_files_flushed_total
+              description: File handles that have been removed from the cache
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: file_handles
+            - name: iis.w3svc_w3wp_uri_cache_flushed
+              description: URI cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: cached_uris
+            - name: iis.w3svc_w3wp_total_uri_cached
+              description: URI information blocks added to the cache
+              unit: "blocks/s"
+              chart_type: line
+              dimensions:
+                - name: uri_cache_blocks
+            - name: iis.w3svc_w3wp_total_metadata_cached
+              description: Metadata information blocks added to the user-mode cache
+              unit: "blocks/s"
+              chart_type: line
+              dimensions:
+                - name: metadata_blocks
+            - name: iis.w3svc_w3wp_total_metadata_flushed
+              description: User-mode metadata cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: metadata_blocks
+            - name: iis.w3svc_w3wp_output_cache_active_flushed_items
+              description: Items flushed but still in memory for active responses
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: iis.w3svc_w3wp_output_cache_memory_usage
+              description: Current number of bytes used by output cache
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: iis.w3svc_w3wp_output_cache_flushed_total
+              description: Flushes of output cache
+              unit: "flushes"
+              chart_type: line
+              dimensions:
+                - name: output_cache_entries
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
@@ -1637,7 +1721,7 @@ modules:
               1. **Create Monitoring User**
               
                  Create an SQL Server user with the necessary permissions to collect monitoring data:
-                 
+
                  ```tsql
                  USE master;
                  CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
@@ -1650,13 +1734,13 @@ modules:
               2. **Enable Query Store**
               
                  Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
-                 
+
                  ```tsql
                  DECLARE @dbname NVARCHAR(max)
                  DECLARE nd_user_cursor CURSOR FOR SELECT name
                                      FROM master.dbo.sysdatabases
                                      WHERE name NOT IN ('master', 'tempdb')
-                 
+
                  OPEN nd_user_cursor
                  FETCH NEXT FROM nd_user_cursor INTO @dbname
                  WHILE @@FETCH_STATUS = 0
