@@ -2427,6 +2427,7 @@ static void start_metadata_hosts(uv_work_t *req)
 
 #define MAX_SHUTDOWN_TIMEOUT_SECONDS (10)
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
+#define CMD_POOL_SIZE (32768)
 
 static void *metadata_event_loop(void *arg)
 {
@@ -2435,8 +2436,7 @@ static void *metadata_event_loop(void *arg)
     service_register(NULL, NULL, NULL);
     worker_register(EVENT_LOOP_NAME);
 
-//    config->ar = aral_by_size_acquire(sizeof(struct metadata_cmd));
-    init_cmd_pool(&config->cmd_pool, 1024);
+    init_cmd_pool(&config->cmd_pool, CMD_POOL_SIZE);
 
     worker_register_job_name(METADATA_DATABASE_NOOP, "noop");
     worker_register_job_name(METADATA_DEL_DIMENSION, "delete dimension");

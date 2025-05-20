@@ -599,6 +599,7 @@ static void timer_cb(uv_timer_t *handle)
 }
 
 #define MAX_SHUTDOWN_TIMEOUT_SECONDS (5)
+#define CMD_POOL_SIZE (2048)
 
 #define ACLK_SYNC_SHOULD_BE_RUNNING                                                                                    \
     (!shutdown_requested || config->aclk_queries_running || config->alert_push_running ||                              \
@@ -608,8 +609,7 @@ static void *aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
-//    config->ar = aral_by_size_acquire(sizeof(struct aclk_database_cmd));
-    init_cmd_pool(&config->cmd_pool, 100);
+    init_cmd_pool(&config->cmd_pool, CMD_POOL_SIZE);
 
     worker_register("ACLKSYNC");
 
