@@ -693,7 +693,7 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
     // apply all the prototypes for the charts of the host
     RRDSET *st;
     rrdset_foreach_reentrant(st, host) {
-        if (!service_running(SERVICE_HEALTH))
+        if (is_health_thread && !service_running(SERVICE_HEALTH))
             break;
         health_prototype_reset_alerts_for_rrdset(st);
     }
