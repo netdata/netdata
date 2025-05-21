@@ -537,7 +537,6 @@ static void start_alert_push(uv_work_t *req __maybe_unused)
 int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config, aclk_query_t *query) {
 
     worker_data_t *worker = get_worker(&config->worker_pool);
-    worker->request.data = worker;
     worker->payload = query;
     worker->config = config;
 
@@ -574,7 +573,6 @@ static void timer_cb(uv_timer_t *handle)
         worker_data_t *worker;
         if (!config->alert_push_running) {
             worker = get_worker(&config->worker_pool);
-            worker->request.data = worker;
             worker->config = config;
             config->alert_push_running = true;
             if (uv_queue_work(handle->loop, &worker->request, start_alert_push, after_start_alert_push)) {
@@ -763,12 +761,6 @@ static void *aclk_synchronization_event_loop(void *arg)
 
                 case ACLK_DATABASE_NODE_UNREGISTER:
                     worker = get_worker(&config->worker_pool);
-                    if (!worker) {
-                        nd_log_daemon(NDLP_ERR, "Failed to get worker for unregister node");
-                        freez(cmd.param[0]);
-                        break;
-                    }
-                    worker->request.data = worker;
                     worker->config = config;
                     worker->payload = cmd.param[0];
 
@@ -875,11 +867,6 @@ static void *aclk_synchronization_event_loop(void *arg)
                         break;
 
                     worker = get_worker(&config->worker_pool);
-                    if (!worker) {
-                        nd_log_daemon(NDLP_ERR, "Failed to get worker for ACLK batch job");
-                        break;
-                    }
-                    worker->request.data = worker;
                     worker->config = config;
                     worker->payload = aclk_query_batch;
 

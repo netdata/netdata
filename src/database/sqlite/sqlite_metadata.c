@@ -2544,7 +2544,6 @@ static void *metadata_event_loop(void *arg)
                         break;
 
                     worker = get_worker(&config->worker_pool);
-                    worker->request.data = worker;
                     worker->config = config;
                     worker->pending_alert_list = pending_alert_list;
                     worker->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
@@ -2572,7 +2571,6 @@ static void *metadata_event_loop(void *arg)
 
                     worker = get_worker(&config->worker_pool);
                     config->ctx_load_running = true;
-                    worker->request.data = worker;
                     worker->config = config;
                     if (uv_queue_work(loop, &worker->request, ctx_hosts_load, after_ctx_hosts_load)) {
                         config->ctx_load_running = false;
