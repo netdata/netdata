@@ -165,7 +165,7 @@ void init_cmd_pool(CmdPool *pool, int size) {
 
     uv_mutex_init(&pool->lock);
     uv_cond_init(&pool->not_full);
-;}
+}
 
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
 {

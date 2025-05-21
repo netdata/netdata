@@ -326,7 +326,7 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
                 http_api_v2(client, query);
             ok_to_send = false;
             break;
-        case CTX_CHECKPOINT:;
+        case CTX_CHECKPOINT:
             worker_is_busy(UV_EVENT_CTX_CHECKPOINT);
             rrdcontext_hub_checkpoint_command(query->data.payload);
             ok_to_send = false;
@@ -639,7 +639,7 @@ static void *aclk_synchronization_event_loop(void *arg)
 
     sql_delete_aclk_table_list();
 
-    int query_thread_count = netdata_conf_cloud_query_threads();
+    int query_thread_count = (int) netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     //struct worker_data *worker_datadata;
