@@ -3,9 +3,16 @@
 metrics:
   - MIB: TCP-MIB
     symbol:
+      OID: 1.3.6.1.2.1.6.9.0
+      name: tcpCurrEstab
+      description: Current TCP connections in ESTABLISHED or CLOSE-WAIT state
+      family: Network/IP/TCP/Connections
+      unit: "{connection}"
+  - MIB: TCP-MIB
+    symbol:
       OID: 1.3.6.1.2.1.6.5.0
       name: tcpActiveOpens
-      description: Number of times that TCP connections have made a direct transition to the SYN-SENT state from the CLOSED state
+      description: TCP connections transitioning from CLOSED to SYN-SENT
       family: Network/IP/TCP/Connections
       unit: "{transition}"
       metric_type: monotonic_count
@@ -13,70 +20,63 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.6.6.0
       name: tcpPassiveOpens
-      description: Number of times TCP connections have made a direct transition to the SYN-RCVD state from the LISTEN state
+      description: TCP connections transitioning from LISTEN to SYN-RCVD
       family: Network/IP/TCP/Connections
       unit: "{transition}"
       metric_type: monotonic_count
-  - MIB: TCP-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.6.7.0
-      name: tcpAttemptFails
-      description: Number of times that TCP connections have made a direct transition to the CLOSED state from either the SYN-SENT state or the SYN-RCVD state, plus the number of times that TCP connections have made a direct transition to the LISTEN state from the SYN-RCVD state
-      family: Network/IP/TCP/Connections
-      unit: "{transition}"
-      metric_type: monotonic_count
-  - MIB: TCP-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.6.8.0
-      name: tcpEstabResets
-      description: Number of times that TCP connections have made a direct transition to the CLOSED state from either the ESTABLISHED state or the CLOSE-WAIT state
-      family: Network/IP/TCP/Connections
-      unit: "{transition}"
-      metric_type: monotonic_count
-  - MIB: TCP-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.6.9.0
-      name: tcpCurrEstab
-      description: Number of TCP connections for which the current state is either ESTABLISHED or CLOSE-WAIT
-      family: Network/IP/TCP/Connections
-      unit: "{connection}"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.17.0
       name: tcpHCInSegs
-      description: Total number of segments received, including those received in error. This count includes segments received on currently established connections. This object is the 64-bit equivalent of tcpInSegs
-      family: Network/IP/TCP/Segments
-      unit: "{segment}"
+      description: TCP segments received
+      family: Network/IP/TCP/Packets
+      unit: "{packet}"
       metric_type: monotonic_count
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.18.0
       name: tcpHCOutSegs
-      description: Number of segments sent, including those on current connections but excluding those containing only retransmitted octets. This object is the 64-bit equivalent of tcpOutSegs
-      family: Network/IP/TCP/Segments
-      unit: "{segment}"
-      metric_type: monotonic_count
-  - MIB: TCP-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.6.12.0
-      name: tcpRetransSegs
-      description: Total number of segments retransmitted; that is, the number of TCP segments transmitted containing one or more previously transmitted octets
-      family: Network/IP/TCP/Segments
-      unit: "{segment}"
+      description: TCP segments sent
+      family: Network/IP/TCP/Packets
+      unit: "{packet}"
       metric_type: monotonic_count
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.14.0
       name: tcpInErrs
-      description: Total number of segments received in error (e.g., bad TCP checksums)
-      family: Network/IP/TCP/Segments
-      unit: "{segment}"
+      description: TCP segments received with errors
+      family: Network/IP/TCP/Errors
+      unit: "{error}"
+      metric_type: monotonic_count
+  - MIB: TCP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.6.7.0
+      name: tcpAttemptFails
+      description: Failed TCP connection attempts
+      family: Network/IP/TCP/Errors
+      unit: "{failure}"
+      metric_type: monotonic_count
+  - MIB: TCP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.6.8.0
+      name: tcpEstabResets
+      description: TCP connections reset from ESTABLISHED/CLOSE-WAIT
+      family: Network/IP/TCP/Errors
+      unit: "{transition}"
       metric_type: monotonic_count
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.15.0
       name: tcpOutRsts
-      description: Number of TCP segments sent containing the RST flag
-      family: Network/IP/TCP/Segments
-      unit: "{segment}"
+      description: TCP segments sent with RST flag
+      family: Network/IP/TCP/Errors
+      unit: "{reset}"
+      metric_type: monotonic_count
+  - MIB: TCP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.6.12.0
+      name: tcpRetransSegs
+      description: TCP segments retransmitted
+      family: Network/IP/TCP/Retransmits
+      unit: "{retransmit}"
       metric_type: monotonic_count
