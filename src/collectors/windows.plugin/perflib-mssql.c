@@ -257,7 +257,8 @@ static void netdata_MSSQL_error(uint32_t type, SQLHANDLE handle, enum netdata_ms
     }
 }
 
-static inline void netdata_MSSQL_release_results(SQLHSTMT *stmt) {
+static inline void netdata_MSSQL_release_results(SQLHSTMT *stmt)
+{
     SQLFreeStmt(stmt, SQL_CLOSE);
     SQLFreeStmt(stmt, SQL_UNBIND);
     SQLFreeStmt(stmt, SQL_RESET_PARAMS);
@@ -981,9 +982,8 @@ static int initialize(int update_every)
     }
 
     if (create_thread)
-        mssql_query_thread = nd_thread_create("mssql_queries",
-                                              NETDATA_THREAD_OPTION_DEFAULT,
-                                              netdata_mssql_queries, &update_every);
+        mssql_query_thread =
+            nd_thread_create("mssql_queries", NETDATA_THREAD_OPTION_DEFAULT, netdata_mssql_queries, &update_every);
 
     return 0;
 }
@@ -2116,6 +2116,7 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
+    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
     int *update_every = data;
 
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
@@ -2130,16 +2131,20 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
 
     DWORD i;
     for (i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
-        if (!doMSSQL[i])
+        if (!collect_perflib[i])
             continue;
 
         DWORD id = RegistryFindIDByName(mi->objectName[i]);
-        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
-            return -1;
+        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+            collect_perflib[i] = false;
+            continue;
+        }
 
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-        if (!pDataBlock)
-            return -1;
+        if (!pDataBlock) {
+            collect_perflib[i] = false;
+            continue;
+        }
 
         doMSSQL[i](pDataBlock, mi, *update_every);
     }
