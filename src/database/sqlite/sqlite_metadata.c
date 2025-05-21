@@ -2633,11 +2633,12 @@ static void *metadata_event_loop(void *arg)
     uv_close((uv_handle_t *)&config->async, NULL);
     uv_walk(loop, libuv_close_callback, NULL);
 
-    size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * USEC_PER_MS) / SHUTDOWN_SLEEP_INTERVAL_MS;
-    while ((config->metadata_running || config->ctx_load_running) && --loop_count) {
+    size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+    while ((config->metadata_running || config->ctx_load_running) && loop_count > 0) {
         if (!uv_run(loop, UV_RUN_NOWAIT))
             break;  // No pending callbacks
         sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
+        loop_count--;
     }
 
     (void)uv_loop_close(loop);
