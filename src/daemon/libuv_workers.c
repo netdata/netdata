@@ -132,13 +132,16 @@ void init_worker_pool(WorkerPool *pool) {
 // Get a worker from the pool
 // Needs to be called from the uv event loop thread
 worker_data_t *get_worker(WorkerPool *pool) {
+    worker_data_t *worker;
     if (pool->top == 0) {
-        worker_data_t *worker = callocz(1, sizeof(worker_data_t));
+        worker = callocz(1, sizeof(worker_data_t));
         worker->allocated = true;  // Mark as allocated
-        return worker;
+    } else {
+        int index = pool->free_stack[--pool->top]; // Pop from stack
+        worker = &pool->workers[index];
     }
-    int index = pool->free_stack[--pool->top];  // Pop from stack
-    return &pool->workers[index];
+    worker->request.data = worker;
+    return worker;
 }
 
 // Return a worker for reuse
