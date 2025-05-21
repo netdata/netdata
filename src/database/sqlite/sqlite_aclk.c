@@ -301,10 +301,10 @@ static void async_cb(uv_async_t *handle)
 
 static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
 {
-    worker_data_t *worker_data = req->data;
-    struct aclk_sync_config_s *config = worker_data->config;
+    worker_data_t *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
     config->aclk_queries_running--;
-    return_worker(&config->worker_pool, worker_data);
+    return_worker(&config->worker_pool, worker);
 }
 
 static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *query)
@@ -404,9 +404,9 @@ static void aclk_run_query_job(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    worker_data_t *worker_data = req->data;
-    struct aclk_sync_config_s *config = worker_data->config;
-    aclk_query_t *query = (aclk_query_t *) worker_data->payload;
+    worker_data_t *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
+    aclk_query_t *query = (aclk_query_t *)worker->payload;
 
     aclk_run_query(config, query);
     worker_is_idle();
@@ -414,19 +414,19 @@ static void aclk_run_query_job(uv_work_t *req)
 
 static void after_aclk_execute_batch(uv_work_t *req, int status __maybe_unused)
 {
-    worker_data_t *worker_data = req->data;
-    struct aclk_sync_config_s *config = worker_data->config;
+    worker_data_t *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
     config->aclk_batch_job_is_running = false;
-    return_worker(&config->worker_pool, worker_data);
+    return_worker(&config->worker_pool, worker);
 }
 
 static void aclk_execute_batch(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    worker_data_t *worker_data = req->data;
-    struct aclk_sync_config_s *config = worker_data->config;
-    struct judy_list_t *aclk_query_batch = worker_data->payload;
+    worker_data_t *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
+    struct judy_list_t *aclk_query_batch = worker->payload;
 
     if (!aclk_query_batch)
         return;
@@ -456,12 +456,6 @@ static void aclk_execute_batch(uv_work_t *req)
     worker_is_idle();
 }
 
-//struct worker_data {
-//    uv_work_t request;
-//    void *payload;
-//    struct aclk_sync_config_s *config;
-//};
-
 struct notify_timer_cb_data {
     void *payload;
     struct completion *completion;
@@ -469,20 +463,20 @@ struct notify_timer_cb_data {
 
 static void after_do_unregister_node(uv_work_t *req, int status __maybe_unused)
 {
-    worker_data_t *worker_data = req->data;
-    struct aclk_sync_config_s *config = worker_data->config;
-    return_worker(&config->worker_pool, worker_data);
+    worker_data_t *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
+    return_worker(&config->worker_pool, worker);
 }
 
 static void do_unregister_node(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    worker_data_t *worker_data =  req->data;
+    worker_data_t *worker =  req->data;
 
     worker_is_busy(UV_EVENT_UNREGISTER_NODE);
 
-    sql_unregister_node(worker_data->payload);
+    sql_unregister_node(worker->payload);
 
     worker_is_idle();
 }
@@ -510,11 +504,11 @@ static void node_update_timer_cb(uv_timer_t *handle)
 
 static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 {
-    struct worker_data *data = req->data;
-    struct aclk_sync_config_s *config = data->config;
+    struct worker_data *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
 
     config->alert_push_running = false;
-    return_worker(&config->worker_pool, data);
+    return_worker(&config->worker_pool, worker);
 }
 
 // Worker thread to scan hosts for pending metadata to store
@@ -542,20 +536,16 @@ static void start_alert_push(uv_work_t *req __maybe_unused)
 
 int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config, aclk_query_t *query) {
 
-    worker_data_t *worker_data = get_worker(&config->worker_pool);
-    if (!worker_data) {
-        netdata_log_error("Failed to get worker data");
-        return -1;
-    }
-    worker_data->request.data = worker_data;
-    worker_data->payload = query;
-    worker_data->config = config;
+    worker_data_t *worker = get_worker(&config->worker_pool);
+    worker->request.data = worker;
+    worker->payload = query;
+    worker->config = config;
 
     config->aclk_queries_running++;
-    int rc = uv_queue_work(loop, &worker_data->request, aclk_run_query_job, after_aclk_run_query_job);
+    int rc = uv_queue_work(loop, &worker->request, aclk_run_query_job, after_aclk_run_query_job);
     if (rc) {
         config->aclk_queries_running--;
-        return_worker(&config->worker_pool, worker_data);
+        return_worker(&config->worker_pool, worker);
     }
     return rc;
 }
@@ -581,14 +571,15 @@ static void timer_cb(uv_timer_t *handle)
     struct aclk_sync_config_s *config = handle->data;
 
     if (aclk_online_for_alerts()) {
-        worker_data_t *worker_data;
-        if (!config->alert_push_running && (worker_data = get_worker(&config->worker_pool))) {
-            worker_data->request.data = worker_data;
-            worker_data->config = config;
+        worker_data_t *worker;
+        if (!config->alert_push_running) {
+            worker = get_worker(&config->worker_pool);
+            worker->request.data = worker;
+            worker->config = config;
             config->alert_push_running = true;
-            if (uv_queue_work(handle->loop, &worker_data->request, start_alert_push, after_start_alert_push)) {
+            if (uv_queue_work(handle->loop, &worker->request, start_alert_push, after_start_alert_push)) {
                 config->alert_push_running = false;
-                return_worker(&config->worker_pool, worker_data);
+                return_worker(&config->worker_pool, worker);
             }
         }
     }
@@ -642,7 +633,6 @@ static void *aclk_synchronization_event_loop(void *arg)
     int query_thread_count = (int) netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
-    //struct worker_data *worker_datadata;
     struct notify_timer_cb_data *timer_cb_data;
     aclk_query_t *query;
 
@@ -653,7 +643,7 @@ static void *aclk_synchronization_event_loop(void *arg)
     size_t pending_queries = 0;
 
     Pvoid_t *Pvalue;
-    worker_data_t  *worker_data;
+    worker_data_t  *worker;
 
     unsigned cmd_batch_size;
 
@@ -772,19 +762,19 @@ static void *aclk_synchronization_event_loop(void *arg)
                     break;
 
                 case ACLK_DATABASE_NODE_UNREGISTER:
-                    worker_data = get_worker(&config->worker_pool);
-                    if (!worker_data) {
+                    worker = get_worker(&config->worker_pool);
+                    if (!worker) {
                         nd_log_daemon(NDLP_ERR, "Failed to get worker for unregister node");
                         freez(cmd.param[0]);
                         break;
                     }
-                    worker_data->request.data = worker_data;
-                    worker_data->config = config;
-                    worker_data->payload = cmd.param[0];
+                    worker->request.data = worker;
+                    worker->config = config;
+                    worker->payload = cmd.param[0];
 
-                    if (uv_queue_work(loop, &worker_data->request, do_unregister_node, after_do_unregister_node)) {
+                    if (uv_queue_work(loop, &worker->request, do_unregister_node, after_do_unregister_node)) {
                         freez(cmd.param[0]);
-                        return_worker(&config->worker_pool, worker_data);
+                        return_worker(&config->worker_pool, worker);
                     }
                     break;
                 case ACLK_DATABASE_PUSH_ALERT_CONFIG:
@@ -884,23 +874,23 @@ static void *aclk_synchronization_event_loop(void *arg)
                     if (!aclk_query_batch || config->aclk_batch_job_is_running)
                         break;
 
-                    worker_data = get_worker(&config->worker_pool);
-                    if (!worker_data) {
+                    worker = get_worker(&config->worker_pool);
+                    if (!worker) {
                         nd_log_daemon(NDLP_ERR, "Failed to get worker for ACLK batch job");
                         break;
                     }
-                    worker_data->request.data = worker_data;
-                    worker_data->config = config;
-                    worker_data->payload = aclk_query_batch;
+                    worker->request.data = worker;
+                    worker->config = config;
+                    worker->payload = aclk_query_batch;
 
                     config->aclk_batch_job_is_running = true;
                     config->aclk_jobs_pending -= aclk_query_batch->count;
                     aclk_query_batch = NULL;
 
-                    if (uv_queue_work(loop, &worker_data->request, aclk_execute_batch, after_aclk_execute_batch)) {
-                        aclk_query_batch = worker_data->payload;
+                    if (uv_queue_work(loop, &worker->request, aclk_execute_batch, after_aclk_execute_batch)) {
+                        aclk_query_batch = worker->payload;
                         config->aclk_jobs_pending += aclk_query_batch->count;
-                        return_worker(&config->worker_pool, worker_data);
+                        return_worker(&config->worker_pool, worker);
                         config->aclk_batch_job_is_running = false;
                     }
                     break;

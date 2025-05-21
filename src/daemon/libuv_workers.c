@@ -129,7 +129,8 @@ void init_worker_pool(WorkerPool *pool) {
     pool->top = MAX_ACTIVE_WORKERS;  // All workers are initially free
 }
 
-// Get a worker (reuse if available, NULL if pool exhausted)
+// Get a worker from the pool
+// Needs to be called from the uv event loop thread
 worker_data_t *get_worker(WorkerPool *pool) {
     if (pool->top == 0) {
         worker_data_t *worker = callocz(1, sizeof(worker_data_t));

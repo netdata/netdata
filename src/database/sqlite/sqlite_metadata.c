@@ -1847,8 +1847,8 @@ static void ctx_hosts_load(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    worker_data_t *data = req->data;
-    struct meta_config_s *config = data->config;
+    worker_data_t *worker = req->data;
+    struct meta_config_s *config = worker->config;
 
     worker_is_busy(UV_EVENT_HOST_CONTEXT_LOAD);
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
@@ -2394,18 +2394,18 @@ static void start_metadata_hosts(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    worker_data_t *data = req->data;
-    struct meta_config_s *config = data->config;
+    worker_data_t *worker = req->data;
+    struct meta_config_s *config = worker->config;
 
-    BUFFER *work_buffer = data->work_buffer;
+    BUFFER *work_buffer = worker->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
-    store_sql_statements((struct judy_list_t *)data->pending_sql_statement, true);
+    store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true);
 
-    store_alert_transitions((struct judy_list_t *)data->pending_alert_list, true);
+    store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true);
 
     if (!SHUTDOWN_REQUESTED(config))
-        store_ctx_cleanup_list(config, (struct judy_list_t *)data->pending_ctx_cleanup_list);
+        store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
@@ -2415,7 +2415,7 @@ static void start_metadata_hosts(uv_work_t *req)
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
 
     if (!SHUTDOWN_REQUESTED(config)) {
-        do_pending_uuid_deletion(config, (struct judy_list_t *)data->pending_uuid_deletion);
+        do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
         run_metadata_cleanup(config);
     }
 
