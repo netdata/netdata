@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20315](https://github.com/netdata/netdata/pull/20315) ([netdatabot](https://github.com/netdatabot))
+- docs: fix netdata-assistant.md [\#20314](https://github.com/netdata/netdata/pull/20314) ([ilyam8](https://github.com/ilyam8))
+- plugins dyncfg is always on localhost [\#20312](https://github.com/netdata/netdata/pull/20312) ([ktsaou](https://github.com/ktsaou))
+- docs: fix tip in streaming readme [\#20310](https://github.com/netdata/netdata/pull/20310) ([ilyam8](https://github.com/ilyam8))
+- Netdata ai [\#20309](https://github.com/netdata/netdata/pull/20309) ([kanelatechnical](https://github.com/kanelatechnical))
+- Improve user transition log messages [\#20308](https://github.com/netdata/netdata/pull/20308) ([ilyam8](https://github.com/ilyam8))
 - fix use after free of streaming current parent [\#20305](https://github.com/netdata/netdata/pull/20305) ([ktsaou](https://github.com/ktsaou))
 - fix heap-use-after-free in plugins.d inflight functions [\#20304](https://github.com/netdata/netdata/pull/20304) ([ktsaou](https://github.com/ktsaou))
 - Improve metasync shutdown [\#20303](https://github.com/netdata/netdata/pull/20303) ([stelfrag](https://github.com/stelfrag))
@@ -48,6 +54,7 @@
 - fix\(go.d/snmp\): use ifDescr for interface name if ifName is empty [\#20248](https://github.com/netdata/netdata/pull/20248) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/sd/snmp\): fix snmpv3 credentials [\#20247](https://github.com/netdata/netdata/pull/20247) ([ilyam8](https://github.com/ilyam8))
 - SNMP first cisco yaml file pass [\#20246](https://github.com/netdata/netdata/pull/20246) ([Ancairon](https://github.com/Ancairon))
+- IIS W3SCV W3MP Metrics \(windows.plugin\) [\#20245](https://github.com/netdata/netdata/pull/20245) ([thiagoftsm](https://github.com/thiagoftsm))
 - Model Context Protocol Server \(MCP\) for Netdata Part 1 [\#20244](https://github.com/netdata/netdata/pull/20244) ([ktsaou](https://github.com/ktsaou))
 - Fix build issue on old distros [\#20243](https://github.com/netdata/netdata/pull/20243) ([stelfrag](https://github.com/stelfrag))
 - Session claim id in docker [\#20240](https://github.com/netdata/netdata/pull/20240) ([stelfrag](https://github.com/stelfrag))
@@ -459,14 +466,6 @@
 - improvement\(go.d/sd\): add file path to k8s/snmp discovered job source [\#19776](https://github.com/netdata/netdata/pull/19776) ([ilyam8](https://github.com/ilyam8))
 - Improve agent shutdown [\#19775](https://github.com/netdata/netdata/pull/19775) ([stelfrag](https://github.com/stelfrag))
 - Fix SIGSEGV on static installs due to dengine log [\#19774](https://github.com/netdata/netdata/pull/19774) ([ktsaou](https://github.com/ktsaou))
-- kickstart: install native pkg on RPi2+ [\#19773](https://github.com/netdata/netdata/pull/19773) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/sd\): rename discoverers pkgs [\#19772](https://github.com/netdata/netdata/pull/19772) ([ilyam8](https://github.com/ilyam8))
-- block signals before curl [\#19771](https://github.com/netdata/netdata/pull/19771) ([ktsaou](https://github.com/ktsaou))
-- block all signals before spawning any threads [\#19770](https://github.com/netdata/netdata/pull/19770) ([ktsaou](https://github.com/ktsaou))
-- add handling for sigabrt in the status file [\#19769](https://github.com/netdata/netdata/pull/19769) ([ktsaou](https://github.com/ktsaou))
-- copy fields only when the source is valid [\#19768](https://github.com/netdata/netdata/pull/19768) ([ktsaou](https://github.com/ktsaou))
-- detect crashes during status file processing [\#19767](https://github.com/netdata/netdata/pull/19767) ([ktsaou](https://github.com/ktsaou))
-- post status syncrhonously [\#19766](https://github.com/netdata/netdata/pull/19766) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
