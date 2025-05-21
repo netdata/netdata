@@ -22,6 +22,7 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 
 	names, err := f.Readdirnames(-1)
 	require.NoError(t, err)
+	require.NotEmpty(t, names)
 
 	require.Equal(t, len(names)-1 /*README.md*/, len(profiles))
 }
