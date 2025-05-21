@@ -258,7 +258,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
         health_initialize_rrdhost(host);
 
-
     health_execute_delayed_initializations(host);
 
     if (unlikely(apply_hibernation_delay)) {
