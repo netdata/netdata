@@ -1789,7 +1789,7 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
     if (!mdw->rd_resource_wait_msec)
         mdw->rd_resource_wait_msec =
-            rrddim_add(mi->st_resource_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(mi->st_resource_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     if (!mdw->rd_signal_wait_msec)
         mdw->rd_signal_wait_msec =
