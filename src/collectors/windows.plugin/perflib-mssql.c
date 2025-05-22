@@ -1806,7 +1806,7 @@ void mssql_waiting_count_charts(struct mssql_instance *mi, struct mssql_db_waits
             "locks",
             "mssql.instance_waiting_count",
             "Number of waits on this wait type.",
-            "waits",
+            "waits/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_WAITING_COUNT,
