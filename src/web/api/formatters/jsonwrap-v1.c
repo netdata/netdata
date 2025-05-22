@@ -125,8 +125,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_initialize(
         wb, kq, sq, 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_member_add_uint64(wb, "api", 1);
-    buffer_json_member_add_string(wb, "id", qt->id);
+    jsonwrap_keys_init(options);
+    buffer_json_member_add_uint64(wb, JSKEY(api), 1);
+    buffer_json_member_add_string(wb, JSKEY(id), qt->id);
     buffer_json_member_add_string(wb, "name", qt->id);
     buffer_json_member_add_time_t(wb, "view_update_every", r->view.update_every);
     buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
@@ -178,9 +179,10 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
 }
 
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb) {
-    buffer_json_member_add_double(wb, "min", r->view.min);
-    buffer_json_member_add_double(wb, "max", r->view.max);
+    buffer_json_member_add_double(wb, JSKEY(min), r->view.min);
+    buffer_json_member_add_double(wb, JSKEY(max), r->view.max);
 
     buffer_json_query_timings(wb, "timings", &r->internal.qt->timings);
     buffer_json_finalize(wb);
+    jsonwrap_keys_reset();
 }

@@ -3,6 +3,127 @@
 #include "jsonwrap.h"
 #include "jsonwrap-internal.h"
 
+// Static key name structures
+static const struct jsonwrap_key_names jsonwrap_short_keys = {
+    .selected = "sl",
+    .excluded = "ex",
+    .queried = "qr",
+    .failed = "fl",
+    .dimensions = "ds",
+    .instances = "is",
+    .alerts = "al",
+    .statistics = "sts",
+    .name = "nm",
+    .hostname = "nm",
+    .id = "id",
+    .node_id = "nd",
+    .time = "time",
+    .value = "vl",
+    .label_values = "vl",
+    .machine_guid = "mg",
+    .agent_index = "ai",
+    .clear = "cl",
+    .warning = "wr",
+    .critical = "cr",
+    .other = "ot",
+    .min = "min",
+    .max = "max",
+    .avg = "avg",
+    .sum = "sum",
+    .count = "cnt",
+    .volume = "vol",
+    .anomaly_rate = "arp",
+    .anomaly_count = "arc",
+    .contribution = "con",
+    .point_annotations = "pa",
+    .point_schema = "point",
+    .priority = "pri",
+    .update_every = "ue",
+    .view = "view",
+    .tier = "tier",
+    .tr = "tr",
+    .after = "af",
+    .before = "bf",
+    .status = "st",
+    .api = "api",
+    .database = "db",
+    .first_entry = "fe",
+    .last_entry = "le",
+    .node_index = "ni",
+    .units = "un",
+    .weight = "wg",
+    .as = "as",
+    .ids = "ids",
+    .info = "info",
+};
+
+static const struct jsonwrap_key_names jsonwrap_long_keys = {
+    .selected = "selected",
+    .excluded = "excluded",
+    .queried = "queried",
+    .failed = "failed",
+    .dimensions = "dimensions",
+    .instances = "instances",
+    .alerts = "alerts",
+    .statistics = "statistics",
+    .name = "name",
+    .hostname = "hostname",
+    .id = "id",
+    .node_id = "node_id",
+    .time = "time",
+    .value = "value",
+    .label_values = "label_values",
+    .machine_guid = "machine_guid",
+    .agent_index = "agents_array_index",
+    .clear = "clear",
+    .warning = "warning",
+    .critical = "critical",
+    .other = "other",
+    .min = "min",
+    .max = "max",
+    .avg = "average",
+    .sum = "sum",
+    .count = "count",
+    .volume = "volume",
+    .anomaly_rate = "anomaly_rate_percent",
+    .anomaly_count = "anomalous_points_count",
+    .contribution = "contribution_percent",
+    .point_annotations = "point_annotations_bitmap",
+    .point_schema = "point_schema",
+    .priority = "priority",
+    .update_every = "update_every",
+    .view = "view",
+    .tier = "tier",
+    .tr = "tier",
+    .after = "after",
+    .before = "before",
+    .status = "status",
+    .api = "api",
+    .database = "database",
+    .first_entry = "first_entry",
+    .last_entry = "last_entry",
+    .node_index = "nodes_array_index",
+    .units = "units",
+    .weight = "weight",
+    .as = "as",
+    .ids = "ids",
+    .info = "info",
+};
+
+// Thread-local pointer to the current key names
+__thread const struct jsonwrap_key_names *jsonwrap_keys = &jsonwrap_short_keys;
+
+void jsonwrap_keys_init(RRDR_OPTIONS options) {
+    if(options & RRDR_OPTION_LONG_JSON_KEYS)
+        jsonwrap_keys = &jsonwrap_long_keys;
+    else
+        jsonwrap_keys = &jsonwrap_short_keys;
+}
+
+void jsonwrap_keys_reset(void) {
+    jsonwrap_keys = &jsonwrap_short_keys;
+}
+
 ALWAYS_INLINE
 size_t rrdr_dimension_names(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     const size_t dimensions = r->d;
@@ -73,16 +194,16 @@ void query_target_total_counts(BUFFER *wb, const char *key, struct summary_total
     buffer_json_member_add_object(wb, key);
 
     if(totals->selected)
-        buffer_json_member_add_uint64(wb, "sl", totals->selected);
+        buffer_json_member_add_uint64(wb, JSKEY(selected), totals->selected);
 
     if(totals->excluded)
-        buffer_json_member_add_uint64(wb, "ex", totals->excluded);
+        buffer_json_member_add_uint64(wb, JSKEY(excluded), totals->excluded);
 
     if(totals->queried)
-        buffer_json_member_add_uint64(wb, "qr", totals->queried);
+        buffer_json_member_add_uint64(wb, JSKEY(queried), totals->queried);
 
     if(totals->failed)
-        buffer_json_member_add_uint64(wb, "fl", totals->failed);
+        buffer_json_member_add_uint64(wb, JSKEY(failed), totals->failed);
 
     buffer_json_object_close(wb);
 }
@@ -92,19 +213,19 @@ void query_target_metric_counts(BUFFER *wb, QUERY_METRICS_COUNTS *metrics) {
     if(!metrics->selected && !metrics->queried && !metrics->failed && !metrics->excluded)
         return;
 
-    buffer_json_member_add_object(wb, "ds");
+    buffer_json_member_add_object(wb, JSKEY(dimensions));
 
     if(metrics->selected)
-        buffer_json_member_add_uint64(wb, "sl", metrics->selected);
+        buffer_json_member_add_uint64(wb, JSKEY(selected), metrics->selected);
 
     if(metrics->excluded)
-        buffer_json_member_add_uint64(wb, "ex", metrics->excluded);
+        buffer_json_member_add_uint64(wb, JSKEY(excluded), metrics->excluded);
 
     if(metrics->queried)
-        buffer_json_member_add_uint64(wb, "qr", metrics->queried);
+        buffer_json_member_add_uint64(wb, JSKEY(queried), metrics->queried);
 
     if(metrics->failed)
-        buffer_json_member_add_uint64(wb, "fl", metrics->failed);
+        buffer_json_member_add_uint64(wb, JSKEY(failed), metrics->failed);
 
     buffer_json_object_close(wb);
 }
@@ -114,19 +235,19 @@ void query_target_instance_counts(BUFFER *wb, QUERY_INSTANCES_COUNTS *instances)
     if(!instances->selected && !instances->queried && !instances->failed && !instances->excluded)
         return;
 
-    buffer_json_member_add_object(wb, "is");
+    buffer_json_member_add_object(wb, JSKEY(instances));
 
     if(instances->selected)
-        buffer_json_member_add_uint64(wb, "sl", instances->selected);
+        buffer_json_member_add_uint64(wb, JSKEY(selected), instances->selected);
 
     if(instances->excluded)
-        buffer_json_member_add_uint64(wb, "ex", instances->excluded);
+        buffer_json_member_add_uint64(wb, JSKEY(excluded), instances->excluded);
 
     if(instances->queried)
-        buffer_json_member_add_uint64(wb, "qr", instances->queried);
+        buffer_json_member_add_uint64(wb, JSKEY(queried), instances->queried);
 
     if(instances->failed)
-        buffer_json_member_add_uint64(wb, "fl", instances->failed);
+        buffer_json_member_add_uint64(wb, JSKEY(failed), instances->failed);
 
     buffer_json_object_close(wb);
 }
@@ -139,22 +260,22 @@ void query_target_alerts_counts(BUFFER *wb, QUERY_ALERTS_COUNTS *alerts, const c
     if(array)
         buffer_json_add_array_item_object(wb);
     else
-        buffer_json_member_add_object(wb, "al");
+        buffer_json_member_add_object(wb, JSKEY(alerts));
 
     if(name)
-        buffer_json_member_add_string(wb, "nm", name);
+        buffer_json_member_add_string(wb, JSKEY(name), name);
 
     if(alerts->clear)
-        buffer_json_member_add_uint64(wb, "cl", alerts->clear);
+        buffer_json_member_add_uint64(wb, JSKEY(clear), alerts->clear);
 
     if(alerts->warning)
-        buffer_json_member_add_uint64(wb, "wr", alerts->warning);
+        buffer_json_member_add_uint64(wb, JSKEY(warning), alerts->warning);
 
     if(alerts->critical)
-        buffer_json_member_add_uint64(wb, "cr", alerts->critical);
+        buffer_json_member_add_uint64(wb, JSKEY(critical), alerts->critical);
 
     if(alerts->other)
-        buffer_json_member_add_uint64(wb, "ot", alerts->other);
+        buffer_json_member_add_uint64(wb, JSKEY(other), alerts->other);
 
     buffer_json_object_close(wb);
 }
@@ -164,34 +285,28 @@ void query_target_points_statistics(BUFFER *wb, QUERY_TARGET *qt, STORAGE_POINT 
     if(!sp->count)
         return;
 
-    buffer_json_member_add_object(wb, "sts");
+    buffer_json_member_add_object(wb, JSKEY(statistics));
 
-    buffer_json_member_add_double(wb, "min", sp->min);
-    buffer_json_member_add_double(wb, "max", sp->max);
+    buffer_json_member_add_double(wb, JSKEY(min), sp->min);
+    buffer_json_member_add_double(wb, JSKEY(max), sp->max);
 
     if(query_target_aggregatable(qt)) {
-        buffer_json_member_add_uint64(wb, "cnt", sp->count);
+        buffer_json_member_add_uint64(wb, JSKEY(count), sp->count);
 
-        if(sp->sum != 0.0) {
-            buffer_json_member_add_double(wb, "sum", sp->sum);
-            buffer_json_member_add_double(wb, "vol", sp->sum * (NETDATA_DOUBLE) query_view_update_every(qt));
-        }
+        buffer_json_member_add_double(wb, JSKEY(sum), sp->sum);
+        buffer_json_member_add_double(wb, JSKEY(volume), sp->sum * (NETDATA_DOUBLE) query_view_update_every(qt));
 
-        if(sp->anomaly_count != 0)
-            buffer_json_member_add_uint64(wb, "arc", sp->anomaly_count);
+        buffer_json_member_add_uint64(wb, JSKEY(anomaly_count), sp->anomaly_count);
     }
     else {
         NETDATA_DOUBLE avg = (sp->count) ? sp->sum / (NETDATA_DOUBLE)sp->count : 0.0;
-        if(avg != 0.0)
-            buffer_json_member_add_double(wb, "avg", avg);
+        buffer_json_member_add_double(wb, JSKEY(avg), avg);
 
         NETDATA_DOUBLE arp = storage_point_anomaly_rate(*sp);
-        if(arp != 0.0)
-            buffer_json_member_add_double(wb, "arp", arp);
+        buffer_json_member_add_double(wb, JSKEY(anomaly_rate), arp);
 
         NETDATA_DOUBLE con = (qt->query_points.sum > 0.0) ? sp->sum * 100.0 / qt->query_points.sum : 0.0;
-        if(con != 0.0)
-            buffer_json_member_add_double(wb, "con", con);
+        buffer_json_member_add_double(wb, JSKEY(contribution), con);
     }
     buffer_json_object_close(wb);
 }

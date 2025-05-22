@@ -98,8 +98,8 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "description", "Limits the number of nodes, instances, dimensions, and label values returned in the results. "
                                                            "When the number of items exceeds this limit, only the top N items by contribution are returned, "
                                                            "with the remaining items aggregated into a 'remaining X dimensions' entry. "
-                                                           "This helps keep response sizes manageable for high-cardinality queries. "
-                                                           "The default limit is 10.");
+                                                           "This helps keep response sizes manageable for high-cardinality queries.");
+        buffer_json_member_add_uint64(buffer, "default", 10);
     }
     buffer_json_object_close(buffer); // cardinality_limit
 
@@ -257,6 +257,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
     buffer_json_add_array_item_string(buffer, "time_group");
     buffer_json_add_array_item_string(buffer, "group_by");
     buffer_json_add_array_item_string(buffer, "aggregation");
+    buffer_json_add_array_item_string(buffer, "cardinality_limit");
     buffer_json_array_close(buffer);
     
     buffer_json_object_close(buffer); // inputSchema
@@ -391,6 +392,12 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
+    struct json_object *cardinality_limit_obj = NULL;
+    if (!json_object_object_get_ex(params, "cardinality_limit", &cardinality_limit_obj) || !cardinality_limit_obj) {
+        buffer_sprintf(mcpc->error, "Missing required parameter 'cardinality_limit'. This parameter limits the number of items returned to keep response sizes manageable (default: 10).");
+        return MCP_RC_BAD_REQUEST;
+    }
+    
     // Get time_group value to check if it's percentile or countif
     const char *time_group_str = NULL;
     if (json_object_is_type(time_group_obj, json_type_string)) {
@@ -512,7 +519,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Prepare query target request
     QUERY_TARGET_REQUEST qtr = {
-        .version = 2,
+        .version = 3,
         .scope_nodes = nodes,     // Use nodes as scope_nodes
         .scope_contexts = context, // Use the single context as scope_contexts
         .after = after,
@@ -530,7 +537,8 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         .options = options |
                    RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
                    RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
-                   RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS,
+                   RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS | RRDR_OPTION_LONG_JSON_KEYS |
+                   RRDR_OPTION_MCP_INFO,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,
@@ -604,304 +612,15 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_INTERNAL_ERROR;
     }
     
-    // Initialize the success response
+    // Return the raw query engine response as-is
     mcp_init_success_result(mcpc, id);
     {
-        // Start building content array for the result
         buffer_json_member_add_array(mcpc->result, "content");
         {
             buffer_json_add_array_item_object(mcpc->result);
             {
                 buffer_json_member_add_string(mcpc->result, "type", "text");
-
-                // Parse the result as JSON and remove some fields
-                const char *tmp_buffer_str = buffer_tostring(tmp_buffer);
-                struct json_object *json_result = json_tokener_parse(tmp_buffer_str ? tmp_buffer_str : "{}");
-                if (json_result) {
-                    // Check if the "result.data" array is empty
-                    struct json_object *result_obj = NULL;
-                    struct json_object *data_obj = NULL;
-                    bool empty_data = true;
-                    
-                    // Access the "result" object
-                    if (json_object_object_get_ex(json_result, "result", &result_obj)) {
-                        // Access the "data" array in "result"
-                        if (json_object_object_get_ex(result_obj, "data", &data_obj)) {
-                            // Check if the array is empty or has elements
-                            if (json_object_is_type(data_obj, json_type_array)) {
-                                int data_length = json_object_array_length(data_obj);
-                                if (data_length > 0) {
-                                    empty_data = false;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (empty_data) {
-                        buffer_flush(mcpc->result);
-
-                        // Free the JSON object
-                        json_object_put(json_result);
-                        
-                        // Return a more detailed error message about empty data
-                        buffer_sprintf(mcpc->error, 
-                            "Query matched no data. Possible reasons:\n"
-                            "1. The context '%s' exists but has no data in the requested time range (%lld to %lld)\n"
-                            "2. The nodes filter '%s' doesn't match any nodes that collect this context\n"
-                            "3. The dimensions filter '%s' doesn't match any available dimensions\n"
-                            "4. The labels filter '%s' doesn't match any metrics with those labels\n"
-                            "Try using the context_details tool to verify the context exists and which nodes collect it.",
-                            context, 
-                            (long long)after, 
-                            (long long)before, 
-                            nodes ? nodes : "*",
-                            dimensions ? dimensions : "*",
-                            labels ? labels : "none"
-                        );
-                        return MCP_RC_BAD_REQUEST;
-                    }
-                    
-                    // Extract important summary information before removing fields
-                    metadata = json_object_new_object();
-                    struct json_object *summary_obj = NULL;
-                    
-                    // Find the summary object and extract counts
-                    if (json_object_object_get_ex(json_result, "summary", &summary_obj) && summary_obj) {
-                        // Create a counts object for metadata
-                        struct json_object *counts = json_object_new_object();
-                        
-                        // Extract node count
-                        struct json_object *nodes_obj = NULL;
-                        if (json_object_object_get_ex(summary_obj, "nodes", &nodes_obj) && nodes_obj) {
-                            if (json_object_is_type(nodes_obj, json_type_array)) {
-                                int count = json_object_array_length(nodes_obj);
-                                json_object_object_add(counts, "nodes", json_object_new_int(count));
-                            }
-                        }
-                        
-                        // Extract instance count
-                        struct json_object *instances_obj = NULL;
-                        if (json_object_object_get_ex(summary_obj, "instances", &instances_obj) && instances_obj) {
-                            if (json_object_is_type(instances_obj, json_type_array)) {
-                                int count = json_object_array_length(instances_obj);
-                                json_object_object_add(counts, "instances", json_object_new_int(count));
-                            }
-                        }
-                        
-                        // Extract dimension count
-                        struct json_object *dimensions_obj = NULL;
-                        if (json_object_object_get_ex(summary_obj, "dimensions", &dimensions_obj) && dimensions_obj) {
-                            if (json_object_is_type(dimensions_obj, json_type_array)) {
-                                int count = json_object_array_length(dimensions_obj);
-                                json_object_object_add(counts, "dimensions", json_object_new_int(count));
-                            }
-                        }
-                        
-                        // Add counts to metadata
-                        json_object_object_add(metadata, "counts", counts);
-                        
-                        // Extract labels information
-                        struct json_object *labels_obj = NULL;
-                        if (json_object_object_get_ex(summary_obj, "labels", &labels_obj) && labels_obj) {
-                            if (json_object_is_type(labels_obj, json_type_array)) {
-                                int labels_count = json_object_array_length(labels_obj);
-                                struct json_object *metadata_labels = json_object_new_array();
-                                
-                                // Process each label key
-                                for (int i = 0; i < labels_count; i++) {
-                                    struct json_object *label = json_object_array_get_idx(labels_obj, i);
-                                    if (label && json_object_is_type(label, json_type_object)) {
-                                        // Get label key
-                                        struct json_object *id_obj = NULL;
-                                        if (json_object_object_get_ex(label, "id", &id_obj) && id_obj) {
-                                            const char *label_key = json_object_get_string(id_obj);
-                                            
-                                            // Skip common labels that are always present with a single value
-                                            if (label_key && (
-                                                strcmp(label_key, "_collect_plugin") == 0 || 
-                                                strcmp(label_key, "_collect_module") == 0)) {
-                                                continue;
-                                            }
-                                            
-                                            struct json_object *label_meta = json_object_new_object();
-                                            json_object_object_add(label_meta, "key", json_object_get(id_obj));
-                                            
-                                            // Get label values
-                                            struct json_object *values_obj = NULL;
-                                            if (json_object_object_get_ex(label, "vl", &values_obj) && values_obj) {
-                                                if (json_object_is_type(values_obj, json_type_array)) {
-                                                    int values_count = json_object_array_length(values_obj);
-                                                    json_object_object_add(label_meta, "count", json_object_new_int(values_count));
-                                                    
-                                                    // Add a sample of values (first 2)
-                                                    struct json_object *sample_values = json_object_new_array();
-                                                    int sample_size = values_count > 2 ? 2 : values_count;
-                                                    
-                                                    for (int j = 0; j < sample_size; j++) {
-                                                        struct json_object *value = json_object_array_get_idx(values_obj, j);
-                                                        if (value && json_object_is_type(value, json_type_object)) {
-                                                            struct json_object *value_id = NULL;
-                                                            if (json_object_object_get_ex(value, "id", &value_id) && value_id) {
-                                                                json_object_array_add(sample_values, json_object_get(value_id));
-                                                            }
-                                                        }
-                                                    }
-                                                    
-                                                    json_object_object_add(label_meta, "values", sample_values);
-                                                }
-                                            }
-                                            
-                                            json_object_array_add(metadata_labels, label_meta);
-                                        }
-                                    }
-                                }
-                                
-                                json_object_object_add(metadata, "labels", metadata_labels);
-                            }
-                        }
-                    }
-                    
-                    // We'll use the metadata object directly later
-                    // No need to convert to string in advance
-                    
-                    // Now remove unwanted fields
-                    json_object_object_del(json_result, "api");
-                    json_object_object_del(json_result, "versions");
-                    json_object_object_del(json_result, "summary");
-                    json_object_object_del(json_result, "totals");
-                    json_object_object_del(json_result, "timings");
-                    json_object_object_del(json_result, "agents");
-                    json_object_object_del(json_result, "functions");
-
-                    // Convert back to string
-                    const char *modified_json = json_object_to_json_string_ext(json_result, JSON_C_TO_STRING_PRETTY);
-
-                    // Write it to the result buffer (should be after the opening brace for "result")
-                    buffer_json_member_add_string(mcpc->result, "text", modified_json);
-
-                    // Free the JSON object
-                    json_object_put(json_result);
-                } else {
-                    // If parsing failed, just use an empty object as the result
-                    buffer_json_member_add_string(mcpc->result, "text", "{}");
-                }
-            }
-            buffer_json_object_close(mcpc->result);
-
-            // Add metadata as text
-            buffer_json_add_array_item_object(mcpc->result);
-            {
-                buffer_json_member_add_string(mcpc->result, "type", "text");
-                
-                // Add metadata as plain text, with careful handling of the JSON to avoid format issues
-                BUFFER *plain_text = buffer_create(0, NULL);
-                
-                // First add the explanation text
-                buffer_strcat(plain_text, "QUERY METADATA\n");
-
-                // Now manually add a cleaner version of the counts
-                if (metadata) {
-                    struct json_object *counts_obj = NULL;
-                    if (json_object_object_get_ex(metadata, "counts", &counts_obj)) {
-                        struct json_object *nodes_count = NULL;
-                        if (json_object_object_get_ex(counts_obj, "nodes", &nodes_count)) {
-                            buffer_sprintf(plain_text, "- Nodes Aggregated: %d\n", json_object_get_int(nodes_count));
-                        }
-                        
-                        struct json_object *instances_count = NULL;
-                        if (json_object_object_get_ex(counts_obj, "instances", &instances_count)) {
-                            buffer_sprintf(plain_text, "- Instances Aggregated (across all nodes): %d\n", json_object_get_int(instances_count));
-                        }
-                        
-                        struct json_object *dimensions_count = NULL;
-                        if (json_object_object_get_ex(counts_obj, "dimensions", &dimensions_count)) {
-                            buffer_sprintf(plain_text, "- Unique dimension names (across all instances): %d\n", json_object_get_int(dimensions_count));
-                        }
-                    }
-                    
-                    // Process labels array
-                    struct json_object *labels_array = NULL;
-                    if (json_object_object_get_ex(metadata, "labels", &labels_array) && 
-                        json_object_is_type(labels_array, json_type_array)) {
-                        
-                        int num_labels = json_object_array_length(labels_array);
-                        if (num_labels > 0) {
-                            buffer_strcat(plain_text, "\nLabel information:\n");
-                            
-                            for (int i = 0; i < num_labels; i++) {
-                                struct json_object *label = json_object_array_get_idx(labels_array, i);
-                                if (!label) continue;
-                                
-                                struct json_object *key_obj = NULL;
-                                struct json_object *count_obj = NULL;
-                                struct json_object *values_obj = NULL;
-                                
-                                if (json_object_object_get_ex(label, "key", &key_obj) && 
-                                    json_object_object_get_ex(label, "count", &count_obj) &&
-                                    json_object_object_get_ex(label, "values", &values_obj)) {
-                                    
-                                    const char *key = json_object_get_string(key_obj);
-                                    int count = json_object_get_int(count_obj);
-                                    
-                                    buffer_sprintf(plain_text, "- '%s': %d unique label values", key, count);
-                                    
-                                    if (json_object_is_type(values_obj, json_type_array)) {
-                                        int values_length = json_object_array_length(values_obj);
-                                        if (values_length > 0) {
-                                            buffer_strcat(plain_text, " (sample: ");
-                                            
-                                            for (int j = 0; j < values_length; j++) {
-                                                struct json_object *value = json_object_array_get_idx(values_obj, j);
-                                                if (value) {
-                                                    if (j > 0) buffer_strcat(plain_text, ", ");
-                                                    buffer_sprintf(plain_text, "'%s'", json_object_get_string(value));
-                                                }
-                                            }
-                                            
-                                            buffer_strcat(plain_text, ")");
-                                        }
-                                    }
-                                    
-                                    buffer_strcat(plain_text, "\n");
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(plain_text));
-                
-                // Free the temporary buffer
-                buffer_free(plain_text);
-            }
-            buffer_json_object_close(mcpc->result);
-            
-            // Add explanation of data points
-            buffer_json_add_array_item_object(mcpc->result);
-            {
-                buffer_json_member_add_string(mcpc->result, "type", "text");
-                buffer_json_member_add_string(
-                    mcpc->result, "text",
-                    "Each point in the `result` has an array of 3 values:\n"
-                    "- `value`: is the Value based on the samples\n"
-                    "- `arp`: is the Anomaly Rate Percentage\n"
-                    "- `pa`: is a bitmap of Point Annotations:\n"
-                    "   1 = `EMPTY` the point has no value.\n"
-                    "   2 = `RESET` at least one metric aggregated experienced an overflow (a counter that wrapped or restarted).\n"
-                    "   4 = `PARTIAL` this point should have more metrics aggregated into it, but not all metrics had data.\n"
-                    "\n"
-                    "`db` is about the raw data in the db (before aggregations).\n"
-                    "\n"
-                    "`view` is about the `result` (after all aggregations).\n"
-                    "\n"
-                    "FIELDS\n"
-                    "`sts` stands for Statistics.\n"
-                    "\n"
-                    "`arp` is Anomaly Rate Percentage.\n"
-                    "      The percentage of samples in the time series that were detected as anomalies.\n"
-                    "\n"
-                    "`con` is Contribution Percentage.\n"
-                    "      The percentage each time series is contributing to the total volume of the chart.");
+                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(tmp_buffer));
             }
             buffer_json_object_close(mcpc->result);
         }
@@ -910,10 +629,5 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
     
-    // Free the metadata object if it was allocated
-    if (metadata) {
-        json_object_put(metadata);
-    }
-
     return MCP_RC_OK;
 }

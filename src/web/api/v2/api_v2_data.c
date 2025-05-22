@@ -17,14 +17,14 @@ __attribute__((constructor)) void initialize_group_by_keys(void) {
     }
 }
 
-int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, size_t version) {
     usec_t received_ut = now_monotonic_usec();
 
     int ret = HTTP_RESP_BAD_REQUEST;
 
     buffer_flush(w->response.data);
 
-    char    *google_version = "0.6",
+    char *google_version = "0.6",
          *google_reqId = "0",
          *google_sig = "0",
          *google_out = "json",
@@ -201,7 +201,7 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
-        .version = 2,
+        .version = version,
         .scope_nodes = scope_nodes,
         .scope_contexts = scope_contexts,
         .after = after,
@@ -308,4 +308,12 @@ cleanup:
     query_target_release(qt);
     onewayalloc_destroy(owa);
     return ret;
+}
+
+int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v23_data_internal(host, w, url, 2);
+}
+
+int api_v3_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v23_data_internal(host, w, url, 3);
 }

@@ -14,9 +14,9 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
                     continue;
 
                 buffer_json_member_add_object(wb, string2str(rc->config.name));
-                buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
-                buffer_json_member_add_double(wb, "vl", rc->value);
-                buffer_json_member_add_string(wb, "un", string2str(rc->config.units));
+                buffer_json_member_add_string(wb, JSKEY(status), rrdcalc_status2string(rc->status));
+                buffer_json_member_add_double(wb, JSKEY(value), rc->value);
+                buffer_json_member_add_string(wb, JSKEY(units), string2str(rc->config.units));
                 buffer_json_object_close(wb);
             }
             buffer_json_object_close(wb);
@@ -86,9 +86,9 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
 
                         buffer_json_member_add_object(wb, host->machine_guid);
                         if(qn->node_id[0])
-                            buffer_json_member_add_string(wb, "nd", qn->node_id);
-                        buffer_json_member_add_uint64(wb, "ni", qn->slot);
-                        buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
+                            buffer_json_member_add_string(wb, JSKEY(node_id), qn->node_id);
+                        buffer_json_member_add_uint64(wb, JSKEY(node_index), qn->slot);
+                        buffer_json_member_add_string(wb, JSKEY(hostname), rrdhost_hostname(host));
                         buffer_json_member_add_object(wb, "contexts");
 
                         last_host = host;
@@ -120,8 +120,8 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         }
 
                         buffer_json_member_add_object(wb, rrdinstance_acquired_id(ria));
-                        buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(ria));
-                        buffer_json_member_add_time_t(wb, "ue", rrdinstance_acquired_update_every(ria));
+                        buffer_json_member_add_string(wb, JSKEY(name), rrdinstance_acquired_name(ria));
+                        buffer_json_member_add_time_t(wb, JSKEY(update_every), rrdinstance_acquired_update_every(ria));
                         RRDLABELS *labels = rrdinstance_acquired_labels(ria);
                         if(labels) {
                             buffer_json_member_add_object(wb, "labels");
@@ -136,17 +136,17 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
 
                     buffer_json_member_add_object(wb, rrdmetric_acquired_id(rma));
                     {
-                        buffer_json_member_add_string(wb, "nm", rrdmetric_acquired_name(rma));
-                        buffer_json_member_add_uint64(wb, "qr", queried ? 1 : 0);
+                        buffer_json_member_add_string(wb, JSKEY(name), rrdmetric_acquired_name(rma));
+                        buffer_json_member_add_uint64(wb, JSKEY(queried), queried ? 1 : 0);
                         time_t first_entry_s = rrdmetric_acquired_first_entry(rma);
                         time_t last_entry_s = rrdmetric_acquired_last_entry(rma);
-                        buffer_json_member_add_time_t(wb, "fe", first_entry_s);
-                        buffer_json_member_add_time_t(wb, "le", last_entry_s ? last_entry_s : now_s);
+                        buffer_json_member_add_time_t(wb, JSKEY(first_entry), first_entry_s);
+                        buffer_json_member_add_time_t(wb, JSKEY(last_entry), last_entry_s ? last_entry_s : now_s);
 
                         if(qm) {
                             if(qm->status & RRDR_DIMENSION_GROUPED) {
                                 // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
-                                buffer_json_member_add_string(wb, "as", string2str(qm->grouped_as.name));
+                                buffer_json_member_add_string(wb, JSKEY(as), string2str(qm->grouped_as.name));
                             }
 
                             query_target_points_statistics(wb, qt, &qm->query_points);

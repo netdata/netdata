@@ -31,6 +31,8 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
     size_t count = qt->nodes.used;
     size_t cardinality_limit = qt->request.cardinality_limit;
 
+    bool show_node_status = !(qt->request.options & RRDR_OPTION_MINIMAL_STATS);
+
     // Check if we need to apply cardinality limiting
     if (cardinality_limit > 0 && count > cardinality_limit) {
         // We'll need to sort and limit the nodes
@@ -67,7 +69,7 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
                 QUERY_NODE *qn = query_node(qt, items[i].index);
                 RRDHOST *host = qn->rrdhost;
                 buffer_json_add_array_item_object(wb);
-                buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, true);
+                buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, show_node_status);
 
                 // Only include detailed statistics if MINIMAL_STATS option is not set
                 if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -106,9 +108,9 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
             char remaining_label[50];
             snprintfz(remaining_label, sizeof(remaining_label), "remaining %zu nodes", remaining_count);
 
-            buffer_json_member_add_string(wb, "id", "__remaining_nodes__");
-            buffer_json_member_add_string(wb, "nm", remaining_label);
-            buffer_json_member_add_double(wb, "con", remaining_contribution);
+            buffer_json_member_add_string(wb, JSKEY(id), "__remaining_nodes__");
+            buffer_json_member_add_string(wb, JSKEY(hostname), remaining_label);
+            buffer_json_member_add_double(wb, JSKEY(contribution), remaining_contribution);
 
             // Only include detailed statistics if MINIMAL_STATS option is not set
             if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -128,7 +130,7 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
             QUERY_NODE *qn = query_node(qt, c);
             RRDHOST *host = qn->rrdhost;
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, true);
+            buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, show_node_status);
 
             // Only include detailed statistics if MINIMAL_STATS option is not set
             if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {

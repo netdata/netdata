@@ -193,31 +193,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
-void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
-    buffer_json_member_add_object(wb, "st");
-    {
-        buffer_json_member_add_uint64(wb, "ai", ai);
-        buffer_json_member_add_uint64(wb, "code", 200);
-        buffer_json_member_add_string(wb, "msg", "");
-        if (duration_ut)
-            buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE) duration_ut / 1000.0);
-    }
-    buffer_json_object_close(wb);
-}
-
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
-    buffer_json_member_add_string(wb, "mg", host->machine_guid);
-
-    if(!UUIDiszero(host->node_id))
-        buffer_json_member_add_uuid(wb, "nd", host->node_id.uuid);
-    buffer_json_member_add_string(wb, "nm", rrdhost_hostname(host));
-    buffer_json_member_add_uint64(wb, "ni", ni);
-
-    if(status)
-        buffer_json_agent_status_id(wb, 0, duration_ut);
-}
-
-void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_unused, usec_t duration_ut, bool status) {
+void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_unused) {
     buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
 
     if(!UUIDiszero(host->node_id))
@@ -230,9 +206,6 @@ void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_un
                                   (rrdhost_is_virtual(host) ? "virtual" : "child"));
 
     buffer_json_member_add_boolean(wb, "connected", rrdhost_is_online(host));
-
-    if(status)
-        buffer_json_agent_status_id(wb, 0, duration_ut);
 }
 
 static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
@@ -385,8 +358,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
     buffer_json_add_array_item_object(wb); // this node
 
     if(ctl->mode & CONTEXTS_V2_MCP)
-        buffer_json_node_add_v2_mcp(wb, host, node_id, 0,
-                                    (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
+        buffer_json_node_add_v2_mcp(wb, host, node_id);
     else
         buffer_json_node_add_v2(wb, host, node_id, 0,
                             (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));

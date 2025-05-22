@@ -88,21 +88,21 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
         size_t remaining_count = 0;
         
         // Output the top instances
-        for (size_t i = 0; i < count; i++) {
+        for (size_t i = 0; (long)i < count; i++) {
             if (i < instances_to_show) {
                 // Output this instance normally
                 QUERY_INSTANCE *qi = query_instance(qt, items[i].index);
                 
                 buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "id", items[i].id);
+                buffer_json_member_add_string(wb, JSKEY(id), items[i].id);
                 
                 if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
-                    buffer_json_member_add_string(wb, "nm", items[i].name);
+                    buffer_json_member_add_string(wb, JSKEY(name), items[i].name);
                 
-                buffer_json_member_add_uint64(wb, "ni", qi->query_host_id);
+                buffer_json_member_add_uint64(wb, JSKEY(node_index), qi->query_host_id);
                 
                 if (items[i].contribution > 0.0)
-                    buffer_json_member_add_double(wb, "con", items[i].contribution);
+                    buffer_json_member_add_double(wb, JSKEY(contribution), items[i].contribution);
                 
                 // Only include detailed statistics if MINIMAL_STATS option is not set
                 if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -138,11 +138,11 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
             snprintfz(remaining_instance, sizeof(remaining_instance), "remaining %zu instances", remaining_count);
             
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "id", "__remaining_instances__");
-            buffer_json_member_add_string(wb, "nm", remaining_instance);
+            buffer_json_member_add_string(wb, JSKEY(id), "__remaining_instances__");
+            buffer_json_member_add_string(wb, JSKEY(name), remaining_instance);
             
             if (remaining_contribution > 0.0)
-                buffer_json_member_add_double(wb, "con", remaining_contribution);
+                buffer_json_member_add_double(wb, JSKEY(contribution), remaining_contribution);
             
             // Only include detailed statistics if MINIMAL_STATS option is not set
             if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -161,18 +161,18 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
             QUERY_INSTANCE *qi = query_instance(qt, c);
             
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "id", rrdinstance_acquired_id(qi->ria));
+            buffer_json_member_add_string(wb, JSKEY(id), rrdinstance_acquired_id(qi->ria));
             
             if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
-                buffer_json_member_add_string(wb, "nm", rrdinstance_acquired_name(qi->ria));
+                buffer_json_member_add_string(wb, JSKEY(name), rrdinstance_acquired_name(qi->ria));
             
-            buffer_json_member_add_uint64(wb, "ni", qi->query_host_id);
+            buffer_json_member_add_uint64(wb, JSKEY(node_index), qi->query_host_id);
             
             // Calculate contribution for this instance
             if (qt->query_points.sum > 0) {
                 NETDATA_DOUBLE contribution = qi->query_points.sum * 100.0 / qt->query_points.sum;
                 if (contribution > 0.0)
-                    buffer_json_member_add_double(wb, "con", contribution);
+                    buffer_json_member_add_double(wb, JSKEY(contribution), contribution);
             }
             
             // Only include detailed statistics if MINIMAL_STATS option is not set
