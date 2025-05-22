@@ -1436,6 +1436,10 @@ set(API_PLUGIN_FILES
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
         src/web/api/queries/query.h
+        src/web/api/queries/query-group-by.c
+        src/web/api/queries/query-group-over-time.c
+        src/web/api/queries/query-internal.h
+        src/web/api/queries/query-plan.c
         src/web/api/queries/average/average.c
         src/web/api/queries/average/average.h
         src/web/api/queries/countif/countif.c
@@ -1474,8 +1478,19 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/ssv/ssv.h
         src/web/api/formatters/value/value.c
         src/web/api/formatters/value/value.h
-        src/web/api/formatters/json_wrapper.c
-        src/web/api/formatters/json_wrapper.h
+        src/web/api/formatters/jsonwrap.c
+        src/web/api/formatters/jsonwrap.h
+        src/web/api/formatters/jsonwrap-internal.h
+        src/web/api/formatters/jsonwrap-objects-tree.c
+        src/web/api/formatters/jsonwrap-query-plan.c
+        src/web/api/formatters/jsonwrap-summary-alerts.c
+        src/web/api/formatters/jsonwrap-summary-contexts.c
+        src/web/api/formatters/jsonwrap-summary-dimensions.c
+        src/web/api/formatters/jsonwrap-summary-instances.c
+        src/web/api/formatters/jsonwrap-summary-labels.c
+        src/web/api/formatters/jsonwrap-summary-nodes.c
+        src/web/api/formatters/jsonwrap-v1.c
+        src/web/api/formatters/jsonwrap-v2.c
         src/web/api/formatters/charts2json.c
         src/web/api/formatters/charts2json.h
         src/web/api/formatters/rrdset2json.c

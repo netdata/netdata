@@ -14,7 +14,7 @@
 
 #include "web/api/formatters/rrdset2json.h"
 #include "web/api/formatters/charts2json.h"
-#include "web/api/formatters/json_wrapper.h"
+#include "web/api/formatters/jsonwrap.h"
 
 #include "web/server/web_client.h"
 

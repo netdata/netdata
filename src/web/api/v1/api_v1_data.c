@@ -29,7 +29,9 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
+    char *cardinality_limit_str = NULL;
     size_t tier = 0;
+    size_t cardinality_limit = 0;
     RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
     RRDR_OPTIONS options = 0;
@@ -63,6 +65,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
         else if(!strcmp(name, "timeout")) timeout_str = value;
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group_options")) group_options = value;
+        else if(!strcmp(name, "cardinality_limit")) cardinality_limit_str = value;
         else if(!strcmp(name, "group")) {
             group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
@@ -146,6 +149,9 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     int       points = (points_str && *points_str)?str2i(points_str):0;
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
+    
+    if (cardinality_limit_str && *cardinality_limit_str)
+        cardinality_limit = str2ul(cardinality_limit_str);
 
     QUERY_TARGET_REQUEST qtr = {
         .version = 1,
@@ -169,6 +175,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
         .labels = chart_labels_filter,
         .query_source = QUERY_SOURCE_API_DATA,
         .priority = STORAGE_PRIORITY_NORMAL,
+        .cardinality_limit = cardinality_limit,
         .interrupt_callback = web_client_interrupt_callback,
         .interrupt_callback_data = w,
         .transaction = &w->transaction,

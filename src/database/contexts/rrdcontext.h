@@ -294,6 +294,9 @@ typedef struct query_target_request {
 
     // group by across multiple time-series
     struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES];
+    
+    // limiting cardinality of summary lists
+    size_t cardinality_limit;           // limit the number of items per category in summary
 
     usec_t received_ut;
 

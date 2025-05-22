@@ -48,6 +48,8 @@ static struct {
     , {"minify"            , 0    , RRDR_OPTION_MINIFY}
     , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
     , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
+    , {"minimal-stats"     , 0    , RRDR_OPTION_MINIMAL_STATS}
+    , {"minimal"           , 0    , RRDR_OPTION_MINIMAL_STATS}
     , {NULL                , 0    , 0}
 };
 
