@@ -178,7 +178,7 @@ role_recipients_telegram[sre]="123456789"
 <details>
 <summary><strong>Time-Based Routing Example</strong></summary><br/>
 
-You can use external scripts to dynamically change recipients based on work hours, on-call schedules, etc:
+You can use external scripts to dynamically change recipients based on work hours, on-call schedules, etc.:
 
 ```ini
 # Use a script to determine the current on-call engineer
@@ -403,7 +403,7 @@ before testing.
 
 ### Debugging with Trace
 
-To see full execution output:
+To see the full execution output:
 
 ```bash
 bash -x ./plugins.d/alarm-notify.sh test

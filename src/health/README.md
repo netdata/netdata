@@ -4,7 +4,7 @@ Netdata provides two ways to send alert notifications. You can use either one or
 
 :::tip
 
-Alerts are based on each node's health status. You can change thresholds, add new alerts, or silence specific ones using Netdata's alerting system.
+Alerts are based on each node's health status. You can change thresholds, add new alerts, or silence-specific ones using Netdata's alerting system.
 
 [See how to configure alerts](/src/health/REFERENCE.md)
 
@@ -41,23 +41,23 @@ Use this table to choose and set up your preferred alerting method:
 
 1. Open the notification config:
 
-```bash
-sudo ./edit-config health_alarm_notify.conf
-```
+   ```bash
+   sudo ./edit-config health_alarm_notify.conf
+   ```
 
-2. Enable your preferred method, for example email:
+2. Enable your preferred method, for example, email:
 
-```ini
-SEND_EMAIL="YES"
-DEFAULT_RECIPIENT_EMAIL="you@example.com"
-```
+   ```ini
+   SEND_EMAIL="YES"
+   DEFAULT_RECIPIENT_EMAIL="you@example.com"
+   ```
 
 3. Ensure your system can send mail (via `sendmail`, SMTP relay, etc.)
 4. Restart the agent:
 
-```bash
-sudo systemctl restart netdata
-```
+   ```bash
+   sudo systemctl restart netdata
+   ```
 
 [See all Agent-based integrations](/docs/alerts-&-notifications/notifications/agent-dispatched-notifications)
 
@@ -66,7 +66,7 @@ sudo systemctl restart netdata
 The Netdata Agent continuously monitors system health and performance. It offers:
 
 - Hundreds of pre-configured alerts covering system, app, and service metrics
-- No setup required works out of the box
+- No setup is required to work out of the box
 - Dynamic customization you can fully control how, when, and what triggers an alert
 
 [See which collectors support alerts](/src/collectors/COLLECTORS.md)
