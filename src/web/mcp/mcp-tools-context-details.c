@@ -48,6 +48,15 @@ void mcp_tool_context_details_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // before
 
+    buffer_json_member_add_object(buffer, "cardinality_limit");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Maximum number of dimensions, instances, and label values to return per context");
+        buffer_json_member_add_string(buffer, "description", "Limits the number of dimensions, instances, and label values returned.");
+        buffer_json_member_add_int64(buffer, "default", 50);
+    }
+    buffer_json_object_close(buffer); // cardinality_limit
+
     buffer_json_object_close(buffer); // properties
 
     // No required fields
@@ -96,6 +105,15 @@ MCP_RETURN_CODE mcp_tool_context_details_execute(MCP_CLIENT *mcpc, struct json_o
         }
     }
 
+    size_t cardinality_limit = 50;
+    if (params && json_object_object_get_ex(params, "cardinality_limit", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "cardinality_limit", &obj);
+        if (obj && json_object_is_type(obj, json_type_int)) {
+            cardinality_limit = json_object_get_int64(obj);
+        }
+    }
+
     CLEAN_BUFFER *t = buffer_create(0, NULL);
     buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -104,6 +122,7 @@ MCP_RETURN_CODE mcp_tool_context_details_execute(MCP_CLIENT *mcpc, struct json_o
         .scope_contexts = contexts_pattern,
         .after = after,
         .before = before,
+        .cardinality_limit = cardinality_limit,
         .options = CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS | CONTEXTS_OPTION_MCP,
     };
 

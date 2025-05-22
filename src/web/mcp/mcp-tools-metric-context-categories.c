@@ -43,7 +43,7 @@ MCP_RETURN_CODE mcp_tool_metric_context_categories_execute(MCP_CLIENT *mcpc, str
 
     SIMPLE_PATTERN *pattern = NULL;
     if(like_pattern && *like_pattern)
-        pattern = simple_pattern_create(like_pattern, "|", SIMPLE_PATTERN_EXACT, false);
+        pattern = simple_pattern_create(like_pattern, "|", SIMPLE_PATTERN_SUBSTRING, false);
 
     rrdcontext_context_registry_json_mcp_categories_array(t, pattern);
     buffer_json_finalize(t);

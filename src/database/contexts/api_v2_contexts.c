@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "api_v2_contexts.h"
+#include "../rrdlabels-aggregated.h"
 
 #include "aclk/aclk_capas.h"
 
@@ -67,6 +68,7 @@ struct context_v2_entry {
     FTS_MATCH match;
     DICTIONARY *instances_dict;
     DICTIONARY *dimensions_dict;
+    RRDLABELS_AGGREGATED *labels_aggregated;
     RRDCONTEXT *rc;
 };
 
@@ -715,7 +717,9 @@ static void contexts_insert_callback(const DICTIONARY_ITEM *item __maybe_unused,
         t->dimensions_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
     }
 
-    // TODO: initialize labels structure
+    if(ctl->options & CONTEXTS_OPTION_LABELS) {
+        t->labels_aggregated = rrdlabels_aggregated_create();
+    }
 }
 
 static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
@@ -751,7 +755,11 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
             dfe_done(rm);
         }
 
-        // TODO find all the label keys and values
+        // Collect labels from this instance
+        if((ctl->options & CONTEXTS_OPTION_LABELS) && t->labels_aggregated) {
+            RRDLABELS *labels = rrdinstance_labels(ri);
+            rrdlabels_aggregated_add_from_rrdlabels(t->labels_aggregated, labels);
+        }
     }
     dfe_done(ri);
 }
@@ -767,8 +775,8 @@ static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused,
         dictionary_destroy(z->instances_dict);
     if(z->dimensions_dict)
         dictionary_destroy(z->dimensions_dict);
-
-    // TODO: free labels structure
+    if(z->labels_aggregated)
+        rrdlabels_aggregated_destroy(z->labels_aggregated);
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
@@ -1032,29 +1040,56 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         if (mode & CONTEXTS_V2_SEARCH)
                             buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
 
-                        // Add instances sub-object if requested
-                        if((ctl.options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
-                            buffer_json_member_add_array(wb, "instances");
-                            void *entry;
-                            dfe_start_read(z->instances_dict, entry) {
-                                buffer_json_add_array_item_string(wb, entry_dfe.name);
-                            }
-                            dfe_done(entry);
-                            buffer_json_array_close(wb);
-                        }
-
                         // Add dimensions sub-object if requested
                         if((ctl.options & CONTEXTS_OPTION_DIMENSIONS) && z->dimensions_dict) {
                             buffer_json_member_add_array(wb, "dimensions");
                             void *entry;
+                            size_t count = 0;
+                            size_t total = dictionary_entries(z->dimensions_dict);
+                            size_t limit = ctl.request->cardinality_limit;
+                            
                             dfe_start_read(z->dimensions_dict, entry) {
+                                if(limit && count >= limit - 1 && total > limit) {
+                                    // Add remaining count message
+                                    char msg[100];
+                                    snprintf(msg, sizeof(msg), "... %zu dimensions more", total - count);
+                                    buffer_json_add_array_item_string(wb, msg);
+                                    break;
+                                }
                                 buffer_json_add_array_item_string(wb, entry_dfe.name);
+                                count++;
                             }
                             dfe_done(entry);
                             buffer_json_array_close(wb);
                         }
 
-                        // TODO: print labels sub-object if requested
+                        // Add labels sub-object if requested
+                        if((ctl.options & CONTEXTS_OPTION_LABELS) && z->labels_aggregated) {
+                            rrdlabels_aggregated_to_buffer_json(z->labels_aggregated, wb, "labels", ctl.request->cardinality_limit);
+                        }
+
+                        // Add instances sub-object if requested
+                        if((ctl.options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
+                            buffer_json_member_add_array(wb, "instances");
+                            void *entry;
+                            size_t count = 0;
+                            size_t total = dictionary_entries(z->instances_dict);
+                            size_t limit = ctl.request->cardinality_limit;
+                            
+                            dfe_start_read(z->instances_dict, entry) {
+                                if(limit && count >= limit - 1 && total > limit) {
+                                    // Add remaining count message
+                                    char msg[100];
+                                    snprintf(msg, sizeof(msg), "... %zu instances more", total - count);
+                                    buffer_json_add_array_item_string(wb, msg);
+                                    break;
+                                }
+                                buffer_json_add_array_item_string(wb, entry_dfe.name);
+                                count++;
+                            }
+                            dfe_done(entry);
+                            buffer_json_array_close(wb);
+                        }
                     }
                     buffer_json_object_close(wb);
                 }
