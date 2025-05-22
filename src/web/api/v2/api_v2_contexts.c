@@ -76,5 +76,6 @@ int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w,
 int api_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return api_v2_contexts_internal(
         host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS,
-        CONTEXTS_OPTION_PRIORITIES);
+        CONTEXTS_OPTION_PRIORITIES | CONTEXTS_OPTION_RETENTION | CONTEXTS_OPTION_LIVENESS | 
+        CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS);
 }

@@ -1,41 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mcp-tools-contexts-search.h"
+#include "mcp-tools-get-metrics-details.h"
 #include "database/contexts/rrdcontext.h"
 
-void mcp_tool_contexts_search_schema(BUFFER *buffer) {
+void mcp_tool_get_metrics_details_schema(BUFFER *buffer) {
     // Tool input schema
     buffer_json_member_add_object(buffer, "inputSchema");
     buffer_json_member_add_string(buffer, "type", "object");
-    buffer_json_member_add_string(buffer, "title", "Filter metric contexts");
+    buffer_json_member_add_string(buffer, "title", "Get metrics details");
 
     // Properties
     buffer_json_member_add_object(buffer, "properties");
 
-    buffer_json_member_add_object(buffer, "q");
+    buffer_json_member_add_object(buffer, "metrics");
     {
         buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Pipe separated glob-like patterns to search for in all metadata");
-        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching any string related to contexts, including contexts, titles, instances, dimensions, label keys, label values, families. Examples: *eth0*|*sda*, to find all charts related to network interface eth0 and disk sda.");
-        buffer_json_member_add_string(buffer, "default", "*");
+        buffer_json_member_add_string(buffer, "title", "Metrics to get details for");
+        buffer_json_member_add_string(buffer, "description", "Pipe-separated list of metric names. Maximum 20 metrics per request. Example: 'system.cpu|system.load|system.ram'");
     }
-    buffer_json_object_close(buffer); // q
-
-    buffer_json_member_add_object(buffer, "contexts");
-    {
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Pipe separated list of contexts or context patterns to be returned");
-        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on context names. Examples: context1|context2, or even *word1*|*word2*, to match against contexts identifiers.");
-        buffer_json_member_add_string(buffer, "default", "*");
-    }
-    buffer_json_object_close(buffer); // contexts
+    buffer_json_object_close(buffer); // metrics
 
     buffer_json_member_add_object(buffer, "nodes");
     {
         buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Pipe separated list of nodes or node patterns, for which the contexts should be returned");
-        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on nodes for slicing the metadata database of Netdata. Examples: node1|node2, or even *db*|*dns*, to match against hostnames");
-        buffer_json_member_add_string(buffer, "default", "*");
+        buffer_json_member_add_string(buffer, "title", "Node filter");
+        buffer_json_member_add_string(buffer, "description", "Filter details by specific nodes. Leave empty for all nodes");
+        buffer_json_member_add_string(buffer, "default", "");
     }
     buffer_json_object_close(buffer); // nodes
 
@@ -57,33 +47,56 @@ void mcp_tool_contexts_search_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // before
 
+    buffer_json_member_add_object(buffer, "cardinality_limit");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Maximum number of dimensions, instances, and label values to return per context");
+        buffer_json_member_add_string(buffer, "description", "Limits the number of dimensions, instances, and label values returned.");
+        buffer_json_member_add_int64(buffer, "default", 50);
+    }
+    buffer_json_object_close(buffer); // cardinality_limit
+
     buffer_json_object_close(buffer); // properties
 
-    // No required fields
+    // Required fields
+    buffer_json_member_add_array(buffer, "required");
+    buffer_json_add_array_item_string(buffer, "metrics");
+    buffer_json_array_close(buffer);
+    
     buffer_json_object_close(buffer); // inputSchema
 }
 
-MCP_RETURN_CODE mcp_tool_contexts_search_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
+MCP_RETURN_CODE mcp_tool_get_metrics_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
 {
     if (!mcpc || id == 0)
         return MCP_RC_ERROR;
 
-    const char *q = NULL;
-    if (params && json_object_object_get_ex(params, "q", NULL)) {
+    // Extract the 'metrics' parameter (required)
+    const char *metrics_pattern = NULL;
+    if (params && json_object_object_get_ex(params, "metrics", NULL)) {
         struct json_object *obj = NULL;
-        json_object_object_get_ex(params, "q", &obj);
+        json_object_object_get_ex(params, "metrics", &obj);
         if (obj && json_object_is_type(obj, json_type_string)) {
-            q = json_object_get_string(obj);
+            metrics_pattern = json_object_get_string(obj);
         }
     }
-
-    const char *contexts_pattern = NULL;
-    if (params && json_object_object_get_ex(params, "contexts", NULL)) {
-        struct json_object *obj = NULL;
-        json_object_object_get_ex(params, "contexts", &obj);
-        if (obj && json_object_is_type(obj, json_type_string)) {
-            contexts_pattern = json_object_get_string(obj);
-        }
+    
+    if (!metrics_pattern || strlen(metrics_pattern) == 0) {
+        buffer_sprintf(mcpc->error, "Missing required parameter 'metrics'");
+        return MCP_RC_ERROR;
+    }
+    
+    // Count the number of metrics requested (pipe-separated)
+    size_t metric_count = 1;
+    const char *p = metrics_pattern;
+    while (*p) {
+        if (*p == '|') metric_count++;
+        p++;
+    }
+    
+    if (metric_count > 20) {
+        buffer_sprintf(mcpc->error, "Too many metrics requested. Maximum 20 metrics per request (got %zu)", metric_count);
+        return MCP_RC_ERROR;
     }
 
     const char *nodes_pattern = NULL;
@@ -92,6 +105,7 @@ MCP_RETURN_CODE mcp_tool_contexts_search_execute(MCP_CLIENT *mcpc, struct json_o
         json_object_object_get_ex(params, "nodes", &obj);
         if (obj && json_object_is_type(obj, json_type_string)) {
             nodes_pattern = json_object_get_string(obj);
+            if (nodes_pattern && strlen(nodes_pattern) == 0) nodes_pattern = NULL;
         }
     }
 
@@ -113,25 +127,33 @@ MCP_RETURN_CODE mcp_tool_contexts_search_execute(MCP_CLIENT *mcpc, struct json_o
         }
     }
 
+    size_t cardinality_limit = 50;
+    if (params && json_object_object_get_ex(params, "cardinality_limit", NULL)) {
+        struct json_object *obj = NULL;
+        json_object_object_get_ex(params, "cardinality_limit", &obj);
+        if (obj && json_object_is_type(obj, json_type_int)) {
+            cardinality_limit = json_object_get_int64(obj);
+        }
+    }
+
     CLEAN_BUFFER *t = buffer_create(0, NULL);
-    buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     struct api_v2_contexts_request req = {
         .scope_nodes = nodes_pattern,
-        .scope_contexts = contexts_pattern,
+        .scope_contexts = metrics_pattern,
         .after = after,
         .before = before,
-        .q = q,
-        .options = CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_MCP,
+        .cardinality_limit = cardinality_limit,
+        .options = CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_DIMENSIONS | 
+                   CONTEXTS_OPTION_LABELS | CONTEXTS_OPTION_MCP | CONTEXTS_OPTION_RETENTION | 
+                   CONTEXTS_OPTION_LIVENESS | CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS,
     };
 
-    int code = rrdcontext_to_json_v2(t, &req, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH);
+    int code = rrdcontext_to_json_v2(t, &req, CONTEXTS_V2_CONTEXTS);
     if (code != HTTP_RESP_OK) {
-        buffer_sprintf(mcpc->error, "Failed to fetch contexts, query returned http error code %d", code);
+        buffer_sprintf(mcpc->error, "Failed to fetch metrics details, query returned http error code %d", code);
         return MCP_RC_ERROR;
     }
-
-    buffer_json_finalize(t);
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
