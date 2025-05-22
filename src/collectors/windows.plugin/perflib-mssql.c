@@ -1655,7 +1655,7 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
         rrdset_done(mi->st_deadLocks);
 }
 
-void mssql_total_wait_charts(struct mssql_instance *mi, int update_every)
+void mssql_total_wait_charts(struct mssql_instance *mi)
 {
     if (!mi->st_total_wait) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1673,14 +1673,14 @@ void mssql_total_wait_charts(struct mssql_instance *mi, int update_every)
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_WAITS_TOTAL,
-            update_every,
+            mi->update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mi->st_total_wait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
 }
 
-void mssql_resource_wait_charts(struct mssql_instance *mi, int update_every)
+void mssql_resource_wait_charts(struct mssql_instance *mi)
 {
     if (!mi->st_resource_wait_msec) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1698,14 +1698,14 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, int update_every)
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_RESOURCE_WAIT,
-            update_every,
+            mi->update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mi->st_resource_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
 }
 
-void mssql_signal_wait_charts(struct mssql_instance *mi, int update_every)
+void mssql_signal_wait_charts(struct mssql_instance *mi)
 {
     if (!mi->st_signal_wait_msec) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1723,14 +1723,14 @@ void mssql_signal_wait_charts(struct mssql_instance *mi, int update_every)
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_SIGNAL_WAIT,
-            update_every,
+            mi->update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mi->st_signal_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
     }
 }
 
-void mssql_max_wait_charts(struct mssql_instance *mi, int update_every)
+void mssql_max_wait_charts(struct mssql_instance *mi)
 {
     if (!mi->st_max_wait_time_msec) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1748,7 +1748,7 @@ void mssql_max_wait_charts(struct mssql_instance *mi, int update_every)
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_MAX_WAIT_TIME,
-            update_every,
+            mi->update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mi->st_max_wait_time_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
@@ -1773,7 +1773,7 @@ void mssql_waiting_count_charts(struct mssql_instance *mi, int update_every)
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_WAITING_COUNT,
-            update_every,
+            mi->update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mi->st_waiting_tasks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
@@ -1840,11 +1840,11 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
-    mssql_total_wait_charts(mi, update_every);
-    mssql_resource_wait_charts(mi, update_every);
-    mssql_signal_wait_charts(mi, update_every);
-    mssql_max_wait_charts(mi, update_every);
-    mssql_waiting_count_charts(mi, update_every);
+    mssql_total_wait_charts(mi);
+    mssql_resource_wait_charts(mi);
+    mssql_signal_wait_charts(mi);
+    mssql_max_wait_charts(mi);
+    mssql_waiting_count_charts(mi);
 
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
 
