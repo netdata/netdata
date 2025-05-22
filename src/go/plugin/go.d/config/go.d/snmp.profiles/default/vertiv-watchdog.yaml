@@ -15,23 +15,30 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.5
         name: vertiv.internalTemp
+        description: Internal temperature measurement
+        unit: "Cel"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.6
         name: vertiv.internalHumidity
+        description: Internal humidity measurement
+        unit: "%"
       - OID: 1.3.6.1.4.1.21239.5.1.2.1.7
         name: vertiv.internalDewPoint
+        description: Internal dew point temperature
+        unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.21239.5.1.2.1.2
           name: vertiv.internalSerial
         tag: vertiv_internal_serial
-#      - symbol:
-#          OID: 1.3.6.1.4.1.21239.5.1.1.7.0
-#          name: vertiv.temperatureUnits
-#        tag: vertiv_temperature_units
-#        mapping:
-#          0: fahrenheit
-#          1: celsius
-# TODO : Add this tag back when tagging by scalar symbol is implemented NDM-2247
+      #      - symbol:
+      #          OID: 1.3.6.1.4.1.21239.5.1.1.7.0
+      #          name: vertiv.temperatureUnits
+      #        tag: vertiv_temperature_units
+      #        mapping:
+      #          0: fahrenheit
+      #          1: celsius
+      # TODO : Add this tag back when tagging by scalar symbol is implemented NDM-2247
       - symbol:
           OID: 1.3.6.1.4.1.21239.5.1.2.1.4
           name: vertiv.internalAvail
@@ -48,6 +55,9 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.21239.5.1.4.1.5
         name: vertiv.tempSensorTemp
+        description: Temperature measured by the temperature sensor
+        unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.21239.5.1.4.1.2

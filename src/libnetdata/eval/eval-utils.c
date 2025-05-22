@@ -292,21 +292,65 @@ static size_t expression_hardcode_node_variable(EVAL_NODE *node, STRING *variabl
     return matches;
 }
 
+static size_t str_replace_cpy(char *dst, size_t dst_size,
+                     const char *src,
+                     const char *variable, size_t variable_len,
+                     const char *value, size_t value_len) {
+
+    if (!dst || !src || !variable || !value || dst_size == 0 || variable_len == 0 || value_len == 0)
+        return 0;
+
+    const char *pos = strstr(src, variable);
+    if (!pos)
+        return 0;
+
+    size_t src_idx = 0;
+    size_t dst_idx = 0;
+    size_t matches = 0;
+
+    while (src[src_idx] != '\0') {
+        if (pos && &src[src_idx] == pos) {
+            if (dst_idx + value_len >= dst_size)
+                return 0;
+
+            matches++;
+            memcpy(&dst[dst_idx], value, value_len);
+            dst_idx += value_len;
+            src_idx += variable_len;
+
+            pos = strstr(&src[src_idx], variable);
+        } else {
+            if (dst_idx + 1 >= dst_size)
+                return 0;
+            dst[dst_idx++] = src[src_idx++];
+        }
+    }
+
+    if (dst_idx >= dst_size)
+        return 0;
+
+    dst[dst_idx] = '\0';
+
+    return matches;
+}
+
+
 void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable, NETDATA_DOUBLE value) {
-    if (!expression || !variable || isnan(value))
+    if (!expression || !variable)
         return;
 
     size_t matches = expression_hardcode_node_variable(expression->nodes, variable, value);
     if (matches) {
-        char replace[1024];
-        snprintfz(replace, sizeof(replace), NETDATA_DOUBLE_FORMAT_AUTO, value);
+        char replace[DOUBLE_MAX_LENGTH];
+        if(isnan(value))
+            strncpyz(replace, "nan", sizeof(replace));
+        else if(isinf(value))
+            strncpyz(replace, "inf", sizeof(replace));
+        else
+            print_netdata_double(replace, value);
         size_t replace_len = strlen(replace);
 
         size_t source_len = string_strlen(expression->source);
-        const char *source_str = string2str(expression->source);
-
-        // Allocate enough space to accommodate all replacements.
-        char buf[source_len + 1 + matches * (replace_len + 1)];
 
         char find1[string_strlen(variable) + 1 + 1];
         snprintfz(find1, sizeof(find1), "$%s", string2str(variable));
@@ -316,50 +360,40 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
         snprintfz(find2, sizeof(find2), "${%s}", string2str(variable));
         size_t find2_len = strlen(find2);
 
-        size_t found = 0; (void)found;
-        char *buf_ptr = buf;
-        const char *source_ptr = source_str;
+        // Calculate the maximum possible buffer size needed
+        // Source length + (max replacement length - min variable length) * matches + null terminator
+        size_t min_var_len = MIN(find1_len, find2_len);
+        size_t max_buf_size = source_len + 1 + (matches * (replace_len > min_var_len ? replace_len - min_var_len : 0));
 
-        while (*source_ptr) {
-            char *s1 = strstr(source_ptr, find1);
-            char *s2 = strstr(source_ptr, find2);
+        char buf1[max_buf_size];
+        char buf2[max_buf_size];
 
-            char *s = s1;
-            size_t len = find1_len;
-            if (s2 && (!s1 || s2 < s1)) {
-                s = s2;
-                len = find2_len;
+        char *dst[2] = {buf1, buf2};
+
+        const char *src = string2str(expression->source);
+        size_t slot = 0;
+        while(matches) {
+            size_t matched = 0;
+
+            matched = str_replace_cpy(dst[slot], max_buf_size, src, find1, find1_len, replace, replace_len);
+            if(matched) {
+                src = dst[slot];
+                if(++slot > 1) slot = 0;
+                matches -= MIN(matches, matched);
             }
 
-            if (s) {
-                // Skip this check since the function has been moved to eval-parser.c
-                if (s == s1) {
-                    // Move past the variable if it's part of a larger word.
-                    source_ptr = s + len;
-                    continue;
+            if(matches) {
+                matched = str_replace_cpy(dst[slot], max_buf_size, src, find2, find2_len, replace, replace_len);
+                if(matched) {
+                    src = dst[slot];
+                    if (++slot > 1) slot = 0;
+                    matches -= MIN(matches, matched);
                 }
-
-                // Copy the part before the variable.
-                memcpy(buf_ptr, source_ptr, s - source_ptr);
-                buf_ptr += (s - source_ptr);
-
-                // Copy the replacement.
-                memcpy(buf_ptr, replace, replace_len);
-                buf_ptr += replace_len;
-                *buf_ptr = '\0';
-
-                // Move the source pointer past the replaced variable.
-                source_ptr = s + len;
-                found++;
-            } else {
-                // Copy the rest of the string if no more variables are found.
-                strcpy(buf_ptr, source_ptr);
-                break;
             }
         }
 
         // Update the expression source with the new string.
         string_freez(expression->source);
-        expression->source = string_strdupz(buf);
+        expression->source = string_strdupz(src);
     }
 }

@@ -50,10 +50,10 @@ The following builds from source should usually work, although we don't regularl
 |              Platform               |     Platform Versions      |
 |:-----------------------------------:|:--------------------------:|
 |         Linux Distributions         | Latest unreleased versions |
-|       FreeBSD and derivatives       |         13-STABLE          |
+|       FreeBSD and derivatives       |         14-STABLE          |
 |       Gentoo and derivatives        |           Latest           |
 |     Arch Linux and derivatives      |      latest from AUR       |
-|                MacOS                |         11, 12, 13         |
+|                MacOS                |         13, 14, 15         |
 | Linux under Microsoft Windows (WSL) |           Latest           |
 
 ## Static Builds and Unsupported Linux Versions

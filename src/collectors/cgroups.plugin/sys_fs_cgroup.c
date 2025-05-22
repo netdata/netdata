@@ -338,6 +338,9 @@ void read_cgroup_plugin_configuration() {
 
                        // ----------------------------------------------------------------
 
+                       " !/machine.slice/*/.control "
+                       " !/machine.slice/*/payload* "
+                       " !/machine.slice/*/supervisor "
                        " /machine.slice/*.service "           // #3367 systemd-nspawn
 
                        // ----------------------------------------------------------------
@@ -1339,6 +1342,9 @@ static void cgroup_main_cleanup(void *pptr) {
             sleep_usec(step);
         }
     }
+    // We should be done, but just in case, avoid blocking shutdown
+    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED))
+        (void) nd_thread_join(discovery_thread.thread);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -1395,9 +1401,10 @@ void *cgroups_main(void *ptr) {
         goto exit;
     }
 
-    int error = uv_thread_create(&discovery_thread.thread, cgroup_discovery_worker, NULL);
-    if (error) {
-        collector_error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
+    discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
+
+    if (!discovery_thread.thread) {
+        collector_error("CGROUP: cannot create thread worker");
         goto exit;
     }
 

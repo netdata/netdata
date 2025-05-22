@@ -90,8 +90,6 @@ void update_cpu_utilization_limit_chart(struct cgroup *cg, NETDATA_DOUBLE cpu_li
     cpu_usage = (NETDATA_DOUBLE)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
     NETDATA_DOUBLE cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (cpu_limit * cgroup_update_every);
 
-    rrdset_isnot_obsolete___safe_from_collector_thread(chart);
-
     rrddim_set(chart, "used", (cpu_used > 0) ? (collected_number)cpu_used : 0);
 
     cg->prev_cpu_usage = cpu_usage;
@@ -480,8 +478,6 @@ void update_mem_usage_limit_chart(struct cgroup *cg, unsigned long long memory_l
         rrddim_add(chart, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrdset_isnot_obsolete___safe_from_collector_thread(chart);
-
     rrddim_set(chart, "available", (collected_number)(memory_limit - cg->memory.usage_in_bytes));
     rrddim_set(chart, "used", (collected_number)cg->memory.usage_in_bytes);
     rrdset_done(chart);
@@ -518,7 +514,6 @@ void update_mem_utilization_chart(struct cgroup *cg, unsigned long long memory_l
         rrddim_add(chart, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrdset_isnot_obsolete___safe_from_collector_thread(chart);
     collected_number util = (collected_number)(cg->memory.usage_in_bytes * 100 / memory_limit);
     rrddim_set(chart, "utilization", util);
     rrdset_done(chart);

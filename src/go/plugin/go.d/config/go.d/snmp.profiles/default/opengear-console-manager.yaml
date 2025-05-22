@@ -17,9 +17,14 @@ metrics:
       - name: ogSerialPortRxBytes
         OID: 1.3.6.1.4.1.25049.17.2.1.10
         metric_type: monotonic_count
+        description: Number of bytes received on the serial port
+        unit: "By"
       - name: ogSerialPortTxBytes
         OID: 1.3.6.1.4.1.25049.17.2.1.11
         metric_type: monotonic_count
+        description: Number of bytes transmitted on the serial port
+        unit: "By"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1  # ogSerialPortIndex
         tag: og_serial_port_index
@@ -124,6 +129,9 @@ metrics:
       - name: ogCellModemCounter
         OID: 1.3.6.1.4.1.25049.17.17.1.16
         metric_type: monotonic_count
+        description: Number of cell modem events counted
+        unit: "{event}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1  # ogCellModemIndex
         tag: og_cell_modem_index

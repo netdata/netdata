@@ -52,7 +52,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
         struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
         br->data = *data;
         br->host_state_id = object_state_id(&st->rrdhost->state_id);
-        br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
+        br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id), true);
         if(br->rsa) {
             br->cb = cb;
 
@@ -232,7 +232,7 @@ void *backfill_thread(void *ptr) {
     for(size_t t = 0; t < threads - 1 ;t++) {
         char tag[15];
         snprintfz(tag, sizeof(tag), "BACKFILL[%zu]", t + 1);
-        th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
+        th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, backfill_worker_thread, NULL);
     }
 
     backfill_worker_thread((void *)0x01);

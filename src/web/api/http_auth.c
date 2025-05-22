@@ -302,6 +302,10 @@ static void bearer_tokens_load_from_disk(void) {
 bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
     bool rc = false;
 
+    // javascript may send "null" or "undefined"
+    if(!v || !*v || strcmp(v, "null") == 0 || strcmp(v, "undefined") == 0)
+        return rc;
+
     if(!uuid_parse_flexi(v, w->auth.bearer_token)) {
         char uuid_str[UUID_COMPACT_STR_LEN];
         uuid_unparse_lower_compact(w->auth.bearer_token, uuid_str);

@@ -65,27 +65,27 @@ void rrdset_index_destroy(RRDHOST *host);
 
 void rrdset_free(RRDSET *st);
 
-RRDSET *rrdset_find(RRDHOST *host, const char *id);
-RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
+RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete);
+RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool include_obsolete);
 
-RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id);
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete);
 
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 
 uint16_t rrddim_collection_modulo(RRDSET *st, uint32_t spread);
 
-#define rrdset_find_localhost(id) rrdset_find(localhost, id)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_localhost(const char *id) {
-    RRDSET *st = rrdset_find_localhost(id);
+/* This will not return charts that are obsolete */
+ALWAYS_INLINE
+static RRDSET *rrdset_find_active_localhost(const char *id) {
+    RRDSET *st = rrdset_find(localhost, id, false);
     return st;
 }
 
-#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
-/* This will not return charts that are archived */
-static inline RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id) {
-    RRDSET *st = rrdset_find_bytype_localhost(type, id);
+/* This will not return charts that are obsolete */
+ALWAYS_INLINE
+static RRDSET *rrdset_find_active_bytype_localhost(const char *type, const char *id) {
+    RRDSET *st = rrdset_find_bytype(localhost, type, id, false);
     return st;
 }
 

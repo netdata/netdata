@@ -14,10 +14,14 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.5.10 # genCpuAverageUtilization.10
+      description: Current average CPU utilization in percentage
+      unit: "%"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.10 # genMemUtilizationPercentUsed.10
+      description: Percentage of memory used
+      unit: "%"
   - MIB: AVAYA-ENTITY-MIB
     table:
       name: avEntPhyChFruTable
@@ -25,6 +29,7 @@ metrics:
     symbols:
       - name: avaya.avEntPhyChFru
         constant_value_one: true
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - index: 1
         tag: avaya_ent_physical_index
@@ -50,66 +55,42 @@ metrics:
           6: multiple_fan_fault
           7: bad_expansion_cable
           255: unknown
-#  - MIB: AVAYA-RTP-MIB
-#    symbol:
-#      name: avaya.avRtpEnable
-#      OID: 1.3.6.1.4.1.6889.2.7.1.2.0
-#      enum:
-#        true: 1
-#        false: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
-#  - MIB: G700-MG-MIB
-#    symbol:
-#      name: avaya.cmgQosControl
-#      OID: 1.3.6.1.4.1.6889.2.9.1.2.2.1.0
-#      enum:
-#        local: 1
-#        remote: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSigDscp
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.2.0
+      description: DiffServ code point for signaling traffic on the H.248 link received from the controller
+      unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.3.0
+      description: 802.1 priority for signaling traffic on the H.248 link received from the controller
+      unit: "{priority_level}"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSigDscp
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.4.0
+      description: DiffServ code point for signaling traffic on the H.248 link locally administered
+      unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.5.0
+      description: 802.1 priority for signaling traffic on the H.248 link locally administered
+      unit: "{priority_level}"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgCurrent802Vlan
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.7.0
-#  - MIB: G700-MG-MIB
-#    symbol:
-#      name: avaya.cmgRegistrationState
-#      OID: 1.3.6.1.4.1.6889.2.9.1.3.1.0
-#      enum:
-#        registered: 1
-#        notRegistered: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
-#  - MIB: G700-MG-MIB
-#    symbol:
-#      name: avaya.cmgH248LinkStatus
-#      OID: 1.3.6.1.4.1.6889.2.9.1.3.3.0
-#      enum:
-#        up: 1
-#        down: 2
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
+      description: Current 802.1 VLAN ID in use
+      unit: "{vlan_id}"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgH248LinkErrorCode
       OID: 1.3.6.1.4.1.6889.2.9.1.3.4.0
+      description: Most recently received H.248 error code affecting the link between media gateway and controller
+      unit: "{error_code}"
   - MIB: G700-MG-MIB
     table:
       name: cmgVoipEngineTable
@@ -117,10 +98,17 @@ metrics:
     symbols:
       - name: avaya.cmgVoipTotalChannels
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.6
+        description: Total number of channels available to the VoIP engine
+        unit: "{channel}"
       - name: avaya.cmgVoipChannelsInUse
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.7
+        description: Number of channels currently in use at the VoIP engine
+        unit: "{channel}"
       - name: avaya.cmgVoipAverageOccupancy
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.8
+        description: Five-minute average occupancy of the VoIP engine
+        unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: avaya.cmgVoipCurrentIpAddress
@@ -158,8 +146,13 @@ metrics:
     symbols:
       - name: avaya.cmgDSPCoreTotalChannels
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.2
+        description: Total number of channels available to the DSP core
+        unit: "{channel}"
       - name: avaya.cmgDSPCoreChannelsInUse
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.3
+        description: Number of channels currently in use at the DSP core
+        unit: "{channel}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4

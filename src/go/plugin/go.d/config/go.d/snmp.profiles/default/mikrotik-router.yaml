@@ -18,16 +18,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.6
         name: mtxrOpticalTemperature
+        description: Temperature at sensor chip
+        unit: "Cel"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.10
         name: mtxrOpticalRxPower
+        description: Received optical power
+        unit: "mW"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.7
         name: mtxrOpticalSupplyVoltage
+        description: Supply voltage
+        unit: "V"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.8
         name: mtxrOpticalTxBiasCurrent
+        description: Transmit bias current
+        unit: "mA"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.5
         name: mtxrOpticalWavelength
+        description: Optical wavelength
+        unit: "nm"
       - OID: 1.3.6.1.4.1.14988.1.1.19.1.1.9
         name: mtxrOpticalTxPower
+        description: Transmit optical power
+        unit: "mW"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14988.1.1.19.1.1.1
@@ -55,14 +67,20 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.14988.1.1.3.6
       name: mtxrHlCpuTemperature
+      description: Temperature near cpu
+      unit: "Cel"
   - MIB: MIKROTIK-MIB
     symbol:
       OID: 1.3.6.1.4.1.14988.1.1.3.10
       name: mtxrHlTemperature
+      description: Temperature at sensor chip
+      unit: "Cel"
   - MIB: MIKROTIK-MIB
     symbol:
       OID: 1.3.6.1.4.1.14988.1.1.3.8
       name: mtxrHlVoltage
+      description: Core voltage
+      unit: "V"
   - MIB: MIKROTIK-MIB
     table:
       OID: 1.3.6.1.4.1.14988.1.1.15.1
@@ -70,10 +88,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14988.1.1.15.1.1.6
         name: mtxrPOEPower
+        description: Power over ethernet
+        unit: "W"
       - OID: 1.3.6.1.4.1.14988.1.1.15.1.1.4
         name: mtxrPOEVoltage
+        description: Power over ethernet voltage
+        unit: "V"
       - OID: 1.3.6.1.4.1.14988.1.1.15.1.1.5
         name: mtxrPOECurrent
+        description: Power over ethernet current
+        unit: "mA"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14988.1.1.15.1.1.1
@@ -106,6 +130,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
       name: cpu.usage
+      description: Average percentage of time that this processor was not idle
+      unit: "%"
   - MIB: HOST-RESOURCES-MIB
     table:
       OID: 1.3.6.1.2.1.25.2.3
@@ -113,8 +139,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: memory.total
+        description: Size of the storage represented by this entry in allocation units
+        unit: "{memory_allocation_unit}"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: memory.used
+        description: Amount of the storage represented by this entry that is allocated
+        unit: "{memory_allocation_unit}"
     metric_tags:
       - tag: mem
         index: 1

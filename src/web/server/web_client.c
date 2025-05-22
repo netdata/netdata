@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_client.h"
+#include "web/websocket/websocket.h"
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers
@@ -163,6 +164,15 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 
     freez(w->auth_bearer_token);
     w->auth_bearer_token = NULL;
+    
+    // Free WebSocket resources
+    freez(w->websocket.key);
+    w->websocket.key = NULL;
+    
+    w->websocket.ext_flags = WS_EXTENSION_NONE;
+    w->websocket.protocol = WS_PROTOCOL_DEFAULT;
+    w->websocket.client_max_window_bits = 0;
+    w->websocket.server_max_window_bits = 0;
 
     // if we had enabled compression, release it
     if(w->response.zinitialized) {
@@ -909,7 +919,11 @@ void web_client_build_http_header(struct web_client *w) {
 }
 
 static inline void web_client_send_http_header(struct web_client *w) {
-    web_client_build_http_header(w);
+    // For WebSocket handshake, the header is already fully prepared in websocket_handle_handshake
+    // For standard HTTP responses, we need to build the header
+    if (w->response.code != HTTP_RESP_WEBSOCKET_HANDSHAKE) {
+        web_client_build_http_header(w);
+    }
 
     // sent the HTTP header
     netdata_log_debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"
@@ -1207,7 +1221,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
                 // do we have such a data set?
                 RRDSET *st = rrdset_find_byname(host, tok);
-                if(!st) st = rrdset_find(host, tok);
+                if(!st) st = rrdset_find(host, tok, false);
                 if(!st) {
                     w->response.data->content_type = CT_TEXT_HTML;
                     buffer_strcat(w->response.data, "Chart is not found: ");
@@ -1215,8 +1229,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                     netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
                     return HTTP_RESP_NOT_FOUND;
                 }
-
-                debug_flags |= D_RRD_STATS;
 
                 if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))
                     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
@@ -1303,6 +1315,14 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                                                w->forwarded_for ? w->forwarded_for : w->client_ip);
             }
 
+            // Check if this is a WebSocket upgrade request
+            // The full WebSocket handshake detection will happen in the header parsing,
+            // but we need to set the initial mode to GET for processing to continue
+            if (w->mode == HTTP_REQUEST_MODE_GET && web_client_has_websocket_handshake(w) && web_client_is_websocket(w)) {
+                w->mode = HTTP_REQUEST_MODE_WEBSOCKET;
+                netdata_log_debug(D_WEB_CLIENT, "%llu: Detected WebSocket handshake request", w->id);
+            }
+
             switch(w->mode) {
                 case HTTP_REQUEST_MODE_STREAM:
                     if(unlikely(!http_can_access_stream(w))) {
@@ -1312,6 +1332,21 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
                     w->response.code = stream_receiver_accept_connection(
                         w, (char *)buffer_tostring(w->url_query_string_decoded), NULL);
+                    return;
+                
+                case HTTP_REQUEST_MODE_WEBSOCKET:
+                    if(unlikely(!http_can_access_dashboard(w))) {
+                        web_client_permission_denied_acl(w);
+                        return;
+                    }
+                    
+                    // Handle WebSocket handshake - this will take over the socket
+                    // similar to how stream_receiver_accept_connection works
+                    w->response.code = websocket_handle_handshake(w);
+                    
+                    // After this point the socket has been taken over
+                    // No need to send a response as the WebSocket handler
+                    // has already sent the handshake response
                     return;
 
                 case HTTP_REQUEST_MODE_OPTIONS:
@@ -1398,7 +1433,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 // wait for more data
                 // set to normal to prevent web_server_rcv_callback
                 // from going into stream mode
-                if (w->mode == HTTP_REQUEST_MODE_STREAM)
+                if (w->mode == HTTP_REQUEST_MODE_STREAM || w->mode == HTTP_REQUEST_MODE_WEBSOCKET)
                     w->mode = HTTP_REQUEST_MODE_GET;
                 return;
             }
@@ -1457,6 +1492,10 @@ void web_client_process_request_from_web_server(struct web_client *w) {
     switch(w->mode) {
         case HTTP_REQUEST_MODE_STREAM:
             netdata_log_debug(D_WEB_CLIENT, "%llu: STREAM done.", w->id);
+            break;
+
+        case HTTP_REQUEST_MODE_WEBSOCKET:
+            netdata_log_debug(D_WEB_CLIENT, "%llu: Done preparing the WEBSOCKET response..", w->id);
             break;
 
         case HTTP_REQUEST_MODE_OPTIONS:

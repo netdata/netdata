@@ -9,6 +9,12 @@
 
 typedef void (*nd_thread_canceller)(void *data);
 
+typedef enum __attribute__((packed)) {
+    ND_THREAD_LIST_NONE = 0,
+    ND_THREAD_LIST_RUNNING,
+    ND_THREAD_LIST_EXITED,
+} ND_THREAD_LIST;
+
 struct nd_thread {
     void *arg;
     pid_t tid;
@@ -16,7 +22,7 @@ struct nd_thread {
     void *ret; // the return value of start routine
     void *(*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
-    pthread_t thread;
+    uv_thread_t thread;
     bool cancel_atomic;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -36,6 +42,7 @@ struct nd_thread {
         void *data;
     } canceller;
 
+    ND_THREAD_LIST list;
     struct nd_thread *prev, *next;
 };
 
@@ -254,30 +261,29 @@ void query_target_free(void);
 void service_exits(void);
 void rrd_collector_finished(void);
 
-static void nd_thread_join_exited_detached_threads(void) {
-    while(1) {
+void nd_thread_join_threads()
+{
+    ND_THREAD *nti;
+    do {
         spinlock_lock(&threads_globals.exited.spinlock);
 
-        ND_THREAD *nti = threads_globals.exited.list;
-        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
-            nti = nti->next;
+        nti = threads_globals.exited.list;
 
-        if(nti)
+        if (nti) {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+            nd_log_daemon(NDLP_DEBUG, "nd_thread_join_threads: Joining thread with id %d (%s) during shutdown", nti->tid, nti->tag);
+        }
 
         spinlock_unlock(&threads_globals.exited.spinlock);
 
-        if(nti) {
-            nd_log(NDLS_DAEMON, NDLP_INFO, "Joining detached thread '%s', tid %d", nti->tag, nti->tid);
-            nd_thread_join(nti);
-        }
-        else
-            break;
-    }
+        // handles null
+        nd_thread_join(nti);
+
+    } while (nti);
 }
 
-static void nd_thread_exit(void *pptr) {
-    ND_THREAD *nti = CLEANUP_FUNCTION_GET_PTR(pptr);
+static void nd_thread_exit(ND_THREAD *nti) {
 
     if(nti != _nd_thread_info || !nti || !_nd_thread_info) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -328,17 +334,19 @@ static void nd_thread_exit(void *pptr) {
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 
     spinlock_lock(&threads_globals.running.spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+    if(nti->list == ND_THREAD_LIST_RUNNING) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_NONE;
+    }
     spinlock_unlock(&threads_globals.running.spinlock);
 
-    if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) != NETDATA_THREAD_OPTION_JOINABLE) {
-        spinlock_lock(&threads_globals.exited.spinlock);
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-        spinlock_unlock(&threads_globals.exited.spinlock);
-    }
+    spinlock_lock(&threads_globals.exited.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+    nti->list = ND_THREAD_LIST_EXITED;
+    spinlock_unlock(&threads_globals.exited.spinlock);
 }
 
-static void *nd_thread_starting_point(void *ptr) {
+static void nd_thread_starting_point(void *ptr) {
     ND_THREAD *nti = _nd_thread_info = (ND_THREAD *)ptr;
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_STARTED);
 
@@ -348,20 +356,17 @@ static void *nd_thread_starting_point(void *ptr) {
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_STARTUP) != NETDATA_THREAD_OPTION_DONT_LOG_STARTUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid_cached());
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
-
-    CLEANUP_FUNCTION_REGISTER(nd_thread_exit) cleanup_ptr = nti;
-
     signals_block_all_except_deadly();
+
+    spinlock_lock(&threads_globals.running.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+    nti->list = ND_THREAD_LIST_RUNNING;
+    spinlock_unlock(&threads_globals.running.spinlock);
 
     // run the thread code
     nti->ret = nti->start_routine(nti->arg);
 
-    return nti;
+    nd_thread_exit(nti);
 }
 
 ND_THREAD *nd_thread_self(void) {
@@ -372,32 +377,47 @@ bool nd_thread_is_me(ND_THREAD *nti) {
     return nti && nti->thread == pthread_self();
 }
 
-ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg) {
-    nd_thread_join_exited_detached_threads();
 
+// utils
+#define MAX_THREAD_CREATE_RETRIES (10)
+#define MAX_THREAD_CREATE_WAIT_MS (1000)
+
+static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+{
+    int err;
+
+    do {
+        err = uv_thread_create(thread, thread_func, arg);
+        if (err == 0)
+            break;
+
+        sleep_usec(MAX_THREAD_CREATE_WAIT_MS * USEC_PER_MS);
+    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+
+    return err;
+}
+
+ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine)(void *), void *arg)
+{
     ND_THREAD *nti = callocz(1, sizeof(*nti));
     spinlock_init(&nti->canceller.spinlock);
     nti->arg = arg;
     nti->start_routine = start_routine;
-    nti->options = options & NETDATA_THREAD_OPTIONS_ALL;
+    nti->options = (options & NETDATA_THREAD_OPTIONS_ALL);
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
 
-    spinlock_lock(&threads_globals.running.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
-    spinlock_unlock(&threads_globals.running.spinlock);
-
-    int ret = pthread_create(&nti->thread, &threads_globals.attr, nd_thread_starting_point, nti);
+    int retries = 0;
+    int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, &retries);
     if(ret != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "failed to create new thread for %s. pthread_create() failed with code %d",
+               "failed to create new thread for %s. uv_thread_create() failed with code %d",
                tag, ret);
 
-        spinlock_lock(&threads_globals.running.spinlock);
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
-        spinlock_unlock(&threads_globals.running.spinlock);
         freez(nti);
         return NULL;
     }
+    if (retries)
+        nd_log_daemon(NDLP_WARNING, "nd_thread_create required %d attempts", retries);
 
     return nti;
 }
@@ -438,18 +458,33 @@ int nd_thread_join(ND_THREAD *nti) {
     if(!nti)
         return ESRCH;
 
-    int ret = pthread_join(nti->thread, NULL);
-    if(ret != 0) {
+    if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_JOINED))
+        return 0;
+
+    int ret;
+    if((ret = uv_thread_join(&nti->thread))) {
+        // we can't join the thread
+
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "cannot join thread. pthread_join() failed with code %d. (tag=%s)",
+               "cannot join thread. uv_thread_join() failed with code %d. (tag=%s)",
                ret, nti->tag);
     }
     else {
-        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
+        // we successfully joined the thread
+       nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
+
+        spinlock_lock(&threads_globals.running.spinlock);
+        if(nti->list == ND_THREAD_LIST_RUNNING) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
+        spinlock_unlock(&threads_globals.running.spinlock);
 
         spinlock_lock(&threads_globals.exited.spinlock);
-        if(nti->prev)
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        if(nti->list == ND_THREAD_LIST_EXITED) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
+        }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
         freez(nti);

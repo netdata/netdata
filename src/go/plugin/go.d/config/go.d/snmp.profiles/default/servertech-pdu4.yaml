@@ -16,6 +16,9 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4UnitMonitor
         constant_value_one: true
+        description: "Constant value one"
+        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4UnitID
@@ -84,18 +87,33 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4InputCordActivePower
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.3
+        description: "Active power of the input cord"
+        unit: "W"
       - name: servertech.sentry4.st4InputCordApparentPower
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.5
+        description: "Apparent power of the input cord"
+        unit: "VA"
       - name: servertech.sentry4.st4InputCordPowerUtilized
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.7
+        description: "Power utilized by the input cord"
+        unit: "W"
       - name: servertech.sentry4.st4InputCordPowerFactor
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.8
+        description: "Power factor of the input cord"
+        unit: "10*2.1"
       - name: servertech.sentry4.st4InputCordEnergy
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.10
+        description: "Energy consumed by the input cord"
+        unit: "Wh"
       - name: servertech.sentry4.st4InputCordFrequency
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.11
+        description: "Frequency of the input cord"
+        unit: "Hz"
       - name: servertech.sentry4.st4InputCordOutOfBalance
         OID: 1.3.6.1.4.1.1718.4.1.3.3.1.12
+        description: "Out of balance measurement of the input cord"
+        unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4InputCordID
@@ -303,8 +321,13 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4LineCurrent
         OID: 1.3.6.1.4.1.1718.4.1.4.3.1.3
+        description: "Current of the line"
+        unit: "A"
       - name: servertech.sentry4.st4LineCurrentUtilized
         OID: 1.3.6.1.4.1.1718.4.1.4.3.1.5
+        description: "Utilized current of the line"
+        unit: "A"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4LineID
@@ -387,20 +410,37 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4PhaseVoltage
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.3
+        description: "Voltage of the phase"
+        unit: "V"
       - name: servertech.sentry4.st4PhaseVoltageDeviation
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.5
+        description: "Voltage deviation of the phase"
+        unit: "V"
       - name: servertech.sentry4.st4PhaseCurrent
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.6
+        description: "Current of the phase"
+        unit: "A"
       - name: servertech.sentry4.st4PhaseCurrentCrestFactor
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.7
+        description: "Current crest factor of the phase"
+        unit: "1"
       - name: servertech.sentry4.st4PhaseActivePower
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.8
+        description: "Active power of the phase"
+        unit: "W"
       - name: servertech.sentry4.st4PhaseApparentPower
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.9
+        description: "Apparent power of the phase"
+        unit: "VA"
       - name: servertech.sentry4.st4PhasePowerFactor
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.10
+        description: "Power factor of the phase"
+        unit: "1"
       - name: servertech.sentry4.st4PhaseEnergy
         OID: 1.3.6.1.4.1.1718.4.1.5.3.1.13
+        description: "Energy consumed by the phase"
+        unit: "Wh"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4PhaseID
@@ -523,6 +563,9 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4OcpMonitor
         constant_value_one: true
+        description: "Constant value one"
+        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4OcpID
@@ -543,10 +586,14 @@ metrics:
           name: servertech.sentry4.st4OcpCurrentCapacity
           OID: 1.3.6.1.4.1.1718.4.1.6.2.1.7
         tag: servertech_sentry4_st4_ocp_current_capacity
+        description: "Current capacity of the ocp"
+        unit: "A"
       - symbol:
           name: servertech.sentry4.st4OcpCurrentCapacityMax
           OID: 1.3.6.1.4.1.1718.4.1.6.2.1.8
         tag: servertech_sentry4_st4_ocp_current_capacity_max
+        description: "Maximum current capacity of the ocp"
+        unit: "A"
       - symbol:
           name: servertech.sentry4.st4OcpBranchCount
           OID: 1.3.6.1.4.1.1718.4.1.6.2.1.20
@@ -589,8 +636,13 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4BranchCurrent
         OID: 1.3.6.1.4.1.1718.4.1.7.3.1.3
+        description: "Current of the branch"
+        unit: "A"
       - name: servertech.sentry4.st4BranchCurrentUtilized
         OID: 1.3.6.1.4.1.1718.4.1.7.3.1.5
+        description: "Utilized current of the branch"
+        unit: "A"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4BranchID
@@ -685,6 +737,9 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4OutletMonitor
         constant_value_one: true
+        description: "Constant value one"
+        unit: "TBD"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4OutletID
@@ -772,6 +827,9 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4TempSensorValue
         OID: 1.3.6.1.4.1.1718.4.1.9.3.1.1
+        description: "Temperature sensor value"
+        unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4TempSensorID
@@ -823,6 +881,9 @@ metrics:
     symbols:
       - name: servertech.sentry4.st4HumidSensorValue
         OID: 1.3.6.1.4.1.1718.4.1.10.3.1.1
+        description: "Humidity sensor value"
+        unit: "%"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: servertech.sentry4.st4HumidSensorID

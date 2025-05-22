@@ -131,4 +131,8 @@ bool ml_model_received_from_child(RRDHOST *host, const char *json) {
     return false;
 }
 
+ void ml_host_disconnected(RRDHOST *rh) {
+     UNUSED(rh);
+}
+
 #endif

@@ -346,11 +346,8 @@ int rwlocks_stress_test(void) {
         };
 
         snprintf(thr_name, sizeof(thr_name), "pthread_rw%d", i);
-        pthread_contexts[i].thread = nd_thread_create(
-            thr_name,
-            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-            benchmark_thread,
-            &pthread_contexts[i]);
+        pthread_contexts[i].thread =
+            nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG, benchmark_thread, &pthread_contexts[i]);
 
         // Initialize spinlock contexts
         spinlock_contexts[i] = (thread_context_t){
@@ -362,11 +359,8 @@ int rwlocks_stress_test(void) {
         };
 
         snprintf(thr_name, sizeof(thr_name), "spin_rw%d", i);
-        spinlock_contexts[i].thread = nd_thread_create(
-            thr_name,
-            NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
-            benchmark_thread,
-            &spinlock_contexts[i]);
+        spinlock_contexts[i].thread =
+            nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG, benchmark_thread, &spinlock_contexts[i]);
     }
 
     // Run all configurations

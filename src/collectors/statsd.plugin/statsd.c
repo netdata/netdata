@@ -234,7 +234,7 @@ typedef struct statsd_app {
 
 struct collection_thread_status {
     SPINLOCK spinlock;
-    bool running;
+    bool initializing;
     uint32_t max_sockets;
 
     ND_THREAD *thread;
@@ -483,10 +483,7 @@ static inline void metric_update_counters_and_obsoletion(STATSD_METRIC *m) {
     m->events++;
     m->count++;
     m->last_collected = now_realtime_sec();
-    if (m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE))) {
-        rrdset_isnot_obsolete___safe_from_collector_thread(m->st);
-        m->options &= ~STATSD_METRIC_OPTION_OBSOLETE;
-    }
+    m->options &= ~STATSD_METRIC_OPTION_OBSOLETE;
 }
 
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
@@ -1086,10 +1083,6 @@ void statsd_collector_thread_cleanup(void *pptr) {
     struct statsd_udp *d = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!d) return;
 
-    spinlock_lock(&d->status->spinlock);
-    d->status->running = false;
-    spinlock_unlock(&d->status->spinlock);
-
 #ifdef HAVE_RECVMMSG
     size_t i;
     for (i = 0; i < d->size; i++)
@@ -1110,7 +1103,7 @@ static bool statsd_should_stop(void) {
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
     spinlock_lock(&status->spinlock);
-    status->running = true;
+    status->initializing = false;
     spinlock_unlock(&status->spinlock);
 
     worker_register("STATSD");
@@ -1637,8 +1630,8 @@ static inline RRDSET *statsd_private_rrdset_create(
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
     netdata_log_debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1680,7 +1673,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
 static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
     netdata_log_debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
@@ -1723,8 +1716,8 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
 static inline void statsd_private_chart_set(STATSD_METRIC *m) {
     netdata_log_debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1766,8 +1759,8 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
 static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
     netdata_log_debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1812,8 +1805,8 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
 static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     netdata_log_debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
-    if(m->st && unlikely(rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE)))
-       return;
+    if(m->options & STATSD_METRIC_OPTION_OBSOLETE)
+        return;
 
     if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
         m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
@@ -1868,11 +1861,16 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
 // statsd flush metrics
 
 static inline void metric_check_obsoletion(STATSD_METRIC *m) {
-    if(statsd.set_obsolete_after &&
-       !rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE) &&
-       m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED &&
-       m->last_collected + (time_t)statsd.set_obsolete_after < now_realtime_sec()) {
-        rrdset_is_obsolete___safe_from_collector_thread(m->st);
+    if(!(m->options & STATSD_METRIC_OPTION_OBSOLETE) &&
+        statsd.set_obsolete_after &&
+        (m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED) &&
+        m->last_collected + (time_t)statsd.set_obsolete_after < now_realtime_sec()) {
+
+        if(m->st) {
+            rrdset_is_obsolete___safe_from_collector_thread(m->st);
+            m->st = NULL;
+        }
+
         m->options |= STATSD_METRIC_OPTION_OBSOLETE;
     }
 }
@@ -2365,7 +2363,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
     }
     dfe_done(m);
 
-    // flush all the useful metrics
+    // flush all the unuseful metrics
     STATSD_METRIC *m_prev;
     for(m_prev = m = index->first_useful; m ; m = m->next_useful) {
         flush_metric(m);
@@ -2400,17 +2398,18 @@ static void statsd_main_cleanup(void *pptr) {
     if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
-            spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+            bool initializing;
+            do {
+                spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+                initializing = statsd.collection_threads_status[i].initializing;
+                spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
+                if (unlikely(initializing))
+                    sleep_usec(1000);
+            } while(initializing);
 
-            if(statsd.collection_threads_status[i].running) {
-                collector_info("STATSD: signalling data collection thread %d to stop...", i + 1);
-                nd_thread_signal_cancel(statsd.collection_threads_status[i].thread);
-            }
-            else
-                collector_info("STATSD: data collection thread %d found stopped.", i + 1);
-
-            spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
+            (void) nd_thread_join(statsd.collection_threads_status[i].thread);
         }
+        freez(statsd.collection_threads_status);
     }
 
     collector_info("STATSD: closing sockets...");
@@ -2611,6 +2610,7 @@ void *statsd_main(void *ptr) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
         spinlock_init(&statsd.collection_threads_status[i].spinlock);
+        statsd.collection_threads_status[i].initializing = true;
         statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
                                                                       statsd_collector_thread, &statsd.collection_threads_status[i]);
     }

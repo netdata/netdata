@@ -27,8 +27,12 @@ struct system_pool {
     RRDDIM *rd_paged;
     RRDDIM *rd_nonpaged;
 
+    RRDSET *freeSystemPageTableEntries;
+    RRDDIM *rd_free_system_page_table_entries;
+
     COUNTER_DATA pagedData;
     COUNTER_DATA nonPagedData;
+    COUNTER_DATA pageTableEntries;
 };
 
 struct swap localSwap = {0};
@@ -49,6 +53,7 @@ void initialize_pool_keys(struct system_pool *p)
 {
     p->pagedData.key = "Pool Paged Bytes";
     p->nonPagedData.key = "Pool Nonpaged Bytes";
+    p->pageTableEntries.key = "Free System Page Table Entries";
 }
 
 static void initialize(void)
@@ -153,6 +158,37 @@ static void do_memory_system_pool(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
     rrdset_done(localPool.pool);
 }
 
+static void do_memory_page_table_entries(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    perflibGetObjectCounter(pDataBlock, pObjectType, &localPool.pageTableEntries);
+
+    if (!localPool.freeSystemPageTableEntries) {
+        localPool.freeSystemPageTableEntries = rrdset_create_localhost(
+            "mem",
+            "free_system_page_table_entries",
+            NULL,
+            "mem",
+            "mem.system_page_table_entries",
+            "Unused page table entries.",
+            "pages",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMemory",
+            NETDATA_CHART_PRIO_MEM_FREE_SYSTEM_PAGE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        localPool.rd_free_system_page_table_entries =
+            rrddim_add(localPool.freeSystemPageTableEntries, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        localPool.freeSystemPageTableEntries,
+        localPool.rd_free_system_page_table_entries,
+        (collected_number)localPool.pageTableEntries.current.Data);
+
+    rrdset_done(localPool.freeSystemPageTableEntries);
+}
+
 static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Memory");
@@ -187,6 +223,7 @@ static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every)
     do_memory_swap(pDataBlock, pObjectType, update_every);
 
     do_memory_system_pool(pDataBlock, pObjectType, update_every);
+    do_memory_page_table_entries(pDataBlock, pObjectType, update_every);
 
     return true;
 }

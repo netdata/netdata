@@ -117,6 +117,13 @@ AutoReqProv: yes
 %global _have_ml 1
 %endif
 
+# Fedora 42 merges sbin and bin, but we don’t correctly handle that
+# in our install without using the system provided symlinks, so fix our
+# handling here.
+%if "%{_sbindir}" == "/usr/bin"
+%global _sbindir %{_exec_prefix}/sbin
+%endif
+
 # Filter known bogus deps that would be caught by AutoReqProv.
 %global __requires_exclude_from ^%{_libdir}/%{name}/system/.*$
 
@@ -271,9 +278,9 @@ BuildRequires: cups-devel
 # distro handling of versioning).
 %if %{?_upstream_go_toolchain:0}%{!?_upstream_go_toolchain:1}
 %if 0%{?suse_version}
-BuildRequires: go >= 1.23
+BuildRequires: go >= 1.24
 %else
-BuildRequires: golang >= 1.23
+BuildRequires: golang >= 1.24
 %endif
 %endif
 # end - go.d.plugin plugin dependencies

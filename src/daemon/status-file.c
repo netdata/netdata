@@ -46,7 +46,6 @@ ENUM_STR_DEFINE_FUNCTIONS(DAEMON_OS_TYPE, DAEMON_OS_TYPE_UNKNOWN, "unknown");
 
 static DAEMON_STATUS_FILE last_session_status = {
     .v = 0,
-    .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
     },
@@ -54,7 +53,6 @@ static DAEMON_STATUS_FILE last_session_status = {
 
 static DAEMON_STATUS_FILE session_status = {
     .v = STATUS_FILE_VERSION,
-    .spinlock = SPINLOCK_INITIALIZER,
     .fatal = {
         .spinlock = SPINLOCK_INITIALIZER,
     },
@@ -721,7 +719,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
     dsf_acquire(session_status);
-    spinlock_lock(&session_status.spinlock);
 
 #if defined(OS_LINUX)
     session_status.os_type = DAEMON_OS_TYPE_LINUX;
@@ -764,7 +761,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         cs == CLOUD_STATUS_INDIRECT)                                // this is a final state
         session_status.cloud_status = cs;
 
+
+#ifdef ENABLE_DBENGINE
     session_status.oom_protection = dbengine_out_of_memory_protection;
+#else
+    session_status.oom_protection = 0;
+#endif
     
     OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
     if(OS_PROCESS_MEMORY_OK(proc_mem))
@@ -834,7 +836,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         simple_pattern_free(sqlite_pattern);
     }
 
-    spinlock_unlock(&session_status.spinlock);
     dsf_release(session_status);
 }
 

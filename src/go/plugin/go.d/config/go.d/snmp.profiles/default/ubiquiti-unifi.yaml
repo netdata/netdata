@@ -3,34 +3,38 @@ extends:
   - _ubiquiti.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.41112  # Ubiquiti Networks, Inc.
+  - 1.3.6.1.4.1.41112 # Ubiquiti Networks, Inc.
 
 metrics:
   - MIB: FROGFOOT-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.4.1.10002.1.1.1.1.1.0
       name: memory.total
+      description: Total usable physical memory (in KB)
+      unit: "kBy"
   - MIB: FROGFOOT-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.4.1.10002.1.1.1.1.2.0
       name: memory.free
-# TODO: Update once we support matching on specific tag (`match_attributes`)
-#  - MIB: FROGFOOT-RESOURCES-MIB
-#    table:
-#      OID: 1.3.6.1.4.1.10002.1.1.1.4.2
-#      name: loadTable
-#    symbols:
-#      - OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.3.1
-#        name: cpu.usage
-#    metric_tags:
-#      - index: 1
-#        tag: cpu
-#      - symbol:
-#          OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.2.1
-#          name: loadDescr
-#          match_attributes:
-#            - 1 Minute Average
-#        tag: load_descr
+      description: Available physical memory (in KB)
+      unit: "kBy"
+  # TODO: Update once we support matching on specific tag (`match_attributes`)
+  #  - MIB: FROGFOOT-RESOURCES-MIB
+  #    table:
+  #      OID: 1.3.6.1.4.1.10002.1.1.1.4.2
+  #      name: loadTable
+  #    symbols:
+  #      - OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.3.1
+  #        name: cpu.usage
+  #    metric_tags:
+  #      - index: 1
+  #        tag: cpu
+  #      - symbol:
+  #          OID: 1.3.6.1.4.1.10002.1.1.1.4.2.1.2.1
+  #          name: loadDescr
+  #          match_attributes:
+  #            - 1 Minute Average
+  #        tag: load_descr
   - MIB: UBNT-UniFi-MIB
     table:
       OID: 1.3.6.1.4.1.41112.1.6.1.1
@@ -39,17 +43,29 @@ metrics:
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.4
         name: ubiquiti.unifiRadioRxPackets
         metric_type: monotonic_count
+        description: Number of received packets on the radio
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.5
         name: ubiquiti.unifiRadioTxPackets
         metric_type: monotonic_count
+        description: Number of transmitted packets on the radio
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.6
         name: ubiquiti.unifiRadioCuTotal
+        description: Total cumulative usage on the radio
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.7
         name: ubiquiti.unifiRadioCuSelfRx
+        description: Cumulative self received usage on the radio
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.8
         name: ubiquiti.unifiRadioCuSelfTx
+        description: Cumulative self transmitted usage on the radio
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.41112.1.6.1.1.1.9
         name: ubiquiti.unifiRadioOtherBss
+        description: Other basic service sets on the radio
+        unit: "TBD"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.41112.1.6.1.1.1.1

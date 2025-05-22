@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "function-metrics-cardinality.h"
-#include "database/contexts/internal.h"
+#include "database/contexts/rrdcontext-internal.h"
 
 struct counts {
     size_t nodes;

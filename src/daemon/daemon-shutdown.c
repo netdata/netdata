@@ -23,6 +23,7 @@ void rrd_functions_inflight_destroy(void);
 void cgroup_netdev_link_destroy(void);
 void bearer_tokens_destroy(void);
 void alerts_by_x_cleanup(void);
+void websocket_threads_join(void);
 
 static bool abort_on_fatal = true;
 
@@ -70,8 +71,7 @@ void cancel_main_threads(void) {
     if (!static_threads)
         return;
 
-    int i, found = 0;
-    usec_t max = 5 * USEC_PER_SEC, step = 100000;
+    int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             if (static_threads[i].thread) {
@@ -81,35 +81,16 @@ void cancel_main_threads(void) {
                 netdata_log_info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
                 static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
             }
-            found++;
         }
     }
 
-    while(found && max > 0) {
-        max -= step;
-        netdata_log_info("Waiting %d threads to finish...", found);
-        sleep_usec(step);
-        found = 0;
-        for (i = 0; static_threads[i].name != NULL ; i++) {
+    for (i = 0; static_threads[i].name != NULL ; i++) {
+        if(static_threads[i].thread && !nd_thread_is_me(static_threads[i].thread)) {
             if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
-                continue;
-
-            // Don't wait ourselves.
-            if (nd_thread_is_me(static_threads[i].thread))
-                continue;
-
-            found++;
+                nd_thread_join(static_threads[i].thread);
         }
     }
-
-    if(found) {
-        for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
-                netdata_log_error("Main thread %s takes too long to exit. Giving up...", static_threads[i].name);
-        }
-    }
-    else
-        netdata_log_info("All threads finished.");
+    netdata_log_info("All threads finished.");
 
     freez(static_threads);
     static_threads = NULL;
@@ -217,8 +198,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
-    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
+    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS | SERVICE_ACLK |
                         ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
+
+    service_signal_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD);
+
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
     service_wait_exit(SERVICE_MAINTENANCE | SERVICE_SYSTEMD, 5 * USEC_PER_SEC);
@@ -265,9 +249,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     cancel_main_threads();
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
-    metadata_sync_shutdown_background();
-    watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
-
     if (abnormal) {
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
@@ -288,7 +269,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             ND_THREAD *th[nd_profile.storage_tiers];
             for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-                th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
+                th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
             rrdeng_flush_everything_and_wait(true, true, false);
@@ -310,7 +291,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
 
-        metadata_sync_shutdown_background_wait();
+        metadata_sync_shutdown();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
@@ -318,6 +299,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if (!abnormal)
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
 
+    websocket_threads_join();
+    nd_thread_join_threads();
     sqlite_close_databases();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();

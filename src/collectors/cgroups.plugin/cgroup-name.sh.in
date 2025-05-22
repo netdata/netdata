@@ -147,25 +147,37 @@ function docker_like_get_name_command() {
 function docker_like_get_name_api() {
   local host_var="${1}"
   local host="${!host_var}"
-  local path="/containers/${2}/json"
+  local container_id="${2}"
+  local path="/containers/${container_id}/json"
+
   if [ -z "${host}" ]; then
     warning "No ${host_var} is set"
     return 1
   fi
+
   if ! command -v jq >/dev/null 2>&1; then
     warning "Can't find jq command line tool. jq is required for netdata to retrieve container name using ${host} API, falling back to docker ps"
     return 1
   fi
-  if [ -S "${host}" ]; then
-    info "Running API command: curl --unix-socket \"${host}\" http://localhost${path}"
-    JSON=$(curl -sS --unix-socket "${host}" "http://localhost${path}")
+
+  if [[ "${host}" =~ ^([a-z]+)://(.*) ]]; then
+    address="${BASH_REMATCH[2]}"
   else
-    info "Running API command: curl \"${host}${path}\""
-    JSON=$(curl -sS "${host}${path}")
+    address="${host}"
   fi
+
+  if [ -S "${address}" ]; then
+    info "Running API command: curl --unix-socket \"${address}\" http://localhost${path}"
+    JSON=$(curl -sS --unix-socket "${address}" "http://localhost${path}")
+  else
+    info "Running API command: curl \"${address}${path}\""
+    JSON=$(curl -sS "${address}${path}")
+  fi
+
   if OUTPUT=$(echo "${JSON}" | jq -r '.Config.Env[]?, "CONT_NAME=\(.Name)", "IMAGE_NAME=\(.Config.Image)", (.Config.Labels | to_entries[] | "LABEL_\(.key)=\(.value)")') && [ -n "$OUTPUT" ]; then
     parse_docker_like_inspect_output "$OUTPUT"
   fi
+
   return 0
 }
 
@@ -615,8 +627,8 @@ function podman_validate_id() {
 
 # -----------------------------------------------------------------------------
 
-DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
-PODMAN_HOST="${PODMAN_HOST:=/run/podman/podman.sock}"
+DOCKER_HOST="${DOCKER_HOST:=unix:///var/run/docker.sock}"
+PODMAN_HOST="${PODMAN_HOST:=unix:///run/podman/podman.sock}"
 CGROUP_PATH="${1}" # the path as it is (e.g. '/docker/efcf4c409')
 CGROUP="${2//\//_}" # the modified path (e.g. 'docker_efcf4c409')
 EXIT_SUCCESS=0

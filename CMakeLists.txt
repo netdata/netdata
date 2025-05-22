@@ -852,6 +852,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/eval/eval.h
         src/libnetdata/eval/eval-internal.h
         src/libnetdata/eval/eval-unittest.c
+        src/libnetdata/eval/eval-unittest-hardcoding.c
         src/libnetdata/eval/re2c_lemon/lexer.c
         src/libnetdata/eval/re2c_lemon/parser.c
         src/libnetdata/eval/re2c_lemon/parser_wrapper.c
@@ -1598,15 +1599,15 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/api_v2_contexts_alerts.h
         src/database/contexts/api_v2_contexts_alert_transitions.c
         src/database/contexts/api_v2_contexts_alert_config.c
-        src/database/contexts/context.c
-        src/database/contexts/instance.c
-        src/database/contexts/internal.h
-        src/database/contexts/metric.c
+        src/database/contexts/rrdcontext-context.c
+        src/database/contexts/rrdcontext-instance.c
+        src/database/contexts/rrdcontext-internal.h
+        src/database/contexts/rrdcontext-metric.c
         src/database/contexts/query_scope.c
         src/database/contexts/query_target.c
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
-        src/database/contexts/worker.c
+        src/database/contexts/rrdcontext-worker.c
         src/database/rrdcollector.c
         src/database/rrdcollector.h
         src/database/rrddim.c
@@ -1620,6 +1621,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrd.h
         src/database/rrd-metadata.c
         src/database/rrd-metadata.h
+        src/database/rrd-retention.c
+        src/database/rrd-retention.h
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
@@ -1658,7 +1661,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
-        src/database/contexts/contexts-loading.c
+        src/database/contexts/rrdcontext-loading.c
         src/database/rrdset-index-id.c
         src/database/rrdset-index-id.h
         src/database/rrdset-index-name.c
@@ -1688,6 +1691,9 @@ set(RRD_PLUGIN_FILES
         src/database/rrdhost-collection.h
         src/database/pattern-array.c
         src/database/pattern-array.h
+        src/database/contexts/rrdcontext-queues.c
+        src/database/contexts/rrdcontext-context-registry.c
+        src/database/contexts/rrdcontext-context-registry.h
 )
 
 if(ENABLE_DBENGINE)
@@ -1823,22 +1829,57 @@ set(STREAMING_PLUGIN_FILES
 )
 
 set(WEB_PLUGIN_FILES
-        src/web/server/web_client.c
-        src/web/server/web_client.h
-        src/web/server/web_server.c
-        src/web/server/web_server.h
-        src/web/server/static/static-threaded.c
-        src/web/server/static/static-threaded.h
-        src/web/server/web_client_cache.c
-        src/web/server/web_client_cache.h
-        src/web/api/v3/api_v3_stream_info.c
-        src/web/api/v3/api_v3_stream_path.c
-        src/web/api/queries/backfill.c
-        src/web/api/queries/backfill.h
         src/web/api/functions/function-metrics-cardinality.c
         src/web/api/functions/function-metrics-cardinality.h
+        src/web/api/queries/backfill.c
+        src/web/api/queries/backfill.h
         src/web/api/request_source.c
         src/web/api/request_source.h
+        src/web/api/v3/api_v3_stream_info.c
+        src/web/api/v3/api_v3_stream_path.c
+        src/web/mcp/adapters/mcp-websocket.c
+        src/web/mcp/adapters/mcp-websocket.h
+        src/web/mcp/mcp-context.c
+        src/web/mcp/mcp-context.h
+        src/web/mcp/mcp-initialize.c
+        src/web/mcp/mcp-initialize.h
+        src/web/mcp/mcp-notifications.c
+        src/web/mcp/mcp-notifications.h
+        src/web/mcp/mcp-prompts.c
+        src/web/mcp/mcp-prompts.h
+        src/web/mcp/mcp-resources.c
+        src/web/mcp/mcp-resources.h
+        src/web/mcp/mcp-system.c
+        src/web/mcp/mcp-system.h
+        src/web/mcp/mcp-tools.c
+        src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp.c
+        src/web/mcp/mcp.h
+        src/web/server/static/static-threaded.c
+        src/web/server/static/static-threaded.h
+        src/web/server/web_client.c
+        src/web/server/web_client.h
+        src/web/server/web_client_cache.c
+        src/web/server/web_client_cache.h
+        src/web/server/web_server.c
+        src/web/server/web_server.h
+        src/web/websocket/websocket-buffer.h
+        src/web/websocket/websocket-compression.c
+        src/web/websocket/websocket-compression.h
+        src/web/websocket/websocket-echo.c
+        src/web/websocket/websocket-echo.h
+        src/web/websocket/websocket-handshake.c
+        src/web/websocket/websocket-internal.h
+        src/web/websocket/websocket-jsonrpc.c
+        src/web/websocket/websocket-jsonrpc.h
+        src/web/websocket/websocket-message.c
+        src/web/websocket/websocket-receive.c
+        src/web/websocket/websocket-send.c
+        src/web/websocket/websocket-thread.c
+        src/web/websocket/websocket-thread.h
+        src/web/websocket/websocket-utils.c
+        src/web/websocket/websocket.c
+        src/web/websocket/websocket.h
 )
 
 set(CLAIM_PLUGIN_FILES
@@ -2134,7 +2175,7 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/context_stream.cc
         src/aclk/schema-wrappers/context_stream.h
         src/aclk/schema-wrappers/context.cc
-        src/aclk/schema-wrappers/context.h
+        src/aclk/schema-wrappers/rrdcontext-context.h
         src/aclk/schema-wrappers/schema_wrappers.h
         src/aclk/schema-wrappers/schema_wrapper_utils.cc
         src/aclk/schema-wrappers/schema_wrapper_utils.h
@@ -3037,6 +3078,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32>"
 )
 
 netdata_add_protobuf(netdata)

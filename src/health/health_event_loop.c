@@ -133,11 +133,17 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     rrdset_foreach_reentrant(st, host) {
-        if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
+        if (!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION))
+            continue;
+
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
+
         health_prototype_alerts_for_rrdset_incrementally(st);
+
+        if (!service_running(SERVICE_HEALTH))
+            break;
     }
     rrdset_foreach_done(st);
 }
@@ -162,6 +168,10 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     sql_health_alarm_log_load(host);
     rw_spinlock_init(&host->health_log.spinlock);
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
+
+
+    if (!service_running(SERVICE_HEALTH))
+        return;
 
     health_apply_prototypes_to_host(host);
 }
@@ -269,16 +279,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                rrdhost_hostname(host));
 
         host->health.delay_up_to = 0;
-    }
-
-    // wait until cleanup of obsolete charts on children is complete
-    if (host != localhost) {
-        if (unlikely(host->stream.rcv.status.check_obsolete)) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "[%s]: Waiting for chart obsoletion check.",
-                   rrdhost_hostname(host));
-            return;
-        }
     }
 
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
@@ -712,8 +712,8 @@ static void health_main_cleanup(void *pptr) {
 
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    finalize_self_prepared_sql_statements();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");
 }
 

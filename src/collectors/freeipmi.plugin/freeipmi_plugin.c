@@ -1983,7 +1983,7 @@ int main (int argc, char **argv) {
     };
 
     nd_thread_create("IPMI[sensors]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sensors_data);
-    if(netdata_do_sel)
+    if (netdata_do_sel)
         nd_thread_create("IPMI[sel]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sel_data);
 
     // ------------------------------------------------------------------------

@@ -652,12 +652,13 @@ void *analytics_main(void *ptr)
     while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
         heartbeat_next(&hb);
         sec++;
+        if (sec == ANALYTICS_INIT_IMMUTABLE_DATA_SEC)
+            analytics_gather_immutable_meta_data();
     }
 
     if (unlikely(!service_running(SERVICE_ANALYTICS)))
         goto cleanup;
 
-    analytics_gather_immutable_meta_data();
     analytics_gather_mutable_meta_data();
 
     analytics_statistic_t statistic = { "META_START", "-", "-"  };

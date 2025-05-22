@@ -10,6 +10,8 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.11
+        description: Cpu usage percentage
+        unit: "%"
     metric_tags:
       - symbol:
           name: alcatel.ent.healthModuleChassisId
@@ -24,6 +26,8 @@ metrics:
     symbols:
       - name: memory.usage
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.8
+        description: Memory usage percentage
+        unit: "%"
     metric_tags:
       - symbol:
           name: alcatel.ent.healthModuleChassisId
@@ -38,10 +42,13 @@ metrics:
     symbols:
       - name: alcatel.ent.chasEntPhysical
         constant_value_one: true
+        description: Physical entity constant value one
+        unit: "{physical_entity}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         tag: ent_physical_class
@@ -61,24 +68,32 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
-      - # MIB: ENTITY-MIB
+        description: An indication of the general hardware type of the physical entity
+        unit: "{physical_entity}"
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
         tag: ent_physical_name
-      - # MIB: ENTITY-MIB
+        description: The textual name of the physical entity
+        unit: "{physical_entity}"
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
         tag: ent_physical_serial_num
-      - # MIB: ENTITY-MIB
+        description: The vendor-specific serial number string for the physical entity
+        unit: "{physical_entity}"
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
         tag: ent_physical_model_name
+        description: The vendor-specific model name identifier string associated with this physical component
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.1
           name: alcatel.ent.chasEntPhysAdminStatus
@@ -95,6 +110,8 @@ metrics:
           9: takeover_with_fabrc
           10: vc_takeover
           11: reset_vc_all
+        description: The administrative status of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.2
           name: alcatel.ent.chasEntPhysOperStatus
@@ -110,6 +127,8 @@ metrics:
           8: master
           9: idle
           10: pwrsave
+        description: The operational status of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.6
           name: alcatel.ent.chasEntPhysLedStatusOk1
@@ -121,6 +140,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status ok1 of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.7
           name: alcatel.ent.chasEntPhysLedStatusOk2
@@ -132,6 +153,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status ok2 of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.8
           name: alcatel.ent.chasEntPhysLedStatusPrimaryCMM
@@ -143,6 +166,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status primary cmm of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.9
           name: alcatel.ent.chasEntPhysLedStatusSecondaryCMM
@@ -154,6 +179,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status secondary cmm of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.10
           name: alcatel.ent.chasEntPhysLedStatusTemperature
@@ -165,6 +192,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status temperature of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.11
           name: alcatel.ent.chasEntPhysLedStatusFan
@@ -176,6 +205,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status fan of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.12
           name: alcatel.ent.chasEntPhysLedStatusBackupPS
@@ -187,6 +218,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status backup power supply of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.13
           name: alcatel.ent.chasEntPhysLedStatusInternalPS
@@ -198,6 +231,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status internal power supply of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.14
           name: alcatel.ent.chasEntPhysLedStatusControl
@@ -209,6 +244,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status control of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.15
           name: alcatel.ent.chasEntPhysLedStatusFabric
@@ -220,6 +257,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status fabric of the physical entity
+        unit: "{physical_entity}"
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.16
           name: alcatel.ent.chasEntPhysLedStatusPS
@@ -231,6 +270,8 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
+        description: Led status power supply of the physical entity
+        unit: "{physical_entity}"
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
     table:
       name: chasEntTemperatureTable
@@ -238,10 +279,13 @@ metrics:
     symbols:
       - name: alcatel.ent.chasEntTempCurrent
         OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.1
+        description: Current temperature of the physical entity
+        unit: "Cel"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         tag: ent_physical_class
@@ -261,21 +305,21 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
         tag: ent_physical_name
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
         tag: ent_physical_serial_num
-      - # MIB: ENTITY-MIB
+        # MIB: ENTITY-MIB
         # table: entPhysicalTable
-        symbol:
+      - symbol:
           name: alcatel.ent.entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
         tag: ent_physical_model_name
@@ -289,6 +333,8 @@ metrics:
           3: under_threshold
           4: over_first_threshold
           5: over_danger_threshold
+        description: Status of the temperature sensor
+        unit: "{temperature_status}"
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
     table:
       name: alaChasEntPhysFanTable
@@ -296,6 +342,9 @@ metrics:
     symbols:
       - name: alcatel.ent.alaChasEntPhysFanSpeed
         OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.4
+        description: Fan speed in revolutions per minute
+        unit: "1.min"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.2
@@ -305,6 +354,8 @@ metrics:
           0: no_status
           1: not_running
           2: running
+        description: Operational status of the fan
+        unit: "{fan_status}"
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
     table:
       name: alaChasBpsPowerSupplyTable
@@ -312,6 +363,8 @@ metrics:
     symbols:
       - name: alcatel.ent.alaChasBpsPowerSupply
         constant_value_one: true
+        description: Power supply constant value one
+        unit: "{power_supply}"
     metric_tags:
       - symbol:
           name: alcatel.ent.alaChasBpsPowerSupplyName
@@ -321,6 +374,7 @@ metrics:
           name: alcatel.ent.alaChasBpsPowerSupplySerialNum
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.8
         tag: ala_chas_bps_power_supply_serial_num
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.10
           name: alcatel.ent.alaChasBpsPowerSupplyOperStatus
@@ -329,3 +383,5 @@ metrics:
           1: up
           2: down
           3: unknown
+        description: Operational status of the power supply
+        unit: "{power_supply_status}"

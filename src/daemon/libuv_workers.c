@@ -26,7 +26,6 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN, "flushed to open");
 
     // datafile full
-    worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT, "jv2 index wait");
     worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX, "jv2 indexing");
 
     // db rotation related
@@ -110,25 +109,6 @@ void register_libuv_worker_jobs() {
     register_libuv_worker_jobs_internal();
 }
 
-// utils
-#define MAX_THREAD_CREATE_RETRIES (10)
-#define MAX_THREAD_CREATE_WAIT_MS (1000)
-
-int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
-{
-    int err;
-
-    do {
-        err = uv_thread_create(thread, thread_func, arg);
-        if (err == 0)
-            break;
-
-        uv_sleep(MAX_THREAD_CREATE_WAIT_MS);
-    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
-
-    return err;
-}
-
 void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
 {
     // Only close handles that aren't already closing
@@ -138,4 +118,167 @@ void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
         }
         uv_close(handle, NULL);
     }
+}
+
+// Initialize the worker pool
+void init_worker_pool(WorkerPool *pool) {
+    for (int i = 0; i < MAX_ACTIVE_WORKERS; i++) {
+        pool->workers[i].allocated = false;
+        pool->free_stack[i] = i;  // Fill the stack with indices
+    }
+    pool->top = MAX_ACTIVE_WORKERS;  // All workers are initially free
+}
+
+// Get a worker (reuse if available, NULL if pool exhausted)
+worker_data_t *get_worker(WorkerPool *pool) {
+    if (pool->top == 0) {
+        worker_data_t *worker = callocz(1, sizeof(worker_data_t));
+        worker->allocated = true;  // Mark as allocated
+        return worker;
+    }
+    int index = pool->free_stack[--pool->top];  // Pop from stack
+    return &pool->workers[index];
+}
+
+// Return a worker for reuse
+void return_worker(WorkerPool *pool, worker_data_t *worker) {
+    if (unlikely(worker->allocated)) {
+        freez(worker);
+        return;
+    }
+
+    int index = (int) (worker - pool->workers);
+    if (index < 0 || index >= MAX_ACTIVE_WORKERS) {
+        return;  // Invalid worker (should not happen)
+    }
+    pool->free_stack[pool->top++] = index;  // Push index back to stack
+}
+
+// Initialize the command pool
+void init_cmd_pool(CmdPool *pool, int size) {
+    pool->buffer = mallocz(sizeof(cmd_data_t) * size);
+
+    pool->size = size;
+    pool->head = 0;
+    pool->tail = 0;
+    pool->count = 0;
+
+    uv_mutex_init(&pool->lock);
+    uv_cond_init(&pool->not_full);
+}
+
+bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
+{
+    uv_mutex_lock(&pool->lock);
+
+    while (pool->count == pool->size) {
+        if (wait_on_full)
+            uv_cond_wait(&pool->not_full, &pool->lock);
+        else {
+            uv_mutex_unlock(&pool->lock); // No space, return
+            return false;
+        }
+    }
+
+    pool->buffer[pool->tail] = *cmd;
+    pool->tail = (pool->tail + 1) % pool->size;
+    pool->count++;
+
+    uv_mutex_unlock(&pool->lock);
+    return true;
+}
+
+bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd) {
+    uv_mutex_lock(&pool->lock);
+    if (pool->count == 0) {
+        uv_mutex_unlock(&pool->lock); // No commands to pop
+        return false;
+    }
+    *out_cmd = pool->buffer[pool->head];
+    pool->head = (pool->head + 1) % pool->size;
+    pool->count--;
+
+    uv_cond_signal(&pool->not_full);
+    uv_mutex_unlock(&pool->lock);
+    return true;
+}
+
+void release_cmd_pool(CmdPool *pool) {
+    if (pool->buffer) {
+        free(pool->buffer);
+        pool->buffer = NULL;
+    }
+    uv_mutex_destroy(&pool->lock);
+    uv_cond_destroy(&pool->not_full);
+}
+
+/// Test
+
+typedef struct {
+    CmdPool *pool;
+    int total;
+    int failed;
+} ThreadArgs;
+
+void push_thread(void *arg) {
+    ThreadArgs *args = (ThreadArgs *)arg;
+    CmdPool *pool = args->pool;
+    for (int i = 0; i < args->total; ++i) {
+        cmd_data_t cmd;
+        snprintf(cmd.data, sizeof(cmd.data), "cmd-%d", i);
+        push_cmd(pool, &cmd, true);
+    }
+    fprintf(stderr, "PUSHED: %d commands\n", args->total);
+}
+
+void pop_thread(void *arg) {
+    ThreadArgs *args = (ThreadArgs *)arg;
+    CmdPool *pool = args->pool;
+
+    cmd_data_t cmd;
+    for (int i = 0; i < args->total; ) {
+        bool got = pop_cmd(pool, &cmd);
+        if (got) {
+            char expected[64];
+            snprintf(expected, sizeof(expected), "cmd-%d", i);
+            if (strcmp(cmd.data, expected) != 0) {
+                fprintf(stderr, "POPPED: %s --- EXPECTED %s FAILED\n", cmd.data, expected);
+                args->failed++;
+            }
+            i++;
+        } else {
+            uv_sleep(1);  // avoid busy spin
+        }
+    }
+    fprintf(stderr, "POPPED: %d commands\n", args->total);
+}
+
+int test_cmd_pool_fifo()
+{
+    CmdPool pool;
+
+    int pool_sizes[] = {32, 64, 128, 256};
+
+    for (size_t i = 0; i < sizeof(pool_sizes) / sizeof(pool_sizes[0]); ++i) {
+        int pool_size = pool_sizes[i];
+        init_cmd_pool(&pool, pool_size);
+
+        ThreadArgs args = {.pool = &pool, .total = 1000, .failed = 0};
+        uv_thread_t producer, consumer;
+        fprintf(stderr, "Testing pool size %d\n", pool_size);
+
+        uv_thread_create(&producer, push_thread, &args);
+        uv_thread_create(&consumer, pop_thread, &args);
+
+        uv_thread_join(&producer);
+        uv_thread_join(&consumer);
+
+        release_cmd_pool(&pool);
+        if (args.failed) {
+            fprintf(stderr, "Multithreaded FIFO test failed with %d errors.\n", args.failed);
+            return 1;
+        }
+    }
+    fprintf(stderr, "Multithreaded FIFO test passed.\n");
+    return 0;
 }

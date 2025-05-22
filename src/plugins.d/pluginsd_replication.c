@@ -262,29 +262,18 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
         flags_str = "";
 
     if (likely(value_str)) {
-        RRDDIM_FLAGS rd_flags = rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED);
+        NETDATA_DOUBLE value = str2ndd_encoded(value_str, NULL);
+        SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
 
-        if(!(rd_flags & RRDDIM_FLAG_ARCHIVED)) {
-            NETDATA_DOUBLE value = str2ndd_encoded(value_str, NULL);
-            SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
-
-            if (!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT)) {
-                value = NAN;
-                flags = SN_EMPTY_SLOT;
-            }
-
-            rrddim_store_metric(rd, parser->user.replay.end_time_ut, value, flags);
-            rd->collector.last_collected_time.tv_sec = parser->user.replay.end_time;
-            rd->collector.last_collected_time.tv_usec = 0;
-            rd->collector.counter++;
+        if (!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT)) {
+            value = NAN;
+            flags = SN_EMPTY_SLOT;
         }
-        else {
-            nd_log_limit_static_global_var(erl, 1, 0);
-            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
-                         "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. "
-                         "Ignoring data.",
-                         rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_name(rd));
-        }
+
+        rrddim_store_metric(rd, parser->user.replay.end_time_ut, value, flags);
+        rd->collector.last_collected_time.tv_sec = parser->user.replay.end_time;
+        rd->collector.last_collected_time.tv_usec = 0;
+        rd->collector.counter++;
     }
 
     return PARSER_RC_OK;

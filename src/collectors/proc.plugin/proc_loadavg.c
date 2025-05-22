@@ -12,7 +12,7 @@ static const RRDVAR_ACQUIRED *rd_pidmax = NULL;
 
 void proc_loadavg_plugin_cleanup(void) {
     // Cleanup any acquired RRDVARs
-    RRDSET *st = rrdset_find_localhost("system.active_processes");
+    RRDSET *st = rrdset_find(localhost, "system.active_processes", true);
     if (st && rd_pidmax) {
         rrdvar_chart_variable_release(st, rd_pidmax);
         rd_pidmax = NULL;

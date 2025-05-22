@@ -25,6 +25,7 @@ type SysInfo struct {
 	Name         string `json:"name"`
 	Location     string `json:"location"`
 	Organization string `json:"organization"`
+	SysObjectID  string `json:"-"`
 }
 
 func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
@@ -38,27 +39,30 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 		Organization: "Unknown",
 	}
 
-	r := strings.NewReplacer("\n", "\\n", "\r", "\\r")
+	r := strings.NewReplacer("\n", " ", "\r", " ")
 
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
 
 		switch oid {
 		case OidSysDescr:
-			if si.Descr, err = PduToString(pdu); err == nil {
-				si.Descr = r.Replace(si.Descr)
-			}
+			si.Descr, err = PduToString(pdu)
+			si.Descr = r.Replace(si.Descr)
 		case OidSysObject:
 			var sysObj string
 			if sysObj, err = PduToString(pdu); err == nil {
 				si.Organization = LookupBySysObject(sysObj)
+				si.SysObjectID = sysObj
 			}
 		case OidSysContact:
 			si.Contact, err = PduToString(pdu)
+			si.Contact = r.Replace(si.Contact)
 		case OidSysName:
 			si.Name, err = PduToString(pdu)
+			si.Name = r.Replace(si.Name)
 		case OidSysLocation:
 			si.Location, err = PduToString(pdu)
+			si.Location = r.Replace(si.Location)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("OID '%s': %v", pdu.Name, err)

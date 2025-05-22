@@ -343,48 +343,55 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     nd_logger_log_fields(spinlock, fp, limit, priority, output, &nd_log.sources[source],
                          thread_log_fields, THREAD_FIELDS_MAX);
 
-    if(nd_log.sources[source].pending_msg) {
-        // log a pending message
+    if(nd_log.sources[source].pending_msg && spinlock_trylock(&nd_log.sources[source].limits.spinlock)) {
+        // we have to check again if the pending message is still there
 
-        nd_logger_unset_all_thread_fields();
+        const char *pending_msg = nd_log.sources[source].pending_msg;
 
-        thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = (struct log_stack_entry){
+        if(pending_msg) {
+            nd_logger_unset_all_thread_fields();
+
+            thread_log_fields[NDF_TIMESTAMP_REALTIME_USEC].entry = (struct log_stack_entry){
                 .set = true,
                 .type = NDFT_U64,
                 .u64 = now_realtime_usec(),
-        };
+            };
 
-        thread_log_fields[NDF_LOG_SOURCE].entry = (struct log_stack_entry){
+            thread_log_fields[NDF_LOG_SOURCE].entry = (struct log_stack_entry){
                 .set = true,
                 .type = NDFT_TXT,
                 .txt = nd_log_id2source(source),
-        };
+            };
 
-        thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = (struct log_stack_entry){
+            thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = (struct log_stack_entry){
                 .set = true,
                 .type = NDFT_TXT,
                 .txt = program_name,
-        };
+            };
 
-        thread_log_fields[NDF_MESSAGE].entry = (struct log_stack_entry){
+            thread_log_fields[NDF_MESSAGE].entry = (struct log_stack_entry){
                 .set = true,
                 .type = NDFT_TXT,
-                .txt = nd_log.sources[source].pending_msg,
-        };
+                .txt = pending_msg,
+            };
 
-        thread_log_fields[NDF_MESSAGE_ID].entry = (struct log_stack_entry){
-            .set = nd_log.sources[source].pending_msgid != NULL,
-            .type = NDFT_UUID,
-            .uuid = nd_log.sources[source].pending_msgid,
-        };
+            thread_log_fields[NDF_MESSAGE_ID].entry = (struct log_stack_entry){
+                .set = nd_log.sources[source].pending_msgid != NULL,
+                .type = NDFT_UUID,
+                .uuid = nd_log.sources[source].pending_msgid,
+            };
 
-        nd_logger_log_fields(spinlock, fp, false, priority, output,
-                             &nd_log.sources[source],
-                             thread_log_fields, THREAD_FIELDS_MAX);
+            nd_log.sources[source].pending_msg = NULL;
+            nd_log.sources[source].pending_msgid = NULL;
+        }
 
-        freez((void *)nd_log.sources[source].pending_msg);
-        nd_log.sources[source].pending_msg = NULL;
-        nd_log.sources[source].pending_msgid = NULL;
+        spinlock_unlock(&nd_log.sources[source].limits.spinlock);
+
+        if(pending_msg)
+            nd_logger_log_fields(spinlock, fp, false, priority, output, &nd_log.sources[source],
+                                 thread_log_fields, THREAD_FIELDS_MAX);
+
+        freez((void *)pending_msg);
     }
 
     errno_clear();
@@ -473,12 +480,14 @@ static void recursive_fatal_abort(void) {
     _exit(1);
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
 NEVER_INLINE NORETURN
 static void fatal_abort_internal_checks(void) {
     // keep this as a separate function, to have it logged like this in sentry
     abort();
     _exit(1);
 }
+#endif
 
 NEVER_INLINE
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {

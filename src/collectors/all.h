@@ -33,6 +33,7 @@
 #define NETDATA_CHART_PRIO_SYSTEM_ACTIVE_PROCESSES      750
 #define NETDATA_CHART_PRIO_SYSTEM_CTXT                  800
 #define NETDATA_CHART_PRIO_SYSTEM_IDLEJITTER            800
+#define NETDATA_CHART_PRIO_SYSTEM_THREAD_QUEUE          801 // Windows only
 #define NETDATA_CHART_PRIO_SYSTEM_INTR                  900
 #define NETDATA_CHART_PRIO_SYSTEM_SOFTIRQS              950
 #define NETDATA_CHART_PRIO_SYSTEM_SOFTNET_STAT          955
@@ -127,6 +128,7 @@
 #define NETDATA_CHART_PRIO_MEM_SWAP_PAGES             1037 // Windows only
 #define NETDATA_CHART_PRIO_MEM_SWAPIO                 1038
 #define NETDATA_CHART_PRIO_MEM_SYSTEM_POOL            1039 // Windows only
+#define NETDATA_CHART_PRIO_MEM_FREE_SYSTEM_PAGE       1040 // Windows only
 #define NETDATA_CHART_PRIO_MEM_ZSWAP                  1036
 #define NETDATA_CHART_PRIO_MEM_ZSWAPIO                1037
 #define NETDATA_CHART_PRIO_MEM_ZSWAP_COMPRESS_RATIO   1038
@@ -471,7 +473,7 @@
 // [ml] charts
 #define ML_CHART_PRIO_DIMENSIONS                      39181
 #define ML_CHART_PRIO_ANOMALY_RATE                    39182
-#define ML_CHART_PRIO_TYPE_ANOMALY_RATE               39183
+#define ML_CHART_PRIO_CONTEXT_ANOMALY_RATE            39183
 #define ML_CHART_PRIO_DETECTOR_EVENTS                 39184
 
 // [netdata.ml] charts

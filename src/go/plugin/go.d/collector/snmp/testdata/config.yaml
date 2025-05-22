@@ -1,6 +1,7 @@
 update_every: 123
 hostname: "ok"
 create_vnode: yes
+enable_profiles: yes
 vnode:
   name: "ok"
   guid: "ok"

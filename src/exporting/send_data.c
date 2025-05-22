@@ -205,14 +205,12 @@ void simple_connector_send_buffer(
  *
  * @param instance_p an instance data structure.
  */
-void simple_connector_worker(void *instance_p)
+void *simple_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance*)instance_p;
     struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
 
-    char threadname[ND_THREAD_TAG_MAX + 1];
-    snprintfz(threadname, ND_THREAD_TAG_MAX, "EXPSMPL[%zu]", instance->index);
-    uv_thread_set_name_np(threadname);
+    // Thread name is set during creation
 
     uint32_t options = (uint32_t)instance->config.options;
 
@@ -392,4 +390,6 @@ void simple_connector_worker(void *instance_p)
 #endif
 
     simple_connector_cleanup(instance);
+    
+    return NULL;
 }

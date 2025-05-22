@@ -22,10 +22,17 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.3.1.6
         name: netgear.readynasos.ataError
+        description: Ata error count
+        unit: "{error}"
       - OID: 1.3.6.1.4.1.4526.22.3.1.7
         name: netgear.readynasos.diskCapacity
+        description: Disk capacity
+        unit: "By"
       - OID: 1.3.6.1.4.1.4526.22.3.1.10
         name: netgear.readynasos.diskTemperature
+        description: Disk temperature
+        unit: "Cel"
+        # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - tag: netgear_readynasos_disk_id
         symbol:
@@ -62,8 +69,12 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.4.1.2
         name: netgear.readynasos.fanRPM
+        description: Fan revolutions per minute
+        unit: "1.min"
       - OID: 1.3.6.1.4.1.4526.22.4.1.3
         name: netgear.readynasos.fanStatus
+        description: Fan status
+        unit: "TBD"
     metric_tags:
       - tag: netgear_readynasos_fan_type
         symbol:
@@ -76,10 +87,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.5.1.2
         name: netgear.readynasos.temperatureValue
+        description: Temperature value
+        unit: "Cel"
       - OID: 1.3.6.1.4.1.4526.22.5.1.4
         name: netgear.readynasos.temperatureMin
+        description: Minimum temperature
+        unit: "Cel"
       - OID: 1.3.6.1.4.1.4526.22.5.1.5
         name: netgear.readynasos.temperatureMax
+        description: Maximum temperature
+        unit: "Cel"
     metric_tags:
       - tag: netgear_readynasos_temperature_type
         symbol:
@@ -92,15 +109,22 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.4526.22.7.1.3
         name: netgear.readynasos.volumeRAIDLevel
+        description: Volume RAID level
+        unit: "TBD"
       - OID: 1.3.6.1.4.1.4526.22.7.1.5
         name: netgear.readynasos.volumeSize
+        description: Volume size
+        unit: "By"
       - OID: 1.3.6.1.4.1.4526.22.7.1.6
         name: netgear.readynasos.volumeFreeSpace
+        description: Volume free space
+        unit: "By"
     metric_tags:
       - tag: netgear_readynasos_volume_name
         symbol:
           OID: 1.3.6.1.4.1.4526.22.7.1.2
           name: netgear.readynasos.volumeName
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.4526.22.7.1.4
           name: netgear.readynasos.volumeStatus
@@ -120,11 +144,14 @@ metrics:
     symbols:
       - name: netgear.readynasos.psu
         constant_value_one: true
+        description: Power supply unit presence
+        unit: "{psu}"
     metric_tags:
       - tag: netgear_readynasos_psu_desc
         symbol:
           OID: 1.3.6.1.4.1.4526.22.8.1.2
           name: netgear.readynasos.psuDesc
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.4526.22.8.1.3
           name: netgear.readynasos.psuStatus

@@ -17,16 +17,7 @@ metadata:
           OID: 1.3.6.1.2.1.2.2.1.6
           name: ifPhysAddress
           format: mac_address
-      admin_status:
-        symbol:
-          OID: 1.3.6.1.2.1.2.2.1.7
-          name: ifAdminStatus
-      oper_status:
-        symbol:
-          OID: 1.3.6.1.2.1.2.2.1.8
-          name: ifOperStatus
-      # TODO: Impl ip_address
-      alias: # from another table
+      alias:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.18
           name: ifAlias
@@ -37,130 +28,182 @@ metadata:
         tag: interface
 
 metrics:
-- MIB: IF-MIB
-  symbol:
-    OID: 1.3.6.1.2.1.2.1.0
-    name: ifNumber
-
-- MIB: IF-MIB
-  table:
-    OID: 1.3.6.1.2.1.2.2
-    name: ifTable
-  metric_type: monotonic_count_and_rate
-  symbols:
-  - OID: 1.3.6.1.2.1.2.2.1.14
-    name: ifInErrors
-  - OID: 1.3.6.1.2.1.2.2.1.13
-    name: ifInDiscards
-  - OID: 1.3.6.1.2.1.2.2.1.20
-    name: ifOutErrors
-  - OID: 1.3.6.1.2.1.2.2.1.19
-    name: ifOutDiscards
-  metric_tags:
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.1
-      name: ifName
-    table: ifXTable
-    tag: interface
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.18
-      name: ifAlias
-    table: ifXTable
-    tag: interface_alias
-  - index: 1  # ifIndex
-    tag: interface_index
-- MIB: IF-MIB
-  table:
-    OID: 1.3.6.1.2.1.2.2
-    name: ifTable
-  symbols:
-  - OID: 1.3.6.1.2.1.2.2.1.7
-    name: ifAdminStatus
-  - OID: 1.3.6.1.2.1.2.2.1.8
-    name: ifOperStatus
-  - OID: 1.3.6.1.2.1.2.2.1.5
-    name: ifSpeed
-  metric_tags:
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.1
-      name: ifName
-    table: ifXTable
-    tag: interface
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.18
-      name: ifAlias
-    table: ifXTable
-    tag: interface_alias
-  - index: 1  # ifIndex
-    tag: interface_index
-- MIB: IF-MIB
-  table:
-    OID: 1.3.6.1.2.1.31.1.1
-    name: ifXTable
-  metric_type: monotonic_count
-  symbols:
-  - OID: 1.3.6.1.2.1.31.1.1.1.7
-    name: ifHCInUcastPkts
-  - OID: 1.3.6.1.2.1.31.1.1.1.8
-    name: ifHCInMulticastPkts
-  - OID: 1.3.6.1.2.1.31.1.1.1.9
-    name: ifHCInBroadcastPkts
-  - OID: 1.3.6.1.2.1.31.1.1.1.11
-    name: ifHCOutUcastPkts
-  - OID: 1.3.6.1.2.1.31.1.1.1.12
-    name: ifHCOutMulticastPkts
-  - OID: 1.3.6.1.2.1.31.1.1.1.13
-    name: ifHCOutBroadcastPkts
-  metric_tags:
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.1
-      name: ifName
-    tag: interface
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.18
-      name: ifAlias
-    table: ifXTable
-    tag: interface_alias
-  - index: 1  # ifIndex
-    tag: interface_index
-- MIB: IF-MIB
-  table:
-    OID: 1.3.6.1.2.1.31.1.1
-    name: ifXTable
-  metric_type: monotonic_count_and_rate
-  symbols:
-  - OID: 1.3.6.1.2.1.31.1.1.1.6
-    name: ifHCInOctets
-  - OID: 1.3.6.1.2.1.31.1.1.1.10
-    name: ifHCOutOctets
-  metric_tags:
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.1
-      name: ifName
-    tag: interface
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.18
-      name: ifAlias
-    table: ifXTable
-    tag: interface_alias
-  - index: 1  # ifIndex
-    tag: interface_index
-- MIB: IF-MIB
-  table:
-    OID: 1.3.6.1.2.1.31.1.1
-    name: ifXTable
-  symbols:
-  - OID: 1.3.6.1.2.1.31.1.1.1.15
-    name: ifHighSpeed
-  metric_tags:
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.1
-      name: ifName
-    tag: interface
-  - symbol:
-      OID: 1.3.6.1.2.1.31.1.1.1.18
-      name: ifAlias
-    table: ifXTable
-    tag: interface_alias
-  - index: 1  # ifIndex
-    tag: interface_index
+  - MIB: IF-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.2.1.0
+      name: ifNumber
+      description: Number of network interfaces regardless of their current state present on this system
+      family: Network/Interfaces/Count
+      unit: "{interface}"
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.2.2
+      name: ifTable
+    metric_type: monotonic_count_and_rate
+    symbols:
+      - OID: 1.3.6.1.2.1.2.2.1.14
+        name: ifInErrors
+        description: Number of inbound packets that contained errors preventing them from being deliverable to a higher-layer protocol
+        family: Network/Interfaces/Errors
+        unit: "{error}"
+      - OID: 1.3.6.1.2.1.2.2.1.20
+        name: ifOutErrors
+        description: Number of outbound packets that could not be transmitted because of errors
+        family: Network/Interfaces/Errors
+        unit: "{error}"
+      - OID: 1.3.6.1.2.1.2.2.1.13
+        name: ifInDiscards
+        description: Number of inbound packets chosen to be discarded even though no errors had been detected to prevent their being deliverable to a higher-layer protocol
+        family: Network/Interfaces/Discards
+        unit: "{discard}"
+      - OID: 1.3.6.1.2.1.2.2.1.19
+        name: ifOutDiscards
+        description: Number of outbound packets chosen to be discarded even though no errors had been detected to prevent their being transmitted
+        family: Network/Interfaces/Discards
+        unit: "{discard}"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        table: ifXTable
+        tag: interface
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+        table: ifXTable
+        tag: interface_alias
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.2.2
+      name: ifTable
+    symbols:
+      - OID: 1.3.6.1.2.1.2.2.1.7
+        name: ifAdminStatus
+        description: Current administrative state of the interface
+        family: Network/Interfaces/Status
+        unit: "{status}"
+        mapping:
+          1: up
+          2: down
+          3: testing
+      - OID: 1.3.6.1.2.1.2.2.1.8
+        name: ifOperStatus
+        description: Current operational state of the interface
+        family: Network/Interfaces/Status
+        unit: "{status}"
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: notPresent
+          7: lowerLayerDown
+      - OID: 1.3.6.1.2.1.2.2.1.5
+        name: ifSpeed
+        description: Estimate of the interface's current bandwidth in bits per second
+        family: Network/Interfaces/Speed
+        unit: "bit/s"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        table: ifXTable
+        tag: interface
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+        table: ifXTable
+        tag: interface_alias
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    metric_type: monotonic_count
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.7
+        name: ifHCInUcastPkts
+        description: Number of packets delivered by this sub-layer to a higher layer which were not addressed to a multicast or broadcast address
+        family: Network/Interfaces/Packets
+        unit: "{packet}"
+      - OID: 1.3.6.1.2.1.31.1.1.1.8
+        name: ifHCInMulticastPkts
+        description: Number of packets delivered by this sub-layer to a higher layer which were addressed to a multicast address
+        family: Network/Interfaces/Packets
+        unit: "{packet}"
+      - OID: 1.3.6.1.2.1.31.1.1.1.9
+        name: ifHCInBroadcastPkts
+        description: Number of packets delivered by this sub-layer to a higher layer which were addressed to a broadcast address
+        family: Network/Interfaces/Packets
+        unit: "{packet}"
+      - OID: 1.3.6.1.2.1.31.1.1.1.11
+        name: ifHCOutUcastPkts
+        description: Total number of packets that higher-level protocols requested be transmitted and which were not addressed to a multicast or broadcast address
+        family: Network/Interfaces/Packets
+        unit: "{packet}"
+      - OID: 1.3.6.1.2.1.31.1.1.1.12
+        name: ifHCOutMulticastPkts
+        description: Total number of packets that higher-level protocols requested be transmitted and which were addressed to a multicast address
+        family: Network/Interfaces/Packets
+        unit: "{packet}"
+      - OID: 1.3.6.1.2.1.31.1.1.1.13
+        name: ifHCOutBroadcastPkts
+        description: Total number of packets that higher-level protocols requested be transmitted and which were addressed to a broadcast address
+        family: Network/Interfaces/Packets
+        unit: "{packet}"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        tag: interface
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+        table: ifXTable
+        tag: interface_alias
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    metric_type: monotonic_count_and_rate
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.6
+        name: ifHCInOctets
+        description: Total number of octets received on the interface including framing characters
+        family: Network/Interfaces/Traffic
+        unit: "By"
+      - OID: 1.3.6.1.2.1.31.1.1.1.10
+        name: ifHCOutOctets
+        description: Total number of octets transmitted out of the interface including framing characters
+        family: Network/Interfaces/Traffic
+        unit: "By"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        tag: interface
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+        table: ifXTable
+        tag: interface_alias
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.15
+        name: ifHighSpeed
+        description: Estimate of the interface's current bandwidth in units of 1,000,000 bits per second
+        family: Network/Interfaces/Speed
+        unit: "Mbit/s"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        tag: interface
+      - symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+        table: ifXTable
+        tag: interface_alias

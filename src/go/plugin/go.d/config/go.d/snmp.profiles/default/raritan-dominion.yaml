@@ -16,10 +16,14 @@ metrics:
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.13742.3.1.1.0
+      description: Memory usage
+      unit: "%"
   - MIB: RemoteKVMDevice-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.13742.3.1.2.0
+      description: CPU usage
+      unit: "%"
   - MIB: RemoteKVMDevice-MIB
     table:
       name: systemPowerSupplyTable
@@ -27,6 +31,9 @@ metrics:
     symbols:
       - name: raritan.remotekvm.systemPowerSupply
         constant_value_one: true
+        description: System power supply presence
+        unit: "{system_power_supply}"
+    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.13742.3.1.3.1.2
@@ -42,6 +49,8 @@ metrics:
     symbols:
       - name: raritan.remotekvm.portData
         constant_value_one: true
+        description: Port data presence
+        unit: "{port_data}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.13742.3.1.4.1.3
@@ -51,6 +60,7 @@ metrics:
           OID: 1.3.6.1.4.1.13742.3.1.4.1.4
           name: raritan.remotekvm.portDataType
         tag: raritan_remotekvm_port_data_type
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
       - symbol:
           OID: 1.3.6.1.4.1.13742.3.1.4.1.5
           name: raritan.remotekvm.portDataStatus

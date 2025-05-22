@@ -27,6 +27,7 @@ typedef struct rrdstats_metadata {
     struct {
         size_t collected;
         size_t available;
+        size_t unique;    // Count of unique contexts across all hosts
     } contexts;
 } RRDSTATS_METADATA;
 

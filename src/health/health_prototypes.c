@@ -617,9 +617,13 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
     rw_spinlock_read_unlock(&ap->_internal.rw_spinlock);
 }
 
+extern __thread bool is_health_thread;
+
 void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
     RRD_ALERT_PROTOTYPE *ap;
     dfe_start_read(health_globals.prototypes.dict, ap) {
+        if (is_health_thread && !service_running(SERVICE_HEALTH))
+            break;
         health_prototype_apply_to_rrdset(st, ap);
     }
     dfe_done(ap);
@@ -689,6 +693,8 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
     // apply all the prototypes for the charts of the host
     RRDSET *st;
     rrdset_foreach_reentrant(st, host) {
+        if (is_health_thread && !service_running(SERVICE_HEALTH))
+            break;
         health_prototype_reset_alerts_for_rrdset(st);
     }
     rrdset_foreach_done(st);

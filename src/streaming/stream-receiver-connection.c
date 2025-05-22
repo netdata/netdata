@@ -6,6 +6,8 @@
 #include "web/server/h2o/http_server.h"
 #include "stream-replication-sender.h"
 
+void svc_rrdhost_obsolete_all_charts(RRDHOST *host);
+
 // --------------------------------------------------------------------------------------------------------------------
 
 static void stream_receiver_connected_msg(RRDHOST *host, char *dst, size_t len) {
@@ -135,6 +137,7 @@ static int stream_receiver_response_too_busy_now(struct web_client *w) {
 }
 
 static void stream_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
+    // Set the file descriptor and ssl from the web client
     rpt->sock.fd = w->fd;
     rpt->sock.ssl = w->ssl;
 
@@ -149,6 +152,8 @@ static void stream_receiver_takeover_web_connection(struct web_client *w, struct
         w->fd = -1;
 
     buffer_flush(w->response.data);
+
+    web_server_remove_current_socket_from_poll();
 }
 
 static void stream_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
@@ -702,6 +707,9 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     if(stream_receiver_send_first_response(rpt)) {
         // we are the receiver of the node
+
+        // mark all charts as obsolete
+        svc_rrdhost_obsolete_all_charts(rpt->host);
 
         char msg[256];
         stream_receiver_connected_msg(rpt->host, msg, sizeof(msg));

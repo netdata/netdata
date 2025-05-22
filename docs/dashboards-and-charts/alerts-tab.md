@@ -1,58 +1,138 @@
-# Alerts tab
+# Alerts Tab
 
-Netdata comes with hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or its applications.
+Netdata provides hundreds of pre-configured health alerts to notify you when an anomaly or performance issue affects your node or its applications.
 
-## Active tab
+---
 
-From the Active tab, you can see all the active alerts in your Room. You will be presented with a table having information about each alert that is in warning or critical state.
+## Raised Alerts Tab
 
-You can always sort the table by a certain column by clicking on the name of that column, and using the gear icon on the top right to control which columns are visible at any given time.
+The **Raised Alerts** tab shows all current alerts in your Room that are in a **warning** or **critical** state.
 
-### Filter alerts
+### Alert Table Overview
 
-From this tab, you can also filter alerts with the right-hand bar. More specifically, you can filter:
+The table provides key details about each active alert:
 
-- **Alert status**: Filter based on the status of the alerts (e.g., Warning, Critical)
-- **Alert class**: Filter based on the class of the alert (e.g., Latency, Utilization, Workload, etc.)
-- **Alert type & component**: Filter based on the alert's type (e.g., System, Web Server) and component (e.g., CPU, Disk, Load)
-- **Alert role**: Filter by the role that the alert is set to notify (e.g., Sysadmin, Webmaster etc.)
-- **Host labels**: Filter based on the host labels that are configured for the nodes across the Room (e.g., `_cloud_instance_region` to match `us-east-1`)
-- **Node status**: Filter by node availability status (e.g., Live or Offline)
-- **Netdata version**: Filter by Netdata version (e.g., `v1.45.3`)
-- **Nodes**: Filter the alerts based on the nodes of your Room.
+| Column               | Description                                                          |
+|----------------------|----------------------------------------------------------------------|
+| **Alert Name**       | The name of the alert; click to view alert details.                  |
+| **Status**           | Current state: Warning or Critical.                                  |
+| **Class**            | The alert's class (e.g., Latency, Utilization).                      |
+| **Type & Component** | The system type and component involved.                              |
+| **Role**             | The notification role assigned to the alert.                         |
+| **Node Name**        | The node where the alert was triggered.                              |
+| **Silencing Rule**   | Whether silencing rules are applied.                                 |
+| **Actions**          | Options to create silencing rules or ask Netdata Assistant for help. |
 
-### View alert details
+Use the **gear icon** (top right) to control which columns are visible. Sort alerts by clicking on column headers.
 
-By clicking on the name of an entry of the table, you can access that alert's details page, providing you with:
+---
 
-- Latest and Triggered time values
-- The alert's description
-- A link to the Netdata Advisor's page about this alert
-- The chart at the time frame that the alert was triggered
-- The alert's information: Node name, chart instance, type, component and class
-- Configuration section
-- Instance values - Node Instances
+## Filtering Alerts
 
-At the bottom of the panel you can click the green button "View alert page" to open a dynamic tab containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
+Filter the alert list using the right-hand bar:
 
-### Silence an alert
+| Filter Option              | Purpose                                                                          |
+|----------------------------|----------------------------------------------------------------------------------|
+| **Alert Status**           | Filter by status (Warning, Critical).                                            |
+| **Alert Class**            | Filter by class (e.g., Latency, Utilization).                                    |
+| **Alert Type & Component** | Filter by alert type (e.g., System, Web Server) and component (e.g., CPU, Disk). |
+| **Alert Role**             | Filter by the notification role (e.g., Sysadmin, Webmaster).                     |
+| **Host Labels**            | Filter by host labels (e.g., `_cloud_instance_region=us-east-1`).                |
+| **Node Status**            | Filter by node availability (Live, Offline).                                     |
+| **Netdata Version**        | Filter by the Netdata version.                                                   |
+| **Nodes**                  | Filter by specific nodes.                                                        |
 
-From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules) for this alert, or get help and information about this alert from the [Netdata Assistant](/docs/netdata-assistant.md).
+---
 
-## Alert Configurations tab
+## Viewing Alert Details
 
-From this tab, you can view all the configurations for all running alerts in your Room. Each row concerns one alert, and it provides information about it in the rest of the table columns.
+Click on an alert name to open the **alert details page**, which provides:
 
-By running alerts, we mean alerts that are related to some metric that is or was collected. Netdata may have more alerts pre-configured that aren't applicable to your monitoring use-cases.
+| Section                      | Description                                                  |
+|------------------------------|--------------------------------------------------------------|
+| **Latest / Triggered Time**  | Shows when the alert was last triggered.                     |
+| **Description**              | Includes a detailed explanation of the alert.                |
+| **Netdata Advisor Link**     | Links to related Netdata Advisor guidance.                   |
+| **Triggered Chart Snapshot** | Visualizes the chart at the alert’s trigger time.            |
+| **Alert Metadata**           | Shows node name, chart instance, type, component, and class. |
+| **Configuration**            | Displays the alert's configuration parameters.               |
+| **Instance Values**          | Provides node instance details.                              |
 
-You can control which columns are visible by using the gear icon on the right-hand side.
+At the bottom of this page, click **View alert page** to open a dynamic view where you can:
 
-Similarly to the previous tab, you can see the silencing status of an alert, while also being able to dig deeper and show the configuration for the alert and ask the [Netdata Assistant](/docs/netdata-assistant.md) for help.
+- Run metric correlations.
+- Navigate to the specific node’s chart that triggered the alert.
 
-### See the configuration for an alert
+---
 
-From the actions column you can explore the alert's configuration, split by the different nodes that have this alert configured.
+## Silencing Alerts
 
-From there, you can click on any of the rows to get to the individual alert configurations for that node.
+In the **Raised Alerts** tab:
 
-Click on an alert row to see the alert's page, with all the information about when it was last triggered, and what its configuration is.
+- The **Silencing column** shows whether a silencing rule exists for an alert.
+- The **Actions column** allows you to:
+    - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
+    - Ask for help from the [Netdata Assistant](/docs/netdata-assistant.md).
+
+---
+
+## Alert Configurations Tab
+
+The **Alert Configurations** tab shows the configuration of all running alerts in your Room.
+
+:::note
+
+"Running alerts" are alerts attached to metrics that are actively being collected. Pre-configured alerts that do not match your setup may not appear here.
+
+:::
+
+### Configuration Table Overview
+
+| Column             | Description                                         |
+|--------------------|-----------------------------------------------------|
+| **Alert Name**     | The name of the alert; click to view configuration. |
+| **Node Name**      | The node where this configuration applies.          |
+| **Status**         | Whether the alert is active or silenced.            |
+| **Silencing Rule** | Indicates if silencing rules are applied.           |
+| **Actions**        | Explore configuration or ask the Netdata Assistant. |
+
+Use the **gear icon** to adjust which columns are displayed.
+
+---
+
+## Viewing Alert Configuration
+
+From the **Actions column**, click **Show Configuration** to:
+
+| Action              | Outcome                                                      |
+|---------------------|--------------------------------------------------------------|
+| **Explore by Node** | View configurations split by node.                           |
+| **View Alert Page** | See full alert details, including configuration and history. |
+
+This allows you to investigate:
+
+- When the alert last triggered.
+- All configuration parameters per node.
+
+---
+
+## Alert Lifecycle Diagram
+
+```mermaid
+graph TD
+    A[Metric Collection] --> B[Alert Evaluation]
+    B --> C{Condition Met}
+    C -- Yes --> D[Trigger Alert]
+    D --> E[Alert in Raised Alerts Tab]
+    E --> F[Details and Chart Snapshot]
+    E --> G[Apply Silencing Rule]
+    F --> H[Explore Metrics<br/>Run Correlations]
+    G --> I[No Notification Sent]
+    C -- No --> J[No Alert Triggered]
+```
+
+:::tip
+
+The diagram above illustrates the flow of alert detection and management, from metric collection to alert evaluation, triggering, and optional silencing.
+
+:::
