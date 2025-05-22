@@ -421,7 +421,7 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
     }
     buffer_json_array_close(wb); // all transitions
 
-    if(ctl->options & CONTEXTS_OPTION_ALERTS_WITH_CONFIGURATIONS) {
+    if(ctl->options & CONTEXTS_OPTION_CONFIGURATIONS) {
         DICTIONARY *configs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
         for(struct sql_alert_transition_fixed_size *t = data.base; t ; t = t->next) {

@@ -65,6 +65,9 @@ struct context_v2_entry {
     size_t instances;
     RRD_FLAGS flags;
     FTS_MATCH match;
+    DICTIONARY *instances_dict;
+    DICTIONARY *dimensions_dict;
+    RRDCONTEXT *rc;
 };
 
 static inline bool full_text_search_string(FTS_INDEX *fts, SIMPLE_PATTERN *q, STRING *ptr) {
@@ -173,19 +176,23 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
 
     if(ctl->contexts.dict) {
         struct context_v2_entry t = {
-                .count = 1,
-                .id = rc->id,
-                .title = string_dup(rc->title),
-                .family = ctl->mode & CONTEXTS_V2_CONTEXT_TITLES ? string_dup(rc->family) : NULL,
-                .units = string_dup(rc->units),
-                .priority = rc->priority,
-                .first_time_s = rc->first_time_s,
-                .last_time_s = rc->last_time_s,
-                .flags = rc->flags,
-                .nodes = 1,
-                .instances = dictionary_entries(rc->rrdinstances),
-                .match = match,
+            .count = 1,
+            .id = rc->id,
+            .title = string_dup(rc->title),
+            .family = ctl->options & CONTEXTS_OPTION_TITLES ? string_dup(rc->family) : NULL,
+            .units = string_dup(rc->units),
+            .priority = rc->priority,
+            .first_time_s = rc->first_time_s,
+            .last_time_s = rc->last_time_s,
+            .flags = rc->flags,
+            .nodes = 1,
+            .instances = dictionary_entries(rc->rrdinstances),
+            .match = match,
+            .instances_dict = NULL,
+            .dimensions_dict = NULL,
+            .rc = rc,
         };
+
 
         dictionary_set(ctl->contexts.dict, string2str(rc->id), &t, sizeof(struct context_v2_entry));
     }
@@ -357,7 +364,7 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
 static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdcontext_to_json_v2_data *ctl, size_t node_id) {
     buffer_json_add_array_item_object(wb); // this node
 
-    if(ctl->mode & CONTEXTS_V2_MCP)
+    if(ctl->options & CONTEXTS_OPTION_MCP)
         buffer_json_node_add_v2_mcp(wb, host, node_id);
     else
         buffer_json_node_add_v2(wb, host, node_id, 0,
@@ -689,7 +696,64 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     string_freez(n->units);
     string_freez(n->family);
 
+    // for the react callback to use
+    o->rc = n->rc;
+
     return true;
+}
+
+static void contexts_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct context_v2_entry *t = value;
+    struct rrdcontext_to_json_v2_data *ctl = data;
+
+    // Initialize dictionaries for the new features if the corresponding options are set
+    if(ctl->options & CONTEXTS_OPTION_INSTANCES) {
+        t->instances_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+    }
+
+    if(ctl->options & CONTEXTS_OPTION_DIMENSIONS) {
+        t->dimensions_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+    }
+
+    // TODO: initialize labels structure
+}
+
+static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct context_v2_entry *t = value;
+    struct rrdcontext_to_json_v2_data *ctl = data;
+
+    // Only populate dictionaries if they exist (meaning the options are enabled)
+    if(!(ctl->options & (CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS)))
+        return;
+
+    RRDCONTEXT *rc = t->rc;
+
+    // Collect instances, dimensions, and labels if requested
+    RRDINSTANCE *ri;
+    dfe_start_read(rc->rrdinstances, ri) {
+        if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, (ri->flags & RRD_FLAG_COLLECTED) ? ctl->now : ri->last_time_s, (time_t)ri->update_every_s))
+            continue;
+
+        // Add instance name to instances dictionary
+        if((ctl->options & CONTEXTS_OPTION_INSTANCES) && t->instances_dict) {
+            dictionary_set(t->instances_dict, string2str(ri->name), NULL, 0);
+        }
+
+        // Collect dimensions from this instance
+        if((ctl->options & CONTEXTS_OPTION_DIMENSIONS) && t->dimensions_dict) {
+            RRDMETRIC *rm;
+            dfe_start_read(ri->rrdmetrics, rm) {
+                if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, (time_t)ri->update_every_s))
+                    continue;
+
+                dictionary_set(t->dimensions_dict, string2str(rm->name), NULL, 0);
+            }
+            dfe_done(rm);
+        }
+
+        // TODO find all the label keys and values
+    }
+    dfe_done(ri);
 }
 
 static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -697,6 +761,14 @@ static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused,
     string_freez(z->title);
     string_freez(z->family);
     string_freez((z->units));
+    
+    // Clean up the new dictionaries
+    if(z->instances_dict)
+        dictionary_destroy(z->instances_dict);
+    if(z->dimensions_dict)
+        dictionary_destroy(z->dimensions_dict);
+
+    // TODO: free labels structure
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
@@ -709,21 +781,20 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(mode & (CONTEXTS_V2_AGENTS_INFO))
         mode |= CONTEXTS_V2_AGENTS;
 
-    if(!(mode & CONTEXTS_V2_MCP) && (mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)))
+    if(!(req->options & CONTEXTS_OPTION_MCP) && (mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)))
         mode |= CONTEXTS_V2_NODES;
 
     if(mode & CONTEXTS_V2_ALERTS) {
         mode |= CONTEXTS_V2_NODES;
-        req->options &= ~CONTEXTS_OPTION_ALERTS_WITH_CONFIGURATIONS;
+        req->options &= ~CONTEXTS_OPTION_CONFIGURATIONS;
 
-        if(!(req->options & (CONTEXTS_OPTION_ALERTS_WITH_SUMMARY | CONTEXTS_OPTION_ALERTS_WITH_INSTANCES |
-                              CONTEXTS_OPTION_ALERTS_WITH_VALUES)))
-            req->options |= CONTEXTS_OPTION_ALERTS_WITH_SUMMARY;
+        if(!(req->options & (CONTEXTS_OPTION_SUMMARY | CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES)))
+            req->options |= CONTEXTS_OPTION_SUMMARY;
     }
 
     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
         mode |= CONTEXTS_V2_NODES;
-        req->options &= ~CONTEXTS_OPTION_ALERTS_WITH_INSTANCES;
+        req->options &= ~CONTEXTS_OPTION_INSTANCES;
     }
 
     struct rrdcontext_to_json_v2_data ctl = {
@@ -761,7 +832,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
                 sizeof(struct context_v2_entry));
 
+        dictionary_register_insert_callback(ctl.contexts.dict, contexts_insert_callback, &ctl);
         dictionary_register_conflict_callback(ctl.contexts.dict, contexts_conflict_callback, &ctl);
+        dictionary_register_react_callback(ctl.contexts.dict, contexts_react_callback, &ctl);
         dictionary_register_delete_callback(ctl.contexts.dict, contexts_delete_callback, &ctl);
     }
 
@@ -794,7 +867,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     buffer_json_initialize(wb, "\"", "\"", 0, true,
                            ((req->options & CONTEXTS_OPTION_MINIFY) && !(req->options & CONTEXTS_OPTION_DEBUG)) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
-    if(!(mode & CONTEXTS_V2_MCP))
+    if(!(req->options & CONTEXTS_OPTION_MCP))
         buffer_json_member_add_uint64(wb, "api", 2);
 
     if(req->options & CONTEXTS_OPTION_DEBUG) {
@@ -938,26 +1011,50 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
                     buffer_json_member_add_object(wb, string2str(z->id));
                     {
-                        if(mode & CONTEXTS_V2_CONTEXT_TITLES)
+                        if(ctl.options & CONTEXTS_OPTION_TITLES)
                             buffer_json_member_add_string(wb, "title", string2str(z->title));
                         
                         buffer_json_member_add_string(wb, "family", string2str(z->family));
                         buffer_json_member_add_string(wb, "units", string2str(z->units));
 
-                        if(mode & CONTEXTS_V2_CONTEXT_PRIORITIES)
+                        if(ctl.options & CONTEXTS_OPTION_PRIORITIES)
                             buffer_json_member_add_uint64(wb, "priority", z->priority);
 
                         buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
                         buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
                         buffer_json_member_add_boolean(wb, "live", collected);
 
-                        if(mode & CONTEXTS_V2_MCP) {
+                        if(ctl.options & CONTEXTS_OPTION_MCP) {
                             buffer_json_member_add_uint64(wb, "nodes_count", z->nodes);
                             buffer_json_member_add_uint64(wb, "instances_count", z->instances);
                         }
 
                         if (mode & CONTEXTS_V2_SEARCH)
                             buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+
+                        // Add instances sub-object if requested
+                        if((ctl.options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
+                            buffer_json_member_add_array(wb, "instances");
+                            void *entry;
+                            dfe_start_read(z->instances_dict, entry) {
+                                buffer_json_add_array_item_string(wb, entry_dfe.name);
+                            }
+                            dfe_done(entry);
+                            buffer_json_array_close(wb);
+                        }
+
+                        // Add dimensions sub-object if requested
+                        if((ctl.options & CONTEXTS_OPTION_DIMENSIONS) && z->dimensions_dict) {
+                            buffer_json_member_add_array(wb, "dimensions");
+                            void *entry;
+                            dfe_start_read(z->dimensions_dict, entry) {
+                                buffer_json_add_array_item_string(wb, entry_dfe.name);
+                            }
+                            dfe_done(entry);
+                            buffer_json_array_close(wb);
+                        }
+
+                        // TODO: print labels sub-object if requested
                     }
                     buffer_json_object_close(wb);
                 }
@@ -979,14 +1076,14 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             buffer_json_object_close(wb);
         }
 
-        if (mode & (CONTEXTS_V2_VERSIONS))
+        if (mode & CONTEXTS_V2_VERSIONS)
             version_hashes_api_v2(wb, &ctl.versions);
 
         if (mode & CONTEXTS_V2_AGENTS)
             buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true);
     }
 
-    if(!(mode & CONTEXTS_V2_MCP))
+    if(!(ctl.options & CONTEXTS_OPTION_MCP))
         buffer_json_cloud_timings(wb, "timings", &ctl.timings);
 
     buffer_json_finalize(wb);

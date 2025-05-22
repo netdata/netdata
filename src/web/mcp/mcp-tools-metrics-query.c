@@ -573,9 +573,6 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     // Prepare onewayalloc for query execution
     ONEWAYALLOC *owa = onewayalloc_create(0);
     
-    // Variables for metadata processing
-    struct json_object *metadata = NULL;
-    
     // Execute the query and get the data
     time_t latest_timestamp = 0;
     int ret = data_query_execute(owa, tmp_buffer, qt, &latest_timestamp);
