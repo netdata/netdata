@@ -111,7 +111,16 @@ The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-an
 3. Receive customized information and troubleshooting tips specific to that alert
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
+%%{init: {'theme': 'default', 'themeVariables': { 
+  'primaryColor': '#2b2b2b', 
+  'primaryTextColor': '#fff', 
+  'primaryBorderColor': '#7C0000', 
+  'lineColor': '#F8B229', 
+  'secondaryColor': '#006100', 
+  'tertiaryColor': '#333',
+  'fontFamily': 'arial',
+  'fontSize': '16px'
+}}}%%
 flowchart TD
     A[Alert Detected] -->|Analyze Context| B(Alert Assistant)
     style A fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10

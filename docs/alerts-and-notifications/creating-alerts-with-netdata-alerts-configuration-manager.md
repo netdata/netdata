@@ -11,7 +11,16 @@ To use this feature, you'll need an active Netdata subscription. [View subscript
 ## Creating Alerts: Quick Guide
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
+%%{init: {'theme': 'default', 'themeVariables': { 
+  'primaryColor': '#2b2b2b',
+  'primaryTextColor': '#fff', 
+  'primaryBorderColor': '#7C0000',
+  'lineColor': '#F8B229',
+  'secondaryColor': '#006100',
+  'tertiaryColor': '#333',
+  'fontFamily': 'arial',
+  'fontSize': '16px'
+}}}%%
 flowchart LR
     A[Navigate to Metrics] -->|Find Chart| B[Click Alert Icon]
     B -->|Select Add Alert| C[Set Thresholds]
