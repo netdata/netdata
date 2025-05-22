@@ -1680,8 +1680,10 @@ void mssql_total_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *m
             mi->update_every,
             RRDSET_TYPE_LINE);
 
-        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "waits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
+        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "waits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1712,6 +1714,8 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, struct mssql_db_waits
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_resource_wait_msec =
             rrddim_add(mdw->st_resource_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
@@ -1746,6 +1750,8 @@ void mssql_signal_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mdw->st_signal_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_signal_wait_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_signal_wait_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_signal_wait_msec =
             rrddim_add(mdw->st_signal_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
@@ -1780,6 +1786,8 @@ void mssql_max_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *mdw
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mdw->st_max_wait_time_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_max_wait_time_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_max_wait_time_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_max_wait_time_msec =
             rrddim_add(mdw->st_max_wait_time_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
@@ -1814,6 +1822,8 @@ void mssql_waiting_count_charts(struct mssql_instance *mi, struct mssql_db_waits
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mdw->st_waiting_tasks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_waiting_tasks->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdw->st_waiting_tasks->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_waiting_tasks = rrddim_add(mdw->st_waiting_tasks, "waits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
