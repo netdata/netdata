@@ -659,9 +659,6 @@ typedef enum __attribute__ ((__packed__)) {
     CONTEXTS_V2_FUNCTIONS           = (1 << 10),
     CONTEXTS_V2_ALERTS              = (1 << 11),
     CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 12),
-    CONTEXTS_V2_MCP                 = (1 << 13),
-    CONTEXTS_V2_CONTEXT_TITLES      = (1 << 14),
-    CONTEXTS_V2_CONTEXT_PRIORITIES  = (1 << 15),
 } CONTEXTS_V2_MODE;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);

@@ -122,9 +122,10 @@ MCP_RETURN_CODE mcp_tool_contexts_search_execute(MCP_CLIENT *mcpc, struct json_o
         .after = after,
         .before = before,
         .q = q,
+        .options = CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_MCP,
     };
 
-    int code = rrdcontext_to_json_v2(t, &req, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_CONTEXT_TITLES | CONTEXTS_V2_MCP | CONTEXTS_V2_SEARCH);
+    int code = rrdcontext_to_json_v2(t, &req, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH);
     if (code != HTTP_RESP_OK) {
         buffer_sprintf(mcpc->error, "Failed to fetch contexts, query returned http error code %d", code);
         return MCP_RC_ERROR;

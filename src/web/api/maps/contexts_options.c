@@ -9,10 +9,15 @@ static struct {
 } contexts_options[] = {
     {"minify"           , 0    , CONTEXTS_OPTION_MINIFY}
     , {"debug"            , 0    , CONTEXTS_OPTION_DEBUG}
-    , {"config"           , 0    , CONTEXTS_OPTION_ALERTS_WITH_CONFIGURATIONS}
-    , {"instances"        , 0    , CONTEXTS_OPTION_ALERTS_WITH_INSTANCES}
-    , {"values"           , 0    , CONTEXTS_OPTION_ALERTS_WITH_VALUES}
-    , {"summary"          , 0    , CONTEXTS_OPTION_ALERTS_WITH_SUMMARY}
+    , {"config"           , 0    , CONTEXTS_OPTION_CONFIGURATIONS}
+    , {"instances"        , 0    , CONTEXTS_OPTION_INSTANCES}
+    , {"values"           , 0    , CONTEXTS_OPTION_VALUES}
+    , {"summary"          , 0    , CONTEXTS_OPTION_SUMMARY}
+    , {"mcp"              , 0    , CONTEXTS_OPTION_MCP}
+    , {"dimensions"       , 0    , CONTEXTS_OPTION_DIMENSIONS}
+    , {"labels"           , 0    , CONTEXTS_OPTION_LABELS}
+    , {"priorities"       , 0    , CONTEXTS_OPTION_PRIORITIES}
+    , {"titles"           , 0    , CONTEXTS_OPTION_TITLES}
     , {NULL               , 0    , 0}
 };
 
