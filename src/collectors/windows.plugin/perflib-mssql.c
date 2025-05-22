@@ -1810,7 +1810,7 @@ void mssql_waiting_count_charts(struct mssql_instance *mi, struct mssql_db_waits
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_WAITING_COUNT,
-            mdw->update_every,
+            mi->update_every,
             RRDSET_TYPE_LINE);
 
         rrdlabels_add(mdw->st_waiting_tasks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
