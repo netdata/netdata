@@ -1784,23 +1784,33 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     struct mssql_db_waits *mdw = value;
     struct mssql_instance *mi = data;
 
-    if (!mdw->rd_total_wait)
+    if (!mdw->rd_total_wait) {
         mdw->rd_total_wait = rrddim_add(mi->st_total_wait, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(mi->st_total_wait->rrdlabels, "type", dimension, RRDLABEL_SRC_AUTO);
+    }
 
-    if (!mdw->rd_resource_wait_msec)
+    if (!mdw->rd_resource_wait_msec) {
         mdw->rd_resource_wait_msec =
             rrddim_add(mi->st_resource_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rrdlabels_add(mi->st_resource_wait_msec->rrdlabels, "type", dimension, RRDLABEL_SRC_AUTO);
+    }
 
-    if (!mdw->rd_signal_wait_msec)
+    if (!mdw->rd_signal_wait_msec) {
         mdw->rd_signal_wait_msec =
             rrddim_add(mi->st_signal_wait_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(mi->st_signal_wait_msec->rrdlabels, "type", dimension, RRDLABEL_SRC_AUTO);
+    }
 
-    if (!mdw->rd_max_wait_time_msec)
+    if (!mdw->rd_max_wait_time_msec) {
         mdw->rd_max_wait_time_msec =
             rrddim_add(mi->st_max_wait_time_msec, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(mi->st_max_wait_time_msec->rrdlabels, "type", dimension, RRDLABEL_SRC_AUTO);
+    }
 
-    if (!mdw->rd_waiting_tasks)
+    if (!mdw->rd_waiting_tasks) {
         mdw->rd_waiting_tasks = rrddim_add(mi->st_waiting_tasks, dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrdlabels_add(mi->st_waiting_tasks->rrdlabels, "type", dimension, RRDLABEL_SRC_AUTO);
+    }
 
     rrddim_set_by_pointer(
         mi->st_total_wait, mdw->rd_total_wait, (collected_number)mdw->MSSQLDatabaseTotalWait.current.Data);
