@@ -7,16 +7,27 @@ metrics:
       - OID: 1.3.6.1.2.1.14.10.1.6
         name: ospfNbrState
         description: The state of the relationship with this neighbor
-        unit: "{neighbor}"
+        family: OSPF/Neighbors/Status
+        unit: "{status}"
+        mapping:
+          1: down
+          2: attempt
+          3: init
+          4: twoWay
+          5: exchangeStart
+          6: exchange
+          7: loading
+          8: full
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
         description: The number of times this neighbor relationship has changed state or an error has occurred
-        unit: "{change}"
+        family: OSPF/Neighbors/Events
+        unit: "{event}"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
         description: The current length of the retransmission queue
-        unit: "{retransmission_queue}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: OSPF/Neighbors/Queue
+        unit: "{message}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -26,49 +37,7 @@ metrics:
           OID: 1.3.6.1.2.1.14.10.1.1
           name: ospfNbrIpAddr
         tag: neighbor_ip
-      - symbol:
-          OID: 1.3.6.1.2.1.14.10.1.6
-          name: ospfNbrState
-        mapping:
-          1: down
-          2: attempt
-          3: init
-          4: two_way
-          5: exchange_start
-          6: exchange
-          7: loading
-          8: full
-        tag: neighbor_state
-  - MIB: OSPF-MIB
-    table:
-      OID: 1.3.6.1.2.1.14.10
-      name: ospfNbrTable
-    symbols:
-      - name: ospfNbr
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.14.10.1.3
-          name: ospfNbrRtrId
-        tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.10.1.1
-          name: ospfNbrIpAddr
-        tag: neighbor_ip
-      - symbol:
-          OID: 1.3.6.1.2.1.14.10.1.6
-          name: ospfNbrState
-        mapping:
-          1: down
-          2: attempt
-          3: init
-          4: two_way
-          5: exchange_start
-          6: exchange
-          7: loading
-          8: full
-        tag: neighbor_state
+
   - MIB: OSPF-MIB
     table:
       OID: 1.3.6.1.2.1.14.11
@@ -77,16 +46,27 @@ metrics:
       - OID: 1.3.6.1.2.1.14.11.1.5
         name: ospfVirtNbrState
         description: The state of the virtual neighbor relationship
-        unit: "{virtual_neighbor}"
+        family: OSPF/Virtual Neighbors/Status
+        unit: "{status}"
+        mapping:
+          1: down
+          2: attempt
+          3: init
+          4: two_way
+          5: exchange_start
+          6: exchange
+          7: loading
+          8: full
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
         description: The number of times this virtual link has changed its state or an error has occurred
+        family: OSPF/Virtual Neighbors/Events
         unit: "{change}"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
         description: The current length of the retransmission queue
-        unit: "{retransmission_queue}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: OSPF/Virtual Neighbors/Queue
+        unit: "{message}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -96,67 +76,30 @@ metrics:
           OID: 1.3.6.1.2.1.14.11.1.2
           name: ospfVirtNbrRtrId
         tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.11.1.5
-          name: ospfVirtNbrState
-        mapping:
-          1: down
-          2: attempt
-          3: init
-          4: two_way
-          5: exchange_start
-          6: exchange
-          7: loading
-          8: full
-        tag: neighbor_state
-  - MIB: OSPF-MIB
-    table:
-      OID: 1.3.6.1.2.1.14.11
-      name: ospfVirtNbrTable
-    symbols:
-      - name: ospfVirtNbr
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.14.11.1.3
-          name: ospfVirtNbrIpAddr
-        tag: neighbor_ip
-      - symbol:
-          OID: 1.3.6.1.2.1.14.11.1.2
-          name: ospfVirtNbrRtrId
-        tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.11.1.5
-          name: ospfVirtNbrState
-        mapping:
-          1: down
-          2: attempt
-          3: init
-          4: two_way
-          5: exchange_start
-          6: exchange
-          7: loading
-          8: full
-        tag: neighbor_state
+
   - MIB: OSPF-MIB
     table:
       OID: 1.3.6.1.2.1.14.7
       name: ospfIfTable
     symbols:
-      - OID: 1.3.6.1.2.1.14.7.1.8
-        name: ospfIfRetransInterval
-        description: The number of seconds between link state advertisement retransmissions for adjacencies belonging to this interface
-        unit: "s"
       - OID: 1.3.6.1.2.1.14.7.1.12
         name: ospfIfState
         description: The OSPF Interface State
-        unit: "{interface_state}"
+        family: OSPF/Interfaces/Status
+        unit: "{status}"
+        mapping:
+          1: down
+          2: loopback
+          3: waiting
+          4: point_to_point
+          5: designated_router
+          6: backup_designated_router
+          7: other_designated_router
       - OID: 1.3.6.1.2.1.14.7.1.21
         name: ospfIfLsaCount
         description: The total number of link-local link state advertisements in this interface's link-local link state database
-        unit: "{link_state_advertisement}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: OSPF/Interfaces/Link State
+        unit: "{advertisement}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.7.1.1
@@ -168,67 +111,25 @@ metrics:
         table: ospfNbrTable
         MIB: OSPF-MIB
         tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.7.1.12
-          name: ospfIfState
-        mapping:
-          1: down
-          2: loopback
-          3: waiting
-          4: point_to_point
-          5: designated_router
-          6: backup_designated_router
-          7: other_designated_router
-        tag: if_state
-  - MIB: OSPF-MIB
-    table:
-      OID: 1.3.6.1.2.1.14.7
-      name: ospfIfTable
-    symbols:
-      - name: ospfIf
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.14.7.1.1
-          name: ospfIfIpAddress
-        tag: ospf_ip_addr
-      - symbol:
-          OID: 1.3.6.1.2.1.14.10.1.3
-          name: ospfNbrRtrId
-        table: ospfNbrTable
-        MIB: OSPF-MIB
-        tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.7.1.12
-          name: ospfIfState
-        mapping:
-          1: down
-          2: loopback
-          3: waiting
-          4: point_to_point
-          5: designated_router
-          6: backup_designated_router
-          7: other_designated_router
-        tag: if_state
+
   - MIB: OSPF-MIB
     table:
       OID: 1.3.6.1.2.1.14.9
       name: ospfVirtIfTable
     symbols:
-      - OID: 1.3.6.1.2.1.14.9.1.4
-        name: ospfVirtIfRetransInterval
-        description: The number of seconds between link state advertisement retransmissions for adjacencies belonging to this virtual interface
-        unit: "s"
       - OID: 1.3.6.1.2.1.14.9.1.7
         name: ospfVirtIfState
         description: OSPF virtual interface states
-        unit: "{virtual_interface_state}"
+        family: OSPF/Virtual Interfaces/Status
+        unit: "{status}"
+        mapping:
+          1: down
+          4: point_to_point
       - OID: 1.3.6.1.2.1.14.9.1.12
         name: ospfVirtIfLsaCount
         description: The total number of link-local link state advertisements in this virtual interface's link-local link state database
-        unit: "{link_state_advertisement}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: OSPF/Virtual Interfaces/Link State
+        unit: "{advertisement}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
@@ -236,32 +137,3 @@ metrics:
         table: ospfVirtNbrTable
         MIB: OSPF-MIB
         tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.9.1.7
-          name: ospfVirtIfState
-        mapping:
-          1: down
-          4: point_to_point
-        tag: if_state
-  - MIB: OSPF-MIB
-    table:
-      OID: 1.3.6.1.2.1.14.9
-      name: ospfVirtIfTable
-    symbols:
-      - name: ospfVirtIf
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.14.11.1.2
-          name: ospfVirtNbrRtrId
-        table: ospfVirtNbrTable
-        MIB: OSPF-MIB
-        tag: neighbor_id
-      - symbol:
-          OID: 1.3.6.1.2.1.14.9.1.7
-          name: ospfVirtIfState
-        mapping:
-          1: down
-          4: point_to_point
-        tag: if_state
