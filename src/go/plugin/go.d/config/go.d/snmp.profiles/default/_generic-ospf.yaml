@@ -7,7 +7,7 @@ metrics:
       - OID: 1.3.6.1.2.1.14.10.1.6
         name: ospfNbrState
         description: The state of the relationship with this neighbor
-        family: OSPF/Neighbors/Relationships/Status
+        family: OSPF/Neighbors/Status
         unit: "{status}"
         mapping:
           1: down
@@ -21,13 +21,13 @@ metrics:
       - OID: 1.3.6.1.2.1.14.10.1.7
         name: ospfNbrEvents
         description: The number of times this neighbor relationship has changed state or an error has occurred
-        family: OSPF/Neighbors/Relationships/Events
+        family: OSPF/Neighbors/Events
         unit: "{event}"
       - OID: 1.3.6.1.2.1.14.10.1.8
         name: ospfNbrLsRetransQLen
         description: The current length of the retransmission queue
-        family: OSPF/Neighbors
-        unit: "{item}"
+        family: OSPF/Neighbors/Queue
+        unit: "{message}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.10.1.3
@@ -46,7 +46,7 @@ metrics:
       - OID: 1.3.6.1.2.1.14.11.1.5
         name: ospfVirtNbrState
         description: The state of the virtual neighbor relationship
-        family: OSPF/Virtual Neighbors/Relationships/Status
+        family: OSPF/Virtual Neighbors/Status
         unit: "{status}"
         mapping:
           1: down
@@ -60,14 +60,13 @@ metrics:
       - OID: 1.3.6.1.2.1.14.11.1.6
         name: ospfVirtNbrEvents
         description: The number of times this virtual link has changed its state or an error has occurred
-        family: OSPF/Virtual Neighbors/Relationships/Events
+        family: OSPF/Virtual Neighbors/Events
         unit: "{change}"
       - OID: 1.3.6.1.2.1.14.11.1.7
         name: ospfVirtNbrLsRetransQLen
         description: The current length of the retransmission queue
-        family: OSPF/Virtual Neighbors
-        unit: "{item}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: OSPF/Virtual Neighbors/Queue
+        unit: "{message}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.2.1.14.11.1.3
@@ -83,11 +82,6 @@ metrics:
       OID: 1.3.6.1.2.1.14.7
       name: ospfIfTable
     symbols:
-      - OID: 1.3.6.1.2.1.14.7.1.8
-        name: ospfIfRetransInterval
-        description: The number of seconds between link state advertisement retransmissions for adjacencies belonging to this interface
-        family: OSPF/Interfaces/Link State
-        unit: "s"
       - OID: 1.3.6.1.2.1.14.7.1.12
         name: ospfIfState
         description: The OSPF Interface State
@@ -123,11 +117,6 @@ metrics:
       OID: 1.3.6.1.2.1.14.9
       name: ospfVirtIfTable
     symbols:
-      - OID: 1.3.6.1.2.1.14.9.1.4
-        name: ospfVirtIfRetransInterval
-        description: The number of seconds between link state advertisement retransmissions for adjacencies belonging to this virtual interface
-        family: OSPF/Virtual Interfaces/Link State
-        unit: "s"
       - OID: 1.3.6.1.2.1.14.9.1.7
         name: ospfVirtIfState
         description: OSPF virtual interface states
