@@ -172,6 +172,7 @@ role_recipients_slack[sre]="#sre-alerts"
 role_recipients_pagerduty[sre]="PDK3Y5SREXAMPLE"
 role_recipients_telegram[sre]="123456789"
 ```
+
 </details>
 
 <details>
@@ -188,6 +189,7 @@ role_recipients_sms[oncall]="${ONCALL_PHONE}"
 # Standard business hours team gets non-critical alerts during work hours
 role_recipients_slack[business_hours]="#daytime-monitoring"
 ```
+
 </details>
 
 ## Health Management API
@@ -216,6 +218,7 @@ Completely stops evaluation of health checks during maintenance:
 ```bash
 curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: ${TOKEN}"
 ```
+
 </details>
 
 <details>
@@ -226,6 +229,7 @@ Continues to evaluate health checks but prevents notifications:
 ```bash
 curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: ${TOKEN}"
 ```
+
 </details>
 
 <details>
@@ -240,6 +244,7 @@ curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE&context=disk_space
 # Disable CPU alerts for specific hosts
 curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE&context=cpu&hosts=prod-db-*" -H "X-Auth-Token: ${TOKEN}"
 ```
+
 </details>
 
 <details>
@@ -250,6 +255,7 @@ Check what's currently silenced or disabled:
 ```bash
 curl "http://localhost:19999/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: ${TOKEN}"
 ```
+
 </details>
 
 <details>
@@ -260,6 +266,7 @@ Re-enable all health checks and notifications:
 ```bash
 curl "http://localhost:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: ${TOKEN}"
 ```
+
 </details>
 
 ## Configuration Options
@@ -312,6 +319,7 @@ To send notifications via a proxy, set these environment variables:
 export http_proxy="http://10.0.0.1:3128/"
 export https_proxy="http://10.0.0.1:3128/"
 ```
+
 </details>
 
 <details>
@@ -324,6 +332,7 @@ To use custom image paths:
 ```ini
 images_base_url="http://my.public.netdata.server:19999"
 ```
+
 </details>
 
 <details>

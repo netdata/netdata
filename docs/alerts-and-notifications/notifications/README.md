@@ -49,22 +49,22 @@ Netdata's alerts are designed to minimize false positives and prevent alarm fati
 
 ### Alert Severity Levels
 
-| Level | Description | Typical Action |
-|-------|-------------|----------------|
-| **CLEAR** | The metric has returned to normal range | No action needed |
-| **WARNING** | The metric shows concerning behavior that requires attention | Investigate during business hours |
-| **CRITICAL** | The metric indicates a serious problem requiring immediate action | Immediate response required |
+| Level        | Description                                                       | Typical Action                    |
+|--------------|-------------------------------------------------------------------|-----------------------------------|
+| **CLEAR**    | The metric has returned to normal range                           | No action needed                  |
+| **WARNING**  | The metric shows concerning behavior that requires attention      | Investigate during business hours |
+| **CRITICAL** | The metric indicates a serious problem requiring immediate action | Immediate response required       |
 
 These severity levels help you prioritize your response and can be routed to different notification channels based on urgency.
 
 ### Preventing Alert Fatigue
 
-| Feature | Benefit |
-|---------|---------|
-| **Intelligent Defaults** | Thresholds carefully selected based on real-world experience |
+| Feature                   | Benefit                                                               |
+|---------------------------|-----------------------------------------------------------------------|
+| **Intelligent Defaults**  | Thresholds carefully selected based on real-world experience          |
 | **Hysteresis Protection** | Prevents notification floods when metrics fluctuate around thresholds |
-| **Notification Delays** | Configurable delays ensure transient issues don't trigger alerts |
-| **Role-Based Routing** | Ensures alerts reach only the appropriate stakeholders |
+| **Notification Delays**   | Configurable delays ensure transient issues don't trigger alerts      |
+| **Role-Based Routing**    | Ensures alerts reach only the appropriate stakeholders                |
 
 :::tip
 
@@ -100,14 +100,14 @@ For more complex issues, you can access the [Alerts Troubleshooting space](https
 
 Choose the option that fits your needs:
 
-| Use Case | Best Option |
+| Use Case                              | Best Option   |
 |---------------------------------------|---------------|
-| Manage multiple nodes centrally | Netdata Cloud |
-| Fewer configs, alerts from one place | Netdata Cloud |
-| Full control at node level | Netdata Agent |
-| No internet or external dependencies | Netdata Agent |
+| Manage multiple nodes centrally       | Netdata Cloud |
+| Fewer configs, alerts from one place  | Netdata Cloud |
+| Full control at node level            | Netdata Agent |
+| No internet or external dependencies  | Netdata Agent |
 | Fine-tuned control per system/service | Netdata Agent |
-| Want both simplicity and flexibility | Use **both** |
+| Want both simplicity and flexibility  | Use **both**  |
 
 ## Next Steps
 

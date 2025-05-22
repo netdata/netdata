@@ -12,10 +12,10 @@ Alerts are based on each node's health status. You can change thresholds, add ne
 
 ## How Alert Notifications Work
 
-| Method | Where Alerts Are Sent From | Customization | Highlights |
-|--------|----------------------------|---------------|------------|
-| **Netdata Cloud** | Cloud UI | Medium | Centralized alerting using connected nodes' health status |
-| **Netdata Agent** | Local Netdata Agent | High | Node-level alerting with wide integration support |
+| Method            | Where Alerts Are Sent From | Customization | Highlights                                                |
+|-------------------|----------------------------|---------------|-----------------------------------------------------------|
+| **Netdata Cloud** | Cloud UI                   | Medium        | Centralized alerting using connected nodes' health status |
+| **Netdata Agent** | Local Netdata Agent        | High          | Node-level alerting with wide integration support         |
 
 You can enable one or both methods depending on your needs.
 
@@ -23,10 +23,10 @@ You can enable one or both methods depending on your needs.
 
 Use this table to choose and set up your preferred alerting method:
 
-| Option | Setup Location | Setup Effort | Best For |
-|--------|---------------|--------------|----------|
-| **Netdata Cloud** | In the Cloud UI | Low | Teams managing multiple nodes |
-| **Netdata Agent** | On each Netdata node | Medium | Full control and flexibility |
+| Option            | Setup Location       | Setup Effort | Best For                      |
+|-------------------|----------------------|--------------|-------------------------------|
+| **Netdata Cloud** | In the Cloud UI      | Low          | Teams managing multiple nodes |
+| **Netdata Agent** | On each Netdata node | Medium       | Full control and flexibility  |
 
 ## Set Up Alerts via Netdata Cloud
 
@@ -40,11 +40,13 @@ Use this table to choose and set up your preferred alerting method:
 ## Set Up Alerts via Netdata Agent
 
 1. Open the notification config:
+
 ```bash
 sudo ./edit-config health_alarm_notify.conf
 ```
 
 2. Enable your preferred method, for example email:
+
 ```ini
 SEND_EMAIL="YES"
 DEFAULT_RECIPIENT_EMAIL="you@example.com"
@@ -52,6 +54,7 @@ DEFAULT_RECIPIENT_EMAIL="you@example.com"
 
 3. Ensure your system can send mail (via `sendmail`, SMTP relay, etc.)
 4. Restart the agent:
+
 ```bash
 sudo systemctl restart netdata
 ```
@@ -72,27 +75,27 @@ The Netdata Agent continuously monitors system health and performance. It offers
 
 ### The Anatomy of Intelligent Alerts
 
-| Component | Description |
-|-----------|-------------|
-| **Metrics Data** | Collected every second (and at "event frequency" for eBPF metrics), giving you the most precise foundation for alerting |
-| **Filtering** | Alerts run against specific metrics series, with support for pattern matching, labels, hostnames, and operating systems |
-| **Frequency** | Configurable check intervals based on how quickly you need to know about issues |
-| **Templates** | Write once, apply everywhere with dimension templates and the ability to apply logic to multiple charts |
-| **Calculation** | Convert raw metrics into human-readable formats, like percentages, for easier understanding |
-| **Thresholds** | Pre-configured values that determine when metrics are outside acceptable ranges |
-| **Hysteresis** | Prevention of "flapping" alerts for metrics that hover around thresholds |
-| **Severity Levels** | CLEAR, WARNING, and CRITICAL states to indicate the urgency of action needed |
+| Component           | Description                                                                                                             |
+|---------------------|-------------------------------------------------------------------------------------------------------------------------|
+| **Metrics Data**    | Collected every second (and at "event frequency" for eBPF metrics), giving you the most precise foundation for alerting |
+| **Filtering**       | Alerts run against specific metrics series, with support for pattern matching, labels, hostnames, and operating systems |
+| **Frequency**       | Configurable check intervals based on how quickly you need to know about issues                                         |
+| **Templates**       | Write once, apply everywhere with dimension templates and the ability to apply logic to multiple charts                 |
+| **Calculation**     | Convert raw metrics into human-readable formats, like percentages, for easier understanding                             |
+| **Thresholds**      | Pre-configured values that determine when metrics are outside acceptable ranges                                         |
+| **Hysteresis**      | Prevention of "flapping" alerts for metrics that hover around thresholds                                                |
+| **Severity Levels** | CLEAR, WARNING, and CRITICAL states to indicate the urgency of action needed                                            |
 
 ### Preventing False Positives and Alert Fatigue
 
-| Feature | Benefit |
-|---------|---------|
-| **Intelligent Defaults** | Thresholds are carefully selected based on real-world experience |
-| **Dynamic Thresholds** | Some alerts adapt to your system's baseline performance |
+| Feature                   | Benefit                                                                    |
+|---------------------------|----------------------------------------------------------------------------|
+| **Intelligent Defaults**  | Thresholds are carefully selected based on real-world experience           |
+| **Dynamic Thresholds**    | Some alerts adapt to your system's baseline performance                    |
 | **Hysteresis Protection** | Prevents floods of notifications when metrics fluctuate around a threshold |
-| **Notification Delays** | Configurable delays ensure transient issues don't trigger alerts |
-| **Severity Separation** | Different notification channels for different alert severities |
-| **Role-Based Routing** | Ensures alerts reach only the appropriate stakeholders |
+| **Notification Delays**   | Configurable delays ensure transient issues don't trigger alerts           |
+| **Severity Separation**   | Different notification channels for different alert severities             |
+| **Role-Based Routing**    | Ensures alerts reach only the appropriate stakeholders                     |
 
 ## Troubleshooting Alerts
 
