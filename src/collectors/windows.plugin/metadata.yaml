@@ -1986,25 +1986,31 @@ modules:
               unit: waits/s
               chart_type: line
               dimensions:
-                - name: wait_types
+                - name: waits
             - name: mssql.instance_resource_wait
               description: Time waiting for another resource.
               unit: ms
               chart_type: line
               dimensions:
-                - name: wait_types
+                - name: period
             - name: mssql.instance_signal_wait
               description: Difference between the time that the waiting thread was signaled and when it started running.
               unit: ms
               chart_type: line
               dimensions:
-                - name: wait_types
+                - name: period
             - name: mssql.instance_max_wait
               description: Maximum wait time on this wait type.
               unit: ms
               chart_type: line
               dimensions:
-                - name: wait_types
+                - name: period
+            - name: mssql.instance_waiting_count
+              description: Number of waits on this wait type.
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
         - name: Database
           description: "These metrics refer to Microsoft SQL Server databases."
           labels:
