@@ -111,8 +111,8 @@ Choose the option that fits your needs:
 
 ## Next Steps
 
-- 🔧 [Set up Cloud Notifications](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference)
-- ⚙️ [Set up Agent Notifications](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications/agent-notifications-reference)
+- 🔧 [Set up Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)
+- ⚙️ [Set up Agent Notifications](/src/health/notifications/README.md)
 
 :::info
 
