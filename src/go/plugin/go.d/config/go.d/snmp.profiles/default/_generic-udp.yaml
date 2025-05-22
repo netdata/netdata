@@ -2,30 +2,34 @@
 
 metrics:
   - MIB: UDP-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.2.1.7.8.0
       name: udpHCInDatagrams
-    description: The total number of UDP datagrams delivered to UDP users, for devices that can receive more than 1 million UDP datagrams per second.
-    unit: "{datagram}"
+      description: UDP datagrams received
+      family: Network/IP/UDP/Packets
+      unit: "{packet}"
+      metric_type: monotonic_count
   - MIB: UDP-MIB
-    metric_type: monotonic_count
-    symbol:
-      OID: 1.3.6.1.2.1.7.2.0
-      name: udpNoPorts
-    description: The total number of received UDP datagrams for which there was no application at the destination port.
-    unit: "{datagram}"
-  - MIB: UDP-MIB
-    metric_type: monotonic_count
-    symbol:
-      OID: 1.3.6.1.2.1.7.3.0
-      name: udpInErrors
-    description: The number of received UDP datagrams that could not be delivered for reasons other than the lack of an application at the destination port.
-    unit: "{datagram}"
-  - MIB: UDP-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.2.1.7.9.0
       name: udpHCOutDatagrams
-    description: The total number of UDP datagrams sent from this entity, for devices that can transmit more than 1 million UDP datagrams per second.
-    unit: "{datagram}"
+      description: UDP datagrams sent
+      family: Network/IP/UDP/Packets
+      unit: "{packet}"
+      metric_type: monotonic_count
+  - MIB: UDP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.7.3.0
+      name: udpInErrors
+      description: UDP datagrams received but couldn’t be delivered (not due to missing app)
+      family: Network/IP/UDP/Errors
+      unit: "{error}"
+      metric_type: monotonic_count
+  - MIB: UDP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.7.2.0
+      name: udpNoPorts
+      description: UDP datagrams received with no app on the destination port
+      family: Network/IP/UDP/Errors
+      unit: "{error}"
+      metric_type: monotonic_count
