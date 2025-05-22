@@ -96,7 +96,6 @@ MCP_RETURN_CODE mcp_tool_list_nodes_execute(MCP_CLIENT *mcpc, struct json_object
     }
 
     CLEAN_BUFFER *t = buffer_create(0, NULL);
-    buffer_json_initialize(t, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
     struct api_v2_contexts_request req = {
         .scope_nodes = nodes_pattern,
@@ -111,8 +110,6 @@ MCP_RETURN_CODE mcp_tool_list_nodes_execute(MCP_CLIENT *mcpc, struct json_object
         buffer_sprintf(mcpc->error, "Failed to fetch nodes, query returned http error code %d", code);
         return MCP_RC_ERROR;
     }
-
-    buffer_json_finalize(t);
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);

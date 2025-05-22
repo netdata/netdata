@@ -72,6 +72,97 @@ struct context_v2_entry {
     RRDCONTEXT *rc;
 };
 
+struct category_entry {
+    size_t count;
+    DICTIONARY *contexts; // Dictionary to hold context names
+};
+
+static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_dict, size_t cardinality_limit) {
+    size_t total_contexts = dictionary_entries(contexts_dict);
+    
+    // First pass: count categories
+    DICTIONARY *categories = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    
+    struct context_v2_entry *z;
+    dfe_start_read(contexts_dict, z) {
+        const char *context_name = string2str(z->id);
+        char category[256];
+        const char *dot = strchr(context_name, '.');
+        if (dot) {
+            size_t prefix_len = dot - context_name;
+            if (prefix_len > sizeof(category) - 1) prefix_len = sizeof(category) - 1;
+            strncpy(category, context_name, prefix_len);
+            category[prefix_len] = '\0';
+        } else {
+            strncpy(category, context_name, sizeof(category) - 1);
+            category[sizeof(category) - 1] = '\0';
+        }
+        
+        struct category_entry *entry = dictionary_get(categories, category);
+        if (!entry) {
+            entry = callocz(1, sizeof(struct category_entry));
+            entry->contexts = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+            dictionary_set(categories, category, entry, sizeof(struct category_entry));
+        }
+        entry->count++;
+        // Store the context name for sampling
+        dictionary_set(entry->contexts, context_name, NULL, 0);
+    }
+    dfe_done(z);
+    
+    // Calculate how many samples per category
+    size_t num_categories = dictionary_entries(categories);
+    size_t samples_per_category = 2; // Default to 2
+    if (num_categories > 0 && cardinality_limit > 0) {
+        samples_per_category = cardinality_limit / num_categories;
+        if (samples_per_category < 2) samples_per_category = 2;
+    }
+    
+    // Add info object first
+    buffer_json_member_add_object(wb, "__info__");
+    buffer_json_member_add_string(wb, "status", "categorized");
+    buffer_json_member_add_uint64(wb, "total_contexts", total_contexts);
+    buffer_json_member_add_uint64(wb, "categories", num_categories);
+    buffer_json_member_add_uint64(wb, "samples_per_category", samples_per_category);
+    buffer_json_member_add_string(wb, "help", "Results grouped by category with samples. Use 'metrics' parameter with specific patterns like 'system.*' to get full details for a category.");
+    buffer_json_object_close(wb);
+    
+    // Output categorized contexts
+    struct category_entry *cat_entry;
+    dfe_start_read(categories, cat_entry) {
+        buffer_json_member_add_array(wb, cat_entry_dfe.name);
+        
+        size_t samples_shown = 0;
+        void *ctx_name;
+        dfe_start_read(cat_entry->contexts, ctx_name) {
+            if (samples_shown < samples_per_category) {
+                buffer_json_add_array_item_string(wb, ctx_name_dfe.name);
+                samples_shown++;
+            } else {
+                break;
+            }
+        }
+        dfe_done(ctx_name);
+        
+        // Add "... and X more" if there are more contexts
+        if (cat_entry->count > samples_shown) {
+            char msg[100];
+            snprintf(msg, sizeof(msg), "... and %zu more", cat_entry->count - samples_shown);
+            buffer_json_add_array_item_string(wb, msg);
+        }
+        
+        buffer_json_array_close(wb);
+    }
+    dfe_done(cat_entry);
+    
+    // Cleanup
+    dfe_start_write(categories, cat_entry) {
+        dictionary_destroy(cat_entry->contexts);
+    }
+    dfe_done(cat_entry);
+    dictionary_destroy(categories);
+}
+
 static inline bool full_text_search_string(FTS_INDEX *fts, SIMPLE_PATTERN *q, STRING *ptr) {
     fts->searches++;
     fts->string_searches++;
@@ -1011,91 +1102,137 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         }
 
         if (mode & CONTEXTS_V2_CONTEXTS) {
-            buffer_json_member_add_object(wb, "contexts");
-            {
+            size_t contexts_count = 0;
+            size_t contexts_limit = ctl.request->cardinality_limit;
+            size_t total_contexts = dictionary_entries(ctl.contexts.dict);
+
+            bool contexts_is_object = false;
+
+            // If we have more contexts than the limit and MCP option is set, use categorized output
+            if (contexts_limit && total_contexts > contexts_limit && (ctl.options & CONTEXTS_OPTION_MCP)) {
+                buffer_json_member_add_object(wb, "contexts");
+                rrdcontext_categorize_and_output(wb, ctl.contexts.dict, contexts_limit);
+                buffer_json_object_close(wb);
+            } else {
+                if (mode & CONTEXTS_V2_SEARCH ||
+                    ctl.options & (CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS |
+                                   CONTEXTS_OPTION_PRIORITIES | CONTEXTS_OPTION_RETENTION | CONTEXTS_OPTION_LIVENESS |
+                                   CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS | CONTEXTS_OPTION_INSTANCES)) {
+                    contexts_is_object = true;
+                    buffer_json_member_add_object(wb, "contexts");
+                } else
+                    buffer_json_member_add_array(wb, "contexts");
+
                 struct context_v2_entry *z;
-                dfe_start_read(ctl.contexts.dict, z) {
+                dfe_start_read(ctl.contexts.dict, z)
+                {
+                    // Check if we've reached the limit
+                    if (contexts_limit && contexts_count >= contexts_limit) {
+                        // Add a special entry indicating truncation
+                        buffer_json_member_add_object(wb, "__truncated__");
+                        buffer_json_member_add_uint64(wb, "total_contexts", total_contexts);
+                        buffer_json_member_add_uint64(wb, "returned", contexts_count);
+                        buffer_json_member_add_uint64(wb, "remaining", total_contexts - contexts_count);
+                        buffer_json_object_close(wb);
+                        break;
+                    }
+
                     bool collected = z->flags & RRD_FLAG_COLLECTED;
 
-                    buffer_json_member_add_object(wb, string2str(z->id));
-                    {
-                        if(ctl.options & CONTEXTS_OPTION_TITLES)
-                            buffer_json_member_add_string(wb, "title", string2str(z->title));
-                        
-                        buffer_json_member_add_string(wb, "family", string2str(z->family));
-                        buffer_json_member_add_string(wb, "units", string2str(z->units));
+                    if (contexts_is_object) {
+                        buffer_json_member_add_object(wb, string2str(z->id));
+                        {
+                            if (ctl.options & CONTEXTS_OPTION_TITLES)
+                                buffer_json_member_add_string(wb, "title", string2str(z->title));
 
-                        if(ctl.options & CONTEXTS_OPTION_PRIORITIES)
-                            buffer_json_member_add_uint64(wb, "priority", z->priority);
+                            if (ctl.options & CONTEXTS_OPTION_FAMILY)
+                                buffer_json_member_add_string(wb, "family", string2str(z->family));
 
-                        buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
-                        buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
-                        buffer_json_member_add_boolean(wb, "live", collected);
+                            if (ctl.options & CONTEXTS_OPTION_UNITS)
+                                buffer_json_member_add_string(wb, "units", string2str(z->units));
 
-                        if(ctl.options & CONTEXTS_OPTION_MCP) {
-                            buffer_json_member_add_uint64(wb, "nodes_count", z->nodes);
-                            buffer_json_member_add_uint64(wb, "instances_count", z->instances);
-                        }
+                            if (ctl.options & CONTEXTS_OPTION_PRIORITIES)
+                                buffer_json_member_add_uint64(wb, "priority", z->priority);
 
-                        if (mode & CONTEXTS_V2_SEARCH)
-                            buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
-
-                        // Add dimensions sub-object if requested
-                        if((ctl.options & CONTEXTS_OPTION_DIMENSIONS) && z->dimensions_dict) {
-                            buffer_json_member_add_array(wb, "dimensions");
-                            void *entry;
-                            size_t count = 0;
-                            size_t total = dictionary_entries(z->dimensions_dict);
-                            size_t limit = ctl.request->cardinality_limit;
-                            
-                            dfe_start_read(z->dimensions_dict, entry) {
-                                if(limit && count >= limit - 1 && total > limit) {
-                                    // Add remaining count message
-                                    char msg[100];
-                                    snprintf(msg, sizeof(msg), "... %zu dimensions more", total - count);
-                                    buffer_json_add_array_item_string(wb, msg);
-                                    break;
-                                }
-                                buffer_json_add_array_item_string(wb, entry_dfe.name);
-                                count++;
+                            if (ctl.options & CONTEXTS_OPTION_RETENTION) {
+                                buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
+                                buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
                             }
-                            dfe_done(entry);
-                            buffer_json_array_close(wb);
-                        }
 
-                        // Add labels sub-object if requested
-                        if((ctl.options & CONTEXTS_OPTION_LABELS) && z->labels_aggregated) {
-                            rrdlabels_aggregated_to_buffer_json(z->labels_aggregated, wb, "labels", ctl.request->cardinality_limit);
-                        }
+                            if (ctl.options & CONTEXTS_OPTION_LIVENESS)
+                                buffer_json_member_add_boolean(wb, "live", collected);
 
-                        // Add instances sub-object if requested
-                        if((ctl.options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
-                            buffer_json_member_add_array(wb, "instances");
-                            void *entry;
-                            size_t count = 0;
-                            size_t total = dictionary_entries(z->instances_dict);
-                            size_t limit = ctl.request->cardinality_limit;
-                            
-                            dfe_start_read(z->instances_dict, entry) {
-                                if(limit && count >= limit - 1 && total > limit) {
-                                    // Add remaining count message
-                                    char msg[100];
-                                    snprintf(msg, sizeof(msg), "... %zu instances more", total - count);
-                                    buffer_json_add_array_item_string(wb, msg);
-                                    break;
+                            if (mode & CONTEXTS_V2_SEARCH)
+                                buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
+
+                            // Add dimensions sub-object if requested
+                            if ((ctl.options & CONTEXTS_OPTION_DIMENSIONS) && z->dimensions_dict) {
+                                buffer_json_member_add_array(wb, "dimensions");
+                                void *entry;
+                                size_t count = 0;
+                                size_t total = dictionary_entries(z->dimensions_dict);
+                                size_t limit = ctl.request->cardinality_limit;
+
+                                dfe_start_read(z->dimensions_dict, entry)
+                                {
+                                    if (limit && count >= limit - 1 && total > limit) {
+                                        // Add remaining count message
+                                        char msg[100];
+                                        snprintf(msg, sizeof(msg), "... %zu dimensions more", total - count);
+                                        buffer_json_add_array_item_string(wb, msg);
+                                        break;
+                                    }
+                                    buffer_json_add_array_item_string(wb, entry_dfe.name);
+                                    count++;
                                 }
-                                buffer_json_add_array_item_string(wb, entry_dfe.name);
-                                count++;
+                                dfe_done(entry);
+                                buffer_json_array_close(wb);
                             }
-                            dfe_done(entry);
-                            buffer_json_array_close(wb);
+
+                            // Add labels sub-object if requested
+                            if ((ctl.options & CONTEXTS_OPTION_LABELS) && z->labels_aggregated) {
+                                rrdlabels_aggregated_to_buffer_json(
+                                    z->labels_aggregated, wb, "labels", ctl.request->cardinality_limit);
+                            }
+
+                            // Add instances sub-object if requested
+                            if ((ctl.options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
+                                buffer_json_member_add_array(wb, "instances");
+                                void *entry;
+                                size_t count = 0;
+                                size_t total = dictionary_entries(z->instances_dict);
+                                size_t limit = ctl.request->cardinality_limit;
+
+                                dfe_start_read(z->instances_dict, entry)
+                                {
+                                    if (limit && count >= limit - 1 && total > limit) {
+                                        // Add remaining count message
+                                        char msg[100];
+                                        snprintf(msg, sizeof(msg), "... %zu instances more", total - count);
+                                        buffer_json_add_array_item_string(wb, msg);
+                                        break;
+                                    }
+                                    buffer_json_add_array_item_string(wb, entry_dfe.name);
+                                    count++;
+                                }
+                                dfe_done(entry);
+                                buffer_json_array_close(wb);
+                            }
                         }
+                        buffer_json_object_close(wb);
+                    } else {
+                        buffer_json_add_array_item_string(wb, string2str(z->id));
                     }
-                    buffer_json_object_close(wb);
+
+                    contexts_count++;
                 }
                 dfe_done(z);
-            }
-            buffer_json_object_close(wb); // contexts
+
+                if(contexts_is_object)
+                    buffer_json_object_close(wb); // contexts
+                else
+                    buffer_json_array_close(wb);
+            } // end else
         }
 
         if (mode & CONTEXTS_V2_ALERTS)

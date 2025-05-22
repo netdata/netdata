@@ -8,14 +8,12 @@
 #include "mcp-request-id.h"
 
 // MCP tool names - use these constants when referring to tools
-#define MCP_TOOL_METRIC_CONTEXT_CATEGORIES "list_metric_context_categories"
-#define MCP_TOOL_METRIC_CONTEXTS "list_metric_contexts"
-#define MCP_TOOL_CONTEXT_DETAILS "context_details"
-#define MCP_TOOL_CONTEXT_SEARCH "context_full_text_search"
+#define MCP_TOOL_LIST_METRICS "list_metrics"
+#define MCP_TOOL_GET_METRICS_DETAILS "get_metrics_details"
 #define MCP_TOOL_LIST_NODES "list_nodes"
-#define MCP_TOOL_NODE_DETAILS "node_details"
+#define MCP_TOOL_GET_NODE_DETAILS "get_node_details"
 #define MCP_TOOL_EXECUTE_FUNCTION "execute_function"
-#define MCP_TOOL_METRICS_QUERY "metrics_query"
+#define MCP_TOOL_QUERY_METRICS "query_metrics"
 
 // MCP protocol versions
 typedef enum {

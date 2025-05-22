@@ -132,8 +132,8 @@ void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *patt
         buffer_json_member_add_string(wb, "instructions",
                                       "The following is the list of contexts.\n"
                                       "You can get additional information for any context by calling,\n"
-                                      "the tool " MCP_TOOL_CONTEXT_DETAILS " with params:\n"
-                                      "`contexts=context1|context2` to get more information about context1 and context2.\n");
+                                      "the tool " MCP_TOOL_GET_METRICS_DETAILS " with params:\n"
+                                      "`metrics=context1|context2` to get more information about context1 and context2.\n");
     }
     buffer_json_object_close(wb); // info
 
@@ -229,9 +229,9 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
         buffer_json_member_add_string(wb, "instructions",
                                       "The following list groups metric contexts by prefix.\n"
                                       "In case the original list of contexts is too big to be processed at once,\n"
-                                      "use the `like` parameter to fetch the contexts in smaller batches.\n"
-                                      "Example: call the "MCP_TOOL_METRIC_CONTEXTS" with params:\n"
-                                      "`like=system.*|net.*` to get all system.* and net.* contexts\n");
+                                      "use the `q` parameter to fetch the contexts in smaller batches.\n"
+                                      "Example: call the " MCP_TOOL_LIST_METRICS " with params:\n"
+                                      "`q=system.*|net.*` to get all system.* and net.* contexts\n");
     }
     buffer_json_object_close(wb); // info
 

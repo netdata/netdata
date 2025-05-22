@@ -61,7 +61,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Context Name");
         buffer_json_member_add_string(buffer, "description", "The specific context name to query. This parameter is required.\n"
-                                                             "To discover available contexts, first use the " MCP_TOOL_METRIC_CONTEXTS " tool.");
+                                                             "To discover available contexts, first use the " MCP_TOOL_LIST_METRICS " tool.");
     }
     buffer_json_object_close(buffer); // context
 

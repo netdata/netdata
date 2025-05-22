@@ -1882,14 +1882,10 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-resources.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
-        src/web/mcp/mcp-tools-metric-contexts.c
-        src/web/mcp/mcp-tools-metric-contexts.h
-        src/web/mcp/mcp-tools-metric-context-categories.c
-        src/web/mcp/mcp-tools-metric-context-categories.h
-        src/web/mcp/mcp-tools-context-details.c
-        src/web/mcp/mcp-tools-context-details.h
-        src/web/mcp/mcp-tools-contexts-search.c
-        src/web/mcp/mcp-tools-contexts-search.h
+        src/web/mcp/mcp-tools-list-metrics.c
+        src/web/mcp/mcp-tools-list-metrics.h
+        src/web/mcp/mcp-tools-get-metrics-details.c
+        src/web/mcp/mcp-tools-get-metrics-details.h
         src/web/mcp/mcp-tools-list-nodes.c
         src/web/mcp/mcp-tools-list-nodes.h
         src/web/mcp/mcp-tools-node-details.c

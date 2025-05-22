@@ -17,6 +17,10 @@ typedef enum contexts_options {
     CONTEXTS_OPTION_LABELS                      = (1 << 8), // include context labels
     CONTEXTS_OPTION_PRIORITIES                  = (1 << 9), // include context priorities
     CONTEXTS_OPTION_TITLES                      = (1 << 10), // include context titles
+    CONTEXTS_OPTION_RETENTION                   = (1 << 11), // include first_entry and last_entry
+    CONTEXTS_OPTION_LIVENESS                    = (1 << 12), // include live status
+    CONTEXTS_OPTION_FAMILY                      = (1 << 13), // include family
+    CONTEXTS_OPTION_UNITS                       = (1 << 14), // include units
 } CONTEXTS_OPTIONS;
 
 CONTEXTS_OPTIONS contexts_options_str_to_id(char *o);
