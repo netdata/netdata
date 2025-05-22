@@ -1713,7 +1713,7 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, struct mssql_db_waits
 
         rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         mdw->rd_resource_wait_msec =
-            rrddim_add(mdw->st_resource_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(mdw->st_resource_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
