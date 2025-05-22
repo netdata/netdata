@@ -50,6 +50,9 @@ static struct {
     , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
     , {"minimal-stats"     , 0    , RRDR_OPTION_MINIMAL_STATS}
     , {"minimal"           , 0    , RRDR_OPTION_MINIMAL_STATS}
+    , {"long-json-keys"    , 0    , RRDR_OPTION_LONG_JSON_KEYS}
+    , {"long-keys"         , 0    , RRDR_OPTION_LONG_JSON_KEYS}
+    , {"mcp-info"          , 0    , RRDR_OPTION_MCP_INFO}
     , {NULL                , 0    , 0}
 };
 

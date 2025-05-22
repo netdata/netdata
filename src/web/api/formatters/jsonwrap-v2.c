@@ -3,6 +3,30 @@
 #include "jsonwrap.h"
 #include "jsonwrap-internal.h"
 
+void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
+    buffer_json_member_add_object(wb, JSKEY(status));
+    {
+        buffer_json_member_add_uint64(wb, JSKEY(agent_index), ai);
+        buffer_json_member_add_uint64(wb, "code", 200);
+        buffer_json_member_add_string(wb, "msg", "");
+        if (duration_ut)
+            buffer_json_member_add_double(wb, "ms", (NETDATA_DOUBLE) duration_ut / 1000.0);
+    }
+    buffer_json_object_close(wb);
+}
+
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
+    buffer_json_member_add_string(wb, JSKEY(machine_guid), host->machine_guid);
+
+    if(!UUIDiszero(host->node_id))
+        buffer_json_member_add_uuid(wb, JSKEY(node_id), host->node_id.uuid);
+    buffer_json_member_add_string(wb, JSKEY(hostname), rrdhost_hostname(host));
+    buffer_json_member_add_uint64(wb, JSKEY(node_index), ni);
+
+    if(status)
+        buffer_json_agent_status_id(wb, 0, duration_ut);
+}
+
 static void query_target_combined_chart_type(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
     if(contexts >= 1)
         buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rrdcontext_acquired_chart_type(qt->contexts.array[0].rca)));
@@ -102,7 +126,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
     buffer_json_array_close(wb);
 
     if(options & RRDR_OPTION_RETURN_RAW) {
-        buffer_json_member_add_array(wb, "sum");
+        buffer_json_member_add_array(wb, JSKEY(sum));
         for(size_t c = 0; c < r->d ; c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
@@ -111,7 +135,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
         }
         buffer_json_array_close(wb);
 
-        buffer_json_member_add_array(wb, "cnt");
+        buffer_json_member_add_array(wb, JSKEY(count));
         for(size_t c = 0; c < r->d ; c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
@@ -120,7 +144,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
         }
         buffer_json_array_close(wb);
 
-        buffer_json_member_add_array(wb, "arc");
+        buffer_json_member_add_array(wb, JSKEY(anomaly_count));
         for(size_t c = 0; c < r->d ; c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
@@ -138,7 +162,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
             sum += ABS(sp[c].sum);
         }
 
-        buffer_json_member_add_array(wb, "avg");
+        buffer_json_member_add_array(wb, JSKEY(avg));
         for(size_t c = 0; c < r->d ; c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
@@ -147,7 +171,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
         }
         buffer_json_array_close(wb);
 
-        buffer_json_member_add_array(wb, "arp");
+        buffer_json_member_add_array(wb, JSKEY(anomaly_rate));
         for(size_t c = 0; c < r->d ; c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
@@ -156,7 +180,7 @@ static inline void rrdr_dimension_query_points_statistics(BUFFER *wb, const char
         }
         buffer_json_array_close(wb);
 
-        buffer_json_member_add_array(wb, "con");
+        buffer_json_member_add_array(wb, JSKEY(contribution));
         for(size_t c = 0; c < r->d ; c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
@@ -287,10 +311,12 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
 
     buffer_json_initialize(
         wb, kq, sq, 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
-    buffer_json_member_add_uint64(wb, "api", 2);
+    
+    jsonwrap_keys_init(options);
+    buffer_json_member_add_uint64(wb, JSKEY(api), qt->request.version);
 
     if(options & RRDR_OPTION_DEBUG) {
-        buffer_json_member_add_string(wb, "id", qt->id);
+        buffer_json_member_add_string(wb, JSKEY(id), qt->id);
         buffer_json_member_add_object(wb, "request");
         {
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(qt->request.format));
@@ -318,14 +344,14 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
             buffer_json_member_add_time_t(wb, "before", qt->request.before);
             buffer_json_member_add_uint64(wb, "points", qt->request.points);
             if (qt->request.options & RRDR_OPTION_SELECTED_TIER)
-                buffer_json_member_add_uint64(wb, "tier", qt->request.tier);
+                buffer_json_member_add_uint64(wb, JSKEY(tier), qt->request.tier);
             else
-                buffer_json_member_add_string(wb, "tier", NULL);
+                buffer_json_member_add_string(wb, JSKEY(tier), NULL);
             buffer_json_object_close(wb); // window
 
             buffer_json_member_add_object(wb, "aggregations");
             {
-                buffer_json_member_add_object(wb, "time");
+                buffer_json_member_add_object(wb, JSKEY(time));
                 buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
                 buffer_json_member_add_string(wb, "time_group_options", qt->request.time_group_options);
                 if (qt->request.resampling_time > 0)
@@ -364,9 +390,9 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         buffer_json_object_close(wb); // request
     }
 
-    version_hashes_api_v2(wb, &qt->versions);
+    if(!(options & RRDR_OPTION_MINIMAL_STATS))
+        version_hashes_api_v2(wb, &qt->versions);
 
-    buffer_json_member_add_object(wb, "summary");
     struct summary_total_counts
         nodes_totals = { 0 },
         contexts_totals = { 0 },
@@ -374,13 +400,23 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         metrics_totals = { 0 },
         label_key_totals = { 0 },
         label_key_value_totals = { 0 };
+
+    buffer_json_member_add_object(wb, "summary");
     {
+        if(options & RRDR_OPTION_MCP_INFO)
+            buffer_json_member_add_string(
+                wb, JSKEY(info),
+                "The summary section breaks down the different sources that contribute "
+                "data to the query. Use this to detect spikes, dives, anomalies (the % of anomalous samples vs the total samples) "
+                "and evaluate the different groupings that may be beneficial for the task at hand.");
+        
         query_target_summary_nodes_v2(wb, qt, "nodes", &nodes_totals);
         r->internal.contexts = query_target_summary_contexts_v2(wb, qt, "contexts", &contexts_totals);
         query_target_summary_instances_v2(wb, qt, "instances", &instances_totals);
         query_target_summary_dimensions_v12(wb, qt, "dimensions", true, &metrics_totals);
         query_target_summary_labels_v12(wb, qt, "labels", true, &label_key_totals, &label_key_value_totals);
-        query_target_summary_alerts_v2(wb, qt, "alerts");
+        if(!(options & RRDR_OPTION_MINIMAL_STATS))
+            query_target_summary_alerts_v2(wb, qt, "alerts");
     }
     if(query_target_aggregatable(qt)) {
         buffer_json_member_add_object(wb, "globals");
@@ -407,7 +443,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         buffer_json_object_close(wb); // detailed
     }
 
-    query_target_functions(wb, "functions", r);
+    if(!(options & RRDR_OPTION_MINIMAL_STATS))
+        query_target_functions(wb, "functions", r);
 }
 
 void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
@@ -415,8 +452,15 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     DATASOURCE_FORMAT format = qt->request.format;
     RRDR_OPTIONS options = qt->window.options;
 
-    buffer_json_member_add_object(wb, "db");
+    buffer_json_member_add_object(wb, JSKEY(database));
     {
+        if(options & RRDR_OPTION_MCP_INFO)
+            buffer_json_member_add_string(
+                wb, JSKEY(info),
+                "The database section provides metadata about the underlying data storage, "
+                "including retention periods and update frequencies, and data availability "
+                "across different storage tiers.");
+        
         buffer_json_member_add_uint64(wb, "tiers", nd_profile.storage_tiers);
         buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
         buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
@@ -425,16 +469,16 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         query_target_combined_units_v2(wb, qt, r->internal.contexts, true);
         buffer_json_member_add_object(wb, "dimensions");
         {
-            rrdr_dimension_ids(wb, "ids", r, options);
+            rrdr_dimension_ids(wb, JSKEY(ids), r, options);
             rrdr_dimension_units_array_v2(wb, "units", r, options, true);
-            rrdr_dimension_query_points_statistics(wb, "sts", r, options, false);
+            rrdr_dimension_query_points_statistics(wb, JSKEY(statistics), r, options, false);
         }
         buffer_json_object_close(wb); // dimensions
 
         buffer_json_member_add_array(wb, "per_tier");
         for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_uint64(wb, "tier", tier);
+            buffer_json_member_add_uint64(wb, JSKEY(tier), tier);
             buffer_json_member_add_uint64(wb, "queries", qt->db.tiers[tier].queries);
             buffer_json_member_add_uint64(wb, "points", qt->db.tiers[tier].points);
             buffer_json_member_add_time_t(wb, "update_every", qt->db.tiers[tier].update_every);
@@ -446,8 +490,17 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     }
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_object(wb, "view");
+    buffer_json_member_add_object(wb, JSKEY(view));
     {
+        if(options & RRDR_OPTION_MCP_INFO)
+            buffer_json_member_add_string(
+                wb, JSKEY(info),
+                "The view section provides summarized data for the visible time window. "
+                "For each dimension returned, it contains the minimum, maximum, and average values, "
+                "the anomaly rate (% of anomalous samples vs total samples) and contribution percentages, "
+                "across all points."
+                );
+        
         query_target_title(wb, qt, r->internal.contexts);
         buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);
         buffer_json_member_add_time_t(wb, "after", r->view.after);
@@ -475,21 +528,24 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         buffer_json_member_add_object(wb, "dimensions");
         {
             rrdr_grouped_by_array_v2(wb, "grouped_by", r, options);
-            rrdr_dimension_ids(wb, "ids", r, options);
+            rrdr_dimension_ids(wb, JSKEY(ids), r, options);
             rrdr_dimension_names(wb, "names", r, options);
             rrdr_dimension_units_array_v2(wb, "units", r, options, false);
             rrdr_dimension_priority_array_v2(wb, "priorities", r, options);
             rrdr_dimension_aggregated_array_v2(wb, "aggregated", r, options);
-            rrdr_dimension_query_points_statistics(wb, "sts", r, options, true);
+            rrdr_dimension_query_points_statistics(wb, JSKEY(statistics), r, options, true);
             rrdr_json_group_by_labels(wb, "labels", r, options);
         }
         buffer_json_object_close(wb); // dimensions
-        buffer_json_member_add_double(wb, "min", r->view.min);
-        buffer_json_member_add_double(wb, "max", r->view.max);
+        buffer_json_member_add_double(wb, JSKEY(min), r->view.min);
+        buffer_json_member_add_double(wb, JSKEY(max), r->view.max);
     }
     buffer_json_object_close(wb); // view
 
-    buffer_json_agents_v2(wb, &r->internal.qt->timings, 0, false, true);
-    buffer_json_cloud_timings(wb, "timings", &r->internal.qt->timings);
+    if(!(options & RRDR_OPTION_MINIMAL_STATS)) {
+        buffer_json_agents_v2(wb, &r->internal.qt->timings, 0, false, true);
+        buffer_json_cloud_timings(wb, "timings", &r->internal.qt->timings);
+    }
     buffer_json_finalize(wb);
+    jsonwrap_keys_reset();
 }

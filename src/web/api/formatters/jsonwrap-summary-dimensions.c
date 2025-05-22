@@ -59,9 +59,9 @@ static int dimensions_sorted_walktrhough_cb(const DICTIONARY_ITEM *item __maybe_
 
     // Output this dimension normally
     buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_string(wb, "id", z->id);
+    buffer_json_member_add_string(wb, JSKEY(id), z->id);
     if (z->id != z->name && z->name)
-        buffer_json_member_add_string(wb, "nm", z->name);
+        buffer_json_member_add_string(wb, JSKEY(name), z->name);
 
     // Only include detailed statistics if MINIMAL_STATS option is not set
     if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -69,7 +69,7 @@ static int dimensions_sorted_walktrhough_cb(const DICTIONARY_ITEM *item __maybe_
     }
 
     query_target_points_statistics(wb, qt, &z->query_points);
-    buffer_json_member_add_uint64(wb, "pri", z->priority);
+    buffer_json_member_add_uint64(wb, JSKEY(priority), z->priority);
     buffer_json_object_close(wb);
 
     aggregate_into_summary_totals(totals, &z->metrics);
@@ -203,9 +203,9 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
             char remaining_label[50];
             snprintfz(remaining_label, sizeof(remaining_label), "remaining %zu dimensions", t.remaining_count);
 
-            buffer_json_member_add_string(wb, "id", "__remaining_dimensions__");
-            buffer_json_member_add_string(wb, "nm", remaining_label);
-            buffer_json_member_add_double(wb, "con", t.remaining_contribution);
+            buffer_json_member_add_string(wb, JSKEY(id), "__remaining_dimensions__");
+            buffer_json_member_add_string(wb, JSKEY(name), remaining_label);
+            buffer_json_member_add_double(wb, JSKEY(contribution), t.remaining_contribution);
 
             // Only include detailed statistics if MINIMAL_STATS option is not set
             if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {

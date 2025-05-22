@@ -671,6 +671,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status);
 void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings);
+void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut);
 
 // ----------------------------------------------------------------------------
 // scope

@@ -80,10 +80,10 @@ int label_values_sorted_sum_compar(const DICTIONARY_ITEM **item1, const DICTIONA
 static inline void output_label_value(BUFFER *wb, QUERY_TARGET *qt, const char *id, const char *name,
                                       QUERY_METRICS_COUNTS *metrics, STORAGE_POINT *points) {
     buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_string(wb, "id", id);
+    buffer_json_member_add_string(wb, JSKEY(id), id);
 
     if (name)
-        buffer_json_member_add_string(wb, "nm", name);
+        buffer_json_member_add_string(wb, JSKEY(name), name);
 
     // Only include detailed statistics if MINIMAL_STATS option is not set
     if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -165,7 +165,7 @@ void query_target_summary_labels_v12(BUFFER *wb, QUERY_TARGET *qt, const char *k
     dfe_start_read(t.keys, d) {
         if(v2) {
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, "id", d_dfe.name);
+            buffer_json_member_add_string(wb, JSKEY(id), d_dfe.name);
 
             // Only include detailed statistics if MINIMAL_STATS option is not set
             if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -174,7 +174,7 @@ void query_target_summary_labels_v12(BUFFER *wb, QUERY_TARGET *qt, const char *k
 
             query_target_points_statistics(wb, qt, &d->query_points);
             aggregate_into_summary_totals(key_totals, &d->metrics);
-            buffer_json_member_add_array(wb, "vl");
+            buffer_json_member_add_array(wb, JSKEY(label_values));
 
             // Apply cardinality limiting to label values
             size_t values_count = dictionary_entries(d->values);

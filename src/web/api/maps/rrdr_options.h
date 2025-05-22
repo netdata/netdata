@@ -37,6 +37,8 @@ typedef enum rrdr_options {
     RRDR_OPTION_MINIFY          = (1ULL << 28), // remove JSON spaces and newlines from JSON output
     RRDR_OPTION_GROUP_BY_LABELS = (1ULL << 29), // v2 returns flattened labels per dimension of the chart
     RRDR_OPTION_MINIMAL_STATS   = (1ULL << 30), // Remove "totals" and statistics fields (qr, sl, ex) from response
+    RRDR_OPTION_LONG_JSON_KEYS  = (1ULL << 31), // Use descriptive long JSON keys instead of cryptic short ones
+    RRDR_OPTION_MCP_INFO        = (1ULL << 32), // Include "info" nodes in JSON response sections
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR     = (1ULL << 63), // internal use only, to let the formatters know we want to render the anomaly rate
