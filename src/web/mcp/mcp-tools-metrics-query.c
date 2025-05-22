@@ -90,6 +90,18 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "description", "Filter for charts having specified alert states.");
     }
     buffer_json_object_close(buffer); // alerts
+    
+    buffer_json_member_add_object(buffer, "cardinality_limit");
+    {
+        buffer_json_member_add_string(buffer, "type", "number");
+        buffer_json_member_add_string(buffer, "title", "Cardinality Limit");
+        buffer_json_member_add_string(buffer, "description", "Limits the number of nodes, instances, dimensions, and label values returned in the results. "
+                                                           "When the number of items exceeds this limit, only the top N items by contribution are returned, "
+                                                           "with the remaining items aggregated into a 'remaining X dimensions' entry. "
+                                                           "This helps keep response sizes manageable for high-cardinality queries. "
+                                                           "The default limit is 10.");
+    }
+    buffer_json_object_close(buffer); // cardinality_limit
 
     // Time parameters
     buffer_json_member_add_object(buffer, "after");
@@ -339,9 +351,9 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     const char *nodes = extract_string_param(params, "nodes");
     const char *context = extract_string_param(params, "context");
     
-    // Validate required parameters
+    // Validate required parameters with detailed error messages
     if (!context || !*context) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'context'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'context'. This parameter specifies which metric context to query. Use the list_metric_contexts tool to discover available contexts.");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -350,32 +362,32 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     struct json_object *group_by_obj = NULL, *aggregation_obj = NULL;
     
     if (!json_object_object_get_ex(params, "after", &after_obj) || !after_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'after'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (epoch timestamp in seconds or negative value for relative time).");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "before", &before_obj) || !before_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'before'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'before'. This parameter defines the end time for your query (epoch timestamp in seconds or negative value for relative time).");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "points", &points_obj) || !points_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'points'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'points'. This parameter defines how many data points to return in your result set (e.g., 60 for minute-level granularity in an hour).");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "time_group", &time_group_obj) || !time_group_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'time_group'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'time_group'. This parameter defines how to aggregate data points over time (e.g., 'average', 'min', 'max', 'sum').");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "group_by", &group_by_obj) || !group_by_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'group_by'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'group_by'. This parameter defines how to group metrics (e.g., 'dimension', 'instance', 'node', or combinations like 'dimension,node').");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "aggregation", &aggregation_obj) || !aggregation_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'aggregation'");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'aggregation'. This parameter defines the function to use when aggregating metrics (e.g., 'sum', 'min', 'max', 'average').");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -391,7 +403,11 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
             
             struct json_object *time_group_options_obj = NULL;
             if (!json_object_object_get_ex(params, "time_group_options", &time_group_options_obj) || !time_group_options_obj) {
-                buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using '%s'", time_group_str);
+                if (strcmp(time_group_str, "percentile") == 0) {
+                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
+                } else {
+                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='countif'. You must specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+                }
                 return MCP_RC_BAD_REQUEST;
             }
         }
@@ -404,9 +420,15 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     time_t after = extract_time_param(params, "after", -600);
     time_t before = extract_time_param(params, "before", 0);
     
-    // If both after and before are exactly zero, consider them not given
+    // Validate time range
     if (after == 0 && before == 0) {
-        buffer_sprintf(mcpc->error, "Invalid time range: both 'after' and 'before' cannot be zero");
+        buffer_sprintf(mcpc->error, "Invalid time range: both 'after' and 'before' cannot be zero. Use negative values for relative times (e.g., after=-3600, before=-0 for the last hour) or specific timestamps for absolute times.");
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // Check if after is later than before (when both are absolute timestamps)
+    if (after > 0 && before > 0 && after >= before) {
+        buffer_sprintf(mcpc->error, "Invalid time range: 'after' (%lld) must be earlier than 'before' (%lld). The query time range must be at least 1 second.", (long long)after, (long long)before);
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -414,13 +436,29 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Other parameters
     size_t points = extract_size_param(params, "points", 0);
+    size_t cardinality_limit = extract_size_param(params, "cardinality_limit", 10);
+
+    // Check if points is more than 1000
+    if (points < 1) {
+        buffer_sprintf(mcpc->error,
+                       "Too few data points requested: %zu. The minimum allowed is 1 point.",
+                       points);
+        return MCP_RC_BAD_REQUEST;
+    }
+
+    // Check if points is more than 1000
+    if (points > 1000) {
+        buffer_sprintf(mcpc->error, 
+            "Too many data points requested: %zu. The maximum allowed is 1000 points. Please reduce the 'points' parameter value to 1000 or less.\n"
+            "This limit helps reduce response size and save context space when used with AI assistants.",
+            points);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
     int timeout = (int)extract_size_param(params, "timeout", 0);
     
-    // Options (format is always JSON2 for MCP)
-    DATASOURCE_FORMAT format = DATASOURCE_JSON2; // Always use JSON2 for MCP
-    
     const char *options_str = extract_string_param(params, "options");
-    RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR;
+    RRDR_OPTIONS options = 0;
     if (options_str && *options_str)
         options |= rrdr_options_parse(options_str);
     
@@ -431,8 +469,8 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     const char *time_group_options = extract_string_param(params, "time_group_options");
     
-    // Tier selection
-    size_t tier = extract_size_param(params, "tier", 0);
+    // Tier selection (give an invalid default to now the caller added a tier to the query)
+    size_t tier = extract_size_param(params, "tier", nd_profile.storage_tiers + 1);
     if (tier < nd_profile.storage_tiers)
         options |= RRDR_OPTION_SELECTED_TIER;
     else
@@ -481,15 +519,18 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         .before = before,
         .host = NULL,
         .st = NULL,
-        .nodes = NULL,              // Don't use nodes parameter here
-        .contexts = NULL,           // Don't use contexts parameter here
+        .nodes = NULL,              // Don't use nodes parameter here (we use scope_nodes)
+        .contexts = NULL,           // Don't use contexts parameter here (we use scope_contexts)
         .instances = NULL,
         .dimensions = dimensions,
         .alerts = alerts,
         .timeout_ms = timeout,
         .points = points,
-        .format = format,
-        .options = options,
+        .format = DATASOURCE_JSON2,
+        .options = options |
+                   RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
+                   RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
+                   RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,
@@ -499,6 +540,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         .query_source = QUERY_SOURCE_API_DATA,
         .priority = STORAGE_PRIORITY_NORMAL,
         .received_ut = received_ut,
+        .cardinality_limit = cardinality_limit,
         
         .interrupt_callback = mcp_query_interrupt_callback,
         .interrupt_callback_data = &interrupt_data,
@@ -512,12 +554,11 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Create query target
     QUERY_TARGET *qt = query_target_create(&qtr);
-    
     if (!qt) {
         buffer_sprintf(mcpc->error, "Failed to prepare the query.");
         return MCP_RC_INTERNAL_ERROR;
     }
-    
+
     // Create a temporary buffer for the query result
     CLEAN_BUFFER *tmp_buffer = buffer_create(0, NULL);
     
@@ -537,7 +578,29 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     if (ret != HTTP_RESP_OK) {
         buffer_flush(mcpc->result);
-        buffer_sprintf(mcpc->error, "Failed to execute query: %d", ret);
+        const char *error_desc = "unknown error";
+        
+        // Map common HTTP error codes to more descriptive messages
+        switch (ret) {
+            case HTTP_RESP_BAD_REQUEST:
+                error_desc = "bad request parameters";
+                break;
+            case HTTP_RESP_NOT_FOUND:
+                error_desc = "context or metrics not found";
+                break;
+            case HTTP_RESP_GATEWAY_TIMEOUT:
+            case HTTP_RESP_SERVICE_UNAVAILABLE:
+                error_desc = "timeout or service unavailable";
+                break;
+            case HTTP_RESP_INTERNAL_SERVER_ERROR:
+                error_desc = "internal server error";
+                break;
+            default:
+                break;
+        }
+        
+        buffer_sprintf(mcpc->error, "Failed to execute query: %s (http error code: %d). The context '%s' might not exist, or no data is available for the specified time range.",
+                      error_desc, ret, context);
         return MCP_RC_INTERNAL_ERROR;
     }
     
@@ -580,8 +643,21 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
                         // Free the JSON object
                         json_object_put(json_result);
                         
-                        // Return error message about empty data
-                        buffer_sprintf(mcpc->error, "Query matched no data. Please check your filters and the context name.");
+                        // Return a more detailed error message about empty data
+                        buffer_sprintf(mcpc->error, 
+                            "Query matched no data. Possible reasons:\n"
+                            "1. The context '%s' exists but has no data in the requested time range (%lld to %lld)\n"
+                            "2. The nodes filter '%s' doesn't match any nodes that collect this context\n"
+                            "3. The dimensions filter '%s' doesn't match any available dimensions\n"
+                            "4. The labels filter '%s' doesn't match any metrics with those labels\n"
+                            "Try using the context_details tool to verify the context exists and which nodes collect it.",
+                            context, 
+                            (long long)after, 
+                            (long long)before, 
+                            nodes ? nodes : "*",
+                            dimensions ? dimensions : "*",
+                            labels ? labels : "none"
+                        );
                         return MCP_RC_BAD_REQUEST;
                     }
                     
@@ -721,32 +797,25 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
                 BUFFER *plain_text = buffer_create(0, NULL);
                 
                 // First add the explanation text
-                buffer_strcat(plain_text, 
-                    "QUERY METADATA\n"
-                    "This metadata provides information about the unique items included in the query results:\n"
-                    "- The 'counts' section shows the number of unique nodes, instances, and dimensions\n"
-                    "- The 'labels' section shows each label key, the number of unique values for that key,\n"
-                    "  and a sample of up to 2 values (not necessarily the most common ones)\n\n");
-                
+                buffer_strcat(plain_text, "QUERY METADATA\n");
+
                 // Now manually add a cleaner version of the counts
                 if (metadata) {
                     struct json_object *counts_obj = NULL;
                     if (json_object_object_get_ex(metadata, "counts", &counts_obj)) {
-                        buffer_strcat(plain_text, "Counts of unique items:\n");
-                        
                         struct json_object *nodes_count = NULL;
                         if (json_object_object_get_ex(counts_obj, "nodes", &nodes_count)) {
-                            buffer_sprintf(plain_text, "- Nodes: %d\n", json_object_get_int(nodes_count));
+                            buffer_sprintf(plain_text, "- Nodes Aggregated: %d\n", json_object_get_int(nodes_count));
                         }
                         
                         struct json_object *instances_count = NULL;
                         if (json_object_object_get_ex(counts_obj, "instances", &instances_count)) {
-                            buffer_sprintf(plain_text, "- Instances: %d\n", json_object_get_int(instances_count));
+                            buffer_sprintf(plain_text, "- Instances Aggregated (across all nodes): %d\n", json_object_get_int(instances_count));
                         }
                         
                         struct json_object *dimensions_count = NULL;
                         if (json_object_object_get_ex(counts_obj, "dimensions", &dimensions_count)) {
-                            buffer_sprintf(plain_text, "- Dimensions: %d\n", json_object_get_int(dimensions_count));
+                            buffer_sprintf(plain_text, "- Unique dimension names (across all instances): %d\n", json_object_get_int(dimensions_count));
                         }
                     }
                     
@@ -774,7 +843,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
                                     const char *key = json_object_get_string(key_obj);
                                     int count = json_object_get_int(count_obj);
                                     
-                                    buffer_sprintf(plain_text, "- '%s': %d unique values", key, count);
+                                    buffer_sprintf(plain_text, "- '%s': %d unique label values", key, count);
                                     
                                     if (json_object_is_type(values_obj, json_type_array)) {
                                         int values_length = json_object_array_length(values_obj);

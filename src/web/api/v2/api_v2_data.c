@@ -48,7 +48,9 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     char *alerts = NULL;
     char *time_group_options = NULL;
     char *tier_str = NULL;
+    char *cardinality_limit_str = NULL;
     size_t tier = 0;
+    size_t cardinality_limit = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON2;
     RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR;
@@ -107,6 +109,7 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         else if(!strcmp(name, "time_group_options")) time_group_options = value;
         else if(!strcmp(name, "time_resampling")) resampling_time_str = value;
         else if(!strcmp(name, "tier")) tier_str = value;
+        else if(!strcmp(name, "cardinality_limit")) cardinality_limit_str = value;
         else if(!strcmp(name, "callback")) responseHandler = value;
         else if(!strcmp(name, "filename")) outFileName = value;
         else if(!strcmp(name, "tqx")) {
@@ -186,6 +189,10 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         else
             tier = 0;
     }
+    
+    if(cardinality_limit_str && *cardinality_limit_str) {
+        cardinality_limit = str2ul(cardinality_limit_str);
+    }
 
     time_t    before = (before_str && *before_str)?str2l(before_str):0;
     time_t    after  = (after_str  && *after_str) ?str2l(after_str):-600;
@@ -219,6 +226,7 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         .query_source = QUERY_SOURCE_API_DATA,
         .priority = STORAGE_PRIORITY_NORMAL,
         .received_ut = received_ut,
+        .cardinality_limit = cardinality_limit,
 
         .interrupt_callback = web_client_interrupt_callback,
         .interrupt_callback_data = w,
