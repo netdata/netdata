@@ -2,8 +2,6 @@
 
 Netdata's Agent can send alert notifications directly from each node. It supports a wide range of services, multiple recipients, and role-based routing.
 
----
-
 ## How It Works
 
 The Agent uses a notification script defined in `netdata.conf` under the `[health]` section:
@@ -20,16 +18,95 @@ This script handles:
 - Multiple notification methods
 - Role-based routing (e.g., `sysadmin`, `webmaster`, `dba`)
 
----
+## Role-Based Routing Visualization
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
+flowchart TD
+    Alert[High CPU Usage Alert] --> Check{Severity Level}
+    style Alert fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style Check fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    
+    Check -->|WARNING| WarningRouting{Role: SysAdmin}
+    Check -->|CRITICAL| CriticalRouting{Multiple Roles}
+    
+    style WarningRouting fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style CriticalRouting fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    
+    WarningRouting --> SlackChannel[Slack]
+    WarningRouting --> EmailOps[Email]
+    
+    CriticalRouting --> PagerDuty[PagerDuty]
+    CriticalRouting --> EmailManagers[Email]
+    CriticalRouting --> SlackUrgent[Slack]
+    CriticalRouting --> SMS[SMS]
+    
+    style SlackChannel fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style EmailOps fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style PagerDuty fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style EmailManagers fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style SlackUrgent fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style SMS fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+```
+
+## Health Management API Workflow
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
+flowchart TD
+    Start[Normal Operation] --> Maintenance{Maintenance<br/>Window?}
+    style Start fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style Maintenance fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    
+    Maintenance -->|No| NormalOps[Continue Normal Alerting]
+    Maintenance -->|Yes| ApiAction{Choose API Action}
+    
+    style NormalOps fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style ApiAction fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    
+    ApiAction -->|Silence All| SilenceAll[SILENCE ALL]
+    ApiAction -->|Disable All| DisableAll[DISABLE ALL]
+    ApiAction -->|Selective Silence| SilenceSelect[SILENCE Specific]
+    
+    SilenceAll --> AlertMode["Alerts: Yes<br/>Notifications: No"]
+    DisableAll --> CheckMode["Alerts: No<br/>Notifications: No"]
+    SilenceSelect --> SelectMode["Selected: Silenced<br/>Others: Normal"]
+    
+    style SilenceAll fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style DisableAll fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style SilenceSelect fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    
+    style AlertMode fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    style CheckMode fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    style SelectMode fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    
+    AlertMode --> MaintenanceEnd{Maintenance<br/>Complete?}
+    CheckMode --> MaintenanceEnd
+    SelectMode --> MaintenanceEnd
+    
+    style MaintenanceEnd fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    
+    MaintenanceEnd -->|Yes| Reset[RESET]
+    MaintenanceEnd -->|No| Continue[Continue Maintenance]
+    
+    style Reset fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style Continue fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    
+    Reset --> Restored[Normal Operations Restored]
+    
+    style Restored fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+```
 
 ## Quick Setup
 
-:::tip Recommended
+:::tip
+
 Use the `edit-config` script to safely edit configuration files. It automatically creates the necessary files in the right place and opens them in your editor.
-→ [Learn how to use `edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)
+[Learn how to use `edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)
+
 :::
 
-1. Open the Agent’s health notification config:
+1. Open the Agent's health notification config:
    ```bash
    sudo ./edit-config health_alarm_notify.conf
    ```
@@ -43,11 +120,9 @@ Use the `edit-config` script to safely edit configuration files. It automaticall
    sudo systemctl restart netdata
    ```
 
----
-
 ## Example: Alert with Role-Based Routing
 
-Here’s an example alert assigned to the `sysadmin` role from the `ram.conf` file:
+Here's an example alert assigned to the `sysadmin` role from the `ram.conf` file:
 
 ```ini
 alarm: ram_in_use
@@ -74,11 +149,130 @@ role_recipients_email[sysadmin]="admin1@example.com admin2@example.com"
 role_recipients_slack[sysadmin]="#alerts #infra"
 ```
 
----
+## Advanced Role-Based Routing Examples
+
+<details>
+<summary><strong>DevOps Team Example</strong></summary><br/>
+
+```ini
+# Backend team receives database and application server alerts
+role_recipients_slack[backend]="#backend-team"
+role_recipients_pagerduty[backend]="PDK3Y5EXAMPLE"
+
+# Frontend team receives web server and CDN alerts
+role_recipients_slack[frontend]="#frontend-team"
+role_recipients_opsgenie[frontend]="key1example"
+
+# Security team receives all security-related alerts
+role_recipients_email[security]="security@example.com"
+role_recipients_slack[security]="#security-alerts"
+
+# SRE team receives critical infrastructure alerts 24/7
+role_recipients_slack[sre]="#sre-alerts"
+role_recipients_pagerduty[sre]="PDK3Y5SREXAMPLE"
+role_recipients_telegram[sre]="123456789"
+```
+
+</details>
+
+<details>
+<summary><strong>Time-Based Routing Example</strong></summary><br/>
+
+You can use external scripts to dynamically change recipients based on work hours, on-call schedules, etc.:
+
+```ini
+# Use a script to determine the current on-call engineer
+ONCALL_EMAIL=$(get_oncall_email.sh)
+role_recipients_email[oncall]="${ONCALL_EMAIL}"
+role_recipients_sms[oncall]="${ONCALL_PHONE}"
+
+# Standard business hours team gets non-critical alerts during work hours
+role_recipients_slack[business_hours]="#daytime-monitoring"
+```
+
+</details>
+
+## Health Management API
+
+Netdata provides a powerful Health Management API that lets you control alert behavior during maintenance windows, testing, or other planned activities.
+
+### API Authorization
+
+The API is protected by an authorization token stored in `/var/lib/netdata/netdata.api.key`:
+
+```bash
+# Get your token
+TOKEN=$(cat /var/lib/netdata/netdata.api.key)
+
+# Use the token in API calls
+curl "http://localhost:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: ${TOKEN}"
+```
+
+### Common API Commands
+
+<details>
+<summary><strong>Disable All Health Checks</strong></summary><br/>
+
+Completely stops evaluation of health checks during maintenance:
+
+```bash
+curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: ${TOKEN}"
+```
+
+</details>
+
+<details>
+<summary><strong>Silence All Notifications</strong></summary><br/>
+
+Continues to evaluate health checks but prevents notifications:
+
+```bash
+curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: ${TOKEN}"
+```
+
+</details>
+
+<details>
+<summary><strong>Disable Specific Alerts</strong></summary><br/>
+
+Target only certain alerts by name, chart, context, host, or family:
+
+```bash
+# Silence all disk space alerts
+curl "http://localhost:19999/api/v1/manage/health?cmd=SILENCE&context=disk_space" -H "X-Auth-Token: ${TOKEN}"
+
+# Disable CPU alerts for specific hosts
+curl "http://localhost:19999/api/v1/manage/health?cmd=DISABLE&context=cpu&hosts=prod-db-*" -H "X-Auth-Token: ${TOKEN}"
+```
+
+</details>
+
+<details>
+<summary><strong>View Current Silenced/Disabled Alerts</strong></summary><br/>
+
+Check what's currently silenced or disabled:
+
+```bash
+curl "http://localhost:19999/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: ${TOKEN}"
+```
+
+</details>
+
+<details>
+<summary><strong>Reset to Normal Operation</strong></summary><br/>
+
+Re-enable all health checks and notifications:
+
+```bash
+curl "http://localhost:19999/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: ${TOKEN}"
+```
+
+</details>
 
 ## Configuration Options
 
-### Recipients Per Role
+<details>
+<summary><strong>Recipients Per Role</strong></summary><br/>
 
 Define who receives alerts and how:
 
@@ -97,10 +291,10 @@ role_recipients_email[sysadmin]="disabled"
 ```
 
 If left empty, the default recipient for that method is used.
+</details>
 
----
-
-### Alert Severity Filtering
+<details>
+<summary><strong>Alert Severity Filtering</strong></summary><br/>
 
 You can limit certain recipients to only receive **critical** alerts:
 
@@ -114,10 +308,10 @@ This setup:
 - Sends only critical-related alerts to `user2@example.com`
 
 Works for all supported methods: email, Slack, Telegram, Twilio, Discord, etc.
+</details>
 
----
-
-### Proxy Settings
+<details>
+<summary><strong>Proxy Settings</strong></summary><br/>
 
 To send notifications via a proxy, set these environment variables:
 
@@ -126,9 +320,10 @@ export http_proxy="http://10.0.0.1:3128/"
 export https_proxy="http://10.0.0.1:3128/"
 ```
 
----
+</details>
 
-### Notification Images
+<details>
+<summary><strong>Notification Images</strong></summary><br/>
 
 By default, Netdata includes public image URLs in notifications (hosted by the global Registry).
 
@@ -138,9 +333,10 @@ To use custom image paths:
 images_base_url="http://my.public.netdata.server:19999"
 ```
 
----
+</details>
 
-### Custom Date Format
+<details>
+<summary><strong>Custom Date Format</strong></summary><br/>
 
 Change the timestamp format in notifications:
 
@@ -158,11 +354,11 @@ Common formats:
 | Local time         | `+%x %X`                    |
 | ANSI C / asctime() | *(leave empty)*             |
 
-→ See `man date` for more formatting options.
+See `man date` for more formatting options.
+</details>
 
----
-
-### Hostname Format
+<details>
+<summary><strong>Hostname Format</strong></summary><br/>
 
 By default, Netdata uses the short hostname in notifications.
 
@@ -172,9 +368,8 @@ To use the fully qualified domain name (FQDN), set:
 use_fqdn=YES
 ```
 
-If you’ve set a custom hostname in `netdata.conf`, that value takes priority.
-
----
+If you've set a custom hostname in `netdata.conf`, that value takes priority.
+</details>
 
 ## Testing Your Notification Setup
 
@@ -194,19 +389,21 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 ./plugins.d/alarm-notify.sh test "webmaster"
 ```
 
-:::info Using a custom Registry?
-If you’re running your own Netdata Registry, set:
+:::important
+
+If you're running your own Netdata Registry, set:
 
 ```bash
 export NETDATA_REGISTRY_URL="https://your.registry.url"
 ```
 
 before testing.
+
 :::
 
 ### Debugging with Trace
 
-To see full execution output:
+To see the full execution output:
 
 ```bash
 bash -x ./plugins.d/alarm-notify.sh test
@@ -214,7 +411,67 @@ bash -x ./plugins.d/alarm-notify.sh test
 
 Then look for the internal calls and re-run the one you want to trace in more detail.
 
----
+## Troubleshooting Alert Notifications
+
+Here are solutions for common alert notification issues:
+
+### Email Notifications Not Working
+
+1. Verify your email configuration:
+   ```bash
+   grep -E "SEND_EMAIL|DEFAULT_RECIPIENT_EMAIL" /etc/netdata/health_alarm_notify.conf
+   ```
+
+2. Check if the system can send mail:
+   ```bash
+   echo "Test" | mail -s "Test Email" your@email.com
+   ```
+
+3. Look for errors in the Netdata log:
+   ```bash
+   tail -f /var/log/netdata/error.log | grep "alarm notify"
+   ```
+
+4. Test with debugging enabled:
+   ```bash
+   sudo su -s /bin/bash netdata
+   export NETDATA_ALARM_NOTIFY_DEBUG=1
+   ./plugins.d/alarm-notify.sh test
+   ```
+
+### Slack Notifications Failing
+
+1. Verify your webhook URL is correct:
+   ```bash
+   grep -E "SLACK_WEBHOOK_URL" /etc/netdata/health_alarm_notify.conf
+   ```
+
+2. Check for network connectivity to Slack:
+   ```bash
+   curl -X POST -H "Content-type: application/json" --data '{"text":"Test"}' YOUR_WEBHOOK_URL
+   ```
+
+3. Confirm channel names start with `#` in your configuration.
+
+### PagerDuty Integration Issues
+
+1. Verify your service key:
+   ```bash
+   grep -E "PAGERDUTY_SERVICE_KEY" /etc/netdata/health_alarm_notify.conf
+   ```
+
+2. Test the PagerDuty API directly:
+   ```bash
+   curl -H "Content-Type: application/json" -X POST -d '{"service_key":"YOUR_SERVICE_KEY","event_type":"trigger","description":"Test"}' https://events.pagerduty.com/generic/2010-04-15/create_event.json
+   ```
+
+### Notification Delays
+
+If notifications seem delayed:
+
+1. Check the `delay` parameter in your alarm configuration
+2. Verify your `health.d/*.conf` files for delay settings
+3. Check the `ALARM_NOTIFY_DELAY` setting in health_alarm_notify.conf
 
 ## Related Docs
 
