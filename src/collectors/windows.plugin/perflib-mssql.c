@@ -77,6 +77,7 @@ struct mssql_db_waits {
 
 struct mssql_instance {
     char *instanceID;
+    int update_every;
 
     struct netdata_mssql_conn conn;
 
@@ -1004,7 +1005,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     }
 }
 
-static int mssql_fill_dictionary()
+static int mssql_fill_dictionary(int update_every)
 {
     HKEY hKey;
     LSTATUS ret = RegOpenKeyExA(
@@ -1042,6 +1043,7 @@ static int mssql_fill_dictionary()
         }
 
         struct mssql_instance *p = dictionary_set(mssql_instances, avalue, NULL, sizeof(*p));
+        p->update_every = update_every;
     }
 
 endMSSQLFillDict:
@@ -1112,7 +1114,7 @@ static int initialize(int update_every)
 
     dictionary_register_insert_callback(mssql_instances, dict_mssql_insert_cb, &create_thread);
 
-    if (mssql_fill_dictionary()) {
+    if (mssql_fill_dictionary(update_every)) {
         return -1;
     }
 
