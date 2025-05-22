@@ -6,12 +6,21 @@
 
 **Merged pull requests:**
 
+- SOC 2 cloud doc update [\#20325](https://github.com/netdata/netdata/pull/20325) ([kanelatechnical](https://github.com/kanelatechnical))
+- dont init dyncfg for vnode [\#20324](https://github.com/netdata/netdata/pull/20324) ([ilyam8](https://github.com/ilyam8))
+- \_generic-tcp.yaml pass [\#20321](https://github.com/netdata/netdata/pull/20321) ([Ancairon](https://github.com/Ancairon))
+- build\(deps\): bump github.com/lmittmann/tint from 1.0.7 to 1.1.0 in /src/go [\#20320](https://github.com/netdata/netdata/pull/20320) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): update otel dependencies version [\#20319](https://github.com/netdata/netdata/pull/20319) ([ilyam8](https://github.com/ilyam8))
+- Cancel health initialization if shutdown has been requested [\#20318](https://github.com/netdata/netdata/pull/20318) ([stelfrag](https://github.com/stelfrag))
+- SNMP: \_generic-if.yaml pass [\#20317](https://github.com/netdata/netdata/pull/20317) ([Ancairon](https://github.com/Ancairon))
+- Update libbpf [\#20316](https://github.com/netdata/netdata/pull/20316) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#20315](https://github.com/netdata/netdata/pull/20315) ([netdatabot](https://github.com/netdatabot))
 - docs: fix netdata-assistant.md [\#20314](https://github.com/netdata/netdata/pull/20314) ([ilyam8](https://github.com/ilyam8))
 - plugins dyncfg is always on localhost [\#20312](https://github.com/netdata/netdata/pull/20312) ([ktsaou](https://github.com/ktsaou))
 - docs: fix tip in streaming readme [\#20310](https://github.com/netdata/netdata/pull/20310) ([ilyam8](https://github.com/ilyam8))
 - Netdata ai [\#20309](https://github.com/netdata/netdata/pull/20309) ([kanelatechnical](https://github.com/kanelatechnical))
 - Improve user transition log messages [\#20308](https://github.com/netdata/netdata/pull/20308) ([ilyam8](https://github.com/ilyam8))
+- Reduce memory allocations in event loops [\#20306](https://github.com/netdata/netdata/pull/20306) ([stelfrag](https://github.com/stelfrag))
 - fix use after free of streaming current parent [\#20305](https://github.com/netdata/netdata/pull/20305) ([ktsaou](https://github.com/ktsaou))
 - fix heap-use-after-free in plugins.d inflight functions [\#20304](https://github.com/netdata/netdata/pull/20304) ([ktsaou](https://github.com/ktsaou))
 - Improve metasync shutdown [\#20303](https://github.com/netdata/netdata/pull/20303) ([stelfrag](https://github.com/stelfrag))
@@ -23,6 +32,7 @@
 - build\(deps\): bump k8s.io/client-go from 0.33.0 to 0.33.1 in /src/go [\#20295](https://github.com/netdata/netdata/pull/20295) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix\(go.d\): sanitize vnode labels before creating vnode [\#20293](https://github.com/netdata/netdata/pull/20293) ([ilyam8](https://github.com/ilyam8))
 - docs: Observability centralization points [\#20292](https://github.com/netdata/netdata/pull/20292) ([kanelatechnical](https://github.com/kanelatechnical))
+- Cisco yaml pass [\#20291](https://github.com/netdata/netdata/pull/20291) ([Ancairon](https://github.com/Ancairon))
 - Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
 - Fix when docker socket group id points to an existing group in container [\#20288](https://github.com/netdata/netdata/pull/20288) ([felipecrs](https://github.com/felipecrs))
 - add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
@@ -62,6 +72,7 @@
 - Revert "Revert "fix\(go.d/couchdb\): correct db size charts unit"" [\#20235](https://github.com/netdata/netdata/pull/20235) ([ilyam8](https://github.com/ilyam8))
 - Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
+- ci: ignore changes in src/go/otel-collector/release-config.yaml.in [\#20222](https://github.com/netdata/netdata/pull/20222) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.1](https://github.com/netdata/netdata/tree/v2.5.1) (2025-05-08)
 
@@ -457,15 +468,6 @@
 - docs\(go.d/snmp\): add snmp discovery information [\#19790](https://github.com/netdata/netdata/pull/19790) ([ilyam8](https://github.com/ilyam8))
 - User configurable crash reporting [\#19789](https://github.com/netdata/netdata/pull/19789) ([ktsaou](https://github.com/ktsaou))
 - detect when running in CI and disable posting status [\#19787](https://github.com/netdata/netdata/pull/19787) ([ktsaou](https://github.com/ktsaou))
-- chore: rename snmp.profiles.d -\> snmp.profiles [\#19786](https://github.com/netdata/netdata/pull/19786) ([ilyam8](https://github.com/ilyam8))
-- add datadog profiles for snmp collector [\#19785](https://github.com/netdata/netdata/pull/19785) ([Ancairon](https://github.com/Ancairon))
-- Revert broken DEB priority configuration in repoconfig packages. [\#19783](https://github.com/netdata/netdata/pull/19783) ([Ferroin](https://github.com/Ferroin))
-- Restructure shutdown logic used during updates. [\#19781](https://github.com/netdata/netdata/pull/19781) ([Ferroin](https://github.com/Ferroin))
-- add unique machine id to status file [\#19778](https://github.com/netdata/netdata/pull/19778) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/sd\): fix logging cfg source when disabled [\#19777](https://github.com/netdata/netdata/pull/19777) ([ilyam8](https://github.com/ilyam8))
-- improvement\(go.d/sd\): add file path to k8s/snmp discovered job source [\#19776](https://github.com/netdata/netdata/pull/19776) ([ilyam8](https://github.com/ilyam8))
-- Improve agent shutdown [\#19775](https://github.com/netdata/netdata/pull/19775) ([stelfrag](https://github.com/stelfrag))
-- Fix SIGSEGV on static installs due to dengine log [\#19774](https://github.com/netdata/netdata/pull/19774) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
