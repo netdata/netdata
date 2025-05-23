@@ -16,7 +16,7 @@ void mcp_tool_list_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Full-text search");
-        buffer_json_member_add_string(buffer, "description", "Search across all metadata (names, titles, instances, dimensions, labels). Example: 'memory pressure'");
+        buffer_json_member_add_string(buffer, "description", "Search across all metadata (names, titles, instances, dimensions, labels). Use pipe (|) to separate multiple search terms. Examples: 'memory|pressure', 'cpu|load|system'");
         buffer_json_member_add_string(buffer, "default", "");
     }
     buffer_json_object_close(buffer); // q
@@ -25,7 +25,7 @@ void mcp_tool_list_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Metric name pattern");
-        buffer_json_member_add_string(buffer, "description", "Pattern matching on metric names only. Supports wildcards like 'system.*' or '*cpu*|*memory*'");
+        buffer_json_member_add_string(buffer, "description", "Pattern matching on metric names only. Use pipe (|) to separate multiple patterns. Supports wildcards. Examples: 'system.*', '*cpu*|*memory*', 'disk.*|net.*|system.*'");
         buffer_json_member_add_string(buffer, "default", "");
     }
     buffer_json_object_close(buffer); // metrics
@@ -34,7 +34,7 @@ void mcp_tool_list_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Node filter");
-        buffer_json_member_add_string(buffer, "description", "Filter by specific nodes. Supports patterns like 'node1|node2' or '*web*|*db*' on their hostnames");
+        buffer_json_member_add_string(buffer, "description", "Filter by specific nodes using their hostnames. Use pipe (|) to separate multiple patterns. Examples: 'node1|node2', '*web*|*db*', 'prod-*|staging-*'");
         buffer_json_member_add_string(buffer, "default", "");
     }
     buffer_json_object_close(buffer); // nodes
