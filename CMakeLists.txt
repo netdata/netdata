@@ -1882,14 +1882,8 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-resources.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
-        src/web/mcp/mcp-tools-list-metrics.c
-        src/web/mcp/mcp-tools-list-metrics.h
-        src/web/mcp/mcp-tools-get-metrics-details.c
-        src/web/mcp/mcp-tools-get-metrics-details.h
-        src/web/mcp/mcp-tools-list-nodes.c
-        src/web/mcp/mcp-tools-list-nodes.h
-        src/web/mcp/mcp-tools-node-details.c
-        src/web/mcp/mcp-tools-node-details.h
+        src/web/mcp/mcp-tools-list-metadata.c
+        src/web/mcp/mcp-tools-list-metadata.h
         src/web/mcp/mcp-tools-execute-function.c
         src/web/mcp/mcp-tools-execute-function.h
         src/web/mcp/mcp-tools-metrics-query.c

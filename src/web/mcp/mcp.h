@@ -11,7 +11,8 @@
 #define MCP_TOOL_LIST_METRICS "list_metrics"
 #define MCP_TOOL_GET_METRICS_DETAILS "get_metrics_details"
 #define MCP_TOOL_LIST_NODES "list_nodes"
-#define MCP_TOOL_GET_NODE_DETAILS "get_node_details"
+#define MCP_TOOL_GET_NODES_DETAILS "get_nodes_details"
+#define MCP_TOOL_LIST_FUNCTIONS "list_functions"
 #define MCP_TOOL_EXECUTE_FUNCTION "execute_function"
 #define MCP_TOOL_QUERY_METRICS "query_metrics"
 
@@ -34,6 +35,12 @@
     "   - 'labels' can be specified in two formats:\n" \
     "      • String format: 'labels: key1:value1|key1:value2|key2:value3' (values with same key are ORed, different keys are ANDed)\n" \
     "      • Structured format: 'labels: {\"key1\": [\"value1\", \"value2\"], \"key2\": \"value3\"}' (array values are ORed, different keys are ANDed)"
+
+// MCP default values for all tools
+#define MCP_DEFAULT_AFTER_TIME     -3600  // 1 hour ago
+#define MCP_DEFAULT_BEFORE_TIME    0      // now
+#define MCP_METADATA_CARDINALITY_LIMIT 50   // For metadata queries (list tools)
+#define MCP_DATA_CARDINALITY_LIMIT 10       // For data queries (metrics query)
 
 // MCP protocol versions
 typedef enum {

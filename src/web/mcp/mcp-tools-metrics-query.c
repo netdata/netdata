@@ -204,7 +204,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
                                                            "When the number of items exceeds this limit, only the top N items by contribution are returned, "
                                                            "with the remaining items aggregated into a 'remaining X dimensions' entry. "
                                                            "This helps keep response sizes manageable for high-cardinality queries.");
-        buffer_json_member_add_uint64(buffer, "default", 10);
+        buffer_json_member_add_uint64(buffer, "default", MCP_DATA_CARDINALITY_LIMIT);
     }
     buffer_json_object_close(buffer); // cardinality_limit
 
@@ -499,7 +499,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     struct json_object *cardinality_limit_obj = NULL;
     if (!json_object_object_get_ex(params, "cardinality_limit", &cardinality_limit_obj) || !cardinality_limit_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'cardinality_limit'. This parameter limits the number of items returned to keep response sizes manageable (default: 10).");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'cardinality_limit'. This parameter limits the number of items returned to keep response sizes manageable (default: %d).", MCP_DATA_CARDINALITY_LIMIT);
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -571,7 +571,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Other parameters
     size_t points = extract_size_param(params, "points", 0);
-    size_t cardinality_limit = extract_size_param(params, "cardinality_limit", 10);
+    size_t cardinality_limit = extract_size_param(params, "cardinality_limit", MCP_DATA_CARDINALITY_LIMIT);
 
     // Check if points is more than 1000
     if (points < 1) {
