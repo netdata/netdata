@@ -66,6 +66,15 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
     buffer_json_object_close(buffer); // context
 
 
+    buffer_json_member_add_object(buffer, "instances");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Instances Pattern");
+        buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on instances to include in the query.\n"
+                                                             "If no instances are specified, all instances of the context are queried.");
+    }
+    buffer_json_object_close(buffer); // instances
+
     buffer_json_member_add_object(buffer, "dimensions");
     {
         buffer_json_member_add_string(buffer, "type", "string");
@@ -419,6 +428,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
             }
         }
     }
+    const char *instances = extract_string_param(params, "instances");
     const char *dimensions = extract_string_param(params, "dimensions");
     const char *labels = extract_string_param(params, "labels");
     const char *alerts = extract_string_param(params, "alerts");
@@ -528,7 +538,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         .st = NULL,
         .nodes = NULL,              // Don't use nodes parameter here (we use scope_nodes)
         .contexts = NULL,           // Don't use contexts parameter here (we use scope_contexts)
-        .instances = NULL,
+        .instances = instances,
         .dimensions = dimensions,
         .alerts = alerts,
         .timeout_ms = timeout,
