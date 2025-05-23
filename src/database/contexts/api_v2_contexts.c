@@ -100,9 +100,9 @@ static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_di
         
         struct category_entry *entry = dictionary_get(categories, category);
         if (!entry) {
-            entry = callocz(1, sizeof(struct category_entry));
-            entry->contexts = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-            dictionary_set(categories, category, entry, sizeof(struct category_entry));
+            struct category_entry new_entry = {0};
+            new_entry.contexts = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+            entry = dictionary_set(categories, category, &new_entry, sizeof(struct category_entry));
         }
         entry->count++;
         // Store the context name for sampling
