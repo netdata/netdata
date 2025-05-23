@@ -32,9 +32,11 @@ This integration adheres to SCIM v2 specifications. Supported features include:
 - User Resource Management (urn:ietf:params:scim:schemas:core:2.0:User)
 - Group Resource Management (urn:ietf:params:scim:schemas:core:2.0:Group)
 - Create users
+- Import users
 - Update user attributes
 - Deactivate users
 - Create groups
+- Import groups
 - Associate users to groups
 - Nested groups supported
 - Patch operations: Supported
