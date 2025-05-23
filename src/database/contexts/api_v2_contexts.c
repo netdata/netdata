@@ -1113,6 +1113,11 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 buffer_json_member_add_object(wb, "contexts");
                 rrdcontext_categorize_and_output(wb, ctl.contexts.dict, contexts_limit);
                 buffer_json_object_close(wb);
+                if (ctl.options & CONTEXTS_OPTION_MCP) {
+                    buffer_json_member_add_string(
+                        wb, "info",
+                        "Next Steps: provide a better pattern to match less contexts, or run 'get_metrics_details' to get more information for the contexts of interest.");
+                }
             } else {
                 if (mode & CONTEXTS_V2_SEARCH ||
                     ctl.options & (CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS |
@@ -1228,10 +1233,32 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 }
                 dfe_done(z);
 
-                if(contexts_is_object)
+                if(contexts_is_object) {
                     buffer_json_object_close(wb); // contexts
-                else
+
+                    if (ctl.options & CONTEXTS_OPTION_MCP) {
+                        buffer_json_member_add_string(
+                            wb, "info",
+                            "Next Steps: Query time-series data with the 'query_metrics' tool, using different aggregations to inspect different views:\n"
+                            "   - 'group_by: dimension' will aggregate all time-series by the listed dimensions\n"
+                            "   - 'group_by: instance' will aggregate all time-series by the listed instances\n"
+                            "   - 'group_by: label, group_by_label: {label_key}' will aggregate by the listed label values\n"
+                            "\n"
+                            "Dimensions, instances and labels can also be used for filtering in 'metrics_query':\n"
+                            "   - 'dimensions: dimension1|dimension2|*dimension*' will select only the time-series with the given dimension\n"
+                            "   - 'instances: instance1|instance2|*instance*' will select only the time-series with the given instance\n"
+                            "   - 'labels: key:value1|value2|*value*' will select only the time-series with the given label key and values\n");
+                    }
+                }
+                else {
                     buffer_json_array_close(wb);
+
+                    if (ctl.options & CONTEXTS_OPTION_MCP) {
+                        buffer_json_member_add_string(
+                            wb, "info",
+                            "Next Steps: run 'get_metrics_details' to get more information for the contexts of interest.");
+                    }
+                }
             } // end else
         }
 
