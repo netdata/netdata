@@ -1981,6 +1981,16 @@ modules:
               chart_type: line
               dimensions:
                 - name: blocked
+        - name: MSSQL Waits
+          description: "These metrics refer to the Microsoft SQL Server instances defined on the host and their associated wait events."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: wait_type
+              description: A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes.
+            - name: wait_type
+              description: Waits, which are occurrences where a worker thread is not actively processing a query but is instead waiting for a resource or event.
+          metrics:
             - name: mssql.instance_total_wait
               description: Number of waits on this wait type.
               unit: waits/s
