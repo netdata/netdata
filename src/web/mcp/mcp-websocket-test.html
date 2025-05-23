@@ -83,6 +83,20 @@
         .method-item.dynamic:hover {
             background-color: #e0f0ff;
         }
+        .method-item.history {
+            border-left: 3px solid #666;
+            background-color: #f8f8f8;
+        }
+        .method-item.history:hover {
+            background-color: #eeeeee;
+        }
+        .method-item.history.error {
+            border-left-color: #d00;
+            background-color: #fff5f5;
+        }
+        .method-item.history.error:hover {
+            background-color: #ffeeee;
+        }
         #jsonEditor {
             width: 100%;
             height: 100%;
@@ -208,12 +222,13 @@
                 <div class="flow-item" data-flow="prompts-flow">Prompts</div>
                 <div class="flow-item" data-flow="logging-flow">Logging</div>
                 <div class="flow-item" data-flow="completion-flow">Completion</div>
+                <div class="flow-item" data-flow="history-flow">History</div>
             </div>
         </div>
         
         <!-- Second Column - Methods -->
         <div class="column">
-            <h3 class="column-header">Methods</h3>
+            <h3 class="column-header" id="methodsHeader">Methods</h3>
             <div class="column-content" id="methodsContainer">
                 <!-- Methods will be loaded here -->
             </div>
@@ -280,6 +295,7 @@
         const commLog = document.getElementById('commLog');
         const flowsContainer = document.getElementById('flowsContainer');
         const methodsContainer = document.getElementById('methodsContainer');
+        const methodsHeader = document.getElementById('methodsHeader');
         const rawViewToggle = document.getElementById('rawViewToggle');
         
         // WebSocket connection
@@ -297,6 +313,33 @@
         let dynamicToolsLoaded = false;
         let dynamicResourcesLoaded = false;
         let dynamicPromptsLoaded = false;
+        
+        // Request history
+        let requestHistory = [];
+        let currentHistoryIndex = null;
+        const MAX_HISTORY_ITEMS = 1000; // Keep last 1000 items
+        
+        // Load history from localStorage on startup
+        function loadHistory() {
+            const saved = localStorage.getItem('mcp-request-history');
+            if (saved) {
+                try {
+                    requestHistory = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to load history:', e);
+                    requestHistory = [];
+                }
+            }
+        }
+        
+        // Save history to localStorage
+        function saveHistory() {
+            try {
+                localStorage.setItem('mcp-request-history', JSON.stringify(requestHistory));
+            } catch (e) {
+                console.error('Failed to save history:', e);
+            }
+        }
         
         // Function to highlight JSON syntax with colors
         function syntaxHighlightJson(json) {
@@ -673,9 +716,63 @@
                         }
                     }
                 }
+            },
+            'history-flow': {
+                name: 'History',
+                methods: {} // Will be populated dynamically with history items
             }
             // End of standard MCP flows
         };
+        
+        // Add a request/response to history
+        function addToHistory(method, request, response, responseRaw, error) {
+            const historyItem = {
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                timestamp: new Date().toISOString(),
+                method: method,
+                request: request,
+                response: response,
+                responseRaw: responseRaw,
+                error: error
+            };
+            
+            // Add to beginning of array (newest first)
+            requestHistory.unshift(historyItem);
+            
+            // Limit history size
+            if (requestHistory.length > MAX_HISTORY_ITEMS) {
+                requestHistory = requestHistory.slice(0, MAX_HISTORY_ITEMS);
+            }
+            
+            // Save to localStorage
+            saveHistory();
+            
+            // Update history flow if currently viewing it
+            if (currentFlow === 'history-flow') {
+                loadHistoryMethods();
+            }
+        }
+        
+        // Load history items as methods in the history flow
+        function loadHistoryMethods() {
+            flows['history-flow'].methods = {};
+            
+            requestHistory.forEach((item, index) => {
+                const date = new Date(item.timestamp);
+                const timeStr = date.toLocaleTimeString();
+                const dateStr = date.toLocaleDateString();
+                
+                flows['history-flow'].methods[item.id] = {
+                    name: `${item.method} - ${timeStr}`,
+                    description: `${dateStr} - ${item.error ? 'Failed' : 'Success'}`,
+                    dynamic: true,
+                    isHistory: true,
+                    hasError: !!item.error,
+                    historyItem: item,
+                    defaultRequest: item.request
+                };
+            });
+        }
         
         // Initialize UI
         function initializeUI() {
@@ -695,6 +792,18 @@
             loadMethodsForFlow(currentFlow);
         }
         
+        // Clear history
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all history? This cannot be undone.')) {
+                requestHistory = [];
+                saveHistory();
+                if (currentFlow === 'history-flow') {
+                    loadHistoryMethods();
+                    loadMethodsForFlow('history-flow');
+                }
+            }
+        }
+        
         // Load methods for a specific flow
         function loadMethodsForFlow(flowId) {
             methodsContainer.innerHTML = '';
@@ -702,10 +811,30 @@
             
             if (!flow) return;
             
+            // Update header based on flow
+            if (flowId === 'history-flow') {
+                methodsHeader.innerHTML = 'Methods <button onclick="clearHistory()" style="float: right; font-size: 12px; padding: 4px 8px;">Clear History</button>';
+                loadHistoryMethods();
+            } else {
+                methodsHeader.textContent = 'Methods';
+            }
+            
             Object.keys(flow.methods).forEach(methodId => {
                 const method = flow.methods[methodId];
                 const methodElement = document.createElement('div');
-                methodElement.className = method.dynamic ? 'method-item dynamic' : 'method-item';
+                
+                // Determine the class based on method type
+                let className = 'method-item';
+                if (method.isHistory) {
+                    className += ' history';
+                    if (method.hasError) {
+                        className += ' error';
+                    }
+                } else if (method.dynamic) {
+                    className += ' dynamic';
+                }
+                
+                methodElement.className = className;
                 methodElement.dataset.method = methodId;
                 methodElement.dataset.flow = flowId;
                 
@@ -820,6 +949,26 @@
         // Load a saved response for the selected method
         function loadResponseForMethod(flowId, methodId) {
             const key = `${flowId}:${methodId}`;
+            
+            // Special handling for history items
+            if (flowId === 'history-flow' && flows[flowId].methods[methodId]) {
+                const historyItem = flows[flowId].methods[methodId].historyItem;
+                if (historyItem) {
+                    currentResponseRaw = historyItem.responseRaw || null;
+                    currentResponseParsed = historyItem.response || null;
+                    currentResponseError = historyItem.error || null;
+                    
+                    // Display response based on toggle state
+                    displayResponse();
+                    
+                    requestData.textContent = 'Request: ' + JSON.stringify(historyItem.request, null, 2);
+                    
+                    // Show the timestamp in the comm log
+                    const date = new Date(historyItem.timestamp);
+                    commLog.innerHTML = `[${date.toLocaleTimeString()}.${String(date.getMilliseconds()).padStart(3, '0')}] Historical request\n`;
+                    return;
+                }
+            }
             
             if (methodState.has(key)) {
                 const state = methodState.get(key);
@@ -964,6 +1113,13 @@
                             methodState.get(key).responseTimestamp = responseTimestamp;
                             methodState.get(key).commLog = commLog.innerHTML;
                             
+                            // Add to history
+                            const method = methodState.get(key).method || currentMethod;
+                            const requestSent = methodState.get(key).requestSent;
+                            if (requestSent) {
+                                addToHistory(method, requestSent, response, event.data, null);
+                            }
+                            
                             // Check for special responses that need dynamic processing
                             if (currentFlow && currentMethod) {
                                 // Define which responses we should process dynamically
@@ -1020,6 +1176,13 @@
                             methodState.get(key).responseRaw = event.data;
                             methodState.get(key).responseError = error.message;
                             methodState.get(key).commLog = commLog.innerHTML;
+                            
+                            // Add to history with error
+                            const method = methodState.get(key).method || currentMethod;
+                            const requestSent = methodState.get(key).requestSent;
+                            if (requestSent) {
+                                addToHistory(method, requestSent, null, event.data, error.message);
+                            }
                         }
                     }
                 };
@@ -1093,6 +1256,7 @@
                     methodState.get(key).requestSent = requestObj;
                     methodState.get(key).requestTimestamp = requestTimestamp;
                     methodState.get(key).commLog = commLog.innerHTML;
+                    methodState.get(key).method = requestObj.method; // Store method for history
                 }
                 
             } catch (error) {
@@ -1333,6 +1497,7 @@
         }
         
         // Initialize the UI
+        loadHistory();
         loadSavedState();
         initializeUI();
     </script>
