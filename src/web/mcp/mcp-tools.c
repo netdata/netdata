@@ -33,10 +33,7 @@
 #include "database/contexts/rrdcontext.h"
 
 // Include tool-specific header files
-#include "mcp-tools-list-metrics.h"
-#include "mcp-tools-get-metrics-details.h"
-#include "mcp-tools-list-nodes.h"
-#include "mcp-tools-node-details.h"
+#include "mcp-tools-list-metadata.h"
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-metrics-query.h"
 
@@ -57,23 +54,76 @@ typedef struct {
     bool open_world_hint;     // If true, tool interacts with external world
 } MCP_TOOL_DEF;
 
+// Wrapper functions for unified list tools
+static MCP_RETURN_CODE unified_list_tool_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id, const char *tool_name) {
+    const MCP_LIST_TOOL_CONFIG *config = mcp_get_list_tool_config(tool_name);
+    if (!config) {
+        buffer_sprintf(mcpc->error, "Unknown list tool: %s", tool_name);
+        return MCP_RC_INTERNAL_ERROR;
+    }
+    return mcp_unified_list_tool_execute(mcpc, config, params, id);
+}
+
+static void unified_list_tool_schema(BUFFER *buffer, const char *tool_name) {
+    const MCP_LIST_TOOL_CONFIG *config = mcp_get_list_tool_config(tool_name);
+    if (!config) return;
+    mcp_unified_list_tool_schema(buffer, config);
+}
+
+// Specific wrappers for each list tool
+static MCP_RETURN_CODE list_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_METRICS);
+}
+static void list_metrics_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_LIST_METRICS);
+}
+
+static MCP_RETURN_CODE get_metrics_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_GET_METRICS_DETAILS);
+}
+static void get_metrics_details_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_GET_METRICS_DETAILS);
+}
+
+static MCP_RETURN_CODE list_nodes_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_NODES);
+}
+static void list_nodes_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_LIST_NODES);
+}
+
+static MCP_RETURN_CODE list_functions_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_FUNCTIONS);
+}
+static void list_functions_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_LIST_FUNCTIONS);
+}
+
+static MCP_RETURN_CODE get_nodes_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_GET_NODES_DETAILS);
+}
+static void get_nodes_details_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_GET_NODES_DETAILS);
+}
+
 // Static array of tool definitions
 static const MCP_TOOL_DEF mcp_tools[] = {
+    // List tools (using unified implementation)
     {
         .name = MCP_TOOL_LIST_METRICS,
         .title = "Discover available metrics",
-        .description = "Lists available metrics (contexts) with time-aware filtering. Returns metric names matching search patterns, filtered by nodes and time window. Supports full-text search across names, titles, instances, dimensions, and labels. Default limit: 100 metrics.\n",
-        .execute_callback = mcp_tool_list_metrics_execute,
-        .schema_callback = mcp_tool_list_metrics_schema,
+        .description = "Lists available metrics (contexts) with time-aware filtering. Returns metric names matching search patterns, filtered by nodes and time window. Supports full-text search across names, titles, instances, dimensions, and labels.\n",
+        .execute_callback = list_metrics_execute,
+        .schema_callback = list_metrics_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
     {
         .name = MCP_TOOL_GET_METRICS_DETAILS,
         .title = "Get detailed information about specific metrics",
-        .description = "Gets comprehensive metadata for specific metrics. Returns titles, units, dimensions, instances, labels, and collection status. Supports cardinality limits for dimensions/instances/labels. Maximum 20 metrics per request.\n",
-        .execute_callback = mcp_tool_get_metrics_details_execute,
-        .schema_callback = mcp_tool_get_metrics_details_schema,
+        .description = "Gets comprehensive metadata for specific metrics. Returns titles, units, dimensions, instances, labels, and collection status.\n",
+        .execute_callback = get_metrics_details_execute,
+        .schema_callback = get_metrics_details_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
@@ -81,34 +131,44 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .name = MCP_TOOL_LIST_NODES,
         .title = "List all monitored nodes in the Netdata ecosystem",
         .description = "Lists all monitored nodes in the infrastructure. Returns node IDs, hostnames, connection status, and parent-child relationships. Use this to discover available nodes before querying metrics or executing functions.\n",
-        .execute_callback = mcp_tool_list_nodes_execute,
-        .schema_callback = mcp_tool_list_nodes_schema,
+        .execute_callback = list_nodes_execute,
+        .schema_callback = list_nodes_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
     {
-        .name = MCP_TOOL_GET_NODE_DETAILS,
-        .title = "Get detailed information about monitored nodes",
-        .description = "Gets comprehensive node information including hardware specs, OS details, capabilities, health status, available functions, and monitoring configuration. Essential for understanding node capabilities before executing functions.\n",
-        .execute_callback = mcp_tool_node_details_execute,
-        .schema_callback = mcp_tool_node_details_schema,
+        .name = MCP_TOOL_LIST_FUNCTIONS,
+        .title = "List available functions",
+        .description = "Lists all available Netdata functions that can be executed on nodes. Returns function names, descriptions, and execution requirements. Use this to discover what functions are available before executing them.\n",
+        .execute_callback = list_functions_execute,
+        .schema_callback = list_functions_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
+    {
+        .name = MCP_TOOL_GET_NODES_DETAILS,
+        .title = "Get detailed information about monitored nodes",
+        .description = "Gets comprehensive node information including hardware specs, OS details, capabilities, health status, available functions, and monitoring configuration. Essential for understanding node capabilities before executing functions.\n",
+        .execute_callback = get_nodes_details_execute,
+        .schema_callback = get_nodes_details_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    
+    // Non-list tools (keep their original implementation)
     {
         .name = MCP_TOOL_EXECUTE_FUNCTION,
         .title = "Execute a function on a specific node",
         .description = "Executes live data collection functions on nodes. Common functions: 'processes' (running processes), 'network-connections' (active connections), 'mount-points' (disk mounts), 'systemd-services' (service status). Returns tabular data with filtering and sorting options.\n",
         .execute_callback = mcp_tool_execute_function_execute,
         .schema_callback = mcp_tool_execute_function_schema,
-        .read_only_hint = false, // This tool can modify state
-        .open_world_hint = false
+        .read_only_hint = true,  // Currently read-only (will change when dynamic config is added)
+        .open_world_hint = true  // Routes requests to remote nodes in the Netdata ecosystem
     },
-    
     {
         .name = MCP_TOOL_QUERY_METRICS,
         .title = "Query metrics data",
-        .description = "Queries time-series metrics data with powerful aggregation options. Specify context, time range, and grouping (by dimension, instance, node, or label). Returns data points with statistics and contribution analysis. Supports cardinality limits to manage large result sets.\n",
+        .description = "Queries time-series metrics data with powerful aggregation options. Specify context, time range, and grouping (by dimension, instance, node, or label). Returns data points with statistics and contribution analysis.\n",
         .execute_callback = mcp_tool_metrics_query_execute,
         .schema_callback = mcp_tool_metrics_query_schema,
         .read_only_hint = true,
