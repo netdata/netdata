@@ -136,6 +136,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Instances Pattern");
         buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on instances to include in the query.\n"
+                                                             "Use pipe (|) to separate multiple patterns. Examples: 'eth0|eth1', '*sda*|*nvme*', 'cpu0|cpu1|cpu2'\n"
                                                              "If no instances are specified, all instances of the context are queried.");
     }
     buffer_json_object_close(buffer); // instances
@@ -145,6 +146,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Dimensions Pattern");
         buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on dimensions to include in the query.\n"
+                                                             "Use pipe (|) to separate multiple patterns. Examples: 'read|write', 'in|out', 'used|free|cached'\n"
                                                              "If no dimensions are specified, all dimensions of the context are queried.");
     }
     buffer_json_object_close(buffer); // dimensions
