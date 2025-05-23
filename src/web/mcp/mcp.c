@@ -276,6 +276,7 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     const char *method = json_object_get_string(method_obj);
     
     // Extract params (optional)
+    bool params_created = false;
     if (json_object_object_get_ex(request, "params", &params_obj)) {
         if (json_object_get_type(params_obj) != json_type_object) {
             buffer_strcat(mcpc->error, "params must be an object");
@@ -285,6 +286,7 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     } else {
         // Create an empty params object if none provided
         params_obj = json_object_new_object();
+        params_created = true;
     }
     
     // Extract and register the request ID
@@ -370,6 +372,10 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
 
     // If this is a notification (no ID), don't generate a response
     if (!has_id) {
+        // Clean up the params object if we created it
+        if (params_created) {
+            json_object_put(params_obj);
+        }
         return rc;
     }
 
@@ -385,6 +391,11 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
 
     // Clean up the request ID
     mcp_request_id_del(mcpc, id);
+
+    // Clean up the params object if we created it
+    if (params_created) {
+        json_object_put(params_obj);
+    }
 
     return rc;
 }
