@@ -2,10 +2,14 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.2...HEAD)
 
 **Merged pull requests:**
 
+- Update alerting and notification documentation Agent [\#20329](https://github.com/netdata/netdata/pull/20329) ([kanelatechnical](https://github.com/kanelatechnical))
+- generic-bgp4.yaml [\#20328](https://github.com/netdata/netdata/pull/20328) ([Ancairon](https://github.com/Ancairon))
+- generic-ospf.yaml pass [\#20327](https://github.com/netdata/netdata/pull/20327) ([Ancairon](https://github.com/Ancairon))
+- generic-udp.yaml pass [\#20326](https://github.com/netdata/netdata/pull/20326) ([Ancairon](https://github.com/Ancairon))
 - SOC 2 cloud doc update [\#20325](https://github.com/netdata/netdata/pull/20325) ([kanelatechnical](https://github.com/kanelatechnical))
 - dont init dyncfg for vnode [\#20324](https://github.com/netdata/netdata/pull/20324) ([ilyam8](https://github.com/ilyam8))
 - \_generic-tcp.yaml pass [\#20321](https://github.com/netdata/netdata/pull/20321) ([Ancairon](https://github.com/Ancairon))
@@ -73,6 +77,10 @@
 - Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
 - ci: ignore changes in src/go/otel-collector/release-config.yaml.in [\#20222](https://github.com/netdata/netdata/pull/20222) ([ilyam8](https://github.com/ilyam8))
+
+## [v2.5.2](https://github.com/netdata/netdata/tree/v2.5.2) (2025-05-22)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.1...v2.5.2)
 
 ## [v2.5.1](https://github.com/netdata/netdata/tree/v2.5.1) (2025-05-08)
 
@@ -463,11 +471,6 @@
 - improvement\(go.d/k8s\_state\): add more CronJob metrics [\#19796](https://github.com/netdata/netdata/pull/19796) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19794](https://github.com/netdata/netdata/pull/19794) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/k8s\_state\): collect cronjobs [\#19793](https://github.com/netdata/netdata/pull/19793) ([ilyam8](https://github.com/ilyam8))
-- status file improvements 12 [\#19792](https://github.com/netdata/netdata/pull/19792) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19791](https://github.com/netdata/netdata/pull/19791) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/snmp\): add snmp discovery information [\#19790](https://github.com/netdata/netdata/pull/19790) ([ilyam8](https://github.com/ilyam8))
-- User configurable crash reporting [\#19789](https://github.com/netdata/netdata/pull/19789) ([ktsaou](https://github.com/ktsaou))
-- detect when running in CI and disable posting status [\#19787](https://github.com/netdata/netdata/pull/19787) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
