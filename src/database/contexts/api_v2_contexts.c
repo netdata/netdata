@@ -563,7 +563,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         // interrupted
         return -1; // stop the query
 
-    bool host_matched = (ctl->mode & CONTEXTS_V2_NODES);
+    bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS));
     bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_ALERTS));
 
     if(do_contexts) {
@@ -596,7 +596,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
     }
 
-    if(ctl->mode & CONTEXTS_V2_NODES) {
+    if(ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS)) {
         struct contexts_v2_node t = {
             .ni = ctl->nodes.ni++,
             .host = host,
@@ -921,7 +921,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
     bool debug = ctl.options & CONTEXTS_OPTION_DEBUG;
 
-    if(mode & CONTEXTS_V2_NODES) {
+    if(mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS)) {
         ctl.nodes.dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                     NULL, sizeof(struct contexts_v2_node));
     }
@@ -1083,16 +1083,20 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
                         buffer_json_member_add_string(wb, "name", name);
                         buffer_json_member_add_string(wb, "help", string2str(t->help));
-                        buffer_json_member_add_array(wb, "ni");
-                        {
-                            for (size_t i = 0; i < t->used; i++)
-                                buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
+
+                        if (!(ctl.options & CONTEXTS_OPTION_MCP)) {
+                            buffer_json_member_add_array(wb, "ni");
+                            {
+                                for (size_t i = 0; i < t->used; i++)
+                                    buffer_json_add_array_item_uint64(wb, t->node_ids[i]);
+                            }
+                            buffer_json_array_close(wb);
+
+                            buffer_json_member_add_uint64(wb, "priority", t->priority);
+                            buffer_json_member_add_uint64(wb, "version", t->version);
                         }
-                        buffer_json_array_close(wb);
                         buffer_json_member_add_string(wb, "tags", string2str(t->tags));
                         http_access2buffer_json_array(wb, "access", t->access);
-                        buffer_json_member_add_uint64(wb, "priority", t->priority);
-                        buffer_json_member_add_uint64(wb, "version", t->version);
                     }
                     buffer_json_object_close(wb);
                 }
