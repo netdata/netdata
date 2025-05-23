@@ -122,6 +122,7 @@ Add the SQL Server connection details to your `netdata.conf` file:
 ```
 [plugin:windows:PerflibMSSQL]
         driver = SQL Server
+        instance = Dev
         server = 127.0.0.1\\Dev, 1433
         #address = [protocol:]Address[,port |\pipe\pipename]
         uid = netdata_user
@@ -135,12 +136,15 @@ Configuration options:
 | Option                   | Description                                                                  |
 |--------------------------|------------------------------------------------------------------------------|
 | `driver`                 | ODBC driver used to connect to the SQL Server                                |
+| `instance`               | Instance name                                                                |
 | `server`                 | Server address or instance name                                              |
 | `address`                | Alternative to `server`; supports named pipes if the server supports them    |
 | `uid`                    | SQL Server user identifier                                                   |
 | `pwd`                    | Password for the specified user                                              |
 | `additional instances`   | Number of additional SQL Server instances to monitor                         |
 | `windows authentication` | Set to `yes` to use Windows credentials instead of SQL Server authentication |
+
+The `instance` option is required when Netdata pulls data from outside an MSSQL server.
 
 For more information on connection parameters, see the [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16).
 
@@ -157,6 +161,7 @@ SQL Server can host multiple instances on the same machine. To monitor additiona
    ```text
    [plugin:windows:PerflibMSSQL1]
         driver = SQL Server
+        instance = Production
         server = 127.0.0.1\\Production, 1434
         uid = netdata_user
         pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2$

@@ -21,6 +21,7 @@ BOOL is_sqlexpress = FALSE;
 ND_THREAD *mssql_query_thread = NULL;
 
 struct netdata_mssql_conn {
+    const char *instance;
     const char *driver;
     const char *server;
     const char *address;
@@ -88,7 +89,7 @@ struct mssql_instance {
     char *instanceID;
     int update_every;
 
-    struct netdata_mssql_conn conn;
+    struct netdata_mssql_conn *conn;
 
     char *objectName[NETDATA_MSSQL_METRICS_END];
 
@@ -356,31 +357,31 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
         dbname,
         dbname);
 
-    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+            SQL_HANDLE_STMT, mdi->parent->conn->dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
         goto endtransactions;
     }
 
     ret = SQLBindCol(
-        mdi->parent->conn.dbTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
+        mdi->parent->conn->dbTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT, mdi->parent->conn->dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endtransactions;
     }
 
-    ret = SQLBindCol(mdi->parent->conn.dbTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    ret = SQLBindCol(mdi->parent->conn->dbTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mdi->parent->conn.dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT, mdi->parent->conn->dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endtransactions;
     }
 
     do {
-        ret = SQLFetch(mdi->parent->conn.dbTransactionSTMT);
+        ret = SQLFetch(mdi->parent->conn->dbTransactionSTMT);
         switch (ret) {
             case SQL_SUCCESS:
             case SQL_SUCCESS_WITH_INFO:
@@ -430,7 +431,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     } while (true);
 
 endtransactions:
-    netdata_MSSQL_release_results(mdi->parent->conn.dbTransactionSTMT);
+    netdata_MSSQL_release_results(mdi->parent->conn->dbTransactionSTMT);
 }
 
 void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
@@ -448,31 +449,31 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
         dbname,
         dbname);
 
-    SQLRETURN ret = SQLExecDirect(mdi->parent->conn.dbLocksSTMT, (SQLCHAR *)query, SQL_NTS);
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbLocksSTMT, (SQLCHAR *)query, SQL_NTS);
     if (ret != SQL_SUCCESS) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+            SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
         goto endlocks;
     }
 
     ret =
-        SQLBindCol(mdi->parent->conn.dbLocksSTMT, 1, SQL_C_CHAR, resource_type, sizeof(resource_type), &col_object_len);
+        SQLBindCol(mdi->parent->conn->dbLocksSTMT, 1, SQL_C_CHAR, resource_type, sizeof(resource_type), &col_object_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endlocks;
     }
 
-    ret = SQLBindCol(mdi->parent->conn.dbLocksSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
+    ret = SQLBindCol(mdi->parent->conn->dbLocksSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(
-            SQL_HANDLE_STMT, mdi->parent->conn.dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endlocks;
     }
 
     do {
-        ret = SQLFetch(mdi->parent->conn.dbLocksSTMT);
+        ret = SQLFetch(mdi->parent->conn->dbLocksSTMT);
         switch (ret) {
             case SQL_SUCCESS:
             case SQL_SUCCESS_WITH_INFO:
@@ -495,7 +496,7 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
     } while (true);
 
 endlocks:
-    netdata_MSSQL_release_results(mdi->parent->conn.dbLocksSTMT);
+    netdata_MSSQL_release_results(mdi->parent->conn->dbLocksSTMT);
 }
 
 int dict_mssql_fill_waits(struct mssql_instance *mi)
@@ -608,7 +609,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     // We failed to collect this for the database, so we are not going to try again
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
         mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
-            mdi->parent->conn.dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
+            mdi->parent->conn->dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
     else {
         mdi->collecting_data = false;
         goto enddrunquery;
@@ -634,30 +635,30 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn.checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
+    ret = SQLExecDirect(mi->conn->checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         perm = LONG_MAX;
         goto endperm;
     }
 
-    ret = SQLBindCol(mi->conn.checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
+    ret = SQLBindCol(mi->conn->checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         perm = LONG_MAX;
         goto endperm;
     }
 
-    ret = SQLFetch(mi->conn.checkPermSTMT);
+    ret = SQLFetch(mi->conn->checkPermSTMT);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH, mi->instanceID);
         perm = LONG_MAX;
         goto endperm;
     }
 
 endperm:
-    netdata_MSSQL_release_results(mi->conn.checkPermSTMT);
+    netdata_MSSQL_release_results(mi->conn->checkPermSTMT);
     return perm;
 }
 
@@ -675,21 +676,21 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn.databaseListSTMT, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
+    ret = SQLExecDirect(mi->conn->databaseListSTMT, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enddblist;
     }
 
-    ret = SQLBindCol(mi->conn.databaseListSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
+    ret = SQLBindCol(mi->conn->databaseListSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
 
     if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn.databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddblist;
     }
 
     do {
-        ret = SQLFetch(mi->conn.databaseListSTMT);
+        ret = SQLFetch(mi->conn->databaseListSTMT);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             goto enddblist;
         }
@@ -705,7 +706,7 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
     } while (true);
 
 enddblist:
-    netdata_MSSQL_release_results(mi->conn.databaseListSTMT);
+    netdata_MSSQL_release_results(mi->conn->databaseListSTMT);
 }
 
 static bool netdata_MSSQL_initialize_conection(struct netdata_mssql_conn *nmc)
@@ -968,6 +969,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     }
 
     dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
+    dbconn->instance = inicfg_get(&netdata_config, section_name, "instance", NULL);
     dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
     dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
     dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
@@ -1033,11 +1035,12 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
     initialize_mssql_objects(mi, instance);
     initialize_mssql_keys(mi);
-    netdata_read_config_options(&mi->conn);
+    mi->conn = callocz(1, sizeof(struct netdata_mssql_conn));
+    netdata_read_config_options(mi->conn);
 
-    if (mi->conn.connectionString) {
-        mi->conn.is_connected = netdata_MSSQL_initialize_conection(&mi->conn);
-        if (mi->conn.is_connected)
+    if (mi->conn->connectionString) {
+        mi->conn->is_connected = netdata_MSSQL_initialize_conection(mi->conn);
+        if (mi->conn->is_connected)
             *create_thread = true;
     }
 }
@@ -1110,7 +1113,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                 NDLS_COLLECTORS,
                 NDLP_ERR,
                 "User %s does not have permission to run queries on %s",
-                mi->conn.username,
+                mi->conn->username,
                 mi->instanceID);
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
@@ -1902,7 +1905,7 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1945,7 +1948,7 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, c
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1983,7 +1986,7 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2019,7 +2022,7 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2058,7 +2061,7 @@ static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2098,7 +2101,7 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const 
 
 static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2134,7 +2137,7 @@ static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2170,7 +2173,7 @@ static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2206,7 +2209,7 @@ static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2242,7 +2245,7 @@ static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2282,7 +2285,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn.is_connected))
+    if (unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];

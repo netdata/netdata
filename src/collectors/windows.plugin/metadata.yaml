@@ -1887,6 +1887,10 @@ modules:
               description: ODBC driver used to connect to the SQL Server.
               default_value: SQL Server
               required: false
+            - name: instance
+              description: Instance name
+              default_value: empty
+              required: true
             - name: server
               description: Server address or instance name.
               default_value: empty
@@ -1923,6 +1927,7 @@ modules:
               config: |
                 [plugin:windows:PerflibMSSQL]
                    driver = SQL Server
+                   instance = Dev
                    server = 127.0.0.1\\Dev, 1433
                    uid = netdata_user
                    pwd = 1ReallyStrongPasswordShouldBeInsertedHere
@@ -1933,12 +1938,14 @@ modules:
               config: |
                 [plugin:windows:PerflibMSSQL]
                   driver = SQL Server
+                  instance = Dev
                   server = 127.0.0.1\\Dev, 1433
                   uid = netdata_user
                   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
                   additional instances = 1
                 [plugin:windows:PerflibMSSQL1]
                   driver = SQL Server
+                  instance = Production
                   server = 127.0.0.1\\Production, 1434
                   uid = netdata_user
                   pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
