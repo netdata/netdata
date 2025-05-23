@@ -15,6 +15,26 @@
 #define MCP_TOOL_EXECUTE_FUNCTION "execute_function"
 #define MCP_TOOL_QUERY_METRICS "query_metrics"
 
+#define MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES                                                               \
+    "Next Steps: provide a better pattern to match less contexts, " \
+    "or run '" MCP_TOOL_GET_METRICS_DETAILS "' to get more information for the contexts of interest."
+
+#define MCP_INFO_CONTEXT_ARRAY_RESPONSE \
+    "Next Steps: run the '"MCP_TOOL_GET_METRICS_DETAILS"' tool to get more information for the contexts of interest."
+
+#define MCP_INFO_CONTEXT_NEXT_STEPS \
+    "Next Steps: Query time-series data with the '"MCP_TOOL_QUERY_METRICS"' tool, using different aggregations to inspect different views:\n" \
+    "   - 'group_by: dimension' will aggregate all time-series by the listed dimensions\n" \
+    "   - 'group_by: instance' will aggregate all time-series by the listed instances\n" \
+    "   - 'group_by: label, group_by_label: {label_key}' will aggregate by the listed label values\n" \
+    "\n" \
+    "Dimensions, instances and labels can also be used for filtering in '"MCP_TOOL_QUERY_METRICS"':\n" \
+    "   - 'dimensions: dimension1|dimension2|*dimension*' will select only the time-series with the given dimension\n" \
+    "   - 'instances: instance1|instance2|*instance*' will select only the time-series with the given instance\n" \
+    "   - 'labels' can be specified in two formats:\n" \
+    "      • String format: 'labels: key1:value1|key1:value2|key2:value3' (values with same key are ORed, different keys are ANDed)\n" \
+    "      • Structured format: 'labels: {\"key1\": [\"value1\", \"value2\"], \"key2\": \"value3\"}' (array values are ORed, different keys are ANDed)"
+
 // MCP protocol versions
 typedef enum {
     MCP_PROTOCOL_VERSION_UNKNOWN = 0,

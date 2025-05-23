@@ -250,7 +250,15 @@
         
         <!-- Fourth Column - Response Viewer -->
         <div class="column">
-            <h3 class="column-header">Response</h3>
+            <h3 class="column-header">
+                Response
+                <div style="float: right; font-size: 0.8em;">
+                    <label style="font-weight: normal; cursor: pointer;">
+                        <input type="checkbox" id="rawViewToggle" style="margin-right: 4px;">
+                        Raw View
+                    </label>
+                </div>
+            </h3>
             <div style="display: flex; flex-direction: column; height: calc(100% - 35px);">
                 <pre id="responseViewer" style="flex: 1; overflow: auto; margin: 0; padding: 6px; background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap; word-break: break-word;"><span class="json-null">No response yet.</span></pre>
             </div>
@@ -272,12 +280,18 @@
         const commLog = document.getElementById('commLog');
         const flowsContainer = document.getElementById('flowsContainer');
         const methodsContainer = document.getElementById('methodsContainer');
+        const rawViewToggle = document.getElementById('rawViewToggle');
         
         // WebSocket connection
         let socket = null;
         let requestId = 1;
         let isConnected = false;
         let requestTimestamp = null;
+        
+        // Store current response data
+        let currentResponseRaw = null;
+        let currentResponseParsed = null;
+        let currentResponseError = null;
         
         // Flags to track dynamic items
         let dynamicToolsLoaded = false;
@@ -286,8 +300,28 @@
         
         // Function to highlight JSON syntax with colors
         function syntaxHighlightJson(json) {
+            // Custom replacer function to handle nested JSON strings
+            const replacer = (key, value) => {
+                // Check if this is a text field that might contain JSON
+                if (key === 'text' && typeof value === 'string') {
+                    // Try to detect if it's a JSON string
+                    const trimmed = value.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+                        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                        try {
+                            // Try to parse the JSON string and return it directly
+                            return JSON.parse(value);
+                        } catch (e) {
+                            // Not valid JSON, return as is
+                            return value;
+                        }
+                    }
+                }
+                return value;
+            };
+            
             // Use more space for indentation to make it easier to read
-            const jsonStr = JSON.stringify(json, null, 4);
+            const jsonStr = JSON.stringify(json, replacer, 4);
             
             // A more direct approach for syntax highlighting
             let result = '';
@@ -395,6 +429,31 @@
                 // Replace literal \n with actual line breaks for display
                 .replace(/\\n/g, '<br>');
         }
+        
+        // Function to display response based on current toggle state
+        function displayResponse() {
+            if (!currentResponseRaw && !currentResponseError) {
+                responseViewer.innerHTML = '<span class="json-null">No response yet.</span>';
+                return;
+            }
+            
+            if (rawViewToggle.checked) {
+                // Show raw response
+                responseViewer.textContent = currentResponseRaw || '';
+            } else {
+                // Show parsed response
+                if (currentResponseError) {
+                    responseViewer.innerHTML = `<div style="color: #d00; font-weight: bold;">⚠️ Parse Error:</div><div style="color: #d00; margin-top: 8px;">${escapeHtml(currentResponseError)}</div>`;
+                } else if (currentResponseParsed) {
+                    responseViewer.innerHTML = syntaxHighlightJson(currentResponseParsed);
+                } else {
+                    responseViewer.innerHTML = '<span class="json-null">No response yet.</span>';
+                }
+            }
+        }
+        
+        // Toggle handler
+        rawViewToggle.addEventListener('change', displayResponse);
         
         // State storage for method requests and responses
         const methodState = new Map();
@@ -762,21 +821,35 @@
         function loadResponseForMethod(flowId, methodId) {
             const key = `${flowId}:${methodId}`;
             
-            if (methodState.has(key) && methodState.get(key).response) {
-                responseViewer.innerHTML = syntaxHighlightJson(methodState.get(key).response);
-                if (methodState.get(key).requestSent) {
-                    requestData.textContent = 'Request: ' + JSON.stringify(methodState.get(key).requestSent, null, 2);
+            if (methodState.has(key)) {
+                const state = methodState.get(key);
+                
+                // Update current response data
+                currentResponseRaw = state.responseRaw || null;
+                currentResponseParsed = state.response || null;
+                currentResponseError = state.responseError || null;
+                
+                // Display response based on toggle state
+                displayResponse();
+                
+                if (state.requestSent) {
+                    requestData.textContent = 'Request: ' + JSON.stringify(state.requestSent, null, 2);
                 } else {
                     requestData.textContent = '';
                 }
                 
                 // Show communication log if available
-                if (methodState.get(key).commLog) {
-                    commLog.innerHTML = methodState.get(key).commLog;
+                if (state.commLog) {
+                    commLog.innerHTML = state.commLog;
                 } else {
                     commLog.innerHTML = '';
                 }
             } else {
+                // Clear current response data
+                currentResponseRaw = null;
+                currentResponseParsed = null;
+                currentResponseError = null;
+                
                 responseViewer.innerHTML = '<span class="json-null">No response yet.</span>';
                 requestData.textContent = '';
                 commLog.innerHTML = '';
@@ -847,6 +920,11 @@
                 };
                 
                 socket.onmessage = (event) => {
+                    // Store raw response
+                    currentResponseRaw = event.data;
+                    currentResponseParsed = null;
+                    currentResponseError = null;
+                    
                     try {
                         // Calculate response time
                         const responseTimestamp = new Date();
@@ -857,9 +935,10 @@
                         const responseSize = new Blob([event.data]).size;
                         
                         const response = JSON.parse(event.data);
+                        currentResponseParsed = response;
                         
-                        // Display the response with syntax highlighting
-                        responseViewer.innerHTML = syntaxHighlightJson(response);
+                        // Display the response based on current toggle state
+                        displayResponse();
                         
                         // Update communication log
                         let logEntry = '';
@@ -881,6 +960,7 @@
                             }
                             
                             methodState.get(key).response = response;
+                            methodState.get(key).responseRaw = event.data;
                             methodState.get(key).responseTimestamp = responseTimestamp;
                             methodState.get(key).commLog = commLog.innerHTML;
                             
@@ -922,9 +1002,25 @@
                             }
                         }
                     } catch (error) {
-                        // If parse fails, display the raw data
-                        responseViewer.innerHTML = `<span class="json-string">${escapeHtml(event.data)}</span>`;
+                        // If parse fails, store the error
+                        currentResponseError = error.message;
                         console.error('Error parsing JSON response:', error);
+                        
+                        // Display based on current toggle state
+                        displayResponse();
+                        
+                        // Save the error state for the current method
+                        if (currentFlow && currentMethod) {
+                            const key = `${currentFlow}:${currentMethod}`;
+                            
+                            if (!methodState.has(key)) {
+                                methodState.set(key, {});
+                            }
+                            
+                            methodState.get(key).responseRaw = event.data;
+                            methodState.get(key).responseError = error.message;
+                            methodState.get(key).commLog = commLog.innerHTML;
+                        }
                     }
                 };
                 

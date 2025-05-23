@@ -33,6 +33,71 @@
 #include "mcp-tools-metrics-query.h"
 #include "web/api/formatters/rrd2json.h"
 
+/**
+ * Convert structured labels object to Netdata's pipe-delimited format
+ * 
+ * MCP format (structured JSON):
+ * {
+ *   "disk_type": ["ssd", "nvme"],    // OR between values
+ *   "mount_point": ["/", "/home"]    // AND between different keys
+ * }
+ * 
+ * Netdata format (string):
+ * "disk_type:ssd|disk_type:nvme|mount_point:/|mount_point:/home"
+ * 
+ * The backend automatically ORs values with the same key and ANDs different keys.
+ * 
+ * @param labels_obj JSON object containing structured labels
+ * @param output_buffer Buffer to store the converted string
+ * @return 0 on success, -1 on error
+ */
+static int convert_structured_labels_to_string(struct json_object *labels_obj, BUFFER *output_buffer) {
+    if (!labels_obj || !output_buffer) {
+        return -1;
+    }
+    
+    if (!json_object_is_type(labels_obj, json_type_object)) {
+        return -1;
+    }
+    
+    buffer_flush(output_buffer);
+    
+    int first_pair = 1;
+    struct json_object_iterator it = json_object_iter_begin(labels_obj);
+    struct json_object_iterator itEnd = json_object_iter_end(labels_obj);
+    
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        const char *key = json_object_iter_peek_name(&it);
+        struct json_object *value_obj = json_object_iter_peek_value(&it);
+        
+        if (json_object_is_type(value_obj, json_type_array)) {
+            // Handle array of values
+            int array_len = json_object_array_length(value_obj);
+            for (int i = 0; i < array_len; i++) {
+                struct json_object *array_item = json_object_array_get_idx(value_obj, i);
+                if (json_object_is_type(array_item, json_type_string)) {
+                    if (!first_pair) {
+                        buffer_strcat(output_buffer, "|");
+                    }
+                    buffer_sprintf(output_buffer, "%s:%s", key, json_object_get_string(array_item));
+                    first_pair = 0;
+                }
+            }
+        } else if (json_object_is_type(value_obj, json_type_string)) {
+            // Handle single string value
+            if (!first_pair) {
+                buffer_strcat(output_buffer, "|");
+            }
+            buffer_sprintf(output_buffer, "%s:%s", key, json_object_get_string(value_obj));
+            first_pair = 0;
+        }
+        
+        json_object_iter_next(&it);
+    }
+    
+    return 0;
+}
+
 // JSON schema for the metrics query tool
 void mcp_tool_metrics_query_schema(BUFFER *buffer) {
     // Tool input schema
@@ -86,9 +151,38 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
 
     buffer_json_member_add_object(buffer, "labels");
     {
+        buffer_json_member_add_array(buffer, "oneOf");
+        
+        // Option 1: String format
+        buffer_json_add_array_item_object(buffer);
         buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Labels Filter");
-        buffer_json_member_add_string(buffer, "description", "Filter for charts having specified labels (key:value pairs).");
+        buffer_json_member_add_string(buffer, "title", "Labels Filter (String Format)");
+        buffer_json_member_add_string(buffer, "description", "Filter using pipe-delimited format: 'key1:value1|key1:value2|key2:value3'");
+        buffer_json_object_close(buffer);
+        
+        // Option 2: Structured object format
+        buffer_json_add_array_item_object(buffer);
+        buffer_json_member_add_string(buffer, "type", "object");
+        buffer_json_member_add_string(buffer, "title", "Labels Filter (Structured Format)");
+        buffer_json_member_add_string(buffer, "description", "Filter using structured format where each key maps to a value or array of values. "
+                                                             "Values in the same array are ORed, different keys are ANDed. "
+                                                             "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}");
+        buffer_json_member_add_object(buffer, "additionalProperties");
+        buffer_json_member_add_array(buffer, "oneOf");
+        buffer_json_add_array_item_object(buffer);
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_object_close(buffer);
+        buffer_json_add_array_item_object(buffer);
+        buffer_json_member_add_string(buffer, "type", "array");
+        buffer_json_member_add_object(buffer, "items");
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_object_close(buffer);
+        buffer_json_object_close(buffer);
+        buffer_json_array_close(buffer); // oneOf
+        buffer_json_object_close(buffer); // additionalProperties
+        buffer_json_object_close(buffer);
+        
+        buffer_json_array_close(buffer); // oneOf
     }
     buffer_json_object_close(buffer); // labels
 
@@ -430,7 +524,29 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     }
     const char *instances = extract_string_param(params, "instances");
     const char *dimensions = extract_string_param(params, "dimensions");
-    const char *labels = extract_string_param(params, "labels");
+    
+    // Handle labels - can be either string or structured object
+    const char *labels = NULL;
+    BUFFER *labels_buffer = NULL;
+    struct json_object *labels_obj = NULL;
+    
+    if (json_object_object_get_ex(params, "labels", &labels_obj) && labels_obj) {
+        if (json_object_is_type(labels_obj, json_type_string)) {
+            // Direct string format
+            labels = json_object_get_string(labels_obj);
+        } else if (json_object_is_type(labels_obj, json_type_object)) {
+            // Structured format - convert to string
+            labels_buffer = buffer_create(256, NULL);
+            if (convert_structured_labels_to_string(labels_obj, labels_buffer) == 0) {
+                labels = buffer_tostring(labels_buffer);
+            } else {
+                buffer_free(labels_buffer);
+                buffer_sprintf(mcpc->error, "Failed to convert structured labels to string format");
+                return MCP_RC_BAD_REQUEST;
+            }
+        }
+    }
+    
     const char *alerts = extract_string_param(params, "alerts");
     
     // Time parameters
@@ -574,6 +690,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     QUERY_TARGET *qt = query_target_create(&qtr);
     if (!qt) {
         buffer_sprintf(mcpc->error, "Failed to prepare the query.");
+        if (labels_buffer) buffer_free(labels_buffer);
         return MCP_RC_INTERNAL_ERROR;
     }
 
@@ -616,6 +733,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         
         buffer_sprintf(mcpc->error, "Failed to execute query: %s (http error code: %d). The context '%s' might not exist, or no data is available for the specified time range.",
                       error_desc, ret, context);
+        if (labels_buffer) buffer_free(labels_buffer);
         return MCP_RC_INTERNAL_ERROR;
     }
     
@@ -635,6 +753,11 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     }
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
+    
+    // Clean up allocated memory
+    if (labels_buffer) {
+        buffer_free(labels_buffer);
+    }
     
     return MCP_RC_OK;
 }
