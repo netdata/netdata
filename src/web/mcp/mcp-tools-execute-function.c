@@ -12,8 +12,8 @@ typedef enum {
     OP_LESS_EQUALS,      // <=
     OP_GREATER,          // >
     OP_GREATER_EQUALS,   // >=
-    OP_LIKE,             // like
-    OP_NOT_LIKE,         // not like
+    OP_MATCH,            // simple pattern
+    OP_NOT_MATCH,        // not simple pattern
     OP_UNKNOWN           // unknown operator
 } OPERATOR_TYPE;
 
@@ -28,7 +28,7 @@ typedef struct condition_s {
     char column_name[256];           // Name of the column (for error reporting) - fixed size array
     OPERATOR_TYPE op;                // Operator type
     struct json_object *value;       // Value to compare against (referenced, not owned)
-    SIMPLE_PATTERN *pattern;         // Pre-compiled pattern for LIKE operations
+    SIMPLE_PATTERN *pattern;         // Pre-compiled pattern for MATCH operations
 } CONDITION;
 
 // Structure to hold an array of conditions
@@ -131,11 +131,11 @@ static OPERATOR_TYPE string_to_operator(const char *op_str) {
     if (strcmp(op_str, ">=") == 0)
         return OP_GREATER_EQUALS;
     
-    if (strcmp(op_str, "like") == 0 || strcmp(op_str, "in") == 0)
-        return OP_LIKE;
+    if (strcmp(op_str, "match") == 0 || strcmp(op_str, "like") == 0 || strcmp(op_str, "in") == 0)
+        return OP_MATCH;
     
-    if (strcmp(op_str, "not like") == 0 || strcmp(op_str, "not in") == 0)
-        return OP_NOT_LIKE;
+    if (strcmp(op_str, "not match") == 0 || strcmp(op_str, "not like") == 0 || strcmp(op_str, "not in") == 0)
+        return OP_NOT_MATCH;
     
     return OP_UNKNOWN;
 }
@@ -156,12 +156,12 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
     if (!value || !condition)
         return false;
     
-    // Handle LIKE and NOT LIKE operators (pattern matching) - always convert to strings
-    if (condition->op == OP_LIKE || condition->op == OP_NOT_LIKE) {
+    // Handle MATCH and NOT MATCH operators (pattern matching) - always convert to strings
+    if (condition->op == OP_MATCH || condition->op == OP_NOT_MATCH) {
         if (condition->pattern) {
             const char *val_str = json_object_get_string(value);
             bool pattern_match = simple_pattern_matches(condition->pattern, val_str);
-            return (condition->op == OP_LIKE) ? pattern_match : !pattern_match;
+            return (condition->op == OP_MATCH) ? pattern_match : !pattern_match;
         }
         return false;
     }
@@ -356,7 +356,7 @@ static int preprocess_conditions(struct json_object *conditions_array,
         curr->op = string_to_operator(op_str);
         if (curr->op == OP_UNKNOWN) {
             if (error_buffer)
-                buffer_sprintf(error_buffer, "Invalid operator '%s' at index %zu. Valid operators are: ==, !=, <>, <, <=, >, >=, like, not like", 
+                buffer_sprintf(error_buffer, "Invalid operator '%s' at index %zu. Valid operators are: ==, !=, <>, <, <=, >, >=, match, not match", 
                               op_str, i);
             free_condition_patterns(condition_array);
             return -6; // Invalid operator
@@ -392,8 +392,8 @@ static int preprocess_conditions(struct json_object *conditions_array,
             curr->column_index = json_object_get_int(index_obj);
         }
         
-        // Pre-compile patterns for LIKE operators
-        if (curr->op == OP_LIKE || curr->op == OP_NOT_LIKE) {
+        // Pre-compile patterns for MATCH operators
+        if (curr->op == OP_MATCH || curr->op == OP_NOT_MATCH) {
             // Always convert to string for pattern matching, regardless of original type
             const char *pattern_str = json_object_get_string(value_obj);
             curr->pattern = string_to_simple_pattern_nocase_substring(pattern_str);
@@ -485,13 +485,11 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // limit
     
-    // q parameter removed in favor of column-specific 'like' conditions
-
     buffer_json_member_add_object(buffer, "conditions");
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", "Filter conditions");
-        buffer_json_member_add_string(buffer, "description", "Array of conditions to filter rows. Each condition is an array of [column, operator, value] where operator can be ==, !=, <>, <, <=, >, >=, like, not like");
+        buffer_json_member_add_string(buffer, "description", "Array of conditions to filter rows. Each condition is an array of [column, operator, value] where operator can be ==, !=, <>, <, <=, >, >=, match, not match");
         
         buffer_json_member_add_object(buffer, "items");
         {
@@ -519,8 +517,8 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
                     buffer_json_add_array_item_string(buffer, "<=");
                     buffer_json_add_array_item_string(buffer, ">");
                     buffer_json_add_array_item_string(buffer, ">=");
-                    buffer_json_add_array_item_string(buffer, "like");
-                    buffer_json_add_array_item_string(buffer, "not like");
+                    buffer_json_add_array_item_string(buffer, "match");
+                    buffer_json_add_array_item_string(buffer, "not match");
                     buffer_json_array_close(buffer);
                 }
                 buffer_json_object_close(buffer);
@@ -821,13 +819,13 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
                 "    [\"another_column\", \"another_operator\", another_value]\n"
                 "]\n"
                 "```\n\n"
-                "Available operators: ==, !=, <>, <, <=, >, >=, like, not like\n\n"
+                "Available operators: ==, !=, <>, <, <=, >, >=, match, not match\n\n"
                 "Examples:\n"
                 "- [\"cpu\", \"==\", 0] - Match where cpu equals 0\n"
-                "- [\"name\", \"like\", \"*sys*\"] - Match where name contains 'sys'\n"
+                "- [\"name\", \"match\", \"*sys*\"] - Match where name contains 'sys'\n"
                 "- [\"value\", \">\", 100] - Match where value is greater than 100\n"
-                "- [\"state\", \"like\", \"*running*|*stopped*\"] - Match multiple values using the pipe (|) character\n\n"
-                "Note: To match multiple values for a field, use the 'like' operator with patterns separated by the pipe (|) character.",
+                "- [\"state\", \"match\", \"*running*|*stopped*\"] - Match multiple values using the pipe (|) character\n\n"
+                "Note: To match multiple values for a field, use the 'match' operator with patterns separated by the pipe (|) character.",
                 buffer_tostring(error_buffer)
             );
             
@@ -1025,15 +1023,15 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         buffer_strcat(output, "  \"tips\": [\n");
         buffer_strcat(output, "    \"Verify the column names in your conditions\",\n");
         buffer_strcat(output, "    \"Check the values and operators used\",\n");
-        buffer_strcat(output, "    \"For 'like' operators, ensure your pattern format is correct\",\n");
-        buffer_strcat(output, "    \"To match multiple values, use 'like' with patterns separated by the pipe (|) character: '*value1*|*value2*'\",\n");
+        buffer_strcat(output, "    \"For 'match' operators, ensure your pattern format is correct\",\n");
+        buffer_strcat(output, "    \"To match multiple values, use 'match' with patterns separated by the pipe (|) character: '*value1*|*value2*'\",\n");
         buffer_strcat(output, "    \"Try broadening your filter criteria\"\n");
         buffer_strcat(output, "  ],\n");
         buffer_strcat(output, "  \"examples\": [\n");
         buffer_strcat(output, "    {\"condition\": [\"cpu\", \"==\", 0], \"description\": \"Match where cpu equals 0\"},\n");
-        buffer_strcat(output, "    {\"condition\": [\"name\", \"like\", \"*sys*\"], \"description\": \"Match where name contains 'sys'\"},\n");
+        buffer_strcat(output, "    {\"condition\": [\"name\", \"match\", \"*sys*\"], \"description\": \"Match where name contains 'sys'\"},\n");
         buffer_strcat(output, "    {\"condition\": [\"value\", \">\", 100], \"description\": \"Match where value is greater than 100\"},\n");
-        buffer_strcat(output, "    {\"condition\": [\"state\", \"like\", \"*running*|*stopped*\"], \"description\": \"Match multiple values using the pipe (|) character\"}\n");
+        buffer_strcat(output, "    {\"condition\": [\"state\", \"match\", \"*running*|*stopped*\"], \"description\": \"Match multiple values using the pipe (|) character\"}\n");
         buffer_strcat(output, "  ],\n");
         buffer_strcat(output, "  ");
         output_columns_as_json(output, columns_obj);
@@ -1103,7 +1101,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             "        \"conditions\": [\n"
             "            [\"%s\", \">\", 100],\n"
             "            [\"%s\", \"==\", \"value\"],\n"
-            "            [\"%s\", \"like\", \"*pattern1*|*pattern2*\"]\n"
+            "            [\"%s\", \"match\", \"*pattern1*|*pattern2*\"]\n"
             "        ]\n"
             "    }\n"
             "}\n"
@@ -1113,10 +1111,10 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             "2. `sort_column` and `sort_order`: Sort results by column\n"
             "3. `limit`: Limit number of rows returned\n"
             "4. `conditions`: Array of [column, operator, value] conditions\n"
-            "   - Operators: ==, !=, <>, <, <=, >, >=, like, not like\n"
+            "   - Operators: ==, !=, <>, <, <=, >, >=, match, not match\n"
             "   - Values can be strings, numbers, or booleans\n"
-            "   - 'like' and 'not like' use Netdata's simple pattern format for string matching\n"
-            "   - To match multiple values, use 'like' with patterns separated by pipe (|): \"*value1*|*value2*\"\n",
+            "   - 'match' and 'not match' use Netdata's simple pattern format for string matching\n"
+            "   - To match multiple values, use 'match' with patterns separated by pipe (|): \"*value1*|*value2*\"\n",
             node_name, function_name, 
             example_columns,  // This will be quoted column names
             column_names[0],
@@ -1299,8 +1297,6 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
             }
         }
     }
-    
-    // Full text search removed in favor of column-specific 'like' conditions
     
     // Get conditions parameter (array of [column, op, value] arrays)
     if (json_object_object_get_ex(params, "conditions", NULL)) {
