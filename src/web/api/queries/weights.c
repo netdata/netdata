@@ -308,6 +308,7 @@ struct query_weights_data {
     SIMPLE_PATTERN *scope_contexts_sp;
     SIMPLE_PATTERN *scope_instances_sp;
     SIMPLE_PATTERN *scope_labels_sp;
+    SIMPLE_PATTERN *scope_dimensions_sp;
     SIMPLE_PATTERN *nodes_sp;
     SIMPLE_PATTERN *contexts_sp;
     SIMPLE_PATTERN *instances_sp;
@@ -1523,6 +1524,9 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             .version = 1,
             .scope_nodes = qwd->qwr->scope_nodes,
             .scope_contexts = qwd->qwr->scope_contexts,
+            .scope_instances = qwd->qwr->scope_instances,
+            .scope_labels = qwd->qwr->scope_labels,
+            .scope_dimensions = qwd->qwr->scope_dimensions,
             .nodes = qwd->qwr->nodes,
             .contexts = qwd->qwr->contexts,
             .instances = qwd->qwr->instances,
@@ -1774,6 +1778,7 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
     ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
                                             qwd->scope_instances_sp,
                                             qwd->scope_labels_pa,
+                                            qwd->scope_dimensions_sp,
                                             qwd->instances_sp,
                                             NULL,
                                             qwd->labels_pa,
@@ -1819,6 +1824,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .scope_contexts_sp = string_to_simple_pattern(qwr->scope_contexts),
             .scope_instances_sp = string_to_simple_pattern(qwr->scope_instances),
             .scope_labels_sp = string_to_simple_pattern(qwr->scope_labels),
+            .scope_dimensions_sp = string_to_simple_pattern(qwr->scope_dimensions),
             .nodes_sp = string_to_simple_pattern(qwr->nodes),
             .contexts_sp = string_to_simple_pattern(qwr->contexts),
             .instances_sp = string_to_simple_pattern(qwr->instances),
@@ -2028,6 +2034,7 @@ cleanup:
     simple_pattern_free(qwd.scope_contexts_sp);
     simple_pattern_free(qwd.scope_instances_sp);
     simple_pattern_free(qwd.scope_labels_sp);
+    simple_pattern_free(qwd.scope_dimensions_sp);
     simple_pattern_free(qwd.nodes_sp);
     simple_pattern_free(qwd.contexts_sp);
     simple_pattern_free(qwd.instances_sp);

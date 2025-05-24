@@ -29,6 +29,7 @@ typedef struct query_weights_request {
     const char *scope_contexts;
     const char *scope_instances;
     const char *scope_labels;
+    const char *scope_dimensions;
     const char *nodes;
     const char *contexts;
     const char *instances;
