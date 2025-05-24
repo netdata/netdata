@@ -2,59 +2,299 @@
 
 From the Cloud interface, you can manage your space's Alert notification silencing rules settings as well as allow users to define their personal ones.
 
+## Rule Hierarchy
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
+flowchart TD
+    Space[Space Level] --> Room[Room Level]
+    Room --> Node[Node Level]
+    Node --> Alert[Alert Level]
+    
+    Space --> SpaceRules[Space Silencing Rules<br/>Affects All Users]
+    Room --> RoomRules[Room-Specific Rules<br/>Target Specific Teams]
+    Node --> NodeRules[Node-Specific Rules<br/>Individual Servers]
+    Alert --> AlertRules[Alert-Specific Rules<br/>Granular Control]
+    
+    style Space fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style Room fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    style Node fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style Alert fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    
+    style SpaceRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style RoomRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style NodeRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style AlertRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+```
+
+## Decision Flowchart
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
+flowchart TD
+    Start[Need to Silence Alerts?] --> Scope{Who Should Be Affected?}
+    style Start fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style Scope fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    
+    Scope -->|All Users| SpaceRule[Create Space Rule<br/>Admin/Manager Required]
+    Scope -->|Just Me| PersonalRule[Create Personal Rule<br/>Any Role Except Billing]
+    
+    style SpaceRule fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    style PersonalRule fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    
+    SpaceRule --> Target{What to Target?}
+    PersonalRule --> Target
+    
+    style Target fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    
+    Target -->|All Infrastructure| AllNodes[All Rooms + All Nodes]
+    Target -->|Specific Team| SpecificRoom[Target Specific Room]
+    Target -->|Individual Server| SpecificNode[Target Specific Node]
+    Target -->|Alert Type| SpecificAlert[Target Alert Context/Name]
+    
+    style AllNodes fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style SpecificRoom fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style SpecificNode fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    style SpecificAlert fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+```
+
 ## Prerequisites
 
-To manage **space's Alert notification silencing rule settings**, you will need the following:
+<details>
+<summary><strong>For Space Alert Notification Silencing Rules</strong></summary><br/>
+
+To manage space-level silencing rules, you need:
 
 - A Netdata Cloud account
-- Access to Space as an **administrator** or **manager** (**troubleshooters** can only view space rules)
+- Access to Space as **administrator** or **manager** (**troubleshooters** can only view space rules)
+</details>
 
-To manage your **personal Alert notification silencing rule settings**, you will need the following:
+<details>
+<summary><strong>For Personal Alert Notification Silencing Rules</strong></summary><br/>
+
+To manage your personal silencing rules, you need:
 
 - A Netdata Cloud account
 - Access to Space with any role except **billing**
+</details>
 
-### Steps
+:::note
 
-1. Click on the **Space settings** cog (located above your profile icon).
-2. Click on the **Alert & Notification** tab on the left-hand side.
-3. Click on the **Notification Silencing Rules** tab.
-4. You will be presented with a table of the configured Alert notification silencing rules for:
+You can only add rules if your space is on a [paid plan](/docs/netdata-cloud/view-plan-and-billing.md).
 
-    - The space (if you aren't an **observer**)
-    - Yourself
+:::
 
-   You will be able to:
+## Quick Access from Dashboard
 
-    1. **Add a new** Alert notification silencing rule configuration.
-        - Choose if it applies to **All users** or **Myself** (All users is only available for **administrators** and **managers**).
-        - You need to provide a name for the configuration so you can refer to it.
-        - Define criteria for Nodes, to which Rooms will the rule apply, on what Nodes and whether it applies to host labels key-value pairs.
-        - Define criteria for Alerts, such as Alert name is being targeted and in what Alert context. You can also specify if it applies to a specific Alert role.
-        - Define when it is applied:
-            - Immediately, from now until it is turned off or until a specific duration (start and end date automatically set).
-            - Scheduled, you can specify the start and end time for when the rule becomes active and then inactive (time is set according to your browser's local timezone).
-              Note: You are only able to add a rule if your space is on a [paid plan](/docs/netdata-cloud/view-plan-and-billing.md).
-    2. **Edit an existing** Alert notification silencing rule configuration. You will be able to change:
-        - The name provided for it
-        - Who it applies to
-        - Selection criteria for Nodes and Alerts
-        - When it will be applied
-    3. **Enable/Disable** a given Alert notification silencing rule configuration.
-        - Use the toggle to enable or disable
-    4. **Delete an existing** Alert notification silencing rule.
-        - Use the trash icon to delete your configuration
+You can also create silencing rules directly from the Alerts tab or Nodes tab:
 
-## Silencing Rules Examples
+- **From Alerts tab**: Use the "Actions" column to create new silencing rules for specific alerts
+- **From Nodes tab**: Add alert silencing rules directly from any node row
 
-| Rule name                        | Rooms              | Nodes    | Host Label               | Alert name                                       | Alert context | Alert instance           | Alert role  | Description                                                                                                                                                                                                               |
-|:---------------------------------|:-------------------|:---------|:-------------------------|:-------------------------------------------------|:--------------|:-------------------------|:------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Space silencing                  | All Rooms          | *        | *                        | *                                                | *             | *                        | *           | This rule silences the entire space, targets all nodes, and for all users. E.g. infrastructure-wide maintenance window.                                                                                                   |
-| DB Servers Rooms                 | PostgreSQL Servers | *        | *                        | *                                                | *             | *                        | *           | This rule silences the nodes in the Room named PostgreSQL Servers, for example, it doesn't silence the `All Nodes` Room. E.g. My team with membership to this Room doesn't want to receive notifications for these nodes. |
-| Node child1                      | All Rooms          | `child1` | *                        | *                                                | *             | *                        | *           | This rule silences all Alert state transitions for node `child1` in all Rooms and for all users. E.g. node could be going under maintenance.                                                                              |
-| Production nodes                 | All Rooms          | *        | `environment:production` | *                                                | *             | *                        | *           | This rule silences all Alert state transitions for nodes with the host label key-value pair `environment:production`. E.g. Maintenance window on nodes with specific host labels.                                         |
-| Third party maintenance          | All Rooms          | *        | *                        | `httpcheck_posthog_netdata_cloud.request_status` | *             | *                        | *           | This rule silences this specific Alert since the third-party partner will be undergoing maintenance.                                                                                                                      |
-| Intended stress usage on CPU     | All Rooms          | *        | *                        | *                                                | `system.cpu`  | *                        | *           | This rule silences specific Alerts across all nodes and their CPU cores.                                                                                                                                                  |
-| Silence role webmaster           | All Rooms          | *        | *                        | *                                                | *             | *                        | `webmaster` | This rule silences all Alerts configured with the role `webmaster`.                                                                                                                                                       |
-| Silence Alert on node            | All Rooms          | `child1` | *                        | `httpcheck_posthog_netdata_cloud.request_status` | *             | *                        | *           | This rule silences the specific Alert on the `child1` node.                                                                                                                                                               |
-| Disk Space Alerts on mount point | All Rooms          | *        | *                        | `disk_space_usage`                               | `disk.space`  | `disk_space_opt_baddisk` | *           | This rule silences the specific Alert instance on all nodes `/opt/baddisk`.                                                                                                                                               |
+## Steps to Configure Silencing Rules
+
+1. Click the **Space settings** cog (located above your profile icon)
+2. Click the **Alert & Notification** tab on the left-hand side  
+3. Click the **Notification Silencing Rules** tab
+
+You will see configured Alert notification silencing rules for the space (if you aren't an **observer**) and yourself.
+
+## Rule Configuration
+
+### Available Actions
+
+| Action | Description |
+|--------|-------------|
+| **Add New Rule** | Create silencing rules for "All users" (administrators/managers only) or "Myself" |
+| **Edit Existing Rule** | Modify name, scope, criteria, and timing |
+| **Enable/Disable Rule** | Use toggle to activate or deactivate rules |
+| **Delete Rule** | Remove silencing rules using the trash icon |
+
+### Configuration Criteria
+
+<details>
+<summary><strong>Node Criteria</strong></summary><br/>
+
+**Rooms**: Which Rooms will this apply to?
+
+**Nodes**: What specific Nodes?
+
+**Host Labels**: Does it apply to host labels key-value pairs?
+</details>
+
+<details>
+<summary><strong>Alert Criteria</strong></summary><br/>
+
+**Alert Name**: Which alert name is being targeted?
+
+**Alert Context**: What alert context?
+
+**Alert Role**: Will it apply to a specific alert role?
+</details>
+
+<details>
+<summary><strong>Timing Options</strong></summary><br/>
+
+**Immediate**: From now until turned off or until specific duration (start and end date automatically set).
+
+**Scheduled**: Specify start and end time when rule becomes active and inactive (time set according to your browser local timezone).
+</details>
+
+## Step-by-Step Wizards for Common Use Cases
+
+<details>
+<summary><strong>Maintenance Window for All Infrastructure</strong></summary><br/>
+
+**Use Case**: Complete infrastructure maintenance affecting all users
+
+**Configuration Steps**:
+1. Choose "All users" (requires admin/manager role)
+2. Set name: "Infrastructure Maintenance [Date]"
+3. **Node Criteria**: 
+   - Rooms: All Rooms
+   - Nodes: *
+   - Host Labels: *
+4. **Alert Criteria**:
+   - Alert Name: *
+   - Alert Context: *
+   - Alert Role: *
+5. **Timing**: Scheduled with maintenance window start/end times
+
+**Validation Checklist**:
+- Admin/Manager permissions confirmed.
+- All rooms and nodes targeted (*).
+- Maintenance window times set correctly.
+- Rule name includes date for easy reference.
+</details>
+
+<details>
+<summary><strong>Team-Specific Alert Silencing</strong></summary><br/>
+
+**Use Case**: Database team doesn't want notifications for their managed servers.
+
+**Configuration Steps**:
+1. Choose "All users" (for team-wide effect)
+2. Set name: "DB Team - PostgreSQL Servers"
+3. **Node Criteria**:
+   - Rooms: PostgreSQL Servers
+   - Nodes: *
+   - Host Labels: *
+4. **Alert Criteria**:
+   - Alert Name: *
+   - Alert Context: *
+   - Alert Role: *
+5. **Timing**: Immediate (ongoing)
+
+**Validation Checklist**:
+- Correct room selected (not "All Rooms")
+- Team members have access to specified room
+- Rule name clearly identifies team and scope
+</details>
+
+<details>
+<summary><strong>Single Node Maintenance</strong></summary><br/>
+
+**Use Case**: Specific server undergoing maintenance
+
+**Configuration Steps**:
+1. Choose "All users" or "Myself" based on impact
+2. Set name: "Node Maintenance - [NodeName]"
+3. **Node Criteria**:
+   - Rooms: All Rooms
+   - Nodes: [specific node name]
+   - Host Labels: *
+4. **Alert Criteria**:
+   - Alert Name: *
+   - Alert Context: *
+   - Alert Role: *
+5. **Timing**: Scheduled with maintenance window
+
+**Validation Checklist**:
+- Exact node name specified correctly
+- Maintenance window times confirmed
+- Other team members notified if using "All users"
+</details>
+
+<details>
+<summary><strong>Load Testing Alert Suppression</strong></summary><br/>
+
+**Use Case**: Planned stress testing that will trigger CPU alerts
+
+**Configuration Steps**:
+1. Choose appropriate scope ("All users" or "Myself")
+2. Set name: "Load Testing - CPU Alerts"
+3. **Node Criteria**:
+   - Rooms: [testing environment rooms]
+   - Nodes: * (or specific test nodes)
+   - Host Labels: environment:testing (if applicable)
+4. **Alert Criteria**:
+   - Alert Name: *
+   - Alert Context: system.cpu
+   - Alert Role: *
+5. **Timing**: Scheduled for testing period
+
+:::tip
+
+**Validation Checklist**:
+- Correct alert context specified (system.cpu)
+- Testing environment properly targeted
+- Testing timeframe accurately set
+- Production systems excluded
+
+:::
+
+</details>
+
+## Rule Validation Checklist
+
+:::tip
+
+Before activating any silencing rule, verify:
+
+| Category | Validation Item | Description |
+|----------|----------------|-------------|
+| **Basic Configuration** | Rule name is descriptive | Include purpose/date for easy reference |
+| | Correct scope selected | Choose "All users" vs "Myself" appropriately |
+| | Proper permissions for scope | Admin/manager required for "All users" |
+| **Target Validation** | Room selection matches scope | Ensure intended rooms are targeted |
+| | Node specification is accurate | Use * for all, specific names for targeted nodes |
+| | Host labels correctly formatted | Use key:value pairs format |
+| **Alert Criteria** | Alert name/context matches | Verify targeting intended alerts |
+| | Alert role properly specified | Use role-based alerting correctly |
+| | Wildcard (*) used appropriately | Apply broad targeting where needed |
+| **Timing Configuration** | Immediate vs Scheduled selection | Choose appropriate timing method |
+| | Start/end times set correctly | Consider browser timezone |
+| | Duration appropriate | Match planned activity timeframe |
+| **Impact Assessment** | Stakeholders notified | Inform team of silencing rule activation |
+| | Alternative monitoring in place | Ensure backup monitoring if needed |
+| | Rule deactivation planned | Schedule rule removal after maintenance |
+
+:::
+
+## Common Silencing Scenarios
+
+| Scenario | Configuration | Use Case |
+|----------|---------------|----------|
+| **Infrastructure Maintenance** | All Rooms, All Nodes (*) | Complete infrastructure-wide maintenance window |
+| **Team-Specific Silencing** | Specific Room (e.g., PostgreSQL Servers) | Team doesn't want notifications for their managed nodes |
+| **Single Node Maintenance** | Specific node (e.g., child1) | Node undergoing maintenance |
+| **Environment-Based Silencing** | Host label: environment:production | Maintenance on production environment nodes |
+| **Third-Party Service Issues** | Specific alert name | External service maintenance affecting monitoring |
+| **Load Testing** | Alert context: system.cpu | Planned stress testing on CPU resources |
+| **Role-Based Control** | Alert role: webmaster | Silence all alerts for specific role |
+| **Granular Alert Control** | Specific alert + specific node | Targeted silencing for known issues |
+| **Storage Maintenance** | Alert: disk_space_usage, Instance: specific mount | Maintenance on specific storage volumes |
+
+## Detailed Examples Reference
+
+| Rule Name | Rooms | Nodes | Host Label | Alert Name | Alert Context | Alert Instance | Alert Role | Description |
+|-----------|-------|-------|------------|------------|---------------|----------------|------------|-------------|
+| Space silencing | All Rooms | * | * | * | * | * | * | Silences entire space, all nodes, all users. Infrastructure-wide maintenance window |
+| DB Servers Rooms | PostgreSQL Servers | * | * | * | * | * | * | Silences nodes in PostgreSQL Servers Room only, not All Nodes Room |
+| Node child1 | All Rooms | child1 | * | * | * | * | * | Silences all Alert state transitions for node child1 in all Rooms |
+| Production nodes | All Rooms | * | environment:production | * | * | * | * | Silences Alert state transitions for nodes with environment:production label |
+| Third party maintenance | All Rooms | * | * | httpcheck_posthog_netdata_cloud.request_status | * | * | * | Silences specific Alert during third-party partner maintenance |
+| Intended stress usage on CPU | All Rooms | * | * | * | system.cpu | * | * | Silences specific Alerts across all nodes and their CPU cores |
+| Silence role webmaster | All Rooms | * | * | * | * | * | webmaster | Silences all Alerts configured with role webmaster |
+| Silence Alert on node | All Rooms | child1 | * | httpcheck_posthog_netdata_cloud.request_status | * | * | * | Silences specific Alert on child1 node |
+| Disk Space Alerts on mount point | All Rooms | * | * | disk_space_usage | disk.space | disk_space_opt_baddisk | * | Silences specific Alert instance on all nodes /opt/baddisk |
