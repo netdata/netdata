@@ -2,6 +2,7 @@
 
 #include "json.h"
 #include "../jsonwrap-internal.h"
+#include "web/mcp/mcp.h"
 
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
@@ -271,17 +272,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, "result");
 
     if(options & RRDR_OPTION_MCP_INFO)
-        buffer_json_member_add_string(
-            wb, JSKEY(info),
-            "The 'result' section contains the actual time-series data points.\n"
-            "Each point of each dimension is represented as an array of 3 values:\n"
-            "  a) the value itself, aggregated as requested\n"
-            "  b) the point anomaly rate percentage (% of anomalous samples vs total samples)\n"
-            "  c) the point annotations, a combined bitmap of 1+2+4, where:\n"
-            "     1 = empty data, value should be ignored\n"
-            "     2 = counter has been reset or overflown, value may not be accurate\n"
-            "     4 = partial data, at least one of the sources aggregated had gaps at that time\n"
-            "Summarized data across the entire time-frame is provided at the 'view' section.");
+        buffer_json_member_add_string(wb, JSKEY(info), MCP_QUERY_INFO_RESULT_SECTION);
 
     buffer_json_member_add_array(wb, "labels");
     buffer_json_add_array_item_string(wb, "time");

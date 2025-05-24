@@ -413,3 +413,47 @@ char *simple_pattern_iterate(SIMPLE_PATTERN **p)
     (*Proot) = (*Proot)->next;
     return (char *) root->match;
 }
+
+bool simple_pattern_contains_wildcards(const char *str, const char *separators) {
+    if(unlikely(!str || !*str)) return false;
+
+    // Check if it starts with exclamation mark (and not escaped)
+    if(*str == '!')
+        return true;
+
+    bool isseparator[256] = {
+              [' ']  = true    // space
+            , ['\t'] = true    // tab
+            , ['\r'] = true    // carriage return
+            , ['\n'] = true    // new line
+            , ['\f'] = true    // form feed
+            , ['\v'] = true    // vertical tab
+    };
+
+    if (unlikely(separators == SIMPLE_PATTERN_NO_SEPARATORS))
+        memset(isseparator, false, sizeof(isseparator));
+
+    else if (unlikely(separators && *separators)) {
+        memset(isseparator, false, sizeof(isseparator));
+        while(*separators) isseparator[(unsigned char)*separators++] = true;
+    }
+
+    // Check for separators or asterisks in the string, respecting escaping
+    const char *s = str;
+    char escape = 0;
+    while(*s) {
+        if(*s == '\\' && !escape) {
+            escape = 1;
+            s++;
+        }
+        else {
+            if (!escape && (isseparator[(unsigned char)*s] || *s == '*'))
+                return true;
+            
+            s++;
+            escape = 0;
+        }
+    }
+
+    return false;
+}
