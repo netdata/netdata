@@ -2,6 +2,7 @@
 
 #include "jsonwrap.h"
 #include "jsonwrap-internal.h"
+#include "web/mcp/mcp.h"
 
 void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
     buffer_json_member_add_object(wb, JSKEY(status));
@@ -404,11 +405,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, "summary");
     {
         if(options & RRDR_OPTION_MCP_INFO)
-            buffer_json_member_add_string(
-                wb, JSKEY(info),
-                "The summary section breaks down the different sources that contribute "
-                "data to the query. Use this to detect spikes, dives, anomalies (the % of anomalous samples vs the total samples) "
-                "and evaluate the different groupings that may be beneficial for the task at hand.");
+            buffer_json_member_add_string(wb, JSKEY(info), MCP_QUERY_INFO_SUMMARY_SECTION);
         
         query_target_summary_nodes_v2(wb, qt, "nodes", &nodes_totals);
         r->internal.contexts = query_target_summary_contexts_v2(wb, qt, "contexts", &contexts_totals);
@@ -455,11 +452,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, JSKEY(database));
     {
         if(options & RRDR_OPTION_MCP_INFO)
-            buffer_json_member_add_string(
-                wb, JSKEY(info),
-                "The database section provides metadata about the underlying data storage, "
-                "including retention periods and update frequencies, and data availability "
-                "across different storage tiers.");
+            buffer_json_member_add_string(wb, JSKEY(info), MCP_QUERY_INFO_DATABASE_SECTION);
         
         buffer_json_member_add_uint64(wb, "tiers", nd_profile.storage_tiers);
         buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
@@ -493,13 +486,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, JSKEY(view));
     {
         if(options & RRDR_OPTION_MCP_INFO)
-            buffer_json_member_add_string(
-                wb, JSKEY(info),
-                "The view section provides summarized data for the visible time window. "
-                "For each dimension returned, it contains the minimum, maximum, and average values, "
-                "the anomaly rate (% of anomalous samples vs total samples) and contribution percentages, "
-                "across all points."
-                );
+            buffer_json_member_add_string(wb, JSKEY(info), MCP_QUERY_INFO_VIEW_SECTION);
         
         query_target_title(wb, qt, r->internal.contexts);
         buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);

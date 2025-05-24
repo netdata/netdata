@@ -42,6 +42,34 @@
 #define MCP_METADATA_CARDINALITY_LIMIT 50   // For metadata queries (list tools)
 #define MCP_DATA_CARDINALITY_LIMIT 10       // For data queries (metrics query)
 
+// MCP query info messages
+#define MCP_QUERY_INFO_SUMMARY_SECTION \
+    "The summary section breaks down the different sources that contribute " \
+    "data to the query. Use this to detect spikes, dives, anomalies (the % of anomalous samples vs the total samples) " \
+    "and evaluate the different groupings that may be beneficial for the task at hand."
+
+#define MCP_QUERY_INFO_DATABASE_SECTION \
+    "The database section provides metadata about the underlying data storage, " \
+    "including retention periods and update frequencies, and data availability " \
+    "across different storage tiers."
+
+#define MCP_QUERY_INFO_VIEW_SECTION \
+    "The view section provides summarized data for the visible time window. " \
+    "For each dimension returned, it contains the minimum, maximum, and average values, " \
+    "the anomaly rate (% of anomalous samples vs total samples) and contribution percentages, " \
+    "across all points."
+
+#define MCP_QUERY_INFO_RESULT_SECTION \
+    "The 'result' section contains the actual time-series data points.\n" \
+    "Each point of each dimension is represented as an array of 3 values:\n" \
+    "  a) the value itself, aggregated as requested\n" \
+    "  b) the point anomaly rate percentage (% of anomalous samples vs total samples)\n" \
+    "  c) the point annotations, a combined bitmap of 1+2+4, where:\n" \
+    "     1 = empty data, value should be ignored\n" \
+    "     2 = counter has been reset or overflown, value may not be accurate\n" \
+    "     4 = partial data, at least one of the sources aggregated had gaps at that time\n" \
+    "Summarized data across the entire time-frame is provided at the 'view' section."
+
 // MCP protocol versions
 typedef enum {
     MCP_PROTOCOL_VERSION_UNKNOWN = 0,
