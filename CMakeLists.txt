@@ -1886,8 +1886,8 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-list-metadata.h
         src/web/mcp/mcp-tools-execute-function.c
         src/web/mcp/mcp-tools-execute-function.h
-        src/web/mcp/mcp-tools-metrics-query.c
-        src/web/mcp/mcp-tools-metrics-query.h
+        src/web/mcp/mcp-tools-query-metrics.c
+        src/web/mcp/mcp-tools-query-metrics.h
         src/web/mcp/mcp-time-utils.c
         src/web/mcp/mcp-time-utils.h
         src/web/mcp/mcp-request-id.c
