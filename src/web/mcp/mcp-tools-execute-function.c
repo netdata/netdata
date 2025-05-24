@@ -37,6 +37,77 @@ typedef struct {
     size_t count;                    // Number of conditions currently in use
 } CONDITION_ARRAY;
 
+// Helper function to create a filtered copy of a column definition
+static struct json_object *create_filtered_column(struct json_object *col_obj) {
+    struct json_object *col_copy = json_object_new_object();
+    
+    // Handle type conversion for better LLM understanding
+    struct json_object *type_obj = NULL;
+    if (json_object_object_get_ex(col_obj, "type", &type_obj) && 
+        json_object_is_type(type_obj, json_type_string)) {
+        const char *type_str = json_object_get_string(type_obj);
+        RRDF_FIELD_TYPE field_type = RRDF_FIELD_TYPE_2id(type_str);
+        
+        // Replace the original type with a simplified scalar type for LLM
+        json_object_object_add(col_copy, "type", 
+                              json_object_new_string(field_type_to_json_scalar_type(field_type)));
+    }
+    
+    // Copy only necessary properties
+    struct json_object_iterator col_it = json_object_iter_begin(col_obj);
+    struct json_object_iterator col_itEnd = json_object_iter_end(col_obj);
+    
+    while (!json_object_iter_equal(&col_it, &col_itEnd)) {
+        const char *field_key = json_object_iter_peek_name(&col_it);
+        struct json_object *field_val = json_object_iter_peek_value(&col_it);
+        
+        // Skip properties we don't need for LLM
+        if (strcmp(field_key, "visible") != 0 &&
+            strcmp(field_key, "visualization") != 0 &&
+            strcmp(field_key, "value_options") != 0 &&
+            strcmp(field_key, "sort") != 0 &&
+            strcmp(field_key, "sortable") != 0 &&
+            strcmp(field_key, "sticky") != 0 &&
+            strcmp(field_key, "summary") != 0 &&
+            strcmp(field_key, "filter") != 0 &&
+            strcmp(field_key, "full_width") != 0 &&
+            strcmp(field_key, "wrap") != 0 &&
+            strcmp(field_key, "default_expanded_filter") != 0 &&
+            // Skip type as we've already handled it
+            strcmp(field_key, "type") != 0) {
+            json_object_object_add(col_copy, field_key, json_object_get(field_val));
+        }
+        
+        json_object_iter_next(&col_it);
+    }
+    
+    return col_copy;
+}
+
+// Helper function to output columns as JSON with proper filtering
+static void output_columns_as_json(BUFFER *output, struct json_object *columns_obj) {
+    struct json_object *filtered_columns = json_object_new_object();
+    
+    struct json_object_iterator it = json_object_iter_begin(columns_obj);
+    struct json_object_iterator itEnd = json_object_iter_end(columns_obj);
+    
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        const char *col_name = json_object_iter_peek_name(&it);
+        struct json_object *col_obj = json_object_iter_peek_value(&it);
+        
+        struct json_object *col_copy = create_filtered_column(col_obj);
+        json_object_object_add(filtered_columns, col_name, col_copy);
+        
+        json_object_iter_next(&it);
+    }
+    
+    buffer_strcat(output, "\"columns\": ");
+    const char *columns_json = json_object_to_json_string_ext(filtered_columns, JSON_C_TO_STRING_PRETTY);
+    buffer_strcat(output, columns_json);
+    
+    json_object_put(filtered_columns);
+}
+
 // Convert string operator to enum type
 static OPERATOR_TYPE string_to_operator(const char *op_str) {
     if (!op_str)
@@ -80,6 +151,88 @@ static void free_condition_patterns(CONDITION_ARRAY *condition_array) {
     }
 }
 
+// Check if a single value matches a condition
+static bool value_matches_condition(struct json_object *value, const CONDITION *condition) {
+    if (!value || !condition)
+        return false;
+    
+    // Handle LIKE and NOT LIKE operators (pattern matching) - always convert to strings
+    if (condition->op == OP_LIKE || condition->op == OP_NOT_LIKE) {
+        if (condition->pattern) {
+            const char *val_str = json_object_get_string(value);
+            bool pattern_match = simple_pattern_matches(condition->pattern, val_str);
+            return (condition->op == OP_LIKE) ? pattern_match : !pattern_match;
+        }
+        return false;
+    }
+    // Handle numeric comparisons - try to convert to numbers if comparing with numbers
+    else if (json_object_is_type(value, json_type_int) || 
+             json_object_is_type(value, json_type_double) ||
+             json_object_is_type(condition->value, json_type_int) || 
+             json_object_is_type(condition->value, json_type_double)) {
+        
+        double val_num = json_object_get_double(value);
+        double cond_num = json_object_get_double(condition->value);
+        
+        switch (condition->op) {
+            case OP_EQUALS:
+                return (val_num == cond_num);
+            case OP_NOT_EQUALS:
+                return (val_num != cond_num);
+            case OP_LESS:
+                return (val_num < cond_num);
+            case OP_LESS_EQUALS:
+                return (val_num <= cond_num);
+            case OP_GREATER:
+                return (val_num > cond_num);
+            case OP_GREATER_EQUALS:
+                return (val_num >= cond_num);
+            default:
+                return false;
+        }
+    }
+    // Boolean comparisons - convert to booleans if possible
+    else if (json_object_is_type(value, json_type_boolean) || 
+             json_object_is_type(condition->value, json_type_boolean)) {
+        
+        bool val_bool = json_object_get_boolean(value);
+        bool cond_bool = json_object_get_boolean(condition->value);
+        
+        switch (condition->op) {
+            case OP_EQUALS:
+                return (val_bool == cond_bool);
+            case OP_NOT_EQUALS:
+                return (val_bool != cond_bool);
+            default:
+                return false;
+        }
+    }
+    // String comparisons for everything else
+    else {
+        const char *val_str = json_object_get_string(value);
+        const char *cond_str = json_object_get_string(condition->value);
+        
+        int cmp = strcmp(val_str, cond_str);
+        
+        switch (condition->op) {
+            case OP_EQUALS:
+                return (cmp == 0);
+            case OP_NOT_EQUALS:
+                return (cmp != 0);
+            case OP_LESS:
+                return (cmp < 0);
+            case OP_LESS_EQUALS:
+                return (cmp <= 0);
+            case OP_GREATER:
+                return (cmp > 0);
+            case OP_GREATER_EQUALS:
+                return (cmp >= 0);
+            default:
+                return false;
+        }
+    }
+}
+
 // Check if a row matches all the conditions
 static bool row_matches_conditions(struct json_object *row, const CONDITION_ARRAY *conditions) {
     if (!conditions || conditions->count == 0)
@@ -87,110 +240,33 @@ static bool row_matches_conditions(struct json_object *row, const CONDITION_ARRA
     
     for (size_t i = 0; i < conditions->count; i++) {
         const CONDITION *current = &conditions->items[i];
-        
-        // Get the value from the row at the specified column index
-        struct json_object *row_val = json_object_array_get_idx(row, current->column_index);
-        
-        // Handle null values
-        if (!row_val) {
-            return false;
-        }
-        
         bool condition_match = false;
         
-        // Handle LIKE and NOT LIKE operators (pattern matching) - always convert to strings
-        if (current->op == OP_LIKE || current->op == OP_NOT_LIKE) {
-            if (current->pattern) {
-                // Always convert to string for pattern matching
-                const char *row_str = json_object_get_string(row_val);
-                bool pattern_match = simple_pattern_matches(current->pattern, row_str);
-                condition_match = (current->op == OP_LIKE) ? pattern_match : !pattern_match;
+        // Special case: column_index == -1 means search all columns
+        if (current->column_index == -1) {
+            // Search across all columns for a match
+            size_t row_length = json_object_array_length(row);
+            for (size_t col_idx = 0; col_idx < row_length; col_idx++) {
+                struct json_object *row_val = json_object_array_get_idx(row, col_idx);
+                if (!row_val) continue;
+                
+                // Check if this column value matches the condition
+                if (value_matches_condition(row_val, current)) {
+                    condition_match = true;
+                    break; // Found a match, no need to check other columns
+                }
             }
         }
-        // Handle numeric comparisons - try to convert to numbers if comparing with numbers
-        else if (json_object_is_type(row_val, json_type_int) || 
-                 json_object_is_type(row_val, json_type_double) ||
-                 json_object_is_type(current->value, json_type_int) || 
-                 json_object_is_type(current->value, json_type_double)) {
-            
-            // Get numeric values using json-c's automatic conversion
-            double row_num = json_object_get_double(row_val);
-            double val_num = json_object_get_double(current->value);
-            
-            switch (current->op) {
-                case OP_EQUALS:
-                    condition_match = (row_num == val_num);
-                    break;
-                case OP_NOT_EQUALS:
-                    condition_match = (row_num != val_num);
-                    break;
-                case OP_LESS:
-                    condition_match = (row_num < val_num);
-                    break;
-                case OP_LESS_EQUALS:
-                    condition_match = (row_num <= val_num);
-                    break;
-                case OP_GREATER:
-                    condition_match = (row_num > val_num);
-                    break;
-                case OP_GREATER_EQUALS:
-                    condition_match = (row_num >= val_num);
-                    break;
-                default:
-                    condition_match = false;
-                    break;
-            }
-        }
-        // Boolean comparisons - convert to booleans if possible
-        else if (json_object_is_type(row_val, json_type_boolean) || 
-                 json_object_is_type(current->value, json_type_boolean)) {
-            
-            bool row_bool = json_object_get_boolean(row_val);
-            bool val_bool = json_object_get_boolean(current->value);
-            
-            switch (current->op) {
-                case OP_EQUALS:
-                    condition_match = (row_bool == val_bool);
-                    break;
-                case OP_NOT_EQUALS:
-                    condition_match = (row_bool != val_bool);
-                    break;
-                default:
-                    condition_match = false;
-                    break;
-            }
-        }
-        // String comparisons for everything else
         else {
-            // Convert both to strings for comparison
-            const char *row_str = json_object_get_string(row_val);
-            const char *val_str = json_object_get_string(current->value);
+            // Normal case: specific column index
+            struct json_object *row_val = json_object_array_get_idx(row, current->column_index);
             
-            int cmp = strcmp(row_str, val_str);
-            
-            switch (current->op) {
-                case OP_EQUALS:
-                    condition_match = (cmp == 0);
-                    break;
-                case OP_NOT_EQUALS:
-                    condition_match = (cmp != 0);
-                    break;
-                case OP_LESS:
-                    condition_match = (cmp < 0);
-                    break;
-                case OP_LESS_EQUALS:
-                    condition_match = (cmp <= 0);
-                    break;
-                case OP_GREATER:
-                    condition_match = (cmp > 0);
-                    break;
-                case OP_GREATER_EQUALS:
-                    condition_match = (cmp >= 0);
-                    break;
-                default:
-                    condition_match = false;
-                    break;
+            // Handle null values
+            if (!row_val) {
+                return false;
             }
+            
+            condition_match = value_matches_condition(row_val, current);
         }
         
         // If any condition doesn't match, return false
@@ -212,7 +288,8 @@ static bool row_matches_conditions(struct json_object *row, const CONDITION_ARRA
 static int preprocess_conditions(struct json_object *conditions_array, 
                                 struct json_object *columns_obj,
                                 CONDITION_ARRAY *condition_array,
-                                BUFFER *error_buffer) {
+                                BUFFER *error_buffer,
+                                bool *has_missing_columns) {
     if (!condition_array) {
         if (error_buffer)
             buffer_strcat(error_buffer, "Invalid condition array pointer");
@@ -221,6 +298,10 @@ static int preprocess_conditions(struct json_object *conditions_array,
     
     // Initialize the condition array
     memset(condition_array, 0, sizeof(CONDITION_ARRAY));
+    
+    // Initialize the missing columns flag
+    if (has_missing_columns)
+        *has_missing_columns = false;
     
     if (!conditions_array || !json_object_is_type(conditions_array, json_type_array))
         return 0; // No conditions is valid
@@ -287,24 +368,29 @@ static int preprocess_conditions(struct json_object *conditions_array,
         // Find column in column definitions
         struct json_object *col_obj = NULL;
         if (!json_object_object_get_ex(columns_obj, col_name, &col_obj)) {
+            // Column not found - mark it as a wildcard search (use -1 as special index)
+            curr->column_index = -1;
+            
+            if (has_missing_columns)
+                *has_missing_columns = true;
+            
             if (error_buffer) {
                 buffer_sprintf(error_buffer, "Column not found: '%s' at index %zu", col_name, i);
             }
-            free_condition_patterns(condition_array);
-            return -5; // Column not found
-        }
-        
-        // Get column index
-        struct json_object *index_obj = NULL;
-        if (!json_object_object_get_ex(col_obj, "index", &index_obj)) {
-            if (error_buffer) {
-                buffer_sprintf(error_buffer, "Column index not found for: '%s' at index %zu", col_name, i);
+            // Don't return error yet - we'll handle this specially
+        } else {
+            // Get column index
+            struct json_object *index_obj = NULL;
+            if (!json_object_object_get_ex(col_obj, "index", &index_obj)) {
+                if (error_buffer) {
+                    buffer_sprintf(error_buffer, "Column index not found for: '%s' at index %zu", col_name, i);
+                }
+                free_condition_patterns(condition_array);
+                return -5; // Column not found (index missing)
             }
-            free_condition_patterns(condition_array);
-            return -5; // Column not found (index missing)
+            
+            curr->column_index = json_object_get_int(index_obj);
         }
-        
-        curr->column_index = json_object_get_int(index_obj);
         
         // Pre-compile patterns for LIKE operators
         if (curr->op == OP_LIKE || curr->op == OP_NOT_LIKE) {
@@ -487,10 +573,15 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
 BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *columns_array, 
                                  const char *sort_column_param, const char *sort_order_param,
                                  int limit_param, struct json_object *conditions_array,
-                                 size_t max_size_threshold, const char *function_name, const char *node_name)
+                                 size_t max_size_threshold, const char *function_name, const char *node_name,
+                                 bool *had_missing_columns_but_found_results)
 {
     BUFFER *output = buffer_create(0, NULL);
     struct json_object *json_result = NULL;
+    
+    // Initialize the output flag
+    if (had_missing_columns_but_found_results)
+        *had_missing_columns_but_found_results = false;
 
     // Parse the JSON result
     const char *json_str = buffer_tostring(result_buffer);
@@ -635,19 +726,14 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         if (!all_columns_found) {
             buffer_flush(output);
             
+            // Create JSON error response
+            buffer_strcat(output, "{\n");
             buffer_sprintf(output, 
-                "Column(s) not found: %s\n\nAvailable columns are:\n\n", 
+                "  \"error\": \"Column(s) not found: %s\",\n", 
                 buffer_tostring(missing_columns));
-            
-            // List all available columns
-            struct json_object_iterator it = json_object_iter_begin(columns_obj);
-            struct json_object_iterator itEnd = json_object_iter_end(columns_obj);
-            
-            while (!json_object_iter_equal(&it, &itEnd)) {
-                const char *col_key = json_object_iter_peek_name(&it);
-                buffer_sprintf(output, "- %s\n", col_key);
-                json_object_iter_next(&it);
-            }
+            buffer_strcat(output, "  ");
+            output_columns_as_json(output, columns_obj);
+            buffer_strcat(output, "\n}");
             
             json_object_put(json_result);
             return output;
@@ -696,18 +782,13 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             // Column not found - return a helpful error message with available columns
             buffer_flush(output);
             
+            // Create JSON error response
+            buffer_strcat(output, "{\n");
             buffer_sprintf(output, 
-                "Sort column '%s' not found. Available columns are:\n\n", sort_column_param);
-            
-            // List all available columns
-            struct json_object_iterator it = json_object_iter_begin(columns_obj);
-            struct json_object_iterator itEnd = json_object_iter_end(columns_obj);
-            
-            while (!json_object_iter_equal(&it, &itEnd)) {
-                const char *col_key = json_object_iter_peek_name(&it);
-                buffer_sprintf(output, "- %s\n", col_key);
-                json_object_iter_next(&it);
-            }
+                "  \"error\": \"Sort column '%s' not found\",\n", sort_column_param);
+            buffer_strcat(output, "  ");
+            output_columns_as_json(output, columns_obj);
+            buffer_strcat(output, "\n}");
             
             json_object_put(json_result);
             return output;
@@ -721,13 +802,14 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
     // Preprocess conditions once for the whole request - using stack-based array
     CONDITION_ARRAY conditions; // Stack-allocated array of conditions
     int conditions_result = 0;
+    bool has_missing_columns = false;
     
     if (conditions_array && json_object_is_type(conditions_array, json_type_array)) {
         CLEAN_BUFFER *error_buffer = buffer_create(0, NULL);
-        conditions_result = preprocess_conditions(conditions_array, columns_obj, &conditions, error_buffer);
+        conditions_result = preprocess_conditions(conditions_array, columns_obj, &conditions, error_buffer, &has_missing_columns);
         
         // Check if preprocessing failed (negative return value means error)
-        if (conditions_result < 0) {
+        if (conditions_result < 0 && conditions_result != -5) {  // -5 is column not found, which we now handle
             // Return a helpful error message with guidance
             buffer_flush(output);
             buffer_sprintf(output, 
@@ -771,6 +853,39 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         if (include_row) {
             rows[row_idx++] = row;
         }
+    }
+    
+    // If we have missing columns and found no matches, provide helpful error
+    if (has_missing_columns && row_idx == 0) {
+        buffer_flush(output);
+        
+        // Create JSON error response
+        buffer_strcat(output, "{\n");
+        buffer_strcat(output, "  \"error\": \"No rows matched the specified conditions\",\n");
+        buffer_strcat(output, "  \"note\": \"The following column(s) were not found, so all columns were searched, although no matches were found\",\n");
+        buffer_strcat(output, "  \"columns_not_found\": [");
+        
+        bool first = true;
+        for (size_t i = 0; i < conditions.count; i++) {
+            if (conditions.items[i].column_index == -1) {
+                if (!first) buffer_strcat(output, ", ");
+                buffer_sprintf(output, "\"%s\"", conditions.items[i].column_name);
+                first = false;
+            }
+        }
+        buffer_strcat(output, "],\n");
+        
+        buffer_strcat(output, "  ");
+        output_columns_as_json(output, columns_obj);
+        buffer_strcat(output, "\n}");
+        
+        // Clean up and return
+        if (conditions_result > 0) {
+            free_condition_patterns(&conditions);
+        }
+        freez((void *)rows);
+        json_object_put(json_result);
+        return output;
     }
 
     // Free pattern resources when we're done with all rows
@@ -865,54 +980,11 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         
         struct json_object *col_obj = NULL;
         if (json_object_object_get_ex(columns_obj, col_name, &col_obj)) {
-            struct json_object *col_copy = json_object_new_object();
-
-            // Handle type conversion for better LLM understanding
-            struct json_object *type_obj = NULL;
-            if (json_object_object_get_ex(col_obj, "type", &type_obj) && 
-                json_object_is_type(type_obj, json_type_string)) {
-                const char *type_str = json_object_get_string(type_obj);
-                RRDF_FIELD_TYPE field_type = RRDF_FIELD_TYPE_2id(type_str);
-                
-                // Replace the original type with a simplified scalar type for LLM
-                json_object_object_add(col_copy, "type", 
-                                      json_object_new_string(field_type_to_json_scalar_type(field_type)));
-            }
+            struct json_object *col_copy = create_filtered_column(col_obj);
             
-            // Copy only necessary properties
-            struct json_object_iterator it = json_object_iter_begin(col_obj);
-            struct json_object_iterator itEnd = json_object_iter_end(col_obj);
-
-            while (!json_object_iter_equal(&it, &itEnd)) {
-                const char *field_key = json_object_iter_peek_name(&it);
-                struct json_object *field_val = json_object_iter_peek_value(&it);
-
-                // Skip properties we don't need for LLM
-                if (strcmp(field_key, "visible") == 0 ||
-                    strcmp(field_key, "visualization") == 0 ||
-                    strcmp(field_key, "value_options") == 0 ||
-                    strcmp(field_key, "sort") == 0 ||
-                    strcmp(field_key, "sortable") == 0 ||
-                    strcmp(field_key, "sticky") == 0 ||
-                    strcmp(field_key, "summary") == 0 ||
-                    strcmp(field_key, "filter") == 0 ||
-                    strcmp(field_key, "full_width") == 0 ||
-                    strcmp(field_key, "wrap") == 0 ||
-                    strcmp(field_key, "default_expanded_filter") == 0 ||
-                    // Skip type as we've already handled it
-                    strcmp(field_key, "type") == 0) {
-                    // Skip these properties
-                }
-                // Update index to match new position
-                else if (strcmp(field_key, "index") == 0) {
-                    json_object_object_add(col_copy, field_key, json_object_new_int((int)i));
-                } else {
-                    json_object_object_add(col_copy, field_key, json_object_get(field_val));
-                }
-
-                json_object_iter_next(&it);
-            }
-
+            // Update index to match new position
+            json_object_object_add(col_copy, "index", json_object_new_int((int)i));
+            
             json_object_object_add(filtered_columns, col_name, col_copy);
         }
     }
@@ -948,21 +1020,30 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         buffer_flush(output);
 
         // Generate error message
-        buffer_sprintf(
-            output,
-            "No results match the specified conditions. Please check your filtering criteria.\n\n"
-            "Tips:\n"
-            "- Verify the column names in your conditions\n"
-            "- Check the values and operators used\n"
-            "- For 'like' operators, ensure your pattern format is correct\n"
-            "- To match multiple values, use 'like' with patterns separated by the pipe (|) character: \"*value1*|*value2*\"\n"
-            "- Try broadening your filter criteria\n\n"
-            "Examples:\n"
-            "- [\"cpu\", \"==\", 0] - Match where cpu equals 0\n"
-            "- [\"name\", \"like\", \"*sys*\"] - Match where name contains 'sys'\n"
-            "- [\"value\", \">\", 100] - Match where value is greater than 100\n"
-            "- [\"state\", \"like\", \"*running*|*stopped*\"] - Match multiple values using the pipe (|) character");
+        buffer_strcat(output, "{\n");
+        buffer_strcat(output, "  \"error\": \"No results match the specified conditions\",\n");
+        buffer_strcat(output, "  \"tips\": [\n");
+        buffer_strcat(output, "    \"Verify the column names in your conditions\",\n");
+        buffer_strcat(output, "    \"Check the values and operators used\",\n");
+        buffer_strcat(output, "    \"For 'like' operators, ensure your pattern format is correct\",\n");
+        buffer_strcat(output, "    \"To match multiple values, use 'like' with patterns separated by the pipe (|) character: '*value1*|*value2*'\",\n");
+        buffer_strcat(output, "    \"Try broadening your filter criteria\"\n");
+        buffer_strcat(output, "  ],\n");
+        buffer_strcat(output, "  \"examples\": [\n");
+        buffer_strcat(output, "    {\"condition\": [\"cpu\", \"==\", 0], \"description\": \"Match where cpu equals 0\"},\n");
+        buffer_strcat(output, "    {\"condition\": [\"name\", \"like\", \"*sys*\"], \"description\": \"Match where name contains 'sys'\"},\n");
+        buffer_strcat(output, "    {\"condition\": [\"value\", \">\", 100], \"description\": \"Match where value is greater than 100\"},\n");
+        buffer_strcat(output, "    {\"condition\": [\"state\", \"like\", \"*running*|*stopped*\"], \"description\": \"Match multiple values using the pipe (|) character\"}\n");
+        buffer_strcat(output, "  ],\n");
+        buffer_strcat(output, "  ");
+        output_columns_as_json(output, columns_obj);
+        buffer_strcat(output, "\n}");
     } else {
+        // Set flag if we used wildcard search and found results
+        if (has_missing_columns && row_idx > 0 && had_missing_columns_but_found_results) {
+            *had_missing_columns_but_found_results = true;
+        }
+        
         // Convert to string
         const char *filtered_json = json_object_to_json_string_ext(filtered_result, JSON_C_TO_STRING_PRETTY);
         buffer_strcat(output, filtered_json);
@@ -1235,6 +1316,7 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     
     // Process and filter the results if needed
     const size_t max_size_threshold = 20UL * 1024;
+    bool had_missing_columns_but_found_results = false;
     CLEAN_BUFFER *processed_result = mcp_process_table_result(
         result_buffer, 
         columns_array, 
@@ -1244,7 +1326,8 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         conditions_array,
         max_size_threshold,
         function_name,
-        node_name
+        node_name,
+        &had_missing_columns_but_found_results
     );
     
     // Initialize success response
@@ -1253,6 +1336,17 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         // Start building content array for the result
         buffer_json_member_add_array(mcpc->result, "content");
         {
+            // Add note if we had missing columns but found results
+            if (had_missing_columns_but_found_results) {
+                buffer_json_add_array_item_object(mcpc->result);
+                {
+                    buffer_json_member_add_string(mcpc->result, "type", "text");
+                    buffer_json_member_add_string(mcpc->result, "text", 
+                        "Note: Not all columns in the conditions were found, so a full-text search was performed across all columns, and matching results were found.");
+                }
+                buffer_json_object_close(mcpc->result); // Close note content
+            }
+            
             // Add the function execution result as text content
             buffer_json_add_array_item_object(mcpc->result);
             {
