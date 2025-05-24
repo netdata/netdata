@@ -160,8 +160,8 @@ static struct json_object *transform_value_for_mcp(struct json_object *val, RRDF
         }
         
         // Format as RFC3339
-        char datetime_buf[256];
-        rfc3339_datetime_ut(datetime_buf, sizeof(datetime_buf), usec_val, 0, false);
+        char datetime_buf[RFC3339_MAX_LENGTH];
+        rfc3339_datetime_ut(datetime_buf, sizeof(datetime_buf), usec_val, 0, true);
         return json_object_new_string(datetime_buf);
     } else if (is_transformable_duration(type, transform)) {
         // Duration is always in seconds
@@ -197,9 +197,14 @@ static void extract_column_transforms(struct json_object *columns_obj,
             // Get transform from value_options
             struct json_object *value_options_obj = NULL;
             if (json_object_object_get_ex(col_obj, "value_options", &value_options_obj) && 
-                json_object_is_type(value_options_obj, json_type_string)) {
-                const char *options_str = json_object_get_string(value_options_obj);
-                col_transforms[i].transform = RRDF_FIELD_TRANSFORM_2id(options_str);
+                json_object_is_type(value_options_obj, json_type_object)) {
+                // value_options is an object, extract the "transform" field
+                struct json_object *transform_obj = NULL;
+                if (json_object_object_get_ex(value_options_obj, "transform", &transform_obj) &&
+                    json_object_is_type(transform_obj, json_type_string)) {
+                    const char *transform_str = json_object_get_string(transform_obj);
+                    col_transforms[i].transform = RRDF_FIELD_TRANSFORM_2id(transform_str);
+                }
             }
         }
     }
