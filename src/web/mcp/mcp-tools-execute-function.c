@@ -22,6 +22,35 @@ typedef enum {
 #define MAX_CONDITIONS 20
 #define MAX_COLUMNS 300  // Maximum number of columns we can handle
 
+// Result status for table processing
+typedef enum {
+    MCP_TABLE_OK,                                    // Success
+    MCP_TABLE_ERROR_INVALID_CONDITIONS,              // Condition format/parsing error
+    MCP_TABLE_ERROR_NO_MATCHES_WITH_MISSING_COLUMNS, // No matches, some columns not found
+    MCP_TABLE_ERROR_NO_MATCHES,                      // No matches with valid columns
+    MCP_TABLE_ERROR_INVALID_SORT_ORDER,              // Invalid sort order parameter
+    MCP_TABLE_ERROR_COLUMNS_NOT_FOUND,               // Requested columns not found
+    MCP_TABLE_ERROR_SORT_COLUMN_NOT_FOUND,           // Sort column not found
+    MCP_TABLE_ERROR_TOO_MANY_COLUMNS,                // Exceeds MAX_COLUMNS
+    MCP_TABLE_NOT_JSON,                              // Response is not valid JSON
+    MCP_TABLE_NOT_PROCESSABLE,                       // JSON but not a processable table format
+    MCP_TABLE_EMPTY_RESULT,                          // Function returned no rows
+    MCP_TABLE_INFO_MISSING_COLUMNS_FOUND_RESULTS,    // Missing columns but found via wildcard
+    MCP_TABLE_RESPONSE_TOO_BIG                        // Result too big, guidance added
+} MCP_TABLE_RESULT_STATUS;
+
+// Structure to hold table processing results
+typedef struct {
+    MCP_TABLE_RESULT_STATUS status;
+    BUFFER *result;                    // The processed result or error details
+    BUFFER *error_message;             // Detailed error message
+    BUFFER *missing_columns;           // List of missing columns (comma-separated)
+    size_t row_count;                  // Number of rows in result
+    size_t column_count;               // Number of columns in result
+    size_t result_size;                // Size of the result in bytes
+    bool had_missing_columns;          // Whether any columns were missing
+} MCP_TABLE_RESULT;
+
 // Structure to hold preprocessed condition information
 typedef struct condition_s {
     int column_index;                // Index of the column in the row
@@ -73,6 +102,7 @@ static struct json_object *create_filtered_column(struct json_object *col_obj) {
             strcmp(field_key, "full_width") != 0 &&
             strcmp(field_key, "wrap") != 0 &&
             strcmp(field_key, "default_expanded_filter") != 0 &&
+            strcmp(field_key, "unique_key") != 0 &&
             // Skip type as we've already handled it
             strcmp(field_key, "type") != 0) {
             json_object_object_add(col_copy, field_key, json_object_get(field_val));
@@ -84,29 +114,6 @@ static struct json_object *create_filtered_column(struct json_object *col_obj) {
     return col_copy;
 }
 
-// Helper function to output columns as JSON with proper filtering
-static void output_columns_as_json(BUFFER *output, struct json_object *columns_obj) {
-    struct json_object *filtered_columns = json_object_new_object();
-    
-    struct json_object_iterator it = json_object_iter_begin(columns_obj);
-    struct json_object_iterator itEnd = json_object_iter_end(columns_obj);
-    
-    while (!json_object_iter_equal(&it, &itEnd)) {
-        const char *col_name = json_object_iter_peek_name(&it);
-        struct json_object *col_obj = json_object_iter_peek_value(&it);
-        
-        struct json_object *col_copy = create_filtered_column(col_obj);
-        json_object_object_add(filtered_columns, col_name, col_copy);
-        
-        json_object_iter_next(&it);
-    }
-    
-    buffer_strcat(output, "\"columns\": ");
-    const char *columns_json = json_object_to_json_string_ext(filtered_columns, JSON_C_TO_STRING_PRETTY);
-    buffer_strcat(output, columns_json);
-    
-    json_object_put(filtered_columns);
-}
 
 // Structure to hold column type and transform information
 typedef struct column_transform_info {
@@ -267,11 +274,11 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
         }
         return false;
     }
-    // Handle numeric comparisons - try to convert to numbers if comparing with numbers
-    else if (json_object_is_type(value, json_type_int) || 
-             json_object_is_type(value, json_type_double) ||
-             json_object_is_type(condition->value, json_type_int) || 
-             json_object_is_type(condition->value, json_type_double)) {
+    // Handle numeric comparisons - only if BOTH values are numeric
+    else if ((json_object_is_type(value, json_type_int) || 
+              json_object_is_type(value, json_type_double)) &&
+             (json_object_is_type(condition->value, json_type_int) || 
+              json_object_is_type(condition->value, json_type_double))) {
         
         double val_num = json_object_get_double(value);
         double cond_num = json_object_get_double(condition->value);
@@ -513,6 +520,252 @@ static int preprocess_conditions(struct json_object *conditions_array,
 
 
 
+// Flags to indicate what additional content should be added for errors
+typedef enum {
+    MCP_TABLE_ADD_NOTHING = 0,
+    MCP_TABLE_ADD_COLUMNS = 1 << 0,
+    MCP_TABLE_ADD_RAW_DATA = 1 << 1,
+    MCP_TABLE_ADD_FILTERING_INSTRUCTIONS = 1 << 2
+} MCP_TABLE_ADDITIONAL_CONTENT;
+
+// Helper to create a filtered columns object for error messages
+static struct json_object *create_filtered_columns_for_errors(struct json_object *columns_obj) {
+    if (!columns_obj) return NULL;
+    
+    struct json_object *filtered = json_object_new_object();
+    struct json_object_iterator it = json_object_iter_begin(columns_obj);
+    struct json_object_iterator itEnd = json_object_iter_end(columns_obj);
+    
+    while (!json_object_iter_equal(&it, &itEnd)) {
+        const char *col_name = json_object_iter_peek_name(&it);
+        struct json_object *col_obj = json_object_iter_peek_value(&it);
+        
+        if (col_obj) {
+            struct json_object *filtered_col = create_filtered_column(col_obj);
+            json_object_object_add(filtered, col_name, filtered_col);
+        }
+        
+        json_object_iter_next(&it);
+    }
+    
+    return filtered;
+}
+
+// Helper function to generate comprehensive error messages for LLMs
+static MCP_TABLE_ADDITIONAL_CONTENT generate_table_error_message(MCP_TABLE_RESULT *result) {
+    buffer_flush(result->error_message);
+    MCP_TABLE_ADDITIONAL_CONTENT additional_content = MCP_TABLE_ADD_NOTHING;
+    
+    switch (result->status) {
+        case MCP_TABLE_ERROR_INVALID_CONDITIONS:
+            buffer_sprintf(result->error_message,
+                "Error processing conditions: %s\n\n"
+                "Conditions should be formatted as:\n"
+                "```json\n"
+                "\"conditions\": [\n"
+                "    [\"column_name\", \"operator\", value],\n"
+                "    [\"another_column\", \"another_operator\", another_value]\n"
+                "]\n"
+                "```",
+                buffer_tostring(result->result)
+            );
+            additional_content = MCP_TABLE_ADD_FILTERING_INSTRUCTIONS;
+            break;
+            
+        case MCP_TABLE_ERROR_NO_MATCHES_WITH_MISSING_COLUMNS:
+            buffer_sprintf(result->error_message,
+                "No rows matched the specified conditions.\n\n"
+                "Note: The following column(s) were not found: %s\n"
+                "A full-text search was performed across all columns, but no matches were found.",
+                buffer_tostring(result->missing_columns)
+            );
+            additional_content = MCP_TABLE_ADD_COLUMNS | MCP_TABLE_ADD_FILTERING_INSTRUCTIONS;
+            break;
+            
+        case MCP_TABLE_ERROR_NO_MATCHES:
+            buffer_strcat(result->error_message,
+                "No results match the specified conditions.\n\n"
+                "Tips:\n"
+                "• Verify the column names in your conditions\n"
+                "• Check the values and operators used\n"
+                "• For 'match' operators, ensure your pattern format is correct\n"
+                "• To match multiple values, use 'match' with patterns separated by the pipe (|) character: '*value1*|*value2*'\n"
+                "• Try broadening your filter criteria"
+            );
+            additional_content = MCP_TABLE_ADD_COLUMNS | MCP_TABLE_ADD_FILTERING_INSTRUCTIONS;
+            break;
+            
+        case MCP_TABLE_ERROR_INVALID_SORT_ORDER:
+            buffer_sprintf(result->error_message,
+                "Invalid sort_order: '%s'. Valid options are 'asc' (ascending) or 'desc' (descending).\n\n"
+                "Example:\n"
+                "```json\n"
+                "\"sort_order\": \"desc\"\n"
+                "```",
+                buffer_tostring(result->result)
+            );
+            additional_content = MCP_TABLE_ADD_NOTHING;
+            break;
+            
+        case MCP_TABLE_ERROR_COLUMNS_NOT_FOUND:
+            buffer_sprintf(result->error_message,
+                "Column(s) not found: %s",
+                buffer_tostring(result->missing_columns)
+            );
+            additional_content = MCP_TABLE_ADD_COLUMNS;
+            break;
+            
+        case MCP_TABLE_ERROR_SORT_COLUMN_NOT_FOUND:
+            buffer_sprintf(result->error_message,
+                "Sort column '%s' not found.",
+                buffer_tostring(result->result)
+            );
+            additional_content = MCP_TABLE_ADD_COLUMNS;
+            break;
+            
+        case MCP_TABLE_ERROR_TOO_MANY_COLUMNS:
+            buffer_sprintf(result->error_message,
+                "Error: Table has %zu columns, which exceeds the maximum supported (%d). Showing raw output.",
+                result->column_count, MAX_COLUMNS
+            );
+            additional_content = MCP_TABLE_ADD_RAW_DATA;
+            break;
+            
+        case MCP_TABLE_NOT_JSON:
+            buffer_strcat(result->error_message,
+                "This response is not valid JSON. Showing raw output.");
+            additional_content = MCP_TABLE_ADD_RAW_DATA;
+            break;
+            
+        case MCP_TABLE_NOT_PROCESSABLE:
+            buffer_strcat(result->error_message,
+                "The function returned JSON but it's not a table format we can filter. Showing raw output.");
+            additional_content = MCP_TABLE_ADD_RAW_DATA;
+            break;
+            
+        case MCP_TABLE_EMPTY_RESULT:
+            buffer_strcat(result->error_message,
+                "The function returned an empty result (no rows).");
+            additional_content = MCP_TABLE_ADD_RAW_DATA;
+            break;
+            
+        case MCP_TABLE_INFO_MISSING_COLUMNS_FOUND_RESULTS:
+            buffer_strcat(result->error_message,
+                "Note: Not all columns in the conditions were found, so a full-text search was performed across all columns, and matching results were found.");
+            additional_content = MCP_TABLE_ADD_NOTHING;
+            break;
+            
+        case MCP_TABLE_RESPONSE_TOO_BIG:
+            buffer_sprintf(result->error_message,
+                "The response is too big (%zu bytes), having %zu rows and %zu columns. Limiting to 1 row for readability.",
+                result->result_size, result->row_count, result->column_count
+            );
+            additional_content = MCP_TABLE_ADD_FILTERING_INSTRUCTIONS;
+            break;
+            
+        default:
+            additional_content = MCP_TABLE_ADD_NOTHING;
+            break;
+    }
+    
+    return additional_content;
+}
+
+// Helper to add filtering instructions as a separate content entry
+static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc) {
+    buffer_json_add_array_item_object(mcpc->result);
+    {
+        buffer_json_member_add_string(mcpc->result, "type", "text");
+        buffer_json_member_add_string(mcpc->result, "text",
+            "FILTERING INSTRUCTIONS:\n"
+            "• **columns**: Select specific columns to reduce width (e.g., [\"Column1\", \"Column2\", \"Column3\"])\n"
+            "• **conditions**: Filter rows using [ [column1, operator1, value1], [column2, operator2, value2], ... ]\n"
+            "• **limit**: Control number of rows returned (e.g., 10)\n"
+            "• **sort_column** + **sort_order**: Order results by a column ('asc' or 'desc')\n"
+            "\n"
+            "Example filtering:\n"
+            "```json\n"
+            "{\n"
+            "  \"columns\": [\"CmdLine\", \"CPU\", \"Memory\", \"Status\"],\n"
+            "  \"conditions\": [\n"
+            "    [\"Memory\", \">\", 1.0],\n"
+            "    [\"CmdLine\", \"match\", \"*systemd*|*postgresql*|*docker*\"]\n"
+            "  ],\n"
+            "  \"sort_column\": \"CPU\",\n"
+            "  \"sort_order\": \"desc\",\n"
+            "  \"limit\": 10\n"
+            "}\n"
+            "```\n"
+            "\n"
+            "Operators: ==, !=, <, <=, >, >=, match (simple pattern), not match (simple pattern)\n"
+            "Simple patterns: '*this*|*that*|*other*' (wildcard search to find strings that include 'this', or 'that', or 'other')"
+        );
+    }
+    buffer_json_object_close(mcpc->result);
+}
+
+// Helper to add columns info as a separate content entry
+static void add_columns_info_to_mcp_result(MCP_CLIENT *mcpc, struct json_object *columns_obj) {
+    if (!columns_obj) return;
+    
+    struct json_object *filtered_columns = create_filtered_columns_for_errors(columns_obj);
+    if (filtered_columns) {
+        // Create wrapper object
+        struct json_object *wrapper = json_object_new_object();
+        json_object_object_add(wrapper, "available_columns", filtered_columns);
+        
+        const char *columns_json = json_object_to_json_string_ext(wrapper, JSON_C_TO_STRING_PRETTY);
+        
+        buffer_json_add_array_item_object(mcpc->result);
+        {
+            buffer_json_member_add_string(mcpc->result, "type", "text");
+            buffer_json_member_add_string(mcpc->result, "text", columns_json);
+        }
+        buffer_json_object_close(mcpc->result);
+        
+        json_object_put(wrapper);
+    }
+}
+
+// Helper to add messages to MCP result based on table result status
+static void add_table_messages_to_mcp_result(MCP_CLIENT *mcpc, 
+                                            MCP_TABLE_RESULT *table_result,
+                                            struct json_object *columns_obj) {
+    // Generate the appropriate error message and get additional content flags
+    MCP_TABLE_ADDITIONAL_CONTENT additional_content = generate_table_error_message(table_result);
+    
+    // Add the message if there's an error or guidance
+    if (table_result->status != MCP_TABLE_OK && buffer_strlen(table_result->error_message) > 0) {
+        buffer_json_add_array_item_object(mcpc->result);
+        {
+            buffer_json_member_add_string(mcpc->result, "type", "text");
+            buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(table_result->error_message));
+        }
+        buffer_json_object_close(mcpc->result);
+    }
+    
+    // Add columns info if requested
+    if ((additional_content & MCP_TABLE_ADD_COLUMNS) && columns_obj) {
+        add_columns_info_to_mcp_result(mcpc, columns_obj);
+    }
+    
+    // Add filtering instructions if requested
+    if (additional_content & MCP_TABLE_ADD_FILTERING_INSTRUCTIONS) {
+        add_filtering_instructions_to_mcp_result(mcpc);
+    }
+    
+    // Add raw data if requested
+    if ((additional_content & MCP_TABLE_ADD_RAW_DATA) && 
+        buffer_strlen(table_result->result) > 0) {
+        buffer_json_add_array_item_object(mcpc->result);
+        {
+            buffer_json_member_add_string(mcpc->result, "type", "text");
+            buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(table_result->result));
+        }
+        buffer_json_object_close(mcpc->result);
+    }
+}
+
 void mcp_tool_execute_function_schema(BUFFER *buffer) {
     // Tool input schema
     buffer_json_member_add_object(buffer, "inputSchema");
@@ -668,23 +921,23 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
  * @param limit_param Maximum number of rows to return (-1 for all)
  * @param conditions_array JSON array of condition arrays [column, op, value] (or NULL for no conditions)
  * @param max_size_threshold Maximum size in bytes before truncation is recommended
- * @param function_name The name of the function for generating examples
- * @param node_name The node name for generating examples
+ * @param table_result Output structure containing the result and status
  * 
- * @return A newly allocated buffer with filtered/processed result or guidance message
+ * @return void (result is returned in table_result structure)
  */
-BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *columns_array, 
-                                 const char *sort_column_param, const char *sort_order_param,
-                                 int limit_param, struct json_object *conditions_array,
-                                 size_t max_size_threshold, const char *function_name, const char *node_name,
-                                 bool *had_missing_columns_but_found_results)
+static void mcp_process_table_result(BUFFER *result_buffer, struct json_object *columns_array, 
+                                    const char *sort_column_param, const char *sort_order_param,
+                                    int limit_param, struct json_object *conditions_array,
+                                    size_t max_size_threshold, MCP_TABLE_RESULT *table_result)
 {
-    BUFFER *output = buffer_create(0, NULL);
-    struct json_object *json_result = NULL;
+    // Initialize result structure
+    memset(table_result, 0, sizeof(MCP_TABLE_RESULT));
+    table_result->result = buffer_create(0, NULL);
+    table_result->error_message = buffer_create(0, NULL);
+    table_result->missing_columns = buffer_create(0, NULL);
+    table_result->status = MCP_TABLE_OK;
     
-    // Initialize the output flag
-    if (had_missing_columns_but_found_results)
-        *had_missing_columns_but_found_results = false;
+    struct json_object *json_result = NULL;
 
     // Parse the JSON result
     const char *json_str = buffer_tostring(result_buffer);
@@ -692,8 +945,8 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
     json_result = json_tokener_parse(json_str);
 
     if (!json_result) {
-        buffer_strcat(output, json_str); // Return original if parsing fails
-        return output;
+        buffer_strcat(table_result->result, json_str); // Return original if parsing fails
+        return;
     }
 
     // Check if it's a table format
@@ -702,18 +955,18 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
 
     if (!json_object_object_get_ex(json_result, "type", &type_obj) ||
         !json_object_object_get_ex(json_result, "has_history", &has_history_obj)) {
-        buffer_strcat(output, json_str); // Not in correct format
+        buffer_strcat(table_result->result, json_str); // Not in correct format
         json_object_put(json_result);
-        return output;
+        return;
     }
 
     const char *type = json_object_get_string(type_obj);
     bool has_history = json_object_get_boolean(has_history_obj);
 
     if (!type || strcmp(type, "table") != 0 || has_history) {
-        buffer_strcat(output, json_str); // Not a table format
+        buffer_strcat(table_result->result, json_str); // Not a table format
         json_object_put(json_result);
-        return output;
+        return;
     }
 
     // Get data and columns
@@ -722,36 +975,27 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
 
     if (!json_object_object_get_ex(json_result, "data", &data_obj) ||
         !json_object_object_get_ex(json_result, "columns", &columns_obj)) {
-        buffer_strcat(output, json_str); // Missing required elements
+        buffer_strcat(table_result->result, json_str); // Missing required elements
         json_object_put(json_result);
-        return output;
+        return;
     }
 
     size_t row_count = json_object_array_length(data_obj);
     size_t column_count = json_object_object_length(columns_obj);
+    
+    // Store row and column counts
+    table_result->row_count = row_count;
+    table_result->column_count = column_count;
 
     // Check if we need to show guidance - only when no filtering is specified
-    bool guidance_added = false;
     if (result_size > max_size_threshold && !columns_array && !sort_column_param && limit_param < 0 &&
         !conditions_array) {
-        buffer_sprintf(output,
-                       "The response is too big (%zu bytes), having %zu rows and %zu columns.\n"
-                       "Here is the first row for your reference:\n"
-                       "\n"
-                       "```json\n",
-                       result_size, row_count, column_count);
-
+        // Store first row in result for guidance
+        table_result->status = MCP_TABLE_RESPONSE_TOO_BIG;
         limit_param = 1;
-        guidance_added = true;
     }
 
-    // If no filtering parameters are provided, just return the original result
-    if (!columns_array && !sort_column_param && limit_param <= 0 && !conditions_array) {
-        buffer_flush(output);
-        buffer_strcat(output, json_str);
-        json_object_put(json_result);
-        return output;
-    }
+    // Even with no filtering parameters, we need to process to remove unwanted fields
 
     // Process filtering parameters
     // Determine sort direction
@@ -764,14 +1008,11 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             descending = false;
         }
         else {
-            // Invalid sort order - return error message
-            buffer_flush(output);
-            buffer_sprintf(output, 
-                "Invalid sort_order: '%s'. Valid options are 'asc' (ascending) or 'desc' (descending).",
-                sort_order_param);
-                
+            // Invalid sort order
+            table_result->status = MCP_TABLE_ERROR_INVALID_SORT_ORDER;
+            buffer_strcat(table_result->result, sort_order_param);
             json_object_put(json_result);
-            return output;
+            return;
         }
     }
 
@@ -783,12 +1024,10 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
     
     // Check if we have too many columns
     if (column_count > MAX_COLUMNS) {
-        buffer_sprintf(output, 
-            "Error: Table has %zu columns, which exceeds the maximum supported (%d).\n"
-            "Please use the 'columns' parameter to select specific columns.",
-            column_count, MAX_COLUMNS);
+        table_result->status = MCP_TABLE_ERROR_TOO_MANY_COLUMNS;
+        table_result->column_count = column_count;
         json_object_put(json_result);
-        return output;
+        return;
     }
     
     if (columns_array && json_object_is_type(columns_array, json_type_array)) {
@@ -825,21 +1064,12 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             }
         }
         
-        // If any columns were not found, return error message
+        // If any columns were not found, set error status
         if (!all_columns_found) {
-            buffer_flush(output);
-            
-            // Create JSON error response
-            buffer_strcat(output, "{\n");
-            buffer_sprintf(output, 
-                "  \"error\": \"Column(s) not found: %s\",\n", 
-                buffer_tostring(missing_columns));
-            buffer_strcat(output, "  ");
-            output_columns_as_json(output, columns_obj);
-            buffer_strcat(output, "\n}");
-            
+            table_result->status = MCP_TABLE_ERROR_COLUMNS_NOT_FOUND;
+            buffer_strcat(table_result->missing_columns, buffer_tostring(missing_columns));
             json_object_put(json_result);
-            return output;
+            return;
         }
     } else {
         // If no columns specified, include all
@@ -882,19 +1112,11 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
                 sort_idx = json_object_get_int(index_obj);
             }
         } else {
-            // Column not found - return a helpful error message with available columns
-            buffer_flush(output);
-            
-            // Create JSON error response
-            buffer_strcat(output, "{\n");
-            buffer_sprintf(output, 
-                "  \"error\": \"Sort column '%s' not found\",\n", sort_column_param);
-            buffer_strcat(output, "  ");
-            output_columns_as_json(output, columns_obj);
-            buffer_strcat(output, "\n}");
-            
+            // Column not found
+            table_result->status = MCP_TABLE_ERROR_SORT_COLUMN_NOT_FOUND;
+            buffer_strcat(table_result->result, sort_column_param);
             json_object_put(json_result);
-            return output;
+            return;
         }
     }
 
@@ -913,30 +1135,12 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         
         // Check if preprocessing failed (negative return value means error)
         if (conditions_result < 0 && conditions_result != -5) {  // -5 is column not found, which we now handle
-            // Return a helpful error message with guidance
-            buffer_flush(output);
-            buffer_sprintf(output, 
-                "Error processing conditions: %s\n\n"
-                "Conditions should be formatted as:\n"
-                "```json\n"
-                "\"conditions\": [\n"
-                "    [\"column_name\", \"operator\", value],\n"
-                "    [\"another_column\", \"another_operator\", another_value]\n"
-                "]\n"
-                "```\n\n"
-                "Available operators: ==, !=, <>, <, <=, >, >=, match, not match\n\n"
-                "Examples:\n"
-                "- [\"cpu\", \"==\", 0] - Match where cpu equals 0\n"
-                "- [\"name\", \"match\", \"*sys*\"] - Match where name contains 'sys'\n"
-                "- [\"value\", \">\", 100] - Match where value is greater than 100\n"
-                "- [\"state\", \"match\", \"*running*|*stopped*\"] - Match multiple values using the pipe (|) character\n\n"
-                "Note: To match multiple values for a field, use the 'match' operator with patterns separated by the pipe (|) character.",
-                buffer_tostring(error_buffer)
-            );
+            table_result->status = MCP_TABLE_ERROR_INVALID_CONDITIONS;
+            buffer_strcat(table_result->result, buffer_tostring(error_buffer));
             
             freez((void *)rows);
             json_object_put(json_result);
-            return output;
+            return;
         }
     }
 
@@ -960,27 +1164,18 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
     
     // If we have missing columns and found no matches, provide helpful error
     if (has_missing_columns && row_idx == 0) {
-        buffer_flush(output);
+        table_result->status = MCP_TABLE_ERROR_NO_MATCHES_WITH_MISSING_COLUMNS;
+        table_result->had_missing_columns = true;
         
-        // Create JSON error response
-        buffer_strcat(output, "{\n");
-        buffer_strcat(output, "  \"error\": \"No rows matched the specified conditions\",\n");
-        buffer_strcat(output, "  \"note\": \"The following column(s) were not found, so all columns were searched, although no matches were found\",\n");
-        buffer_strcat(output, "  \"columns_not_found\": [");
-        
+        // Build missing columns list
         bool first = true;
         for (size_t i = 0; i < conditions.count; i++) {
             if (conditions.items[i].column_index == -1) {
-                if (!first) buffer_strcat(output, ", ");
-                buffer_sprintf(output, "\"%s\"", conditions.items[i].column_name);
+                if (!first) buffer_strcat(table_result->missing_columns, ", ");
+                buffer_sprintf(table_result->missing_columns, "\"%s\"", conditions.items[i].column_name);
                 first = false;
             }
         }
-        buffer_strcat(output, "],\n");
-        
-        buffer_strcat(output, "  ");
-        output_columns_as_json(output, columns_obj);
-        buffer_strcat(output, "\n}");
         
         // Clean up and return
         if (conditions_result > 0) {
@@ -988,7 +1183,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         }
         freez((void *)rows);
         json_object_put(json_result);
-        return output;
+        return;
     }
 
     // Free pattern resources when we're done with all rows
@@ -1145,120 +1340,28 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
     if (limit == 0 && conditions_array) {
         // No rows matched the conditions
         json_object_put(filtered_result);
-
-        buffer_flush(output);
-
-        // Generate error message
-        buffer_strcat(output, "{\n");
-        buffer_strcat(output, "  \"error\": \"No results match the specified conditions\",\n");
-        buffer_strcat(output, "  \"tips\": [\n");
-        buffer_strcat(output, "    \"Verify the column names in your conditions\",\n");
-        buffer_strcat(output, "    \"Check the values and operators used\",\n");
-        buffer_strcat(output, "    \"For 'match' operators, ensure your pattern format is correct\",\n");
-        buffer_strcat(output, "    \"To match multiple values, use 'match' with patterns separated by the pipe (|) character: '*value1*|*value2*'\",\n");
-        buffer_strcat(output, "    \"Try broadening your filter criteria\"\n");
-        buffer_strcat(output, "  ],\n");
-        buffer_strcat(output, "  \"examples\": [\n");
-        buffer_strcat(output, "    {\"condition\": [\"cpu\", \"==\", 0], \"description\": \"Match where cpu equals 0\"},\n");
-        buffer_strcat(output, "    {\"condition\": [\"name\", \"match\", \"*sys*\"], \"description\": \"Match where name contains 'sys'\"},\n");
-        buffer_strcat(output, "    {\"condition\": [\"value\", \">\", 100], \"description\": \"Match where value is greater than 100\"},\n");
-        buffer_strcat(output, "    {\"condition\": [\"state\", \"match\", \"*running*|*stopped*\"], \"description\": \"Match multiple values using the pipe (|) character\"}\n");
-        buffer_strcat(output, "  ],\n");
-        buffer_strcat(output, "  ");
-        output_columns_as_json(output, columns_obj);
-        buffer_strcat(output, "\n}");
+        table_result->status = MCP_TABLE_ERROR_NO_MATCHES;
     } else {
         // Set flag if we used wildcard search and found results
-        if (has_missing_columns && row_idx > 0 && had_missing_columns_but_found_results) {
-            *had_missing_columns_but_found_results = true;
+        if (has_missing_columns && row_idx > 0) {
+            table_result->had_missing_columns = true;
         }
         
-        // Convert to string
+        // Convert to string and store result
         const char *filtered_json = json_object_to_json_string_ext(filtered_result, JSON_C_TO_STRING_PRETTY);
-        buffer_strcat(output, filtered_json);
+        buffer_strcat(table_result->result, filtered_json);
 
+        // Update actual counts from filtered result
+        table_result->row_count = limit;
+        table_result->column_count = selected_count;
+        
         // Free the filtered result
         json_object_put(filtered_result);
     }
 
-    if(guidance_added) {
-        buffer_strcat(output, "\n```\n\n");
-
-        // Get column names for example suggestions
-        char *example_column_names[MAX_COLUMNS] = {0};
-        size_t column_name_count = 0;
-        
-        // Use local variables for the foreach to avoid redefinition conflicts
-        {
-            struct json_object_iterator it = json_object_iter_begin(columns_obj);
-            struct json_object_iterator itEnd = json_object_iter_end(columns_obj);
-            
-            while (!json_object_iter_equal(&it, &itEnd)) {
-                const char *col_key = json_object_iter_peek_name(&it);
-                example_column_names[column_name_count++] = (char*)col_key;  // Store reference only - columns_obj must stay alive
-                if (column_name_count >= column_count)
-                    break;
-                
-                json_object_iter_next(&it);
-            }
-        }
-        
-        // Create example column list as JSON array items
-        char example_columns[256] = {0};
-        size_t example_count = column_count > 3 ? 3 : column_count;
-        
-        for (size_t i = 0; i < example_count; i++) {
-            if (i > 0) strcat(example_columns, ", ");
-            char quoted_name[128] = {0};
-            snprintf(quoted_name, sizeof(quoted_name), "\"%s\"", example_column_names[i]);
-            strcat(example_columns, quoted_name);
-        }
-        
-        // Append the guidance message directly
-        buffer_sprintf(output, 
-            "\n\nNext Steps:\n"
-            "To filter this large result, provide filtering parameters in your request:\n"
-            "```json\n"
-            "\"params\": {\n"
-            "    \"name\": \"execute_function\",\n"
-            "    \"arguments\": {\n"
-            "        \"node\": \"%s\",\n"
-            "        \"function\": \"%s\",\n"
-            "        \"timeout\": 60,\n"
-            "        \"columns\": [%s],\n"
-            "        \"sort_column\": \"%s\",\n"
-            "        \"sort_order\": \"desc\",\n"
-            "        \"limit\": 10,\n"
-            "        \"conditions\": [\n"
-            "            [\"%s\", \">\", 100],\n"
-            "            [\"%s\", \"==\", \"value\"],\n"
-            "            [\"%s\", \"match\", \"*pattern1*|*pattern2*\"]\n"
-            "        ]\n"
-            "    }\n"
-            "}\n"
-            "```\n"
-            "Filtering options:\n"
-            "1. `columns`: Array of column names to include\n"
-            "2. `sort_column` and `sort_order`: Sort results by column\n"
-            "3. `limit`: Limit number of rows returned\n"
-            "4. `conditions`: Array of [column, operator, value] conditions\n"
-            "   - Operators: ==, !=, <>, <, <=, >, >=, match, not match\n"
-            "   - Values can be strings, numbers, or booleans\n"
-            "   - 'match' and 'not match' use Netdata's simple pattern format for string matching\n"
-            "   - To match multiple values, use 'match' with patterns separated by pipe (|): \"*value1*|*value2*\"\n",
-            node_name, function_name, 
-            example_columns,  // This will be quoted column names
-            example_column_names[0],
-            example_column_names[0],  // For numeric example
-            example_column_names[0],
-            example_column_names[0]);
-    }
-
     // Clean up
     freez((void *)rows);
-
     json_object_put(json_result);
-    return output;
 }
 
 MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
@@ -1324,6 +1427,7 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
 
     // Create a buffer for function result
     CLEAN_BUFFER *result_buffer = buffer_create(0, NULL);
+    BUFFER *processed_result = NULL;  // Not CLEAN_BUFFER as it will be cleaned up explicitly
     
     // Create a unique transaction ID
     char transaction[UUID_STR_LEN];
@@ -1441,46 +1545,222 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         }
     }
     
-    // Process and filter the results if needed
-    const size_t max_size_threshold = 20UL * 1024;
-    bool had_missing_columns_but_found_results = false;
-    CLEAN_BUFFER *processed_result = mcp_process_table_result(
-        result_buffer, 
-        columns_array, 
-        sort_column_param,
-        sort_order_param,
-        limit_param,
-        conditions_array,
-        max_size_threshold,
-        function_name,
-        node_name,
-        &had_missing_columns_but_found_results
-    );
-    
     // Initialize success response
     mcp_init_success_result(mcpc, id);
-    {
-        // Start building content array for the result
-        buffer_json_member_add_array(mcpc->result, "content");
-        {
-            // Add note if we had missing columns but found results
-            if (had_missing_columns_but_found_results) {
-                buffer_json_add_array_item_object(mcpc->result);
-                {
-                    buffer_json_member_add_string(mcpc->result, "type", "text");
-                    buffer_json_member_add_string(mcpc->result, "text", 
-                        "Note: Not all columns in the conditions were found, so a full-text search was performed across all columns, and matching results were found.");
-                }
-                buffer_json_object_close(mcpc->result); // Close note content
+    
+    // Start building content array for the result
+    buffer_json_member_add_array(mcpc->result, "content");
+    
+    // Parse the original result to determine how to handle it
+    struct json_object *json_check = json_tokener_parse(buffer_tostring(result_buffer));
+    
+    if (!json_check) {
+        // Not valid JSON - return raw output with message
+        MCP_TABLE_RESULT result = {0};
+        result.status = MCP_TABLE_NOT_JSON;
+        result.result = buffer_dup(result_buffer);
+        result.error_message = buffer_create(0, NULL);
+        result.missing_columns = buffer_create(0, NULL);
+        
+        add_table_messages_to_mcp_result(mcpc, &result, NULL);
+        
+        buffer_free(result.result);
+        buffer_free(result.error_message);
+        buffer_free(result.missing_columns);
+    }
+    else {
+        // We have valid JSON - check if it's processable
+        struct json_object *type_obj = NULL;
+        struct json_object *has_history_obj = NULL;
+        struct json_object *status_obj = NULL;
+        struct json_object *data_obj = NULL;
+        struct json_object *columns_obj = NULL;
+        
+        bool is_processable = false;
+        if (json_object_object_get_ex(json_check, "type", &type_obj) &&
+            json_object_object_get_ex(json_check, "has_history", &has_history_obj)) {
+            
+            const char *type = json_object_get_string(type_obj);
+            bool has_history = json_object_get_boolean(has_history_obj);
+            
+            // Check status if exists
+            int status = 200; // default
+            if (json_object_object_get_ex(json_check, "status", &status_obj)) {
+                status = json_object_get_int(status_obj);
             }
             
-            // Add the function execution result as text content
-            buffer_json_add_array_item_object(mcpc->result);
-            {
-                buffer_json_member_add_string(mcpc->result, "type", "text");
-                buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(processed_result));
+            is_processable = (type && strcmp(type, "table") == 0 && !has_history && status == 200);
+        }
+        
+        if (!is_processable) {
+            // Not a processable table format
+            MCP_TABLE_RESULT result = {0};
+            result.status = MCP_TABLE_NOT_PROCESSABLE;
+            result.result = buffer_dup(result_buffer);
+            result.error_message = buffer_create(0, NULL);
+            result.missing_columns = buffer_create(0, NULL);
+            
+            add_table_messages_to_mcp_result(mcpc, &result, NULL);
+            
+            buffer_free(result.result);
+            buffer_free(result.error_message);
+            buffer_free(result.missing_columns);
+        }
+        else {
+            // It's a processable table - get data and columns
+            if (!json_object_object_get_ex(json_check, "data", &data_obj) ||
+                !json_object_object_get_ex(json_check, "columns", &columns_obj)) {
+                // Missing required fields, treat as not processable
+                MCP_TABLE_RESULT result = {0};
+                result.status = MCP_TABLE_NOT_PROCESSABLE;
+                result.result = buffer_dup(result_buffer);
+                result.error_message = buffer_create(0, NULL);
+                result.missing_columns = buffer_create(0, NULL);
+                
+                add_table_messages_to_mcp_result(mcpc, &result, NULL);
+                
+                buffer_free(result.result);
+                buffer_free(result.error_message);
+                buffer_free(result.missing_columns);
             }
-            buffer_json_object_close(mcpc->result); // Close text content
+            else {
+                // Check if data is empty
+                size_t original_row_count = json_object_array_length(data_obj);
+                
+                if (original_row_count == 0) {
+                    // Empty result
+                    MCP_TABLE_RESULT result = {0};
+                    result.status = MCP_TABLE_EMPTY_RESULT;
+                    result.result = buffer_dup(result_buffer);
+                    result.error_message = buffer_create(0, NULL);
+                    result.missing_columns = buffer_create(0, NULL);
+                    
+                    add_table_messages_to_mcp_result(mcpc, &result, NULL);
+                    
+                    buffer_free(result.result);
+                    buffer_free(result.error_message);
+                    buffer_free(result.missing_columns);
+                }
+                else {
+                    // We have data - process with user parameters
+                    const size_t max_size_threshold = 20UL * 1024;
+                    MCP_TABLE_RESULT first_result = {0};
+                    
+                    // First pass to check size and conditions
+                    mcp_process_table_result(
+                        result_buffer, 
+                        columns_array, 
+                        sort_column_param,
+                        sort_order_param,
+                        limit_param,
+                        conditions_array,
+                        SIZE_MAX, // Don't trigger guidance in first pass
+                        &first_result
+                    );
+                    
+                    // Check for errors
+                    if (first_result.status != MCP_TABLE_OK && 
+                        first_result.status != MCP_TABLE_RESPONSE_TOO_BIG) {
+                        // Handle errors
+                        add_table_messages_to_mcp_result(mcpc, &first_result, columns_obj);
+                        
+                        // Cleanup
+                        buffer_free(first_result.result);
+                        buffer_free(first_result.error_message);
+                        buffer_free(first_result.missing_columns);
+                    }
+                    else {
+                        // Check if we need to add any informational messages
+                        
+                        // Missing columns but found results
+                        if (first_result.had_missing_columns && first_result.row_count > 0) {
+                            MCP_TABLE_RESULT info_result = {0};
+                            info_result.status = MCP_TABLE_INFO_MISSING_COLUMNS_FOUND_RESULTS;
+                            info_result.result = buffer_create(0, NULL);
+                            info_result.error_message = buffer_create(0, NULL);
+                            info_result.missing_columns = buffer_create(0, NULL);
+                            
+                            add_table_messages_to_mcp_result(mcpc, &info_result, columns_obj);
+                            
+                            buffer_free(info_result.result);
+                            buffer_free(info_result.error_message);
+                            buffer_free(info_result.missing_columns);
+                        }
+                        
+                        // Check if response is too big
+                        size_t processed_size = buffer_strlen(first_result.result);
+                        bool need_reprocess = false;
+                        int final_limit = limit_param;
+                        
+                        if (processed_size > max_size_threshold && first_result.row_count > 1) {
+                            need_reprocess = true;
+                            final_limit = 1;
+                            
+                            // Create a result structure for the guidance message
+                            MCP_TABLE_RESULT guidance_result = {0};
+                            guidance_result.status = MCP_TABLE_RESPONSE_TOO_BIG;
+                            guidance_result.result = buffer_create(0, NULL);
+                            guidance_result.error_message = buffer_create(0, NULL);
+                            guidance_result.missing_columns = buffer_create(0, NULL);
+                            guidance_result.row_count = first_result.row_count;
+                            guidance_result.column_count = first_result.column_count;
+                            guidance_result.result_size = processed_size;
+                            
+                            // Use centralized message generation
+                            add_table_messages_to_mcp_result(mcpc, &guidance_result, columns_obj);
+                            
+                            // Cleanup
+                            buffer_free(guidance_result.result);
+                            buffer_free(guidance_result.error_message);
+                            buffer_free(guidance_result.missing_columns);
+                        }
+                        
+                        // Get final result (reprocess if needed)
+                        if (need_reprocess) {
+                            MCP_TABLE_RESULT final_result = {0};
+                            mcp_process_table_result(
+                                result_buffer, 
+                                columns_array, 
+                                sort_column_param,
+                                sort_order_param,
+                                final_limit,
+                                conditions_array,
+                                max_size_threshold,
+                                &final_result
+                            );
+                            
+                            // Use final result
+                            processed_result = final_result.result;
+                            
+                            // Cleanup other buffers
+                            buffer_free(final_result.error_message);
+                            buffer_free(final_result.missing_columns);
+                            buffer_free(first_result.result);
+                        } else {
+                            processed_result = first_result.result;
+                        }
+                        
+                        // Cleanup first_result buffers we're not using
+                        buffer_free(first_result.error_message);
+                        buffer_free(first_result.missing_columns);
+                    }
+                    
+                    // Add the final result if we have one
+                    if (processed_result) {
+                        buffer_json_add_array_item_object(mcpc->result);
+                        {
+                            buffer_json_member_add_string(mcpc->result, "type", "text");
+                            buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(processed_result));
+                        }
+                        buffer_json_object_close(mcpc->result);
+                        
+                        // Cleanup processed_result
+                        buffer_free(processed_result);
+                    }
+                }
+                
+                json_object_put(json_check);
+            }
         }
         buffer_json_array_close(mcpc->result);  // Close content array
     }
