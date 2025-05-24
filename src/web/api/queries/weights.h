@@ -27,6 +27,8 @@ typedef struct query_weights_request {
     RRDHOST *host;
     const char *scope_nodes;
     const char *scope_contexts;
+    const char *scope_instances;
+    const char *scope_labels;
     const char *nodes;
     const char *contexts;
     const char *instances;

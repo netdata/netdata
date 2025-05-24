@@ -35,6 +35,8 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
 
     char *scope_nodes = NULL;
     char *scope_contexts = NULL;
+    char *scope_instances = NULL;
+    char *scope_labels = NULL;
     char *nodes = NULL;
     char *contexts = NULL;
     char *instances = NULL;
@@ -78,6 +80,8 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
 
         if(!strcmp(name, "scope_nodes")) scope_nodes = value;
         else if(!strcmp(name, "scope_contexts")) scope_contexts = value;
+        else if(!strcmp(name, "scope_instances")) scope_instances = value;
+        else if(!strcmp(name, "scope_labels")) scope_labels = value;
         else if(!strcmp(name, "nodes")) nodes = value;
         else if(!strcmp(name, "contexts")) contexts = value;
         else if(!strcmp(name, "instances")) instances = value;
@@ -204,6 +208,8 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
         .version = version,
         .scope_nodes = scope_nodes,
         .scope_contexts = scope_contexts,
+        .scope_instances = scope_instances,
+        .scope_labels = scope_labels,
         .after = after,
         .before = before,
         .host = NULL,

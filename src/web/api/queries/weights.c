@@ -306,12 +306,17 @@ struct query_weights_data {
 
     SIMPLE_PATTERN *scope_nodes_sp;
     SIMPLE_PATTERN *scope_contexts_sp;
+    SIMPLE_PATTERN *scope_instances_sp;
+    SIMPLE_PATTERN *scope_labels_sp;
     SIMPLE_PATTERN *nodes_sp;
     SIMPLE_PATTERN *contexts_sp;
     SIMPLE_PATTERN *instances_sp;
     SIMPLE_PATTERN *dimensions_sp;
     SIMPLE_PATTERN *labels_sp;
     SIMPLE_PATTERN *alerts_sp;
+    
+    struct pattern_array *scope_labels_pa;
+    struct pattern_array *labels_pa;
 
     usec_t timeout_us;
     bool timed_out;
@@ -375,6 +380,8 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
     buffer_json_member_add_object(wb, "scope");
     buffer_json_member_add_string(wb, "scope_nodes", qwd->qwr->scope_nodes ? qwd->qwr->scope_nodes : "*");
     buffer_json_member_add_string(wb, "scope_contexts", qwd->qwr->scope_contexts ? qwd->qwr->scope_contexts : "*");
+    buffer_json_member_add_string(wb, "scope_instances", qwd->qwr->scope_instances ? qwd->qwr->scope_instances : "*");
+    buffer_json_member_add_string(wb, "scope_labels", qwd->qwr->scope_labels ? qwd->qwr->scope_labels : "*");
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "selectors");
@@ -1765,9 +1772,11 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
         return 0;
 
     ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
+                                            qwd->scope_instances_sp,
+                                            qwd->scope_labels_pa,
                                             qwd->instances_sp,
                                             NULL,
-                                            qwd->labels_sp,
+                                            qwd->labels_pa,
                                             qwd->alerts_sp,
                                             qwd->dimensions_sp,
                                             true, true, qwd->qwr->version,
@@ -1808,12 +1817,16 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
             .scope_nodes_sp = string_to_simple_pattern(qwr->scope_nodes),
             .scope_contexts_sp = string_to_simple_pattern(qwr->scope_contexts),
+            .scope_instances_sp = string_to_simple_pattern(qwr->scope_instances),
+            .scope_labels_sp = string_to_simple_pattern(qwr->scope_labels),
             .nodes_sp = string_to_simple_pattern(qwr->nodes),
             .contexts_sp = string_to_simple_pattern(qwr->contexts),
             .instances_sp = string_to_simple_pattern(qwr->instances),
             .dimensions_sp = string_to_simple_pattern(qwr->dimensions),
             .labels_sp = string_to_simple_pattern(qwr->labels),
             .alerts_sp = string_to_simple_pattern(qwr->alerts),
+            .scope_labels_pa = NULL,
+            .labels_pa = NULL,
             .timeout_us = qwr->timeout_ms * USEC_PER_MS,
             .timed_out = false,
             .examined_dimensions = 0,
@@ -1825,6 +1838,12 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                     .received_ut = now_monotonic_usec(),
             }
     };
+    
+    // Pre-compile pattern arrays for labels
+    if(qwd.scope_labels_sp)
+        qwd.scope_labels_pa = pattern_array_add_simple_pattern(NULL, qwd.scope_labels_sp, ':');
+    if(qwd.labels_sp)
+        qwd.labels_pa = pattern_array_add_simple_pattern(NULL, qwd.labels_sp, ':');
 
     if(!rrdr_relative_window_to_absolute_query(&qwr->after, &qwr->before, NULL, false))
         buffer_no_cacheable(wb);
@@ -2007,12 +2026,17 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 cleanup:
     simple_pattern_free(qwd.scope_nodes_sp);
     simple_pattern_free(qwd.scope_contexts_sp);
+    simple_pattern_free(qwd.scope_instances_sp);
+    simple_pattern_free(qwd.scope_labels_sp);
     simple_pattern_free(qwd.nodes_sp);
     simple_pattern_free(qwd.contexts_sp);
     simple_pattern_free(qwd.instances_sp);
     simple_pattern_free(qwd.dimensions_sp);
     simple_pattern_free(qwd.labels_sp);
     simple_pattern_free(qwd.alerts_sp);
+    
+    pattern_array_free(qwd.scope_labels_pa);
+    pattern_array_free(qwd.labels_pa);
 
     register_result_destroy(qwd.results);
 

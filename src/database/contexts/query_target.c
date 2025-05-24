@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdcontext-internal.h"
+#include "database/pattern-array.h"
 
 #define QUERY_TARGET_MAX_REALLOC_INCREASE 500
 #define query_target_realloc_size(size, start) \
@@ -77,11 +78,27 @@ void query_target_release(QUERY_TARGET *qt) {
     simple_pattern_free(qt->instances.pattern);
     qt->instances.pattern = NULL;
 
+    simple_pattern_free(qt->instances.scope_pattern);
+    qt->instances.scope_pattern = NULL;
+
     simple_pattern_free(qt->instances.chart_label_key_pattern);
     qt->instances.chart_label_key_pattern = NULL;
 
+    simple_pattern_free(qt->instances.scope_chart_label_key_pattern);
+    qt->instances.scope_chart_label_key_pattern = NULL;
+
     simple_pattern_free(qt->instances.labels_pattern);
     qt->instances.labels_pattern = NULL;
+
+    simple_pattern_free(qt->instances.scope_labels_pattern);
+    qt->instances.scope_labels_pattern = NULL;
+
+    pattern_array_free(qt->instances.labels_pa);
+    qt->instances.labels_pa = NULL;
+
+    pattern_array_free(qt->instances.scope_labels_pa);
+    qt->instances.scope_labels_pa = NULL;
+
     simple_pattern_free(qt->query.pattern);
     qt->query.pattern = NULL;
 
@@ -190,6 +207,8 @@ typedef struct query_target_locals {
 
     const char *scope_nodes;
     const char *scope_contexts;
+    const char *scope_instances;
+    const char *scope_labels;
 
     const char *nodes;
     const char *contexts;
@@ -729,18 +748,14 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
 static inline bool query_instance_matches_labels(
     RRDINSTANCE *ri,
     SIMPLE_PATTERN *chart_label_key_sp,
-    SIMPLE_PATTERN *labels_sp)
+    struct pattern_array *labels_pa)
 {
-
     RRDLABELS *labels = rrdinstance_labels(ri);
     if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
         return false;
 
-    if (labels_sp) {
-        struct pattern_array *pa = pattern_array_add_simple_pattern(NULL, labels_sp, ':');
-        bool found = pattern_array_label_match(pa, labels, ':', NULL);
-        pattern_array_free(pa);
-        return found;
+    if (labels_pa) {
+        return pattern_array_label_match(labels_pa, labels, ':', NULL);
     }
 
     return true;
@@ -766,7 +781,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
         queryable_instance = query_instance_matches_labels(
             ri,
             qt->instances.chart_label_key_pattern,
-            qt->instances.labels_pattern);
+            qt->instances.labels_pa);
 
     if(queryable_instance) {
         if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(ria, qt->instances.alerts_pattern))
@@ -833,6 +848,98 @@ static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT
     return qc;
 }
 
+static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
+                                           RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
+    QUERY_TARGET *qt = qtl->qt;
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    ssize_t added = 0;
+
+    if(unlikely(qt->request.ria)) {
+        // Single instance requested
+        RRDINSTANCE *ri = rrdinstance_acquired_value(qt->request.ria);
+        
+        // Check scope_instances
+        if(qt->instances.scope_pattern) {
+            QUERY_INSTANCE temp_qi = { .ria = qt->request.ria };
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&temp_qi, ri, 
+                qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
+                qt->request.version, qtl->host_node_id_str);
+            if(ret != SP_MATCHED_POSITIVE)
+                return 0;
+        }
+        
+        // Check scope_labels
+        if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+            if(!query_instance_matches_labels(ri,
+                qt->instances.scope_chart_label_key_pattern,
+                qt->instances.scope_labels_pa))
+                return 0;
+        }
+        
+        if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
+            added++;
+    }
+    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca && qtl->st->rrdcontexts.rrdinstance)) {
+        // Single chart requested
+        RRDINSTANCE *ri = rrdinstance_acquired_value(qtl->st->rrdcontexts.rrdinstance);
+        
+        // Check scope_instances
+        if(qt->instances.scope_pattern) {
+            QUERY_INSTANCE temp_qi = { .ria = qtl->st->rrdcontexts.rrdinstance };
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&temp_qi, ri, 
+                qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
+                qt->request.version, qtl->host_node_id_str);
+            if(ret != SP_MATCHED_POSITIVE)
+                return 0;
+        }
+        
+        // Check scope_labels
+        if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+            if(!query_instance_matches_labels(ri,
+                qt->instances.scope_chart_label_key_pattern,
+                qt->instances.scope_labels_pa))
+                return 0;
+        }
+        
+        if(query_instance_add(qtl, qn, qc, qtl->st->rrdcontexts.rrdinstance, queryable_context, false))
+            added++;
+    }
+    else {
+        // Pattern query - iterate through all instances
+        RRDINSTANCE *ri;
+        dfe_start_read(rc->rrdinstances, ri) {
+            if(rrd_flag_is_deleted(ri))
+                continue;
+
+            RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *) ri_dfe.item;
+            
+            // Check scope_instances
+            if(qt->instances.scope_pattern) {
+                QUERY_INSTANCE temp_qi = { .ria = ria };
+                SIMPLE_PATTERN_RESULT ret = query_instance_matches(&temp_qi, ri, 
+                    qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
+                    qt->request.version, qtl->host_node_id_str);
+                if(ret != SP_MATCHED_POSITIVE)
+                    continue;
+            }
+            
+            // Check scope_labels
+            if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+                if(!query_instance_matches_labels(ri,
+                    qt->instances.scope_chart_label_key_pattern,
+                    qt->instances.scope_labels_pa))
+                    continue;
+            }
+            
+            if(query_instance_add(qtl, qn, qc, ria, queryable_context, true))
+                added++;
+        }
+        dfe_done(ri);
+    }
+    
+    return added;
+}
+
 static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     QUERY_TARGET_LOCALS *qtl = data;
 
@@ -844,23 +951,7 @@ static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool quer
     QUERY_TARGET *qt = qtl->qt;
     QUERY_CONTEXT *qc = query_context_allocate(qt, rca);
 
-    ssize_t added = 0;
-    if(unlikely(qt->request.ria)) {
-        if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
-            added++;
-    }
-    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca && qtl->st->rrdcontexts.rrdinstance)) {
-        if(query_instance_add(qtl, qn, qc, qtl->st->rrdcontexts.rrdinstance, queryable_context, false))
-            added++;
-    }
-    else {
-        RRDINSTANCE *ri;
-        dfe_start_read(rc->rrdinstances, ri) {
-                    if(query_instance_add(qtl, qn, qc, (RRDINSTANCE_ACQUIRED *) ri_dfe.item, queryable_context, true))
-                        added++;
-                }
-        dfe_done(ri);
-    }
+    ssize_t added = query_scope_foreach_instance(qtl, qn, qc, rca, queryable_context);
 
     if(!added) {
         query_context_release(qc);
@@ -999,9 +1090,11 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , tier_buffer
         );
     else if(qt->request.version >= 2)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "data_v2://scope_nodes:%s/scope_contexts:%s/nodes:%s/contexts:%s/instances:%s/labels:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/time_group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "data_v2://scope_nodes:%s/scope_contexts:%s/scope_instances:%s/scope_labels:%s/nodes:%s/contexts:%s/instances:%s/labels:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/time_group:%s%s/options:%s%s%s"
                 , qt->request.scope_nodes ? qt->request.scope_nodes : "*"
                 , qt->request.scope_contexts ? qt->request.scope_contexts : "*"
+                , qt->request.scope_instances ? qt->request.scope_instances : "*"
+                , qt->request.scope_labels ? qt->request.scope_labels : "*"
                 , qt->request.nodes ? qt->request.nodes : "*"
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.instances) ? qt->request.instances : "*"
@@ -1052,6 +1145,16 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(qtr->contexts && !qtr->scope_contexts)
         qtr->scope_contexts = qtr->contexts;
 
+    // IMPORTANT: old dashboards do not know about scope_instances and scope_labels
+    // so this code makes non-scope instances and labels to be used as scope.
+    // Leave it commented!
+
+    // if(qtr->instances && !qtr->scope_instances)
+    //     qtr->scope_instances = qtr->instances;
+    //
+    // if(qtr->labels && !qtr->scope_labels)
+    //     qtr->scope_labels = qtr->labels;
+
     memset(&qt->db, 0, sizeof(qt->db));
     qt->query_points = STORAGE_POINT_UNSET;
 
@@ -1077,6 +1180,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
             .st = qt->request.st,
             .scope_nodes = qt->request.scope_nodes,
             .scope_contexts = qt->request.scope_contexts,
+            .scope_instances = qt->request.scope_instances,
+            .scope_labels = qt->request.scope_labels,
             .nodes = qt->request.nodes,
             .contexts = qt->request.contexts,
             .instances = qt->request.instances,
@@ -1096,10 +1201,19 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->contexts.scope_pattern = string_to_simple_pattern(qtl.scope_contexts);
 
     qt->instances.pattern = string_to_simple_pattern(qtl.instances);
+    qt->instances.scope_pattern = string_to_simple_pattern(qtl.scope_instances);
     qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
     qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
+    qt->instances.scope_chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);  // For now, using same as non-scope
     qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
+    qt->instances.scope_labels_pattern = string_to_simple_pattern(qtl.scope_labels);
     qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
+    
+    // Pre-compile pattern arrays for labels
+    if(qt->instances.labels_pattern)
+        qt->instances.labels_pa = pattern_array_add_simple_pattern(NULL, qt->instances.labels_pattern, ':');
+    if(qt->instances.scope_labels_pattern)
+        qt->instances.scope_labels_pa = pattern_array_add_simple_pattern(NULL, qt->instances.scope_labels_pattern, ':');
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
@@ -1150,9 +1264,11 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 }
 
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
+                                            SIMPLE_PATTERN *scope_instances_sp,
+                                            struct pattern_array *scope_labels_pa,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
-                                            SIMPLE_PATTERN *labels_sp,
+                                            struct pattern_array *labels_pa,
                                             SIMPLE_PATTERN *alerts_sp,
                                             SIMPLE_PATTERN *dimensions_sp,
                                             bool match_ids, bool match_names,
@@ -1175,6 +1291,23 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                     continue;
 
                 RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *) ri_dfe.item;
+                
+                // Check scope_instances first - if it doesn't match, skip entirely
+                if(scope_instances_sp) {
+                    QUERY_INSTANCE qi = { .ria = ria, };
+                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, scope_instances_sp, match_ids, match_names, version, host_node_id_str);
+                    qi.ria = NULL;
+                    query_instance_release(&qi);
+
+                    if (ret != SP_MATCHED_POSITIVE)
+                        continue;
+                }
+                
+                // Check scope_labels - if it doesn't match, skip entirely
+                if(scope_labels_pa) {
+                    if(!query_instance_matches_labels(ri, NULL, scope_labels_pa))
+                        continue;
+                }
 
                 if(instances_sp) {
                     QUERY_INSTANCE qi = { .ria = ria, };
@@ -1186,7 +1319,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                         continue;
                 }
 
-                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_sp))
+                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_pa))
                     continue;
 
                 if(alerts_sp && !query_target_match_alert_pattern(ria, alerts_sp))
@@ -1230,5 +1363,6 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                     break;
             }
     dfe_done(ri);
+    
     return count;
 }
