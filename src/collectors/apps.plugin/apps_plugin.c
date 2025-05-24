@@ -815,14 +815,14 @@ int main(int argc, char **argv) {
 
 #if (PROCESSES_HAVE_UID == 1)
         if (enable_users_charts) {
-            send_charts_updates_to_netdata(users_root_target, "user", "user", "User Processes");
+            send_charts_updates_to_netdata(users_root_target, "user", "user", "User");
             send_collected_data_to_netdata(users_root_target, "user", dt);
         }
 #endif
 
 #if (PROCESSES_HAVE_GID == 1)
         if (enable_groups_charts) {
-            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group Processes");
+            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group");
             send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
         }
 #endif

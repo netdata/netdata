@@ -118,6 +118,14 @@ void rrdlabels_aggregated_add_from_rrdlabels(RRDLABELS_AGGREGATED *agg, RRDLABEL
     rrdlabels_walkthrough_read(labels, rrdlabels_aggregated_add_callback, &callback_data);
 }
 
+// Add a single label key-value pair to the aggregated structure
+void rrdlabels_aggregated_add_label(RRDLABELS_AGGREGATED *agg, const char *key, const char *value) {
+    if (!agg || !key || !value) return;
+    
+    // This is essentially the same logic as the callback, but exposed as a public function
+    rrdlabels_aggregated_add_callback(key, value, RRDLABEL_SRC_AUTO, &(struct { RRDLABELS_AGGREGATED *agg; }){ .agg = agg });
+}
+
 // Output aggregated labels as JSON object with keys and their value arrays
 void rrdlabels_aggregated_to_buffer_json(RRDLABELS_AGGREGATED *agg, BUFFER *wb, const char *key, size_t cardinality_limit) {
     if (!agg || !wb) return;
@@ -162,4 +170,68 @@ void rrdlabels_aggregated_to_buffer_json(RRDLABELS_AGGREGATED *agg, BUFFER *wb, 
     }
 
     buffer_json_object_close(wb);
+}
+
+// Merge all labels from source aggregated structure into destination
+void rrdlabels_aggregated_merge(RRDLABELS_AGGREGATED *dst, RRDLABELS_AGGREGATED *src) {
+    if (!dst || !src) return;
+    
+    // Iterate through all keys in source
+    Pvoid_t *PValue;
+    Word_t key_index = 0;
+    bool first_then_next = true;
+    
+    while ((PValue = JudyLFirstThenNext(src->keys_judy, &key_index, &first_then_next))) {
+        STRING *src_key_string = (STRING *)key_index;
+        Pvoid_t src_values_judy = *PValue;
+        
+        // Get or create the destination values JudyL for this key
+        STRING *dst_key_string = string_dup(src_key_string); // Create a new reference
+        Pvoid_t *PDstValue = JudyLIns(&dst->keys_judy, (Word_t)dst_key_string, PJE0);
+        
+        if (!PDstValue || PDstValue == PJERR) {
+            string_freez(dst_key_string);
+            continue; // Skip on error
+        }
+        
+        Pvoid_t dst_values_judy;
+        if (!*PDstValue) {
+            // New key in destination
+            dst_values_judy = (Pvoid_t) NULL;
+            *PDstValue = dst_values_judy;
+        } else {
+            // Key already exists in destination - free the duplicate key
+            string_freez(dst_key_string);
+            dst_values_judy = *PDstValue;
+        }
+        
+        // Now merge all values from source to destination
+        Word_t value_index = 0;
+        bool value_first_then_next = true;
+        Pvoid_t *PValueInner;
+        
+        while ((PValueInner = JudyLFirstThenNext(src_values_judy, &value_index, &value_first_then_next))) {
+            STRING *src_value_string = (STRING *)value_index;
+            STRING *dst_value_string = string_dup(src_value_string); // Create a new reference
+            
+            // Insert into destination values
+            Pvoid_t *PDstValueInner = JudyLIns(&dst_values_judy, (Word_t)dst_value_string, PJE0);
+            
+            if (!PDstValueInner || PDstValueInner == PJERR) {
+                string_freez(dst_value_string);
+                continue; // Skip on error
+            }
+            
+            if (*PDstValueInner) {
+                // Value already exists - free the duplicate
+                string_freez(dst_value_string);
+            } else {
+                // New value - mark as present
+                *PDstValueInner = (Pvoid_t)1;
+            }
+        }
+        
+        // Update the destination JudyL with the potentially modified values_judy
+        *PDstValue = dst_values_judy;
+    }
 }

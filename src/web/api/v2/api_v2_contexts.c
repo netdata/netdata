@@ -38,6 +38,8 @@ int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w,
             req.before = str2l(value);
         else if(!strcmp(name, "timeout"))
             req.timeout_ms = str2l(value);
+        else if(!strcmp(name, "cardinality") || !strcmp(name, "cardinality_limit"))
+            req.cardinality_limit = str2ul(value);
         else if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) {
             if (!strcmp(name, "alert"))
                 req.alerts.alert = value;

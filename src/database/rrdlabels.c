@@ -538,6 +538,25 @@ int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *na
     return ret;
 }
 
+int rrdlabels_walkthrough_read_string(RRDLABELS *labels, int (*callback)(STRING *name, STRING *value, RRDLABEL_SRC ls, void *data), void *data)
+{
+    int ret = 0;
+
+    if(unlikely(!labels || !callback)) return 0;
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+    lfe_start_read(labels, lb, ls)
+    {
+        ret = callback(lb->index.key, lb->index.value, ls, data);
+        if (ret < 0)
+            break;
+    }
+    lfe_done(labels);
+
+    return ret;
+}
+
 static SIMPLE_PATTERN_RESULT rrdlabels_walkthrough_read_sp(RRDLABELS *labels, SIMPLE_PATTERN_RESULT (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data)
 {
     SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
@@ -1458,5 +1477,69 @@ int rrdlabels_unittest(void) {
 
     fprintf(stderr, "%d errors found\n", errors);
     return errors;
+}
+
+// ----------------------------------------------------------------------------
+// Full text search for labels
+
+#include "rrdlabels-aggregated.h"
+
+struct label_full_text_search_data {
+    SIMPLE_PATTERN *pattern;
+    RRDLABELS_AGGREGATED *agg;
+    size_t searches;
+    bool found;
+};
+
+static int label_full_text_search_callback_string(STRING *name, STRING *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
+    struct label_full_text_search_data *d = (struct label_full_text_search_data *)data;
+    
+    // Now we have STRING* directly, no need to create them
+    bool key_matches = false;
+    bool value_matches = false;
+    
+    // First try to match the key
+    if(simple_pattern_matches_string(d->pattern, name)) {
+        key_matches = true;
+        d->searches++;
+    }
+    
+    // Then try to match the value
+    if(simple_pattern_matches_string(d->pattern, value)) {
+        value_matches = true;
+        d->searches++;
+    }
+    
+    // If either matched, add this label to the aggregated structure
+    if(key_matches || value_matches) {
+        if(!d->agg) {
+            d->agg = rrdlabels_aggregated_create();
+        }
+        rrdlabels_aggregated_add_label(d->agg, string2str(name), string2str(value));
+        d->found = true;
+    }
+    
+    return 0; // Continue walking through labels
+}
+
+RRDLABELS_AGGREGATED *rrdlabels_full_text_search(RRDLABELS *labels, SIMPLE_PATTERN *pattern, RRDLABELS_AGGREGATED *agg, size_t *searches) {
+    if(!labels || !pattern) return agg;
+    
+    struct label_full_text_search_data data = {
+        .pattern = pattern,
+        .agg = agg,
+        .searches = 0,
+        .found = false
+    };
+    
+    rrdlabels_walkthrough_read_string(labels, label_full_text_search_callback_string, &data);
+    
+    if(searches)
+        *searches = data.searches;
+    
+    // If we found matches and didn't have an agg structure, one was created
+    // If we had an agg structure, we added to it (or not if no matches)
+    // If no matches and no initial agg, data.agg is still NULL
+    return data.agg;
 }
 

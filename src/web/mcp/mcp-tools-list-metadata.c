@@ -342,7 +342,9 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     // Determine mode - add SEARCH if q is provided
     CONTEXTS_V2_MODE mode = config->mode;
     if (config->params.has_q && q) {
-        mode |= CONTEXTS_V2_SEARCH;
+        mode = CONTEXTS_V2_SEARCH;
+        req.options |= CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS | CONTEXTS_OPTION_TITLES |
+            CONTEXTS_OPTION_LABELS | CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_DIMENSIONS;
     }
 
     int code = rrdcontext_to_json_v2(t, &req, mode);

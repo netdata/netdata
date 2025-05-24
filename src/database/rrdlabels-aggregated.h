@@ -20,7 +20,13 @@ void rrdlabels_aggregated_destroy(RRDLABELS_AGGREGATED *agg);
 // Add all labels from an RRDLABELS instance to the aggregated structure
 void rrdlabels_aggregated_add_from_rrdlabels(RRDLABELS_AGGREGATED *agg, RRDLABELS *labels);
 
+// Add a single label key-value pair to the aggregated structure
+void rrdlabels_aggregated_add_label(RRDLABELS_AGGREGATED *agg, const char *key, const char *value);
+
 // Output aggregated labels as JSON object with keys and their value arrays
 void rrdlabels_aggregated_to_buffer_json(RRDLABELS_AGGREGATED *agg, BUFFER *wb, const char *key, size_t cardinality_limit);
+
+// Merge all labels from source aggregated structure into destination
+void rrdlabels_aggregated_merge(RRDLABELS_AGGREGATED *dst, RRDLABELS_AGGREGATED *src);
 
 #endif /* NETDATA_RRDLABELS_AGGREGATED_H */
