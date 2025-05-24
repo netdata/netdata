@@ -138,6 +138,12 @@ static void *pluginsd_worker_thread(void *arg) {
         }
         cd->unsafe.pid = spawn_popen_pid(cd->unsafe.pi);
 
+        const char *fullfilename = string2str(cd->fullfilename);
+        if (strstr(fullfilename, "systemd-journal.plugin") != NULL) {
+            fprintf(stdout, "systemd-journal.plugin process started with pid %d", cd->unsafe.pid);
+            fprintf(stdout, "\n\t>>> sudo gdb --pid %d\n", cd->unsafe.pid);
+        }
+
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
                rrdhost_hostname(cd->host),

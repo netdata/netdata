@@ -1,0 +1,9 @@
+[package]
+name = "error"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+zerocopy = { workspace = true }
+static_assertions = { workspace = true }
