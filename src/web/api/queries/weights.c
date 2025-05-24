@@ -125,14 +125,14 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_json_member_add_time_t(wb, "after", after);
-    buffer_json_member_add_time_t(wb, "before", before);
+    buffer_json_member_add_time_t_formatted(wb, "after", after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_time_t(wb, "duration", before - after);
     buffer_json_member_add_uint64(wb, "points", points);
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
-        buffer_json_member_add_time_t(wb, "baseline_after", baseline_after);
-        buffer_json_member_add_time_t(wb, "baseline_before", baseline_before);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_after", baseline_after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_before", baseline_before, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_time_t(wb, "baseline_duration", baseline_before - baseline_after);
         buffer_json_member_add_uint64(wb, "baseline_points", points << shifts);
     }
@@ -387,8 +387,8 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "window");
-    buffer_json_member_add_time_t(wb, "after", qwd->qwr->after);
-    buffer_json_member_add_time_t(wb, "before", qwd->qwr->before);
+    buffer_json_member_add_time_t_formatted(wb, "after", qwd->qwr->after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", qwd->qwr->before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_uint64(wb, "points", qwd->qwr->points);
     if(qwd->qwr->options & RRDR_OPTION_SELECTED_TIER)
         buffer_json_member_add_uint64(wb, "tier", qwd->qwr->tier);
@@ -398,8 +398,8 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
         buffer_json_member_add_object(wb, "baseline");
-        buffer_json_member_add_time_t(wb, "baseline_after", qwd->qwr->baseline_after);
-        buffer_json_member_add_time_t(wb, "baseline_before", qwd->qwr->baseline_before);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_after", qwd->qwr->baseline_after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_before", qwd->qwr->baseline_before, options & RRDR_OPTION_RFC3339);
         buffer_json_object_close(wb);
     }
 
@@ -433,16 +433,16 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
     buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(group));
 
     buffer_json_member_add_object(wb, "window");
-    buffer_json_member_add_time_t(wb, "after", after);
-    buffer_json_member_add_time_t(wb, "before", before);
+    buffer_json_member_add_time_t_formatted(wb, "after", after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_time_t(wb, "duration", before - after);
     buffer_json_member_add_uint64(wb, "points", points);
     buffer_json_object_close(wb);
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
         buffer_json_member_add_object(wb, "baseline");
-        buffer_json_member_add_time_t(wb, "after", baseline_after);
-        buffer_json_member_add_time_t(wb, "before", baseline_before);
+        buffer_json_member_add_time_t_formatted(wb, "after", baseline_after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "before", baseline_before, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_time_t(wb, "duration", baseline_before - baseline_after);
         buffer_json_member_add_uint64(wb, "points", points << shifts);
         buffer_json_object_close(wb);
@@ -934,7 +934,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     buffer_json_object_close(wb); //dictionaries
 
-    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true);
+    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -1071,7 +1071,7 @@ static size_t registered_results_to_json_multinode_group_by(
     dfe_done(aw);
     buffer_json_array_close(wb); // result
 
-    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true);
+    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);

@@ -376,6 +376,12 @@ void buffer_json_member_add_duration_ut(BUFFER *wb, const char *key, int64_t dur
     buffer_json_member_add_string(wb, key, buf);
 }
 
+void buffer_json_add_array_item_datetime_rfc3339(BUFFER *wb, uint64_t datetime_ut, bool utc) {
+    char buf[RFC3339_MAX_LENGTH];
+    rfc3339_datetime_ut(buf, sizeof(buf), datetime_ut, 2, utc);
+    buffer_json_add_array_item_string(wb, buf);
+}
+
 // ----------------------------------------------------------------------------
 // unit test
 

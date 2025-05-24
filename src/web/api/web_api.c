@@ -116,6 +116,8 @@ RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o) {
             options |= RRDCONTEXT_OPTION_DEEPSCAN;
         else if(!strcmp(tok, "hidden"))
             options |= RRDCONTEXT_OPTION_SHOW_HIDDEN;
+        else if(!strcmp(tok, "rfc3339"))
+            options |= RRDCONTEXT_OPTION_RFC3339;
     }
 
     return options;

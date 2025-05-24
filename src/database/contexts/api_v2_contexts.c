@@ -308,14 +308,14 @@ void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_un
     buffer_json_member_add_boolean(wb, "connected", rrdhost_is_online(host));
 }
 
-static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
+static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key, CONTEXTS_OPTIONS options) {
     buffer_json_member_add_object(wb, key);
     {
         buffer_json_member_add_uint64(wb, "id", s->ingest.id);
         buffer_json_member_add_int64(wb, "hops", s->ingest.hops);
         buffer_json_member_add_string(wb, "type", rrdhost_ingest_type_to_string(s->ingest.type));
         buffer_json_member_add_string(wb, "status", rrdhost_ingest_status_to_string(s->ingest.status));
-        buffer_json_member_add_time_t(wb, "since", s->ingest.since);
+        buffer_json_member_add_time_t_formatted(wb, "since", s->ingest.since, options & CONTEXTS_OPTION_RFC3339);
         buffer_json_member_add_time_t(wb, "age", s->now - s->ingest.since);
         buffer_json_member_add_uint64(wb, "metrics", s->ingest.collected.metrics);
         buffer_json_member_add_uint64(wb, "instances", s->ingest.collected.instances);
@@ -354,7 +354,7 @@ static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *
     buffer_json_object_close(wb); // collection
 }
 
-static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key) {
+static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *key, CONTEXTS_OPTIONS options) {
     if(s->stream.status == RRDHOST_STREAM_STATUS_DISABLED)
         return;
 
@@ -363,7 +363,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         buffer_json_member_add_uint64(wb, "id", s->stream.id);
         buffer_json_member_add_uint64(wb, "hops", s->stream.hops);
         buffer_json_member_add_string(wb, "status", rrdhost_streaming_status_to_string(s->stream.status));
-        buffer_json_member_add_time_t(wb, "since", s->stream.since);
+        buffer_json_member_add_time_t_formatted(wb, "since", s->stream.since, options & CONTEXTS_OPTION_RFC3339);
         buffer_json_member_add_time_t(wb, "age", s->now - s->stream.since);
 
         if (s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
@@ -501,8 +501,8 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                     buffer_json_member_add_string(wb, "status", rrdhost_db_status_to_string(s.db.status));
                     buffer_json_member_add_string(wb, "liveness", rrdhost_db_liveness_to_string(s.db.liveness));
                     buffer_json_member_add_string(wb, "mode", rrd_memory_mode_name(s.db.mode));
-                    buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
-                    buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
+                    buffer_json_member_add_time_t_formatted(wb, "first_time", s.db.first_time_s, ctl->options & CONTEXTS_OPTION_RFC3339);
+                    buffer_json_member_add_time_t_formatted(wb, "last_time", s.db.last_time_s, ctl->options & CONTEXTS_OPTION_RFC3339);
 
                     buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
                     buffer_json_member_add_uint64(wb, "instances", s.db.instances);
@@ -510,8 +510,8 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                 }
                 buffer_json_object_close(wb);
 
-                rrdhost_receiver_to_json(wb, &s, "ingest");
-                rrdhost_sender_to_json(wb, &s, "stream");
+                rrdhost_receiver_to_json(wb, &s, "ingest", ctl->options);
+                rrdhost_sender_to_json(wb, &s, "stream", ctl->options);
 
                 buffer_json_member_add_object(wb, "ml");
                 buffer_json_member_add_string(wb, "status", rrdhost_ml_status_to_string(s.ml.status));
@@ -1014,8 +1014,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 if (mode & CONTEXTS_V2_SEARCH)
                     buffer_json_member_add_string(wb, "q", req->q);
 
-                buffer_json_member_add_time_t(wb, "after", req->after);
-                buffer_json_member_add_time_t(wb, "before", req->before);
+                buffer_json_member_add_time_t_formatted(wb, "after", req->after, ctl.options & CONTEXTS_OPTION_RFC3339);
+                buffer_json_member_add_time_t_formatted(wb, "before", req->before, ctl.options & CONTEXTS_OPTION_RFC3339);
             }
             buffer_json_object_close(wb); // filters
 
@@ -1162,8 +1162,8 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                                 buffer_json_member_add_uint64(wb, "priority", z->priority);
 
                             if (ctl.options & CONTEXTS_OPTION_RETENTION) {
-                                buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
-                                buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);
+                                buffer_json_member_add_time_t_formatted(wb, "first_entry", z->first_time_s, ctl.options & CONTEXTS_OPTION_RFC3339);
+                                buffer_json_member_add_time_t_formatted(wb, "last_entry", collected ? ctl.now : z->last_time_s, ctl.options & CONTEXTS_OPTION_RFC3339);
                             }
 
                             if (ctl.options & CONTEXTS_OPTION_LIVENESS)
@@ -1269,7 +1269,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             version_hashes_api_v2(wb, &ctl.versions);
 
         if (mode & CONTEXTS_V2_AGENTS)
-            buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true);
+            buffer_json_agents_v2(wb, &ctl.timings, ctl.now, mode & (CONTEXTS_V2_AGENTS_INFO), true, ctl.options);
     }
 
     if(!(ctl.options & CONTEXTS_OPTION_MCP))

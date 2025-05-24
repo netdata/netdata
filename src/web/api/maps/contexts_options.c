@@ -18,6 +18,7 @@ static struct {
     , {"labels"           , 0    , CONTEXTS_OPTION_LABELS}
     , {"priorities"       , 0    , CONTEXTS_OPTION_PRIORITIES}
     , {"titles"           , 0    , CONTEXTS_OPTION_TITLES}
+    , {"rfc3339"          , 0    , CONTEXTS_OPTION_RFC3339}
     , {NULL               , 0    , 0}
 };
 
@@ -60,4 +61,21 @@ void contexts_options_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS
 void contexts_options_init(void) {
     for(size_t i = 0; contexts_options[i].name ; i++)
         contexts_options[i].hash = simple_hash(contexts_options[i].name);
+}
+
+// Map RRDR_OPTIONS to CONTEXTS_OPTIONS for options that are common between both
+ALWAYS_INLINE
+CONTEXTS_OPTIONS rrdr_options_to_contexts_options(RRDR_OPTIONS rrdr_options) {
+    CONTEXTS_OPTIONS contexts_options = 0;
+    
+    if(rrdr_options & RRDR_OPTION_MINIFY)
+        contexts_options |= CONTEXTS_OPTION_MINIFY;
+    
+    if(rrdr_options & RRDR_OPTION_DEBUG)
+        contexts_options |= CONTEXTS_OPTION_DEBUG;
+    
+    if(rrdr_options & RRDR_OPTION_RFC3339)
+        contexts_options |= CONTEXTS_OPTION_RFC3339;
+    
+    return contexts_options;
 }

@@ -53,6 +53,7 @@ static struct {
     , {"long-json-keys"    , 0    , RRDR_OPTION_LONG_JSON_KEYS}
     , {"long-keys"         , 0    , RRDR_OPTION_LONG_JSON_KEYS}
     , {"mcp-info"          , 0    , RRDR_OPTION_MCP_INFO}
+    , {"rfc3339"           , 0    , RRDR_OPTION_RFC3339}
     , {NULL                , 0    , 0}
 };
 

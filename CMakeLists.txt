@@ -1888,6 +1888,8 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-execute-function.h
         src/web/mcp/mcp-tools-metrics-query.c
         src/web/mcp/mcp-tools-metrics-query.h
+        src/web/mcp/mcp-time-utils.c
+        src/web/mcp/mcp-time-utils.h
         src/web/mcp/mcp-request-id.c
         src/web/mcp/mcp-request-id.h
         src/web/mcp/mcp-ping.c

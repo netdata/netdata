@@ -158,7 +158,7 @@ static int claim_json_response(BUFFER *wb, CLAIM_RESPONSE response, const char *
         claim_add_user_info_command(wb);
     }
 
-    buffer_json_agents_v2(wb, NULL, now_s, false, false);
+    buffer_json_agents_v2(wb, NULL, now_s, false, false, 0);
     buffer_json_finalize(wb);
 
     return (response == CLAIM_RESP_ERROR) ? HTTP_RESP_BAD_REQUEST : HTTP_RESP_OK;

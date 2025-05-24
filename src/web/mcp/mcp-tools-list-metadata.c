@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-tools-list-metadata.h"
+#include "mcp-tools.h"
+#include "mcp-time-utils.h"
 #include "database/contexts/rrdcontext.h"
 
 // Static configuration for all list tools
@@ -229,47 +231,12 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
 
     // Add time range parameters if supported
     if (config->params.has_time_range) {
-        buffer_json_member_add_object(buffer, "after");
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Start time");
-        
-        snprintfz(description, sizeof(description),
-                  "Limit %s to those with data collected after this time. "
-                  "Unix timestamp or negative seconds relative to before",
-                  output_name);
-        
-        buffer_json_member_add_string(buffer, "description", description);
-        buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_AFTER_TIME);
-        buffer_json_object_close(buffer); // after
-
-        buffer_json_member_add_object(buffer, "before");
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "End time");
-        
-        snprintfz(description, sizeof(description),
-                  "Limit %s to those with data collected before this time. "
-                  "Unix timestamp or negative seconds relative to now",
-                  output_name);
-        
-        buffer_json_member_add_string(buffer, "description", description);
-        buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_BEFORE_TIME);
-        buffer_json_object_close(buffer); // before
+        mcp_schema_params_add_time_window(buffer, output_name, false);
     }
 
     // Add cardinality limit if supported
     if (config->params.has_cardinality_limit) {
-        size_t default_cardinality = config->defaults.cardinality_limit ?: MCP_METADATA_CARDINALITY_LIMIT;
-        buffer_json_member_add_object(buffer, "cardinality_limit");
-        buffer_json_member_add_string(buffer, "type", "number");
-        
-        buffer_json_member_add_string(buffer, "title", "Cardinality limit");
-        buffer_json_member_add_string(buffer, "description",
-                                      "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
-                                      "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.");
-        buffer_json_member_add_int64(buffer, "default", default_cardinality);
-        buffer_json_member_add_int64(buffer, "minimum", 1);
-        buffer_json_member_add_int64(buffer, "maximum", 500);
-        buffer_json_object_close(buffer); // cardinality_limit
+        mcp_schema_params_add_cardinality_limit(buffer, output_name, false);
     }
 
     buffer_json_object_close(buffer); // properties
@@ -304,17 +271,6 @@ static const char *extract_string_param(struct json_object *params, const char *
     return NULL;
 }
 
-// Helper function to extract time parameter
-static time_t extract_time_param(struct json_object *params, const char *name, time_t default_value) {
-    if (!params || !name) return default_value;
-    
-    struct json_object *obj = NULL;
-    if (json_object_object_get_ex(params, name, &obj) && 
-        json_object_is_type(obj, json_type_int)) {
-        return json_object_get_int64(obj);
-    }
-    return default_value;
-}
 
 // Helper function to extract size_t parameter
 static size_t extract_size_param(struct json_object *params, const char *name, size_t default_value, size_t min, size_t max) {
@@ -358,8 +314,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     time_t after = 0;
     time_t before = 0;
     if (config->params.has_time_range) {
-        after = extract_time_param(params, "after", MCP_DEFAULT_AFTER_TIME);
-        before = extract_time_param(params, "before", MCP_DEFAULT_BEFORE_TIME);
+        after = mcp_extract_time_param(params, "after", MCP_DEFAULT_AFTER_TIME);
+        before = mcp_extract_time_param(params, "before", MCP_DEFAULT_BEFORE_TIME);
     }
     
     // Extract cardinality limit if supported
@@ -380,7 +336,7 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
         .after = after,
         .before = before,
         .cardinality_limit = cardinality_limit,
-        .options = config->options | CONTEXTS_OPTION_MCP,  // Always add MCP
+        .options = config->options | CONTEXTS_OPTION_MCP | CONTEXTS_OPTION_RFC3339,
     };
 
     // Determine mode - add SEARCH if q is provided

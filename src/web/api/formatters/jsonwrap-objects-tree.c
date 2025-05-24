@@ -140,8 +140,8 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         buffer_json_member_add_uint64(wb, JSKEY(queried), queried ? 1 : 0);
                         time_t first_entry_s = rrdmetric_acquired_first_entry(rma);
                         time_t last_entry_s = rrdmetric_acquired_last_entry(rma);
-                        buffer_json_member_add_time_t(wb, JSKEY(first_entry), first_entry_s);
-                        buffer_json_member_add_time_t(wb, JSKEY(last_entry), last_entry_s ? last_entry_s : now_s);
+                        buffer_json_member_add_time_t_formatted(wb, JSKEY(first_entry), first_entry_s, options & RRDR_OPTION_RFC3339);
+                        buffer_json_member_add_time_t_formatted(wb, JSKEY(last_entry), last_entry_s ? last_entry_s : now_s, options & RRDR_OPTION_RFC3339);
 
                         if(qm) {
                             if(qm->status & RRDR_DIMENSION_GROUPED) {
@@ -152,7 +152,7 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                             query_target_points_statistics(wb, qt, &qm->query_points);
 
                             if(options & RRDR_OPTION_DEBUG)
-                                jsonwrap_query_metric_plan(wb, qm);
+                                jsonwrap_query_metric_plan(wb, qm, options);
                         }
                     }
                     buffer_json_object_close(wb); // metric
