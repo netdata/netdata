@@ -31,6 +31,8 @@
  */
 
 #include "mcp-tools-metrics-query.h"
+#include "mcp-tools.h"
+#include "mcp-time-utils.h"
 #include "web/api/formatters/rrd2json.h"
 
 /**
@@ -118,6 +120,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
                                                              "Examples: `node1|node2|node3` or `node*` or `*db*|*dns*`\n"
                                                              "To discover available nodes, first use the " MCP_TOOL_LIST_NODES " tool.\n"
                                                              "If no nodes are specified, all nodes having data for the context in the specified time-frame will be queried.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // nodes
 
@@ -127,6 +130,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "title", "Context Name");
         buffer_json_member_add_string(buffer, "description", "The specific context name to query. This parameter is required.\n"
                                                              "To discover available contexts, first use the " MCP_TOOL_LIST_METRICS " tool.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // context
 
@@ -137,7 +141,9 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "title", "Instances Pattern");
         buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on instances to include in the query.\n"
                                                              "Use pipe (|) to separate multiple patterns. Examples: 'eth0|eth1', '*sda*|*nvme*', 'cpu0|cpu1|cpu2'\n"
-                                                             "If no instances are specified, all instances of the context are queried.");
+                                                             "If no instances are specified, all instances of the context are queried.\n"
+                                                             "Note: Instance behavior varies by collector type - see warning in response when used.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // instances
 
@@ -148,6 +154,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "description", "Glob-like pattern matching on dimensions to include in the query.\n"
                                                              "Use pipe (|) to separate multiple patterns. Examples: 'read|write', 'in|out', 'used|free|cached'\n"
                                                              "If no dimensions are specified, all dimensions of the context are queried.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // dimensions
 
@@ -185,6 +192,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_object_close(buffer);
         
         buffer_json_array_close(buffer); // oneOf
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // labels
 
@@ -193,43 +201,22 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Alerts Filter");
         buffer_json_member_add_string(buffer, "description", "Filter for charts having specified alert states.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // alerts
     
-    buffer_json_member_add_object(buffer, "cardinality_limit");
-    {
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Cardinality Limit");
-        buffer_json_member_add_string(buffer, "description", "Limits the number of nodes, instances, dimensions, and label values returned in the results. "
-                                                           "When the number of items exceeds this limit, only the top N items by contribution are returned, "
-                                                           "with the remaining items aggregated into a 'remaining X dimensions' entry. "
-                                                           "This helps keep response sizes manageable for high-cardinality queries.");
-        buffer_json_member_add_uint64(buffer, "default", MCP_DATA_CARDINALITY_LIMIT);
-    }
-    buffer_json_object_close(buffer); // cardinality_limit
+    // Add cardinality limit
+    mcp_schema_params_add_cardinality_limit(buffer, NULL, true);
 
     // Time parameters
-    buffer_json_member_add_object(buffer, "after");
-    {
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "After Timestamp");
-        buffer_json_member_add_string(buffer, "description", "Start time for the query in seconds since epoch. Negative values indicate relative time from `before`.");
-    }
-    buffer_json_object_close(buffer); // after
-
-    buffer_json_member_add_object(buffer, "before");
-    {
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Before Timestamp");
-        buffer_json_member_add_string(buffer, "description", "End time for the query in seconds since epoch. Negative values indicate relative time from now.");
-    }
-    buffer_json_object_close(buffer); // before
+    mcp_schema_params_add_time_window(buffer, "data", true);
 
     buffer_json_member_add_object(buffer, "points");
     {
         buffer_json_member_add_string(buffer, "type", "number");
         buffer_json_member_add_string(buffer, "title", "Data Points");
         buffer_json_member_add_string(buffer, "description", "Number of data points to return.");
+        buffer_json_member_add_uint64(buffer, "default", 60);
     }
     buffer_json_object_close(buffer); // points
 
@@ -238,6 +225,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "type", "number");
         buffer_json_member_add_string(buffer, "title", "Timeout");
         buffer_json_member_add_string(buffer, "description", "Query timeout in milliseconds.");
+        buffer_json_member_add_uint64(buffer, "default", 30000);
     }
     buffer_json_object_close(buffer); // timeout
 
@@ -251,6 +239,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
                                                              "'display-absolute': Convert percentage values to absolute before application of grouping functions\n\n"
                                                              "'all-dimensions': Include all dimensions, even those with just zero values\n\n"
                                                              "Example: 'absolute percentage'");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // options
 
@@ -289,9 +278,9 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "title", "Time Group Options");
         buffer_json_member_add_string(buffer, "description", "Additional options for time grouping. For 'percentile', specify a percentage (0-100). "
                                                              "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // time_group_options
-
 
     // Tier selection
     buffer_json_member_add_object(buffer, "tier");
@@ -300,6 +289,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "title", "Storage Tier");
         buffer_json_member_add_string(buffer, "description", "Storage tier to query from.\n"
                                                              "If not specified, Netdata will automatically pick the best tier based on the time-frame and points requested.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // tier
 
@@ -323,6 +313,7 @@ void mcp_tool_metrics_query_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Group By Label");
         buffer_json_member_add_string(buffer, "description", "When group_by includes 'label', this parameter specifies which label key to group by. For example, if metrics have a 'disk_type' label with values like 'ssd' or 'hdd', setting group_by_label to 'disk_type' would aggregate metrics separately for SSDs and HDDs.");
+        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // group_by_label
 
@@ -402,26 +393,6 @@ static const char *extract_string_param(struct json_object *params, const char *
     return json_object_get_string(obj);
 }
 
-// Extract time_t parameter from json object
-static time_t extract_time_param(struct json_object *params, const char *name, time_t default_val) {
-    if (!params)
-        return default_val;
-        
-    struct json_object *obj = NULL;
-    if (!json_object_object_get_ex(params, name, &obj) || !obj)
-        return default_val;
-        
-    if (json_object_is_type(obj, json_type_int))
-        return json_object_get_int64(obj);
-        
-    if (json_object_is_type(obj, json_type_string)) {
-        const char *val_str = json_object_get_string(obj);
-        if (val_str && *val_str)
-            return str2l(val_str);
-    }
-    
-    return default_val;
-}
 
 // Extract size_t parameter from json object
 static size_t extract_size_param(struct json_object *params, const char *name, size_t default_val) {
@@ -552,8 +523,8 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     const char *alerts = extract_string_param(params, "alerts");
     
     // Time parameters
-    time_t after = extract_time_param(params, "after", -600);
-    time_t before = extract_time_param(params, "before", 0);
+    time_t after = mcp_extract_time_param(params, "after", MCP_DEFAULT_AFTER_TIME);
+    time_t before = mcp_extract_time_param(params, "before", MCP_DEFAULT_BEFORE_TIME);
     
     // Validate time range
     if (after == 0 && before == 0) {
@@ -666,7 +637,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
                    RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
                    RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
                    RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS | RRDR_OPTION_LONG_JSON_KEYS |
-                   RRDR_OPTION_MCP_INFO,
+                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,
@@ -739,17 +710,41 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_INTERNAL_ERROR;
     }
     
+    // Check if instance filtering or grouping is used
+    bool using_instances = (instances && *instances) || 
+                          (group_by[0].group_by & RRDR_GROUP_BY_INSTANCE);
+    
     // Return the raw query engine response as-is
     mcp_init_success_result(mcpc, id);
     {
         buffer_json_member_add_array(mcpc->result, "content");
         {
+            // Main result content
             buffer_json_add_array_item_object(mcpc->result);
             {
                 buffer_json_member_add_string(mcpc->result, "type", "text");
                 buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(tmp_buffer));
             }
             buffer_json_object_close(mcpc->result);
+            
+            // Add instance usage warning if applicable
+            if (using_instances) {
+                buffer_json_add_array_item_object(mcpc->result);
+                {
+                    buffer_json_member_add_string(mcpc->result, "type", "text");
+                    buffer_json_member_add_string(mcpc->result, "text", 
+                        "⚠️ Instance Usage Notice: Instance filtering/grouping behavior varies by collector type:\n\n"
+                        "- **Stable instances** (systemd services, cgroups): Instance names are typically stable and match their labels. "
+                        "Filtering by instance works reliably.\n\n"
+                        "- **Dynamic instances** (Kubernetes pods, containers, processes): Instance names often contain random IDs or session identifiers. "
+                        "Each restart creates a new instance. For these, filtering/grouping by labels is recommended to see the complete picture across all instances.\n\n"
+                        "- **Detecting restarts**: Grouping by labels and examining instance counts can reveal restart patterns - "
+                        "multiple instances with the same labels but different names often indicate restarts or scaling events.\n\n"
+                        "Best practice: Check if your target system uses stable or dynamic instances. When in doubt, group by labels for comprehensive data, "
+                        "then examine instance patterns for additional insights.");
+                }
+                buffer_json_object_close(mcpc->result);
+            }
         }
         buffer_json_array_close(mcpc->result);  // Close content array
     }

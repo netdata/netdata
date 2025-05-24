@@ -7,7 +7,7 @@
 
 void build_info_to_json_object(BUFFER *b);
 
-void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
+void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array, CONTEXTS_OPTIONS options) {
     if(!now_s)
         now_s = now_realtime_sec();
 
@@ -21,7 +21,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
     buffer_json_member_add_string(wb, "mg", localhost->machine_guid);
     buffer_json_member_add_uuid(wb, "nd", localhost->node_id.uuid);
     buffer_json_member_add_string(wb, "nm", rrdhost_hostname(localhost));
-    buffer_json_member_add_time_t(wb, "now", now_s);
+    buffer_json_member_add_time_t_formatted(wb, "now", now_s, options & CONTEXTS_OPTION_RFC3339);
 
     if(array)
         buffer_json_member_add_uint64(wb, "ai", 0);
@@ -100,8 +100,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             }
 
             if(tier_info->first_time_s < tier_info->last_time_s) {
-                buffer_json_member_add_time_t(wb, "from", tier_info->first_time_s);
-                buffer_json_member_add_time_t(wb, "to", tier_info->last_time_s);
+                buffer_json_member_add_time_t_formatted(wb, "from", tier_info->first_time_s, options & CONTEXTS_OPTION_RFC3339);
+                buffer_json_member_add_time_t_formatted(wb, "to", tier_info->last_time_s, options & CONTEXTS_OPTION_RFC3339);
                 buffer_json_member_add_time_t(wb, "retention", tier_info->retention);
                 buffer_json_member_add_string(wb, "retention_human", tier_info->retention_human);
 

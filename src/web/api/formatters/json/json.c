@@ -104,6 +104,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     size_t overflow_annotation_len = strlen(overflow_annotation);
     size_t object_rows_time_len = strlen(object_rows_time);
 
+    // RFC3339 buffer - allocated once and reused
+    char rfc3339_buf[RFC3339_MAX_LENGTH];
+
     // -------------------------------------------------------------------------
     // print the JSON header
 
@@ -204,11 +207,21 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
+            if(unlikely(options & RRDR_OPTION_RFC3339)) {
+                // Output RFC3339 timestamp
+                usec_t timestamp_ut = (usec_t)r->t[i] * USEC_PER_SEC;
+                rfc3339_datetime_ut(rfc3339_buf, sizeof(rfc3339_buf), timestamp_ut, 0, true);
+                buffer_strcat(wb, "\"");
+                buffer_strcat(wb, rfc3339_buf);
+                buffer_strcat(wb, "\"");
+            }
+            else {
+                buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
 
-            // in ms
-            if(unlikely(options & RRDR_OPTION_MILLISECONDS))
-                buffer_fast_strcat(wb, "000", 3);
+                // in ms
+                if(unlikely(options & RRDR_OPTION_MILLISECONDS))
+                    buffer_fast_strcat(wb, "000", 3);
+            }
 
             buffer_fast_strcat(wb, post_date, post_date_len);
         }

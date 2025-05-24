@@ -117,8 +117,8 @@ void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const char *ke
 
 void query_target_summary_instances_v1(BUFFER *wb, QUERY_TARGET *qt, const char *key);
 
-void jsonwrap_query_plan(RRDR *r, BUFFER *wb);
-void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm);
+void jsonwrap_query_plan(RRDR *r, BUFFER *wb, RRDR_OPTIONS options);
+void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm, RRDR_OPTIONS options);
 
 void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS options);
 

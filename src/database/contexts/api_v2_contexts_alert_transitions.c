@@ -386,7 +386,7 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
             buffer_json_member_add_string(wb, "classification", *t->classification ? t->classification : NULL);
             buffer_json_member_add_string(wb, "type", *t->type ? t->type : NULL);
 
-            buffer_json_member_add_time_t(wb, "when", t->when_key);
+            buffer_json_member_add_time_t_formatted(wb, "when", t->when_key, ctl->options & CONTEXTS_OPTION_RFC3339);
             buffer_json_member_add_string(wb, "info", *t->info ? t->info : "");
             buffer_json_member_add_string(wb, "summary", *t->summary ? t->summary : "");
             buffer_json_member_add_string(wb, "units", *t->units ? t->units : NULL);
@@ -407,9 +407,9 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
 
             buffer_json_member_add_object(wb, "notification");
             {
-                buffer_json_member_add_time_t(wb, "when", t->exec_run_timestamp);
+                buffer_json_member_add_time_t_formatted(wb, "when", t->exec_run_timestamp, ctl->options & CONTEXTS_OPTION_RFC3339);
                 buffer_json_member_add_time_t(wb, "delay", t->delay);
-                buffer_json_member_add_time_t(wb, "delay_up_to_time", t->delay_up_to_timestamp);
+                buffer_json_member_add_time_t_formatted(wb, "delay_up_to_time", t->delay_up_to_timestamp, ctl->options & CONTEXTS_OPTION_RFC3339);
                 health_entry_flags_to_json_array(wb, "flags", t->flags);
                 buffer_json_member_add_string(wb, "exec", *t->exec ? t->exec : string2str(localhost->health.default_exec));
                 buffer_json_member_add_uint64(wb, "exec_code", t->exec_code);

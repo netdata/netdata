@@ -4,6 +4,7 @@
 #define NETDATA_CONTEXTS_OPTIONS_H
 
 #include "libnetdata/libnetdata.h"
+#include "rrdr_options.h"
 
 typedef enum contexts_options {
     CONTEXTS_OPTION_MINIFY                      = (1 << 0), // remove JSON spaces and newlines from JSON output
@@ -21,11 +22,15 @@ typedef enum contexts_options {
     CONTEXTS_OPTION_LIVENESS                    = (1 << 12), // include live status
     CONTEXTS_OPTION_FAMILY                      = (1 << 13), // include family
     CONTEXTS_OPTION_UNITS                       = (1 << 14), // include units
+    CONTEXTS_OPTION_RFC3339                     = (1 << 15), // Return timestamps in RFC3339 format
 } CONTEXTS_OPTIONS;
 
 CONTEXTS_OPTIONS contexts_options_str_to_id(char *o);
 void contexts_options_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_OPTIONS options);
 
 void contexts_options_init(void);
+
+// Map RRDR_OPTIONS to CONTEXTS_OPTIONS for options that are common between both
+CONTEXTS_OPTIONS rrdr_options_to_contexts_options(RRDR_OPTIONS rrdr_options);
 
 #endif //NETDATA_CONTEXTS_OPTIONS_H

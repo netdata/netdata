@@ -316,7 +316,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
             buffer_json_member_add_uuid(wb, "tr_i", t->last_transition_id);
             buffer_json_member_add_double(wb, "tr_v", t->last_status_change_value);
-            buffer_json_member_add_time_t(wb, "tr_t", t->last_status_change);
+            buffer_json_member_add_time_t_formatted(wb, "tr_t", t->last_status_change, ctl->options & CONTEXTS_OPTION_RFC3339);
             buffer_json_member_add_uuid(wb, "cfg", t->config_hash_id);
             buffer_json_member_add_string(wb, "src", string2str(t->source));
 
@@ -333,7 +333,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         if(ctl->request->options & CONTEXTS_OPTION_VALUES) {
             // Netdata Cloud fetched these by querying the agents
             buffer_json_member_add_double(wb, "v", t->value);
-            buffer_json_member_add_time_t(wb, "t", t->last_updated);
+            buffer_json_member_add_time_t_formatted(wb, "t", t->last_updated, ctl->options & CONTEXTS_OPTION_RFC3339);
         }
     }
     buffer_json_object_close(wb); // alert instance

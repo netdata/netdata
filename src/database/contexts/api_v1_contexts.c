@@ -93,8 +93,8 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
     }
 
     buffer_json_member_add_string(wb, "name", string2str(rm->name));
-    buffer_json_member_add_time_t(wb, "first_time_t", rm->first_time_s);
-    buffer_json_member_add_time_t(wb, "last_time_t", rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s);
+    buffer_json_member_add_time_t_formatted(wb, "first_time_t", rm->first_time_s, options & RRDCONTEXT_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "last_time_t", rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_boolean(wb, "collected", rrd_flag_is_collected(rm));
 
     if(options & RRDCONTEXT_OPTION_SHOW_DELETED)
@@ -205,8 +205,8 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(ri->chart_type));
     buffer_json_member_add_uint64(wb, "priority", ri->priority);
     buffer_json_member_add_time_t(wb, "update_every", ri->update_every_s);
-    buffer_json_member_add_time_t(wb, "first_time_t", first_time_s);
-    buffer_json_member_add_time_t(wb, "last_time_t", (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s);
+    buffer_json_member_add_time_t_formatted(wb, "first_time_t", first_time_s, options & RRDCONTEXT_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "last_time_t", (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_boolean(wb, "collected", flags & RRD_FLAG_COLLECTED);
 
     if(options & RRDCONTEXT_OPTION_SHOW_DELETED)
@@ -308,8 +308,8 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
     buffer_json_member_add_string(wb, "family", string2str(rc->family));
     buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rc->chart_type));
     buffer_json_member_add_uint64(wb, "priority", rc->priority);
-    buffer_json_member_add_time_t(wb, "first_time_t", first_time_s);
-    buffer_json_member_add_time_t(wb, "last_time_t", (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s);
+    buffer_json_member_add_time_t_formatted(wb, "first_time_t", first_time_s, options & RRDCONTEXT_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "last_time_t", (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_boolean(wb, "collected", (flags & RRD_FLAG_COLLECTED));
 
     if(options & RRDCONTEXT_OPTION_SHOW_DELETED)
@@ -326,9 +326,9 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
         rrd_reasons_to_buffer_json_array_items(rc->queue.queued_flags, wb);
         buffer_json_array_close(wb);
 
-        buffer_json_member_add_time_t(wb, "last_queued", (time_t)(rc->queue.queued_ut / USEC_PER_SEC));
-        buffer_json_member_add_time_t(wb, "scheduled_dispatch", (time_t)(rc->queue.scheduled_dispatch_ut / USEC_PER_SEC));
-        buffer_json_member_add_time_t(wb, "last_dequeued", (time_t)(rc->queue.dequeued_ut / USEC_PER_SEC));
+        buffer_json_member_add_time_t_formatted(wb, "last_queued", (time_t)(rc->queue.queued_ut / USEC_PER_SEC), options & RRDCONTEXT_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "scheduled_dispatch", (time_t)(rc->queue.scheduled_dispatch_ut / USEC_PER_SEC), options & RRDCONTEXT_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "last_dequeued", (time_t)(rc->queue.dequeued_ut / USEC_PER_SEC), options & RRDCONTEXT_OPTION_RFC3339);
         buffer_json_member_add_uint64(wb, "dispatches", rc->queue.dispatches);
         buffer_json_member_add_uint64(wb, "hub_version", rc->hub.version);
         buffer_json_member_add_uint64(wb, "version", rc->version);
@@ -337,8 +337,8 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
         rrd_reasons_to_buffer_json_array_items(rc->pp.queued_flags, wb);
         buffer_json_array_close(wb);
 
-        buffer_json_member_add_time_t(wb, "pp_last_queued", (time_t)(rc->pp.queued_ut / USEC_PER_SEC));
-        buffer_json_member_add_time_t(wb, "pp_last_dequeued", (time_t)(rc->pp.dequeued_ut / USEC_PER_SEC));
+        buffer_json_member_add_time_t_formatted(wb, "pp_last_queued", (time_t)(rc->pp.queued_ut / USEC_PER_SEC), options & RRDCONTEXT_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "pp_last_dequeued", (time_t)(rc->pp.dequeued_ut / USEC_PER_SEC), options & RRDCONTEXT_OPTION_RFC3339);
         buffer_json_member_add_uint64(wb, "pp_executed", rc->pp.executions);
     }
 

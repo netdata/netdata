@@ -131,10 +131,10 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_string(wb, "name", qt->id);
     buffer_json_member_add_time_t(wb, "view_update_every", r->view.update_every);
     buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
-    buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
-    buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
-    buffer_json_member_add_time_t(wb, "after", r->view.after);
-    buffer_json_member_add_time_t(wb, "before", r->view.before);
+    buffer_json_member_add_time_t_formatted(wb, "first_entry", qt->db.first_time_s, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "last_entry", qt->db.last_time_s, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "after", r->view.after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", r->view.before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_string(wb, "group", time_grouping_tostring(qt->request.time_group_method));
     rrdr_options_to_buffer_json_array(wb, "options", options);
 
@@ -175,7 +175,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_array_close(wb);
 
     if(options & RRDR_OPTION_DEBUG)
-        jsonwrap_query_plan(r, wb);
+        jsonwrap_query_plan(r, wb, options);
 }
 
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb) {

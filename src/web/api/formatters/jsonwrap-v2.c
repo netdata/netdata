@@ -340,8 +340,8 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
             buffer_json_object_close(wb); // selectors
 
             buffer_json_member_add_object(wb, "window");
-            buffer_json_member_add_time_t(wb, "after", qt->request.after);
-            buffer_json_member_add_time_t(wb, "before", qt->request.before);
+            buffer_json_member_add_time_t_formatted(wb, "after", qt->request.after, qt->request.options & RRDR_OPTION_RFC3339);
+            buffer_json_member_add_time_t_formatted(wb, "before", qt->request.before, qt->request.options & RRDR_OPTION_RFC3339);
             buffer_json_member_add_uint64(wb, "points", qt->request.points);
             if (qt->request.options & RRDR_OPTION_SELECTED_TIER)
                 buffer_json_member_add_uint64(wb, JSKEY(tier), qt->request.tier);
@@ -503,8 +503,8 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         
         query_target_title(wb, qt, r->internal.contexts);
         buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);
-        buffer_json_member_add_time_t(wb, "after", r->view.after);
-        buffer_json_member_add_time_t(wb, "before", r->view.before);
+        buffer_json_member_add_time_t_formatted(wb, "after", r->view.after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "before", r->view.before, options & RRDR_OPTION_RFC3339);
 
         if(options & RRDR_OPTION_DEBUG) {
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
@@ -515,8 +515,8 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         if(options & RRDR_OPTION_DEBUG) {
             buffer_json_member_add_object(wb, "partial_data_trimming");
             buffer_json_member_add_time_t(wb, "max_update_every", r->partial_data_trimming.max_update_every);
-            buffer_json_member_add_time_t(wb, "expected_after", r->partial_data_trimming.expected_after);
-            buffer_json_member_add_time_t(wb, "trimmed_after", r->partial_data_trimming.trimmed_after);
+            buffer_json_member_add_time_t_formatted(wb, "expected_after", r->partial_data_trimming.expected_after, options & RRDR_OPTION_RFC3339);
+            buffer_json_member_add_time_t_formatted(wb, "trimmed_after", r->partial_data_trimming.trimmed_after, options & RRDR_OPTION_RFC3339);
             buffer_json_object_close(wb);
         }
 
@@ -543,7 +543,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
     buffer_json_object_close(wb); // view
 
     if(!(options & RRDR_OPTION_MINIMAL_STATS)) {
-        buffer_json_agents_v2(wb, &r->internal.qt->timings, 0, false, true);
+        buffer_json_agents_v2(wb, &r->internal.qt->timings, 0, false, true, rrdr_options_to_contexts_options(options));
         buffer_json_cloud_timings(wb, "timings", &r->internal.qt->timings);
     }
     buffer_json_finalize(wb);
