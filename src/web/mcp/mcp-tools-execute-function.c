@@ -27,8 +27,8 @@ typedef struct condition_s {
     int column_index;                // Index of the column in the row
     char column_name[256];           // Name of the column (for error reporting) - fixed size array
     OPERATOR_TYPE op;                // Operator type
-    struct json_object *value;       // Value to compare against (referenced, not owned)
-    SIMPLE_PATTERN *pattern;         // Pre-compiled pattern for MATCH operations
+    struct json_object *value;       // Value to compare against (referenced, not owned - caller must keep alive)
+    SIMPLE_PATTERN *pattern;         // Pre-compiled pattern for MATCH operations (owned - must be freed)
 } CONDITION;
 
 // Structure to hold an array of conditions
@@ -106,6 +106,103 @@ static void output_columns_as_json(BUFFER *output, struct json_object *columns_o
     buffer_strcat(output, columns_json);
     
     json_object_put(filtered_columns);
+}
+
+// Structure to hold column type and transform information
+typedef struct column_transform_info {
+    RRDF_FIELD_TYPE type;
+    RRDF_FIELD_TRANSFORM transform;
+} COLUMN_TRANSFORM_INFO;
+
+// Check if a column represents a timestamp
+static inline bool is_transformable_timestamp(RRDF_FIELD_TYPE type, RRDF_FIELD_TRANSFORM transform) {
+    return (type == RRDF_FIELD_TYPE_TIMESTAMP || 
+            transform == RRDF_FIELD_TRANSFORM_DATETIME_MS ||
+            transform == RRDF_FIELD_TRANSFORM_DATETIME_USEC);
+}
+
+// Check if a column represents a duration
+static inline bool is_transformable_duration(RRDF_FIELD_TYPE type, RRDF_FIELD_TRANSFORM transform) {
+    (void)transform; // unused for duration
+    return (type == RRDF_FIELD_TYPE_DURATION);
+}
+
+// Check if a column type/transform combination should be transformed to string
+static inline bool is_transformable_to_string(RRDF_FIELD_TYPE type, RRDF_FIELD_TRANSFORM transform) {
+    return is_transformable_timestamp(type, transform) || is_transformable_duration(type, transform);
+}
+
+// Transform a value based on its type and transform settings
+// Returns either a new object (caller owns) or NULL if no transformation needed
+// IMPORTANT: When this returns a non-NULL value, it's a NEW object that the caller owns.
+// When it returns NULL, the caller should use json_object_get() on the original value
+// if they need to store it somewhere that takes ownership.
+static struct json_object *transform_value_for_mcp(struct json_object *val, RRDF_FIELD_TYPE type, RRDF_FIELD_TRANSFORM transform) {
+    if (!val || json_object_is_type(val, json_type_null))
+        return NULL;
+    
+    // If it's not an integer, no transformation possible
+    if (!json_object_is_type(val, json_type_int))
+        return NULL;
+    
+    int64_t num_val = json_object_get_int64(val);
+    
+    if (is_transformable_timestamp(type, transform)) {
+        // Convert to microseconds based on transform
+        usec_t usec_val;
+        if (transform == RRDF_FIELD_TRANSFORM_DATETIME_MS) {
+            usec_val = (usec_t)num_val * USEC_PER_MS;
+        } else if (transform == RRDF_FIELD_TRANSFORM_DATETIME_USEC) {
+            usec_val = (usec_t)num_val;
+        } else {
+            // Default: seconds
+            usec_val = (usec_t)num_val * USEC_PER_SEC;
+        }
+        
+        // Format as RFC3339
+        char datetime_buf[256];
+        rfc3339_datetime_ut(datetime_buf, sizeof(datetime_buf), usec_val, 0, false);
+        return json_object_new_string(datetime_buf);
+    } else if (is_transformable_duration(type, transform)) {
+        // Duration is always in seconds
+        char duration_buf[256];
+        duration_snprintf_time_t(duration_buf, sizeof(duration_buf), (time_t)num_val);
+        return json_object_new_string(duration_buf);
+    }
+    
+    // Value is 0 or negative, no transformation
+    return NULL;
+}
+
+// Extract column transform information from column definitions
+static void extract_column_transforms(struct json_object *columns_obj, 
+                                    int *column_indices, 
+                                    char **column_names,
+                                    size_t selected_count,
+                                    COLUMN_TRANSFORM_INFO *col_transforms) {
+    for (size_t i = 0; i < selected_count; i++) {
+        int col_idx = column_indices[i];
+        const char *col_name = column_names[col_idx];
+        
+        struct json_object *col_obj = NULL;
+        if (json_object_object_get_ex(columns_obj, col_name, &col_obj)) {
+            // Get type
+            struct json_object *type_obj = NULL;
+            if (json_object_object_get_ex(col_obj, "type", &type_obj) && 
+                json_object_is_type(type_obj, json_type_string)) {
+                const char *type_str = json_object_get_string(type_obj);
+                col_transforms[i].type = RRDF_FIELD_TYPE_2id(type_str);
+            }
+            
+            // Get transform from value_options
+            struct json_object *value_options_obj = NULL;
+            if (json_object_object_get_ex(col_obj, "value_options", &value_options_obj) && 
+                json_object_is_type(value_options_obj, json_type_string)) {
+                const char *options_str = json_object_get_string(value_options_obj);
+                col_transforms[i].transform = RRDF_FIELD_TRANSFORM_2id(options_str);
+            }
+        }
+    }
 }
 
 // Convert string operator to enum type
@@ -285,6 +382,9 @@ static bool row_matches_conditions(struct json_object *row, const CONDITION_ARRA
 //   = 0: No conditions provided
 //   < 0: Error processing conditions (-1: generic error, -2: too many conditions, -3: invalid format,
 //        -4: invalid element types, -5: column not found, -6: invalid operator)
+// IMPORTANT: This function stores references to json_object values from conditions_array without
+// incrementing their reference counts. The caller MUST keep conditions_array alive for as long
+// as the returned CONDITION_ARRAY is used.
 static int preprocess_conditions(struct json_object *conditions_array, 
                                 struct json_object *columns_obj,
                                 CONDITION_ARRAY *condition_array,
@@ -362,7 +462,7 @@ static int preprocess_conditions(struct json_object *conditions_array,
             return -6; // Invalid operator
         }
         
-        curr->value = value_obj; // we don't own this, just reference
+        curr->value = value_obj; // Store reference only - we don't own this, conditions_array must stay alive
         curr->pattern = NULL;
         
         // Find column in column definitions
@@ -706,7 +806,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
                         int idx = json_object_get_int(index_obj);
                         if (idx >= 0 && idx < MAX_COLUMNS) {
                             column_selected[idx] = 1;
-                            column_names[idx] = (char*)col; // Just store a reference
+                            column_names[idx] = (char*)col; // Store reference only - columns_obj must stay alive
                         }
                     }
                 } else {
@@ -750,7 +850,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
                 int idx = json_object_get_int(index_obj);
                 if (idx >= 0 && idx < MAX_COLUMNS) {
                     column_selected[idx] = 1;
-                    column_names[idx] = (char*)col_key; // Just store a reference
+                    column_names[idx] = (char*)col_key; // Store reference only - columns_obj must stay alive
                 }
             }
             
@@ -971,7 +1071,40 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         }
     }
 
-    // Create filtered column definitions
+    // Extract column transform information BEFORE creating filtered columns
+    COLUMN_TRANSFORM_INFO col_transforms[MAX_COLUMNS] = {{0}};
+    extract_column_transforms(columns_obj, column_indices, column_names, selected_count, col_transforms);
+
+    // Create filtered data rows with transformation
+    for (size_t i = 0; i < limit; i++) {
+        struct json_object *row = rows[i];
+        struct json_object *new_row = json_object_new_array();
+
+        // Extract only selected columns
+        for (size_t j = 0; j < selected_count; j++) {
+            int col_idx = column_indices[j];
+            struct json_object *val = json_object_array_get_idx(row, col_idx);
+            
+            // Try to transform the value
+            struct json_object *transformed = transform_value_for_mcp(val, col_transforms[j].type, col_transforms[j].transform);
+            
+            if (transformed) {
+                // Use the transformed value (we own it)
+                json_object_array_add(new_row, transformed);
+            } else if (val) {
+                // No transformation needed, use original with ref count increase
+                // json_object_array_add takes ownership, so we must increment ref count
+                json_object_array_add(new_row, json_object_get(val));
+            } else {
+                // NULL value
+                json_object_array_add(new_row, NULL);
+            }
+        }
+
+        json_object_array_add(filtered_data, new_row);
+    }
+
+    // Create filtered column definitions AFTER processing data
     for (size_t i = 0; i < selected_count; i++) {
         int col_idx = column_indices[i];
         const char *col_name = column_names[col_idx];
@@ -983,27 +1116,20 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             // Update index to match new position
             json_object_object_add(col_copy, "index", json_object_new_int((int)i));
             
+            // Check if this column was transformed to string
+            if (is_transformable_to_string(col_transforms[i].type, col_transforms[i].transform)) {
+                // Override type to string since we transformed the value
+                json_object_object_del(col_copy, "type");
+                json_object_object_add(col_copy, "type", json_object_new_string("string"));
+                
+                // Remove numeric-specific properties that don't make sense for strings
+                json_object_object_del(col_copy, "max");
+                json_object_object_del(col_copy, "min");
+                json_object_object_del(col_copy, "units");
+            }
+            
             json_object_object_add(filtered_columns, col_name, col_copy);
         }
-    }
-
-    // Create filtered data rows
-    for (size_t i = 0; i < limit; i++) {
-        struct json_object *row = rows[i];
-        struct json_object *new_row = json_object_new_array();
-
-        // Extract only selected columns
-        for (size_t j = 0; j < selected_count; j++) {
-            int col_idx = column_indices[j];
-            struct json_object *val = json_object_array_get_idx(row, col_idx);
-            if (val) {
-                json_object_array_add(new_row, json_object_get(val));
-            } else {
-                json_object_array_add(new_row, NULL);
-            }
-        }
-
-        json_object_array_add(filtered_data, new_row);
     }
 
     // Add filtered data and columns to result
@@ -1054,7 +1180,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         buffer_strcat(output, "\n```\n\n");
 
         // Get column names for example suggestions
-        char *column_names[MAX_COLUMNS] = {0};
+        char *example_column_names[MAX_COLUMNS] = {0};
         size_t column_name_count = 0;
         
         // Use local variables for the foreach to avoid redefinition conflicts
@@ -1064,7 +1190,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             
             while (!json_object_iter_equal(&it, &itEnd)) {
                 const char *col_key = json_object_iter_peek_name(&it);
-                column_names[column_name_count++] = (char*)col_key;  // Just store a reference, no allocation
+                example_column_names[column_name_count++] = (char*)col_key;  // Store reference only - columns_obj must stay alive
                 if (column_name_count >= column_count)
                     break;
                 
@@ -1079,7 +1205,7 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
         for (size_t i = 0; i < example_count; i++) {
             if (i > 0) strcat(example_columns, ", ");
             char quoted_name[128] = {0};
-            snprintf(quoted_name, sizeof(quoted_name), "\"%s\"", column_names[i]);
+            snprintf(quoted_name, sizeof(quoted_name), "\"%s\"", example_column_names[i]);
             strcat(example_columns, quoted_name);
         }
         
@@ -1117,10 +1243,10 @@ BUFFER *mcp_process_table_result(BUFFER *result_buffer, struct json_object *colu
             "   - To match multiple values, use 'match' with patterns separated by pipe (|): \"*value1*|*value2*\"\n",
             node_name, function_name, 
             example_columns,  // This will be quoted column names
-            column_names[0],
-            column_names[0],  // For numeric example
-            column_names[0],
-            column_names[0]);
+            example_column_names[0],
+            example_column_names[0],  // For numeric example
+            example_column_names[0],
+            example_column_names[0]);
     }
 
     // Clean up
