@@ -33,7 +33,7 @@ struct function_v2_entry {
 
 struct context_v2_entry {
     size_t count;
-    STRING *id;
+    STRING *id; // DO NOT FREE THIS, IT IS NOT DUP'd
     STRING *title;
     STRING *family;
     STRING *units;
@@ -46,7 +46,8 @@ struct context_v2_entry {
     DICTIONARY *instances_dict;
     DICTIONARY *dimensions_dict;
     RRDLABELS_AGGREGATED *labels_aggregated;
-    RRDCONTEXT *rc;
+
+    RRDCONTEXT *rc; // THIS IS TEMPORARY, WHILE REFERENCED, NOT TO BE CLEANED
     
     // For search results
     SEARCH_MATCH_TYPE matched_types;  // Bitmask of all match types
@@ -713,6 +714,21 @@ static void functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
     freez(t->node_ids);
 }
 
+static void contexts_cleanup(struct context_v2_entry *n) {
+    string_freez(n->title);
+    string_freez(n->units);
+    string_freez(n->family);
+
+    // Clean up n's search results
+    dictionary_destroy(n->matched_instances);
+    dictionary_destroy(n->matched_dimensions);
+    rrdlabels_aggregated_destroy(n->matched_labels);
+
+    dictionary_destroy(n->matched_instances);
+    dictionary_destroy(n->matched_dimensions);
+    rrdlabels_aggregated_destroy(n->matched_labels);
+}
+
 static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     struct context_v2_entry *o = old_value;
     struct context_v2_entry *n = new_value;
@@ -830,17 +846,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
         rrdlabels_aggregated_merge(o->matched_labels, n->matched_labels);
     }
 
-    string_freez(n->title);
-    string_freez(n->units);
-    string_freez(n->family);
-    
-    // Clean up n's search results
-    if(n->matched_instances)
-        dictionary_destroy(n->matched_instances);
-    if(n->matched_dimensions)
-        dictionary_destroy(n->matched_dimensions);
-    if(n->matched_labels)
-        rrdlabels_aggregated_destroy(n->matched_labels);
+    contexts_cleanup(n);
 
     // for the react callback to use
     o->rc = n->rc;
@@ -910,17 +916,7 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
 static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct context_v2_entry *z = value;
-    string_freez(z->title);
-    string_freez(z->family);
-    string_freez((z->units));
-    
-    // Clean up the new dictionaries
-    if(z->instances_dict)
-        dictionary_destroy(z->instances_dict);
-    if(z->dimensions_dict)
-        dictionary_destroy(z->dimensions_dict);
-    if(z->labels_aggregated)
-        rrdlabels_aggregated_destroy(z->labels_aggregated);
+    contexts_cleanup(z);
 }
 
 static void contexts_v2_search_results_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl) {
