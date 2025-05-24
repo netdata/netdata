@@ -18,6 +18,10 @@ static struct {
     , {"labels"           , 0    , CONTEXTS_OPTION_LABELS}
     , {"priorities"       , 0    , CONTEXTS_OPTION_PRIORITIES}
     , {"titles"           , 0    , CONTEXTS_OPTION_TITLES}
+    , {"retention"        , 0    , CONTEXTS_OPTION_RETENTION}
+    , {"liveness"         , 0    , CONTEXTS_OPTION_LIVENESS}
+    , {"family"           , 0    , CONTEXTS_OPTION_FAMILY}
+    , {"units"            , 0    , CONTEXTS_OPTION_UNITS}
     , {"rfc3339"          , 0    , CONTEXTS_OPTION_RFC3339}
     , {NULL               , 0    , 0}
 };

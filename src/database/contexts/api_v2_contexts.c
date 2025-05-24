@@ -8,39 +8,17 @@
 // ----------------------------------------------------------------------------
 // /api/v2/contexts API
 
-static const char *fts_match_to_string(FTS_MATCH match) {
-    switch(match) {
-        case FTS_MATCHED_CONTEXT:
-            return "CONTEXT";
-
-        case FTS_MATCHED_INSTANCE:
-            return "INSTANCE";
-
-        case FTS_MATCHED_DIMENSION:
-            return "DIMENSION";
-
-        case FTS_MATCHED_ALERT:
-            return "ALERT";
-
-        case FTS_MATCHED_ALERT_INFO:
-            return "ALERT_INFO";
-
-        case FTS_MATCHED_LABEL:
-            return "LABEL";
-
-        case FTS_MATCHED_FAMILY:
-            return "FAMILY";
-
-        case FTS_MATCHED_TITLE:
-            return "TITLE";
-
-        case FTS_MATCHED_UNITS:
-            return "UNITS";
-
-        default:
-            return "NONE";
-    }
-}
+// Enum for all match types - using bitmask to track multiple matches
+typedef enum {
+    SEARCH_MATCH_NONE = 0,
+    SEARCH_MATCH_CONTEXT_ID = (1 << 0),
+    SEARCH_MATCH_CONTEXT_TITLE = (1 << 1),
+    SEARCH_MATCH_CONTEXT_UNITS = (1 << 2),
+    SEARCH_MATCH_CONTEXT_FAMILY = (1 << 3),
+    SEARCH_MATCH_INSTANCE = (1 << 4),
+    SEARCH_MATCH_DIMENSION = (1 << 5),
+    SEARCH_MATCH_LABEL = (1 << 6),
+} SEARCH_MATCH_TYPE;
 
 struct function_v2_entry {
     size_t size;
@@ -65,11 +43,16 @@ struct context_v2_entry {
     size_t nodes;
     size_t instances;
     RRD_FLAGS flags;
-    FTS_MATCH match;
     DICTIONARY *instances_dict;
     DICTIONARY *dimensions_dict;
     RRDLABELS_AGGREGATED *labels_aggregated;
     RRDCONTEXT *rc;
+    
+    // For search results
+    SEARCH_MATCH_TYPE matched_types;  // Bitmask of all match types
+    DICTIONARY *matched_instances;
+    DICTIONARY *matched_dimensions;
+    RRDLABELS_AGGREGATED *matched_labels;
 };
 
 struct category_entry {
@@ -112,10 +95,10 @@ static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_di
     
     // Calculate how many samples per category
     size_t num_categories = dictionary_entries(categories);
-    size_t samples_per_category = 2; // Default to 2
+    size_t samples_per_category = 3; // Default to 3
     if (num_categories > 0 && cardinality_limit > 0) {
         samples_per_category = cardinality_limit / num_categories;
-        if (samples_per_category < 2) samples_per_category = 2;
+        if (samples_per_category < 3) samples_per_category = 3;
     }
     
     // Add info object first
@@ -135,7 +118,9 @@ static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_di
         size_t samples_shown = 0;
         void *ctx_name;
         dfe_start_read(cat_entry->contexts, ctx_name) {
-            if (samples_shown < samples_per_category) {
+            // Only show samples_per_category - 1 if we need to add "... more"
+            size_t max_to_show = (cat_entry->count > samples_per_category) ? samples_per_category - 1 : cat_entry->count;
+            if (samples_shown < max_to_show) {
                 buffer_json_add_array_item_string(wb, ctx_name_dfe.name);
                 samples_shown++;
             } else {
@@ -144,8 +129,8 @@ static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_di
         }
         dfe_done(ctx_name);
         
-        // Add "... and X more" if there are more contexts
-        if (cat_entry->count > samples_shown) {
+        // Add "... and X more" only if we have more contexts than the limit
+        if (cat_entry->count > samples_per_category) {
             char msg[100];
             snprintf(msg, sizeof(msg), "... and %zu more", cat_entry->count - samples_shown);
             buffer_json_add_array_item_string(wb, msg);
@@ -175,75 +160,95 @@ static inline bool full_text_search_char(FTS_INDEX *fts, SIMPLE_PATTERN *q, char
     return simple_pattern_matches(q, ptr);
 }
 
-static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT *rc, SIMPLE_PATTERN *q) {
-    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->id) ||
-                full_text_search_string(&ctl->q.fts, q, rc->family)))
-        return FTS_MATCHED_CONTEXT;
+// Structure to hold search results
+struct fts_search_results {
+    SEARCH_MATCH_TYPE matched_types;  // Bitmask of all match types
+    DICTIONARY *matched_instances;
+    DICTIONARY *matched_dimensions;
+    RRDLABELS_AGGREGATED *matched_labels;
+};
 
-    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->title)))
-        return FTS_MATCHED_TITLE;
+static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT *rc, SIMPLE_PATTERN *q, struct fts_search_results *results) {
+    // Initialize results
+    results->matched_types = SEARCH_MATCH_NONE;
+    results->matched_instances = NULL;
+    results->matched_dimensions = NULL;
+    results->matched_labels = NULL;
+    
+    // Check context-level matches
+    // Always search ID - it's the primary identifier
+    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->id))) {
+        results->matched_types |= SEARCH_MATCH_CONTEXT_ID;
+    }
+    
+    // Only search family if the option is enabled
+    if((ctl->options & CONTEXTS_OPTION_FAMILY) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->family))) {
+        results->matched_types |= SEARCH_MATCH_CONTEXT_FAMILY;
+    }
+    
+    // Only search title if the option is enabled
+    if((ctl->options & CONTEXTS_OPTION_TITLES) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->title))) {
+        results->matched_types |= SEARCH_MATCH_CONTEXT_TITLE;
+    }
+    
+    // Only search units if the option is enabled
+    if((ctl->options & CONTEXTS_OPTION_UNITS) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->units))) {
+        results->matched_types |= SEARCH_MATCH_CONTEXT_UNITS;
+    }
 
-    if(unlikely(full_text_search_string(&ctl->q.fts, q, rc->units)))
-        return FTS_MATCHED_UNITS;
-
-    FTS_MATCH matched = FTS_MATCHED_NONE;
+    
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(matched) break;
-
         if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, (ri->flags & RRD_FLAG_COLLECTED) ? ctl->now : ri->last_time_s, 0))
             continue;
 
-        if(unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
-           (ri->name != ri->id && full_text_search_string(&ctl->q.fts, q, ri->name))) {
-            matched = FTS_MATCHED_INSTANCE;
-            break;
+        // Check instance name match only if instances option is enabled
+        if((ctl->options & CONTEXTS_OPTION_INSTANCES) && 
+           (unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
+            (ri->name != ri->id && full_text_search_string(&ctl->q.fts, q, ri->name)))) {
+            if(!results->matched_instances)
+                results->matched_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+            dictionary_set(results->matched_instances, string2str(ri->name), NULL, 0);
+            results->matched_types |= SEARCH_MATCH_INSTANCE;
         }
 
-        RRDMETRIC *rm;
-        dfe_start_read(ri->rrdmetrics, rm) {
-            if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, 0))
-                continue;
+        // Check dimensions only if dimensions option is enabled
+        if(ctl->options & CONTEXTS_OPTION_DIMENSIONS) {
+            RRDMETRIC *rm;
+            dfe_start_read(ri->rrdmetrics, rm) {
+                if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, 0))
+                    continue;
 
-            if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
-               (rm->name != rm->id && full_text_search_string(&ctl->q.fts, q, rm->name))) {
-                matched = FTS_MATCHED_DIMENSION;
-                break;
-            }
-        }
-        dfe_done(rm);
-
-        size_t label_searches = 0;
-        RRDLABELS *labels = rrdinstance_labels(ri);
-        if(unlikely(rrdlabels_entries(labels) &&
-                    rrdlabels_match_simple_pattern_parsed(labels, q, ':', &label_searches) == SP_MATCHED_POSITIVE)) {
-            ctl->q.fts.searches += label_searches;
-            ctl->q.fts.char_searches += label_searches;
-            matched = FTS_MATCHED_LABEL;
-            break;
-        }
-        ctl->q.fts.searches += label_searches;
-        ctl->q.fts.char_searches += label_searches;
-
-        if(ri->rrdset) {
-            RRDSET *st = ri->rrdset;
-            rw_spinlock_read_lock(&st->alerts.spinlock);
-            for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->config.name))) {
-                    matched = FTS_MATCHED_ALERT;
-                    break;
-                }
-
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->config.info))) {
-                    matched = FTS_MATCHED_ALERT_INFO;
-                    break;
+                if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
+                   (rm->name != rm->id && full_text_search_string(&ctl->q.fts, q, rm->name))) {
+                    if(!results->matched_dimensions)
+                        results->matched_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+                    dictionary_set(results->matched_dimensions, string2str(rm->name), NULL, 0);
+                    results->matched_types |= SEARCH_MATCH_DIMENSION;
                 }
             }
-            rw_spinlock_read_unlock(&st->alerts.spinlock);
+            dfe_done(rm);
         }
+
+        // Check labels only if labels option is enabled
+        if(ctl->options & CONTEXTS_OPTION_LABELS) {
+            size_t label_searches = 0;
+            RRDLABELS *labels = rrdinstance_labels(ri);
+            if(unlikely(rrdlabels_entries(labels))) {
+                results->matched_labels = rrdlabels_full_text_search(labels, q, results->matched_labels, &label_searches);
+                
+                if(results->matched_labels) {
+                    results->matched_types |= SEARCH_MATCH_LABEL;
+                }
+                
+                ctl->q.fts.searches += label_searches;
+                ctl->q.fts.char_searches += label_searches;
+            }
+        }
+
+        // We don't check alerts anymore as they are less relevant for the search
     }
     dfe_done(ri);
-    return matched;
 }
 
 static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context __maybe_unused) {
@@ -254,11 +259,12 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rc->first_time_s, (rc->flags & RRD_FLAG_COLLECTED) ? ctl->now : rc->last_time_s, 0))
         return 0; // continue to next context
 
-    FTS_MATCH match = FTS_MATCHED_NONE;
+    struct fts_search_results search_results = {0};
+    
     if((ctl->mode & CONTEXTS_V2_SEARCH) && ctl->q.pattern) {
-        match = rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern);
+        rrdcontext_to_json_v2_full_text_search(ctl, rc, ctl->q.pattern, &search_results);
 
-        if(match == FTS_MATCHED_NONE)
+        if(search_results.matched_types == SEARCH_MATCH_NONE)
             return 0; // continue to next context
     }
 
@@ -272,7 +278,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
             .count = 1,
             .id = rc->id,
             .title = string_dup(rc->title),
-            .family = ctl->options & CONTEXTS_OPTION_TITLES ? string_dup(rc->family) : NULL,
+            .family = string_dup(rc->family),
             .units = string_dup(rc->units),
             .priority = rc->priority,
             .first_time_s = rc->first_time_s,
@@ -280,10 +286,14 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
             .flags = rc->flags,
             .nodes = 1,
             .instances = dictionary_entries(rc->rrdinstances),
-            .match = match,
             .instances_dict = NULL,
             .dimensions_dict = NULL,
             .rc = rc,
+            // Store search results
+            .matched_types = search_results.matched_types,
+            .matched_instances = search_results.matched_instances,
+            .matched_dimensions = search_results.matched_dimensions,
+            .matched_labels = search_results.matched_labels,
         };
 
 
@@ -564,7 +574,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         return -1; // stop the query
 
     bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS));
-    bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_ALERTS));
+    bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS));
 
     if(do_contexts) {
         ssize_t added = query_scope_foreach_context(
@@ -783,11 +793,54 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
         o->last_time_s = n->last_time_s;
 
     o->flags |= n->flags;
-    o->match = MIN(o->match, n->match);
+    
+    // Merge search results
+    o->matched_types |= n->matched_types;
+    
+    // For search result dictionaries, we need to merge them
+    if(n->matched_instances && !o->matched_instances) {
+        SWAP(o->matched_instances, n->matched_instances);
+    }
+    else if(n->matched_instances && o->matched_instances) {
+        // Merge entries from n to o
+        void *entry;
+        dfe_start_read(n->matched_instances, entry) {
+            dictionary_set(o->matched_instances, entry_dfe.name, NULL, 0);
+        }
+        dfe_done(entry);
+    }
+    
+    if(n->matched_dimensions && !o->matched_dimensions) {
+        SWAP(o->matched_dimensions, n->matched_dimensions);
+    }
+    else if(n->matched_dimensions && o->matched_dimensions) {
+        // Merge entries from n to o
+        void *entry;
+        dfe_start_read(n->matched_dimensions, entry) {
+            dictionary_set(o->matched_dimensions, entry_dfe.name, NULL, 0);
+        }
+        dfe_done(entry);
+    }
+    
+    if(n->matched_labels && !o->matched_labels) {
+        SWAP(o->matched_labels, n->matched_labels);
+    }
+    else if(n->matched_labels && o->matched_labels) {
+        // Merge n into o
+        rrdlabels_aggregated_merge(o->matched_labels, n->matched_labels);
+    }
 
     string_freez(n->title);
     string_freez(n->units);
     string_freez(n->family);
+    
+    // Clean up n's search results
+    if(n->matched_instances)
+        dictionary_destroy(n->matched_instances);
+    if(n->matched_dimensions)
+        dictionary_destroy(n->matched_dimensions);
+    if(n->matched_labels)
+        rrdlabels_aggregated_destroy(n->matched_labels);
 
     // for the react callback to use
     o->rc = n->rc;
@@ -870,12 +923,280 @@ static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused,
         rrdlabels_aggregated_destroy(z->labels_aggregated);
 }
 
+static void contexts_v2_search_results_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl) {
+    size_t contexts_count = 0;
+    size_t contexts_limit = ctl->request->cardinality_limit;
+    size_t total_contexts = dictionary_entries(ctl->contexts.dict);
+    
+    // Calculate per-context item limit: MIN(cardinality_limit/total_contexts, 3)
+    // But use the contexts that will be shown, not total
+    size_t contexts_to_show = (contexts_limit && total_contexts > contexts_limit) ? contexts_limit : total_contexts;
+    size_t per_context_limit = 3;  // Default minimum
+    if (contexts_limit && contexts_to_show > 0) {
+        size_t calculated_limit = contexts_limit / contexts_to_show;
+        if (calculated_limit > per_context_limit)
+            per_context_limit = calculated_limit;
+    }
+
+    buffer_json_member_add_object(wb, "contexts");
+    
+    struct context_v2_entry *z;
+    dfe_start_read(ctl->contexts.dict, z) {
+        // Check if we've reached the limit
+        if (contexts_limit && contexts_count >= contexts_limit) {
+            // Add a special entry indicating truncation
+            buffer_json_member_add_object(wb, "__truncated__");
+            buffer_json_member_add_uint64(wb, "total_contexts", total_contexts);
+            buffer_json_member_add_uint64(wb, "returned", contexts_count);
+            buffer_json_member_add_uint64(wb, "remaining", total_contexts - contexts_count);
+            buffer_json_object_close(wb);
+            break;
+        }
+
+        buffer_json_member_add_object(wb, string2str(z->id));
+        {
+            // Always show title, family, units in search results for context
+            if (z->matched_types & SEARCH_MATCH_CONTEXT_TITLE)
+                buffer_json_member_add_string(wb, "title", string2str(z->title));
+
+            if (z->matched_types & SEARCH_MATCH_CONTEXT_FAMILY)
+                buffer_json_member_add_string(wb, "family", string2str(z->family));
+
+            if (z->matched_types & SEARCH_MATCH_CONTEXT_UNITS)
+                buffer_json_member_add_string(wb, "units", string2str(z->units));
+            
+            // Output what matched as an array
+            if (!(ctl->options & CONTEXTS_OPTION_MCP)) {
+                buffer_json_member_add_array(wb, "matched");
+                if (z->matched_types & SEARCH_MATCH_CONTEXT_ID)
+                    buffer_json_add_array_item_string(wb, "id");
+                if (z->matched_types & SEARCH_MATCH_CONTEXT_TITLE)
+                    buffer_json_add_array_item_string(wb, "title");
+                if (z->matched_types & SEARCH_MATCH_CONTEXT_UNITS)
+                    buffer_json_add_array_item_string(wb, "units");
+                if (z->matched_types & SEARCH_MATCH_CONTEXT_FAMILY)
+                    buffer_json_add_array_item_string(wb, "families");
+                if (z->matched_types & SEARCH_MATCH_INSTANCE)
+                    buffer_json_add_array_item_string(wb, "instances");
+                if (z->matched_types & SEARCH_MATCH_DIMENSION)
+                    buffer_json_add_array_item_string(wb, "dimensions");
+                if (z->matched_types & SEARCH_MATCH_LABEL)
+                    buffer_json_add_array_item_string(wb, "labels");
+                buffer_json_array_close(wb);
+            }
+
+            // Add instances array if any matched
+            if(z->matched_instances && dictionary_entries(z->matched_instances) > 0) {
+                buffer_json_member_add_array(wb, "instances");
+                void *entry;
+                size_t count = 0;
+                size_t total = dictionary_entries(z->matched_instances);
+                
+                dfe_start_read(z->matched_instances, entry) {
+                    if (per_context_limit && total > per_context_limit && count >= per_context_limit - 1) {
+                        char msg[100];
+                        snprintf(msg, sizeof(msg), "... %zu instances more", total - count);
+                        buffer_json_add_array_item_string(wb, msg);
+                        break;
+                    }
+                    buffer_json_add_array_item_string(wb, entry_dfe.name);
+                    count++;
+                }
+                dfe_done(entry);
+                buffer_json_array_close(wb);
+            }
+            
+            // Add dimensions array if any matched
+            if(z->matched_dimensions && dictionary_entries(z->matched_dimensions) > 0) {
+                buffer_json_member_add_array(wb, "dimensions");
+                void *entry;
+                size_t count = 0;
+                size_t total = dictionary_entries(z->matched_dimensions);
+                
+                dfe_start_read(z->matched_dimensions, entry) {
+                    if (per_context_limit && total > per_context_limit && count >= per_context_limit - 1) {
+                        char msg[100];
+                        snprintf(msg, sizeof(msg), "... %zu dimensions more", total - count);
+                        buffer_json_add_array_item_string(wb, msg);
+                        break;
+                    }
+                    buffer_json_add_array_item_string(wb, entry_dfe.name);
+                    count++;
+                }
+                dfe_done(entry);
+                buffer_json_array_close(wb);
+            }
+            
+            // Add labels if any matched
+            if(z->matched_labels) {
+                rrdlabels_aggregated_to_buffer_json(
+                    z->matched_labels, wb, "labels", per_context_limit);
+            }
+        }
+        buffer_json_object_close(wb);
+        
+        contexts_count++;
+    }
+    dfe_done(z);
+
+    buffer_json_object_close(wb); // contexts
+    
+    // Add info about cardinality limit if it was reached
+    if (contexts_limit && total_contexts > contexts_limit && (ctl->options & CONTEXTS_OPTION_MCP)) {
+        buffer_json_member_add_string(wb, "info", "Cardinality limit reached. Use cardinality_limit parameter to see more results.");
+    }
+}
+
+static void contexts_v2_contexts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl) {
+    size_t contexts_count = 0;
+    size_t contexts_limit = ctl->request->cardinality_limit;
+    size_t total_contexts = dictionary_entries(ctl->contexts.dict);
+
+    bool contexts_is_object = false;
+
+    // If we have more contexts than the limit and MCP option is set, use categorized output
+    if (contexts_limit && total_contexts > contexts_limit && (ctl->options & CONTEXTS_OPTION_MCP)) {
+        buffer_json_member_add_object(wb, "contexts");
+        rrdcontext_categorize_and_output(wb, ctl->contexts.dict, contexts_limit);
+        buffer_json_object_close(wb);
+        if (ctl->options & CONTEXTS_OPTION_MCP) {
+            buffer_json_member_add_string(wb, "info", MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES);
+        }
+    } else {
+        if (ctl->options & (CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS |
+                           CONTEXTS_OPTION_PRIORITIES | CONTEXTS_OPTION_RETENTION | CONTEXTS_OPTION_LIVENESS |
+                           CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS | CONTEXTS_OPTION_INSTANCES)) {
+            contexts_is_object = true;
+            buffer_json_member_add_object(wb, "contexts");
+        } else
+            buffer_json_member_add_array(wb, "contexts");
+
+        struct context_v2_entry *z;
+        dfe_start_read(ctl->contexts.dict, z) {
+            // Check if we've reached the limit
+            if (contexts_limit && contexts_count >= contexts_limit) {
+                // Add a special entry indicating truncation
+                if (contexts_is_object) {
+                    buffer_json_member_add_object(wb, "__truncated__");
+                    buffer_json_member_add_uint64(wb, "total_contexts", total_contexts);
+                    buffer_json_member_add_uint64(wb, "returned", contexts_count);
+                    buffer_json_member_add_uint64(wb, "remaining", total_contexts - contexts_count);
+                    buffer_json_object_close(wb);
+                } else {
+                    char msg[100];
+                    snprintf(msg, sizeof(msg), "... %zu contexts more", total_contexts - contexts_count);
+                    buffer_json_add_array_item_string(wb, msg);
+                }
+                break;
+            }
+
+            bool collected = z->flags & RRD_FLAG_COLLECTED;
+
+            if (contexts_is_object) {
+                buffer_json_member_add_object(wb, string2str(z->id));
+                {
+                    if (ctl->options & CONTEXTS_OPTION_TITLES)
+                        buffer_json_member_add_string(wb, "title", string2str(z->title));
+
+                    if (ctl->options & CONTEXTS_OPTION_FAMILY)
+                        buffer_json_member_add_string(wb, "family", string2str(z->family));
+
+                    if (ctl->options & CONTEXTS_OPTION_UNITS)
+                        buffer_json_member_add_string(wb, "units", string2str(z->units));
+
+                    if (ctl->options & CONTEXTS_OPTION_PRIORITIES)
+                        buffer_json_member_add_uint64(wb, "priority", z->priority);
+
+                    if (ctl->options & CONTEXTS_OPTION_RETENTION) {
+                        buffer_json_member_add_time_t_formatted(wb, "first_entry", z->first_time_s, ctl->options & CONTEXTS_OPTION_RFC3339);
+                        buffer_json_member_add_time_t_formatted(wb, "last_entry", collected ? ctl->now : z->last_time_s, ctl->options & CONTEXTS_OPTION_RFC3339);
+                    }
+
+                    if (ctl->options & CONTEXTS_OPTION_LIVENESS)
+                        buffer_json_member_add_boolean(wb, "live", collected);
+
+                    // Add dimensions sub-object if requested
+                    if ((ctl->options & CONTEXTS_OPTION_DIMENSIONS) && z->dimensions_dict) {
+                        buffer_json_member_add_array(wb, "dimensions");
+                        void *entry;
+                        size_t count = 0;
+                        size_t total = dictionary_entries(z->dimensions_dict);
+                        size_t limit = ctl->request->cardinality_limit;
+
+                        dfe_start_read(z->dimensions_dict, entry) {
+                            if (limit && count >= limit - 1 && total > limit) {
+                                // Add remaining count message
+                                char msg[100];
+                                snprintf(msg, sizeof(msg), "... %zu dimensions more", total - count);
+                                buffer_json_add_array_item_string(wb, msg);
+                                break;
+                            }
+                            buffer_json_add_array_item_string(wb, entry_dfe.name);
+                            count++;
+                        }
+                        dfe_done(entry);
+                        buffer_json_array_close(wb);
+                    }
+
+                    // Add labels sub-object if requested
+                    if ((ctl->options & CONTEXTS_OPTION_LABELS) && z->labels_aggregated) {
+                        rrdlabels_aggregated_to_buffer_json(
+                            z->labels_aggregated, wb, "labels", ctl->request->cardinality_limit);
+                    }
+
+                    // Add instances sub-object if requested
+                    if ((ctl->options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
+                        buffer_json_member_add_array(wb, "instances");
+                        void *entry;
+                        size_t count = 0;
+                        size_t total = dictionary_entries(z->instances_dict);
+                        size_t limit = ctl->request->cardinality_limit;
+
+                        dfe_start_read(z->instances_dict, entry) {
+                            if (limit && count >= limit - 1 && total > limit) {
+                                // Add remaining count message
+                                char msg[100];
+                                snprintf(msg, sizeof(msg), "... %zu instances more", total - count);
+                                buffer_json_add_array_item_string(wb, msg);
+                                break;
+                            }
+                            buffer_json_add_array_item_string(wb, entry_dfe.name);
+                            count++;
+                        }
+                        dfe_done(entry);
+                        buffer_json_array_close(wb);
+                    }
+                }
+                buffer_json_object_close(wb);
+            } else {
+                buffer_json_add_array_item_string(wb, string2str(z->id));
+            }
+
+            contexts_count++;
+        }
+        dfe_done(z);
+
+        if(contexts_is_object) {
+            buffer_json_object_close(wb); // contexts
+
+            if (ctl->options & CONTEXTS_OPTION_MCP) {
+                buffer_json_member_add_string(wb, "info", MCP_INFO_CONTEXT_NEXT_STEPS);
+            }
+        }
+        else {
+            buffer_json_array_close(wb);
+
+            if (ctl->options & CONTEXTS_OPTION_MCP) {
+                buffer_json_member_add_string(wb, "info", MCP_INFO_CONTEXT_ARRAY_RESPONSE);
+            }
+        }
+    }
+}
+
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
     int resp = HTTP_RESP_OK;
     bool run = true;
 
-    if(mode & CONTEXTS_V2_SEARCH)
-        mode |= CONTEXTS_V2_CONTEXTS;
 
     if(mode & (CONTEXTS_V2_AGENTS_INFO))
         mode |= CONTEXTS_V2_AGENTS;
@@ -926,7 +1247,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                                                     NULL, sizeof(struct contexts_v2_node));
     }
 
-    if(mode & CONTEXTS_V2_CONTEXTS) {
+    if(mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH)) {
         ctl.contexts.dict = dictionary_create_advanced(
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
                 sizeof(struct context_v2_entry));
@@ -1105,151 +1426,11 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             buffer_json_array_close(wb);
         }
 
-        if (mode & CONTEXTS_V2_CONTEXTS) {
-            size_t contexts_count = 0;
-            size_t contexts_limit = ctl.request->cardinality_limit;
-            size_t total_contexts = dictionary_entries(ctl.contexts.dict);
-
-            bool contexts_is_object = false;
-
-            // If we have more contexts than the limit and MCP option is set, use categorized output
-            if (contexts_limit && total_contexts > contexts_limit && (ctl.options & CONTEXTS_OPTION_MCP)) {
-                buffer_json_member_add_object(wb, "contexts");
-                rrdcontext_categorize_and_output(wb, ctl.contexts.dict, contexts_limit);
-                buffer_json_object_close(wb);
-                if (ctl.options & CONTEXTS_OPTION_MCP) {
-                    buffer_json_member_add_string(wb, "info", MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES);
-                }
-            } else {
-                if (mode & CONTEXTS_V2_SEARCH ||
-                    ctl.options & (CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS |
-                                   CONTEXTS_OPTION_PRIORITIES | CONTEXTS_OPTION_RETENTION | CONTEXTS_OPTION_LIVENESS |
-                                   CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS | CONTEXTS_OPTION_INSTANCES)) {
-                    contexts_is_object = true;
-                    buffer_json_member_add_object(wb, "contexts");
-                } else
-                    buffer_json_member_add_array(wb, "contexts");
-
-                struct context_v2_entry *z;
-                dfe_start_read(ctl.contexts.dict, z)
-                {
-                    // Check if we've reached the limit
-                    if (contexts_limit && contexts_count >= contexts_limit) {
-                        // Add a special entry indicating truncation
-                        buffer_json_member_add_object(wb, "__truncated__");
-                        buffer_json_member_add_uint64(wb, "total_contexts", total_contexts);
-                        buffer_json_member_add_uint64(wb, "returned", contexts_count);
-                        buffer_json_member_add_uint64(wb, "remaining", total_contexts - contexts_count);
-                        buffer_json_object_close(wb);
-                        break;
-                    }
-
-                    bool collected = z->flags & RRD_FLAG_COLLECTED;
-
-                    if (contexts_is_object) {
-                        buffer_json_member_add_object(wb, string2str(z->id));
-                        {
-                            if (ctl.options & CONTEXTS_OPTION_TITLES)
-                                buffer_json_member_add_string(wb, "title", string2str(z->title));
-
-                            if (ctl.options & CONTEXTS_OPTION_FAMILY)
-                                buffer_json_member_add_string(wb, "family", string2str(z->family));
-
-                            if (ctl.options & CONTEXTS_OPTION_UNITS)
-                                buffer_json_member_add_string(wb, "units", string2str(z->units));
-
-                            if (ctl.options & CONTEXTS_OPTION_PRIORITIES)
-                                buffer_json_member_add_uint64(wb, "priority", z->priority);
-
-                            if (ctl.options & CONTEXTS_OPTION_RETENTION) {
-                                buffer_json_member_add_time_t_formatted(wb, "first_entry", z->first_time_s, ctl.options & CONTEXTS_OPTION_RFC3339);
-                                buffer_json_member_add_time_t_formatted(wb, "last_entry", collected ? ctl.now : z->last_time_s, ctl.options & CONTEXTS_OPTION_RFC3339);
-                            }
-
-                            if (ctl.options & CONTEXTS_OPTION_LIVENESS)
-                                buffer_json_member_add_boolean(wb, "live", collected);
-
-                            if (mode & CONTEXTS_V2_SEARCH)
-                                buffer_json_member_add_string(wb, "match", fts_match_to_string(z->match));
-
-                            // Add dimensions sub-object if requested
-                            if ((ctl.options & CONTEXTS_OPTION_DIMENSIONS) && z->dimensions_dict) {
-                                buffer_json_member_add_array(wb, "dimensions");
-                                void *entry;
-                                size_t count = 0;
-                                size_t total = dictionary_entries(z->dimensions_dict);
-                                size_t limit = ctl.request->cardinality_limit;
-
-                                dfe_start_read(z->dimensions_dict, entry)
-                                {
-                                    if (limit && count >= limit - 1 && total > limit) {
-                                        // Add remaining count message
-                                        char msg[100];
-                                        snprintf(msg, sizeof(msg), "... %zu dimensions more", total - count);
-                                        buffer_json_add_array_item_string(wb, msg);
-                                        break;
-                                    }
-                                    buffer_json_add_array_item_string(wb, entry_dfe.name);
-                                    count++;
-                                }
-                                dfe_done(entry);
-                                buffer_json_array_close(wb);
-                            }
-
-                            // Add labels sub-object if requested
-                            if ((ctl.options & CONTEXTS_OPTION_LABELS) && z->labels_aggregated) {
-                                rrdlabels_aggregated_to_buffer_json(
-                                    z->labels_aggregated, wb, "labels", ctl.request->cardinality_limit);
-                            }
-
-                            // Add instances sub-object if requested
-                            if ((ctl.options & CONTEXTS_OPTION_INSTANCES) && z->instances_dict) {
-                                buffer_json_member_add_array(wb, "instances");
-                                void *entry;
-                                size_t count = 0;
-                                size_t total = dictionary_entries(z->instances_dict);
-                                size_t limit = ctl.request->cardinality_limit;
-
-                                dfe_start_read(z->instances_dict, entry)
-                                {
-                                    if (limit && count >= limit - 1 && total > limit) {
-                                        // Add remaining count message
-                                        char msg[100];
-                                        snprintf(msg, sizeof(msg), "... %zu instances more", total - count);
-                                        buffer_json_add_array_item_string(wb, msg);
-                                        break;
-                                    }
-                                    buffer_json_add_array_item_string(wb, entry_dfe.name);
-                                    count++;
-                                }
-                                dfe_done(entry);
-                                buffer_json_array_close(wb);
-                            }
-                        }
-                        buffer_json_object_close(wb);
-                    } else {
-                        buffer_json_add_array_item_string(wb, string2str(z->id));
-                    }
-
-                    contexts_count++;
-                }
-                dfe_done(z);
-
-                if(contexts_is_object) {
-                    buffer_json_object_close(wb); // contexts
-
-                    if (ctl.options & CONTEXTS_OPTION_MCP) {
-                        buffer_json_member_add_string(wb, "info", MCP_INFO_CONTEXT_NEXT_STEPS);
-                    }
-                }
-                else {
-                    buffer_json_array_close(wb);
-
-                    if (ctl.options & CONTEXTS_OPTION_MCP) {
-                        buffer_json_member_add_string(wb, "info", MCP_INFO_CONTEXT_ARRAY_RESPONSE);
-                    }
-                }
-            } // end else
+        if (mode & CONTEXTS_V2_SEARCH) {
+            contexts_v2_search_results_to_json(wb, &ctl);
+        }
+        else if (mode & CONTEXTS_V2_CONTEXTS) {
+            contexts_v2_contexts_to_json(wb, &ctl);
         }
 
         if (mode & CONTEXTS_V2_ALERTS)
