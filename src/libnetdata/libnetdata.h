@@ -316,6 +316,8 @@ static inline void *CLEANUP_FUNCTION_GET_PTR(void *pptr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+void libnetdata_init(void);
+
 # ifdef __cplusplus
 }
 # endif
