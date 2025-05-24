@@ -35,7 +35,7 @@
 // Include tool-specific header files
 #include "mcp-tools-list-metadata.h"
 #include "mcp-tools-execute-function.h"
-#include "mcp-tools-metrics-query.h"
+#include "mcp-tools-query-metrics.h"
 
 // Tool handler function prototypes
 typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
