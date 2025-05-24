@@ -1705,7 +1705,8 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics,
+            the size of all the data files, and the wait stats in the database you must:
 
             - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
             - Configure a database connection (see Setup → Configuration → Examples).
@@ -1980,6 +1981,46 @@ modules:
               chart_type: line
               dimensions:
                 - name: blocked
+        - name: MSSQL Waits
+          description: "These metrics refer to the Microsoft SQL Server instances defined on the host and their associated wait events."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: wait_type
+              description: A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes.
+            - name: wait_type
+              description: Waits, which are occurrences where a worker thread is not actively processing a query but is instead waiting for a resource or event.
+          metrics:
+            - name: mssql.instance_total_wait
+              description: Number of waits on this wait type.
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
+            - name: mssql.instance_resource_wait
+              description: Time waiting for another resource.
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: period
+            - name: mssql.instance_signal_wait
+              description: Difference between the time that the waiting thread was signaled and when it started running.
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: period
+            - name: mssql.instance_max_wait
+              description: Maximum wait time on this wait type.
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: period
+            - name: mssql.instance_waiting_count
+              description: Number of waits on this wait type.
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
         - name: Database
           description: "These metrics refer to Microsoft SQL Server databases."
           labels:
