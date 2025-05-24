@@ -3,6 +3,9 @@
 #ifndef NETDATA_RRDCONTEXT_H
 #define NETDATA_RRDCONTEXT_H 1
 
+// Forward declaration for pattern_array
+struct pattern_array;
+
 // ----------------------------------------------------------------------------
 // RRDMETRIC
 
@@ -259,6 +262,8 @@ typedef struct query_target_request {
 
     const char *scope_nodes;
     const char *scope_contexts;
+    const char *scope_instances;
+    const char *scope_labels;
 
     // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
@@ -382,9 +387,14 @@ typedef struct query_target {
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *scope_pattern;
         SIMPLE_PATTERN *labels_pattern;
+        SIMPLE_PATTERN *scope_labels_pattern;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
+        SIMPLE_PATTERN *scope_chart_label_key_pattern;
+        struct pattern_array *labels_pa;
+        struct pattern_array *scope_labels_pa;
     } instances;
 
     struct {
@@ -689,9 +699,11 @@ ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, S
 
 typedef ssize_t (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
+                                            SIMPLE_PATTERN *scope_instances_sp,
+                                            struct pattern_array *scope_labels_pa,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
-                                            SIMPLE_PATTERN *labels_sp,
+                                            struct pattern_array *labels_pa,
                                             SIMPLE_PATTERN *alerts_sp,
                                             SIMPLE_PATTERN *dimensions_sp,
                                             bool match_ids, bool match_names,

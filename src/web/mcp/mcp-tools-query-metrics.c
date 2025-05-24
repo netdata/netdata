@@ -754,15 +754,17 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
     // Prepare query target request
     QUERY_TARGET_REQUEST qtr = {
         .version = 3,
-        .scope_nodes = nodes,     // Use nodes as scope_nodes
-        .scope_contexts = context, // Use the single context as scope_contexts
+        .scope_nodes = nodes,       // Use nodes as scope_nodes
+        .scope_contexts = context,  // Use the single context as scope_contexts
+        .scope_instances = instances, // Use instances as scope_instances for MCP
+        .scope_labels = labels,     // Use labels as scope_labels for MCP
         .after = after,
         .before = before,
         .host = NULL,
         .st = NULL,
         .nodes = NULL,              // Don't use nodes parameter here (we use scope_nodes)
         .contexts = NULL,           // Don't use contexts parameter here (we use scope_contexts)
-        .instances = instances,
+        .instances = NULL,          // Don't use instances parameter here (we use scope_instances)
         .dimensions = dimensions,
         .alerts = alerts,
         .timeout_ms = timeout,
@@ -778,7 +780,7 @@ MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_obj
         .resampling_time = 0,
         .tier = tier,
         .chart_label_key = NULL,
-        .labels = labels,
+        .labels = NULL,             // Don't use labels parameter here (we use scope_labels)
         .query_source = QUERY_SOURCE_API_DATA,
         .priority = STORAGE_PRIORITY_NORMAL,
         .received_ut = received_ut,
