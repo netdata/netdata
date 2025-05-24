@@ -264,6 +264,7 @@ typedef struct query_target_request {
     const char *scope_contexts;
     const char *scope_instances;
     const char *scope_labels;
+    const char *scope_dimensions;
 
     // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
@@ -380,6 +381,7 @@ typedef struct query_target {
         QUERY_DIMENSION *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *scope_pattern;
     } dimensions;
 
     struct {
@@ -701,6 +703,7 @@ typedef ssize_t (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_AC
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             SIMPLE_PATTERN *scope_instances_sp,
                                             struct pattern_array *scope_labels_pa,
+                                            SIMPLE_PATTERN *scope_dimensions_sp,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
                                             struct pattern_array *labels_pa,

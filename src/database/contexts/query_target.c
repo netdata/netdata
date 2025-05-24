@@ -101,6 +101,9 @@ void query_target_release(QUERY_TARGET *qt) {
 
     simple_pattern_free(qt->query.pattern);
     qt->query.pattern = NULL;
+    
+    simple_pattern_free(qt->dimensions.scope_pattern);
+    qt->dimensions.scope_pattern = NULL;
 
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
@@ -209,6 +212,7 @@ typedef struct query_target_locals {
     const char *scope_contexts;
     const char *scope_instances;
     const char *scope_labels;
+    const char *scope_dimensions;
 
     const char *nodes;
     const char *contexts;
@@ -408,6 +412,20 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     if(rrd_flag_is_deleted(rm))
         return false;
+    
+    // Check scope_dimensions first - if it doesn't match, skip entirely
+    if(qt->dimensions.scope_pattern) {
+        SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+        
+        if(qtl->match_ids)
+            ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, rm->id, NULL, 0);
+            
+        if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
+            ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, rm->name, NULL, 0);
+            
+        if(ret != SP_MATCHED_POSITIVE)
+            return false;  // Skip this dimension entirely - not in scope
+    }
 
     QUERY_STATUS status = QUERY_STATUS_NONE;
 
@@ -1090,11 +1108,12 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , tier_buffer
         );
     else if(qt->request.version >= 2)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "data_v2://scope_nodes:%s/scope_contexts:%s/scope_instances:%s/scope_labels:%s/nodes:%s/contexts:%s/instances:%s/labels:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/time_group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "data_v2://scope_nodes:%s/scope_contexts:%s/scope_instances:%s/scope_labels:%s/scope_dimensions:%s/nodes:%s/contexts:%s/instances:%s/labels:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/time_group:%s%s/options:%s%s%s"
                 , qt->request.scope_nodes ? qt->request.scope_nodes : "*"
                 , qt->request.scope_contexts ? qt->request.scope_contexts : "*"
                 , qt->request.scope_instances ? qt->request.scope_instances : "*"
                 , qt->request.scope_labels ? qt->request.scope_labels : "*"
+                , qt->request.scope_dimensions ? qt->request.scope_dimensions : "*"
                 , qt->request.nodes ? qt->request.nodes : "*"
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.instances) ? qt->request.instances : "*"
@@ -1182,6 +1201,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
             .scope_contexts = qt->request.scope_contexts,
             .scope_instances = qt->request.scope_instances,
             .scope_labels = qt->request.scope_labels,
+            .scope_dimensions = qt->request.scope_dimensions,
             .nodes = qt->request.nodes,
             .contexts = qt->request.contexts,
             .instances = qt->request.instances,
@@ -1203,6 +1223,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->instances.pattern = string_to_simple_pattern(qtl.instances);
     qt->instances.scope_pattern = string_to_simple_pattern(qtl.scope_instances);
     qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
+    qt->dimensions.scope_pattern = string_to_simple_pattern(qtl.scope_dimensions);
     qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
     qt->instances.scope_chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);  // For now, using same as non-scope
     qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
@@ -1266,6 +1287,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             SIMPLE_PATTERN *scope_instances_sp,
                                             struct pattern_array *scope_labels_pa,
+                                            SIMPLE_PATTERN *scope_dimensions_sp,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
                                             struct pattern_array *labels_pa,
@@ -1331,6 +1353,20 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 dfe_start_read(ri->rrdmetrics, rm) {
                             if(rrd_flag_is_deleted(rm))
                                 continue;
+
+                            // Check scope_dimensions first - if it doesn't match, skip entirely
+                            if(scope_dimensions_sp) {
+                                SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+
+                                if (match_ids)
+                                    ret = simple_pattern_matches_string_extract(scope_dimensions_sp, rm->id, NULL, 0);
+
+                                if (ret == SP_NOT_MATCHED && match_names && (rm->name != rm->id || !match_ids))
+                                    ret = simple_pattern_matches_string_extract(scope_dimensions_sp, rm->name, NULL, 0);
+
+                                if(ret != SP_MATCHED_POSITIVE)
+                                    continue;
+                            }
 
                             if(dimensions_sp) {
                                 SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
