@@ -719,131 +719,143 @@ static void contexts_cleanup(struct context_v2_entry *n) {
     string_freez(n->units);
     string_freez(n->family);
 
-    // Clean up n's search results
-    dictionary_destroy(n->matched_instances);
-    dictionary_destroy(n->matched_dimensions);
-    rrdlabels_aggregated_destroy(n->matched_labels);
+    dictionary_destroy(n->instances_dict);
+    dictionary_destroy(n->dimensions_dict);
+    rrdlabels_aggregated_destroy(n->labels_aggregated);
 
+    // Clean up n's search results
     dictionary_destroy(n->matched_instances);
     dictionary_destroy(n->matched_dimensions);
     rrdlabels_aggregated_destroy(n->matched_labels);
 }
 
 static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+    struct rrdcontext_to_json_v2_data *ctl = data;
     struct context_v2_entry *o = old_value;
     struct context_v2_entry *n = new_value;
 
     o->count++;
 
+    o->flags |= n->flags;
     o->nodes += n->nodes;
     o->instances += n->instances;
 
-    if(o->title != n->title) {
-        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
-            // keep old
-            ;
-        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
-            // keep new
-            SWAP(o->title, n->title);
-        }
-        else {
-            // merge
-            STRING *old_title = o->title;
-            o->title = string_2way_merge(o->title, n->title);
-            string_freez(old_title);
-            // n->title will be freed below
-        }
-    }
-
-    if(o->family != n->family) {
-        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
-            // keep old
-            ;
-        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
-            // keep new
-            SWAP(o->family, n->family);
-        }
-        else {
-            // merge
-            STRING *old_family = o->family;
-            o->family = string_2way_merge(o->family, n->family);
-            string_freez(old_family);
-            // n->family will be freed below
+    if (ctl->options & CONTEXTS_OPTION_TITLES) {
+        if(o->title != n->title) {
+            if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+                // keep old
+                    ;
+            else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+                // keep new
+                SWAP(o->title, n->title);
+            }
+            else {
+                // merge
+                STRING *old_title = o->title;
+                o->title = string_2way_merge(o->title, n->title);
+                string_freez(old_title);
+                // n->title will be freed below
+            }
         }
     }
 
-    if(o->units != n->units) {
-        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
-            // keep old
-            ;
-        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
-            // keep new
-            SWAP(o->units, n->units);
-        }
-        else {
-            // keep old
-            ;
+    if (ctl->options & CONTEXTS_OPTION_FAMILY) {
+        if(o->family != n->family) {
+            if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+                // keep old
+                    ;
+            else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+                // keep new
+                SWAP(o->family, n->family);
+            }
+            else {
+                // merge
+                STRING *old_family = o->family;
+                o->family = string_2way_merge(o->family, n->family);
+                string_freez(old_family);
+                // n->family will be freed below
+            }
         }
     }
 
-    if(o->priority != n->priority) {
-        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
-            // keep o
-            ;
-        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED))
-            // keep n
-            o->priority = n->priority;
-        else
-            // keep the min
-            o->priority = MIN(o->priority, n->priority);
-    }
-
-    if(o->first_time_s && n->first_time_s)
-        o->first_time_s = MIN(o->first_time_s, n->first_time_s);
-    else if(!o->first_time_s)
-        o->first_time_s = n->first_time_s;
-
-    if(o->last_time_s && n->last_time_s)
-        o->last_time_s = MAX(o->last_time_s, n->last_time_s);
-    else if(!o->last_time_s)
-        o->last_time_s = n->last_time_s;
-
-    o->flags |= n->flags;
-    
-    // Merge search results
-    o->matched_types |= n->matched_types;
-    
-    // For search result dictionaries, we need to merge them
-    if(n->matched_instances && !o->matched_instances) {
-        SWAP(o->matched_instances, n->matched_instances);
-    }
-    else if(n->matched_instances && o->matched_instances) {
-        // Merge entries from n to o
-        void *entry;
-        dfe_start_read(n->matched_instances, entry) {
-            dictionary_set(o->matched_instances, entry_dfe.name, NULL, 0);
+    if (ctl->options & CONTEXTS_OPTION_UNITS) {
+        if(o->units != n->units) {
+            if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+                // keep old
+                    ;
+            else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+                // keep new
+                SWAP(o->units, n->units);
+            }
+            else {
+                // keep old
+                ;
+            }
         }
-        dfe_done(entry);
     }
-    
-    if(n->matched_dimensions && !o->matched_dimensions) {
-        SWAP(o->matched_dimensions, n->matched_dimensions);
-    }
-    else if(n->matched_dimensions && o->matched_dimensions) {
-        // Merge entries from n to o
-        void *entry;
-        dfe_start_read(n->matched_dimensions, entry) {
-            dictionary_set(o->matched_dimensions, entry_dfe.name, NULL, 0);
+
+    if (ctl->options & CONTEXTS_OPTION_PRIORITIES) {
+        if(o->priority != n->priority) {
+            if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+                // keep o
+                    ;
+            else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED))
+                // keep n
+                    o->priority = n->priority;
+            else
+                // keep the min
+                    o->priority = MIN(o->priority, n->priority);
         }
-        dfe_done(entry);
     }
-    
-    if(n->matched_labels && !o->matched_labels) {
-        SWAP(o->matched_labels, n->matched_labels);
+
+    if (ctl->options & CONTEXTS_OPTION_RETENTION) {
+        if(o->first_time_s && n->first_time_s)
+            o->first_time_s = MIN(o->first_time_s, n->first_time_s);
+        else if(!o->first_time_s)
+            o->first_time_s = n->first_time_s;
+
+        if(o->last_time_s && n->last_time_s)
+            o->last_time_s = MAX(o->last_time_s, n->last_time_s);
+        else if(!o->last_time_s)
+            o->last_time_s = n->last_time_s;
     }
-    else if(n->matched_labels && o->matched_labels) {
-        // Merge n into o
-        rrdlabels_aggregated_merge(o->matched_labels, n->matched_labels);
+
+    if (ctl->mode & CONTEXTS_V2_SEARCH) {
+        // Merge search results
+        o->matched_types |= n->matched_types;
+
+        // For search result dictionaries, we need to merge them
+        if(n->matched_instances && !o->matched_instances) {
+            SWAP(o->matched_instances, n->matched_instances);
+        }
+        else if(n->matched_instances && o->matched_instances) {
+            // Merge entries from n to o
+            void *entry;
+            dfe_start_read(n->matched_instances, entry) {
+                dictionary_set(o->matched_instances, entry_dfe.name, NULL, 0);
+            }
+            dfe_done(entry);
+        }
+
+        if(n->matched_dimensions && !o->matched_dimensions) {
+            SWAP(o->matched_dimensions, n->matched_dimensions);
+        }
+        else if(n->matched_dimensions && o->matched_dimensions) {
+            // Merge entries from n to o
+            void *entry;
+            dfe_start_read(n->matched_dimensions, entry) {
+                dictionary_set(o->matched_dimensions, entry_dfe.name, NULL, 0);
+            }
+            dfe_done(entry);
+        }
+
+        if(n->matched_labels && !o->matched_labels) {
+            SWAP(o->matched_labels, n->matched_labels);
+        }
+        else if(n->matched_labels && o->matched_labels) {
+            // Merge n into o
+            rrdlabels_aggregated_merge(o->matched_labels, n->matched_labels);
+        }
     }
 
     contexts_cleanup(n);
@@ -854,31 +866,26 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     return true;
 }
 
-static void contexts_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
-    struct context_v2_entry *t = value;
-    struct rrdcontext_to_json_v2_data *ctl = data;
-
-    // Initialize dictionaries for the new features if the corresponding options are set
-    if(ctl->options & CONTEXTS_OPTION_INSTANCES) {
-        t->instances_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
-    }
-
-    if(ctl->options & CONTEXTS_OPTION_DIMENSIONS) {
-        t->dimensions_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
-    }
-
-    if(ctl->options & CONTEXTS_OPTION_LABELS) {
-        t->labels_aggregated = rrdlabels_aggregated_create();
-    }
-}
-
 static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     struct context_v2_entry *t = value;
     struct rrdcontext_to_json_v2_data *ctl = data;
 
     // Only populate dictionaries if they exist (meaning the options are enabled)
-    if(!(ctl->options & (CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS)))
+    if(!(ctl->mode & CONTEXTS_V2_CONTEXTS) || !(ctl->options & (CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_DIMENSIONS | CONTEXTS_OPTION_LABELS)))
         return;
+
+    // Initialize dictionaries for the new features if the corresponding options are set
+    if(ctl->options & CONTEXTS_OPTION_INSTANCES && !t->instances_dict) {
+        t->instances_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+    }
+
+    if(ctl->options & CONTEXTS_OPTION_DIMENSIONS && !t->dimensions_dict) {
+        t->dimensions_dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+    }
+
+    if(ctl->options & CONTEXTS_OPTION_LABELS && !t->labels_aggregated) {
+        t->labels_aggregated = rrdlabels_aggregated_create();
+    }
 
     RRDCONTEXT *rc = t->rc;
 
@@ -889,12 +896,12 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
             continue;
 
         // Add instance name to instances dictionary
-        if((ctl->options & CONTEXTS_OPTION_INSTANCES) && t->instances_dict) {
+        if(t->instances_dict) {
             dictionary_set(t->instances_dict, string2str(ri->name), NULL, 0);
         }
 
         // Collect dimensions from this instance
-        if((ctl->options & CONTEXTS_OPTION_DIMENSIONS) && t->dimensions_dict) {
+        if(t->dimensions_dict) {
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
                 if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, (time_t)ri->update_every_s))
@@ -906,7 +913,7 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
         }
 
         // Collect labels from this instance
-        if((ctl->options & CONTEXTS_OPTION_LABELS) && t->labels_aggregated) {
+        if(t->labels_aggregated) {
             RRDLABELS *labels = rrdinstance_labels(ri);
             rrdlabels_aggregated_add_from_rrdlabels(t->labels_aggregated, labels);
         }
@@ -1248,7 +1255,6 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL,
                 sizeof(struct context_v2_entry));
 
-        dictionary_register_insert_callback(ctl.contexts.dict, contexts_insert_callback, &ctl);
         dictionary_register_conflict_callback(ctl.contexts.dict, contexts_conflict_callback, &ctl);
         dictionary_register_react_callback(ctl.contexts.dict, contexts_react_callback, &ctl);
         dictionary_register_delete_callback(ctl.contexts.dict, contexts_delete_callback, &ctl);
