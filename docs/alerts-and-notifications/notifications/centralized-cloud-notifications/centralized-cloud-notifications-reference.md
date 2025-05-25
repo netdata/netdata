@@ -81,6 +81,7 @@ flowchart LR
 Netdata Cloud offers a silencing rule engine to mute Alert notifications based on specific conditions related to nodes or Alert types. You can manage these settings [here](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md).
 
 You can set up silencing rules that apply to any combination of:
+
 - Users, rooms, nodes, host labels
 - Contexts (charts), alert name, alert role
 - Optional starting and ending date/time for scheduled maintenance windows

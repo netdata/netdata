@@ -6,13 +6,13 @@ From the Cloud interface, you can manage your Space's notification settings as w
 
 Netdata supports five types of notifications that you can configure:
 
-| **Notification Type** | **Description** |
-|:---------------------|:----------------|
-| **Critical** | Alerts indicating serious problems requiring immediate action |
-| **Warning** | Alerts showing concerning behavior that requires attention |
-| **Clear** | Notifications when alerts return to normal state |
-| **Reachable** | Notifications when nodes come back online |
-| **Unreachable** | Notifications when nodes go offline or become unreachable |
+| **Notification Type** | **Description**                                               |
+|:----------------------|:--------------------------------------------------------------|
+| **Critical**          | Alerts indicating serious problems requiring immediate action |
+| **Warning**           | Alerts showing concerning behavior that requires attention    |
+| **Clear**             | Notifications when alerts return to normal state              |
+| **Reachable**         | Notifications when nodes come back online                     |
+| **Unreachable**       | Notifications when nodes go offline or become unreachable     |
 
 ## Manage Space Notification Settings
 
@@ -25,12 +25,12 @@ To manage Space notification settings, you will need the following:
 
 ### Available Actions per Notification Method Based on Service Level
 
-| **Action** | **Personal Service Level** | **System Service Level** |
+| **Action**                                      | **Personal Service Level** | **System Service Level** |
 |:------------------------------------------------|:--------------------------:|:------------------------:|
-| Enable / Disable | X | X |
-| Edit | | X |
-| Delete | X | X |
-| Add multiple configurations for the same method | | X |
+| Enable / Disable                                |             X              |            X             |
+| Edit                                            |                            |            X             |
+| Delete                                          |             X              |            X             |
+| Add multiple configurations for the same method |                            |            X             |
 
 :::note
 
@@ -51,39 +51,40 @@ To manage Space notification settings, you will need the following:
 You will be presented with a table of the configured notification methods for the Space. You will be able to:
 
 - **Add a new** notification method configuration:
-  - Choose the service from the list of available ones. The available options will depend on your subscription plan.
+    - Choose the service from the list of available ones. The available options will depend on your subscription plan.
 
   :::tip
 
-  - You can optionally provide a name for the configuration so you can refer to it.
-  - You can define the filtering criteria, regarding which Rooms the method will apply, and what notifications you want to receive (Critical, Warning, Clear, Reachable and Unreachable).
-  
+    - You can optionally provide a name for the configuration so you can refer to it.
+    - You can define the filtering criteria, regarding which Rooms the method will apply, and what notifications you want to receive (Critical, Warning, Clear, Reachable and Unreachable).
+
   :::
 
-  - Depending on the service, different inputs will be present. 
-  
+    - Depending on the service, different inputs will be present.
+
   :::note
-  
+
   Please note that there are mandatory and optional inputs.
 
   :::
-  
+
   :::tip
 
-  - If you have doubts on how to configure the service, you can find a link at the top of the modal that takes you to the specific documentation page to help you.
+    - If you have doubts on how to configure the service, you can find a link at the top of the modal that takes you to the specific documentation page to help you.
 
   :::
 
 - **Edit an existing** notification method configuration. Personal level ones can't be edited here, see [Manage User Notification Settings](#manage-user-notification-settings). You will be able to change:
-  - The name provided for it
-  - Filtering criteria
-  - Service-specific inputs
+    - The name provided for it
+    - Filtering criteria
+    - Service-specific inputs
 
 - **Enable/Disable** a given notification method configuration:
-  - Use the toggle to enable or disable the notification method configuration
+    - Use the toggle to enable or disable the notification method configuration
 
 - **Delete an existing** notification method configuration. Netdata provided ones can't be deleted, e.g., Email:
-  - Use the trash icon to delete your configuration
+    - Use the trash icon to delete your configuration
+
 </details>
 
 ## Testing Your Notification Setup
@@ -106,6 +107,7 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 # Test specific role
 ./plugins.d/alarm-notify.sh test "webmaster"
 ```
+
 </details>
 
 ## What Happens After Configuration
@@ -144,18 +146,22 @@ Click on your profile picture and navigate to **Settings** → **Notifications**
 <summary><strong>Review Available Options</strong></summary><br/>
 
 You are presented with:
+
 - The Personal [service level](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#service-level) notification methods you can manage
 - The list of Spaces and Rooms you have access to
+
 </details>
 
 <details>
 <summary><strong>Configure Your Notifications</strong></summary><br/>
 
 On this modal you will be able to:
+
 - **Enable/Disable** the notification method on a personal scope, this applies across all Spaces and Rooms
 - **Define what notifications you want to receive** per Space/Room: Critical, Warning, Clear, Reachable and Unreachable
 - **Join a Room and activate notifications**:
-  - From the **All Rooms** tab, click on the Join button for the Room(s) you want
+    - From the **All Rooms** tab, click on the Join button for the Room(s) you want
+
 </details>
 
 ## Best Practices
@@ -163,6 +169,7 @@ On this modal you will be able to:
 Based on Netdata's documentation, here are recommended practices:
 
 ### Filtering Strategy
+
 - Use **Room-based filtering** to organize notifications by infrastructure components
 - Apply **severity filtering** to route Critical alerts to immediate channels (like PagerDuty) and Warning alerts to monitoring channels (like Slack)
 - Utilize **host labels** for granular targeting of specific infrastructure segments
