@@ -670,13 +670,13 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
-    if(unlikely(!parser->user.chart_rrdlabels_linked_temporarily)) {
-        RRDSET *st = pluginsd_get_scope_chart(parser);
-        parser->user.chart_rrdlabels_linked_temporarily = st->rrdlabels;
-        rrdlabels_unmark_all(parser->user.chart_rrdlabels_linked_temporarily);
-    }
+    RRDSET *st = pluginsd_get_scope_chart(parser);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_CLABEL, "Got CHART LABEL without a chart");
 
-    rrdlabels_add(parser->user.chart_rrdlabels_linked_temporarily, name, value, str2l(label_source));
+    if(unlikely(parser->user.clabel_count++ == 0))
+        rrdlabels_unmark_all(st->rrdlabels);
+
+    rrdlabels_add(st->rrdlabels, name, value, str2l(label_source));
 
     return PARSER_RC_OK;
 }
@@ -690,18 +690,19 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
 
     netdata_log_debug(D_PLUGINSD, "requested to commit chart labels");
 
-    if(!parser->user.chart_rrdlabels_linked_temporarily) {
+    if(!parser->user.clabel_count) {
         netdata_log_error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.", rrdhost_hostname(host));
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
-    rrdlabels_remove_all_unmarked(parser->user.chart_rrdlabels_linked_temporarily);
+    rrdlabels_remove_all_unmarked(st->rrdlabels);
 
     rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     rrdset_metadata_updated(st);
 
-    parser->user.chart_rrdlabels_linked_temporarily = NULL;
+    parser->user.clabel_count = 0;
+
     return PARSER_RC_OK;
 }
 
@@ -1124,7 +1125,7 @@ void pluginsd_process_cleanup(PARSER *parser) {
     pluginsd_host_define_cleanup(parser);
 
     rrdlabels_destroy(parser->user.new_host_labels);
-    rrdlabels_destroy(parser->user.chart_rrdlabels_linked_temporarily);
+    parser->user.clabel_count = 0;
 
     parser_destroy(parser);
 }
