@@ -169,8 +169,8 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .name = MCP_TOOL_QUERY_METRICS,
         .title = "Query metrics data",
         .description = "Queries time-series metrics data with powerful aggregation options. Specify context, time range, and grouping (by dimension, instance, node, or label). Returns data points with statistics and contribution analysis.\n",
-        .execute_callback = mcp_tool_metrics_query_execute,
-        .schema_callback = mcp_tool_metrics_query_schema,
+        .execute_callback = mcp_tool_query_metrics_execute,
+        .schema_callback = mcp_tool_query_metrics_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },

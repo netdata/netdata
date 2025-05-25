@@ -142,7 +142,7 @@ static int convert_array_to_pipe_separated(struct json_object *array_obj, BUFFER
 }
 
 // JSON schema for the metrics query tool
-void mcp_tool_metrics_query_schema(BUFFER *buffer) {
+void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     // Tool input schema
     buffer_json_member_add_object(buffer, "inputSchema");
     buffer_json_member_add_string(buffer, "type", "object");
@@ -454,7 +454,7 @@ static size_t extract_size_param(struct json_object *params, const char *name, s
 }
 
 // Execute the metrics query
-MCP_RETURN_CODE mcp_tool_metrics_query_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || id == 0)
         return MCP_RC_ERROR;
 
