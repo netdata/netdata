@@ -232,7 +232,7 @@ metrics:
       - OID: 1.3.6.1.2.1.4.31.3.1.25
         name: ipIfStatsOutDiscards
         description: The number of output IP datagrams for which no problem was encountered to prevent their transmission to their destination, but were discarded
-        family: Network/Interfaces/Error
+        family: Network/Interfaces/Errors
         unit: "{error}"
       - OID: 1.3.6.1.2.1.4.31.3.1.7
         name: ipIfStatsInHdrErrors
