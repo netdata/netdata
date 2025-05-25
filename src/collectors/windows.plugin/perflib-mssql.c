@@ -16,6 +16,7 @@
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
 BOOL is_sqlexpress = FALSE;
+BOOL has_mssql_installed = TRUE;
 ND_THREAD *mssql_query_thread = NULL;
 
 struct netdata_mssql_conn {
@@ -949,11 +950,11 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
 static int mssql_fill_dictionary()
 {
-    HKEY hKey;
+    HKEY hKey = NULL;
     LSTATUS ret = RegOpenKeyExA(
         HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Microsoft SQL Server\\Instance Names\\SQL", 0, KEY_READ, &hKey);
     if (ret != ERROR_SUCCESS)
-        return -1;
+        goto endMSSQLFillDict;
 
     DWORD values = 0;
 
@@ -988,9 +989,15 @@ static int mssql_fill_dictionary()
     }
 
 endMSSQLFillDict:
-    RegCloseKey(hKey);
+    if (hKey)
+        RegCloseKey(hKey);
 
-    return (ret == ERROR_SUCCESS) ? 0 : -1;
+    if (ret != ERROR_SUCCESS) {
+        has_mssql_installed = FALSE;
+        return -1;
+    }
+
+    return  0;
 }
 
 int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -2218,9 +2225,8 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
-    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
     int *update_every = data;
-
+    DWORD i;
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
@@ -2231,24 +2237,27 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_sql_statistics,
         do_mssql_access_methods};
 
-    DWORD i;
-    for (i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
-        if (!collect_perflib[i])
-            continue;
+    if (has_mssql_installed) {
+        static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
 
-        DWORD id = RegistryFindIDByName(mi->objectName[i]);
-        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
-            collect_perflib[i] = false;
-            continue;
+        for (i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
+            if (!collect_perflib[i])
+                continue;
+
+            DWORD id = RegistryFindIDByName(mi->objectName[i]);
+            if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+                collect_perflib[i] = false;
+                continue;
+            }
+
+            PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+            if (!pDataBlock) {
+                collect_perflib[i] = false;
+                continue;
+            }
+
+            doMSSQL[i](pDataBlock, mi, *update_every);
         }
-
-        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-        if (!pDataBlock) {
-            collect_perflib[i] = false;
-            continue;
-        }
-
-        doMSSQL[i](pDataBlock, mi, *update_every);
     }
 
     return 1;
