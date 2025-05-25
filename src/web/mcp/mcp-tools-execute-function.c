@@ -477,17 +477,23 @@ static int preprocess_conditions(struct json_object *conditions_array,
         curr->value = value_obj; // Store reference only - we don't own this, conditions_array must stay alive
         curr->pattern = NULL;
         
+        // Check for special column names that mean "search all columns"
+        bool is_all_columns = (strcmp(col_name, "*") == 0 || strcmp(col_name, "") == 0);
+        
         // Find column in column definitions
         struct json_object *col_obj = NULL;
-        if (!json_object_object_get_ex(columns_obj, col_name, &col_obj)) {
-            // Column not found - mark it as a wildcard search (use -1 as special index)
+        if (is_all_columns || !json_object_object_get_ex(columns_obj, col_name, &col_obj)) {
+            // Column not found or explicitly all columns - mark it as a wildcard search (use -1 as special index)
             curr->column_index = -1;
             
-            if (has_missing_columns)
-                *has_missing_columns = true;
-            
-            if (error_buffer) {
-                buffer_sprintf(error_buffer, "Column not found: '%s' at index %zu", col_name, i);
+            // Only report as missing if it's not a special "all columns" indicator
+            if (!is_all_columns) {
+                if (has_missing_columns)
+                    *has_missing_columns = true;
+                
+                if (error_buffer) {
+                    buffer_sprintf(error_buffer, "Column not found: '%s' at index %zu", col_name, i);
+                }
             }
             // Don't return error yet - we'll handle this specially
         } else {
@@ -517,8 +523,6 @@ static int preprocess_conditions(struct json_object *conditions_array,
     
     return (int)condition_array->count; // Return the number of conditions processed
 }
-
-
 
 // Flags to indicate what additional content should be added for errors
 typedef enum {
@@ -689,7 +693,8 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc) {
             "  \"columns\": [\"CmdLine\", \"CPU\", \"Memory\", \"Status\"],\n"
             "  \"conditions\": [\n"
             "    [\"Memory\", \">\", 1.0],\n"
-            "    [\"CmdLine\", \"match\", \"*systemd*|*postgresql*|*docker*\"]\n"
+            "    [\"CmdLine\", \"match\", \"*systemd*|*postgresql*|*docker*\"],\n"
+            "    [\"*\", \"match\", \"*error*|*warning*\"]  // Search all columns\n"
             "  ],\n"
             "  \"sort_column\": \"CPU\",\n"
             "  \"sort_order\": \"desc\",\n"
@@ -698,7 +703,8 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc) {
             "```\n"
             "\n"
             "Operators: ==, !=, <, <=, >, >=, match (simple pattern), not match (simple pattern)\n"
-            "Simple patterns: '*this*|*that*|*other*' (wildcard search to find strings that include 'this', or 'that', or 'other')"
+            "Simple patterns: '*this*|*that*|*other*' (wildcard search to find strings that include 'this', or 'that', or 'other')\n"
+            "Full-text search: Use '*' or '' as column name to search across all columns"
         );
     }
     buffer_json_object_close(mcpc->result);
@@ -847,7 +853,11 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", "Filter conditions");
-        buffer_json_member_add_string(buffer, "description", "Array of conditions to filter rows. Each condition is an array of [column, operator, value] where operator can be ==, !=, <>, <, <=, >, >=, match, not match");
+        buffer_json_member_add_string(buffer, "description",
+            "Array of conditions to filter rows. "
+            "Each condition is an array of [column, operator, value] where operator "
+            "can be ==, !=, <>, <, <=, >, >=, match, not match. "
+            "Use '*' or '' (empty string) as column name to search across all columns.");
         
         buffer_json_member_add_object(buffer, "items");
         {
