@@ -323,7 +323,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
             if (options & RRDR_OPTION_MILLISECONDS)
                 buffer_json_add_array_item_time_ms(wb, now); // the time
             else
-                buffer_json_add_array_item_time_t(wb, now); // the time
+                buffer_json_add_array_item_time_t_formatted(wb, now, options & RRDR_OPTION_RFC3339); // the time
 
             for (d = 0; d < used; d++) {
                 if (!rrdr_dimension_should_be_exposed(r->od[d], options))
