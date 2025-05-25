@@ -56,13 +56,15 @@ static struct netdata_mssql_conn *mssql_conn_list = NULL;
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
     NETDATA_MSSQL_SQL_ERRORS,
-    NETDATA_MSSQL_DATABASE,
     NETDATA_MSSQL_LOCKS,
     NETDATA_MSSQL_WAITS,
     NETDATA_MSSQL_MEMORY,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
     NETDATA_MSSQL_ACCESS_METHODS,
+
+    // Data get with queries
+    NETDATA_MSSQL_DATABASE,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -2429,7 +2431,7 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     struct mssql_db_instance *mdi = value;
     const char *db = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    if (!mdi->collecting_data) {
+    if (!mdi->collecting_data || !mdi->parent) {
         goto endchartcb;
     }
 
@@ -2462,32 +2464,6 @@ endchartcb:
 
 static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_DATABASE]);
-    if (!pObjectType)
-        return;
-
-    PERF_INSTANCE_DEFINITION *pi = NULL;
-    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
-            break;
-
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", (size_t)sizeof(windows_shared_buffer) - 1);
-
-        if (!strcasecmp(windows_shared_buffer, "_Total"))
-            continue;
-
-        struct mssql_db_instance *mdi =
-            dictionary_set(mi->databases, windows_shared_buffer, NULL, (size_t)sizeof(*mdi));
-        if (!mdi)
-            continue;
-
-        if (!mdi->parent) {
-            mdi->parent = mi;
-        }
-    }
-
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_charts_cb, &update_every);
 }
 
@@ -2631,18 +2607,21 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
-        do_mssql_databases,
         do_mssql_locks,
         do_mssql_waits,
         do_mssql_memory_mgr,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
-        do_mssql_access_methods};
+        do_mssql_access_methods,
+
+        // Data Get with queries
+        do_mssql_databases
+    };
 
     if (has_mssql_installed) {
         static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
 
-        for (i = 0; i < NETDATA_MSSQL_METRICS_END; i++) {
+        for (i = 0; i < NETDATA_MSSQL_DATABASE; i++) {
             if (!collect_perflib[i])
                 continue;
 
@@ -2660,6 +2639,10 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
 
             doMSSQL[i](pDataBlock, mi, *update_every);
         }
+    }
+
+    for (i = NETDATA_MSSQL_DATABASE; i < NETDATA_MSSQL_METRICS_END; i++) {
+        doMSSQL[i](NULL, mi, *update_every);
     }
 
     return 1;
