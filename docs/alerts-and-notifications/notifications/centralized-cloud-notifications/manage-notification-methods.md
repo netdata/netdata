@@ -187,6 +187,6 @@ Based on Netdata's documentation, here are recommended practices:
 
 ## Related Documentation
 
-- [Alert notification silencing rules](/docs/alerting/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules)
+- [Alert notification silencing rules](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md)
 - [Service classification reference](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#service-classification)
-- [Agent notification testing](/docs/alerts-&-notifications/notifications/agent-dispatched-notifications/agent-notifications-reference)
+- [Agent notification testing](/src/health/notifications/README.md#testing-your-notification-setup)

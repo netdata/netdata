@@ -139,7 +139,7 @@ You will see configured Alert notification silencing rules for the space (if you
 
 **Immediate**: From now until turned off or until specific duration (start and end date automatically set).
 
-**Scheduled**: Specify start and end time when rule becomes active and inactive (time set according to your browser local timezone).
+**Scheduled**: Specify start and end time when the rule becomes active and inactive (time set according to your browser local timezone).
 </details>
 
 ## Step-by-Step Wizards for Common Use Cases
@@ -166,9 +166,9 @@ You will see configured Alert notification silencing rules for the space (if you
 **Validation Checklist**:
 
 - Admin/Manager permissions confirmed.
-- All rooms and nodes targeted (*).
-- Maintenance window times set correctly.
-- Rule name includes date for easy reference.
+- All rooms and nodes are targeted (*).
+- Maintenance window times are set correctly.
+- Rule name includes a date for easy reference.
 
 </details>
 
@@ -194,7 +194,7 @@ You will see configured Alert notification silencing rules for the space (if you
 **Validation Checklist**:
 
 - Correct room selected (not "All Rooms")
-- Team members have access to specified room
+- Team members have access to the specified room
 - Rule name clearly identifies team and scope
 
 </details>
@@ -216,13 +216,13 @@ You will see configured Alert notification silencing rules for the space (if you
     - Alert Name: *
     - Alert Context: *
     - Alert Role: *
-5. **Timing**: Scheduled with maintenance window
+5. **Timing**: Scheduled with the maintenance window
 
 **Validation Checklist**:
 
 - Exact node name specified correctly
 - Maintenance window times confirmed
-- Other team members notified if using "All users"
+- Other team members are notified if using "All users"
 
 </details>
 
@@ -233,8 +233,8 @@ You will see configured Alert notification silencing rules for the space (if you
 
 **Configuration Steps**:
 
-1. Choose appropriate scope ("All users" or "Myself")
-2. Set name: "Load Testing - CPU Alerts"
+1. Choose the appropriate scope ("All users" or "Myself")
+2. Set the name: "Load Testing - CPU Alerts"
 3. **Node Criteria**:
     - Rooms: [testing environment rooms]
     - Nodes: * (or specific test nodes)
@@ -243,7 +243,7 @@ You will see configured Alert notification silencing rules for the space (if you
     - Alert Name: *
     - Alert Context: system.cpu
     - Alert Role: *
-5. **Timing**: Scheduled for testing period
+5. **Timing**: Scheduled for the testing period
 
 :::tip
 

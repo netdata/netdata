@@ -4,13 +4,13 @@ Netdata Cloud sends Alert notifications for nodes in warning, critical, or unrea
 
 ## Benefits of Centralized Notifications
 
-- Consolidate health status views across all infrastructure in one place
+- Consolidate health status views across all infrastructure components in one place
 - Set up and [manage your Alert notifications easily](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md)
 - Expedite troubleshooting with tools like [Metric Correlations](/docs/metric-correlations.md) and the [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md)
 
 :::info
 
-To avoid notification overload, **flood protection** is triggered when a node frequently disconnects or sends excessive Alerts, highlighting potential issues. You can still access node details through Netdata Cloud, or directly via the local Agent dashboard.
+To avoid notification overload, **flood protection** is triggered when a node frequently disconnects or sends excessive Alerts, highlighting potential issues. You can still access node details through Netdata Cloud or directly via the local Agent dashboard.
 
 :::
 
