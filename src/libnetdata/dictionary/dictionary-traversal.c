@@ -203,12 +203,6 @@ static int dictionary_sort_compar(const void *item1, const void *item2) {
 int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data, dict_item_comparator_t item_comparator) {
     if(unlikely(!dict || !walkthrough_callback)) return 0;
 
-    if(!item_comparator) {
-        // the caller does not care for some specific order
-        // return them in FIFO order
-        return dictionary_walkthrough_rw(dict, rw, walkthrough_callback, data);
-    }
-
     if(unlikely(is_dictionary_destroyed(dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_sorted_walkthrough_rw() on a destroyed dictionary");
         return 0;

@@ -198,10 +198,12 @@ void query_target_summary_labels_v12(BUFFER *wb, QUERY_TARGET *qt, const char *k
                                                     label_values_sorted_sum_compar :
                                                     NULL; // No specific ordering for normal case
 
-            // Use sorted walkthrough for both cases
-            dictionary_sorted_walkthrough_rw(d->values, DICTIONARY_LOCK_READ,
-                                             label_values_walkthrough_cb,
-                                             &vt, comparator);
+            if (comparator)
+                dictionary_sorted_walkthrough_rw(d->values, DICTIONARY_LOCK_READ,
+                    label_values_walkthrough_cb, &vt, comparator);
+            else
+                dictionary_walkthrough_rw(d->values, DICTIONARY_LOCK_READ,
+                    label_values_walkthrough_cb, &vt);
 
             // Add the aggregated "remaining" value if there are any
             if (vt.remaining.count > 0) {

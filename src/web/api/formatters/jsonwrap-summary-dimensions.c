@@ -192,8 +192,13 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
                                                 dimensions_sorted_sum_compar :
                                                 dimensions_sorted_priority_compar;
 
-        dictionary_sorted_walkthrough_rw(dict, DICTIONARY_LOCK_READ, dimensions_sorted_walktrhough_cb,
-                                         &t, comparator);
+        if (comparator)
+            dictionary_sorted_walkthrough_rw(dict, DICTIONARY_LOCK_READ,
+                dimensions_sorted_walktrhough_cb, &t, comparator);
+        else
+            dictionary_walkthrough_rw(dict, DICTIONARY_LOCK_READ,
+                dimensions_sorted_walktrhough_cb, &t);
+
 
         // Add the aggregated "remaining" dimension if there are any
         if (t.remaining_count > 0) {
