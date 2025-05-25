@@ -21,10 +21,13 @@ BOOL is_sqlexpress = FALSE;
 ND_THREAD *mssql_query_thread = NULL;
 
 struct netdata_mssql_conn {
-    const char *instance;
+    const char *instance_name;
+    char *cmpinstance;
     const char *driver;
     const char *server;
+    char *cmpserver;
     const char *address;
+    char *cmpaddress;
     const char *username;
     const char *password;
     int instances;
@@ -43,7 +46,11 @@ struct netdata_mssql_conn {
     SQLHSTMT dbLocksSTMT;
 
     BOOL is_connected;
+
+    struct netdata_mssql_conn *next;
 };
+
+static struct netdata_mssql_conn *mssql_conn_list = NULL;
 
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
@@ -345,6 +352,9 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 
 void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
 {
+    if (!mdi->parent->conn)
+        return;
+
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
@@ -436,6 +446,9 @@ endtransactions:
 
 void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 {
+    if (!mdi->parent->conn)
+        return;
+
 #define NETDATA_MSSQL_MAX_RESOURCE_TYPE (60)
     char resource_type[NETDATA_MSSQL_MAX_RESOURCE_TYPE + 1] = {};
     long value = 0;
@@ -602,7 +615,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    if (!mdi->collecting_data) {
+    if (!mdi->parent->conn || !mdi->collecting_data) {
         goto enddrunquery;
     }
 
@@ -628,7 +641,7 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
     long perm = 0;
     SQLLEN col_data_len = 0;
 
-    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+    if (!mi->conn || ++next_try != NETDATA_MSSQL_NEXT_TRY)
         return 1;
 
     next_try = 0;
@@ -664,6 +677,9 @@ endperm:
 
 void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
+    if (!mi->conn)
+        return;
+
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     SQLLEN col_data_len = 0;
 
@@ -942,23 +958,25 @@ void netdata_mount_mssql_connection_string(struct netdata_mssql_conn *dbInput)
     dbInput->connectionString = (SQLCHAR *)strdupz((char *)conn);
 }
 
-static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
+static inline char *netdata_mssql_to_lowerz(const char *in) {
+    if (!in)
+        return NULL;
+
+    char *parse = strdupz(in);
+    char *move = parse;
+    for ( ; *move; ++move) *move = (char)tolower(*move);
+
+    return parse;
+}
+
+static struct netdata_mssql_conn *netdata_read_config_options()
 {
-    dbconn->netdataSQLEnv = NULL;
-    dbconn->netdataSQLHDBc = NULL;
-    dbconn->checkPermSTMT = NULL;
-    dbconn->databaseListSTMT = NULL;
-    dbconn->dataFileSizeSTMT = NULL;
-    dbconn->dbTransactionSTMT = NULL;
-    dbconn->dbWaitsSTMT = NULL;
-    dbconn->dbLocksSTMT = NULL;
-
-    dbconn->is_connected = FALSE;
-
     static uint16_t expected_instances = 1;
     static uint16_t total_instances = 0;
     if (total_instances > expected_instances)
-        return;
+        return NULL;
+
+    struct netdata_mssql_conn *dbconn = callocz(1, sizeof(struct netdata_mssql_conn));
 
 #define NETDATA_MAX_MSSSQL_SECTION_LENGTH (40)
 #define NETDATA_DEFAULT_MSSQL_SECTION "plugin:windows:PerflibMSSQL"
@@ -969,9 +987,15 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
     }
 
     dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
-    dbconn->instance = inicfg_get(&netdata_config, section_name, "instance", NULL);
+    dbconn->instance_name = inicfg_get(&netdata_config, section_name, "instance", NULL);
+    dbconn->cmpinstance = netdata_mssql_to_lowerz(dbconn->instance_name);
+
     dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
+    dbconn->cmpserver =  netdata_mssql_to_lowerz(dbconn->server);
+
     dbconn->address = inicfg_get(&netdata_config, section_name, "address", NULL);
+    dbconn->cmpaddress =  netdata_mssql_to_lowerz(dbconn->address);
+
     dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
     dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
     dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
@@ -982,6 +1006,30 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
         expected_instances = dbconn->instances;
 
     total_instances++;
+
+    return dbconn;
+}
+
+static struct netdata_mssql_conn *netdata_attach_connection(const char *instance) {
+    struct netdata_mssql_conn *list;
+    char *cmpinstance = netdata_mssql_to_lowerz(instance);
+    size_t len = strlen(instance);
+    for (list = mssql_conn_list; list; list = list->next) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME TEST %s %s %s | %s", list->instance_name, list->server, list->address, instance);
+        if (list->cmpinstance && !strncmp(cmpinstance, list->cmpinstance, len) ||
+            list->cmpserver && strstr(list->cmpserver, cmpinstance) ||
+            list->cmpaddress && strstr(list->cmpaddress, cmpinstance)) {
+            if (!list->instance_name)
+                list->instance_name = strdupz(instance);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "KILLME INTIALIZE %s %s %s | %s", list->instance_name, list->server, list->address, instance);
+            freez(cmpinstance);
+            return list;
+        }
+    }
+
+    freez(cmpinstance);
+
+    return NULL;
 }
 
 void mssql_fill_initial_instances(struct mssql_instance *mi)
@@ -1035,10 +1083,9 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
     initialize_mssql_objects(mi, instance);
     initialize_mssql_keys(mi);
-    mi->conn = callocz(1, sizeof(struct netdata_mssql_conn));
-    netdata_read_config_options(mi->conn);
+    mi->conn = netdata_attach_connection(instance);
 
-    if (mi->conn->connectionString) {
+    if (mi->conn && mi->conn->connectionString) {
         mi->conn->is_connected = netdata_MSSQL_initialize_conection(mi->conn);
         if (mi->conn->is_connected)
             *create_thread = true;
@@ -1106,9 +1153,15 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     struct mssql_instance *mi = value;
     static long collecting = 1;
 
+<<<<<<< HEAD
     if (mi->conn.is_connected && collecting) {
         collecting = metdata_mssql_check_permission(mi);
         if (!collecting) {
+=======
+    if (mi->conn && mi->conn->is_connected && have_perm) {
+        have_perm = metdata_mssql_check_permission(mi);
+        if (!have_perm) {
+>>>>>>> d5c4e0af2 (perflib_mssql: Separate parsing from registry read.)
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
@@ -1146,6 +1199,24 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
     return NULL;
 }
 
+static int netdata_parse_mssql_options() {
+    struct netdata_mssql_conn *last = NULL;
+    struct netdata_mssql_conn *curr;
+    int counter = 0;
+
+    while( (curr = netdata_read_config_options())) {
+        if (last) {
+            curr->next = last;
+        } else {
+            mssql_conn_list = curr;
+        }
+
+        last = curr;
+        counter++;
+    }
+    return counter;
+}
+
 static int initialize(int update_every)
 {
     static bool create_thread = false;
@@ -1154,7 +1225,12 @@ static int initialize(int update_every)
 
     dictionary_register_insert_callback(mssql_instances, dict_mssql_insert_cb, &create_thread);
 
+<<<<<<< HEAD
     if (mssql_fill_dictionary(update_every)) {
+=======
+    int total_options = netdata_parse_mssql_options();
+    if (mssql_fill_dictionary() && !total_options) {
+>>>>>>> d5c4e0af2 (perflib_mssql: Separate parsing from registry read.)
         return -1;
     }
 
@@ -1905,7 +1981,7 @@ static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1948,7 +2024,7 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, c
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -1986,7 +2062,7 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2022,7 +2098,7 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2061,7 +2137,7 @@ static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2101,7 +2177,7 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const 
 
 static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2137,7 +2213,7 @@ static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2173,7 +2249,7 @@ static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2209,7 +2285,7 @@ static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2245,7 +2321,7 @@ static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2285,7 +2361,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    if (unlikely(!mdi->parent->conn->is_connected))
+    if (unlikely(!mdi->parent->conn) || unlikely(!mdi->parent->conn->is_connected))
         return;
 
     char id[RRD_ID_LENGTH_MAX + 1];

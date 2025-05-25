@@ -144,8 +144,6 @@ Configuration options:
 | `additional instances`   | Number of additional SQL Server instances to monitor                         |
 | `windows authentication` | Set to `yes` to use Windows credentials instead of SQL Server authentication |
 
-The `instance` option is required when Netdata pulls data from outside an MSSQL server.
-
 For more information on connection parameters, see the [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16).
 
 ## Monitoring Multiple SQL Server Instances
