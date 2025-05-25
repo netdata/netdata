@@ -4,7 +4,6 @@
 #define NETDATA_MCP_REQUEST_ID_H
 
 #include "libnetdata/libnetdata.h"
-#include <json-c/json.h>
 
 // Request ID type - 0 is reserved for "no ID given"
 typedef size_t MCP_REQUEST_ID;

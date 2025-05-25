@@ -120,13 +120,11 @@ void mcp_request_id_cleanup_all(MCP_CLIENT *mcpc) {
     // Iterate through all entries
     while (PValue != NULL) {
         // Free the request ID entry
-        if (PValue) {
-            MCP_REQUEST_ID_ENTRY *entry = *PValue;
-            if (entry->type == MCP_REQUEST_ID_TYPE_STRING)
-                string_freez(entry->str_value);
-            freez(entry);
-        }
-        
+        MCP_REQUEST_ID_ENTRY *entry = *PValue;
+        if (entry->type == MCP_REQUEST_ID_TYPE_STRING)
+            string_freez(entry->str_value);
+        freez(entry);
+
         // Move to next entry
         PValue = JudyLNext(mcpc->request_ids, &Index, NULL);
     }

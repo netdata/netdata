@@ -304,15 +304,15 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     MCP_RETURN_CODE rc;
 
     // Check for notifications/initialized method which marks client as ready
-    if (strcmp(method, "notifications/initialized") == 0) {
+    if(!method || !*method) {
+        buffer_strcat(mcpc->error, "Empty method name");
+        rc = MCP_RC_INVALID_PARAMS;
+    }
+    else if (strcmp(method, "notifications/initialized") == 0) {
         mcpc->ready = true;
         netdata_log_debug(D_WEB_CLIENT, "MCP client %s v%s is now ready", 
                          string2str(mcpc->client_name), string2str(mcpc->client_version));
         rc = MCP_RC_OK;
-    }
-    else if(!method || !*method) {
-        buffer_strcat(mcpc->error, "Empty method name");
-        rc = MCP_RC_INVALID_PARAMS;
     }
     else if (strncmp(method, "tools/", 6) == 0) {
         // Tools namespace
