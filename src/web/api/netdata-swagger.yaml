@@ -1,7 +1,44 @@
 openapi: 3.0.0
 info:
   title: Netdata API
-  description: Real-time performance and health monitoring.
+  description: |
+    Real-time performance and health monitoring.
+    
+    ## API Versions
+    
+    Netdata provides three API versions:
+    - **v1**: The original API, focused on single-node operations
+    - **v2**: Multi-node API with advanced grouping and aggregation capabilities
+    - **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features
+    
+    ### v3 API Endpoints
+    
+    The v3 API provides the following endpoints (most reuse v1 or v2 implementations):
+    - `/api/v3/data` - Multi-dimensional data queries (uses v2 implementation)
+    - `/api/v3/weights` - Metric scoring/correlation (uses v2 implementation)
+    - `/api/v3/contexts` - Context metadata (uses v2 implementation)
+    - `/api/v3/nodes` - Node information (uses v2 implementation)
+    - `/api/v3/q` - Full-text search (uses v2 implementation)
+    - `/api/v3/alerts` - Alert information (uses v2 implementation)
+    - `/api/v3/alert_transitions` - Alert state transitions (uses v2 implementation)
+    - `/api/v3/alert_config` - Alert configuration (uses v2 implementation)
+    - `/api/v3/functions` - Available functions (uses v2 implementation)
+    - `/api/v3/function` - Execute functions (uses v1 implementation)
+    - `/api/v3/info` - Agent information (uses v2 implementation)
+    - `/api/v3/node_instances` - Node instance information (uses v2 implementation)
+    - `/api/v3/stream_path` - Streaming topology (v3 specific)
+    - `/api/v3/versions` - Version information (uses v2 implementation)
+    - `/api/v3/badge.svg` - Dynamic badges (uses v1 implementation)
+    - `/api/v3/allmetrics` - Export metrics (uses v1 implementation)
+    - `/api/v3/context` - Single context info (uses v1 implementation)
+    - `/api/v3/variable` - Variable information (uses v1 implementation)
+    - `/api/v3/config` - Dynamic configuration (uses v1 implementation)
+    - `/api/v3/settings` - Agent settings (v3 specific)
+    - `/api/v3/me` - Current user information (v3 specific)
+    - `/api/v3/claim` - Agent claiming (v3 specific)
+    - Additional management and streaming endpoints
+    
+    Note: This documentation currently focuses on v1 and v2 endpoints. The v3 endpoints listed above generally accept the same parameters as their v1/v2 counterparts.
   version: "v1-rolling"
   contact:
     name: Netdata Agent API
@@ -47,6 +84,7 @@ paths:
         - $ref: '#/components/parameters/scopeContexts'
         - $ref: '#/components/parameters/filterNodes'
         - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/contextsQueryOptions'
       responses:
         "200":
           description: OK
@@ -55,6 +93,41 @@ paths:
               schema:
                 description: |
                   `/api/v2/nodes` response for all nodes hosted by a Netdata Agent.
+                type: object
+                properties:
+                  api:
+                    $ref: '#/components/schemas/api'
+                  agents:
+                    $ref: '#/components/schemas/agents'
+                  versions:
+                    $ref: '#/components/schemas/versions'
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/nodeFull'
+  /api/v3/nodes:
+    get:
+      operationId: getNodes3
+      tags:
+        - nodes
+      summary: Nodes Info v3
+      description: |
+        Get a list of all nodes hosted by this Netdata Agent.
+        This is the same as `/api/v2/nodes` but may support additional features in the future.
+      parameters:
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/contextsQueryOptions'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                description: |
+                  `/api/v3/nodes` response for all nodes hosted by a Netdata Agent.
                 type: object
                 properties:
                   api:
@@ -80,6 +153,29 @@ paths:
         - $ref: '#/components/parameters/scopeContexts'
         - $ref: '#/components/parameters/filterNodes'
         - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/contextsQueryOptions'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/contexts2'
+  /api/v3/contexts:
+    get:
+      operationId: getContexts3
+      tags:
+        - contexts
+      summary: Contexts Info v3
+      description: |
+        Get a list of all contexts, across all nodes, hosted by this Netdata Agent.
+        This is the same as `/api/v2/contexts` but may support additional features in the future.
+      parameters:
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/contextsQueryOptions'
       responses:
         "200":
           description: OK
@@ -107,6 +203,36 @@ paths:
         - $ref: '#/components/parameters/scopeContexts'
         - $ref: '#/components/parameters/filterNodes'
         - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/contextsQueryOptions'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/contexts2'
+  /api/v3/q:
+    get:
+      operationId: q3
+      tags:
+        - contexts
+      summary: Full Text Search v3
+      description: |
+        Get a list of contexts, across all nodes, hosted by this Netdata Agent, matching a string expression.
+        This is the same as `/api/v2/q` but may support additional features in the future.
+      parameters:
+        - name: q
+          in: query
+          description: The strings to search for, formatted as a simple pattern
+          required: true
+          schema:
+            type: string
+            format: simple pattern
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/contextsQueryOptions'
       responses:
         "200":
           description: OK
@@ -407,9 +533,13 @@ paths:
               - average
               - sum
               - percentage
+              - extremes
             default: average
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/scopeInstances'
+        - $ref: '#/components/parameters/scopeLabels'
+        - $ref: '#/components/parameters/scopeDimensions'
         - $ref: '#/components/parameters/filterNodes'
         - $ref: '#/components/parameters/filterContexts'
         - $ref: '#/components/parameters/filterInstances'
@@ -425,6 +555,121 @@ paths:
         - $ref: '#/components/parameters/dataTimeGroupOptions2'
         - $ref: '#/components/parameters/dataTimeResampling2'
         - $ref: '#/components/parameters/dataFormat2'
+        - $ref: '#/components/parameters/cardinalityLimit'
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/callback'
+        - $ref: '#/components/parameters/filename'
+        - $ref: '#/components/parameters/tqx'
+      responses:
+        "200":
+          description: |
+            The call was successful. The response includes the data in the format requested.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/jsonwrap2'
+                  - $ref: '#/components/schemas/data_json_formats2'
+            text/plain:
+              schema:
+                type: string
+                format: according to the format requested.
+            text/html:
+              schema:
+                type: string
+                format: html
+            application/x-javascript:
+              schema:
+                type: string
+                format: javascript
+        "400":
+          description: |
+            Bad request - the body will include a message stating what is wrong.
+        "500":
+          description: |
+            Internal server error. This usually means the server is out of memory.
+  /api/v3/data:
+    get:
+      operationId: dataQuery3
+      tags:
+        - data
+      summary: Data Query v3
+      description: |
+        Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
+        This is the same as `/api/v2/data` but may support additional features in the future.
+      parameters:
+        - name: group_by
+          in: query
+          description: |
+            A comma separated list of the groupings required.
+            All possible values can be combined together, except `selected`. If `selected` is given in the list, all others are ignored.
+            The order they are placed in the list is currently ignored.
+            This parameter is also accepted as `group_by[0]` and `group_by[1]` when multiple grouping passes are required.
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - dimension
+                - instance
+                - percentage-of-instance
+                - label
+                - node
+                - context
+                - units
+                - selected
+            default:
+              - dimension
+        - name: group_by_label
+          in: query
+          description: |
+            A comma separated list of the label keys to group by their values. The order of the labels in the list is respected.
+            This parameter is also accepted as `group_by_label[0]` and `group_by_label[1]` when multiple grouping passes are required.
+          required: false
+          schema:
+            type: string
+            format: comma separated list of label keys to group by
+            default: ""
+        - name: aggregation
+          in: query
+          description: |
+            The aggregation function to apply when grouping metrics together.
+            When option `raw` is given, `average` and `avg` behave like `sum` and the caller is expected to calculate the average.
+            This parameter is also accepted as `aggregation[0]` and `aggregation[1]` when multiple grouping passes are required.
+          required: false
+          schema:
+            type: string
+            enum:
+              - min
+              - max
+              - avg
+              - average
+              - sum
+              - percentage
+              - extremes
+            default: average
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/scopeInstances'
+        - $ref: '#/components/parameters/scopeLabels'
+        - $ref: '#/components/parameters/scopeDimensions'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/filterInstances'
+        - $ref: '#/components/parameters/filterLabels'
+        - $ref: '#/components/parameters/filterAlerts'
+        - $ref: '#/components/parameters/filterDimensions'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup2'
+        - $ref: '#/components/parameters/dataTimeGroupOptions2'
+        - $ref: '#/components/parameters/dataTimeResampling2'
+        - $ref: '#/components/parameters/dataFormat2'
+        - $ref: '#/components/parameters/cardinalityLimit'
         - $ref: '#/components/parameters/timeoutMS'
         - $ref: '#/components/parameters/callback'
         - $ref: '#/components/parameters/filename'
@@ -813,6 +1058,9 @@ paths:
         - $ref: '#/components/parameters/weightMethods'
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/scopeInstances'
+        - $ref: '#/components/parameters/scopeLabels'
+        - $ref: '#/components/parameters/scopeDimensions'
         - $ref: '#/components/parameters/filterNodes'
         - $ref: '#/components/parameters/filterContexts'
         - $ref: '#/components/parameters/filterInstances'
@@ -829,6 +1077,56 @@ paths:
         - $ref: '#/components/parameters/dataQueryOptions'
         - $ref: '#/components/parameters/dataTimeGroup2'
         - $ref: '#/components/parameters/dataTimeGroupOptions2'
+        - $ref: '#/components/parameters/cardinalityLimit'
+      responses:
+        "200":
+          description: JSON object with weights for each context, chart and dimension.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/weights2"
+        "400":
+          description: The given parameters are invalid.
+        "403":
+          description: metrics correlations are not enabled on this Netdata Agent.
+        "404":
+          description: |
+            No charts could be found, or the method that correlated the metrics did not produce any result.
+        "504":
+          description: Timeout - the query took too long and has been cancelled.
+  /api/v3/weights:
+    get:
+      operationId: weights3
+      tags:
+        - weights
+      summary: Score or weight all or some of the metrics, across all nodes, according to various algorithms.
+      description: |
+        This endpoint goes through all metrics and scores them according to an algorithm.
+        This is the same as `/api/v2/weights` but may support additional features in the future.
+      parameters:
+        - $ref: '#/components/parameters/weightMethods'
+        - $ref: '#/components/parameters/scopeNodes'
+        - $ref: '#/components/parameters/scopeContexts'
+        - $ref: '#/components/parameters/scopeInstances'
+        - $ref: '#/components/parameters/scopeLabels'
+        - $ref: '#/components/parameters/scopeDimensions'
+        - $ref: '#/components/parameters/filterNodes'
+        - $ref: '#/components/parameters/filterContexts'
+        - $ref: '#/components/parameters/filterInstances'
+        - $ref: '#/components/parameters/filterLabels'
+        - $ref: '#/components/parameters/filterAlerts'
+        - $ref: '#/components/parameters/filterDimensions'
+        - $ref: '#/components/parameters/baselineAfter'
+        - $ref: '#/components/parameters/baselineBefore'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/tier'
+        - $ref: '#/components/parameters/points'
+        - $ref: '#/components/parameters/timeoutMS'
+        - $ref: '#/components/parameters/dataQueryOptions'
+        - $ref: '#/components/parameters/dataTimeGroup2'
+        - $ref: '#/components/parameters/dataTimeGroupOptions2'
+        - $ref: '#/components/parameters/cardinalityLimit'
       responses:
         "200":
           description: JSON object with weights for each context, chart and dimension.
@@ -1202,6 +1500,36 @@ components:
         type: string
         format: simple pattern
         default: "*"
+    scopeInstances:
+      name: scope_instances
+      in: query
+      description: |
+        A simple pattern limiting the instances scope of the query. The scope controls both data and metadata response. This limits which instances are even considered for the query, including their visibility in the query response metadata. The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`. Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    scopeLabels:
+      name: scope_labels
+      in: query
+      description: |
+        A simple pattern limiting the labels scope of the query. The scope controls both data and metadata response. This limits which instances are even considered for the query based on their labels. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by scope nodes, scope contexts, and scope instances). Only instances having labels that match this pattern will be included in the query. Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
+    scopeDimensions:
+      name: scope_dimensions
+      in: query
+      description: |
+        A simple pattern limiting the dimensions scope of the query. The scope controls both data and metadata response. This limits which dimensions are even considered for the query, including their visibility in the query response metadata. The simple pattern is checked against both the dimension `id` and `name`. Both positive and negative simple pattern expressions are supported.
+      required: false
+      schema:
+        type: string
+        format: simple pattern
+        default: "*"
     filterNodes:
       name: nodes
       in: query
@@ -1339,6 +1667,10 @@ components:
         * `label-quotes` - In `csv` output format, enclose each header label in quotes.
         * `objectrows` - Each row of value should be an object, not an array (only for `json` format).
         * `google_json` - Comply with google JSON/JSONP specs (only for `json` format).
+        * `minimal-stats` or `minimal` - Reduce the amount of statistics returned in `jsonwrap` format to save bandwidth.
+        * `long-json-keys` or `long-keys` - Use descriptive key names in JSON output instead of abbreviated ones.
+        * `mcp-info` - Include additional metadata useful for the Model Context Protocol (MCP) integration.
+        * `rfc3339` - Return timestamps in RFC3339 format (e.g., "2023-01-01T00:00:00Z") instead of Unix timestamps.
       required: false
       allowEmptyValue: false
       schema:
@@ -1376,6 +1708,12 @@ components:
             - label-quotes
             - objectrows
             - google_json
+            - minimal-stats
+            - minimal
+            - long-json-keys
+            - long-keys
+            - mcp-info
+            - rfc3339
         default:
           - seconds
           - jsonwrap
@@ -1428,6 +1766,8 @@ components:
           - trimmed-median15
           - trimmed-median20
           - trimmed-median25
+          - ema
+          - extremes
         default: average
     dataTimeGroup2:
       name: time_group
@@ -1478,6 +1818,8 @@ components:
           - trimmed-median15
           - trimmed-median20
           - trimmed-median25
+          - ema
+          - extremes
         default: average
     dataTimeGroupOptions1:
       name: group_options
@@ -1495,6 +1837,56 @@ components:
       required: false
       schema:
         type: string
+    cardinalityLimit:
+      name: cardinality_limit
+      in: query
+      description: |
+        Limits the number of unique items (contexts, instances, dimensions) returned in the query result. This is useful for preventing excessive memory usage and response sizes when queries match a large number of metrics. The query engine will return the most relevant items up to this limit.
+      required: false
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        default: 10000
+    contextsQueryOptions:
+      name: options
+      in: query
+      description: |
+        Options that affect the output of contexts metadata queries.
+        * `minify` - Remove unnecessary spaces and newlines from the output to reduce bandwidth.
+        * `debug` - Provide additional debugging information in the response.
+        * `config` - Include alert configuration information (used by /api/v2/alert_transitions).
+        * `instances` - Include alert/context instance information (used by /api/v2/alerts).
+        * `values` - Include latest metric values (used by /api/v2/alerts).
+        * `summary` - Include summary counters (used by /api/v2/alerts).
+        * `mcp` - Format output for Model Context Protocol (MCP) integration.
+        * `dimensions` - Include dimension information for each context.
+        * `labels` - Include label information for each context.
+        * `priorities` - Include priority information for each context.
+        * `titles` - Include title information for each context.
+        * `rfc3339` - Return timestamps in RFC3339 format (e.g., "2023-01-01T00:00:00Z") instead of Unix timestamps.
+        
+        Note: Some options like `retention`, `liveness`, `family`, and `units` are automatically included by specific endpoints and cannot be controlled via this parameter.
+      required: false
+      allowEmptyValue: false
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - minify
+            - debug
+            - config
+            - instances
+            - values
+            - summary
+            - mcp
+            - dimensions
+            - labels
+            - priorities
+            - titles
+            - rfc3339
+        default: []
     dataTimeResampling1:
       name: gtime
       in: query
@@ -1618,7 +2010,18 @@ components:
     contextOptions1:
       name: options
       in: query
-      description: Options that affect data generation.
+      description: |
+        Options that affect data generation.
+        * `full` or `all` - Include all available information.
+        * `charts` - Include chart information.
+        * `dimensions` - Include dimension information.
+        * `labels` - Include label information.
+        * `uuids` - Include UUIDs in the response.
+        * `queue` - Include queue information.
+        * `flags` - Include internal flags.
+        * `deleted` - Include deleted items.
+        * `deepscan` - Perform a deep scan for contexts.
+        * `rfc3339` - Return timestamps in RFC3339 format instead of Unix timestamps.
       required: false
       schema:
         type: array
@@ -1635,6 +2038,7 @@ components:
             - flags
             - deleted
             - deepscan
+            - rfc3339
     chart:
       name: chart
       in: query

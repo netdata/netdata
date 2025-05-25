@@ -38,8 +38,8 @@ void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct sql_aler
                 {
                     // buffer_json_member_add_string(wb, "lookup", t->value.db.lookup); // does not exist in Netdata Cloud
 
-                    buffer_json_member_add_time_t(wb, "after", t->value.db.after);
-                    buffer_json_member_add_time_t(wb, "before", t->value.db.before);
+                    buffer_json_member_add_time_t_formatted(wb, "after", t->value.db.after, d->ctl && (d->ctl->options & CONTEXTS_OPTION_RFC3339));
+                    buffer_json_member_add_time_t_formatted(wb, "before", t->value.db.before, d->ctl && (d->ctl->options & CONTEXTS_OPTION_RFC3339));
                     buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(t->value.db.time_group_condition));
                     buffer_json_member_add_double(wb, "time_group_value", t->value.db.time_group_value);
                     buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(t->value.db.dims_group));

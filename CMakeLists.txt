@@ -828,6 +828,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/bitmap/bitmap64.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
+        src/libnetdata/buffer/functions_fields.c
+        src/libnetdata/buffer/functions_fields.h
         src/libnetdata/ringbuffer/ringbuffer.c
         src/libnetdata/ringbuffer/ringbuffer.h
         src/libnetdata/circular_buffer/circular_buffer.c
@@ -912,8 +914,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/string/utf8.h
         src/libnetdata/worker_utilization/worker_utilization.c
         src/libnetdata/worker_utilization/worker_utilization.h
-        src/libnetdata/http/http_access.c
-        src/libnetdata/http/http_access.h
+        src/libnetdata/user-auth/http-access.c
+        src/libnetdata/user-auth/http-access.h
+        src/libnetdata/user-auth/user-auth.c
+        src/libnetdata/user-auth/user-auth.h
         src/libnetdata/http/http_defs.c
         src/libnetdata/http/http_defs.h
         src/libnetdata/http/content_type.c
@@ -1421,6 +1425,10 @@ set(API_PLUGIN_FILES
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
         src/web/api/queries/query.h
+        src/web/api/queries/query-group-by.c
+        src/web/api/queries/query-group-over-time.c
+        src/web/api/queries/query-internal.h
+        src/web/api/queries/query-plan.c
         src/web/api/queries/average/average.c
         src/web/api/queries/average/average.h
         src/web/api/queries/countif/countif.c
@@ -1445,6 +1453,8 @@ set(API_PLUGIN_FILES
         src/web/api/queries/des/des.h
         src/web/api/queries/trimmed_mean/trimmed_mean.c
         src/web/api/queries/trimmed_mean/trimmed_mean.h
+        src/web/api/queries/extremes/extremes.c
+        src/web/api/queries/extremes/extremes.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
@@ -1457,8 +1467,19 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/ssv/ssv.h
         src/web/api/formatters/value/value.c
         src/web/api/formatters/value/value.h
-        src/web/api/formatters/json_wrapper.c
-        src/web/api/formatters/json_wrapper.h
+        src/web/api/formatters/jsonwrap.c
+        src/web/api/formatters/jsonwrap.h
+        src/web/api/formatters/jsonwrap-internal.h
+        src/web/api/formatters/jsonwrap-objects-tree.c
+        src/web/api/formatters/jsonwrap-query-plan.c
+        src/web/api/formatters/jsonwrap-summary-alerts.c
+        src/web/api/formatters/jsonwrap-summary-contexts.c
+        src/web/api/formatters/jsonwrap-summary-dimensions.c
+        src/web/api/formatters/jsonwrap-summary-instances.c
+        src/web/api/formatters/jsonwrap-summary-labels.c
+        src/web/api/formatters/jsonwrap-summary-nodes.c
+        src/web/api/formatters/jsonwrap-v1.c
+        src/web/api/formatters/jsonwrap-v2.c
         src/web/api/formatters/charts2json.c
         src/web/api/formatters/charts2json.h
         src/web/api/formatters/rrdset2json.c
@@ -1617,6 +1638,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
+        src/database/rrdlabels-aggregated.c
+        src/database/rrdlabels-aggregated.h
         src/database/rrd.c
         src/database/rrd.h
         src/database/rrd-metadata.c
@@ -1833,26 +1856,34 @@ set(WEB_PLUGIN_FILES
         src/web/api/functions/function-metrics-cardinality.h
         src/web/api/queries/backfill.c
         src/web/api/queries/backfill.h
-        src/web/api/request_source.c
-        src/web/api/request_source.h
         src/web/api/v3/api_v3_stream_info.c
         src/web/api/v3/api_v3_stream_path.c
         src/web/mcp/adapters/mcp-websocket.c
         src/web/mcp/adapters/mcp-websocket.h
-        src/web/mcp/mcp-context.c
-        src/web/mcp/mcp-context.h
         src/web/mcp/mcp-initialize.c
         src/web/mcp/mcp-initialize.h
-        src/web/mcp/mcp-notifications.c
-        src/web/mcp/mcp-notifications.h
         src/web/mcp/mcp-prompts.c
         src/web/mcp/mcp-prompts.h
         src/web/mcp/mcp-resources.c
         src/web/mcp/mcp-resources.h
-        src/web/mcp/mcp-system.c
-        src/web/mcp/mcp-system.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp-tools-list-metadata.c
+        src/web/mcp/mcp-tools-list-metadata.h
+        src/web/mcp/mcp-tools-execute-function.c
+        src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-query-metrics.c
+        src/web/mcp/mcp-tools-query-metrics.h
+        src/web/mcp/mcp-time-utils.c
+        src/web/mcp/mcp-time-utils.h
+        src/web/mcp/mcp-request-id.c
+        src/web/mcp/mcp-request-id.h
+        src/web/mcp/mcp-ping.c
+        src/web/mcp/mcp-ping.h
+        src/web/mcp/mcp-logging.c
+        src/web/mcp/mcp-logging.h
+        src/web/mcp/mcp-completion.c
+        src/web/mcp/mcp-completion.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c

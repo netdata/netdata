@@ -23,8 +23,4 @@ int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffe
 MCP_CLIENT *mcp_websocket_get_context(struct websocket_server_client *wsc);
 void mcp_websocket_set_context(struct websocket_server_client *wsc, MCP_CLIENT *ctx);
 
-// Convenience wrappers for sending responses
-void mcp_websocket_send_error_response(struct websocket_server_client *wsc, int code, const char *message, uint64_t id);
-void mcp_websocket_send_success_response(struct websocket_server_client *wsc, struct json_object *result, uint64_t id);
-
 #endif // NETDATA_MCP_ADAPTER_WEBSOCKET_H

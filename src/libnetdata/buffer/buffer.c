@@ -335,9 +335,15 @@ void buffer_json_finalize(BUFFER *wb) {
 
 // ----------------------------------------------------------------------------
 
+__attribute__((nonstring))
 const char hex_digits[16] = "0123456789ABCDEF";
+
+__attribute__((nonstring))
 const char hex_digits_lower[16] = "0123456789abcdef";
+
+__attribute__((nonstring))
 const char base64_digits[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
 unsigned char hex_value_from_ascii[256];
 unsigned char base64_value_from_ascii[256];
 
@@ -368,6 +374,12 @@ void buffer_json_member_add_duration_ut(BUFFER *wb, const char *key, int64_t dur
     char buf[64];
     duration_snprintf(buf, sizeof(buf), duration_ut, "us", true);
     buffer_json_member_add_string(wb, key, buf);
+}
+
+void buffer_json_add_array_item_datetime_rfc3339(BUFFER *wb, uint64_t datetime_ut, bool utc) {
+    char buf[RFC3339_MAX_LENGTH];
+    rfc3339_datetime_ut(buf, sizeof(buf), datetime_ut, 2, utc);
+    buffer_json_add_array_item_string(wb, buf);
 }
 
 // ----------------------------------------------------------------------------

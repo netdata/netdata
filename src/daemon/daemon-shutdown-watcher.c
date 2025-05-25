@@ -142,6 +142,8 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_JOIN_STATIC_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES, shutdown_start_time);
@@ -184,6 +186,8 @@ void watcher_thread_start() {
         "wait for dbengine collectors to finish";
     watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg = "stop dbengine tiers";
     watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg = "stop metasync threads";
+    watcher_steps[WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS].msg = "stop websocket threads";
+    watcher_steps[WATCHER_STEP_ID_JOIN_STATIC_THREADS].msg = "join static threads";
     watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg = "close SQL databases";
     watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg = "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg = "free openssl structures";

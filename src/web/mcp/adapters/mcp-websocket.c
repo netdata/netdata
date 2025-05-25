@@ -22,6 +22,9 @@ int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffe
     const char *text = buffer_tostring(buffer);
     if (!text || !*text) return -1;
     
+    // Log the raw outgoing message
+    netdata_log_debug(D_MCP, "SND: %s", text);
+    
     return websocket_protocol_send_text(wsc, text);
 }
 
@@ -30,6 +33,10 @@ static MCP_CLIENT *mcp_websocket_create_context(struct websocket_server_client *
     if (!wsc) return NULL;
 
     MCP_CLIENT *ctx = mcp_create_client(MCP_TRANSPORT_WEBSOCKET, wsc);
+    if (ctx) {
+        // Set pointer to the websocket client's user_auth
+        ctx->user_auth = &wsc->user_auth;
+    }
     mcp_websocket_set_context(wsc, ctx);
     
     return ctx;
@@ -51,19 +58,22 @@ void mcp_websocket_on_connect(struct websocket_server_client *wsc) {
 
 // WebSocket message handler for MCP - receives message and routes to MCP
 void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *message, size_t length, WEBSOCKET_OPCODE opcode) {
-    if (!wsc || !message || length == 0) return;
+    if (!wsc || !message || length == 0)
+        return;
+    
+    // Log the raw incoming message
+    netdata_log_debug(D_MCP, "RCV: %s", message);
     
     // Only handle text messages
     if (opcode != WS_OPCODE_TEXT) {
-        websocket_debug(wsc, "Ignoring binary message");
+        websocket_error(wsc, "Ignoring binary message - mcp supports only TEXT messages");
         return;
     }
     
     // Get the MCP context
-    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
-    if (!ctx) {
-        websocket_debug(wsc, "MCP context not found");
-        websocket_protocol_send_close(wsc, WS_CLOSE_INTERNAL_ERROR, "MCP context not found");
+    MCP_CLIENT *mcpc = mcp_websocket_get_context(wsc);
+    if (!mcpc) {
+        websocket_error(wsc, "MCP context not found");
         return;
     }
     
@@ -73,15 +83,12 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     request = json_tokener_parse_verbose(message, &jerr);
     
     if (!request || jerr != json_tokener_success) {
-        websocket_debug(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
-        CLEAN_BUFFER *b = buffer_create(0, NULL);
-        mcp_jsonrpc_error(b, NULL, 0, -32700);
-        mcp_websocket_send_buffer(wsc, b);
+        websocket_error(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
         return;
     }
     
     // Pass the request to the MCP handler
-    mcp_handle_request(ctx, request);
+    mcp_handle_request(mcpc, request);
     
     // Free the request object
     json_object_put(request);
@@ -117,8 +124,6 @@ void mcp_websocket_on_disconnect(struct websocket_server_client *wsc) {
 
 // Register WebSocket callbacks for MCP
 void mcp_websocket_adapter_initialize(void) {
-    // Initialize the MCP subsystem
     mcp_initialize_subsystem();
-    
     netdata_log_info("MCP WebSocket adapter initialized");
 }

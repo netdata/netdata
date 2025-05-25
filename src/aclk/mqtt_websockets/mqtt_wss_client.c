@@ -617,8 +617,9 @@ int mqtt_wss_connect(
     client->poll_fds[POLLFD_SOCKET].events = POLLIN;
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
-        if(mqtt_wss_service(client, 60 * MSEC_PER_SEC)) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d.", host, port);
+        int rc = mqtt_wss_service(client, 60 * MSEC_PER_SEC);
+        if(rc) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d. Code: %d", host, port, rc);
             return 2;
         }
     }

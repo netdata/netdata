@@ -44,10 +44,19 @@ void rrdlabels_unmark_all(RRDLABELS *labels);
 void rrdlabels_remove_all_unmarked(RRDLABELS *labels);
 
 int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+int rrdlabels_walkthrough_read_string(RRDLABELS *labels, int (*callback)(STRING *name, STRING *value, RRDLABEL_SRC ls, void *data), void *data);
 void rrdlabels_log_to_buffer(RRDLABELS *labels, BUFFER *wb);
 bool rrdlabels_match_simple_pattern(RRDLABELS *labels, const char *simple_pattern_txt);
 
 SIMPLE_PATTERN_RESULT rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches);
+
+// Forward declaration for RRDLABELS_AGGREGATED
+struct rrdlabels_aggregated;
+// Full text search through labels - matches if either key OR value matches the pattern
+// If agg is NULL and matches are found, a new aggregated structure is created and returned
+// If agg is not NULL, matches are added to it and it is returned
+// Returns NULL only if no matches found and agg was NULL
+struct rrdlabels_aggregated *rrdlabels_full_text_search(RRDLABELS *labels, SIMPLE_PATTERN *pattern, struct rrdlabels_aggregated *agg, size_t *searches);
 int rrdlabels_to_buffer(RRDLABELS *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them,
                         bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data,
                         void (*name_sanitizer)(char *dst, const char *src, size_t dst_size),

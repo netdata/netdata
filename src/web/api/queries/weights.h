@@ -27,6 +27,9 @@ typedef struct query_weights_request {
     RRDHOST *host;
     const char *scope_nodes;
     const char *scope_contexts;
+    const char *scope_instances;
+    const char *scope_labels;
+    const char *scope_dimensions;
     const char *nodes;
     const char *contexts;
     const char *instances;
@@ -52,6 +55,7 @@ typedef struct query_weights_request {
     RRDR_OPTIONS options;
     size_t tier;
     time_t timeout_ms;
+    size_t cardinality_limit;
 
     weights_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;

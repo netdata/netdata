@@ -48,6 +48,12 @@ static struct {
     , {"minify"            , 0    , RRDR_OPTION_MINIFY}
     , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
     , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
+    , {"minimal-stats"     , 0    , RRDR_OPTION_MINIMAL_STATS}
+    , {"minimal"           , 0    , RRDR_OPTION_MINIMAL_STATS}
+    , {"long-json-keys"    , 0    , RRDR_OPTION_LONG_JSON_KEYS}
+    , {"long-keys"         , 0    , RRDR_OPTION_LONG_JSON_KEYS}
+    , {"mcp-info"          , 0    , RRDR_OPTION_MCP_INFO}
+    , {"rfc3339"           , 0    , RRDR_OPTION_RFC3339}
     , {NULL                , 0    , 0}
 };
 
@@ -68,7 +74,11 @@ RRDR_OPTIONS rrdr_options_parse_one(const char *o) {
     return ret;
 }
 
-RRDR_OPTIONS rrdr_options_parse(char *o) {
+RRDR_OPTIONS rrdr_options_parse(const char *options_str) {
+    char src[strlen(options_str) + 1];
+    strcatz(src, 0, options_str, sizeof(src));
+    char *o = src;
+
     RRDR_OPTIONS ret = 0;
     char *tok;
 

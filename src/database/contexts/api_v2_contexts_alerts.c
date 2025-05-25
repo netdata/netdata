@@ -135,7 +135,7 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                                         sizeof(struct alert_by_x_entry),
                                         rcl);
 
-                if (ctl->options & (CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES)) {
+                if (ctl->options & (CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES)) {
                     char key[20 + 1];
                     snprintfz(key, sizeof(key) - 1, "%p", rcl);
 
@@ -304,10 +304,10 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
         buffer_json_member_add_string(wb, "ch", string2str(t->chart_id));
         buffer_json_member_add_string(wb, "ch_n", string2str(t->chart_name));
 
-        if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_SUMMARY)
+        if(ctl->request->options & CONTEXTS_OPTION_SUMMARY)
             buffer_json_member_add_uint64(wb, "ati", t->ati);
 
-        if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_INSTANCES) {
+        if(ctl->request->options & CONTEXTS_OPTION_INSTANCES) {
             buffer_json_member_add_string(wb, "units", string2str(t->units));
             buffer_json_member_add_string(wb, "fami", string2str(t->family));
             buffer_json_member_add_string(wb, "info", string2str(t->info));
@@ -316,7 +316,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
             buffer_json_member_add_uuid(wb, "tr_i", t->last_transition_id);
             buffer_json_member_add_double(wb, "tr_v", t->last_status_change_value);
-            buffer_json_member_add_time_t(wb, "tr_t", t->last_status_change);
+            buffer_json_member_add_time_t_formatted(wb, "tr_t", t->last_status_change, ctl->options & CONTEXTS_OPTION_RFC3339);
             buffer_json_member_add_uuid(wb, "cfg", t->config_hash_id);
             buffer_json_member_add_string(wb, "src", string2str(t->source));
 
@@ -330,10 +330,10 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             // rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
         }
 
-        if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_VALUES) {
+        if(ctl->request->options & CONTEXTS_OPTION_VALUES) {
             // Netdata Cloud fetched these by querying the agents
             buffer_json_member_add_double(wb, "v", t->value);
-            buffer_json_member_add_time_t(wb, "t", t->last_updated);
+            buffer_json_member_add_time_t_formatted(wb, "t", t->last_updated, ctl->options & CONTEXTS_OPTION_RFC3339);
         }
     }
     buffer_json_object_close(wb); // alert instance
@@ -391,7 +391,7 @@ static void contexts_v2_alert_instances_to_json(BUFFER *wb, const char *key, str
 }
 
 void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
-    if(ctl->request->options & CONTEXTS_OPTION_ALERTS_WITH_SUMMARY) {
+    if(ctl->request->options & CONTEXTS_OPTION_SUMMARY) {
         buffer_json_member_add_array(wb, "alerts");
         {
             struct alert_v2_entry *t;
@@ -457,7 +457,7 @@ void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *c
         contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_module, "alerts_by_module");
     }
 
-    if(ctl->request->options & (CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES)) {
+    if(ctl->request->options & (CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES)) {
         contexts_v2_alert_instances_to_json(wb, "alert_instances", ctl, debug);
     }
 }
@@ -533,7 +533,7 @@ static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const 
 
 bool rrdcontexts_v2_init_alert_dictionaries(struct rrdcontext_to_json_v2_data *ctl, struct api_v2_contexts_request *req) {
     if(req->alerts.transition) {
-        ctl->options |= CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES;
+        ctl->options |= CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES;
         if(!sql_find_alert_transition(req->alerts.transition, rrdcontext_v2_set_transition_filter, ctl))
             return false;
     }
@@ -587,7 +587,7 @@ bool rrdcontexts_v2_init_alert_dictionaries(struct rrdcontext_to_json_v2_data *c
     dictionary_register_insert_callback(ctl->alerts.by_module, alerts_by_x_insert_callback, NULL);
     dictionary_register_conflict_callback(ctl->alerts.by_module, alerts_by_x_conflict_callback, NULL);
 
-    if(ctl->options & (CONTEXTS_OPTION_ALERTS_WITH_INSTANCES | CONTEXTS_OPTION_ALERTS_WITH_VALUES)) {
+    if(ctl->options & (CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES)) {
         ctl->alerts.alert_instances = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(struct sql_alert_instance_v2_entry));

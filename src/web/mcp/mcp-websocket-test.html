@@ -76,6 +76,27 @@
             background-color: #d0e8f2;
             font-weight: bold;
         }
+        .method-item.dynamic {
+            border-left: 3px solid #0088cc;
+            background-color: #f0f8ff;
+        }
+        .method-item.dynamic:hover {
+            background-color: #e0f0ff;
+        }
+        .method-item.history {
+            border-left: 3px solid #666;
+            background-color: #f8f8f8;
+        }
+        .method-item.history:hover {
+            background-color: #eeeeee;
+        }
+        .method-item.history.error {
+            border-left-color: #d00;
+            background-color: #fff5f5;
+        }
+        .method-item.history.error:hover {
+            background-color: #ffeeee;
+        }
         #jsonEditor {
             width: 100%;
             height: 100%;
@@ -195,18 +216,19 @@
             <h3 class="column-header">Flows</h3>
             <div class="column-content" id="flowsContainer">
                 <div class="flow-item active" data-flow="initialize-flow">Initialize</div>
+                <div class="flow-item" data-flow="ping-flow">Ping</div>
                 <div class="flow-item" data-flow="tools-flow">Tools</div>
                 <div class="flow-item" data-flow="resources-flow">Resources</div>
                 <div class="flow-item" data-flow="prompts-flow">Prompts</div>
-                <div class="flow-item" data-flow="notifications-flow">Notifications</div>
-                <div class="flow-item" data-flow="context-flow">Context</div>
-                <div class="flow-item" data-flow="system-flow">System</div>
+                <div class="flow-item" data-flow="logging-flow">Logging</div>
+                <div class="flow-item" data-flow="completion-flow">Completion</div>
+                <div class="flow-item" data-flow="history-flow">History</div>
             </div>
         </div>
         
         <!-- Second Column - Methods -->
         <div class="column">
-            <h3 class="column-header">Methods</h3>
+            <h3 class="column-header" id="methodsHeader">Methods</h3>
             <div class="column-content" id="methodsContainer">
                 <!-- Methods will be loaded here -->
             </div>
@@ -243,7 +265,15 @@
         
         <!-- Fourth Column - Response Viewer -->
         <div class="column">
-            <h3 class="column-header">Response</h3>
+            <h3 class="column-header">
+                Response
+                <div style="float: right; font-size: 0.8em;">
+                    <label style="font-weight: normal; cursor: pointer;">
+                        <input type="checkbox" id="rawViewToggle" style="margin-right: 4px;">
+                        Raw View
+                    </label>
+                </div>
+            </h3>
             <div style="display: flex; flex-direction: column; height: calc(100% - 35px);">
                 <pre id="responseViewer" style="flex: 1; overflow: auto; margin: 0; padding: 6px; background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap; word-break: break-word;"><span class="json-null">No response yet.</span></pre>
             </div>
@@ -265,6 +295,8 @@
         const commLog = document.getElementById('commLog');
         const flowsContainer = document.getElementById('flowsContainer');
         const methodsContainer = document.getElementById('methodsContainer');
+        const methodsHeader = document.getElementById('methodsHeader');
+        const rawViewToggle = document.getElementById('rawViewToggle');
         
         // WebSocket connection
         let socket = null;
@@ -272,10 +304,67 @@
         let isConnected = false;
         let requestTimestamp = null;
         
+        // Store current response data
+        let currentResponseRaw = null;
+        let currentResponseParsed = null;
+        let currentResponseError = null;
+        
+        // Flags to track dynamic items
+        let dynamicToolsLoaded = false;
+        let dynamicResourcesLoaded = false;
+        let dynamicPromptsLoaded = false;
+        
+        // Request history
+        let requestHistory = [];
+        let currentHistoryIndex = null;
+        const MAX_HISTORY_ITEMS = 1000; // Keep last 1000 items
+        
+        // Load history from localStorage on startup
+        function loadHistory() {
+            const saved = localStorage.getItem('mcp-request-history');
+            if (saved) {
+                try {
+                    requestHistory = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to load history:', e);
+                    requestHistory = [];
+                }
+            }
+        }
+        
+        // Save history to localStorage
+        function saveHistory() {
+            try {
+                localStorage.setItem('mcp-request-history', JSON.stringify(requestHistory));
+            } catch (e) {
+                console.error('Failed to save history:', e);
+            }
+        }
+        
         // Function to highlight JSON syntax with colors
         function syntaxHighlightJson(json) {
+            // Custom replacer function to handle nested JSON strings
+            const replacer = (key, value) => {
+                // Check if this is a text field that might contain JSON
+                if (key === 'text' && typeof value === 'string') {
+                    // Try to detect if it's a JSON string
+                    const trimmed = value.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+                        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                        try {
+                            // Try to parse the JSON string and return it directly
+                            return JSON.parse(value);
+                        } catch (e) {
+                            // Not valid JSON, return as is
+                            return value;
+                        }
+                    }
+                }
+                return value;
+            };
+            
             // Use more space for indentation to make it easier to read
-            const jsonStr = JSON.stringify(json, null, 4);
+            const jsonStr = JSON.stringify(json, replacer, 4);
             
             // A more direct approach for syntax highlighting
             let result = '';
@@ -384,6 +473,31 @@
                 .replace(/\\n/g, '<br>');
         }
         
+        // Function to display response based on current toggle state
+        function displayResponse() {
+            if (!currentResponseRaw && !currentResponseError) {
+                responseViewer.innerHTML = '<span class="json-null">No response yet.</span>';
+                return;
+            }
+            
+            if (rawViewToggle.checked) {
+                // Show raw response
+                responseViewer.textContent = currentResponseRaw || '';
+            } else {
+                // Show parsed response
+                if (currentResponseError) {
+                    responseViewer.innerHTML = `<div style="color: #d00; font-weight: bold;">⚠️ Parse Error:</div><div style="color: #d00; margin-top: 8px;">${escapeHtml(currentResponseError)}</div>`;
+                } else if (currentResponseParsed) {
+                    responseViewer.innerHTML = syntaxHighlightJson(currentResponseParsed);
+                } else {
+                    responseViewer.innerHTML = '<span class="json-null">No response yet.</span>';
+                }
+            }
+        }
+        
+        // Toggle handler
+        rawViewToggle.addEventListener('change', displayResponse);
+        
         // State storage for method requests and responses
         const methodState = new Map();
         let currentFlow = 'initialize-flow';
@@ -436,79 +550,18 @@
                             id: 1
                         }
                     },
-                    'tools/execute': {
-                        name: 'tools/execute',
+                    'tools/call': {
+                        name: 'tools/call',
                         description: 'Execute a tool with parameters',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'tools/execute',
+                            method: 'tools/call',
                             params: {
-                                name: 'explore_metrics',
-                                input: {
-                                    context: 'system.cpu'
+                                name: 'contexts',
+                                arguments: {
+                                    like: 'system.*'
                                 }
                             },
-                            id: 1
-                        }
-                    },
-                    'tools/cancel': {
-                        name: 'tools/cancel',
-                        description: 'Cancel a running tool execution',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/cancel',
-                            params: {
-                                executionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/status': {
-                        name: 'tools/status',
-                        description: 'Get status of a tool execution',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/status',
-                            params: {
-                                executionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/validate': {
-                        name: 'tools/validate',
-                        description: 'Validate parameters for a tool',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/validate',
-                            params: {
-                                name: 'explore_metrics',
-                                input: {
-                                    context: 'system.cpu'
-                                }
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/describe': {
-                        name: 'tools/describe',
-                        description: 'Get detailed documentation for a tool',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/describe',
-                            params: {
-                                name: 'explore_metrics'
-                            },
-                            id: 1
-                        }
-                    },
-                    'tools/getCapabilities': {
-                        name: 'tools/getCapabilities',
-                        description: 'Get capabilities of the tools subsystem',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'tools/getCapabilities',
-                            params: {},
                             id: 1
                         }
                     }
@@ -594,22 +647,6 @@
                             id: 1
                         }
                     },
-                    'prompts/execute': {
-                        name: 'prompts/execute',
-                        description: 'Execute a prompt',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/execute',
-                            params: {
-                                name: 'analyze_metrics',
-                                input: {
-                                    context: 'system.cpu',
-                                    timeframe: '1h'
-                                }
-                            },
-                            id: 1
-                        }
-                    },
                     'prompts/get': {
                         name: 'prompts/get',
                         description: 'Get a specific prompt',
@@ -622,268 +659,120 @@
                             id: 1
                         }
                     },
-                    'prompts/save': {
-                        name: 'prompts/save',
-                        description: 'Save a prompt',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/save',
-                            params: {
-                                name: 'my_custom_prompt',
-                                description: 'A custom prompt for analysis',
-                                template: 'Analyze the following metrics: {{context}}'
-                            },
-                            id: 1
-                        }
-                    },
-                    'prompts/delete': {
-                        name: 'prompts/delete',
-                        description: 'Delete a prompt',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/delete',
-                            params: {
-                                name: 'my_custom_prompt'
-                            },
-                            id: 1
-                        }
-                    },
-                    'prompts/getCategories': {
-                        name: 'prompts/getCategories',
-                        description: 'Get categories of prompts',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/getCategories',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'prompts/getHistory': {
-                        name: 'prompts/getHistory',
-                        description: 'Get history of prompt executions',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'prompts/getHistory',
-                            params: {
-                                limit: 10
-                            },
-                            id: 1
-                        }
-                    }
                 }
             },
-            'notifications-flow': {
-                name: 'Notifications',
+            'ping-flow': {
+                name: 'Ping',
                 methods: {
-                    'notifications/initialized': {
-                        name: 'notifications/initialized',
-                        description: 'Notify server that client is initialized',
+                    'ping': {
+                        name: 'ping',
+                        description: 'Simple health check to ensure server is responsive',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'notifications/initialized'
-                            // No id for notifications
-                        }
-                    },
-                    'notifications/subscribe': {
-                        name: 'notifications/subscribe',
-                        description: 'Subscribe to notifications',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/subscribe',
-                            params: {
-                                type: 'alerts'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/unsubscribe': {
-                        name: 'notifications/unsubscribe',
-                        description: 'Unsubscribe from notifications',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/unsubscribe',
-                            params: {
-                                subscriptionId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/acknowledge': {
-                        name: 'notifications/acknowledge',
-                        description: 'Acknowledge a notification',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/acknowledge',
-                            params: {
-                                notificationId: '12345'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/getHistory': {
-                        name: 'notifications/getHistory',
-                        description: 'Get history of notifications',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/getHistory',
-                            params: {
-                                limit: 10
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/send': {
-                        name: 'notifications/send',
-                        description: 'Send a notification',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/send',
-                            params: {
-                                type: 'message',
-                                content: 'Test notification from client'
-                            },
-                            id: 1
-                        }
-                    },
-                    'notifications/getSettings': {
-                        name: 'notifications/getSettings',
-                        description: 'Get notification settings',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'notifications/getSettings',
+                            method: 'ping',
                             params: {},
                             id: 1
                         }
                     }
                 }
             },
-            'context-flow': {
-                name: 'Context',
+            'logging-flow': {
+                name: 'Logging',
                 methods: {
-                    'context/provide': {
-                        name: 'context/provide',
-                        description: 'Provide context to the server',
+                    'logging/setLevel': {
+                        name: 'logging/setLevel',
+                        description: 'Set the logging level for the server',
                         defaultRequest: {
                             jsonrpc: '2.0',
-                            method: 'context/provide',
+                            method: 'logging/setLevel',
                             params: {
-                                context: {
-                                    user: 'admin',
-                                    preferences: {
-                                        theme: 'dark'
-                                    }
+                                level: 'info'
+                            },
+                            id: 1
+                        }
+                    }
+                }
+            },
+            'completion-flow': {
+                name: 'Completion',
+                methods: {
+                    'completion/complete': {
+                        name: 'completion/complete',
+                        description: 'Request completions for an argument',
+                        defaultRequest: {
+                            jsonrpc: '2.0',
+                            method: 'completion/complete',
+                            params: {
+                                argument: {
+                                    name: 'test',
+                                    value: 'test'
+                                },
+                                ref: {
+                                    type: 'ref/prompt',
+                                    name: 'test-prompt'
                                 }
                             },
                             id: 1
                         }
-                    },
-                    'context/clear': {
-                        name: 'context/clear',
-                        description: 'Clear context',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/clear',
-                            params: {
-                                keys: ['preferences']
-                            },
-                            id: 1
-                        }
-                    },
-                    'context/status': {
-                        name: 'context/status',
-                        description: 'Get context status',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/status',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'context/save': {
-                        name: 'context/save',
-                        description: 'Save context for future use',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/save',
-                            params: {
-                                name: 'my_saved_context'
-                            },
-                            id: 1
-                        }
-                    },
-                    'context/load': {
-                        name: 'context/load',
-                        description: 'Load a saved context',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'context/load',
-                            params: {
-                                name: 'my_saved_context'
-                            },
-                            id: 1
-                        }
                     }
                 }
             },
-            'system-flow': {
-                name: 'System',
-                methods: {
-                    'system/health': {
-                        name: 'system/health',
-                        description: 'Get system health information',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/health',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'system/version': {
-                        name: 'system/version',
-                        description: 'Get detailed version information',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/version',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'system/metrics': {
-                        name: 'system/metrics',
-                        description: 'Get system performance metrics',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/metrics',
-                            params: {},
-                            id: 1
-                        }
-                    },
-                    'system/restart': {
-                        name: 'system/restart',
-                        description: 'Request system restart',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/restart',
-                            params: {
-                                force: false
-                            },
-                            id: 1
-                        }
-                    },
-                    'system/status': {
-                        name: 'system/status',
-                        description: 'Get system status',
-                        defaultRequest: {
-                            jsonrpc: '2.0',
-                            method: 'system/status',
-                            params: {},
-                            id: 1
-                        }
-                    }
-                }
+            'history-flow': {
+                name: 'History',
+                methods: {} // Will be populated dynamically with history items
             }
-            // Additional flows can be added here later
+            // End of standard MCP flows
         };
+        
+        // Add a request/response to history
+        function addToHistory(method, request, response, responseRaw, error) {
+            const historyItem = {
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                timestamp: new Date().toISOString(),
+                method: method,
+                request: request,
+                response: response,
+                responseRaw: responseRaw,
+                error: error
+            };
+            
+            // Add to beginning of array (newest first)
+            requestHistory.unshift(historyItem);
+            
+            // Limit history size
+            if (requestHistory.length > MAX_HISTORY_ITEMS) {
+                requestHistory = requestHistory.slice(0, MAX_HISTORY_ITEMS);
+            }
+            
+            // Save to localStorage
+            saveHistory();
+            
+            // Update history flow if currently viewing it
+            if (currentFlow === 'history-flow') {
+                loadHistoryMethods();
+            }
+        }
+        
+        // Load history items as methods in the history flow
+        function loadHistoryMethods() {
+            flows['history-flow'].methods = {};
+            
+            requestHistory.forEach((item, index) => {
+                const date = new Date(item.timestamp);
+                const timeStr = date.toLocaleTimeString();
+                const dateStr = date.toLocaleDateString();
+                
+                flows['history-flow'].methods[item.id] = {
+                    name: `${item.method} - ${timeStr}`,
+                    description: `${dateStr} - ${item.error ? 'Failed' : 'Success'}`,
+                    dynamic: true,
+                    isHistory: true,
+                    hasError: !!item.error,
+                    historyItem: item,
+                    defaultRequest: item.request
+                };
+            });
+        }
         
         // Initialize UI
         function initializeUI() {
@@ -903,6 +792,18 @@
             loadMethodsForFlow(currentFlow);
         }
         
+        // Clear history
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all history? This cannot be undone.')) {
+                requestHistory = [];
+                saveHistory();
+                if (currentFlow === 'history-flow') {
+                    loadHistoryMethods();
+                    loadMethodsForFlow('history-flow');
+                }
+            }
+        }
+        
         // Load methods for a specific flow
         function loadMethodsForFlow(flowId) {
             methodsContainer.innerHTML = '';
@@ -910,10 +811,30 @@
             
             if (!flow) return;
             
+            // Update header based on flow
+            if (flowId === 'history-flow') {
+                methodsHeader.innerHTML = 'Methods <button onclick="clearHistory()" style="float: right; font-size: 12px; padding: 4px 8px;">Clear History</button>';
+                loadHistoryMethods();
+            } else {
+                methodsHeader.textContent = 'Methods';
+            }
+            
             Object.keys(flow.methods).forEach(methodId => {
                 const method = flow.methods[methodId];
                 const methodElement = document.createElement('div');
-                methodElement.className = 'method-item';
+                
+                // Determine the class based on method type
+                let className = 'method-item';
+                if (method.isHistory) {
+                    className += ' history';
+                    if (method.hasError) {
+                        className += ' error';
+                    }
+                } else if (method.dynamic) {
+                    className += ' dynamic';
+                }
+                
+                methodElement.className = className;
                 methodElement.dataset.method = methodId;
                 methodElement.dataset.flow = flowId;
                 
@@ -1029,21 +950,55 @@
         function loadResponseForMethod(flowId, methodId) {
             const key = `${flowId}:${methodId}`;
             
-            if (methodState.has(key) && methodState.get(key).response) {
-                responseViewer.innerHTML = syntaxHighlightJson(methodState.get(key).response);
-                if (methodState.get(key).requestSent) {
-                    requestData.textContent = 'Request: ' + JSON.stringify(methodState.get(key).requestSent, null, 2);
+            // Special handling for history items
+            if (flowId === 'history-flow' && flows[flowId].methods[methodId]) {
+                const historyItem = flows[flowId].methods[methodId].historyItem;
+                if (historyItem) {
+                    currentResponseRaw = historyItem.responseRaw || null;
+                    currentResponseParsed = historyItem.response || null;
+                    currentResponseError = historyItem.error || null;
+                    
+                    // Display response based on toggle state
+                    displayResponse();
+                    
+                    requestData.textContent = 'Request: ' + JSON.stringify(historyItem.request, null, 2);
+                    
+                    // Show the timestamp in the comm log
+                    const date = new Date(historyItem.timestamp);
+                    commLog.innerHTML = `[${date.toLocaleTimeString()}.${String(date.getMilliseconds()).padStart(3, '0')}] Historical request\n`;
+                    return;
+                }
+            }
+            
+            if (methodState.has(key)) {
+                const state = methodState.get(key);
+                
+                // Update current response data
+                currentResponseRaw = state.responseRaw || null;
+                currentResponseParsed = state.response || null;
+                currentResponseError = state.responseError || null;
+                
+                // Display response based on toggle state
+                displayResponse();
+                
+                if (state.requestSent) {
+                    requestData.textContent = 'Request: ' + JSON.stringify(state.requestSent, null, 2);
                 } else {
                     requestData.textContent = '';
                 }
                 
                 // Show communication log if available
-                if (methodState.get(key).commLog) {
-                    commLog.innerHTML = methodState.get(key).commLog;
+                if (state.commLog) {
+                    commLog.innerHTML = state.commLog;
                 } else {
                     commLog.innerHTML = '';
                 }
             } else {
+                // Clear current response data
+                currentResponseRaw = null;
+                currentResponseParsed = null;
+                currentResponseError = null;
+                
                 responseViewer.innerHTML = '<span class="json-null">No response yet.</span>';
                 requestData.textContent = '';
                 commLog.innerHTML = '';
@@ -1114,6 +1069,11 @@
                 };
                 
                 socket.onmessage = (event) => {
+                    // Store raw response
+                    currentResponseRaw = event.data;
+                    currentResponseParsed = null;
+                    currentResponseError = null;
+                    
                     try {
                         // Calculate response time
                         const responseTimestamp = new Date();
@@ -1124,9 +1084,10 @@
                         const responseSize = new Blob([event.data]).size;
                         
                         const response = JSON.parse(event.data);
+                        currentResponseParsed = response;
                         
-                        // Display the response with syntax highlighting
-                        responseViewer.innerHTML = syntaxHighlightJson(response);
+                        // Display the response based on current toggle state
+                        displayResponse();
                         
                         // Update communication log
                         let logEntry = '';
@@ -1148,13 +1109,81 @@
                             }
                             
                             methodState.get(key).response = response;
+                            methodState.get(key).responseRaw = event.data;
                             methodState.get(key).responseTimestamp = responseTimestamp;
                             methodState.get(key).commLog = commLog.innerHTML;
+                            
+                            // Add to history
+                            const method = methodState.get(key).method || currentMethod;
+                            const requestSent = methodState.get(key).requestSent;
+                            if (requestSent) {
+                                addToHistory(method, requestSent, response, event.data, null);
+                            }
+                            
+                            // Check for special responses that need dynamic processing
+                            if (currentFlow && currentMethod) {
+                                // Define which responses we should process dynamically
+                                const dynamicResponseHandlers = {
+                                    'tools-flow': {
+                                        'tools/list': {
+                                            property: 'tools',
+                                            processor: processDynamicList
+                                        }
+                                    },
+                                    'resources-flow': {
+                                        'resources/list': {
+                                            property: 'resources',
+                                            processor: processDynamicList
+                                        }
+                                    },
+                                    'prompts-flow': {
+                                        'prompts/list': {
+                                            property: 'prompts',
+                                            processor: processDynamicList
+                                        }
+                                    }
+                                };
+                                
+                                // Check if we have a handler for this flow and method
+                                if (dynamicResponseHandlers[currentFlow] && 
+                                    dynamicResponseHandlers[currentFlow][currentMethod]) {
+                                    
+                                    const handler = dynamicResponseHandlers[currentFlow][currentMethod];
+                                    const items = response.result && response.result[handler.property];
+                                    
+                                    if (items) {
+                                        handler.processor(currentFlow, items);
+                                    }
+                                }
+                            }
                         }
                     } catch (error) {
-                        // If parse fails, display the raw data
-                        responseViewer.innerHTML = `<span class="json-string">${escapeHtml(event.data)}</span>`;
+                        // If parse fails, store the error
+                        currentResponseError = error.message;
                         console.error('Error parsing JSON response:', error);
+                        
+                        // Display based on current toggle state
+                        displayResponse();
+                        
+                        // Save the error state for the current method
+                        if (currentFlow && currentMethod) {
+                            const key = `${currentFlow}:${currentMethod}`;
+                            
+                            if (!methodState.has(key)) {
+                                methodState.set(key, {});
+                            }
+                            
+                            methodState.get(key).responseRaw = event.data;
+                            methodState.get(key).responseError = error.message;
+                            methodState.get(key).commLog = commLog.innerHTML;
+                            
+                            // Add to history with error
+                            const method = methodState.get(key).method || currentMethod;
+                            const requestSent = methodState.get(key).requestSent;
+                            if (requestSent) {
+                                addToHistory(method, requestSent, null, event.data, error.message);
+                            }
+                        }
                     }
                 };
                 
@@ -1227,6 +1256,7 @@
                     methodState.get(key).requestSent = requestObj;
                     methodState.get(key).requestTimestamp = requestTimestamp;
                     methodState.get(key).commLog = commLog.innerHTML;
+                    methodState.get(key).method = requestObj.method; // Store method for history
                 }
                 
             } catch (error) {
@@ -1234,6 +1264,208 @@
                 console.error('Send error:', error);
             }
         });
+        
+        // Configuration for dynamic item processing
+        const dynamicItemConfig = {
+            'tools-flow': {
+                itemPrefix: 'tool:',
+                displayProperty: 'name',
+                requiredProperty: 'name',
+                removePredicate: (methodId) => !(methodId === 'tools/list' || methodId === 'tools/call'),
+                createDefaultRequest: (item) => ({
+                    jsonrpc: '2.0',
+                    method: 'tools/call',
+                    params: {
+                        name: item.name,
+                        arguments: createDefaultInputFromSchema(item.inputSchema)
+                    },
+                    id: 1
+                })
+            },
+            'resources-flow': {
+                itemPrefix: 'resource:',
+                displayProperty: (item) => item.uri.replace('nd://', '').split('?')[0],
+                requiredProperty: 'uri',
+                removePredicate: (methodId) => methodId.startsWith('resource:'),
+                createDefaultRequest: (item) => ({
+                    jsonrpc: '2.0',
+                    method: 'resources/read',
+                    params: {
+                        uri: item.uri
+                    },
+                    id: 1
+                })
+            },
+            'prompts-flow': {
+                itemPrefix: 'prompt:',
+                displayProperty: 'name',
+                requiredProperty: 'name',
+                removePredicate: (methodId) => methodId.startsWith('prompt:'),
+                createDefaultRequest: (item) => ({
+                    jsonrpc: '2.0',
+                    method: 'prompts/get',
+                    params: {
+                        name: item.name
+                    },
+                    id: 1
+                })
+            }
+        };
+        
+        // Unified function to process dynamic lists
+        function processDynamicList(flowId, items) {
+            console.log(`Processing ${flowId} list:`, items);
+            
+            // Get config for this flow
+            const config = dynamicItemConfig[flowId];
+            if (!config) return;
+            
+            // Remove existing dynamic methods
+            removeExistingDynamicItems(flowId);
+            
+            // Add each item as a separate method
+            items.forEach(item => {
+                // Check if the item has the required property
+                const requiredProp = typeof config.requiredProperty === 'function' 
+                    ? config.requiredProperty(item) 
+                    : item[config.requiredProperty];
+                    
+                if (requiredProp) {
+                    addDynamicMethod(flowId, item);
+                }
+            });
+            
+            // Refresh the methods view
+            loadMethodsForFlow(flowId);
+            
+            // Set the loaded flag for this type
+            if (flowId === 'tools-flow') dynamicToolsLoaded = true;
+            else if (flowId === 'resources-flow') dynamicResourcesLoaded = true;
+            else if (flowId === 'prompts-flow') dynamicPromptsLoaded = true;
+        }
+        
+        // Remove existing dynamic methods based on flow
+        function removeExistingDynamicItems(flowId) {
+            const flow = flows[flowId];
+            const config = dynamicItemConfig[flowId];
+            
+            if (!flow || !config) return;
+            
+            // Keep only the fixed methods based on the predicate
+            const fixedMethods = {};
+            Object.keys(flow.methods).forEach(methodId => {
+                if (!config.removePredicate(methodId)) {
+                    fixedMethods[methodId] = flow.methods[methodId];
+                }
+            });
+            
+            // Replace with just the fixed methods
+            flows[flowId].methods = fixedMethods;
+        }
+        
+        // Add a dynamic method based on flow and item
+        function addDynamicMethod(flowId, item) {
+            const config = dynamicItemConfig[flowId];
+            if (!config) return;
+            
+            // Get display name based on configuration
+            const displayName = typeof config.displayProperty === 'function' 
+                ? config.displayProperty(item) 
+                : item[config.displayProperty];
+                
+            const methodId = `${config.itemPrefix}${displayName}`;
+            
+            // Create dynamic method entry
+            flows[flowId].methods[methodId] = {
+                name: displayName,
+                description: item.description || `Execute the '${displayName}' ${flowId.replace('-flow', '')}`,
+                dynamic: true, // Mark as dynamically created
+                defaultRequest: config.createDefaultRequest(item)
+            };
+            
+            console.log(`Added dynamic method to ${flowId}: ${methodId}`, flows[flowId].methods[methodId]);
+        }
+        
+        // Create default input values based on JSON schema
+        function createDefaultInputFromSchema(schema) {
+            // Default empty object
+            const input = {};
+            
+            // If we have properties in the schema, populate with defaults
+            if (schema && schema.properties) {
+                const properties = schema.properties;
+                
+                Object.keys(properties).forEach(propName => {
+                    // Try to create sensible defaults based on property type
+                    const property = properties[propName];
+                    const type = property.type;
+                    
+                    if (type === 'string') {
+                        // If there's an example, use it
+                        if (property.examples && property.examples.length > 0) {
+                            input[propName] = property.examples[0];
+                        } 
+                        // If there's a format, create a placeholder for it
+                        else if (property.format) {
+                            switch (property.format) {
+                                case 'date-time':
+                                    input[propName] = new Date().toISOString();
+                                    break;
+                                case 'date':
+                                    input[propName] = new Date().toISOString().split('T')[0];
+                                    break;
+                                case 'time':
+                                    input[propName] = new Date().toISOString().split('T')[1].split('.')[0];
+                                    break;
+                                case 'email':
+                                    input[propName] = "user@example.com";
+                                    break;
+                                case 'hostname':
+                                    input[propName] = "example.com";
+                                    break;
+                                case 'ipv4':
+                                    input[propName] = "192.168.1.1";
+                                    break;
+                                case 'ipv6':
+                                    input[propName] = "2001:db8::1";
+                                    break;
+                                case 'uri':
+                                    input[propName] = "https://example.com";
+                                    break;
+                                default:
+                                    input[propName] = "";
+                            }
+                        } 
+                        // Otherwise use an empty string
+                        else {
+                            input[propName] = "";
+                        }
+                    } 
+                    else if (type === 'number' || type === 'integer') {
+                        // Use default if provided, otherwise 0
+                        input[propName] = property.default !== undefined ? property.default : 0;
+                    } 
+                    else if (type === 'boolean') {
+                        // Use default if provided, otherwise false
+                        input[propName] = property.default !== undefined ? property.default : false;
+                    } 
+                    else if (type === 'array') {
+                        // Use empty array
+                        input[propName] = [];
+                    } 
+                    else if (type === 'object') {
+                        // Use empty object
+                        input[propName] = {};
+                    } 
+                    else {
+                        // For any other type, just use null
+                        input[propName] = null;
+                    }
+                });
+            }
+            
+            return input;
+        }
         
         // Load saved state from localStorage
         function loadSavedState() {
@@ -1265,6 +1497,7 @@
         }
         
         // Initialize the UI
+        loadHistory();
         loadSavedState();
         initializeUI();
     </script>
