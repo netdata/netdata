@@ -4,6 +4,7 @@
 #include "../rrdlabels-aggregated.h"
 #include "aclk/aclk_capas.h"
 #include "web/mcp/mcp.h"
+#include "libnetdata/json/json-keys.h"
 
 // ----------------------------------------------------------------------------
 // /api/v2/contexts API
@@ -75,11 +76,10 @@ static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_di
         if (dot) {
             size_t prefix_len = dot - context_name;
             if (prefix_len > sizeof(category) - 1) prefix_len = sizeof(category) - 1;
-            strncpy(category, context_name, prefix_len);
+            memcpy(category, context_name, prefix_len);
             category[prefix_len] = '\0';
         } else {
-            strncpy(category, context_name, sizeof(category) - 1);
-            category[sizeof(category) - 1] = '\0';
+            strncpyz(category, context_name, sizeof(category) - 1);
         }
         
         struct category_entry *entry = dictionary_get(categories, category);
@@ -1244,6 +1244,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     };
 
     bool debug = ctl.options & CONTEXTS_OPTION_DEBUG;
+    
+    // Initialize JSON keys based on options
+    json_keys_init((ctl.options & CONTEXTS_OPTION_JSON_LONG_KEYS) ? JSON_KEYS_OPTION_LONG_KEYS : 0);
 
     if(mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS)) {
         ctl.nodes.dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -1472,5 +1475,6 @@ cleanup:
     simple_pattern_free(ctl.q.pattern);
     simple_pattern_free(ctl.alerts.alert_name_pattern);
 
+    json_keys_reset();
     return resp;
 }

@@ -59,7 +59,7 @@ static int dimensions_sorted_walktrhough_cb(const DICTIONARY_ITEM *item __maybe_
 
     // Output this dimension normally
     buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_string(wb, JSKEY(id), z->id);
+    buffer_json_member_add_string(wb, "id", z->id);
     if (z->id != z->name && z->name)
         buffer_json_member_add_string(wb, JSKEY(name), z->name);
 
@@ -203,7 +203,7 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
             char remaining_label[50];
             snprintfz(remaining_label, sizeof(remaining_label), "remaining %zu dimensions", t.remaining_count);
 
-            buffer_json_member_add_string(wb, JSKEY(id), "__remaining_dimensions__");
+            buffer_json_member_add_string(wb, "id", "__remaining_dimensions__");
             buffer_json_member_add_string(wb, JSKEY(name), remaining_label);
             buffer_json_member_add_double(wb, JSKEY(contribution), t.remaining_contribution);
 

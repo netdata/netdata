@@ -213,8 +213,7 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
     if (strstr(v, "permessage-deflate") != NULL) {
         // Parse extension parameters
         char extension_copy[1024];
-        strncpy(extension_copy, v, sizeof(extension_copy) - 1);
-        extension_copy[sizeof(extension_copy) - 1] = '\0';
+        strncpyz(extension_copy, v, sizeof(extension_copy) - 1);
 
         char *token, *saveptr;
         token = strtok_r(extension_copy, ",", &saveptr);

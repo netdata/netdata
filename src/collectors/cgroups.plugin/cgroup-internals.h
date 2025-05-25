@@ -378,7 +378,7 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
     buffer[0] = '\0';
 
     if (cg->chart_id[0] == '\0' || (cg->chart_id[0] == '/' && cg->chart_id[1] == '\0'))
-        strncpy(buffer, "cgroup_root", RRD_ID_LENGTH_MAX);
+        strncpyz(buffer, "cgroup_root", RRD_ID_LENGTH_MAX - 1);
     else if (is_cgroup_systemd_service(cg))
         snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s%s", services_chart_id_prefix, cg->chart_id);
     else

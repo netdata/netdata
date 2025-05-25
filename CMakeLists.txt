@@ -878,6 +878,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/inlined.h
         src/libnetdata/json/json.c
         src/libnetdata/json/json.h
+        src/libnetdata/json/json-keys.c
+        src/libnetdata/json/json-keys.h
         src/libnetdata/json/vendored/jsmn.c
         src/libnetdata/json/vendored/jsmn.h
         src/libnetdata/libnetdata.c

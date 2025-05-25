@@ -3,12 +3,13 @@
 #include "json.h"
 #include "../jsonwrap-internal.h"
 #include "web/mcp/mcp.h"
+#include "libnetdata/json/json-keys.h"
 
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
 void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
-    jsonwrap_keys_init(options);
+    json_keys_init((options & RRDR_OPTION_LONG_JSON_KEYS) ? JSON_KEYS_OPTION_LONG_KEYS : 0);
     
     //netdata_log_info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
@@ -272,7 +273,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_object(wb, "result");
 
     if(options & RRDR_OPTION_MCP_INFO)
-        buffer_json_member_add_string(wb, JSKEY(info), MCP_QUERY_INFO_RESULT_SECTION);
+        buffer_json_member_add_string(wb, "info", MCP_QUERY_INFO_RESULT_SECTION);
 
     buffer_json_member_add_array(wb, "labels");
     buffer_json_add_array_item_string(wb, "time");

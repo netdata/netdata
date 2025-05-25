@@ -39,7 +39,7 @@ size_t query_target_summary_contexts_v2(BUFFER *wb, QUERY_TARGET *qt, const char
     size_t unique_contexts = dictionary_entries(dict);
     dfe_start_read(dict, z) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, JSKEY(id), z_dfe.name);
+        buffer_json_member_add_string(wb, "id", z_dfe.name);
 
         // Only include detailed statistics if MINIMAL_STATS option is not set
         if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {

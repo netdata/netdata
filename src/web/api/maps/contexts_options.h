@@ -23,6 +23,7 @@ typedef enum contexts_options {
     CONTEXTS_OPTION_FAMILY                      = (1 << 13), // include family
     CONTEXTS_OPTION_UNITS                       = (1 << 14), // include units
     CONTEXTS_OPTION_RFC3339                     = (1 << 15), // Return timestamps in RFC3339 format
+    CONTEXTS_OPTION_JSON_LONG_KEYS              = (1 << 16), // Use long JSON keys instead of short ones
 } CONTEXTS_OPTIONS;
 
 CONTEXTS_OPTIONS contexts_options_str_to_id(char *o);

@@ -146,7 +146,7 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         if(qm) {
                             if(qm->status & RRDR_DIMENSION_GROUPED) {
                                 // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
-                                buffer_json_member_add_string(wb, JSKEY(as), string2str(qm->grouped_as.name));
+                                buffer_json_member_add_string(wb, "as", string2str(qm->grouped_as.name));
                             }
 
                             query_target_points_statistics(wb, qt, &qm->query_points);

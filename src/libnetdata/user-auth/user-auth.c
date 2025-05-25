@@ -75,20 +75,17 @@ bool user_auth_from_source(const char *src, USER_AUTH *parsed) {
                 parsed->access = http_access_from_hex_str(value);
 
             else if (strcmp(key, "user") == 0) {
-                strncpy(parsed->client_name, value, CLOUD_CLIENT_NAME_LENGTH - 1);
-                parsed->client_name[CLOUD_CLIENT_NAME_LENGTH - 1] = '\0';
+                strncpyz(parsed->client_name, value, CLOUD_CLIENT_NAME_LENGTH - 1);
             }
             else if (strcmp(key, "account") == 0) {
                 if (uuid_parse(value, parsed->cloud_account_id.uuid) != 0)
                     parsed->cloud_account_id = UUID_ZERO;
             }
             else if (strcmp(key, "ip") == 0) {
-                strncpy(parsed->client_ip, value, INET6_ADDRSTRLEN - 1);
-                parsed->client_ip[INET6_ADDRSTRLEN - 1] = '\0';
+                strncpyz(parsed->client_ip, value, INET6_ADDRSTRLEN - 1);
             }
             else if (strcmp(key, "forwarded_for") == 0) {
-                strncpy(parsed->forwarded_for, value, INET6_ADDRSTRLEN - 1);
-                parsed->forwarded_for[INET6_ADDRSTRLEN - 1] = '\0';
+                strncpyz(parsed->forwarded_for, value, INET6_ADDRSTRLEN - 1);
             }
         }
         token = strtok_r(NULL, ",", &saveptr);

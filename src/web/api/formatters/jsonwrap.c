@@ -3,126 +3,6 @@
 #include "jsonwrap.h"
 #include "jsonwrap-internal.h"
 
-// Static key name structures
-static const struct jsonwrap_key_names jsonwrap_short_keys = {
-    .selected = "sl",
-    .excluded = "ex",
-    .queried = "qr",
-    .failed = "fl",
-    .dimensions = "ds",
-    .instances = "is",
-    .alerts = "al",
-    .statistics = "sts",
-    .name = "nm",
-    .hostname = "nm",
-    .id = "id",
-    .node_id = "nd",
-    .time = "time",
-    .value = "vl",
-    .label_values = "vl",
-    .machine_guid = "mg",
-    .agent_index = "ai",
-    .clear = "cl",
-    .warning = "wr",
-    .critical = "cr",
-    .other = "ot",
-    .min = "min",
-    .max = "max",
-    .avg = "avg",
-    .sum = "sum",
-    .count = "cnt",
-    .volume = "vol",
-    .anomaly_rate = "arp",
-    .anomaly_count = "arc",
-    .contribution = "con",
-    .point_annotations = "pa",
-    .point_schema = "point",
-    .priority = "pri",
-    .update_every = "ue",
-    .view = "view",
-    .tier = "tier",
-    .tr = "tr",
-    .after = "af",
-    .before = "bf",
-    .status = "st",
-    .api = "api",
-    .database = "db",
-    .first_entry = "fe",
-    .last_entry = "le",
-    .node_index = "ni",
-    .units = "un",
-    .weight = "wg",
-    .as = "as",
-    .ids = "ids",
-    .info = "info",
-};
-
-static const struct jsonwrap_key_names jsonwrap_long_keys = {
-    .selected = "selected",
-    .excluded = "excluded",
-    .queried = "queried",
-    .failed = "failed",
-    .dimensions = "dimensions",
-    .instances = "instances",
-    .alerts = "alerts",
-    .statistics = "statistics",
-    .name = "name",
-    .hostname = "hostname",
-    .id = "id",
-    .node_id = "node_id",
-    .time = "time",
-    .value = "value",
-    .label_values = "label_values",
-    .machine_guid = "machine_guid",
-    .agent_index = "agents_array_index",
-    .clear = "clear",
-    .warning = "warning",
-    .critical = "critical",
-    .other = "other",
-    .min = "min",
-    .max = "max",
-    .avg = "average",
-    .sum = "sum",
-    .count = "count",
-    .volume = "volume",
-    .anomaly_rate = "anomaly_rate_percent",
-    .anomaly_count = "anomalous_points_count",
-    .contribution = "contribution_percent",
-    .point_annotations = "point_annotations_bitmap",
-    .point_schema = "point_schema",
-    .priority = "priority",
-    .update_every = "update_every",
-    .view = "view",
-    .tier = "tier",
-    .tr = "tier",
-    .after = "after",
-    .before = "before",
-    .status = "status",
-    .api = "api",
-    .database = "database",
-    .first_entry = "first_entry",
-    .last_entry = "last_entry",
-    .node_index = "nodes_array_index",
-    .units = "units",
-    .weight = "weight",
-    .as = "as",
-    .ids = "ids",
-    .info = "info",
-};
-
-// Thread-local pointer to the current key names
-__thread const struct jsonwrap_key_names *jsonwrap_keys = &jsonwrap_short_keys;
-
-void jsonwrap_keys_init(RRDR_OPTIONS options) {
-    if(options & RRDR_OPTION_LONG_JSON_KEYS)
-        jsonwrap_keys = &jsonwrap_long_keys;
-    else
-        jsonwrap_keys = &jsonwrap_short_keys;
-}
-
-void jsonwrap_keys_reset(void) {
-    jsonwrap_keys = &jsonwrap_short_keys;
-}
 
 ALWAYS_INLINE
 size_t rrdr_dimension_names(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
@@ -287,20 +167,20 @@ void query_target_points_statistics(BUFFER *wb, QUERY_TARGET *qt, STORAGE_POINT 
 
     buffer_json_member_add_object(wb, JSKEY(statistics));
 
-    buffer_json_member_add_double(wb, JSKEY(min), sp->min);
-    buffer_json_member_add_double(wb, JSKEY(max), sp->max);
+    buffer_json_member_add_double(wb, "min", sp->min);
+    buffer_json_member_add_double(wb, "max", sp->max);
 
     if(query_target_aggregatable(qt)) {
         buffer_json_member_add_uint64(wb, JSKEY(count), sp->count);
 
-        buffer_json_member_add_double(wb, JSKEY(sum), sp->sum);
+        buffer_json_member_add_double(wb, "sum", sp->sum);
         buffer_json_member_add_double(wb, JSKEY(volume), sp->sum * (NETDATA_DOUBLE) query_view_update_every(qt));
 
         buffer_json_member_add_uint64(wb, JSKEY(anomaly_count), sp->anomaly_count);
     }
     else {
         NETDATA_DOUBLE avg = (sp->count) ? sp->sum / (NETDATA_DOUBLE)sp->count : 0.0;
-        buffer_json_member_add_double(wb, JSKEY(avg), avg);
+        buffer_json_member_add_double(wb, "avg", avg);
 
         NETDATA_DOUBLE arp = storage_point_anomaly_rate(*sp);
         buffer_json_member_add_double(wb, JSKEY(anomaly_rate), arp);

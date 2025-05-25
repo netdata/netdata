@@ -23,6 +23,8 @@ static struct {
     , {"family"           , 0    , CONTEXTS_OPTION_FAMILY}
     , {"units"            , 0    , CONTEXTS_OPTION_UNITS}
     , {"rfc3339"          , 0    , CONTEXTS_OPTION_RFC3339}
+    , {"long-json-keys"   , 0    , CONTEXTS_OPTION_JSON_LONG_KEYS}
+    , {"long-keys"        , 0    , CONTEXTS_OPTION_JSON_LONG_KEYS}
     , {NULL               , 0    , 0}
 };
 
@@ -80,6 +82,9 @@ CONTEXTS_OPTIONS rrdr_options_to_contexts_options(RRDR_OPTIONS rrdr_options) {
     
     if(rrdr_options & RRDR_OPTION_RFC3339)
         contexts_options |= CONTEXTS_OPTION_RFC3339;
+    
+    if(rrdr_options & RRDR_OPTION_LONG_JSON_KEYS)
+        contexts_options |= CONTEXTS_OPTION_JSON_LONG_KEYS;
     
     return contexts_options;
 }

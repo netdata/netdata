@@ -9,7 +9,7 @@ void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm, RRDR_OPTIONS optio
         QUERY_PLAN_ENTRY *qp = &qm->plan.array[p];
 
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, JSKEY(tr), qp->tier);
+        buffer_json_member_add_uint64(wb, JSKEY(tier), qp->tier);
         buffer_json_member_add_time_t_formatted(wb, JSKEY(after), qp->after, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_time_t_formatted(wb, JSKEY(before), qp->before, options & RRDR_OPTION_RFC3339);
         buffer_json_object_close(wb);
@@ -19,7 +19,7 @@ void jsonwrap_query_metric_plan(BUFFER *wb, QUERY_METRIC *qm, RRDR_OPTIONS optio
     buffer_json_member_add_array(wb, "tiers");
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, JSKEY(tr), tier);
+        buffer_json_member_add_uint64(wb, JSKEY(tier), tier);
         buffer_json_member_add_time_t_formatted(wb, JSKEY(first_entry), qm->tiers[tier].db_first_time_s, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_time_t_formatted(wb, JSKEY(last_entry), qm->tiers[tier].db_last_time_s, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_int64(wb, JSKEY(weight), qm->tiers[tier].weight);

@@ -108,7 +108,7 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
             char remaining_label[50];
             snprintfz(remaining_label, sizeof(remaining_label), "remaining %zu nodes", remaining_count);
 
-            buffer_json_member_add_string(wb, JSKEY(id), "__remaining_nodes__");
+            buffer_json_member_add_string(wb, "id", "__remaining_nodes__");
             buffer_json_member_add_string(wb, JSKEY(hostname), remaining_label);
             buffer_json_member_add_double(wb, JSKEY(contribution), remaining_contribution);
 

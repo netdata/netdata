@@ -94,7 +94,7 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
                 QUERY_INSTANCE *qi = query_instance(qt, items[i].index);
                 
                 buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, JSKEY(id), items[i].id);
+                buffer_json_member_add_string(wb, "id", items[i].id);
                 
                 if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
                     buffer_json_member_add_string(wb, JSKEY(name), items[i].name);
@@ -138,7 +138,7 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
             snprintfz(remaining_instance, sizeof(remaining_instance), "remaining %zu instances", remaining_count);
             
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, JSKEY(id), "__remaining_instances__");
+            buffer_json_member_add_string(wb, "id", "__remaining_instances__");
             buffer_json_member_add_string(wb, JSKEY(name), remaining_instance);
             
             if (remaining_contribution > 0.0)
@@ -161,7 +161,7 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
             QUERY_INSTANCE *qi = query_instance(qt, c);
             
             buffer_json_add_array_item_object(wb);
-            buffer_json_member_add_string(wb, JSKEY(id), rrdinstance_acquired_id(qi->ria));
+            buffer_json_member_add_string(wb, "id", rrdinstance_acquired_id(qi->ria));
             
             if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
                 buffer_json_member_add_string(wb, JSKEY(name), rrdinstance_acquired_name(qi->ria));
