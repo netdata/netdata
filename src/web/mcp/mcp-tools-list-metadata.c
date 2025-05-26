@@ -21,6 +21,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_nodes = true,
             .has_time_range = true,
             .has_cardinality_limit = true,
+            .nodes_as_array = true,  // list_metrics uses array for nodes
         },
     },
     {
@@ -82,6 +83,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_time_range = true,
             .has_cardinality_limit = true,
             .nodes_required = true,   // Must specify nodes due to large output
+            .nodes_as_array = true,   // get_nodes_details uses array for nodes
         },
     },
 };
@@ -196,38 +198,56 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
 
     // Add nodes pattern if supported
     if (config->params.has_nodes) {
-        buffer_json_member_add_object(buffer, "nodes");
-        buffer_json_member_add_string(buffer, "type", "string");
-        
-        // Compose title and description based on context
-        snprintfz(title, sizeof(title), "%s nodes", 
-                  config->params.nodes_required ? "Specify the" : "Filter");
-        
-        if (config->params.nodes_required) {
-            snprintfz(description, sizeof(description),
-                      "Specify which nodes to query. This parameter is required because this tool produces detailed output. "
-                      "Use pipe (|) to separate multiple patterns. Examples: 'node1|node2', '*web*|*db*', 'prod-*'");
-        } else if (config->output_type == MCP_LIST_OUTPUT_NODES || config->output_type == MCP_LIST_OUTPUT_FUNCTIONS) {
-            // This is a node/function query - direct filtering
-            snprintfz(description, sizeof(description),
-                      "Filter by specific nodes using their hostnames. "
-                      "Use pipe (|) to separate multiple patterns. "
-                      "Examples: 'node1|node2', '*web*|*db*', 'prod-*|staging-*'");
+        if (config->params.nodes_as_array) {
+            // Use array for nodes
+            mcp_schema_add_array_param(buffer, "nodes",
+                config->params.nodes_required ? "Specify the nodes" : "Filter nodes",
+                config->params.nodes_required ?
+                    "Array of specific node names to query. This parameter is required because this tool produces detailed output. "
+                    "Each node must be an exact match - no wildcards or patterns allowed. "
+                    "Use '" MCP_TOOL_LIST_NODES "' to discover available nodes. "
+                    "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]" :
+                    "Array of specific node names to filter by. "
+                    "Each node must be an exact match - no wildcards or patterns allowed. "
+                    "Use '" MCP_TOOL_LIST_NODES "' to discover available nodes. "
+                    "If not specified, all nodes are included. "
+                    "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]",
+                config->params.nodes_required);
         } else {
-            // This is a metrics query - nodes acts as a filter
-            snprintfz(description, sizeof(description),
-                      "Filter %s to only those collected by these nodes. "
-                      "Use pipe (|) to separate multiple patterns. "
-                      "Examples: 'node1|node2', '*web*|*db*', 'prod-*|staging-*'", 
-                      output_name);
+            // Use string pattern for nodes
+            buffer_json_member_add_object(buffer, "nodes");
+            buffer_json_member_add_string(buffer, "type", "string");
+            
+            // Compose title and description based on context
+            snprintfz(title, sizeof(title), "%s nodes", 
+                      config->params.nodes_required ? "Specify the" : "Filter");
+            
+            if (config->params.nodes_required) {
+                snprintfz(description, sizeof(description),
+                          "Specify which nodes to query. This parameter is required because this tool produces detailed output. "
+                          "Use pipe (|) to separate multiple patterns. Examples: 'node1|node2', '*web*|*db*', 'prod-*'");
+            } else if (config->output_type == MCP_LIST_OUTPUT_NODES || config->output_type == MCP_LIST_OUTPUT_FUNCTIONS) {
+                // This is a node/function query - direct filtering
+                snprintfz(description, sizeof(description),
+                          "Filter by specific nodes using their hostnames. "
+                          "Use pipe (|) to separate multiple patterns. "
+                          "Examples: 'node1|node2', '*web*|*db*', 'prod-*|staging-*'");
+            } else {
+                // This is a metrics query - nodes acts as a filter
+                snprintfz(description, sizeof(description),
+                          "Filter %s to only those collected by these nodes. "
+                          "Use pipe (|) to separate multiple patterns. "
+                          "Examples: 'node1|node2', '*web*|*db*', 'prod-*|staging-*'", 
+                          output_name);
+            }
+            
+            buffer_json_member_add_string(buffer, "title", title);
+            buffer_json_member_add_string(buffer, "description", description);
+            if (!config->params.nodes_required) {
+                buffer_json_member_add_string(buffer, "default", "*");
+            }
+            buffer_json_object_close(buffer); // nodes
         }
-        
-        buffer_json_member_add_string(buffer, "title", title);
-        buffer_json_member_add_string(buffer, "description", description);
-        if (!config->params.nodes_required) {
-            buffer_json_member_add_string(buffer, "default", "*");
-        }
-        buffer_json_object_close(buffer); // nodes
     }
 
     // Add time range parameters if supported
@@ -269,7 +289,26 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     // Extract parameters based on configuration
     const char *q = config->params.has_q ? mcp_params_extract_string(params, "q", NULL) : NULL;
     const char *metrics_pattern = config->params.has_metrics ? mcp_params_extract_string(params, "metrics", NULL) : NULL;
-    const char *nodes_pattern = config->params.has_nodes ? mcp_params_extract_string(params, "nodes", NULL) : NULL;
+    
+    // Handle nodes - either as array or string pattern
+    const char *nodes_pattern = NULL;
+    CLEAN_BUFFER *nodes_buffer = NULL;
+    
+    if (config->params.has_nodes) {
+        if (config->params.nodes_as_array) {
+            // Parse nodes as array
+            const char *error_message = NULL;
+            nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, MCP_TOOL_LIST_NODES, &error_message);
+            if (error_message) {
+                buffer_sprintf(mcpc->error, "%s", error_message);
+                return MCP_RC_BAD_REQUEST;
+            }
+            nodes_pattern = buffer_tostring(nodes_buffer);
+        } else {
+            // Parse nodes as string pattern
+            nodes_pattern = mcp_params_extract_string(params, "nodes", NULL);
+        }
+    }
     
     // Check required parameters
     if (config->params.metrics_required && !metrics_pattern) {
