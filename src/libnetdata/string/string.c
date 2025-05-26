@@ -531,7 +531,7 @@ size_t string_destroy(void) {
             while (PValue) {
                 STRING *string = (STRING *)string_idx;
                 if(string) {
-                    fprintf(stderr, "\n > STRINGS REMAINING %zu: %d references on: '%s'\n",
+                    fprintf(stderr, " > STRING REMAINING No %zu: %d references on: '%s'\n",
                             ++total_strings, string->refcount, string2str(string));
 
                     for (int i = 0; i < string->stacktraces.num_stacktraces; i++) {
@@ -653,7 +653,7 @@ size_t string_destroy(void) {
         buffer_flush(wb);
         stacktrace_to_buffer(entries[i].st, wb);
         
-        fprintf(stderr, "\n > STRINGS REMAINING %zu: %zu strings created from:\n%s\n",
+        fprintf(stderr, "\n > STRINGS BACKTRACE %zu: %zu strings created from:\n%s\n",
                 i + 1, entries[i].count, buffer_tostring(wb));
     }
     

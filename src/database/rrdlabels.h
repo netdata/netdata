@@ -73,4 +73,6 @@ size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size);
 // unfortunately this break when defined in exporting_engine.h
 bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
 
+int rrdlabels_registry_count(void);
+
 #endif /* NETDATA_RRDLABELS_H */

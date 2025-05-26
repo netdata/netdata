@@ -5,6 +5,7 @@
 // Key OF HS ARRRAY
 
 struct {
+    int count;
     Pvoid_t JudyHS;
     SPINLOCK spinlock;
 } global_labels = {
@@ -130,6 +131,7 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
         rrdlabel->label.index = label_index;
         *PValue = rrdlabel;
         RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(RRDLABEL_IDX));
+        global_labels.count++;
     }
     __atomic_add_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
 
@@ -148,7 +150,9 @@ static void delete_label(RRDLABEL *label)
         if (refcount == 0) {
             JudyAllocThreadPulseReset();
 
-            JudyHSDel(&global_labels.JudyHS, (void *)label, sizeof(*label), PJE0);
+            int rc = JudyHSDel(&global_labels.JudyHS, (void *)&label->index, sizeof(label->index), PJE0);
+            if(rc)
+                global_labels.count--;
 
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
 
@@ -159,6 +163,13 @@ static void delete_label(RRDLABEL *label)
         }
     }
     spinlock_unlock(&global_labels.spinlock);
+}
+
+int rrdlabels_registry_count(void) {
+    spinlock_lock(&global_labels.spinlock);
+    int count = global_labels.count;
+    spinlock_unlock(&global_labels.spinlock);
+    return count;
 }
 
 // ----------------------------------------------------------------------------
