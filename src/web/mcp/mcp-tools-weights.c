@@ -156,8 +156,11 @@ static MCP_RETURN_CODE execute_weights_request(
         .transaction = NULL,
     };
     
-    // Call the weights API function directly
-    int http_code = web_api_v12_weights(mcpc->result, &qwr);
+    // Create a temporary buffer for the weights API response
+    BUFFER *tmp_buffer = buffer_create(0, NULL);
+    
+    // Call the weights API function with the temporary buffer
+    int http_code = web_api_v12_weights(tmp_buffer, &qwr);
     
     // Clean up
     if (labels_buffer)
@@ -165,6 +168,7 @@ static MCP_RETURN_CODE execute_weights_request(
     
     // Handle response
     if (http_code != HTTP_RESP_OK) {
+        buffer_free(tmp_buffer);
         buffer_flush(mcpc->result);
         buffer_flush(mcpc->error);
         
@@ -186,6 +190,21 @@ static MCP_RETURN_CODE execute_weights_request(
                 return MCP_RC_INTERNAL_ERROR;
         }
     }
+    
+    // Wrap the response in MCP JSON-RPC format
+    buffer_json_member_add_array(mcpc->result, "content");
+    {
+        buffer_json_add_array_item_object(mcpc->result);
+        {
+            buffer_json_member_add_string(mcpc->result, "type", "text");
+            buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(tmp_buffer));
+        }
+        buffer_json_object_close(mcpc->result);
+    }
+    buffer_json_array_close(mcpc->result);
+    
+    // Clean up the temporary buffer
+    buffer_free(tmp_buffer);
     
     return MCP_RC_OK;
 }
