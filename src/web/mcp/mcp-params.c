@@ -288,14 +288,29 @@ void mcp_schema_add_time_params(
     // After parameter
     buffer_json_member_add_object(buffer, "after");
     {
-        buffer_json_member_add_string(buffer, "type", "number");
+        // Use anyOf for multiple types
+        buffer_json_member_add_array(buffer, "anyOf");
+        {
+            buffer_json_add_array_item_object(buffer);
+            buffer_json_member_add_string(buffer, "type", "number");
+            buffer_json_member_add_string(buffer, "description", "Unix timestamp in seconds or relative time (negative for past)");
+            buffer_json_object_close(buffer);
+            
+            buffer_json_add_array_item_object(buffer);
+            buffer_json_member_add_string(buffer, "type", "string");
+            buffer_json_member_add_string(buffer, "description", "RFC3339 datetime string");
+            buffer_json_object_close(buffer);
+        }
+        buffer_json_array_close(buffer);
+        
         buffer_json_member_add_string(buffer, "title", "Start time");
         
         BUFFER *desc = buffer_create(512, NULL);
-        buffer_sprintf(desc, "Start time for %s. Accepts:\n"
-                            "- Unix timestamp in seconds\n"
-                            "- Negative values for relative time (e.g., -3600 for 1 hour ago)\n"
-                            "- RFC3339 datetime string",
+        buffer_sprintf(desc, "Start time for %s. Accepts multiple formats:\n"
+                            "- **RFC3339 datetime string** (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\")\n"
+                            "- **Unix timestamp** in seconds (e.g., 1705318200)\n"
+                            "- **Relative time** as negative seconds (e.g., -3600 for 1 hour ago, -86400 for 1 day ago)\n"
+                            "Examples: \"2024-01-15T10:30:00Z\", 1705318200, -3600",
                        time_description_prefix ? time_description_prefix : "the query");
         buffer_json_member_add_string(buffer, "description", buffer_tostring(desc));
         buffer_free(desc);
@@ -309,14 +324,30 @@ void mcp_schema_add_time_params(
     // Before parameter
     buffer_json_member_add_object(buffer, "before");
     {
-        buffer_json_member_add_string(buffer, "type", "number");
+        // Use anyOf for multiple types
+        buffer_json_member_add_array(buffer, "anyOf");
+        {
+            buffer_json_add_array_item_object(buffer);
+            buffer_json_member_add_string(buffer, "type", "number");
+            buffer_json_member_add_string(buffer, "description", "Unix timestamp in seconds or relative time (negative for past)");
+            buffer_json_object_close(buffer);
+            
+            buffer_json_add_array_item_object(buffer);
+            buffer_json_member_add_string(buffer, "type", "string");
+            buffer_json_member_add_string(buffer, "description", "RFC3339 datetime string");
+            buffer_json_object_close(buffer);
+        }
+        buffer_json_array_close(buffer);
+        
         buffer_json_member_add_string(buffer, "title", "End time");
         
         BUFFER *desc = buffer_create(512, NULL);
-        buffer_sprintf(desc, "End time for %s. Accepts:\n"
-                            "- Unix timestamp in seconds\n"
-                            "- Negative values for relative time\n"
-                            "- RFC3339 datetime string",
+        buffer_sprintf(desc, "End time for %s. Accepts multiple formats:\n"
+                            "- **RFC3339 datetime string** (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\")\n"
+                            "- **Unix timestamp** in seconds (e.g., 1705318200)\n"
+                            "- **Relative time** as negative seconds (e.g., -3600 for 1 hour ago)\n"
+                            "- **0 or \"now\"** for current time\n"
+                            "Examples: \"2024-01-15T10:30:00Z\", 1705318200, -3600, 0",
                        time_description_prefix ? time_description_prefix : "the query");
         buffer_json_member_add_string(buffer, "description", buffer_tostring(desc));
         buffer_free(desc);

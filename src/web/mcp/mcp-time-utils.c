@@ -26,12 +26,18 @@ time_t mcp_extract_time_param(struct json_object *params, const char *name, time
         usec_t timestamp_ut = rfc3339_parse_ut(val_str, &endptr);
         
         // Check if RFC3339 parsing was successful
-        if (timestamp_ut > 0 && endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
+        // Note: We check endptr to see if the entire string was consumed
+        // We don't check timestamp_ut > 0 because dates before 1970 are valid
+        if (endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
             // Successfully parsed as RFC3339, convert to seconds
             return (time_t)(timestamp_ut / USEC_PER_SEC);
         }
         
-        // Fall back to parsing as integer (epoch seconds or relative time)
+        // RFC3339 parsing failed, fall back to parsing as integer
+        // This handles:
+        // - Unix timestamps as strings: "1705318200"
+        // - Relative times as strings: "-3600", "-86400"
+        // - Special values: "0", "now" (handled by str2l)
         return str2l(val_str);
     }
     

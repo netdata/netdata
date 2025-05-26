@@ -15,6 +15,9 @@
 #define MCP_TOOL_LIST_FUNCTIONS "list_functions"
 #define MCP_TOOL_EXECUTE_FUNCTION "execute_function"
 #define MCP_TOOL_QUERY_METRICS "query_metrics"
+#define MCP_TOOL_FIND_CORRELATED_METRICS "find_correlated_metrics"
+#define MCP_TOOL_FIND_ANOMALOUS_METRICS "find_anomalous_metrics"
+#define MCP_TOOL_FIND_UNSTABLE_METRICS "find_unstable_metrics"
 
 #define MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES                                                               \
     "Next Steps: provide a better pattern to match less contexts, " \

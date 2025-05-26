@@ -5,11 +5,6 @@
 
 #include "mcp.h"
 
-// Tool names
-#define MCP_TOOL_FIND_CORRELATED_METRICS "find_correlated_metrics"
-#define MCP_TOOL_FIND_ANOMALOUS_METRICS "find_anomalous_metrics"
-#define MCP_TOOL_FIND_UNSTABLE_METRICS "find_unstable_metrics"
-
 // Execute the find_correlated_metrics tool
 MCP_RETURN_CODE mcp_tool_find_correlated_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer);
