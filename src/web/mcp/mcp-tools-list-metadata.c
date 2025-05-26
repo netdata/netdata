@@ -3,6 +3,7 @@
 #include "mcp-tools-list-metadata.h"
 #include "mcp-tools.h"
 #include "mcp-time-utils.h"
+#include "mcp-params.h"
 #include "database/contexts/rrdcontext.h"
 
 // Static configuration for all list tools
@@ -256,36 +257,7 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
     buffer_json_object_close(buffer); // inputSchema
 }
 
-// Helper function to extract string parameter
-static const char *extract_string_param(struct json_object *params, const char *name) {
-    if (!params || !name) return NULL;
-    
-    struct json_object *obj = NULL;
-    if (json_object_object_get_ex(params, name, &obj) && 
-        json_object_is_type(obj, json_type_string)) {
-        const char *value = json_object_get_string(obj);
-        if (value && strlen(value) > 0) {
-            return value;
-        }
-    }
-    return NULL;
-}
-
-
-// Helper function to extract size_t parameter
-static size_t extract_size_param(struct json_object *params, const char *name, size_t default_value, size_t min, size_t max) {
-    if (!params || !name) return default_value;
-    
-    struct json_object *obj = NULL;
-    if (json_object_object_get_ex(params, name, &obj) && 
-        json_object_is_type(obj, json_type_int)) {
-        size_t value = json_object_get_int64(obj);
-        if (value < min) value = min;
-        if (value > max) value = max;
-        return value;
-    }
-    return default_value;
-}
+// Removed extract_string_param and extract_size_param - now using mcp-params functions
 
 // Unified execution
 MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_TOOL_CONFIG *config,
@@ -295,9 +267,9 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
         return MCP_RC_ERROR;
 
     // Extract parameters based on configuration
-    const char *q = config->params.has_q ? extract_string_param(params, "q") : NULL;
-    const char *metrics_pattern = config->params.has_metrics ? extract_string_param(params, "metrics") : NULL;
-    const char *nodes_pattern = config->params.has_nodes ? extract_string_param(params, "nodes") : NULL;
+    const char *q = config->params.has_q ? mcp_params_extract_string(params, "q", NULL) : NULL;
+    const char *metrics_pattern = config->params.has_metrics ? mcp_params_extract_string(params, "metrics", NULL) : NULL;
+    const char *nodes_pattern = config->params.has_nodes ? mcp_params_extract_string(params, "nodes", NULL) : NULL;
     
     // Check required parameters
     if (config->params.metrics_required && !metrics_pattern) {
@@ -322,7 +294,12 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     size_t cardinality_limit = 0;
     if (config->params.has_cardinality_limit) {
         size_t default_cardinality = config->defaults.cardinality_limit ?: MCP_METADATA_CARDINALITY_LIMIT;
-        cardinality_limit = extract_size_param(params, "cardinality_limit", default_cardinality, 1, 500);
+        const char *size_error = NULL;
+        cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", default_cardinality, 1, 500, &size_error);
+        if (size_error) {
+            buffer_sprintf(mcpc->error, "%s", size_error);
+            return MCP_RC_BAD_REQUEST;
+        }
     }
 
     CLEAN_BUFFER *t = buffer_create(0, NULL);

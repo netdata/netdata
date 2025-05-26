@@ -33,113 +33,9 @@
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools.h"
 #include "mcp-time-utils.h"
+#include "mcp-params.h"
 #include "web/api/formatters/rrd2json.h"
 
-/**
- * Convert structured labels object to Netdata's pipe-delimited format
- * 
- * MCP format (structured JSON):
- * {
- *   "disk_type": ["ssd", "nvme"],    // OR between values
- *   "mount_point": ["/", "/home"]    // AND between different keys
- * }
- * 
- * Netdata format (string):
- * "disk_type:ssd|disk_type:nvme|mount_point:/|mount_point:/home"
- * 
- * The backend automatically ORs values with the same key and ANDs different keys.
- * 
- * @param labels_obj JSON object containing structured labels
- * @param output_buffer Buffer to store the converted string
- * @return 0 on success, -1 on error
- */
-static int convert_structured_labels_to_string(struct json_object *labels_obj, BUFFER *output_buffer) {
-    if (!labels_obj || !output_buffer) {
-        return -1;
-    }
-    
-    if (!json_object_is_type(labels_obj, json_type_object)) {
-        return -1;
-    }
-    
-    buffer_flush(output_buffer);
-    
-    int first_pair = 1;
-    struct json_object_iterator it = json_object_iter_begin(labels_obj);
-    struct json_object_iterator itEnd = json_object_iter_end(labels_obj);
-    
-    while (!json_object_iter_equal(&it, &itEnd)) {
-        const char *key = json_object_iter_peek_name(&it);
-        struct json_object *value_obj = json_object_iter_peek_value(&it);
-        
-        // Check if label key contains patterns
-        if (simple_pattern_contains_wildcards(key, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS)) {
-            return -2; // Special error code for pattern in key
-        }
-        
-        if (json_object_is_type(value_obj, json_type_array)) {
-            // Handle array of values
-            int array_len = json_object_array_length(value_obj);
-            for (int i = 0; i < array_len; i++) {
-                struct json_object *array_item = json_object_array_get_idx(value_obj, i);
-                if (json_object_is_type(array_item, json_type_string)) {
-                    const char *value = json_object_get_string(array_item);
-                    
-                    // Check if label value contains patterns
-                    if (simple_pattern_contains_wildcards(value, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS)) {
-                        return -3; // Special error code for pattern in value
-                    }
-                    
-                    if (!first_pair) {
-                        buffer_strcat(output_buffer, "|");
-                    }
-                    buffer_sprintf(output_buffer, "%s:%s", key, value);
-                    first_pair = 0;
-                }
-            }
-        } else {
-            // Value must be an array
-            return -1;
-        }
-        
-        json_object_iter_next(&it);
-    }
-    
-    return 0;
-}
-
-// Convert array of strings to pipe-separated string, checking for wildcards
-static int convert_array_to_pipe_separated(struct json_object *array_obj, BUFFER *output_buffer, bool allow_wildcards) {
-    if (!array_obj || !output_buffer) {
-        return -1;
-    }
-    
-    if (!json_object_is_type(array_obj, json_type_array)) {
-        return -1;
-    }
-    
-    buffer_flush(output_buffer);
-    
-    int array_len = json_object_array_length(array_obj);
-    for (int i = 0; i < array_len; i++) {
-        struct json_object *item = json_object_array_get_idx(array_obj, i);
-        if (json_object_is_type(item, json_type_string)) {
-            const char *value = json_object_get_string(item);
-            
-            // Check for wildcards if not allowed
-            if (!allow_wildcards && simple_pattern_contains_wildcards(value, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS)) {
-                return -2; // Special error code for wildcards
-            }
-            
-            if (i > 0) {
-                buffer_strcat(output_buffer, "|");
-            }
-            buffer_strcat(output_buffer, value);
-        }
-    }
-    
-    return 0;
-}
 
 // JSON schema for the metrics query tool
 void mcp_tool_query_metrics_schema(BUFFER *buffer) {
@@ -152,86 +48,48 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     buffer_json_member_add_object(buffer, "properties");
 
     // Selection parameters
-    buffer_json_member_add_object(buffer, "nodes");
-    {
-        buffer_json_member_add_string(buffer, "type", "array");
-        buffer_json_member_add_string(buffer, "title", "Nodes");
-        buffer_json_member_add_string(buffer, "description", "Array of specific node names to include in the query.\n"
-                                                             "If no nodes are specified, all nodes having data for the context in the specified time-frame will be queried.\n"
-                                                             "Examples: [\"node1\", \"node2\", \"node3\"]\n"
-                                                             "To discover available nodes, first use the " MCP_TOOL_LIST_NODES " tool.\n"
-                                                             "Note: Wildcards are not supported. Use exact node names only.");
-        buffer_json_member_add_object(buffer, "items");
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_object_close(buffer); // items
-        buffer_json_member_add_array(buffer, "default");
-        buffer_json_array_close(buffer); // default
-    }
-    buffer_json_object_close(buffer); // nodes
+    mcp_schema_add_array_param(buffer, "nodes",
+        "Nodes",
+        "Array of specific node names to include in the query.\n"
+        "If no nodes are specified, all nodes having data for the context in the specified time-frame will be queried.\n"
+        "Examples: [\"node1\", \"node2\", \"node3\"]\n"
+        "To discover available nodes, first use the " MCP_TOOL_LIST_NODES " tool.\n"
+        "Note: Wildcards are not supported. Use exact node names only.",
+        false);
 
-    buffer_json_member_add_object(buffer, "context");
-    {
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Context Name");
-        buffer_json_member_add_string(buffer, "description", "The exact context name to query. This parameter is required.\n"
-                                                             "To discover available contexts, first use the " MCP_TOOL_LIST_METRICS " tool.\n"
-                                                             "Note: Wildcards are not supported. Use exact context name only.");
-        buffer_json_member_add_string(buffer, "default", NULL);
-    }
-    buffer_json_object_close(buffer); // context
+    mcp_schema_add_string_param(buffer, "context", "Context Name",
+                               "The exact context name to query. This parameter is required.\n"
+                               "To discover available contexts, first use the " MCP_TOOL_LIST_METRICS " tool.\n"
+                               "Note: Wildcards are not supported. Use exact context name only.",
+                               NULL, true);
 
 
-    buffer_json_member_add_object(buffer, "instances");
-    {
-        buffer_json_member_add_string(buffer, "type", "array");
-        buffer_json_member_add_string(buffer, "title", "Instances Filter");
-        buffer_json_member_add_string(buffer, "description", "List of specific instance names to include in the query.\n"
-                                                             "Each instance must be an exact match - no wildcards or patterns allowed.\n"
-                                                             "Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover available instances for a context.\n"
-                                                             "If no instances are specified, all instances of the context are queried.\n"
-                                                             "Example: [\"eth0\", \"eth1\", \"lo\"]");
-        buffer_json_member_add_object(buffer, "items");
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_object_close(buffer); // items
-        buffer_json_member_add_string(buffer, "default", NULL);
-    }
-    buffer_json_object_close(buffer); // instances
+    mcp_schema_add_array_param(buffer, "instances",
+        "Instances Filter",
+        "List of specific instance names to include in the query.\n"
+        "Each instance must be an exact match - no wildcards or patterns allowed.\n"
+        "Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover available instances for a context.\n"
+        "If no instances are specified, all instances of the context are queried.\n"
+        "Example: [\"eth0\", \"eth1\", \"lo\"]",
+        false);
 
-    buffer_json_member_add_object(buffer, "dimensions");
-    {
-        buffer_json_member_add_string(buffer, "type", "array");
-        buffer_json_member_add_string(buffer, "title", "Dimensions Filter");
-        buffer_json_member_add_string(buffer, "description", "Array of specific dimension names to include in the query. This parameter is required and cannot be empty.\n"
-                                                             "You must explicitly list every dimension you want to query.\n"
-                                                             "Examples: [\"read\", \"write\"] or [\"in\", \"out\"] or [\"used\", \"free\", \"cached\"]\n"
-                                                             "To discover available dimensions, use the " MCP_TOOL_GET_METRICS_DETAILS " tool with the context.\n"
-                                                             "Note: Wildcards are not supported. You must specify exact dimension names.");
-        buffer_json_member_add_object(buffer, "items");
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_object_close(buffer); // items
-    }
-    buffer_json_object_close(buffer); // dimensions
+    mcp_schema_add_array_param(buffer, "dimensions",
+        "Dimensions Filter",
+        "Array of specific dimension names to include in the query. This parameter is required and cannot be empty.\n"
+        "You must explicitly list every dimension you want to query.\n"
+        "Examples: [\"read\", \"write\"] or [\"in\", \"out\"] or [\"used\", \"free\", \"cached\"]\n"
+        "To discover available dimensions, use the " MCP_TOOL_GET_METRICS_DETAILS " tool with the context.\n"
+        "Note: Wildcards are not supported. You must specify exact dimension names.",
+        true);
 
-    buffer_json_member_add_object(buffer, "labels");
-    {
-        buffer_json_member_add_string(buffer, "type", "object");
-        buffer_json_member_add_string(buffer, "title", "Labels Filter");
-        buffer_json_member_add_string(buffer, "description", "Filter using labels where each key maps to an array of exact values. "
-                                                             "Values in the same array are ORed, different keys are ANDed. "
-                                                             "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}\n"
-                                                             "To discover available labels and their values, use the " MCP_TOOL_GET_METRICS_DETAILS " tool.\n"
-                                                             "Note: Wildcards are not supported. Use exact label keys and values only.");
-        buffer_json_member_add_object(buffer, "additionalProperties");
-        {
-            buffer_json_member_add_string(buffer, "type", "array");
-            buffer_json_member_add_object(buffer, "items");
-            buffer_json_member_add_string(buffer, "type", "string");
-            buffer_json_object_close(buffer); // items
-        }
-        buffer_json_object_close(buffer); // additionalProperties
-        buffer_json_member_add_string(buffer, "default", NULL);
-    }
-    buffer_json_object_close(buffer); // labels
+    mcp_schema_add_labels_object(buffer,
+        "Labels Filter",
+        "Filter using labels where each key maps to an array of exact values. "
+        "Values in the same array are ORed, different keys are ANDed. "
+        "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}\n"
+        "To discover available labels and their values, use the " MCP_TOOL_GET_METRICS_DETAILS " tool.\n"
+        "Note: Wildcards are not supported. Use exact label keys and values only.",
+        false);
 
     buffer_json_member_add_object(buffer, "alerts");
     {
@@ -246,7 +104,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     mcp_schema_params_add_cardinality_limit(buffer, NULL, true);
 
     // Time parameters
-    mcp_schema_params_add_time_window(buffer, "data", true);
+    mcp_schema_add_time_params(buffer, "data", true);
 
     buffer_json_member_add_object(buffer, "points");
     {
@@ -344,14 +202,9 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // group_by
 
-    buffer_json_member_add_object(buffer, "group_by_label");
-    {
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Group By Label");
-        buffer_json_member_add_string(buffer, "description", "When group_by includes 'label', this parameter specifies which label key to group by. For example, if metrics have a 'disk_type' label with values like 'ssd' or 'hdd', setting group_by_label to 'disk_type' would aggregate metrics separately for SSDs and HDDs.");
-        buffer_json_member_add_string(buffer, "default", NULL);
-    }
-    buffer_json_object_close(buffer); // group_by_label
+    mcp_schema_add_string_param(buffer, "group_by_label", "Group By Label",
+                               "When group_by includes 'label', this parameter specifies which label key to group by. For example, if metrics have a 'disk_type' label with values like 'ssd' or 'hdd', setting group_by_label to 'disk_type' would aggregate metrics separately for SSDs and HDDs.",
+                               NULL, false);
 
     buffer_json_member_add_object(buffer, "aggregation");
     {
@@ -414,42 +267,7 @@ static bool mcp_query_interrupt_callback(void *data) {
     return false;
 }
 
-// Extract string parameter from json object
-static const char *extract_string_param(struct json_object *params, const char *name) {
-    if (!params)
-        return NULL;
-        
-    struct json_object *obj = NULL;
-    if (!json_object_object_get_ex(params, name, &obj) || !obj)
-        return NULL;
-        
-    if (!json_object_is_type(obj, json_type_string))
-        return NULL;
-        
-    return json_object_get_string(obj);
-}
-
-
-// Extract size_t parameter from json object
-static size_t extract_size_param(struct json_object *params, const char *name, size_t default_val) {
-    if (!params)
-        return default_val;
-        
-    struct json_object *obj = NULL;
-    if (!json_object_object_get_ex(params, name, &obj) || !obj)
-        return default_val;
-        
-    if (json_object_is_type(obj, json_type_int))
-        return (size_t)json_object_get_int64(obj);
-        
-    if (json_object_is_type(obj, json_type_string)) {
-        const char *val_str = json_object_get_string(obj);
-        if (val_str && *val_str)
-            return str2u(val_str);
-    }
-    
-    return default_val;
-}
+// Removed extract_string_param and extract_size_param - now using mcp-params functions
 
 // Execute the metrics query
 MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
@@ -461,7 +279,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     usec_t received_ut = now_monotonic_usec();
     
     // Extract and validate context parameter
-    const char *context = extract_string_param(params, "context");
+    const char *context = mcp_params_extract_string(params, "context", NULL);
     
     // Validate required parameters with detailed error messages
     if (!context || !*context) {
@@ -545,130 +363,61 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     }
     
     // Handle nodes array parameter
-    const char *nodes = NULL;
-    BUFFER *nodes_buffer = NULL;
-    struct json_object *nodes_obj = NULL;
+    CLEAN_BUFFER *nodes_buffer = NULL;
+    const char *error = NULL;
     
-    if (json_object_object_get_ex(params, "nodes", &nodes_obj) && nodes_obj) {
-        if (json_object_is_type(nodes_obj, json_type_array)) {
-            nodes_buffer = buffer_create(256, NULL);
-            int result = convert_array_to_pipe_separated(nodes_obj, nodes_buffer, false);
-            if (result == -2) {
-                buffer_free(nodes_buffer);
-                buffer_sprintf(mcpc->error, "The 'nodes' parameter must contain exact node names, not patterns. "
-                                            "Wildcards are not supported. "
-                                            "Use the " MCP_TOOL_LIST_NODES " tool to discover exact node names.");
-                return MCP_RC_BAD_REQUEST;
-            } else if (result != 0) {
-                buffer_free(nodes_buffer);
-                buffer_sprintf(mcpc->error, "Invalid nodes format. Must be an array of strings.");
-                return MCP_RC_BAD_REQUEST;
-            }
-            nodes = buffer_tostring(nodes_buffer);
-        } else {
-            buffer_sprintf(mcpc->error, "Nodes must be an array of strings, not %s", json_type_to_name(json_object_get_type(nodes_obj)));
-            return MCP_RC_BAD_REQUEST;
-        }
+    nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, MCP_TOOL_LIST_NODES, &error);
+    if (error) {
+        buffer_sprintf(mcpc->error, "Invalid nodes parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
     }
     
     // Handle instances array parameter
-    const char *instances = NULL;
-    BUFFER *instances_buffer = NULL;
-    struct json_object *instances_obj = NULL;
+    CLEAN_BUFFER *instances_buffer = NULL;
     
-    if (json_object_object_get_ex(params, "instances", &instances_obj) && instances_obj) {
-        if (json_object_is_type(instances_obj, json_type_array)) {
-            instances_buffer = buffer_create(256, NULL);
-            int result = convert_array_to_pipe_separated(instances_obj, instances_buffer, false);
-            if (result == -2) {
-                buffer_free(instances_buffer);
-                buffer_sprintf(mcpc->error, "The 'instances' parameter must contain exact instance names, not patterns. "
-                                            "Wildcards are not supported. "
-                                            "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover exact instance names.");
-                return MCP_RC_BAD_REQUEST;
-            } else if (result != 0) {
-                buffer_free(instances_buffer);
-                buffer_sprintf(mcpc->error, "Invalid instances format. Must be an array of strings.");
-                return MCP_RC_BAD_REQUEST;
-            }
-            instances = buffer_tostring(instances_buffer);
-        } else {
-            buffer_sprintf(mcpc->error, "Instances must be an array of strings, not %s", json_type_to_name(json_object_get_type(instances_obj)));
-            return MCP_RC_BAD_REQUEST;
-        }
+    instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_sprintf(mcpc->error, "Invalid instances parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
     }
     
     // Handle dimensions array parameter
-    const char *dimensions = NULL;
-    BUFFER *dimensions_buffer = NULL;
+    CLEAN_BUFFER *dimensions_buffer = NULL;
     
-    // dimensions_obj already checked above as required parameter
-    if (json_object_is_type(dimensions_obj, json_type_array)) {
-        int array_len = json_object_array_length(dimensions_obj);
-        if (array_len == 0) {
-            buffer_sprintf(mcpc->error, "The 'dimensions' parameter cannot be an empty array. "
-                                        "You must explicitly list every dimension you want to query. "
-                                        "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover available dimensions for the context '%s'.", context);
-            return MCP_RC_BAD_REQUEST;
-        }
-        
-        dimensions_buffer = buffer_create(256, NULL);
-        int result = convert_array_to_pipe_separated(dimensions_obj, dimensions_buffer, false);
-        if (result == -2) {
-            buffer_free(dimensions_buffer);
-            buffer_sprintf(mcpc->error, "The 'dimensions' parameter must contain exact dimension names, not patterns. "
-                                        "Wildcards are not supported. "
-                                        "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover exact dimension names.");
-            return MCP_RC_BAD_REQUEST;
-        } else if (result != 0) {
-            buffer_free(dimensions_buffer);
-            buffer_sprintf(mcpc->error, "Invalid dimensions format. Must be an array of strings.");
-            return MCP_RC_BAD_REQUEST;
-        }
-        dimensions = buffer_tostring(dimensions_buffer);
-    } else {
+    // First check if dimensions is provided and is an array (required parameter)
+    if (!json_object_is_type(dimensions_obj, json_type_array)) {
         buffer_sprintf(mcpc->error, "Dimensions must be an array of strings, not %s", json_type_to_name(json_object_get_type(dimensions_obj)));
         return MCP_RC_BAD_REQUEST;
     }
     
-    // Handle labels - expects structured object only
-    const char *labels = NULL;
-    BUFFER *labels_buffer = NULL;
-    struct json_object *labels_obj = NULL;
-    
-    if (json_object_object_get_ex(params, "labels", &labels_obj) && labels_obj) {
-        if (json_object_is_type(labels_obj, json_type_object)) {
-            // Structured format - convert to string
-            labels_buffer = buffer_create(256, NULL);
-            int result = convert_structured_labels_to_string(labels_obj, labels_buffer);
-            if (result == 0) {
-                labels = buffer_tostring(labels_buffer);
-            } else {
-                buffer_free(labels_buffer);
-                if (result == -2) {
-                    buffer_sprintf(mcpc->error, "Label keys must be exact names, not patterns. "
-                                                "Wildcards or pattern separators are not supported in label keys. "
-                                                "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover exact label keys.");
-                } else if (result == -3) {
-                    buffer_sprintf(mcpc->error, "Label values must be exact values, not patterns. "
-                                                "Wildcards or pattern separators are not supported in label values. "
-                                                "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover exact label values.");
-                } else {
-                    buffer_sprintf(mcpc->error, "Invalid labels format. Each label key must map to an array of string values. Example: {\"cgroup_name\": [\"value1\", \"value2\"]}");
-                }
-                return MCP_RC_BAD_REQUEST;
-            }
-        } else {
-            buffer_sprintf(mcpc->error, "Labels must be an object, not %s", json_type_to_name(json_object_get_type(labels_obj)));
-            return MCP_RC_BAD_REQUEST;
-        }
+    // Check for empty array
+    int array_len = json_object_array_length(dimensions_obj);
+    if (array_len == 0) {
+        buffer_sprintf(mcpc->error, "The 'dimensions' parameter cannot be an empty array. "
+                                    "You must explicitly list every dimension you want to query. "
+                                    "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover available dimensions for the context '%s'.", context);
+        return MCP_RC_BAD_REQUEST;
     }
     
-    const char *alerts = extract_string_param(params, "alerts");
+    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_sprintf(mcpc->error, "Invalid dimensions parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    // Handle labels - expects structured object only
+    CLEAN_BUFFER *labels_buffer = NULL;
+    
+    labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_sprintf(mcpc->error, "Invalid labels parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    const char *alerts = mcp_params_extract_string(params, "alerts", NULL);
     
     // Time parameters
-    time_t after = mcp_extract_time_param(params, "after", MCP_DEFAULT_AFTER_TIME);
-    time_t before = mcp_extract_time_param(params, "before", MCP_DEFAULT_BEFORE_TIME);
+    time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
+    time_t before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
     
     // Validate time range
     if (after == 0 && before == 0) {
@@ -685,8 +434,18 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // No need to check aggregation_obj here - we already have default in group_by struct
     
     // Other parameters
-    size_t points = extract_size_param(params, "points", 0);
-    size_t cardinality_limit = extract_size_param(params, "cardinality_limit", MCP_DATA_CARDINALITY_LIMIT);
+    const char *size_error = NULL;
+    size_t points = mcp_params_extract_size(params, "points", 0, 0, SIZE_MAX, &size_error);
+    if (size_error) {
+        buffer_sprintf(mcpc->error, "%s", size_error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    size_t cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", MCP_DATA_CARDINALITY_LIMIT, 1, 1000, &size_error);
+    if (size_error) {
+        buffer_sprintf(mcpc->error, "%s", size_error);
+        return MCP_RC_BAD_REQUEST;
+    }
 
     // Check if points is more than 1000
     if (points < 1) {
@@ -705,9 +464,14 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    int timeout = (int)extract_size_param(params, "timeout", 0);
+    const char *timeout_error = NULL;
+    int timeout = mcp_params_extract_timeout(params, "timeout", 0, 0, 3600, &timeout_error);
+    if (timeout_error) {
+        buffer_sprintf(mcpc->error, "%s", timeout_error);
+        return MCP_RC_BAD_REQUEST;
+    }
     
-    const char *options_str = extract_string_param(params, "options");
+    const char *options_str = mcp_params_extract_string(params, "options", NULL);
     RRDR_OPTIONS options = 0;
     if (options_str && *options_str)
         options |= rrdr_options_parse(options_str);
@@ -717,10 +481,14 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     if (time_group_str && *time_group_str)
         time_group = time_grouping_parse(time_group_str, RRDR_GROUPING_AVERAGE);
     
-    const char *time_group_options = extract_string_param(params, "time_group_options");
+    const char *time_group_options = mcp_params_extract_string(params, "time_group_options", NULL);
     
     // Tier selection (give an invalid default to now the caller added a tier to the query)
-    size_t tier = extract_size_param(params, "tier", nd_profile.storage_tiers + 1);
+    size_t tier = mcp_params_extract_size(params, "tier", nd_profile.storage_tiers + 1, 0, SIZE_MAX, &size_error);
+    if (size_error) {
+        buffer_sprintf(mcpc->error, "%s", size_error);
+        return MCP_RC_BAD_REQUEST;
+    }
     if (tier < nd_profile.storage_tiers)
         options |= RRDR_OPTION_SELECTED_TIER;
     else
@@ -735,17 +503,17 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         },
     };
     
-    const char *group_by_str = extract_string_param(params, "group_by");
+    const char *group_by_str = mcp_params_extract_string(params, "group_by", NULL);
     if (group_by_str && *group_by_str)
         group_by[0].group_by = group_by_parse(group_by_str);
     
-    const char *group_by_label = extract_string_param(params, "group_by_label");
+    const char *group_by_label = mcp_params_extract_string(params, "group_by_label", NULL);
     if (group_by_label && *group_by_label) {
         group_by[0].group_by_label = (char *)group_by_label;
         group_by[0].group_by |= RRDR_GROUP_BY_LABEL;
     }
     
-    const char *aggregation_str = extract_string_param(params, "aggregation");
+    const char *aggregation_str = mcp_params_extract_string(params, "aggregation", NULL);
     if (aggregation_str && *aggregation_str)
         group_by[0].aggregation = group_by_aggregate_function_parse(aggregation_str);
     
@@ -758,11 +526,11 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // Prepare query target request
     QUERY_TARGET_REQUEST qtr = {
         .version = 3,
-        .scope_nodes = nodes,       // Use nodes as scope_nodes
+        .scope_nodes = buffer_tostring(nodes_buffer),       // Use nodes as scope_nodes
         .scope_contexts = context,  // Use the single context as scope_contexts
-        .scope_instances = instances, // Use instances as scope_instances for MCP
-        .scope_labels = labels,     // Use labels as scope_labels for MCP
-        .scope_dimensions = dimensions, // Use dimensions as scope_dimensions for MCP
+        .scope_instances = buffer_tostring(instances_buffer), // Use instances as scope_instances for MCP
+        .scope_labels = buffer_tostring(labels_buffer),     // Use labels as scope_labels for MCP
+        .scope_dimensions = buffer_tostring(dimensions_buffer), // Use dimensions as scope_dimensions for MCP
         .after = after,
         .before = before,
         .host = NULL,
@@ -805,10 +573,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     QUERY_TARGET *qt = query_target_create(&qtr);
     if (!qt) {
         buffer_sprintf(mcpc->error, "Failed to prepare the query.");
-        if (nodes_buffer) buffer_free(nodes_buffer);
-        if (instances_buffer) buffer_free(instances_buffer);
-        if (dimensions_buffer) buffer_free(dimensions_buffer);
-        if (labels_buffer) buffer_free(labels_buffer);
         return MCP_RC_INTERNAL_ERROR;
     }
 
@@ -851,15 +615,11 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         
         buffer_sprintf(mcpc->error, "Failed to execute query: %s (http error code: %d). The context '%s' might not exist, or no data is available for the specified time range.",
                       error_desc, ret, context);
-        if (nodes_buffer) buffer_free(nodes_buffer);
-        if (instances_buffer) buffer_free(instances_buffer);
-        if (dimensions_buffer) buffer_free(dimensions_buffer);
-        if (labels_buffer) buffer_free(labels_buffer);
         return MCP_RC_INTERNAL_ERROR;
     }
     
     // Check if instance filtering or grouping is used
-    bool using_instances = (instances && *instances) || 
+    bool using_instances = (instances_buffer && buffer_strlen(instances_buffer) > 0) || 
                           (group_by[0].group_by & RRDR_GROUP_BY_INSTANCE);
     
     // Return the raw query engine response as-is
@@ -930,12 +690,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     }
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
-    
-    // Clean up allocated memory
-    if (nodes_buffer) buffer_free(nodes_buffer);
-    if (instances_buffer) buffer_free(instances_buffer);
-    if (dimensions_buffer) buffer_free(dimensions_buffer);
-    if (labels_buffer) buffer_free(labels_buffer);
     
     return MCP_RC_OK;
 }

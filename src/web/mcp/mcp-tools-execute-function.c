@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-tools-execute-function.h"
+#include "mcp-params.h"
 #include "database/contexts/rrdcontext.h"
 #include "database/rrdfunctions.h"
 
@@ -797,14 +798,9 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // function
     
-    buffer_json_member_add_object(buffer, "timeout");
-    {
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Execution timeout in seconds");
-        buffer_json_member_add_string(buffer, "description", "Maximum time to wait for function execution (default: 60)");
-        buffer_json_member_add_int64(buffer, "default", 60);
-    }
-    buffer_json_object_close(buffer); // timeout
+    mcp_schema_add_timeout(buffer, "timeout", "Execution timeout in seconds",
+                          "Maximum time to wait for function execution (default: 60)",
+                          60, 1, 3600, false);
 
     buffer_json_member_add_object(buffer, "columns");
     {
@@ -820,13 +816,9 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // columns
 
-    buffer_json_member_add_object(buffer, "sort_column");
-    {
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Column to sort by");
-        buffer_json_member_add_string(buffer, "description", "Name of the column to sort the results by.");
-    }
-    buffer_json_object_close(buffer); // sort_column
+    mcp_schema_add_string_param(buffer, "sort_column", "Column to sort by",
+                               "Name of the column to sort the results by.",
+                               NULL, false);
 
     buffer_json_member_add_object(buffer, "sort_order");
     {
@@ -841,13 +833,9 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // sort_order
 
-    buffer_json_member_add_object(buffer, "limit");
-    {
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Row limit");
-        buffer_json_member_add_string(buffer, "description", "Maximum number of rows to return");
-    }
-    buffer_json_object_close(buffer); // limit
+    mcp_schema_add_size_param(buffer, "limit", "Row limit",
+                             "Maximum number of rows to return",
+                             0, 0, SIZE_MAX, false);
     
     buffer_json_member_add_object(buffer, "conditions");
     {
@@ -1408,15 +1396,11 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         return MCP_RC_BAD_REQUEST;
     }
 
-    int timeout = 60; // Default timeout 60 seconds
-    if (json_object_object_get_ex(params, "timeout", NULL)) {
-        struct json_object *obj = NULL;
-        json_object_object_get_ex(params, "timeout", &obj);
-        if (obj && json_object_is_type(obj, json_type_int)) {
-            timeout = json_object_get_int(obj);
-            if (timeout <= 0)
-                timeout = 60;
-        }
+    const char *timeout_error = NULL;
+    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, &timeout_error); // Default timeout 60 seconds
+    if (timeout_error) {
+        buffer_sprintf(mcpc->error, "%s", timeout_error);
+        return MCP_RC_BAD_REQUEST;
     }
 
     // Find the host by hostname first

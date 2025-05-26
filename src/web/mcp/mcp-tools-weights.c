@@ -3,6 +3,7 @@
 #include "mcp-tools-weights.h"
 #include "mcp-tools.h"
 #include "mcp-time-utils.h"
+#include "mcp-params.h"
 #include "web/api/web_api.h"
 #include "web/api/queries/weights.h"
 #include "web/api/queries/query.h"
@@ -18,16 +19,16 @@ static MCP_RETURN_CODE execute_weights_request(
     // Initialize response
     mcp_init_success_result(mcpc, id);
     
-    // Extract time parameters using MCP time utilities
-    time_t after = mcp_extract_time_param(params, "after", MCP_DEFAULT_AFTER_TIME);
-    time_t before = mcp_extract_time_param(params, "before", MCP_DEFAULT_BEFORE_TIME);
+    // Extract time parameters using common parsing functions
+    time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
+    time_t before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
     time_t baseline_after = 0;
     time_t baseline_before = 0;
     
     // For correlation methods (KS2, VOLUME), parse baseline times
     if (method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
-        baseline_after = mcp_extract_time_param(params, "baseline_after", 0);
-        baseline_before = mcp_extract_time_param(params, "baseline_before", 0);
+        baseline_after = mcp_params_parse_time(params, "baseline_after", 0);
+        baseline_before = mcp_params_parse_time(params, "baseline_before", 0);
         
         // If baseline not specified, auto-calculate as 4x the query window before the query window
         if (baseline_after == 0 && baseline_before == 0) {
@@ -37,59 +38,58 @@ static MCP_RETURN_CODE execute_weights_request(
         }
     }
     
-    // Parse other parameters
-    const char *contexts = NULL;
-    const char *nodes = NULL;
-    const char *instances = NULL;
-    const char *dimensions = NULL;
-    const char *labels = NULL;
-
-    struct json_object *obj;
-    if (json_object_object_get_ex(params, "contexts", &obj) && json_object_is_type(obj, json_type_string))
-        contexts = json_object_get_string(obj);
-        
-    if (json_object_object_get_ex(params, "nodes", &obj) && json_object_is_type(obj, json_type_string))
-        nodes = json_object_get_string(obj);
-        
-    if (json_object_object_get_ex(params, "instances", &obj) && json_object_is_type(obj, json_type_string))
-        instances = json_object_get_string(obj);
-        
-    if (json_object_object_get_ex(params, "dimensions", &obj) && json_object_is_type(obj, json_type_string))
-        dimensions = json_object_get_string(obj);
-        
-    // Handle labels conversion
-    BUFFER *labels_buffer = NULL;
-    if (json_object_object_get_ex(params, "labels", &obj) && json_object_is_type(obj, json_type_object)) {
-        // Convert labels object to query string format
-        struct json_object_iterator it = json_object_iter_begin(obj);
-        struct json_object_iterator itEnd = json_object_iter_end(obj);
-        
-        labels_buffer = buffer_create(256, NULL);
-        int first = 1;
-        
-        while (!json_object_iter_equal(&it, &itEnd)) {
-            const char *key = json_object_iter_peek_name(&it);
-            struct json_object *val = json_object_iter_peek_value(&it);
-            
-            if (json_object_is_type(val, json_type_array)) {
-                size_t array_len = json_object_array_length(val);
-                for (size_t i = 0; i < array_len; i++) {
-                    struct json_object *item = json_object_array_get_idx(val, i);
-                    if (json_object_is_type(item, json_type_string)) {
-                        if (!first) buffer_strcat(labels_buffer, "|");
-                        buffer_sprintf(labels_buffer, "%s:%s", key, json_object_get_string(item));
-                        first = 0;
-                    }
-                }
-            }
-            json_object_iter_next(&it);
-        }
-        
-        if (buffer_strlen(labels_buffer) > 0)
-            labels = buffer_tostring(labels_buffer);
+    // Parse filter parameters using common parsing functions
+    // Use CLEAN_BUFFER for automatic cleanup
+    CLEAN_BUFFER *contexts_buffer = NULL;
+    CLEAN_BUFFER *nodes_buffer = NULL;
+    CLEAN_BUFFER *instances_buffer = NULL;
+    CLEAN_BUFFER *dimensions_buffer = NULL;
+    CLEAN_BUFFER *labels_buffer = NULL;
+    
+    const char *error = NULL;
+    
+    // Parse contexts as array
+    contexts_buffer = mcp_params_parse_contexts_array(params, false, MCP_TOOL_LIST_METRICS, &error);
+    if (error) {
+        buffer_flush(mcpc->error);
+        buffer_sprintf(mcpc->error, "Invalid contexts parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // Parse nodes as array
+    nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, MCP_TOOL_LIST_NODES, &error);
+    if (error) {
+        buffer_flush(mcpc->error);
+        buffer_sprintf(mcpc->error, "Invalid nodes parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // Parse instances as array
+    instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_flush(mcpc->error);
+        buffer_sprintf(mcpc->error, "Invalid instances parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // Parse dimensions as array
+    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_flush(mcpc->error);
+        buffer_sprintf(mcpc->error, "Invalid dimensions parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // Parse labels as object
+    labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_flush(mcpc->error);
+        buffer_sprintf(mcpc->error, "Invalid labels parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
     }
     
     // Get cardinality limit
+    struct json_object *obj;
     size_t cardinality_limit = 50; // Default for MCP
     if (json_object_object_get_ex(params, "cardinality_limit", &obj) && json_object_is_type(obj, json_type_int))
         cardinality_limit = json_object_get_int(obj);
@@ -114,11 +114,11 @@ static MCP_RETURN_CODE execute_weights_request(
     QUERY_WEIGHTS_REQUEST qwr = {
         .version = 2,
         .host = NULL,  // Will query all hosts
-        .scope_nodes = nodes,
-        .scope_contexts = contexts,
-        .scope_instances = instances,
-        .scope_labels = labels,
-        .scope_dimensions = dimensions,
+        .scope_nodes = buffer_tostring(nodes_buffer),
+        .scope_contexts = buffer_tostring(contexts_buffer),
+        .scope_instances = buffer_tostring(instances_buffer),
+        .scope_labels = buffer_tostring(labels_buffer),
+        .scope_dimensions = buffer_tostring(dimensions_buffer),
         .nodes = NULL,
         // exclude netdata internal metrics
         // exclude system interrupts and CPU interrupts, while are fragile
@@ -151,18 +151,13 @@ static MCP_RETURN_CODE execute_weights_request(
     };
     
     // Create a temporary buffer for the weights API response
-    BUFFER *tmp_buffer = buffer_create(0, NULL);
+    CLEAN_BUFFER *tmp_buffer = buffer_create(0, NULL);
     
     // Call the weights API function with the temporary buffer
     int http_code = web_api_v12_weights(tmp_buffer, &qwr);
     
-    // Clean up
-    if (labels_buffer)
-        buffer_free(labels_buffer);
-    
     // Handle response
     if (http_code != HTTP_RESP_OK) {
-        buffer_free(tmp_buffer);
         buffer_flush(mcpc->result);
         buffer_flush(mcpc->error);
         
@@ -201,15 +196,12 @@ static MCP_RETURN_CODE execute_weights_request(
     buffer_json_object_close(mcpc->result); // Close the "result" object
     buffer_json_finalize(mcpc->result);
     
-    // Clean up the temporary buffer
-    buffer_free(tmp_buffer);
-    
     return MCP_RC_OK;
 }
 
 // Schema helper for common time window parameters
 static void add_weights_time_parameters(BUFFER *buffer, bool include_baseline) {
-    mcp_schema_params_add_time_window(buffer, "metrics", true);
+    mcp_schema_add_time_params(buffer, "metrics", true);
     
     if (include_baseline) {
         buffer_json_member_add_object(buffer, "baseline_after");
@@ -235,52 +227,37 @@ static void add_weights_time_parameters(BUFFER *buffer, bool include_baseline) {
 
 // Schema helper for common filter parameters
 static void add_weights_filter_parameters(BUFFER *buffer) {
-    buffer_json_member_add_object(buffer, "contexts");
-    buffer_json_member_add_string(buffer, "type", "string");
-    buffer_json_member_add_string(buffer, "title", "Filter by metric contexts");
-    buffer_json_member_add_string(buffer, "description", 
-        "Filter to specific metric types (e.g., 'system.cpu', 'disk.*', 'mysql.*'). "
-        "Use pipe (|) to separate multiple patterns. Supports wildcards.");
-    buffer_json_object_close(buffer);
+    mcp_schema_add_contexts_array(buffer,
+        "Filter by metric contexts",
+        "Array of exact context names to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries']). "
+        "Wildcards are not supported. Use exact context names only.",
+        false);
     
-    buffer_json_member_add_object(buffer, "nodes");
-    buffer_json_member_add_string(buffer, "type", "string");
-    buffer_json_member_add_string(buffer, "title", "Filter by nodes");
-    buffer_json_member_add_string(buffer, "description", 
-        "Filter to specific nodes (e.g., 'web-server-1', 'database-*'). "
-        "Use pipe (|) to separate multiple patterns. Supports wildcards.");
-    buffer_json_object_close(buffer);
+    mcp_schema_add_array_param(buffer, "nodes",
+        "Filter by nodes",
+        "Array of exact node names to filter (e.g., ['web-server-1', 'database-primary']). "
+        "Wildcards are not supported. Use exact node names only.",
+        false);
     
-    buffer_json_member_add_object(buffer, "instances");
-    buffer_json_member_add_string(buffer, "type", "string");
-    buffer_json_member_add_string(buffer, "title", "Filter by instances");
-    buffer_json_member_add_string(buffer, "description", 
-        "Filter to specific instances (e.g., 'eth0', 'sda', 'production_db'). "
-        "Use pipe (|) to separate multiple patterns. Supports wildcards.");
-    buffer_json_object_close(buffer);
+    mcp_schema_add_array_param(buffer, "instances",
+        "Filter by instances",
+        "Array of exact instance names to filter (e.g., ['eth0', 'sda', 'production_db']). "
+        "Wildcards are not supported. Use exact instance names only.",
+        false);
     
-    buffer_json_member_add_object(buffer, "dimensions");
-    buffer_json_member_add_string(buffer, "type", "string");
-    buffer_json_member_add_string(buffer, "title", "Filter by dimensions");
-    buffer_json_member_add_string(buffer, "description", 
-        "Filter to specific dimensions (e.g., 'user', 'writes', 'slow_queries'). "
-        "Use pipe (|) to separate multiple patterns. Supports wildcards.");
-    buffer_json_object_close(buffer);
+    mcp_schema_add_array_param(buffer, "dimensions",
+        "Filter by dimensions",
+        "Array of exact dimension names to filter (e.g., ['user', 'writes', 'slow_queries']). "
+        "Wildcards are not supported. Use exact dimension names only.",
+        false);
     
-    buffer_json_member_add_object(buffer, "labels");
-    buffer_json_member_add_string(buffer, "type", "object");
-    buffer_json_member_add_string(buffer, "title", "Filter by labels");
-    buffer_json_member_add_string(buffer, "description", 
-        "Filter using labels where each key maps to an array of values. "
+    mcp_schema_add_labels_object(buffer,
+        "Filter by labels",
+        "Filter using labels where each key maps to an array of exact values. "
         "Values in the same array are ORed, different keys are ANDed. "
-        "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}");
-    buffer_json_member_add_object(buffer, "additionalProperties");
-    buffer_json_member_add_string(buffer, "type", "array");
-    buffer_json_member_add_object(buffer, "items");
-    buffer_json_member_add_string(buffer, "type", "string");
-    buffer_json_object_close(buffer); // items
-    buffer_json_object_close(buffer); // additionalProperties
-    buffer_json_object_close(buffer); // labels
+        "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}\n"
+        "Note: Wildcards are not supported. Use exact label keys and values only.",
+        false);
 }
 
 // find_correlated_metrics implementation
@@ -324,14 +301,9 @@ void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer) {
     buffer_json_member_add_string(buffer, "default", "volume");
     buffer_json_object_close(buffer); // method
     
-    buffer_json_member_add_object(buffer, "cardinality_limit");
-    buffer_json_member_add_string(buffer, "type", "number");
-    buffer_json_member_add_string(buffer, "title", "Maximum results");
-    buffer_json_member_add_string(buffer, "description", "Maximum number of results to return");
-    buffer_json_member_add_int64(buffer, "default", 50);
-    buffer_json_member_add_int64(buffer, "minimum", 1);
-    buffer_json_member_add_int64(buffer, "maximum", 200);
-    buffer_json_object_close(buffer); // cardinality_limit
+    mcp_schema_add_cardinality_limit(buffer, 
+        "Maximum number of results to return",
+        50, 200);
     
     buffer_json_object_close(buffer); // properties
     
@@ -358,14 +330,9 @@ void mcp_tool_find_anomalous_metrics_schema(BUFFER *buffer) {
     add_weights_time_parameters(buffer, false);
     add_weights_filter_parameters(buffer);
     
-    buffer_json_member_add_object(buffer, "cardinality_limit");
-    buffer_json_member_add_string(buffer, "type", "number");
-    buffer_json_member_add_string(buffer, "title", "Maximum results");
-    buffer_json_member_add_string(buffer, "description", "Maximum number of results to return");
-    buffer_json_member_add_int64(buffer, "default", 50);
-    buffer_json_member_add_int64(buffer, "minimum", 1);
-    buffer_json_member_add_int64(buffer, "maximum", 200);
-    buffer_json_object_close(buffer); // cardinality_limit
+    mcp_schema_add_cardinality_limit(buffer, 
+        "Maximum number of results to return",
+        50, 200);
     
     buffer_json_object_close(buffer); // properties
     
@@ -393,14 +360,9 @@ void mcp_tool_find_unstable_metrics_schema(BUFFER *buffer) {
     add_weights_time_parameters(buffer, false);
     add_weights_filter_parameters(buffer);
     
-    buffer_json_member_add_object(buffer, "cardinality_limit");
-    buffer_json_member_add_string(buffer, "type", "number");
-    buffer_json_member_add_string(buffer, "title", "Maximum results");
-    buffer_json_member_add_string(buffer, "description", "Maximum number of results to return");
-    buffer_json_member_add_int64(buffer, "default", 50);
-    buffer_json_member_add_int64(buffer, "minimum", 1);
-    buffer_json_member_add_int64(buffer, "maximum", 200);
-    buffer_json_object_close(buffer); // cardinality_limit
+    mcp_schema_add_cardinality_limit(buffer, 
+        "Maximum number of results to return",
+        50, 200);
     
     buffer_json_object_close(buffer); // properties
     
