@@ -1672,8 +1672,8 @@ void mssql_total_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *m
             NULL,
             "locks",
             "mssql.instance_total_wait",
-            "Number of waits on this wait type.",
-            "waits/s",
+            "Total wait time for this wait type in milliseconds.",
+            "ms",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_WAITS_TOTAL,
@@ -1683,7 +1683,7 @@ void mssql_total_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *m
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
-        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "waits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "periods", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1717,7 +1717,7 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, struct mssql_db_waits
         rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_resource_wait_msec =
-            rrddim_add(mdw->st_resource_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(mdw->st_resource_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
