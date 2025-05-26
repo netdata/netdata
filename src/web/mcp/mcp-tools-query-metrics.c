@@ -201,15 +201,14 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", "Dimensions Filter");
-        buffer_json_member_add_string(buffer, "description", "Array of specific dimension names to include in the query.\n"
+        buffer_json_member_add_string(buffer, "description", "Array of specific dimension names to include in the query. This parameter is required and cannot be empty.\n"
+                                                             "You must explicitly list every dimension you want to query.\n"
                                                              "Examples: [\"read\", \"write\"] or [\"in\", \"out\"] or [\"used\", \"free\", \"cached\"]\n"
-                                                             "If no dimensions are specified, all dimensions of the context are queried.\n"
                                                              "To discover available dimensions, use the " MCP_TOOL_GET_METRICS_DETAILS " tool with the context.\n"
-                                                             "Note: Wildcards are not supported. Use exact dimension names only.");
+                                                             "Note: Wildcards are not supported. You must specify exact dimension names.");
         buffer_json_member_add_object(buffer, "items");
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_object_close(buffer); // items
-        buffer_json_member_add_string(buffer, "default", NULL);
     }
     buffer_json_object_close(buffer); // dimensions
 
@@ -336,13 +335,12 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Group By");
-        buffer_json_member_add_string(buffer, "description", "Specifies how to group metrics across different time-series. Supports following options which can be combined (comma-separated):\n\n"
+        buffer_json_member_add_string(buffer, "description", "Specifies how to group metrics across different time-series. This parameter is required.\n\n"
                                                              "'dimension': Groups metrics by dimension name across all instances/nodes. If monitoring disks having reads and writes, this will produce the aggregate read and writes for all disks of all nodes.\n\n"
                                                              "'instance': Groups metrics by instance across all nodes. If monitoring disks, the result will be 1 metric per disk, aggregating its reads and writes.\n\n"
                                                              "'node': Groups metrics from the same node. If monitoring disks, the result will be 1 metric per node, aggregating its reads and writes across all its disks.\n\n"
                                                              "'label': Groups metrics with the same value for the specified label (requires group_by_label). Example: if the label has 2 values: physical and virtual, the result will be 2 metrics: physical and virtual.\n\n"
                                                              "Multiple groupings can be combined, e.g., 'node,dimension' will produce separate read and write metrics for each node.");
-        buffer_json_member_add_string(buffer, "default", "dimension");
     }
     buffer_json_object_close(buffer); // group_by
 
@@ -359,14 +357,13 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Aggregation Function");
-        buffer_json_member_add_string(buffer, "description", "Function to use when aggregating grouped metrics:\n\n"
+        buffer_json_member_add_string(buffer, "description", "Function to use when aggregating grouped metrics. This parameter is required.\n\n"
                                                              "'sum': Sum of all grouped metrics (useful for additive metrics like bytes transferred, operations, etc.)\n\n"
                                                              "'min': Minimum value among all grouped metrics (useful for finding best performance metrics)\n\n"
                                                              "'max': Maximum value among all grouped metrics (useful for finding worst performance metrics, peak resource usage)\n\n"
-                                                             "'average': Average of all grouped metrics (useful for utilization and most ratio metrics)\n\n"
+                                                             "'average': Average of all grouped metrics (CAUTION: When group_by doesn't include 'dimension', this averages different metric types together - e.g., CPU user + system + idle - which is rarely meaningful)\n\n"
                                                              "'percentage': Expresses each grouped metric as a percentage of its group's total (useful for seeing proportional contributions)\n\n"
                                                              "'extremes': For each group, shows maximum value for positive metrics and minimum value for negative metrics (useful for showing both highest peaks and lowest dips)");
-        buffer_json_member_add_string(buffer, "default", "average");
         
         // Define enum of possible values
         buffer_json_member_add_array(buffer, "enum");
@@ -385,6 +382,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     // Required fields
     buffer_json_member_add_array(buffer, "required");
     buffer_json_add_array_item_string(buffer, "context");
+    buffer_json_add_array_item_string(buffer, "dimensions");
     buffer_json_add_array_item_string(buffer, "after");
     buffer_json_add_array_item_string(buffer, "before");
     buffer_json_add_array_item_string(buffer, "points");
@@ -481,7 +479,12 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Check if all required parameters are provided
     struct json_object *after_obj = NULL, *before_obj = NULL, *points_obj = NULL, *time_group_obj = NULL;
-    struct json_object *group_by_obj = NULL, *aggregation_obj = NULL;
+    struct json_object *group_by_obj = NULL, *aggregation_obj = NULL, *dimensions_obj = NULL;
+    
+    if (!json_object_object_get_ex(params, "dimensions", &dimensions_obj) || !dimensions_obj) {
+        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. This parameter specifies which dimensions to include in the query. Use [] to include all dimensions, or specify an array of dimension names like [\"read\", \"write\"].");
+        return MCP_RC_BAD_REQUEST;
+    }
     
     if (!json_object_object_get_ex(params, "after", &after_obj) || !after_obj) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (epoch timestamp in seconds or negative value for relative time).");
@@ -598,28 +601,34 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // Handle dimensions array parameter
     const char *dimensions = NULL;
     BUFFER *dimensions_buffer = NULL;
-    struct json_object *dimensions_obj = NULL;
     
-    if (json_object_object_get_ex(params, "dimensions", &dimensions_obj) && dimensions_obj) {
-        if (json_object_is_type(dimensions_obj, json_type_array)) {
-            dimensions_buffer = buffer_create(256, NULL);
-            int result = convert_array_to_pipe_separated(dimensions_obj, dimensions_buffer, false);
-            if (result == -2) {
-                buffer_free(dimensions_buffer);
-                buffer_sprintf(mcpc->error, "The 'dimensions' parameter must contain exact dimension names, not patterns. "
-                                            "Wildcards are not supported. "
-                                            "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover exact dimension names.");
-                return MCP_RC_BAD_REQUEST;
-            } else if (result != 0) {
-                buffer_free(dimensions_buffer);
-                buffer_sprintf(mcpc->error, "Invalid dimensions format. Must be an array of strings.");
-                return MCP_RC_BAD_REQUEST;
-            }
-            dimensions = buffer_tostring(dimensions_buffer);
-        } else {
-            buffer_sprintf(mcpc->error, "Dimensions must be an array of strings, not %s", json_type_to_name(json_object_get_type(dimensions_obj)));
+    // dimensions_obj already checked above as required parameter
+    if (json_object_is_type(dimensions_obj, json_type_array)) {
+        int array_len = json_object_array_length(dimensions_obj);
+        if (array_len == 0) {
+            buffer_sprintf(mcpc->error, "The 'dimensions' parameter cannot be an empty array. "
+                                        "You must explicitly list every dimension you want to query. "
+                                        "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover available dimensions for the context '%s'.", context);
             return MCP_RC_BAD_REQUEST;
         }
+        
+        dimensions_buffer = buffer_create(256, NULL);
+        int result = convert_array_to_pipe_separated(dimensions_obj, dimensions_buffer, false);
+        if (result == -2) {
+            buffer_free(dimensions_buffer);
+            buffer_sprintf(mcpc->error, "The 'dimensions' parameter must contain exact dimension names, not patterns. "
+                                        "Wildcards are not supported. "
+                                        "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover exact dimension names.");
+            return MCP_RC_BAD_REQUEST;
+        } else if (result != 0) {
+            buffer_free(dimensions_buffer);
+            buffer_sprintf(mcpc->error, "Invalid dimensions format. Must be an array of strings.");
+            return MCP_RC_BAD_REQUEST;
+        }
+        dimensions = buffer_tostring(dimensions_buffer);
+    } else {
+        buffer_sprintf(mcpc->error, "Dimensions must be an array of strings, not %s", json_type_to_name(json_object_get_type(dimensions_obj)));
+        return MCP_RC_BAD_REQUEST;
     }
     
     // Handle labels - expects structured object only
@@ -720,7 +729,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // Group by parameters (simplified - in real implementation handle multiple passes)
     struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES] = {
         {
-            .group_by = RRDR_GROUP_BY_DIMENSION,
+            .group_by = RRDR_GROUP_BY_NONE,
             .group_by_label = NULL,
             .aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE,
         },
@@ -739,11 +748,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     const char *aggregation_str = extract_string_param(params, "aggregation");
     if (aggregation_str && *aggregation_str)
         group_by[0].aggregation = group_by_aggregate_function_parse(aggregation_str);
-    else
-        group_by[0].aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE; // Default to average if not specified
-    
-    if (group_by[0].group_by == RRDR_GROUP_BY_NONE)
-        group_by[0].group_by = RRDR_GROUP_BY_DIMENSION;
     
     // Create interrupt callback data
     mcp_query_interrupt_data interrupt_data = {
@@ -870,6 +874,38 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                 buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(tmp_buffer));
             }
             buffer_json_object_close(mcpc->result);
+            
+            // Add warning about potentially misleading aggregation
+            bool warn_aggregation = false;
+            // Only warn if using average without dimension grouping AND multiple dimensions selected
+            int dimensions_count = json_object_array_length(dimensions_obj);
+            if (dimensions_count > 1 &&
+                group_by[0].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && 
+                !(group_by[0].group_by & RRDR_GROUP_BY_DIMENSION)) {
+                warn_aggregation = true;
+            }
+            
+            if (warn_aggregation) {
+                buffer_json_add_array_item_object(mcpc->result);
+                {
+                    buffer_json_member_add_string(mcpc->result, "type", "text");
+                    buffer_json_member_add_string(mcpc->result, "text",
+                        "⚠️ WARNING: Potentially Misleading Aggregation\n\n"
+                        "You are using 'average' aggregation without including 'dimension' in group_by. "
+                        "This means different metric types are being averaged together, which rarely produces meaningful results.\n\n"
+                        "For example:\n"
+                        "- For CPU metrics: averaging user, system, idle, wait states together\n"
+                        "- For network metrics: averaging in/out traffic together\n"
+                        "- For disk I/O: averaging reads and writes together\n\n"
+                        "Check the 'aggregated' field in view.dimensions to see how many time-series were combined. "
+                        "Values greater than 1 indicate multiple different metrics were averaged together.\n\n"
+                        "Consider using:\n"
+                        "- 'sum' aggregation for additive metrics\n"
+                        "- Include 'dimension' in group_by (e.g., 'instance,dimension')\n"
+                        "- Review the summary section to understand what's being aggregated");
+                }
+                buffer_json_object_close(mcpc->result);
+            }
             
             // Add instance usage warning if applicable
             if (using_instances) {
