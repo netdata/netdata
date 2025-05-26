@@ -1159,6 +1159,7 @@ static int mssql_fill_dictionary(int update_every)
             continue;
 
         struct mssql_instance *p = dictionary_set(mssql_instances, avalue, NULL, (size_t)sizeof(*p));
+        (void)p;
     }
 
 endMSSQLFillDict:
