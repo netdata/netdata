@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -159,6 +160,8 @@ func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
 		m.Warningf("dyncfg: userconfig: module %s: failed to create config from payload: %v", mn, err)
 		m.dyncfgRespf(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
 	}
+
+	m.Infof("QQ %s", string(bs))
 
 	m.dyncfgRespPayloadYAML(fn, string(bs))
 }
@@ -736,6 +739,10 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 	if err := yaml.Unmarshal(bs, &yms); err != nil {
 		return nil, err
 	}
+
+	yms = slices.DeleteFunc(yms, func(item yaml.MapItem) bool {
+		return item.Key == "name"
+	})
 
 	yms = append([]yaml.MapItem{{Key: "name", Value: jobName}}, yms...)
 
