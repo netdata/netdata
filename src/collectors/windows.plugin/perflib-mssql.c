@@ -17,7 +17,6 @@
 #define SQLSERVER_MAX_NAME_LENGTH NETDATA_MAX_INSTANCE_OBJECT
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
-BOOL is_sqlexpress = FALSE;
 BOOL has_mssql_installed = TRUE;
 ND_THREAD *mssql_query_thread = NULL;
 
@@ -33,6 +32,7 @@ struct netdata_mssql_conn {
     const char *password;
     int instances;
     bool windows_auth;
+    bool is_sqlexpress;
 
     SQLCHAR *connectionString;
 
@@ -816,7 +816,7 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
     } else if (!strcmp(instance, "SQLEXPRESS")) {
         strncpyz(prefix, "MSSQL$SQLEXPRESS:", (size_t)sizeof(prefix) - 1);
     } else {
-        char *express = (!is_sqlexpress) ? "" : "SQLEXPRESS:";
+        char *express = (!mi->conn || !mi->conn->is_sqlexpress) ? "" : "SQLEXPRESS:";
         snprintfz(prefix, (size_t)sizeof(prefix) - 1, "MSSQL$%s%s:", express, instance);
     }
 
@@ -1011,6 +1011,7 @@ static struct netdata_mssql_conn *netdata_read_config_options()
     dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
     dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
     dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
+    dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
 
     netdata_mount_mssql_connection_string(dbconn);
     if (!total_instances)
@@ -1114,10 +1115,14 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     mi->conn = netdata_attach_connection(instance);
 
     if (mi->conn && mi->conn->connectionString) {
+        mi->conn->is_sqlexpress = (!strcmp(avalue, "SQLEXPRESS")) ? TRUE : FALSE;
         mi->conn->is_connected = netdata_MSSQL_initialize_conection(mi->conn);
         if (mi->conn->is_connected)
             *create_thread = true;
     }
+
+    initialize_mssql_objects(mi, instance);
+    initialize_mssql_keys(mi);
 }
 
 static int mssql_fill_dictionary(int update_every)
@@ -1153,12 +1158,7 @@ static int mssql_fill_dictionary(int update_every)
         if (ret != ERROR_SUCCESS)
             continue;
 
-        if (!strcmp(avalue, "SQLEXPRESS")) {
-            is_sqlexpress = TRUE;
-        }
-
-        struct mssql_instance *p = dictionary_set(mssql_instances, avalue, NULL, sizeof(*p));
-        p->update_every = update_every;
+        struct mssql_instance *p = dictionary_set(mssql_instances, avalue, NULL, (size_t)sizeof(*p));
     }
 
 endMSSQLFillDict:

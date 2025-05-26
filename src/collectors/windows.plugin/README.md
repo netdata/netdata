@@ -143,6 +143,7 @@ Configuration options:
 | `pwd`                    | Password for the specified user                                              |
 | `additional instances`   | Number of additional SQL Server instances to monitor                         |
 | `windows authentication` | Set to `yes` to use Windows credentials instead of SQL Server authentication |
+| `express`                | Set to `yes` when running SQL Express version                                |
 
 For more information on connection parameters, see the [Microsoft Official Documentation](https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16).
 

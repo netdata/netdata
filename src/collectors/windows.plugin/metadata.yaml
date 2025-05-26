@@ -1915,6 +1915,10 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
+            - name: windows authentication
+              description: Set to yes when running SQL Express version.
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
@@ -1931,6 +1935,7 @@ modules:
                    server = 127.0.0.1\\Dev, 1433
                    uid = netdata_user
                    pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+                   express = no
             - name: Multiple Instances
               description: An example configuration with two instances.
               folding:
@@ -1942,6 +1947,7 @@ modules:
                   server = 127.0.0.1\\Dev, 1433
                   uid = netdata_user
                   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
+                  express = no
                   additional instances = 1
                 [plugin:windows:PerflibMSSQL1]
                   driver = SQL Server
@@ -1949,6 +1955,7 @@ modules:
                   server = 127.0.0.1\\Production, 1434
                   uid = netdata_user
                   pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
+                  express = no
     troubleshooting:
       problems:
         list: []
