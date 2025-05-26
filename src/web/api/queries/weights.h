@@ -16,6 +16,7 @@ typedef enum {
     WEIGHTS_FORMAT_CHARTS    = 1,
     WEIGHTS_FORMAT_CONTEXTS  = 2,
     WEIGHTS_FORMAT_MULTINODE = 3,
+    WEIGHTS_FORMAT_MCP       = 4,
 } WEIGHTS_FORMAT;
 
 extern int metric_correlations_version;

@@ -36,6 +36,7 @@
 #include "mcp-tools-list-metadata.h"
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-query-metrics.h"
+#include "mcp-tools-weights.h"
 
 // Tool handler function prototypes
 typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
@@ -171,6 +172,35 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .description = "Queries time-series metrics data with powerful aggregation options. Specify context, time range, and grouping (by dimension, instance, node, or label). Returns data points with statistics and contribution analysis.\n",
         .execute_callback = mcp_tool_query_metrics_execute,
         .schema_callback = mcp_tool_query_metrics_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    
+    // Weights/correlation tools
+    {
+        .name = MCP_TOOL_FIND_CORRELATED_METRICS,
+        .title = "Find metrics that changed during an incident",
+        .description = "Finds metrics that changed significantly during an incident by comparing a problem time period with a normal baseline period. Essential for root cause analysis.",
+        .execute_callback = mcp_tool_find_correlated_metrics_execute,
+        .schema_callback = mcp_tool_find_correlated_metrics_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_TOOL_FIND_ANOMALOUS_METRICS,
+        .title = "Find metrics with highest anomaly rates",
+        .description = "Finds metrics that were behaving anomalously according to Netdata's ML models. Returns metrics ranked by their anomaly rates (0 to 1, representing 0-100% of time anomalous).",
+        .execute_callback = mcp_tool_find_anomalous_metrics_execute,
+        .schema_callback = mcp_tool_find_anomalous_metrics_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_TOOL_FIND_UNSTABLE_METRICS,
+        .title = "Find metrics with high variability",
+        .description = "Finds metrics with the highest variability using coefficient of variation (standard deviation as % of mean). Useful for identifying unstable or problematic metrics.",
+        .execute_callback = mcp_tool_find_unstable_metrics_execute,
+        .schema_callback = mcp_tool_find_unstable_metrics_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
