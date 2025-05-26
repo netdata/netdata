@@ -45,7 +45,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
     {
         .name = MCP_TOOL_LIST_NODES,
         .title = "List monitored nodes",
-        .description = "List monitored nodes with optional filtering",
+        .description = "Search for and list monitored nodes by hostname patterns. Use the 'nodes' parameter to search for specific nodes instead of retrieving all nodes",
         .output_type = MCP_LIST_OUTPUT_NODES,
         .mode = CONTEXTS_V2_NODES,
         .options = 0,  // Just MCP will be added
@@ -229,9 +229,9 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
             } else if (config->output_type == MCP_LIST_OUTPUT_NODES || config->output_type == MCP_LIST_OUTPUT_FUNCTIONS) {
                 // This is a node/function query - direct filtering
                 snprintfz(description, sizeof(description),
-                          "Filter by specific nodes using their hostnames. "
-                          "Use pipe (|) to separate multiple patterns. "
-                          "Examples: 'node1|node2', '*web*|*db*', 'prod-*|staging-*'");
+                          "Search for nodes by hostname patterns. This is the primary way to find specific nodes without retrieving the full list. "
+                          "Use pipe (|) to separate multiple patterns. Wildcards (*) are supported for flexible matching. "
+                          "Examples: 'node1|node2' (exact names), '*web*' (contains 'web'), 'prod-*' (starts with 'prod-'), '*db*|*cache*' (contains 'db' OR 'cache')");
             } else {
                 // This is a metrics query - nodes acts as a filter
                 snprintfz(description, sizeof(description),
