@@ -549,7 +549,7 @@ int init_data_files(struct rrdengine_instance *ctx)
             create_new_datafile_pair(ctx, false);
 
         while(rrdeng_ctx_tier_cap_exceeded(ctx))
-            datafile_delete(ctx, ctx->datafiles.first, false, false);
+            datafile_delete(ctx, ctx->datafiles.first, false, true, false);
     }
 
     pgc_reset_hot_max(open_cache);

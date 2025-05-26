@@ -375,6 +375,9 @@ struct rrdengine_instance {
 
     struct {
         uv_rwlock_t rwlock;                         // the linked list of datafiles is protected by this lock
+        bool disk_time;                             // true: delete for disk quota, false: delete for retention
+        bool pending_rotate;
+        bool pending_index;
         struct rrdengine_datafile *first;           // oldest - the newest with ->first->prev
     } datafiles;
 
@@ -535,7 +538,12 @@ static inline time_t max_acceptable_collected_time(void) {
     return now_realtime_sec() + 1;
 }
 
-void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
+void datafile_delete(
+    struct rrdengine_instance *ctx,
+    struct rrdengine_datafile *datafile,
+    bool update_retention,
+    bool disk_time,
+    bool worker);
 
 // --------------------------------------------------------------------------------------------------------------------
 // the following functions are used to sort UUIDs in the journal files
