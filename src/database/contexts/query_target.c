@@ -699,17 +699,21 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
     return matched;
 }
 
+static inline void query_instance_strings_free(QUERY_INSTANCE *qi) {
+    string_freez(qi->id_fqdn);
+    qi->id_fqdn = NULL;
+
+    string_freez(qi->name_fqdn);
+    qi->name_fqdn = NULL;
+}
+
 static inline void query_instance_release(QUERY_INSTANCE *qi) {
     if(qi->ria) {
         rrdinstance_release(qi->ria);
         qi->ria = NULL;
     }
 
-    string_freez(qi->id_fqdn);
-    qi->id_fqdn = NULL;
-
-    string_freez(qi->name_fqdn);
-    qi->name_fqdn = NULL;
+    query_instance_strings_free(qi);
 }
 
 static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTANCE_ACQUIRED *ria, size_t qn_slot) {
@@ -878,10 +882,11 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            QUERY_INSTANCE temp_qi = { .ria = qt->request.ria };
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&temp_qi, ri, 
+            QUERY_INSTANCE qi = { .ria = qt->request.ria };
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                 qt->request.version, qtl->host_node_id_str);
+            query_instance_strings_free(&qi);
             if(ret != SP_MATCHED_POSITIVE)
                 return 0;
         }
@@ -903,10 +908,11 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            QUERY_INSTANCE temp_qi = { .ria = qtl->st->rrdcontexts.rrdinstance };
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&temp_qi, ri, 
+            QUERY_INSTANCE qi = { .ria = qtl->st->rrdcontexts.rrdinstance };
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                 qt->request.version, qtl->host_node_id_str);
+            query_instance_strings_free(&qi);
             if(ret != SP_MATCHED_POSITIVE)
                 return 0;
         }
@@ -933,10 +939,11 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             
             // Check scope_instances
             if(qt->instances.scope_pattern) {
-                QUERY_INSTANCE temp_qi = { .ria = ria };
-                SIMPLE_PATTERN_RESULT ret = query_instance_matches(&temp_qi, ri, 
+                QUERY_INSTANCE qi = { .ria = ria };
+                SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                     qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                     qt->request.version, qtl->host_node_id_str);
+                query_instance_strings_free(&qi);
                 if(ret != SP_MATCHED_POSITIVE)
                     continue;
             }
@@ -1318,8 +1325,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 if(scope_instances_sp) {
                     QUERY_INSTANCE qi = { .ria = ria, };
                     SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, scope_instances_sp, match_ids, match_names, version, host_node_id_str);
-                    qi.ria = NULL;
-                    query_instance_release(&qi);
+                    query_instance_strings_free(&qi);
 
                     if (ret != SP_MATCHED_POSITIVE)
                         continue;
@@ -1334,8 +1340,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 if(instances_sp) {
                     QUERY_INSTANCE qi = { .ria = ria, };
                     SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, instances_sp, match_ids, match_names, version, host_node_id_str);
-                    qi.ria = NULL;
-                    query_instance_release(&qi);
+                    query_instance_strings_free(&qi);
 
                     if (ret != SP_MATCHED_POSITIVE)
                         continue;
