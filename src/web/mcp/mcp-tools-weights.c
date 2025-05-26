@@ -94,7 +94,7 @@ static MCP_RETURN_CODE execute_weights_request(
     if (json_object_object_get_ex(params, "cardinality_limit", &obj) && json_object_is_type(obj, json_type_int))
         cardinality_limit = json_object_get_int(obj);
         
-    // Get time_group parameter
+    // Set time_group parameter based on method
     const char *time_group_options = default_time_group;
     RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
     
@@ -102,15 +102,9 @@ static MCP_RETURN_CODE execute_weights_request(
     if (method == WEIGHTS_METHOD_VALUE && default_time_group && strcmp(default_time_group, "cv") == 0) {
         time_group_method = RRDR_GROUPING_CV;
         time_group_options = "cv";
-    } else {
-        // For other tools, allow user to override
-        if (json_object_object_get_ex(params, "time_group", &obj) && json_object_is_type(obj, json_type_string))
-            time_group_options = json_object_get_string(obj);
-            
-        // Parse time_group_method from string
-        if (time_group_options) {
-            time_group_method = time_grouping_parse(time_group_options, RRDR_GROUPING_AVERAGE);
-        }
+    } else if (default_time_group) {
+        // Use the default time grouping specified by the tool
+        time_group_method = time_grouping_parse(default_time_group, RRDR_GROUPING_AVERAGE);
     }
     
     // Set options
@@ -202,6 +196,10 @@ static MCP_RETURN_CODE execute_weights_request(
         buffer_json_object_close(mcpc->result);
     }
     buffer_json_array_close(mcpc->result);
+    
+    // Close the result object and finalize JSON
+    buffer_json_object_close(mcpc->result); // Close the "result" object
+    buffer_json_finalize(mcpc->result);
     
     // Clean up the temporary buffer
     buffer_free(tmp_buffer);
