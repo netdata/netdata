@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+#define UNLINK_FILE(ctx, path, ret_var)                                                                                \
+    do {                                                                                                               \
+        uv_fs_t _req;                                                                                                  \
+        (ret_var) = uv_fs_unlink(NULL, &(_req), (path), NULL);                                                         \
+        if ((ret_var) < 0) {                                                                                           \
+            netdata_log_error("DBENGINE: uv_fs_unlink(%s): %s", (path), uv_strerror(ret_var));                         \
+            ctx_fs_error(ctx);                                                                                         \
+        }                                                                                                              \
+        uv_fs_req_cleanup(&(_req));                                                                                    \
+    } while (0)
 
 // the default value is set in ND_PROFILE, not here
 time_t dbengine_journal_v2_unmount_time = 120;
@@ -430,6 +440,9 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
     njfv2idx_remove(journalfile->datafile);
 
     bool has_references = false;
+    char path_v2[RRDENG_PATH_MAX];
+
+    journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
 
     do {
         if (has_references)
@@ -450,7 +463,8 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
         }
         else {
             has_references = true;
-            internal_error(true, "DBENGINE JOURNALFILE: waiting for journalfile to be available to unmap...");
+            nd_log_limit_static_global_var(journalfile_erl, 10, 0);
+            nd_log_limit(&journalfile_erl, NDLS_DAEMON, NDLP_WARNING, "DBENGINE: journalfile %s is not available for unmap", path_v2);
         }
 
         spinlock_unlock(&journalfile->data_spinlock);
@@ -520,7 +534,6 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
@@ -528,32 +541,20 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
 
-    if (journalfile->file) {
-        ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
-        if (ret < 0) {
-            netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-            ctx_fs_error(ctx);
-        }
-        uv_fs_req_cleanup(&req);
+    if (journalfile->file)
         (void)close_uv_file(datafile, journalfile->file);
-    }
 
     // This is the new journal v2 index file
-    ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    int deleted = 0;
+    UNLINK_FILE(ctx, path_v2, ret);
+    if (ret == 0)
+       deleted++;
 
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    UNLINK_FILE(ctx, path, ret);
+    if (ret == 0)
+        deleted++;
 
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 2, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.journalfile_deletions, deleted, __ATOMIC_RELAXED);
 
     if(journalfile_v2_data_available(journalfile))
         journalfile_v2_data_unmap_permanently(journalfile);
