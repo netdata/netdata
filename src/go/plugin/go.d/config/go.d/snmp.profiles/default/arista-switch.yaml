@@ -5,7 +5,6 @@ extends:
   - _generic-bgp4.yaml
   - _generic-entity-sensor.yaml
   - _generic-if.yaml
-  - _generic-lldp.yaml
   - _generic-ospf.yaml
 
 metadata:
