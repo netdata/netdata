@@ -1115,7 +1115,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     mi->conn = netdata_attach_connection(instance);
 
     if (mi->conn && mi->conn->connectionString) {
-        mi->conn->is_sqlexpress = (!strcmp(avalue, "SQLEXPRESS")) ? TRUE : FALSE;
+        mi->conn->is_sqlexpress = (!strcmp(instance, "SQLEXPRESS")) ? TRUE : FALSE;
         mi->conn->is_connected = netdata_MSSQL_initialize_conection(mi->conn);
         if (mi->conn->is_connected)
             *create_thread = true;
