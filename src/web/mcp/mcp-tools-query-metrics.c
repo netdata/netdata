@@ -91,15 +91,6 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Note: Wildcards are not supported. Use exact label keys and values only.",
         false);
 
-    buffer_json_member_add_object(buffer, "alerts");
-    {
-        buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Alerts Filter");
-        buffer_json_member_add_string(buffer, "description", "Filter for charts having specified alert states.");
-        buffer_json_member_add_string(buffer, "default", NULL);
-    }
-    buffer_json_object_close(buffer); // alerts
-    
     // Add cardinality limit
     mcp_schema_params_add_cardinality_limit(buffer, NULL, true);
 
@@ -413,7 +404,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    const char *alerts = mcp_params_extract_string(params, "alerts", NULL);
+    // Removed alerts parameter - not used in query_metrics
     
     // Time parameters
     time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
@@ -539,7 +530,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         .contexts = NULL,           // Don't use contexts parameter here (we use scope_contexts)
         .instances = NULL,          // Don't use instances parameter here (we use scope_instances)
         .dimensions = NULL,         // Don't use dimensions parameter here (we use scope_dimensions)
-        .alerts = alerts,
+        .alerts = NULL,
         .timeout_ms = timeout,
         .points = points,
         .format = DATASOURCE_JSON2,

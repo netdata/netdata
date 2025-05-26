@@ -40,6 +40,8 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_time_range = true,
             .has_cardinality_limit = true,
             .metrics_required = true,
+            .nodes_as_array = true,    // get_metrics_details uses array for nodes
+            .metrics_as_array = true,  // get_metrics_details uses array for metrics
         },
     },
     {
@@ -54,6 +56,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_metrics = true,  // Filters nodes that collect these metrics
             .has_time_range = true,
             .has_cardinality_limit = true,
+            .metrics_as_array = true,  // list_nodes uses array for metrics filter
         },
     },
     {
@@ -68,6 +71,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_time_range = false,  // Functions are live, not historical
             .has_cardinality_limit = false,  // Functions list is small, no limit needed
             .nodes_required = true,   // Must specify which nodes to query
+            .nodes_as_array = true,   // list_functions uses array for nodes
         },
     },
     {
@@ -84,6 +88,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_cardinality_limit = true,
             .nodes_required = true,   // Must specify nodes due to large output
             .nodes_as_array = true,   // get_nodes_details uses array for nodes
+            .metrics_as_array = true, // get_nodes_details uses array for metrics
         },
     },
 };
@@ -146,40 +151,74 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
 
     // Add metrics pattern if supported
     if (config->params.has_metrics) {
-        buffer_json_member_add_object(buffer, "metrics");
-        buffer_json_member_add_string(buffer, "type", "string");
-        
-        // Compose title and description based on context
-        if (config->output_type != MCP_LIST_OUTPUT_METRICS) {
-            // This is a node/function query - metrics acts as a filter
-            snprintfz(title, sizeof(title), "%s metrics", 
-                      config->params.metrics_required ? "Specify the" : "Filter");
-            snprintfz(description, sizeof(description),
-                      "Filter %s to only those collecting these metrics. "
-                      "Use pipe (|) to separate multiple patterns. Supports wildcards. "
-                      "Examples: 'system.*', '*cpu*|*memory*', 'disk.*|net.*'", 
-                      output_name);
-        } else {
-            // This is a metrics query
-            snprintfz(title, sizeof(title), "%s metrics", 
-                      config->params.metrics_required ? "Specify the" : "Filter");
-            if (config->params.metrics_required) {
-                snprintfz(description, sizeof(description),
-                          "Pipe-separated list of metric names. "
-                          "Example: 'system.cpu|system.load|system.ram'");
+        if (config->params.metrics_as_array) {
+            // Use array for metrics
+            if (config->output_type != MCP_LIST_OUTPUT_METRICS) {
+                // This is a node/function query - metrics acts as a filter
+                mcp_schema_add_array_param(buffer, "metrics",
+                    config->params.metrics_required ? "Specify the metrics to filter by" : "Filter by metrics",
+                    config->params.metrics_required ?
+                        "Array of specific metric names to filter by. This parameter is required. "
+                        "Each metric must be an exact match - no wildcards or patterns allowed. "
+                        "Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics. "
+                        "Examples: [\"system.cpu\", \"system.load\"], [\"disk.io\", \"disk.space\"]" :
+                        "Array of specific metric names to filter by. "
+                        "Each metric must be an exact match - no wildcards or patterns allowed. "
+                        "Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics. "
+                        "If not specified, all metrics are included. "
+                        "Examples: [\"system.cpu\", \"system.load\"], [\"disk.io\", \"disk.space\"]",
+                    config->params.metrics_required);
             } else {
-                snprintfz(description, sizeof(description),
-                          "Pattern matching on metric names. Use pipe (|) to separate multiple patterns. "
-                          "Supports wildcards. Examples: 'system.*', '*cpu*|*memory*', 'disk.*|net.*|system.*'");
+                // This is a metrics query
+                mcp_schema_add_array_param(buffer, "metrics",
+                    config->params.metrics_required ? "Specify the metrics" : "Filter metrics",
+                    config->params.metrics_required ?
+                        "Array of specific metric names to retrieve details for. This parameter is required. "
+                        "Each metric must be an exact match - no wildcards or patterns allowed. "
+                        "Examples: [\"system.cpu\", \"system.load\", \"system.ram\"]" :
+                        "Array of specific metric names to filter. "
+                        "Each metric must be an exact match - no wildcards or patterns allowed. "
+                        "If not specified, all metrics are included. "
+                        "Examples: [\"system.cpu\", \"system.load\", \"system.ram\"]",
+                    config->params.metrics_required);
             }
+        } else {
+            // Use string pattern for metrics
+            buffer_json_member_add_object(buffer, "metrics");
+            buffer_json_member_add_string(buffer, "type", "string");
+            
+            // Compose title and description based on context
+            if (config->output_type != MCP_LIST_OUTPUT_METRICS) {
+                // This is a node/function query - metrics acts as a filter
+                snprintfz(title, sizeof(title), "%s metrics", 
+                          config->params.metrics_required ? "Specify the" : "Filter");
+                snprintfz(description, sizeof(description),
+                          "Filter %s to only those collecting these metrics. "
+                          "Use pipe (|) to separate multiple patterns. Supports wildcards. "
+                          "Examples: 'system.*', '*cpu*|*memory*', 'disk.*|net.*'", 
+                          output_name);
+            } else {
+                // This is a metrics query
+                snprintfz(title, sizeof(title), "%s metrics", 
+                          config->params.metrics_required ? "Specify the" : "Filter");
+                if (config->params.metrics_required) {
+                    snprintfz(description, sizeof(description),
+                              "Pipe-separated list of metric names. "
+                              "Example: 'system.cpu|system.load|system.ram'");
+                } else {
+                    snprintfz(description, sizeof(description),
+                              "Pattern matching on metric names. Use pipe (|) to separate multiple patterns. "
+                              "Supports wildcards. Examples: 'system.*', '*cpu*|*memory*', 'disk.*|net.*|system.*'");
+                }
+            }
+            
+            buffer_json_member_add_string(buffer, "title", title);
+            buffer_json_member_add_string(buffer, "description", description);
+            if (!config->params.metrics_required) {
+                buffer_json_member_add_string(buffer, "default", "*");
+            }
+            buffer_json_object_close(buffer); // metrics
         }
-        
-        buffer_json_member_add_string(buffer, "title", title);
-        buffer_json_member_add_string(buffer, "description", description);
-        if (!config->params.metrics_required) {
-            buffer_json_member_add_string(buffer, "default", "*");
-        }
-        buffer_json_object_close(buffer); // metrics
     }
 
     // Add full-text search if supported
@@ -288,7 +327,26 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
 
     // Extract parameters based on configuration
     const char *q = config->params.has_q ? mcp_params_extract_string(params, "q", NULL) : NULL;
-    const char *metrics_pattern = config->params.has_metrics ? mcp_params_extract_string(params, "metrics", NULL) : NULL;
+    
+    // Handle metrics - either as array or string pattern
+    const char *metrics_pattern = NULL;
+    CLEAN_BUFFER *metrics_buffer = NULL;
+    
+    if (config->params.has_metrics) {
+        if (config->params.metrics_as_array) {
+            // Parse metrics as array
+            const char *error_message = NULL;
+            metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, MCP_TOOL_LIST_METRICS, &error_message);
+            if (error_message) {
+                buffer_sprintf(mcpc->error, "%s", error_message);
+                return MCP_RC_BAD_REQUEST;
+            }
+            metrics_pattern = buffer_tostring(metrics_buffer);
+        } else {
+            // Parse metrics as string pattern
+            metrics_pattern = mcp_params_extract_string(params, "metrics", NULL);
+        }
+    }
     
     // Handle nodes - either as array or string pattern
     const char *nodes_pattern = NULL;
