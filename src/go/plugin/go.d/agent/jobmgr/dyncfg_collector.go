@@ -161,8 +161,6 @@ func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
 		m.dyncfgRespf(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
 	}
 
-	m.Infof("QQ %s", string(bs))
-
 	m.dyncfgRespPayloadYAML(fn, string(bs))
 }
 
