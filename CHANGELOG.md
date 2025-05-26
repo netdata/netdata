@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Alerts cloud [\#20334](https://github.com/netdata/netdata/pull/20334) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20332](https://github.com/netdata/netdata/pull/20332) ([netdatabot](https://github.com/netdatabot))
+- \_generic-ip.yaml [\#20331](https://github.com/netdata/netdata/pull/20331) ([Ancairon](https://github.com/Ancairon))
 - Update SCIM documentation [\#20330](https://github.com/netdata/netdata/pull/20330) ([juacker](https://github.com/juacker))
 - Update alerting and notification documentation Agent [\#20329](https://github.com/netdata/netdata/pull/20329) ([kanelatechnical](https://github.com/kanelatechnical))
 - generic-bgp4.yaml [\#20328](https://github.com/netdata/netdata/pull/20328) ([Ancairon](https://github.com/Ancairon))
@@ -467,9 +469,6 @@
 - Regenerate integrations docs [\#19804](https://github.com/netdata/netdata/pull/19804) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations docs [\#19803](https://github.com/netdata/netdata/pull/19803) ([netdatabot](https://github.com/netdatabot))
 - async-signal-safe stack traces [\#19802](https://github.com/netdata/netdata/pull/19802) ([ktsaou](https://github.com/ktsaou))
-- add k8s\_state\_cronjob\_last\_execution\_failed alert [\#19801](https://github.com/netdata/netdata/pull/19801) ([ilyam8](https://github.com/ilyam8))
-- bump dag jinja to 3.1.6 [\#19800](https://github.com/netdata/netdata/pull/19800) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump golang.org/x/net from 0.35.0 to 0.37.0 in /src/go [\#19799](https://github.com/netdata/netdata/pull/19799) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
