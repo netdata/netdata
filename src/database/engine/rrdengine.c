@@ -1702,9 +1702,14 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
             continue;
         }
 
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "DBENGINE: journal file %u is ready to be indexed",
-               datafile->fileno);
+        if (unlikely(rrdeng_ctx_tier_cap_exceeded(ctx))) {
+            nd_log_daemon(
+                NDLP_WARNING, "DBENGINE: tier %d reached quota limit, stopping journal indexing", ctx->config.tier);
+            __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
+            break;
+        }
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
 
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
@@ -1746,7 +1751,8 @@ static void after_do_extent_cache_evict(struct rrdengine_instance *ctx __maybe_u
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     __atomic_store_n(&ctx->atomic.migration_to_v2_running, false, __ATOMIC_RELAXED);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    if(ctx_is_available_for_queries(ctx) && rrdeng_ctx_tier_cap_exceeded(ctx))
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
