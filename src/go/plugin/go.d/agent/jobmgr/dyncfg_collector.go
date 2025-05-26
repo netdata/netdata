@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -736,6 +737,10 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 	if err := yaml.Unmarshal(bs, &yms); err != nil {
 		return nil, err
 	}
+
+	yms = slices.DeleteFunc(yms, func(item yaml.MapItem) bool {
+		return item.Key == "name"
+	})
 
 	yms = append([]yaml.MapItem{{Key: "name", Value: jobName}}, yms...)
 
