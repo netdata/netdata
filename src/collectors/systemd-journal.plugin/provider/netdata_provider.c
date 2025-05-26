@@ -81,6 +81,7 @@ int nsd_journal_previous(NsdJournal *j)
 #endif
 }
 
+#if defined(HAVE_SD_JOURNAL_GET_SEQNUM)
 int nsd_journal_get_seqnum(NsdJournal *j, uint64_t *ret_seqnum, NsdId128 *ret_seqnum_id)
 {
 #if defined(HAVE_RUST_PROVIDER)
@@ -89,6 +90,7 @@ int nsd_journal_get_seqnum(NsdJournal *j, uint64_t *ret_seqnum, NsdId128 *ret_se
     return sd_journal_get_seqnum(j, ret_seqnum, ret_seqnum_id);
 #endif
 }
+#endif /* HAVE_SD_JOURNAL_GET_SEQNUM */
 
 int nsd_journal_get_realtime_usec(NsdJournal *j, uint64_t *ret)
 {
@@ -99,33 +101,7 @@ int nsd_journal_get_realtime_usec(NsdJournal *j, uint64_t *ret)
 #endif
 }
 
-void nsd_journal_restart_data(NsdJournal *j)
-{
-#if defined(HAVE_RUST_PROVIDER)
-    rsd_journal_restart_data(j);
-#else
-    sd_journal_restart_data(j);
-#endif
-}
-
-int nsd_journal_enumerate_available_data(NsdJournal *j, const void **data, uintptr_t *l)
-{
-#if defined(HAVE_RUST_PROVIDER)
-    return rsd_journal_enumerate_available_data(j, data, l);
-#else
-    return sd_journal_enumerate_available_data(j, data, l);
-#endif
-}
-
-void nsd_journal_restart_fields(NsdJournal *j)
-{
-#if defined(HAVE_RUST_PROVIDER)
-    rsd_journal_restart_fields(j);
-#else
-    sd_journal_restart_fields(j);
-#endif
-}
-
+#if defined(HAVE_SD_JOURNAL_RESTART_FIELDS)
 int nsd_journal_enumerate_fields(NsdJournal *j, const char **field)
 {
 #if defined(HAVE_RUST_PROVIDER)
@@ -134,7 +110,20 @@ int nsd_journal_enumerate_fields(NsdJournal *j, const char **field)
     return sd_journal_enumerate_fields(j, field);
 #endif
 }
+#endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
 
+#if defined(HAVE_SD_JOURNAL_RESTART_FIELDS)
+void nsd_journal_restart_fields(NsdJournal *j)
+{
+#if defined(HAVE_RUST_PROVIDER)
+    rsd_journal_restart_fields(j);
+#else
+    sd_journal_restart_fields(j);
+#endif
+}
+#endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
+
+#if defined(HAVE_SD_JOURNAL_RESTART_FIELDS)
 int nsd_journal_query_unique(NsdJournal *j, const char *field)
 {
 #if defined(HAVE_RUST_PROVIDER)
@@ -143,7 +132,9 @@ int nsd_journal_query_unique(NsdJournal *j, const char *field)
     return sd_journal_query_unique(j, field);
 #endif
 }
+#endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
 
+#if defined(HAVE_SD_JOURNAL_RESTART_FIELDS)
 void nsd_journal_restart_unique(NsdJournal *j)
 {
 #if defined(HAVE_RUST_PROVIDER)
@@ -152,15 +143,7 @@ void nsd_journal_restart_unique(NsdJournal *j)
     sd_journal_restart_unique(j);
 #endif
 }
-
-int nsd_journal_enumerate_available_unique(NsdJournal *j, const void **data, uintptr_t *l)
-{
-#if defined(HAVE_RUST_PROVIDER)
-    return rsd_journal_enumerate_available_unique(j, data, l);
-#else
-    return sd_journal_enumerate_available_unique(j, data, l);
-#endif
-}
+#endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
 
 int nsd_journal_add_match(NsdJournal *j, const void *data, uintptr_t size)
 {
