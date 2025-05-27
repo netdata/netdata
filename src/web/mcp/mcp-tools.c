@@ -107,6 +107,34 @@ static void get_nodes_details_schema(BUFFER *buffer) {
     unified_list_tool_schema(buffer, MCP_TOOL_GET_NODES_DETAILS);
 }
 
+static MCP_RETURN_CODE list_raised_alerts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_RAISED_ALERTS);
+}
+static void list_raised_alerts_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_LIST_RAISED_ALERTS);
+}
+
+static MCP_RETURN_CODE list_all_alerts_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_ALL_ALERTS);
+}
+static void list_all_alerts_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_LIST_ALL_ALERTS);
+}
+
+static MCP_RETURN_CODE get_alerts_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_GET_ALERTS_DETAILS);
+}
+static void get_alerts_details_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_GET_ALERTS_DETAILS);
+}
+
+static MCP_RETURN_CODE list_alert_transitions_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_ALERT_TRANSITIONS);
+}
+static void list_alert_transitions_schema(BUFFER *buffer) {
+    unified_list_tool_schema(buffer, MCP_TOOL_LIST_ALERT_TRANSITIONS);
+}
+
 // Static array of tool definitions
 static const MCP_TOOL_DEF mcp_tools[] = {
     // List tools (using unified implementation)
@@ -201,6 +229,44 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .description = "Finds metrics with the highest variability using coefficient of variation (standard deviation as % of mean). Useful for identifying unstable or problematic metrics.",
         .execute_callback = mcp_tool_find_unstable_metrics_execute,
         .schema_callback = mcp_tool_find_unstable_metrics_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    
+    // Alert tools
+    {
+        .name = MCP_TOOL_LIST_RAISED_ALERTS,
+        .title = "List raised alerts",
+        .description = "List currently active alerts (WARNING and CRITICAL status) across all nodes",
+        .execute_callback = list_raised_alerts_execute,
+        .schema_callback = list_raised_alerts_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_TOOL_LIST_ALL_ALERTS,
+        .title = "List all alerts",
+        .description = "List all alerts including cleared, undefined, and uninitialized alerts across all nodes",
+        .execute_callback = list_all_alerts_execute,
+        .schema_callback = list_all_alerts_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_TOOL_GET_ALERTS_DETAILS,
+        .title = "Get alerts details",
+        .description = "Get detailed information about specific alerts including instances, values, configuration, and summary",
+        .execute_callback = get_alerts_details_execute,
+        .schema_callback = get_alerts_details_schema,
+        .read_only_hint = true,
+        .open_world_hint = false
+    },
+    {
+        .name = MCP_TOOL_LIST_ALERT_TRANSITIONS,
+        .title = "List alert transitions",
+        .description = "List recent alert state transitions showing how alerts changed over time",
+        .execute_callback = list_alert_transitions_execute,
+        .schema_callback = list_alert_transitions_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },

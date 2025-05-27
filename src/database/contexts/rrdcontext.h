@@ -643,8 +643,8 @@ struct api_v2_contexts_request {
 
     struct {
         CONTEXTS_ALERT_STATUS status;
-        char *alert;
-        char *transition;
+        const char *alert;
+        const char *transition;
         uint32_t last;
 
         const char *facets[ATF_TOTAL_ENTRIES];

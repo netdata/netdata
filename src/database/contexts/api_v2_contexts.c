@@ -574,7 +574,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         // interrupted
         return -1; // stop the query
 
-    bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS));
+    bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS));
     bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS));
 
     if(do_contexts) {
@@ -607,7 +607,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
     }
 
-    if(ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS)) {
+    if(ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS)) {
         struct contexts_v2_node t = {
             .ni = ctl->nodes.ni++,
             .host = host,
@@ -1208,7 +1208,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
         mode |= CONTEXTS_V2_NODES;
 
     if(mode & CONTEXTS_V2_ALERTS) {
-        mode |= CONTEXTS_V2_NODES;
+        if(!(req->options & CONTEXTS_OPTION_MCP))
+            mode |= CONTEXTS_V2_NODES;
+
         req->options &= ~CONTEXTS_OPTION_CONFIGURATIONS;
 
         if(!(req->options & (CONTEXTS_OPTION_SUMMARY | CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES)))
@@ -1248,7 +1250,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     // Initialize JSON keys based on options
     json_keys_init((ctl.options & CONTEXTS_OPTION_JSON_LONG_KEYS) ? JSON_KEYS_OPTION_LONG_KEYS : 0);
 
-    if(mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS)) {
+    if(mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS)) {
         ctl.nodes.dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                     NULL, sizeof(struct contexts_v2_node));
     }

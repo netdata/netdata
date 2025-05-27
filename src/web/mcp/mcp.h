@@ -18,6 +18,10 @@
 #define MCP_TOOL_FIND_CORRELATED_METRICS "find_correlated_metrics"
 #define MCP_TOOL_FIND_ANOMALOUS_METRICS "find_anomalous_metrics"
 #define MCP_TOOL_FIND_UNSTABLE_METRICS "find_unstable_metrics"
+#define MCP_TOOL_LIST_RAISED_ALERTS "list_raised_alerts"
+#define MCP_TOOL_LIST_ALL_ALERTS "list_all_alerts"
+#define MCP_TOOL_GET_ALERTS_DETAILS "get_alerts_details"
+#define MCP_TOOL_LIST_ALERT_TRANSITIONS "list_alert_transitions"
 
 #define MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES                                                               \
     "Next Steps: provide a better pattern to match less contexts, " \

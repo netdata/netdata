@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "api_v2_contexts.h"
+#include "libnetdata/json/json-keys.h"
 
 struct alert_counts {
     size_t critical;
@@ -298,42 +299,54 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
 
     buffer_json_add_array_item_object(wb);
     {
-        buffer_json_member_add_uint64(wb, "ni", t->ni);
-
-        buffer_json_member_add_string(wb, "nm", string2str(t->name));
-        buffer_json_member_add_string(wb, "ch", string2str(t->chart_id));
-        buffer_json_member_add_string(wb, "ch_n", string2str(t->chart_name));
-
         if(ctl->request->options & CONTEXTS_OPTION_SUMMARY)
-            buffer_json_member_add_uint64(wb, "ati", t->ati);
+            buffer_json_member_add_uint64(wb, JSKEY(alerts_index_id), t->ati);
+
+        if(!(ctl->request->options & CONTEXTS_OPTION_MCP))
+            buffer_json_member_add_uint64(wb, JSKEY(node_index), t->ni);
+
+        if(ctl->request->options & CONTEXTS_OPTION_INSTANCES)
+            buffer_json_member_add_uint64(wb, JSKEY(alert_global_id), t->global_id);
+
+        buffer_json_member_add_string(wb, JSKEY(alert_name), string2str(t->name));
+
+        if(ctl->request->options & CONTEXTS_OPTION_MCP)
+            buffer_json_member_add_string(wb, JSKEY(hostname), string2str(t->host->hostname));
+
+        if(ctl->request->options & CONTEXTS_OPTION_INSTANCES)
+            buffer_json_member_add_string(wb, JSKEY(context), string2str(t->context));
+
+        if(!(ctl->request->options & CONTEXTS_OPTION_MCP))
+            buffer_json_member_add_string(wb, JSKEY(instance_id), string2str(t->chart_id));
+
+        buffer_json_member_add_string(wb, JSKEY(instance_name), string2str(t->chart_name));
+
+        if(ctl->request->options & CONTEXTS_OPTION_INSTANCES)
+            buffer_json_member_add_string(wb, JSKEY(status), rrdcalc_status2string(t->status));
 
         if(ctl->request->options & CONTEXTS_OPTION_INSTANCES) {
-            buffer_json_member_add_string(wb, "units", string2str(t->units));
-            buffer_json_member_add_string(wb, "fami", string2str(t->family));
+            buffer_json_member_add_string(wb, JSKEY(family), string2str(t->family));
             buffer_json_member_add_string(wb, "info", string2str(t->info));
-            buffer_json_member_add_string(wb, "sum", string2str(t->summary));
-            buffer_json_member_add_string(wb, "ctx", string2str(t->context));
-            buffer_json_member_add_string(wb, "st", rrdcalc_status2string(t->status));
-            buffer_json_member_add_uuid(wb, "tr_i", t->last_transition_id);
-            buffer_json_member_add_double(wb, "tr_v", t->last_status_change_value);
-            buffer_json_member_add_time_t_formatted(wb, "tr_t", t->last_status_change, ctl->options & CONTEXTS_OPTION_RFC3339);
-            buffer_json_member_add_uuid(wb, "cfg", t->config_hash_id);
-            buffer_json_member_add_string(wb, "src", string2str(t->source));
+            buffer_json_member_add_string(wb, JSKEY(summary), string2str(t->summary));
+            buffer_json_member_add_string(wb, "units", string2str(t->units));
+            buffer_json_member_add_uuid(wb, JSKEY(last_transition_id), t->last_transition_id);
+            buffer_json_member_add_double(wb,  JSKEY(last_transition_value), t->last_status_change_value);
+            buffer_json_member_add_time_t_formatted(wb, JSKEY(last_transition_timestamp), t->last_status_change, ctl->options & CONTEXTS_OPTION_RFC3339);
+            buffer_json_member_add_uuid(wb, JSKEY(configuration_hash), t->config_hash_id);
+            buffer_json_member_add_string(wb, JSKEY(source), string2str(t->source));
 
-            buffer_json_member_add_string(wb, "to", string2str(t->recipient));
-            buffer_json_member_add_string(wb, "tp", string2str(t->type));
-            buffer_json_member_add_string(wb, "cm", string2str(t->component));
-            buffer_json_member_add_string(wb, "cl", string2str(t->classification));
+            buffer_json_member_add_string(wb, JSKEY(recipients), string2str(t->recipient));
+            buffer_json_member_add_string(wb, JSKEY(type), string2str(t->type));
+            buffer_json_member_add_string(wb, JSKEY(component), string2str(t->component));
+            buffer_json_member_add_string(wb, JSKEY(classification), string2str(t->classification));
 
-            // Agent specific fields
-            buffer_json_member_add_uint64(wb, "gi", t->global_id);
             // rrdcalc_flags_to_json_array  (wb, "flags", t->flags);
         }
 
         if(ctl->request->options & CONTEXTS_OPTION_VALUES) {
             // Netdata Cloud fetched these by querying the agents
-            buffer_json_member_add_double(wb, "v", t->value);
-            buffer_json_member_add_time_t_formatted(wb, "t", t->last_updated, ctl->options & CONTEXTS_OPTION_RFC3339);
+            buffer_json_member_add_double(wb, JSKEY(last_updated_value), t->value);
+            buffer_json_member_add_time_t_formatted(wb, JSKEY(last_updated_timestamp), t->last_updated, ctl->options & CONTEXTS_OPTION_RFC3339);
         }
     }
     buffer_json_object_close(wb); // alert instance
@@ -358,10 +371,10 @@ static void contexts_v2_alerts_by_x_to_json(BUFFER *wb, DICTIONARY *dict, const 
             buffer_json_add_array_item_object(wb);
             {
                 buffer_json_member_add_string(wb, "name", b_dfe.name);
-                buffer_json_member_add_uint64(wb, "cr", b->running.counts.critical);
-                buffer_json_member_add_uint64(wb, "wr", b->running.counts.warning);
-                buffer_json_member_add_uint64(wb, "cl", b->running.counts.clear);
-                buffer_json_member_add_uint64(wb, "er", b->running.counts.error);
+                buffer_json_member_add_uint64(wb, JSKEY(critical), b->running.counts.critical);
+                buffer_json_member_add_uint64(wb, JSKEY(warning), b->running.counts.warning);
+                buffer_json_member_add_uint64(wb, JSKEY(clear), b->running.counts.clear);
+                buffer_json_member_add_uint64(wb, JSKEY(error), b->running.counts.error);
                 buffer_json_member_add_uint64(wb, "running", b->running.total);
 
                 buffer_json_member_add_uint64(wb, "running_silent", b->running.silent);
@@ -399,49 +412,49 @@ void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_data *c
             {
                 buffer_json_add_array_item_object(wb);
                 {
-                    buffer_json_member_add_uint64(wb, "ati", t->ati);
+                    buffer_json_member_add_uint64(wb, JSKEY(alerts_index_id), t->ati);
 
-                    buffer_json_member_add_array(wb, "ni");
+                    buffer_json_member_add_array(wb, JSKEY(node_index));
                     void *host_guid;
                     dfe_start_read(t->nodes, host_guid) {
-                        struct contexts_v2_node *cn = dictionary_get(ctl->nodes.dict,host_guid_dfe.name);
+                        struct contexts_v2_node *cn = dictionary_get(ctl->nodes.dict, host_guid_dfe.name);
                         buffer_json_add_array_item_int64(wb, (int64_t) cn->ni);
                     }
                     dfe_done(host_guid);
                     buffer_json_array_close(wb);
 
-                    buffer_json_member_add_string(wb, "nm", string2str(t->name));
-                    buffer_json_member_add_string(wb, "sum", string2str(t->summary));
+                    buffer_json_member_add_string(wb, JSKEY(alert_name), string2str(t->name));
+                    buffer_json_member_add_string(wb, JSKEY(summary), string2str(t->summary));
 
-                    buffer_json_member_add_uint64(wb, "cr", t->counts.critical);
-                    buffer_json_member_add_uint64(wb, "wr", t->counts.warning);
-                    buffer_json_member_add_uint64(wb, "cl", t->counts.clear);
-                    buffer_json_member_add_uint64(wb, "er", t->counts.error);
+                    buffer_json_member_add_uint64(wb, JSKEY(critical), t->counts.critical);
+                    buffer_json_member_add_uint64(wb, JSKEY(warning), t->counts.warning);
+                    buffer_json_member_add_uint64(wb, JSKEY(clear), t->counts.clear);
+                    buffer_json_member_add_uint64(wb, JSKEY(error), t->counts.error);
 
-                    buffer_json_member_add_uint64(wb, "in", t->instances);
-                    buffer_json_member_add_uint64(wb, "nd", dictionary_entries(t->nodes));
-                    buffer_json_member_add_uint64(wb, "cfg", dictionary_entries(t->configs));
+                    buffer_json_member_add_uint64(wb, JSKEY(instances_count), t->instances);
+                    buffer_json_member_add_uint64(wb, JSKEY(nodes_count), dictionary_entries(t->nodes));
+                    buffer_json_member_add_uint64(wb, JSKEY(configurations_count), dictionary_entries(t->configs));
 
-                    buffer_json_member_add_array(wb, "ctx");
+                    buffer_json_member_add_array(wb, JSKEY(contexts));
                     rrdlabels_key_to_buffer_array_item(t->context, wb);
-                    buffer_json_array_close(wb); // ctx
+                    buffer_json_array_close(wb); // contexts
 
-                    buffer_json_member_add_array(wb, "cls");
+                    buffer_json_member_add_array(wb, JSKEY(classifications));
                     rrdlabels_key_to_buffer_array_item(t->classification, wb);
-                    buffer_json_array_close(wb); // classification
+                    buffer_json_array_close(wb); // classifications
 
 
-                    buffer_json_member_add_array(wb, "cp");
+                    buffer_json_member_add_array(wb, JSKEY(components));
                     rrdlabels_key_to_buffer_array_item(t->component, wb);
-                    buffer_json_array_close(wb); // component
+                    buffer_json_array_close(wb); // components
 
-                    buffer_json_member_add_array(wb, "ty");
+                    buffer_json_member_add_array(wb, JSKEY(types));
                     rrdlabels_key_to_buffer_array_item(t->type, wb);
-                    buffer_json_array_close(wb); // type
+                    buffer_json_array_close(wb); // types
 
-                    buffer_json_member_add_array(wb, "to");
+                    buffer_json_member_add_array(wb, JSKEY(recipients));
                     rrdlabels_key_to_buffer_array_item(t->recipient, wb);
-                    buffer_json_array_close(wb); // recipient
+                    buffer_json_array_close(wb); // recipients
                 }
                 buffer_json_object_close(wb); // alert name
             }
