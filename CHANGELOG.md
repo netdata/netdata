@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- improvement\(go.d/sd\): better prometheus exporters detection [\#20348](https://github.com/netdata/netdata/pull/20348) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/dyncfg\): fix duplicate potential "name" in userconfig action [\#20346](https://github.com/netdata/netdata/pull/20346) ([ilyam8](https://github.com/ilyam8))
+- SNMP: \_generic-lldp.yaml [\#20342](https://github.com/netdata/netdata/pull/20342) ([Ancairon](https://github.com/Ancairon))
+- build\(deps\): bump github.com/vmware/govmomi from 0.50.0 to 0.51.0 in /src/go [\#20341](https://github.com/netdata/netdata/pull/20341) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Switch back to epoll from poll [\#20337](https://github.com/netdata/netdata/pull/20337) ([ilyam8](https://github.com/ilyam8))
 - Alerts cloud [\#20334](https://github.com/netdata/netdata/pull/20334) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#20332](https://github.com/netdata/netdata/pull/20332) ([netdatabot](https://github.com/netdatabot))
 - \_generic-ip.yaml [\#20331](https://github.com/netdata/netdata/pull/20331) ([Ancairon](https://github.com/Ancairon))
@@ -463,12 +468,6 @@
 - Avoid zero timeout in libuv timers [\#19810](https://github.com/netdata/netdata/pull/19810) ([stelfrag](https://github.com/stelfrag))
 - fix fsanitize ifdefs [\#19809](https://github.com/netdata/netdata/pull/19809) ([ktsaou](https://github.com/ktsaou))
 - do not change the scheduling policy by default [\#19808](https://github.com/netdata/netdata/pull/19808) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/pihole\): switch to pihole6 api [\#19807](https://github.com/netdata/netdata/pull/19807) ([ilyam8](https://github.com/ilyam8))
-- Help finding leaks and running valgrind [\#19806](https://github.com/netdata/netdata/pull/19806) ([ktsaou](https://github.com/ktsaou))
-- fix memory corruption in streaming [\#19805](https://github.com/netdata/netdata/pull/19805) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19804](https://github.com/netdata/netdata/pull/19804) ([netdatabot](https://github.com/netdatabot))
-- Regenerate integrations docs [\#19803](https://github.com/netdata/netdata/pull/19803) ([netdatabot](https://github.com/netdatabot))
-- async-signal-safe stack traces [\#19802](https://github.com/netdata/netdata/pull/19802) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
