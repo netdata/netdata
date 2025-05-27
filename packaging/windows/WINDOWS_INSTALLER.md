@@ -91,15 +91,17 @@ By using silent installation, you agree to:
 
 For users who want to keep their Windows agents automatically updated with the latest releases, you can set up automated updates.
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
-How to setup automatic Netdata updates on Windows nodes using PowerShell and Task Scheduler.
+How to set up automatic Netdata updates on Windows nodes using PowerShell and Task Scheduler.
 
 :::
 
-### How to setup:
+### How to set up
+
+This setup will automatically download and install the latest Netdata nightly build daily at 7AM UTC.
 
 **1. Create `C:\netdata` dir.**
 
@@ -116,7 +118,7 @@ Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/d
 msiexec /qn /i C:\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>" 
 ```
 
-:::note 
+:::note
 
 **Configuration Required**
 
@@ -129,16 +131,18 @@ Replace `<CLAIM_TOKEN>` with your Netdata Cloud claim token and `<ROOM_ID>` with
 Configure the task with these specific settings:
 
 **General tab** - check:
+
 - `Run whether user is logged in or not`
 - `Run with highest privileges`
 - `Configure for: Windows Vista, Windows Server 2008`
 
 **Triggers tab** - add an entry for:
+
 - `Daily`
 - `7AM UTC`
 
 **Actions tab**:
+
 - **Program/Script:** `powershell`
 - **Arguments:** `-noprofile -executionpolicy bypass -file C:\netdata\netdata-updater.ps1`
 
-This setup will automatically download and install the latest Netdata nightly build daily at 7AM UTC.
