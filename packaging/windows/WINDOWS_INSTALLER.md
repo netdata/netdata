@@ -101,7 +101,7 @@ How to set up automatic Netdata updates on Windows nodes using PowerShell and Ta
 
 ### How to set up
 
-This setup will automatically download and install the latest Netdata nightly build daily at 7AM UTC.
+This setup will automatically download and install the latest Netdata nightly build daily at your preferred time.
 
 **1. Create `C:\netdata` dir.**
 
@@ -139,10 +139,9 @@ Configure the task with these specific settings:
 **Triggers tab** - add an entry for:
 
 - `Daily`
-- `7AM UTC`
+- Set your preferred time (e.g., `7AM UTC`)
 
 **Actions tab**:
 
 - **Program/Script:** `powershell`
 - **Arguments:** `-noprofile -executionpolicy bypass -file C:\netdata\netdata-updater.ps1`
-
