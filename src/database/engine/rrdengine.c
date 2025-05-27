@@ -1731,12 +1731,12 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
 
         if (unlikely(rrdeng_ctx_tier_cap_exceeded(ctx))) {
             nd_log_daemon(
-                NDLP_WARNING, "DBENGINE: tier %d reached quota limit, stopping journal indexing", ctx->config.tier);
+                NDLP_INFO, "DBENGINE: tier %d reached quota limit, stopping journal indexing", ctx->config.tier);
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
             break;
         }
 
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
+        nd_log_daemon(NDLP_INFO, "DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
 
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
