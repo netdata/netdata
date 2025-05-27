@@ -15,49 +15,49 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.2.0
       name: upsSecondsOnBattery
-      description: If the unit is on battery power, the elapsed time since the UPS last switched to battery power, or the time since the network management subsystem was last restarted, whichever is less. Zero shall be returned if the unit is not on battery power.
+      description: If the unit is on battery power, the elapsed time since the UPS last switched to battery power, or the time since the network management subsystem was last restarted, whichever is less. Zero shall be returned if the unit is not on battery power
       family: UPS/Battery
       unit: "s"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.3.0
       name: upsEstimatedMinutesRemaining
-      description: An estimate of the time to battery charge depletion under the present load conditions if the utility power is off and remains off, or if it were to be lost and remain off.
+      description: An estimate of the time to battery charge depletion under the present load conditions if the utility power is off and remains off, or if it were to be lost and remain off
       family: UPS/Battery
       unit: "min"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.4.0
       name: upsEstimatedChargeRemaining
-      description: An estimate of the battery charge remaining expressed as a percent of full charge.
+      description: An estimate of the battery charge remaining expressed as a percent of full charge
       family: UPS/Battery
       unit: "%"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.5.0
       name: upsBatteryVoltage
-      description: The magnitude of the present battery voltage.
+      description: The magnitude of the present battery voltage
       family: UPS/Battery
       unit: "V"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.6.0
       name: upsBatteryCurrent
-      description: The present battery current.
+      description: The present battery current
       family: UPS/Battery
       unit: "A"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.2.7.0
       name: upsBatteryTemperature
-      description: The ambient temperature at or near the UPS Battery casing.
+      description: The ambient temperature at or near the UPS Battery casing
       family: UPS/Battery
       unit: "Cel"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.1.0
       name: upsInputLineBads
-      description: A count of the number of times the input entered an out-of-tolerance condition as defined by the manufacturer. This count is incremented by one each time the input transitions from zero out-of-tolerance lines to one or more input lines out-of-tolerance.
+      description: A count of the number of times the input entered an out-of-tolerance condition as defined by the manufacturer. This count is incremented by one each time the input transitions from zero out-of-tolerance lines to one or more input lines out-of-tolerance
       family: UPS/Input
       unit: "{bad}"
     metric_type: monotonic_count
@@ -65,7 +65,7 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.3.2.0
       name: upsInputNumLines
-      description: The number of input lines utilized in this device. This variable indicates the number of rows in the input table.
+      description: The number of input lines utilized in this device. This variable indicates the number of rows in the input table
       family: UPS/Input
       unit: "{line}"
   - MIB: UPS-MIB
@@ -87,35 +87,35 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.4.2.0
       name: upsOutputFrequency
-      description: The present output frequency.
+      description: The present output frequency
       family: UPS/Output
       unit: "Hz"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.4.3.0
       name: upsOutputNumLines
-      description: The number of output lines utilized in this device. This variable indicates the number of rows in the output table.
+      description: The number of output lines utilized in this device. This variable indicates the number of rows in the output table
       family: UPS/Output
       unit: "{line}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.1.0
       name: upsBypassFrequency
-      description: The present bypass frequency.
+      description: The present bypass frequency
       family: UPS/Bypass
       unit: "Hz"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.5.2.0
       name: upsBypassNumLines
-      description: The number of bypass lines utilized in this device. This entry indicates the number of rows in the bypass table.
+      description: The number of bypass lines utilized in this device. This entry indicates the number of rows in the bypass table
       family: UPS/Bypass
       unit: "{line}"
   - MIB: UPS-MIB
     symbol:
       OID: 1.3.6.1.2.1.33.1.6.1.0
       name: upsAlarmsPresent
-      description: The present number of active alarm conditions.
+      description: The present number of active alarm conditions
       family: UPS/Alarms
       unit: "{alarm}"
   - MIB: UPS-MIB
@@ -136,7 +136,7 @@ metrics:
     symbol:
       OID: 1.3.6.1.2.1.33.1.7.5.0
       name: upsTestStartTime
-      description: The value of sysUpTime at the time the test in progress was initiated, or, if no test is in progress, the time the previous test was initiated.
+      description: The value of sysUpTime at the time the test in progress was initiated, or, if no test is in progress, the time the previous test was initiated
       family: UPS/Test Results
       unit: "s"
   - MIB: UPS-MIB
@@ -231,7 +231,7 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.33.1.6.2.1.3
         name: upsAlarmTime
-        description: The value of sysUpTime when the alarm condition was detected. If the alarm condition was detected at the time of agent startup and presumably existed before agent startup, the value of upsAlarmTime shall equal 0.
+        description: The value of sysUpTime when the alarm condition was detected. If the alarm condition was detected at the time of agent startup and presumably existed before agent startup, the value of upsAlarmTime shall equal 0
         family: UPS/Alarms/Conditions
         unit: "s"
     metric_tags:
