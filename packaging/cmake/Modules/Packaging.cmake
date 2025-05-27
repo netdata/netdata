@@ -415,7 +415,7 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_PLUGIN-SLABINFO-DEBUGINFO_PACKAGE On)
 
 #
 # systemd-journal.plugin
@@ -435,7 +435,26 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/preinst;"
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD_JOURNAL_DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_DEBUGINFO_PACKAGE On)
+
+#
+# systemd-units.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-SYSTEMD-UNITS_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-SYSTEMD-UNITS_DESCRIPTION
+		"The systemd-units collector for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics about systmed units.")
+
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_NAME "netdata-plugin-systemd-units")
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-systemd-units/preinst;"
+	  "${PKG_FILES_PATH}/deb/plugin-systemd-units/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD_UNITS_DEBUGINFO_PACKAGE On)
 
 #
 # xenstat.plugin

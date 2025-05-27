@@ -43,6 +43,7 @@ add_cmake_option ENABLE_PLUGIN_NFACCT On
 add_cmake_option ENABLE_PLUGIN_PERF On
 add_cmake_option ENABLE_PLUGIN_SLABINFO On
 add_cmake_option ENABLE_PLUGIN_SYSTEMD_JOURNAL On
+add_cmake_option ENABLE_PLUGIN_SYSTEMD_UNITS On
 
 add_cmake_option ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE On
 add_cmake_option ENABLE_EXPORTER_MONGODB On
