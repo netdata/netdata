@@ -1018,17 +1018,20 @@ time_t find_uuid_first_time(
                     continue;
 
                 any_matching = true;
+                struct journal_metric_list *live_entry = &uuid_list[journal_search_start];
+                // Check if we avoid bsearch
+                 if (journal_metric_uuid_compare(uuid_original_entry->uuid, live_entry->uuid) != 0) {
+                    live_entry = bsearch(
+                        uuid_original_entry->uuid,
+                        uuid_list + journal_search_start,
+                        journal_metric_count - journal_search_start,
+                        sizeof(*uuid_list),
+                        journal_metric_uuid_compare);
 
-                struct journal_metric_list *live_entry = bsearch(
-                    uuid_original_entry->uuid,
-                    uuid_list + journal_search_start,
-                    journal_metric_count - journal_search_start,
-                    sizeof(*uuid_list),
-                    journal_metric_uuid_compare);
-
-                if (!live_entry) {
-                    not_matching_bsearches++;
-                    continue;
+                    if (!live_entry) {
+                        not_matching_bsearches++;
+                        continue;
+                    }
                 }
 
                 size_t found_index = live_entry - uuid_list;
