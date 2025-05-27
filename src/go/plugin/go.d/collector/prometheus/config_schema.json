@@ -11,6 +11,13 @@
         "minimum": 1,
         "default": 10
       },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 10
+      },
       "url": {
         "title": "URL",
         "description": "The URL of the Prometheus metrics endpoint.",
@@ -230,6 +237,7 @@
           "title": "Base",
           "fields": [
             "update_every",
+            "autodetection_retry",
             "url",
             "timeout",
             "not_follow_redirects",
