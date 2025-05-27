@@ -9,7 +9,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_DISKSTATS_NAME
 #include "../common-contexts/common-contexts.h"
 
-#define RRDFUNCTIONS_DISKSTATS_HELP "View block device statistics"
+#define RRDFUNCTIONS_DISKSTATS_HELP "Displays block device I/O statistics including read/write throughput, operations, latency, and utilization."
 
 #define DISK_TYPE_UNKNOWN   0
 #define DISK_TYPE_PHYSICAL  1

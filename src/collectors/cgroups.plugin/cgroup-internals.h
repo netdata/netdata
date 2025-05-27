@@ -387,8 +387,8 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
     return buffer;
 }
 
-#define RRDFUNCTIONS_CGTOP_HELP "View running containers"
-#define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "View systemd services"
+#define RRDFUNCTIONS_CGTOP_HELP "Lists active containers and cgroups with resource usage including CPU, memory, disk I/O, and network traffic."
+#define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "Shows systemd service cgroups with their process counts and resource consumption (CPU, memory, I/O)."
 
 int cgroup_function_cgroup_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 int cgroup_function_systemd_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);

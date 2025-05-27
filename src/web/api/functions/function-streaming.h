@@ -5,7 +5,7 @@
 
 #include "database/rrd.h"
 
-#define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
+#define RRDFUNCTIONS_STREAMING_HELP "Shows real-time streaming connections and replication status between parent and child nodes, including connection health, data flow metrics, and ML status."
 
 int function_streaming(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 
