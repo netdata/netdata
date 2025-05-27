@@ -113,10 +113,19 @@ New-Item -Path "C:\netdata" -ItemType Directory -Force
 
 Create the file with this exact content:
 
-```powershell
-Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile C:\netdata\netdata-x64.msi
-msiexec /qn /i C:\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>" 
-```
+- Stable version
+
+   ```powershell
+   Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile C:\netdata\netdata-x64.msi
+   msiexec /qn /i C:\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>" 
+   ```
+
+- Nightly version
+
+   ```powershell
+   Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile C:\netdata\netdata-x64.msi
+   msiexec /qn /i C:\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>" 
+   ```
 
 :::note
 
@@ -140,6 +149,18 @@ Configure the task with these specific settings:
 
 - `Daily`
 - Set your preferred time (e.g., `7AM UTC`)
+
+:::tip
+
+**Alternative Scheduling Options**
+
+Instead of daily updates, you might prefer:
+
+- Weekly updates (select "Weekly" in **Triggers tab**)
+- Multiple times per day for critical systems
+- Only on specific days of the week
+
+:::
 
 **Actions tab**:
 
