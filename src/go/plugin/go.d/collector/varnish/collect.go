@@ -107,7 +107,7 @@ func (c *Collector) collectStatistics(mx map[string]int64, bs []byte) error {
 	for name := range c.seenStorages {
 		if !seenStorages[name] {
 			delete(c.seenStorages, name)
-			c.removeBackendCharts(name)
+			c.removeStorageCharts(name)
 		}
 	}
 

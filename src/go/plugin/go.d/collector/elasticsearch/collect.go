@@ -5,13 +5,12 @@ package elasticsearch
 import (
 	"errors"
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -234,16 +233,16 @@ func convertIndexStoreSizeToBytes(size string) int64 {
 	switch {
 	case strings.HasSuffix(size, "kb"):
 		num, _ = strconv.ParseFloat(size[:len(size)-2], 64)
-		num *= math.Pow(1024, 1)
+		num *= 1024
 	case strings.HasSuffix(size, "mb"):
 		num, _ = strconv.ParseFloat(size[:len(size)-2], 64)
-		num *= math.Pow(1024, 2)
+		num *= 1024 * 1024
 	case strings.HasSuffix(size, "gb"):
 		num, _ = strconv.ParseFloat(size[:len(size)-2], 64)
-		num *= math.Pow(1024, 3)
+		num *= 1024 * 1024 * 1024
 	case strings.HasSuffix(size, "tb"):
 		num, _ = strconv.ParseFloat(size[:len(size)-2], 64)
-		num *= math.Pow(1024, 4)
+		num *= 1024 * 1024 * 1024 * 1024
 	case strings.HasSuffix(size, "b"):
 		num, _ = strconv.ParseFloat(size[:len(size)-1], 64)
 	}

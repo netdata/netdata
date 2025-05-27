@@ -179,12 +179,12 @@ func (d *KubeDiscoverer) Discover(ctx context.Context, in chan<- []model.TargetG
 func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *podDiscoverer {
 	pod := d.client.CoreV1().Pods(ns)
 	podLW := &cache.ListWatch{
-		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
+		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			opts.FieldSelector = d.selectorField
 			opts.LabelSelector = d.selectorLabel
 			return pod.List(ctx, opts)
 		},
-		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+		WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 			opts.FieldSelector = d.selectorField
 			opts.LabelSelector = d.selectorLabel
 			return pod.Watch(ctx, opts)
@@ -193,20 +193,20 @@ func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *pod
 
 	cmap := d.client.CoreV1().ConfigMaps(ns)
 	cmapLW := &cache.ListWatch{
-		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
+		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			return cmap.List(ctx, opts)
 		},
-		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+		WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 			return cmap.Watch(ctx, opts)
 		},
 	}
 
 	secret := d.client.CoreV1().Secrets(ns)
 	secretLW := &cache.ListWatch{
-		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
+		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			return secret.List(ctx, opts)
 		},
-		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+		WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 			return secret.Watch(ctx, opts)
 		},
 	}
@@ -225,12 +225,12 @@ func (d *KubeDiscoverer) setupServiceDiscoverer(ctx context.Context, namespace s
 	svc := d.client.CoreV1().Services(namespace)
 
 	svcLW := &cache.ListWatch{
-		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
+		ListWithContextFunc: func(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 			opts.FieldSelector = d.selectorField
 			opts.LabelSelector = d.selectorLabel
 			return svc.List(ctx, opts)
 		},
-		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
+		WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 			opts.FieldSelector = d.selectorField
 			opts.LabelSelector = d.selectorLabel
 			return svc.Watch(ctx, opts)

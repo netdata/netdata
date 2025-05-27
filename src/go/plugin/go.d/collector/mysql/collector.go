@@ -14,7 +14,6 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/go-sql-driver/mysql"
-	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"

@@ -64,7 +64,7 @@ var charts = Charts{
 
 func addReposToCharts(repositories []string, cs *Charts) {
 	for _, name := range repositories {
-		dimName := strings.Replace(name, "/", "_", -1)
+		dimName := strings.ReplaceAll(name, "/", "_")
 		_ = cs.Get("pulls").AddDim(&Dim{
 			ID:   "pull_count_" + name,
 			Name: dimName,

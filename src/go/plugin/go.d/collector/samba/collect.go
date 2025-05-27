@@ -50,7 +50,7 @@ func (c *Collector) collectSmbStatusProfile(mx map[string]int64, profileData []b
 
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 
-		if !(strings.HasSuffix(key, "count") || strings.HasSuffix(key, "bytes")) {
+		if !strings.HasSuffix(key, "count") && !strings.HasSuffix(key, "bytes") {
 			continue
 		}
 

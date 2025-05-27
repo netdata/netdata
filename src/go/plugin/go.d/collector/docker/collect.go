@@ -104,7 +104,7 @@ var (
 )
 
 func (c *Collector) collectContainers(mx map[string]int64) error {
-	containerSet := make(map[string][]types.Container)
+	containerSet := make(map[string][]typesContainer.Summary)
 
 	for _, status := range containerHealthStatuses {
 		if err := func() error {
@@ -207,7 +207,7 @@ func (c *Collector) negotiateAPIVersion() {
 	c.client.NegotiateAPIVersion(ctx)
 }
 
-func hasIgnoreLabel(cntr types.Container) bool {
-	v, _ := cntr.Labels["netdata.cloud/ignore"]
+func hasIgnoreLabel(cntr typesContainer.Summary) bool {
+	v := cntr.Labels["netdata.cloud/ignore"]
 	return strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
 }

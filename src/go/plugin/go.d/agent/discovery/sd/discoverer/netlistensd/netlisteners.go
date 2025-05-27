@@ -231,9 +231,10 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 			continue
 		}
 
-		if tgt.IPAddress == "0.0.0.0" {
+		switch tgt.IPAddress {
+		case "0.0.0.0":
 			tgt.IPAddress = local4
-		} else if tgt.IPAddress == "::" {
+		case "::":
 			tgt.IPAddress = local6
 		}
 

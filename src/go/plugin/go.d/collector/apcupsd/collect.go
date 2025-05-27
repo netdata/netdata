@@ -130,7 +130,7 @@ func battdateSecondsAgo(battdate string) (int64, error) {
 		return 0, err
 	}
 
-	secsAgo := int64(time.Now().Sub(date).Seconds())
+	secsAgo := int64(time.Since(date).Seconds())
 
 	return secsAgo, nil
 }
