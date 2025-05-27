@@ -1993,10 +1993,10 @@ modules:
           metrics:
             - name: mssql.instance_total_wait
               description: Number of waits on this wait type.
-              unit: waits/s
+              unit: ms
               chart_type: line
               dimensions:
-                - name: waits
+                - name: period
             - name: mssql.instance_resource_wait
               description: Time waiting for another resource.
               unit: ms

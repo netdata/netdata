@@ -575,7 +575,10 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
             continue;
 
         mdw->MSSQLDatabaseTotalWait.current.Data = (ULONGLONG)total_wait;
-        mdw->MSSQLDatabaseResourceWaitMSec.current.Data = (ULONGLONG)resource_wait;
+        // Variable mdw->MSSQLDatabaseResourceWaitMSec.current.Data stores a mathematical operation
+        // that can be negative sometimes. This is the reason we have this if
+        if (resource_wait > mdw->MSSQLDatabaseResourceWaitMSec.current.Data)
+            mdw->MSSQLDatabaseResourceWaitMSec.current.Data = (ULONGLONG)resource_wait;
         mdw->MSSQLDatabaseSignalWaitMSec.current.Data = (ULONGLONG)signal_wait;
         mdw->MSSQLDatabaseMaxWaitTimeMSec.current.Data = (ULONGLONG)max_wait;
         mdw->MSSQLDatabaseWaitingTasks.current.Data = (ULONGLONG)waiting_tasks;
@@ -1682,7 +1685,7 @@ void mssql_total_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *m
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
-        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "periods", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
