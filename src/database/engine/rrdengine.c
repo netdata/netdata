@@ -1034,6 +1034,11 @@ time_t find_uuid_first_time(
                 size_t found_index = live_entry - uuid_list;
                 journal_search_start = found_index + 1;  // Next search starts after this match
 
+                if (journal_search_start >= journal_metric_count) {
+                    not_matching_bsearches += (count - index - 1);
+                    break;
+                }
+
                 uuid_original_entry->pages_found += live_entry->entries;
                 uuid_original_entry->df_matched++;
 
