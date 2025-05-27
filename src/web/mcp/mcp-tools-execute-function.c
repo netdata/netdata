@@ -52,6 +52,45 @@ typedef struct {
     bool had_missing_columns;          // Whether any columns were missing
 } MCP_TABLE_RESULT;
 
+// Helper function to check if a JSON response is a processable table
+static bool is_json_processable_table(struct json_object *json_obj, const char **out_type, bool *out_has_history, int *out_status) {
+    if (!json_obj) return false;
+    
+    struct json_object *type_obj = NULL;
+    struct json_object *has_history_obj = NULL;
+    struct json_object *status_obj = NULL;
+    
+    // Type is required
+    if (!json_object_object_get_ex(json_obj, "type", &type_obj)) {
+        return false;
+    }
+    
+    const char *type = json_object_get_string(type_obj);
+    if (!type || strcmp(type, "table") != 0) {
+        return false;
+    }
+    
+    // has_history is optional - assume false if missing
+    bool has_history = false;
+    if (json_object_object_get_ex(json_obj, "has_history", &has_history_obj)) {
+        has_history = json_object_get_boolean(has_history_obj);
+    }
+    
+    // Status is optional - assume 200 if missing
+    int status = 200;
+    if (json_object_object_get_ex(json_obj, "status", &status_obj)) {
+        status = json_object_get_int(status_obj);
+    }
+    
+    // Set output parameters if provided
+    if (out_type) *out_type = type;
+    if (out_has_history) *out_has_history = has_history;
+    if (out_status) *out_status = status;
+    
+    // It's processable if it's a table without history and status is OK
+    return (!has_history && status == 200);
+}
+
 // Structure to hold preprocessed condition information
 typedef struct condition_s {
     int column_index;                // Index of the column in the row
@@ -947,22 +986,9 @@ static void mcp_process_table_result(BUFFER *result_buffer, struct json_object *
         return;
     }
 
-    // Check if it's a table format
-    struct json_object *type_obj = NULL;
-    struct json_object *has_history_obj = NULL;
-
-    if (!json_object_object_get_ex(json_result, "type", &type_obj) ||
-        !json_object_object_get_ex(json_result, "has_history", &has_history_obj)) {
-        buffer_strcat(table_result->result, json_str); // Not in correct format
-        json_object_put(json_result);
-        return;
-    }
-
-    const char *type = json_object_get_string(type_obj);
-    bool has_history = json_object_get_boolean(has_history_obj);
-
-    if (!type || strcmp(type, "table") != 0 || has_history) {
-        buffer_strcat(table_result->result, json_str); // Not a table format
+    // Check if it's a processable table format
+    if (!is_json_processable_table(json_result, NULL, NULL, NULL)) {
+        buffer_strcat(table_result->result, json_str); // Not a processable table format
         json_object_put(json_result);
         return;
     }
@@ -1564,27 +1590,10 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     }
     else {
         // We have valid JSON - check if it's processable
-        struct json_object *type_obj = NULL;
-        struct json_object *has_history_obj = NULL;
-        struct json_object *status_obj = NULL;
         struct json_object *data_obj = NULL;
         struct json_object *columns_obj = NULL;
         
-        bool is_processable = false;
-        if (json_object_object_get_ex(json_check, "type", &type_obj) &&
-            json_object_object_get_ex(json_check, "has_history", &has_history_obj)) {
-            
-            const char *type = json_object_get_string(type_obj);
-            bool has_history = json_object_get_boolean(has_history_obj);
-            
-            // Check status if exists
-            int status = 200; // default
-            if (json_object_object_get_ex(json_check, "status", &status_obj)) {
-                status = json_object_get_int(status_obj);
-            }
-            
-            is_processable = (type && strcmp(type, "table") == 0 && !has_history && status == 200);
-        }
+        bool is_processable = is_json_processable_table(json_check, NULL, NULL, NULL);
         
         if (!is_processable) {
             // Not a processable table format
