@@ -46,11 +46,12 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTPConfig `yaml:",inline" json:""`
-	QueryPinApi    bool `yaml:"pinapi" json:"pinapi"`
-	QueryRepoApi   bool `yaml:"repoapi" json:"repoapi"`
+	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig     `yaml:",inline" json:""`
+	QueryPinApi        bool `yaml:"pinapi" json:"pinapi"`
+	QueryRepoApi       bool `yaml:"repoapi" json:"repoapi"`
 }
 
 type Collector struct {

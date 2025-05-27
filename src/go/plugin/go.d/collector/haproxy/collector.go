@@ -46,8 +46,9 @@ func New() *Collector {
 }
 
 type Config struct {
-	web.HTTPConfig `yaml:",inline" json:""`
-	UpdateEvery    int `yaml:"update_every" json:"update_every"`
+	web.HTTPConfig     `yaml:",inline" json:""`
+	UpdateEvery        int `yaml:"update_every" json:"update_every"`
+	AutoDetectionRetry int `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 }
 
 type Collector struct {
