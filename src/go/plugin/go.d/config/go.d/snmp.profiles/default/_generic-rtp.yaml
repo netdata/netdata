@@ -18,7 +18,7 @@ metrics:
         name: rtpSessionByes
         description: "A count of RTCP BYE messages received by this entity"
         family: Protocols/RTP/Sessions
-        unit: "{bye}"
+        unit: "{message}"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -55,26 +55,26 @@ metrics:
       name: rtpRcvrTable
       OID: 1.3.6.1.2.1.87.1.7
     symbols:
-      - OID: 1.3.6.1.2.1.87.1.7.1.12
-        name: rtpRcvrPackets
-        description: Count of RTP packets received by this RTP host receiver since rtpRcvrStartTime
-        family: Protocols/RTP/Receivers/Packets
-        unit: "{packet}"
-      - OID: 1.3.6.1.2.1.87.1.7.1.6
-        name: rtpRcvrLostPackets
-        description: A count of RTP packets lost as observed by this receiver since rtpRcvrStartTime
-        family: Protocols/RTP/Receivers/Packets
-        unit: "{packet}"
       - OID: 1.3.6.1.2.1.87.1.7.1.13
         name: rtpRcvrOctets
         description: Count of non-header RTP octets received by this receiving RTP host since rtpRcvrStartTime
         family: Protocols/RTP/Receivers/Traffic
         unit: "By"
+      - OID: 1.3.6.1.2.1.87.1.7.1.12
+        name: rtpRcvrPackets
+        description: Count of RTP packets received by this RTP host receiver since rtpRcvrStartTime
+        family: Protocols/RTP/Receivers/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.2.1.87.1.7.1.7
         name: rtpRcvrJitter
         description: An estimate of delay variation as observed by this receiver
-        family: Protocols/RTP/Receivers
+        family: Protocols/RTP/Receivers/Latency
         unit: "ms"
+      - OID: 1.3.6.1.2.1.87.1.7.1.6
+        name: rtpRcvrLostPackets
+        description: A count of RTP packets lost as observed by this receiver since rtpRcvrStartTime
+        family: Protocols/RTP/Receivers/Errors
+        unit: "{packet}"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
