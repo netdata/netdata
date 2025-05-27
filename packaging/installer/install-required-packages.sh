@@ -1293,6 +1293,7 @@ packages() {
     suitable_package libyaml-dev
     suitable_package libsystemd-dev
     suitable_package pcre2
+    suitable_package flex
     suitable_package libcurl-dev
   fi
 
