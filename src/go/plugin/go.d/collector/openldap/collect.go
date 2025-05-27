@@ -4,6 +4,7 @@ package openldap
 
 import (
 	"context"
+
 	"github.com/go-ldap/ldap/v3"
 )
 

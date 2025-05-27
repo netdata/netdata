@@ -1,6 +1,7 @@
 {
   "vnode": "ok",
   "update_every": 123,
+  "autodetection_retry": 123,
   "address": "ok",
   "port": 123,
   "secret": "ok",

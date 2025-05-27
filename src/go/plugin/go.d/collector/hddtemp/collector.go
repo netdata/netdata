@@ -37,9 +37,10 @@ func New() *Collector {
 }
 
 type Config struct {
-	UpdateEvery int              `yaml:"update_every" json:"update_every"`
-	Address     string           `yaml:"address" json:"address"`
-	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
+	UpdateEvery        int              `yaml:"update_every" json:"update_every"`
+	Address            string           `yaml:"address" json:"address"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Timeout            confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type Collector struct {

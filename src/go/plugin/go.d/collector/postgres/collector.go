@@ -62,6 +62,7 @@ func New() *Collector {
 type Config struct {
 	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	DBSelector         string           `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`

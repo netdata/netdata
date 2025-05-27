@@ -50,11 +50,12 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode       string             `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery int                `yaml:"update_every,omitempty" json:"update_every"`
-	URI         string             `yaml:"uri" json:"uri"`
-	Timeout     confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
-	Databases   matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
+	Vnode              string             `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int                `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	URI                string             `yaml:"uri" json:"uri"`
+	Timeout            confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
+	Databases          matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
 }
 
 type Collector struct {

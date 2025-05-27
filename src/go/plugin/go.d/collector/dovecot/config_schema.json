@@ -11,6 +11,13 @@
         "minimum": 1,
         "default": 1
       },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 60
+      },
       "address": {
         "title": "Address",
         "description": "The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections.",
@@ -40,6 +47,13 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "autodetection_retry": {
+      "title": "Detection retry",
+      "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+      "type": "integer",
+      "minimum": 0,
+      "default": 60
     },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
