@@ -195,5 +195,3 @@ packaging/tools/agent-events/parseBehaviorTest.go
 packaging/tools/agent-events/server
 packaging/tools/agent-events/go.mod
 packaging/tools/agent-events/go.sum
-netdata-readme/
-netdata/
