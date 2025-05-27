@@ -1,5 +1,6 @@
 vnode: "ok"
 update_every: 123
+autodetection_retry: 123
 url: "ok"
 timeout: 123.123
 username: "ok"

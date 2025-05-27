@@ -1,5 +1,6 @@
 {
   "update_every": 123,
+  "autodetection_retry": 123,
   "url": "ok",
   "body": "ok",
   "method": "ok",

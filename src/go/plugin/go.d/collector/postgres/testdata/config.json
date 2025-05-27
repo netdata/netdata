@@ -1,6 +1,7 @@
 {
   "vnode": "ok",
   "update_every": 123,
+  "autodetection_retry": 123,
   "dsn": "ok",
   "timeout": 123.123,
   "collect_databases_matching": "ok",

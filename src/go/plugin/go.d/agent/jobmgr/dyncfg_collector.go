@@ -14,12 +14,13 @@ import (
 	"time"
 	"unicode"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
-
-	"gopkg.in/yaml.v2"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 const (
@@ -353,6 +354,8 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 	default:
 	}
 
+	m.retryingTasks.remove(ecfg.cfg)
+
 	m.Infof("dyncfg: restart: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 
 	if err := job.AutoDetection(); err != nil {
@@ -360,6 +363,7 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 		ecfg.status = dyncfgFailed
 		m.dyncfgRespf(fn, 422, "Job restart failed: %v", err)
 		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
+		m.runRetryTask(ecfg, job)
 		return
 	}
 
@@ -420,6 +424,8 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 		m.Infof("dyncfg: enable: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 	}
 
+	m.retryingTasks.remove(ecfg.cfg)
+
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
 		ecfg.status = dyncfgFailed
@@ -432,14 +438,7 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 			m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 		}
 
-		if job.RetryAutoDetection() && !isDyncfg(ecfg.cfg) {
-			m.Infof("%s[%s] job detection failed, will retry in %d seconds",
-				ecfg.cfg.Module(), ecfg.cfg.Name(), job.AutoDetectionEvery())
-
-			ctx, cancel := context.WithCancel(m.ctx)
-			m.retryingTasks.add(ecfg.cfg, &retryTask{cancel: cancel})
-			go runRetryTask(ctx, m.addCh, ecfg.cfg)
-		}
+		m.runRetryTask(ecfg, job)
 		return
 	}
 
@@ -487,6 +486,8 @@ func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
 		}
 	default:
 	}
+
+	m.retryingTasks.remove(ecfg.cfg)
 
 	m.Infof("dyncfg: disable: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 
@@ -545,6 +546,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 			m.seenConfigs.remove(ecfg.cfg)
 		}
 		m.exposedConfigs.remove(ecfg.cfg)
+		m.retryingTasks.remove(ecfg.cfg)
 		m.stopRunningJob(ecfg.cfg.FullName())
 	}
 
@@ -581,6 +583,7 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 
 	m.Infof("dyncfg: remove: %s/%s job by user '%s'", mn, jn, getFnSourceValue(fn, "user"))
 
+	m.retryingTasks.remove(ecfg.cfg)
 	m.seenConfigs.remove(ecfg.cfg)
 	m.exposedConfigs.remove(ecfg.cfg)
 	m.stopRunningJob(ecfg.cfg.FullName())
@@ -660,11 +663,14 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 		return
 	}
 
+	m.retryingTasks.remove(ecfg.cfg)
+
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
 		scfg.status = dyncfgFailed
 		m.dyncfgRespf(fn, 200, "Job update failed: %v", err)
 		m.dyncfgJobStatus(scfg.cfg, scfg.status)
+		m.runRetryTask(scfg, job)
 		return
 	}
 
@@ -723,6 +729,19 @@ func (m *Manager) dyncfgRespf(fn functions.Function, code int, msgf string, a ..
 	})
 }
 
+func (m *Manager) runRetryTask(ecfg *seenConfig, job *module.Job) {
+	if !job.RetryAutoDetection() {
+		return
+	}
+	m.Infof("%s[%s] job detection failed, will retry in %d seconds",
+		ecfg.cfg.Module(), ecfg.cfg.Name(), job.AutoDetectionEvery())
+
+	ctx, cancel := context.WithCancel(m.ctx)
+	m.retryingTasks.add(ecfg.cfg, &retryTask{cancel: cancel})
+
+	go runRetryTask(ctx, m.addCh, ecfg.cfg)
+}
+
 func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]byte, error) {
 	if err := unmarshalPayload(cfg, fn); err != nil {
 		return nil, err
@@ -738,9 +757,7 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 		return nil, err
 	}
 
-	yms = slices.DeleteFunc(yms, func(item yaml.MapItem) bool {
-		return item.Key == "name"
-	})
+	yms = slices.DeleteFunc(yms, func(item yaml.MapItem) bool { return item.Key == "name" })
 
 	yms = append([]yaml.MapItem{{Key: "name", Value: jobName}}, yms...)
 
@@ -748,12 +765,7 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 		"jobs": []any{yms},
 	}
 
-	bs, err = yaml.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-
-	return bs, nil
+	return yaml.Marshal(v)
 }
 
 func configFromPayload(fn functions.Function) (confgroup.Config, error) {

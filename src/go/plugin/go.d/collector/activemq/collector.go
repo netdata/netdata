@@ -48,14 +48,15 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTPConfig `yaml:",inline" json:""`
-	Webadmin       string `yaml:"webadmin,omitempty" json:"webadmin"`
-	MaxQueues      int    `yaml:"max_queues" json:"max_queues"`
-	MaxTopics      int    `yaml:"max_topics" json:"max_topics"`
-	QueuesFilter   string `yaml:"queues_filter,omitempty" json:"queues_filter"`
-	TopicsFilter   string `yaml:"topics_filter,omitempty" json:"topics_filter"`
+	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig     `yaml:",inline" json:""`
+	Webadmin           string `yaml:"webadmin,omitempty" json:"webadmin"`
+	MaxQueues          int    `yaml:"max_queues" json:"max_queues"`
+	MaxTopics          int    `yaml:"max_topics" json:"max_topics"`
+	QueuesFilter       string `yaml:"queues_filter,omitempty" json:"queues_filter"`
+	TopicsFilter       string `yaml:"topics_filter,omitempty" json:"topics_filter"`
 }
 
 type Collector struct {

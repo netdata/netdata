@@ -189,7 +189,6 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	} else {
 		sp, ep := scfg.cfg.SourceTypePriority(), ecfg.cfg.SourceTypePriority()
 		if ep > sp || (ep == sp && ecfg.status == dyncfgRunning) {
-			m.retryingTasks.remove(cfg)
 			return
 		}
 		if ecfg.status == dyncfgRunning {

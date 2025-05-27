@@ -48,18 +48,19 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode           string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery     int    `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTPConfig  `yaml:",inline" json:""`
-	Name            string        `yaml:"name,omitempty" json:"name"`
-	Application     string        `yaml:"app,omitempty" json:"app"`
-	LabelPrefix     string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	BearerTokenFile string        `yaml:"bearer_token_file,omitempty" json:"bearer_token_file"`
-	Selector        selector.Expr `yaml:"selector,omitempty" json:"selector"`
-	ExpectedPrefix  string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS           int           `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric  int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
-	FallbackType    struct {
+	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig     `yaml:",inline" json:""`
+	Name               string        `yaml:"name,omitempty" json:"name"`
+	Application        string        `yaml:"app,omitempty" json:"app"`
+	LabelPrefix        string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
+	BearerTokenFile    string        `yaml:"bearer_token_file,omitempty" json:"bearer_token_file"`
+	Selector           selector.Expr `yaml:"selector,omitempty" json:"selector"`
+	ExpectedPrefix     string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
+	MaxTS              int           `yaml:"max_time_series" json:"max_time_series"`
+	MaxTSPerMetric     int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
+	FallbackType       struct {
 		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
 		Counter []string `yaml:"counter,omitempty" json:"counter"`
 	} `yaml:"fallback_type,omitempty" json:"fallback_type"`

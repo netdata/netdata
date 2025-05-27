@@ -11,6 +11,13 @@
         "minimum": 1,
         "default": 1
       },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 60
+      },
       "address": {
         "title": "Address",
         "description": "The IP address and port where the BOINC client listens for connections.",
@@ -46,6 +53,9 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "autodetection_retry": {
+      "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially, with the value of 60 meaning it retries to start data collection jobs every 60 seconds, while setting it to 0 disables this retry mechanism entirely."
     },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."

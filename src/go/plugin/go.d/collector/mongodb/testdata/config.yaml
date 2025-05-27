@@ -1,5 +1,6 @@
 vnode: "ok"
 update_every: 1
+autodetection_retry: 123
 uri: "ok"
 timeout: 123.123
 databases:

@@ -1,6 +1,7 @@
 {
   "vnode": "ok",
   "update_every": 123,
+  "autodetection_retry": 123,
   "webadmin": "ok",
   "max_queues": 123,
   "max_topics": 123,

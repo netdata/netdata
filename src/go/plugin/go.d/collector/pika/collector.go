@@ -41,11 +41,12 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode            string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
-	Address          string           `yaml:"address" json:"address"`
-	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	tlscfg.TLSConfig `yaml:",inline" json:""`
+	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Address            string           `yaml:"address" json:"address"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
 type (
