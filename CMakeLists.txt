@@ -228,9 +228,15 @@ mark_as_advanced(ENABLE_LIBUNWIND)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False)
-option(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS "Enable netdata's journal file reader implementation benchmarks" False)
-option(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER "Enable libsystemd's journal file reader implementation" True)
+cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
+cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS "Enable netdata's journal file reader implementation benchmarks" False "ENABLE_NETDATA_JOURNAL_FILE_READER" False)
+mark_as_advanced(ENABLE_NETDATA_JOURNAL_FILE_READER_BENCHMARKS)
+
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
+  set(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER True)
+else()
+  set(ENABLE_LIBSYSTEMD_JOURNAL_FILE_READER False)
+endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
 
