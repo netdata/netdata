@@ -1915,7 +1915,7 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
-            - name: windows authentication
+            - name: express
               description: Set to yes when running SQL Express version.
               default_value: no
               required: false
