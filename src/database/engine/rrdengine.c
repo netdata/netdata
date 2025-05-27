@@ -1272,6 +1272,11 @@ void datafile_delete(
         }
     }
 
+    netdata_log_info("DBENGINE: acquired data file '%s/"
+                     DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
+                     "' for deletion.",
+                     ctx->config.dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+
     if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
