@@ -1608,6 +1608,8 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
             buffer_free(result.result);
             buffer_free(result.error_message);
             buffer_free(result.missing_columns);
+            
+            json_object_put(json_check);
         }
         else {
             // It's a processable table - get data and columns
@@ -1625,6 +1627,8 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
                 buffer_free(result.result);
                 buffer_free(result.error_message);
                 buffer_free(result.missing_columns);
+                
+                json_object_put(json_check);
             }
             else {
                 // Check if data is empty
@@ -1643,6 +1647,8 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
                     buffer_free(result.result);
                     buffer_free(result.error_message);
                     buffer_free(result.missing_columns);
+                    
+                    json_object_put(json_check);
                 }
                 else {
                     // We have data - process with user parameters
@@ -1765,8 +1771,9 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
                 json_object_put(json_check);
             }
         }
-        buffer_json_array_close(mcpc->result);  // Close content array
     }
+    
+    buffer_json_array_close(mcpc->result);  // Close content array
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result); // Finalize the JSON
 
