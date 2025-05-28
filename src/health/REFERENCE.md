@@ -1,23 +1,5 @@
 # Configure Health Alerts
 
-<!-- DOCUMENT_METADATA
-title: Netdata Health Alert Configuration Guide
-type: comprehensive_guide  
-topics: monitoring, alerts, configuration, troubleshooting, expressions, variables
-audience: system_administrators, devops_engineers, monitoring_specialists
-complexity: beginner_to_advanced
-last_updated: 2024
--->
-
-<!-- CONTENT_STRUCTURE
-sections: 7
-quick_start: yes
-examples: 7
-decision_trees: 3  
-reference_tables: 15+
-code_samples: 50+
--->
-
 ## Table of Contents
 
 - [Quick Start Guide](#quick-start-guide) <!-- SECTION_TYPE: tutorial -->
