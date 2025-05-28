@@ -9,6 +9,7 @@ metrics:
         # core check only
       name: cpu.usage
       description: Current CPU usage (percentage)
+      family: Fortinet/CPU/Utilization
       unit: "%"
 
 
@@ -20,4 +21,5 @@ metrics:
       # core check only
       name: memory.usage
       description: Current memory utilization (percentage)
+      family: Fortinet/Memory/Utilization
       unit: "%"
