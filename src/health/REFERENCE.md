@@ -41,7 +41,7 @@ sudo netdatacli reload-health
 
 **Key Concept**
 
-You can highly configure Netdata's health watchdog with support for dynamic thresholds, hysteresis, alert templates, and more. You can customize any existing alerts based on your infrastructure's topology or specific monitoring needs, or create entirely new entities.
+You can highly configure Netdata's health watchdog with support for dynamic thresholds, hysteresis, alert templates, and more. You can customize any existing alerts based on your infrastructure's topology or specific monitoring needs or create entirely new entities.
 
 You can use health alerts with any of Netdata's [collectors](/src/collectors/README.md) (see the [supported collector list](/src/collectors/COLLECTORS.md)) to monitor your systems, containers, and applications in real time.
 
@@ -49,7 +49,7 @@ While you can view active alerts on both the local dashboard and Netdata Cloud, 
 
 :::
 
-**Next Steps:** Jump to [Common Tasks](#common-tasks) for specific workflows, or continue reading for comprehensive guidance.
+**Next Steps:** Jump to [Common Tasks](#common-tasks) for specific workflows or continue reading for comprehensive guidance.
 
 ## Common Tasks
 
@@ -393,7 +393,7 @@ template: NAME
 
 - `NAME` can be any alphanumeric character
 - Only `.` (period) and `_` (underscore) symbols allowed
-- Cannot be `chart name`, `dimension name`, `family name`, or `chart variable names`
+- Can’t be `chart name`, `dimension name`, `family name`, or `chart variable names`
 
 #### Alert Line `on`
 
@@ -576,8 +576,8 @@ The result of the lookup will be available as `$this` and `$NAME` in expressions
 
 - The result becomes available as `$this` variable
 - Overwrites the value from your `lookup`
-- Can be used without `lookup` if using [other available variables](#variables)
-- Uses [expressions](#expressions) for syntax
+- Can be used without `lookup` if using [other available variables](#variables-reference)
+- Uses [expressions](#expressions-overview) for syntax
 
 ```text
 calc: EXPRESSION
@@ -634,7 +634,7 @@ crit: EXPRESSION
 
 - Optional (but you need at least one)
 - Should evaluate to true/false (or zero/non-zero)
-- Uses Netdata's [expression syntax](#expressions)
+- Uses Netdata's [expression syntax](#expressions-overview)
 - Can reference variables like `$this`, `$green`, `$red`
 
 **Examples:**
@@ -655,7 +655,7 @@ to: ROLE1 ROLE2 ROLE3 ...
 **How It Works:**
 
 - First parameter passed to the `exec` script
-- Default script (`alarm-notify.sh`) treats this as space-separated list of roles
+- Default script (`alarm-notify.sh`) treats this as a space-separated list of roles
 - Roles are consulted to find exact recipients per notification method
 
 #### Alert Line `exec`
@@ -805,7 +805,7 @@ This requires BOTH conditions to be true (AND logic).
 **Important Notes:**
 
 - Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
-- If specified label doesn't exist on chart, chart won't match
+- If a specified label doesn't exist on the chart, the chart won't match
 - Multiple labels use AND logic
 
 #### Alert Line `summary`
@@ -1036,7 +1036,7 @@ Status values increase with severity, so `$status > $CLEAR` will match both WARN
 - **`REMOVED`** - Alert deleted during configuration reload
 - **`UNINITIALIZED`** - Alert created but not yet calculated
 - **`UNDEFINED`** - Database lookup failed, division by zero, etc.
-- **`CLEAR`** - Alert conditions not met (normal state)
+- **`CLEAR`** - Alert conditions aren’t met (normal state)
 - **`WARNING`** - Warning expression returned true/non-zero
 - **`CRITICAL`** - Critical expression returned true/non-zero
 
@@ -1057,7 +1057,7 @@ Real-world alert configurations that demonstrate different monitoring scenarios.
 <details>
 <summary><strong>Example 1: Server Alive Check</strong></summary><br/>
 
-**Scenario:** Monitor if Apache server is collecting data properly.
+**Scenario:** Monitor if the Apache server is collecting data properly.
 
 **Why This Matters:** Detect when data collection stops, indicating potential server or network issues.
 
@@ -1129,9 +1129,9 @@ template: disk_full_percent
 <details>
 <summary><strong>Example 3: Predictive Disk Full Alert</strong></summary><br/>
 
-**Scenario:** Predict when disks will run out of space based on current fill rate.
+**Scenario:** Predict when disks will run out of space based on the current fill rate.
 
-**Why This Matters:** Get advance warning before disk space becomes critical.
+**Why This Matters:** Get warning before disk space becomes critical.
 
 **Step 1: Calculate Disk Fill Rate**
 
@@ -1196,7 +1196,7 @@ template: 30min_packet_drops
 **Key Points:**
 
 - The drops chart only exists when packets are dropped
-- Alert automatically attaches when first drop is detected
+- The alert automatically attaches when the first drop is detected
 - Zero tolerance for packet loss
 
 <br/>
@@ -1337,7 +1337,7 @@ Monitor `/var/log/netdata/debug.log` - it will show detailed alert processing in
 
 :::important
 
-This will generate a lot of output in debug.log. Use this temporarily for troubleshooting only.
+This will generate a lot of output in the debug.log. Use this temporarily for troubleshooting only.
 
 :::
 
@@ -1684,4 +1684,4 @@ When seeking help, include:
 - [Netdata Community Forum](https://community.netdata.cloud)
 - [Netdata Discord](https://discord.gg/mPZ6WZKKG2)
 
-**Next Steps:** You now have comprehensive knowledge of Netdata health configuration. Start with the [Quick Start Guide](#quick-start-guide) for immediate needs, or dive into [Common Tasks](#common-tasks) for specific workflows.
+**Next Steps:** You now have comprehensive knowledge of Netdata health configuration. Start with the [Quick Start Guide](#quick-start-guide) for immediate needs or dive into [Common Tasks](#common-tasks) for specific workflows.
