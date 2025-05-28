@@ -43,7 +43,7 @@ type DimensionDefinition struct {
 const maxChartIDLength = 1000
 
 // Convert transforms OTLP metrics into Netdata charts
-func (e *netdataExporter) Convert(pms pmetric.Metrics) map[string]*ChartDefinition {
+func (e *netdataExporter) convert(pms pmetric.Metrics) map[string]*ChartDefinition {
 	// Track new and updated charts in this batch
 	currentCharts := make(map[string]bool, len(e.charts))
 
