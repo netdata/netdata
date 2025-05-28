@@ -82,7 +82,7 @@ Step-by-step workflows for the most frequent alert configuration tasks.
 **Why This Matters:** Default thresholds may not fit your specific environment or requirements.
 
 **Quick Example:**
-```yaml
+```text
 # Change CPU warning from 85% to 75%
 warn: $this > (($status >= $WARNING) ? (60) : (75))
 crit: $this > (($status == $CRITICAL) ? (75) : (85))
@@ -106,7 +106,7 @@ crit: $this > (($status == $CRITICAL) ? (75) : (85))
 
 **Real-World Example:** Monitor RAM usage above 80%
 
-```yaml
+```text
 alarm: ram_usage
    on: system.ram
 lookup: average -1m percentage of used
@@ -170,7 +170,7 @@ sudo ./edit-config health.d/cpu.conf
 
 Each health configuration file contains one or more health _entities_, which always begin with `alarm:` or `template:`. Here's the first health entity in `health.d/cpu.conf`:
 
-```yaml
+```text
  template: 10min_cpu_usage
        on: system.cpu
     class: Utilization
@@ -189,7 +189,7 @@ component: CPU
 
 To customize this alert to trigger warning and critical alerts at lower CPU utilization levels, you can change the `warn` and `crit` lines to values of your choosing. For example:
 
-```yaml
+```text
     warn: $this > (($status >= $WARNING)  ? (60) : (75))
     crit: $this > (($status == $CRITICAL) ? (75) : (85))
 ```
@@ -225,7 +225,7 @@ You can also [edit the file where the alert is defined](#how-to-edit-health-conf
 
 You can stop receiving notifications for an individual alert by [changing](#how-to-edit-health-configuration-files) the `to:` line to `silent`.
 
-```yaml
+```text
       to: silent
 ```
 
@@ -276,7 +276,7 @@ sudo ./edit-config health.d/ram-usage.conf
 
 Here's a health entity that triggers a warning alert when your node's RAM usage rises above 80%, and a critical alert above 90%:
 
-```yaml
+```text
  alarm: ram_usage
     on: system.ram
 lookup: average -1m percentage of used
@@ -394,12 +394,12 @@ Alerts have higher precedence and will override templates. If you have `alarm` a
 **Purpose:** This line starts an alert or template based on the [entity type](#entity-types-overview) you want to create.
 
 **Alert Syntax:**
-```yaml
+```text
 alarm: NAME
 ```
 
 **Template Syntax:**
-```yaml
+```text
 template: NAME
 ```
 
@@ -413,7 +413,7 @@ template: NAME
 **Purpose:** This line defines the chart this alert should attach to.
 
 **For Alerts:**
-```yaml
+```text
 on: CHART
 ```
 
@@ -422,7 +422,7 @@ The value `CHART` should be the unique ID or name of the chart you're interested
 ![Finding the unique ID of a chart](https://user-images.githubusercontent.com/1153921/67443082-43b16e80-f5b8-11e9-8d33-d6ee052c6678.png)
 
 **For Templates:**
-```yaml
+```text
 on: CONTEXT
 ```
 
@@ -448,7 +448,7 @@ If you create a template using the `disk.io` context, it will apply an alert to 
 
 **Example Use:** `Latency` can be used for alerts that trigger on latency issues on network interfaces, web servers, or database systems.
 
-```yaml
+```text
 class: Latency
 ```
 
@@ -473,7 +473,7 @@ class: Latency
 
 **Example:** Under the general `Database` type, you can group together alerts that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB`, etc.
 
-```yaml
+```text
 type: Database
 ```
 
@@ -517,7 +517,7 @@ If an alert configuration is missing the `type` line, its value will default to 
 
 **Example:** Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` type.
 
-```yaml
+```text
 component: MySQL
 ```
 
@@ -532,7 +532,7 @@ As with the `class` and `type` lines, if `component` is missing from the configu
 **Purpose:** This line makes a database lookup to find a value. The result of this lookup is available as `$this`.
 
 **Full Syntax:**
-```yaml
+```text
 lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
 ```
 
@@ -569,7 +569,7 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 | `match-names` | Match dimensions by names |
 
 **Example:**
-```yaml
+```text
 lookup: average -10m unaligned of user,system,softirq,irq,guest
 ```
 
@@ -587,7 +587,7 @@ The result of the lookup will be available as `$this` and `$NAME` in expressions
 - Can be used without `lookup` if using [other available variables](#variables)
 - Uses [expressions](#expressions) for syntax
 
-```yaml
+```text
 calc: EXPRESSION
 ```
 
@@ -600,7 +600,7 @@ calc: EXPRESSION
 
 **Purpose:** Sets the update frequency of this alert.
 
-```yaml
+```text
 every: DURATION
 ```
 
@@ -616,7 +616,7 @@ every: DURATION
 
 **Purpose:** Set the green and red thresholds of a chart for visualization.
 
-```yaml
+```text
 green: NUMBER
 red: NUMBER
 ```
@@ -630,7 +630,7 @@ red: NUMBER
 
 **Purpose:** Define the expressions that trigger warning or critical alerts.
 
-```yaml
+```text
 warn: EXPRESSION
 crit: EXPRESSION
 ```
@@ -642,7 +642,7 @@ crit: EXPRESSION
 - Can reference variables like `$this`, `$green`, `$red`
 
 **Examples:**
-```yaml
+```text
 warn: $this > 80
 crit: $this > 95
 ```
@@ -651,7 +651,7 @@ crit: $this > 95
 
 **Purpose:** Specifies who receives notifications when the alert changes status.
 
-```yaml
+```text
 to: ROLE1 ROLE2 ROLE3 ...
 ```
 
@@ -664,7 +664,7 @@ to: ROLE1 ROLE2 ROLE3 ...
 
 **Purpose:** Script to execute when the alert status changes.
 
-```yaml
+```text
 exec: SCRIPT
 ```
 
@@ -684,7 +684,7 @@ These settings don't affect the actual alert - only when the `exec` script is ex
 :::
 
 **Full Syntax:**
-```yaml
+```text
 delay: [[[up U] [down D] multiplier M] max X]
 ```
 
@@ -698,7 +698,7 @@ delay: [[[up U] [down D] multiplier M] max X]
 | `max X` | Maximum absolute notification delay | max(U×M, D×M) |
 
 **Example with Timeline:**
-```yaml
+```text
 delay: up 10s down 15m multiplier 2 max 1h
 ```
 
@@ -714,7 +714,7 @@ Starting at `00:00:00` with CLEAR status:
 
 **Purpose:** Defines the interval between repeating notifications for alerts in CRITICAL or WARNING mode.
 
-```yaml
+```text
 repeat: [off] [warning DURATION] [critical DURATION]
 ```
 
@@ -732,7 +732,7 @@ repeat: [off] [warning DURATION] [critical DURATION]
 
 **Purpose:** Special alert behavior options.
 
-```yaml
+```text
 options: no-clear-notification
 ```
 
@@ -753,19 +753,19 @@ options: no-clear-notification
 **Prerequisites:** See our [host labels guide](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for setup instructions.
 
 **Example Configuration:**
-```yaml
+```text
 [host labels]
     installed = 20191211
     room = server
 ```
 
 **Usage in Alerts:**
-```yaml
+```text
 host labels: room = server
 ```
 
 **Pattern Support:**
-```yaml
+```text
 host labels: installed = 201*  # Matches all hosts installed in 2010s
 ```
 
@@ -783,12 +783,12 @@ host labels: installed = 201*  # Matches all hosts installed in 2010s
 **Example Use Case:** 
 Each `disk_space` chart has a `mount_point` label. To exclude external disk alerts:
 
-```yaml
+```text
 chart labels: mount_point=!/mnt/disk1 *
 ```
 
 **Multiple Label Logic:**
-```yaml
+```text
 chart labels: mount_point=/mnt/disk1 device=sda
 ```
 This requires BOTH conditions to be true (AND logic).
@@ -802,7 +802,7 @@ This requires BOTH conditions to be true (AND logic).
 
 **Purpose:** Brief title of the alert used in notifications and dashboard.
 
-```yaml
+```text
 summary: Available Ram
 ```
 
@@ -814,7 +814,7 @@ summary: Available Ram
 | `${label:LABEL_NAME}` | Chart label value |
 
 **Example with Variables:**
-```yaml
+```text
 summary: 1 minute received traffic overflow for ${label:device}
 ```
 
@@ -830,7 +830,7 @@ Variable names are case-sensitive.
 
 **Purpose:** Detailed description of the alert for notifications and UI elements.
 
-```yaml
+```text
 info: Percentage of estimated amount of RAM available for userspace processes, without causing swapping
 ```
 
@@ -844,13 +844,13 @@ info: Percentage of estimated amount of RAM available for userspace processes, w
 **Examples with Variables:**
 
 **Family Variable:**
-```yaml
+```text
 info: average inbound utilization for the network interface ${family} over the last minute
 ```
 Renders as: `average inbound utilization for the network interface eth0 over the last minute`
 
 **Label Variable:**
-```yaml
+```text
 info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site ${label:target}
 ```
 Renders as: `average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/`
@@ -895,12 +895,12 @@ How to write calculations and use variables in your alert definitions. Essential
 **Why This Matters:** The conditional operator (`? :`) can create "sticky" alert thresholds that prevent alert spam when values fluctuate around a threshold. This is called [hysteresis](https://en.wikipedia.org/wiki/Hysteresis).
 
 **Basic Pattern:**
-```yaml
+```text
 warn: $this > (($status >= $WARNING) ? (lower_threshold) : (higher_threshold))
 ```
 
 **Real Example - CPU Usage Alert:**
-```yaml
+```text
 warn: $this > (($status >= $WARNING)  ? (75) : (85))
 crit: $this > (($status == $CRITICAL) ? (85) : (95))
 ```
@@ -989,7 +989,7 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 | `$CRITICAL` | 3 | Critical condition met |
 
 **Status Comparison Examples:**
-```yaml
+```text
 # Check if alert is in warning or higher
 warn: $status >= $WARNING
 
@@ -1036,7 +1036,7 @@ Real-world alert configurations that demonstrate different monitoring scenarios.
 
 **Why This Matters:** Detect when data collection stops, indicating potential server or network issues.
 
-```yaml
+```text
 template: apache_last_collected_secs
       on: apache.requests
     calc: $now - $last_collected_t
@@ -1072,7 +1072,7 @@ template: apache_last_collected_secs
 
 **Why This Matters:** Prevent system failures due to full disks.
 
-```yaml
+```text
 template: disk_full_percent
       on: disk.space
     calc: $used * 100 / ($avail + $used)
@@ -1107,7 +1107,7 @@ template: disk_full_percent
 **Why This Matters:** Get advance warning before disk space becomes critical.
 
 **Step 1: Calculate Disk Fill Rate**
-```yaml
+```text
     template: disk_fill_rate
           on: disk.space
       lookup: max -1s at -30m unaligned of avail
@@ -1116,7 +1116,7 @@ template: disk_full_percent
 ```
 
 **Step 2: Predict Hours Until Full**
-```yaml
+```text
     template: disk_full_after_hours
           on: disk.space
         calc: $avail / $disk_fill_rate / 3600
@@ -1147,7 +1147,7 @@ template: disk_full_percent
 
 **Why This Matters:** Packet drops indicate network issues that could affect performance.
 
-```yaml
+```text
 template: 30min_packet_drops
       on: net.drops
   lookup: sum -30m unaligned absolute
@@ -1178,7 +1178,7 @@ template: 30min_packet_drops
 
 **Why This Matters:** Identify unusual patterns that fixed thresholds might miss.
 
-```yaml
+```text
  alarm: cpu_user_mean
     on: system.cpu
 lookup: mean -60s of user
@@ -1222,7 +1222,7 @@ lookup: mean -10s of user
 
 **Why This Matters:** Detect complex patterns across multiple metrics without manual threshold tuning.
 
-```yaml
+```text
 template: ml_5min_cpu_chart
       on: system.cpu
   lookup: average -5m anomaly-bit of *
@@ -1252,7 +1252,7 @@ template: ml_5min_cpu_chart
 
 **Why This Matters:** Get a holistic view of system anomalies beyond individual charts.
 
-```yaml
+```text
 template: ml_5min_node
       on: anomaly_detection.anomaly_rate
   lookup: average -5m of anomaly_rate
@@ -1294,7 +1294,7 @@ You can compile Netdata with [debugging](/src/daemon/README.md#debugging)
 **Step 2: Enable Health Debug Flags**
 Add this to `netdata.conf`:
 
-```yaml
+```text
 [global]
    debug flags = 0x0000000000800000
 ```
@@ -1335,12 +1335,12 @@ Visit `http://NODE:19999/api/v1/alarms?all` to see:
 Netdata adds parentheses to show how it evaluates your expressions:
 
 **Your Expression:**
-```yaml
+```text
 warn: $this > 80 and $status >= $WARNING
 ```
 
 **Netdata's Interpretation:**
-```yaml
+```text
 warn: (($this > 80) and ($status >= $WARNING))
 ```
 
@@ -1540,7 +1540,7 @@ flowchart TD
 | Too frequent checks | Increase `every:` interval |
 
 **Hysteresis Example:**
-```yaml
+```text
 # Instead of simple threshold
 warn: $this > 80
 
@@ -1577,7 +1577,7 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
    ```
 
 2. **Write Simple Alert:**
-   ```yaml
+   ```text
    alarm: test_ram
       on: system.ram
    lookup: average -1m percentage of used
@@ -1624,7 +1624,7 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 When seeking help, include:
 
 1. **Alert Configuration:**
-   ```yaml
+   ```text
    # Your complete alert definition
    ```
 
