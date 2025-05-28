@@ -41,13 +41,6 @@ BUFFER *mcp_params_parse_labels_object(
     const char **error_message
 );
 
-// Parse time parameters (after/before) using MCP time utilities
-// Returns the parsed time_t value or default_value if not found
-time_t mcp_params_parse_time(
-    struct json_object *params,
-    const char *param_name,
-    time_t default_value
-);
 
 // Common schema generation functions
 
@@ -89,14 +82,6 @@ void mcp_schema_add_cardinality_limit(
     const char *description,
     size_t default_value,
     size_t max_value
-);
-
-// Utility function to convert JSON array to pipe-separated string
-// Returns: 0 on success, -1 on error, -2 if wildcards found but not allowed
-int mcp_params_array_to_pipe_string(
-    struct json_object *array_obj,
-    BUFFER *output_buffer,
-    bool allow_wildcards
 );
 
 // Extract string parameter with optional default
@@ -162,6 +147,22 @@ void mcp_schema_add_size_param(
     size_t default_value,
     size_t min_value,
     size_t max_value,
+    bool required
+);
+
+time_t mcp_params_parse_time(
+    struct json_object *params,
+    const char *name,
+    time_t default_value);
+
+// Schema generation for individual time parameter
+void mcp_schema_add_time_param(
+    BUFFER *buffer,
+    const char *param_name,
+    const char *title,
+    const char *description,
+    const char *relative_to,
+    time_t default_value,
     bool required
 );
 

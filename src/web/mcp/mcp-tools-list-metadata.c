@@ -2,7 +2,6 @@
 
 #include "mcp-tools-list-metadata.h"
 #include "mcp-tools.h"
-#include "mcp-time-utils.h"
 #include "mcp-params.h"
 #include "database/contexts/rrdcontext.h"
 
@@ -102,7 +101,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_nodes = true,
             .has_metrics = true,  // Filter by context pattern
             .has_alert_pattern = true,
-            .has_time_range = true,
+            .has_time_range = false,  // Raised alerts are current, not historical
             .has_cardinality_limit = true,
             .nodes_as_array = true,
             .metrics_as_array = true,  // Metrics should be array for alerts
@@ -129,44 +128,6 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
         },
         .defaults = {
             .alert_status = CONTEXTS_ALERT_STATUSES,  // All statuses
-        },
-    },
-    {
-        .name = MCP_TOOL_GET_ALERTS_DETAILS,
-        .title = "Get alerts details",
-        .description = "Get detailed information about specific alerts including instances, values, configuration, and summary",
-        .output_type = MCP_LIST_OUTPUT_ALERTS,
-        .mode = CONTEXTS_V2_ALERTS,
-        .options = CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES | 
-                   CONTEXTS_OPTION_SUMMARY | CONTEXTS_OPTION_CONFIGURATIONS,
-        .params = {
-            .has_nodes = true,
-            .has_metrics = true,  // Filter by context
-            .has_alert_pattern = true,
-            .has_time_range = true,
-            .has_cardinality_limit = true,
-            .alerts_required = true,   // Must specify which alerts
-            .nodes_as_array = true,
-            .alerts_as_array = true,   // Alerts specified as array
-            .metrics_as_array = true,  // Metrics should be array for alerts
-        },
-    },
-    {
-        .name = MCP_TOOL_LIST_ALERT_TRANSITIONS,
-        .title = "List alert transitions",
-        .description = "List recent alert state transitions showing how alerts changed over time",
-        .output_type = MCP_LIST_OUTPUT_ALERTS,
-        .mode = CONTEXTS_V2_NODES | CONTEXTS_V2_ALERT_TRANSITIONS,
-        .options = CONTEXTS_OPTION_CONFIGURATIONS,
-        .params = {
-            .has_nodes = true,
-            .has_metrics = true,  // Filter by context pattern
-            .has_alert_pattern = true,
-            .has_time_range = true,
-            .has_cardinality_limit = true,
-            .has_last_transitions = true,  // Number of transitions to return
-            .nodes_as_array = true,
-            .metrics_as_array = true,  // Metrics should be array for alerts
         },
     },
 };
@@ -325,7 +286,7 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
         buffer_json_member_add_object(buffer, "q");
         {
             buffer_json_member_add_string(buffer, "type", "string");
-            buffer_json_member_add_string(buffer, "title", "Full-text search");
+            buffer_json_member_add_string(buffer, "title", "Full-text search on metrics metadata");
             buffer_json_member_add_string(buffer, "description",
                 "Filter metrics by searching across all their metadata (names, titles, instances, dimensions, labels). "
                 "Use pipe (|) to separate multiple search terms. Examples: 'memory|pressure', 'cpu|load|system'");
@@ -339,7 +300,7 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
         if (config->params.nodes_as_array) {
             // Use array for nodes
             mcp_schema_add_array_param(buffer, "nodes",
-                config->params.nodes_required ? "Specify the nodes" : "Filter nodes",
+                config->params.nodes_required ? "Specify the nodes" : "Filter by nodes",
                 config->params.nodes_required ?
                     "Array of specific node names to query. This parameter is required because this tool produces detailed output. "
                     "Each node must be an exact match - no wildcards or patterns allowed. "
@@ -390,68 +351,45 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
 
     // Add time range parameters if supported
     if (config->params.has_time_range) {
-        mcp_schema_params_add_time_window(buffer, output_name, false);
+        // Build description prefix for metadata queries
+        char description_prefix[256];
+        snprintfz(description_prefix, sizeof(description_prefix),
+                  "%s with data collected", output_name ? output_name : "results");
+        mcp_schema_add_time_params(buffer, description_prefix, false);
     }
 
     // Add cardinality limit if supported
     if (config->params.has_cardinality_limit) {
-        mcp_schema_params_add_cardinality_limit(buffer, output_name, false);
+        mcp_schema_add_cardinality_limit(buffer,
+            "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
+            "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.",
+            MCP_METADATA_CARDINALITY_LIMIT,
+            500);
     }
     
     // Add alert-specific parameters
     if (config->params.has_alert_pattern) {
-        if (config->params.alerts_as_array) {
-            // Use array for alerts
-            mcp_schema_add_array_param(buffer, "alerts",
-                config->params.alerts_required ? "Specify the alerts" : "Filter alerts",
-                config->params.alerts_required ?
-                    "Array of specific alert names to query. This parameter is required. "
-                    "Each alert must be an exact match - no wildcards or patterns allowed. "
-                    "Examples: [\"disk_space_usage\", \"cpu_usage\"]" :
-                    "Array of specific alert names to filter. "
-                    "Each alert must be an exact match - no wildcards or patterns allowed. "
-                    "If not specified, all alerts are included. "
-                    "Examples: [\"disk_space_usage\", \"cpu_usage\"]",
-                config->params.alerts_required);
-        } else {
-            // Use string pattern for alerts
-            buffer_json_member_add_object(buffer, "alerts");
-            buffer_json_member_add_string(buffer, "type", "string");
-            buffer_json_member_add_string(buffer, "title", "Filter alerts");
-            buffer_json_member_add_string(buffer, "description",
-                "Pattern matching on alert names. Use pipe (|) to separate multiple patterns. "
-                "Supports wildcards. Examples: 'disk_*', '*cpu*|*memory*', 'health.*'");
-            buffer_json_member_add_string(buffer, "default", "*");
-            buffer_json_object_close(buffer); // alerts
-        }
-    }
-    
-    // Add last transitions parameter
-    if (config->params.has_last_transitions) {
-        buffer_json_member_add_object(buffer, "last");
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Number of transitions");
+        // Use string pattern for alerts
+        buffer_json_member_add_object(buffer, "alerts");
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Filter alerts");
         buffer_json_member_add_string(buffer, "description",
-            "Number of most recent alert transitions to return. Must be between 1 and 100.");
-        buffer_json_member_add_int64(buffer, "default", 1);
-        buffer_json_member_add_int64(buffer, "minimum", 1);
-        buffer_json_member_add_int64(buffer, "maximum", 100);
-        buffer_json_object_close(buffer); // last
+            "Pattern matching on alert names. Use pipe (|) to separate multiple patterns. "
+            "Supports wildcards. Examples: 'disk_*', '*cpu*|*memory*', 'health.*'");
+        buffer_json_member_add_string(buffer, "default", "*");
+        buffer_json_object_close(buffer); // alerts
     }
 
     buffer_json_object_close(buffer); // properties
 
     // Required fields
-    if (config->params.metrics_required || config->params.nodes_required || config->params.alerts_required) {
+    if (config->params.metrics_required || config->params.nodes_required) {
         buffer_json_member_add_array(buffer, "required");
         if (config->params.metrics_required) {
             buffer_json_add_array_item_string(buffer, "metrics");
         }
         if (config->params.nodes_required) {
             buffer_json_add_array_item_string(buffer, "nodes");
-        }
-        if (config->params.alerts_required) {
-            buffer_json_add_array_item_string(buffer, "alerts");
         }
         buffer_json_array_close(buffer);
     }
@@ -532,8 +470,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     time_t after = 0;
     time_t before = 0;
     if (config->params.has_time_range) {
-        after = mcp_extract_time_param(params, "after", MCP_DEFAULT_AFTER_TIME);
-        before = mcp_extract_time_param(params, "before", MCP_DEFAULT_BEFORE_TIME);
+        after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
+        before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
     }
     
     // Extract cardinality limit if supported
@@ -550,44 +488,15 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     
     // Extract alert-specific parameters
     const char *alert_pattern = NULL;
-    CLEAN_BUFFER *alerts_buffer = NULL;
     
     if (config->params.has_alert_pattern) {
-        if (config->params.alerts_as_array) {
-            // Parse alerts as array
-            const char *error_message = NULL;
-            alerts_buffer = mcp_params_parse_array_to_pattern(params, "alerts", false, MCP_TOOL_LIST_RAISED_ALERTS, &error_message);
-            if (error_message) {
-                buffer_sprintf(mcpc->error, "%s", error_message);
-                return MCP_RC_BAD_REQUEST;
-            }
-            alert_pattern = buffer_tostring(alerts_buffer);
-        } else {
-            // Parse alerts as string pattern
-            alert_pattern = mcp_params_extract_string(params, "alerts", NULL);
-        }
+        // Parse alerts as string pattern
+        alert_pattern = mcp_params_extract_string(params, "alerts", NULL);
         if(alert_pattern && !*alert_pattern) {
             alert_pattern = NULL; // Treat empty string as no alerts specified
         }
     }
     
-    // Check required alerts parameter
-    if (config->params.alerts_required && (!alert_pattern || !*alert_pattern)) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'alerts'. You must specify at least one alert name.");
-        return MCP_RC_ERROR;
-    }
-    
-    // Extract last transitions parameter for alert transitions
-    size_t last_transitions = 0;
-    if (config->params.has_last_transitions) {
-        const char *size_error = NULL;
-        last_transitions = mcp_params_extract_size(params, "last", 1, 1, 100, &size_error);
-        if (size_error) {
-            buffer_sprintf(mcpc->error, "%s", size_error);
-            return MCP_RC_BAD_REQUEST;
-        }
-    }
-
     CLEAN_BUFFER *t = buffer_create(0, NULL);
 
     struct api_v2_contexts_request req = {
@@ -603,7 +512,6 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
         .alerts = {
             .alert = alert_pattern,
             .status = config->defaults.alert_status,
-            .last = last_transitions,
         },
     };
 

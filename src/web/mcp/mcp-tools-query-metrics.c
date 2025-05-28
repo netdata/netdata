@@ -32,7 +32,6 @@
 
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools.h"
-#include "mcp-time-utils.h"
 #include "mcp-params.h"
 #include "web/api/formatters/rrd2json.h"
 
@@ -92,7 +91,11 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         false);
 
     // Add cardinality limit
-    mcp_schema_params_add_cardinality_limit(buffer, NULL, true);
+    mcp_schema_add_cardinality_limit(buffer,
+        "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
+        "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.",
+        MCP_DATA_CARDINALITY_LIMIT,
+        500);
 
     // Time parameters
     mcp_schema_add_time_params(buffer, "data", true);

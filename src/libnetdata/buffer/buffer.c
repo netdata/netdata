@@ -125,6 +125,42 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
     va_end(args);
 }
 
+void buffer_json_member_add_sprintf(BUFFER *wb, const char *key, const char *fmt, ...)
+{
+    va_list args;
+    
+    // Create a temporary buffer for the formatted string
+    BUFFER *tmp = buffer_create(0, NULL);
+    
+    va_start(args, fmt);
+    buffer_vsprintf(tmp, fmt, args);
+    va_end(args);
+    
+    // Add as JSON member (which will handle escaping)
+    buffer_json_member_add_string(wb, key, buffer_tostring(tmp));
+    
+    // Free the temporary buffer
+    buffer_free(tmp);
+}
+
+void buffer_json_add_array_item_sprintf(BUFFER *wb, const char *fmt, ...)
+{
+    va_list args;
+    
+    // Create a temporary buffer for the formatted string
+    BUFFER *tmp = buffer_create(0, NULL);
+    
+    va_start(args, fmt);
+    buffer_vsprintf(tmp, fmt, args);
+    va_end(args);
+    
+    // Add as array item (which will handle escaping)
+    buffer_json_add_array_item_string(wb, buffer_tostring(tmp));
+    
+    // Free the temporary buffer
+    buffer_free(tmp);
+}
+
 // generate a javascript date, the fastest possible way...
 void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds)
 {

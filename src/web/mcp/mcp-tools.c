@@ -29,6 +29,7 @@
  */
 
 #include "mcp-tools.h"
+#include "mcp-params.h"
 #include "mcp-initialize.h"
 #include "database/contexts/rrdcontext.h"
 
@@ -37,6 +38,7 @@
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools-weights.h"
+#include "mcp-tools-alert-transitions.h"
 
 // Tool handler function prototypes
 typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
@@ -121,19 +123,6 @@ static void list_all_alerts_schema(BUFFER *buffer) {
     unified_list_tool_schema(buffer, MCP_TOOL_LIST_ALL_ALERTS);
 }
 
-static MCP_RETURN_CODE get_alerts_details_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_GET_ALERTS_DETAILS);
-}
-static void get_alerts_details_schema(BUFFER *buffer) {
-    unified_list_tool_schema(buffer, MCP_TOOL_GET_ALERTS_DETAILS);
-}
-
-static MCP_RETURN_CODE list_alert_transitions_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    return unified_list_tool_execute(mcpc, params, id, MCP_TOOL_LIST_ALERT_TRANSITIONS);
-}
-static void list_alert_transitions_schema(BUFFER *buffer) {
-    unified_list_tool_schema(buffer, MCP_TOOL_LIST_ALERT_TRANSITIONS);
-}
 
 // Static array of tool definitions
 static const MCP_TOOL_DEF mcp_tools[] = {
@@ -253,20 +242,11 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
     {
-        .name = MCP_TOOL_GET_ALERTS_DETAILS,
-        .title = "Get alerts details",
-        .description = "Get detailed information about specific alerts including instances, values, configuration, and summary",
-        .execute_callback = get_alerts_details_execute,
-        .schema_callback = get_alerts_details_schema,
-        .read_only_hint = true,
-        .open_world_hint = false
-    },
-    {
         .name = MCP_TOOL_LIST_ALERT_TRANSITIONS,
         .title = "List alert transitions",
         .description = "List recent alert state transitions showing how alerts changed over time",
-        .execute_callback = list_alert_transitions_execute,
-        .schema_callback = list_alert_transitions_schema,
+        .execute_callback = mcp_tool_list_alert_transitions_execute,
+        .schema_callback = mcp_tool_list_alert_transitions_schema,
         .read_only_hint = true,
         .open_world_hint = false
     },
@@ -358,92 +338,6 @@ static MCP_RETURN_CODE mcp_tools_method_call(MCP_CLIENT *mcpc, struct json_objec
 
 // The MCP specification only defines list and call methods for tools
 // Other methods are not part of the standard specification
-
-/**
- * Add standardized time window parameters (after/before) to schema
- * 
- * @param buffer      Buffer to write JSON schema to
- * @param output_type Type of output (e.g., "nodes", "metrics", "functions") for description
- * @param is_data_query True if this is a data query (different description), false for metadata queries
- */
-void mcp_schema_params_add_time_window(BUFFER *buffer, const char *output_type, bool is_data_query) {
-    buffer_json_member_add_object(buffer, "after");
-    buffer_json_member_add_string(buffer, "type", "number");
-    buffer_json_member_add_string(buffer, "title", "Start time");
-    
-    if (is_data_query) {
-        buffer_json_member_add_string(buffer, "description", 
-            "Start time for the query. Accepts:\n"
-            "- Unix timestamp in seconds (e.g., 1705315800)\n"
-            "- Negative values for relative time from 'before' (e.g., -3600 for 1 hour)\n"
-            "- RFC3339 datetime string (e.g., \"2024-01-15T10:30:00Z\")");
-        buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_AFTER_TIME);
-    } else {
-        char description[512];
-        snprintfz(description, sizeof(description),
-                  "Limit %s to those with data collected after this time. Accepts:\n"
-                  "- Unix timestamp in seconds (e.g., 1705315800)\n"
-                  "- Negative values for relative time from before (e.g., -3600)\n"
-                  "- RFC3339 datetime string (e.g., \"2024-01-15T10:30:00Z\")",
-                  output_type ? output_type : "results");
-        buffer_json_member_add_string(buffer, "description", description);
-        buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_AFTER_TIME);
-    }
-    buffer_json_object_close(buffer); // after
-
-    buffer_json_member_add_object(buffer, "before");
-    buffer_json_member_add_string(buffer, "type", "number");
-    buffer_json_member_add_string(buffer, "title", "End time");
-    
-    if (is_data_query) {
-        buffer_json_member_add_string(buffer, "description", 
-            "End time for the query. Accepts:\n"
-            "- Unix timestamp in seconds (e.g., 1705319400)\n"
-            "- Negative values for relative time from now (e.g., 0 for current time)\n"
-            "- RFC3339 datetime string (e.g., \"2024-01-15T11:30:00Z\")");
-        buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_BEFORE_TIME);
-    } else {
-        char description[512];
-        snprintfz(description, sizeof(description),
-                  "Limit %s to those with data collected before this time. Accepts:\n"
-                  "- Unix timestamp in seconds (e.g., 1705319400)\n"
-                  "- Negative values for relative time from now (e.g., 0)\n"
-                  "- RFC3339 datetime string (e.g., \"2024-01-15T11:30:00Z\")",
-                  output_type ? output_type : "results");
-        buffer_json_member_add_string(buffer, "description", description);
-        buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_BEFORE_TIME);
-    }
-    buffer_json_object_close(buffer); // before
-}
-
-/**
- * Add standardized cardinality limit parameter to schema
- * 
- * @param buffer      Buffer to write JSON schema to
- * @param output_type Type of output (e.g., "nodes", "metrics", "functions") for description
- * @param is_data_query True if this is a data query (different limits), false for metadata queries
- */
-void mcp_schema_params_add_cardinality_limit(BUFFER *buffer, const char *output_type __maybe_unused, bool is_data_query) {
-    buffer_json_member_add_object(buffer, "cardinality_limit");
-    buffer_json_member_add_string(buffer, "type", "number");
-    buffer_json_member_add_string(buffer, "title", "Cardinality limit");
-    
-    if (is_data_query) {
-        buffer_json_member_add_string(buffer, "description",
-            "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
-            "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.");
-        buffer_json_member_add_int64(buffer, "default", MCP_DATA_CARDINALITY_LIMIT);
-    } else {
-        buffer_json_member_add_string(buffer, "description",
-            "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
-            "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.");
-        buffer_json_member_add_int64(buffer, "default", MCP_METADATA_CARDINALITY_LIMIT);
-    }
-    
-    buffer_json_member_add_int64(buffer, "minimum", 1);
-    buffer_json_member_add_int64(buffer, "maximum", 500);
-    buffer_json_object_close(buffer); // cardinality_limit
-}
 
 // Tools namespace method dispatcher (transport-agnostic)
 MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {

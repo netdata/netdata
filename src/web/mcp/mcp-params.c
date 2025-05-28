@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-params.h"
-#include "mcp-time-utils.h"
 #include "web/api/queries/rrdr.h"
 
 // Utility function to check if a string contains wildcards
@@ -17,7 +16,7 @@ static bool contains_wildcards(const char *str) {
 }
 
 // Convert JSON array to pipe-separated string
-int mcp_params_array_to_pipe_string(
+static int mcp_params_array_to_pipe_string(
     struct json_object *array_obj,
     BUFFER *output_buffer,
     bool allow_wildcards
@@ -197,14 +196,6 @@ BUFFER *mcp_params_parse_labels_object(
     return wb;  // Success
 }
 
-// Parse time parameters
-time_t mcp_params_parse_time(
-    struct json_object *params,
-    const char *param_name,
-    time_t default_value
-) {
-    return mcp_extract_time_param(params, param_name, default_value);
-}
 
 // Schema generation functions
 
@@ -285,78 +276,27 @@ void mcp_schema_add_time_params(
     const char *time_description_prefix,
     bool required
 ) {
-    // After parameter
-    buffer_json_member_add_object(buffer, "after");
-    {
-        // Use anyOf for multiple types
-        buffer_json_member_add_array(buffer, "anyOf");
-        {
-            buffer_json_add_array_item_object(buffer);
-            buffer_json_member_add_string(buffer, "type", "number");
-            buffer_json_member_add_string(buffer, "description", "Unix timestamp in seconds or relative time (negative for past)");
-            buffer_json_object_close(buffer);
-            
-            buffer_json_add_array_item_object(buffer);
-            buffer_json_member_add_string(buffer, "type", "string");
-            buffer_json_member_add_string(buffer, "description", "RFC3339 datetime string");
-            buffer_json_object_close(buffer);
-        }
-        buffer_json_array_close(buffer);
-        
-        buffer_json_member_add_string(buffer, "title", "Start time");
-        
-        BUFFER *desc = buffer_create(512, NULL);
-        buffer_sprintf(desc, "Start time for %s. Accepts multiple formats:\n"
-                            "- **RFC3339 datetime string** (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\")\n"
-                            "- **Unix timestamp** in seconds (e.g., 1705318200)\n"
-                            "- **Relative time** as negative seconds (e.g., -3600 for 1 hour ago, -86400 for 1 day ago)\n"
-                            "Examples: \"2024-01-15T10:30:00Z\", 1705318200, -3600",
-                       time_description_prefix ? time_description_prefix : "the query");
-        buffer_json_member_add_string(buffer, "description", buffer_tostring(desc));
-        buffer_free(desc);
-        
-        if (!required) {
-            buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_AFTER_TIME);
-        }
-    }
-    buffer_json_object_close(buffer);
+    // Build descriptions for after and before
+    BUFFER *after_desc = buffer_create(256, NULL);
+    BUFFER *before_desc = buffer_create(256, NULL);
     
-    // Before parameter
-    buffer_json_member_add_object(buffer, "before");
-    {
-        // Use anyOf for multiple types
-        buffer_json_member_add_array(buffer, "anyOf");
-        {
-            buffer_json_add_array_item_object(buffer);
-            buffer_json_member_add_string(buffer, "type", "number");
-            buffer_json_member_add_string(buffer, "description", "Unix timestamp in seconds or relative time (negative for past)");
-            buffer_json_object_close(buffer);
-            
-            buffer_json_add_array_item_object(buffer);
-            buffer_json_member_add_string(buffer, "type", "string");
-            buffer_json_member_add_string(buffer, "description", "RFC3339 datetime string");
-            buffer_json_object_close(buffer);
-        }
-        buffer_json_array_close(buffer);
-        
-        buffer_json_member_add_string(buffer, "title", "End time");
-        
-        BUFFER *desc = buffer_create(512, NULL);
-        buffer_sprintf(desc, "End time for %s. Accepts multiple formats:\n"
-                            "- **RFC3339 datetime string** (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\")\n"
-                            "- **Unix timestamp** in seconds (e.g., 1705318200)\n"
-                            "- **Relative time** as negative seconds (e.g., -3600 for 1 hour ago)\n"
-                            "- **0 or \"now\"** for current time\n"
-                            "Examples: \"2024-01-15T10:30:00Z\", 1705318200, -3600, 0",
-                       time_description_prefix ? time_description_prefix : "the query");
-        buffer_json_member_add_string(buffer, "description", buffer_tostring(desc));
-        buffer_free(desc);
-        
-        if (!required) {
-            buffer_json_member_add_int64(buffer, "default", MCP_DEFAULT_BEFORE_TIME);
-        }
+    if (time_description_prefix && *time_description_prefix) {
+        buffer_sprintf(after_desc, "Start time for %s.", time_description_prefix);
+        buffer_sprintf(before_desc, "End time for %s.", time_description_prefix);
+    } else {
+        buffer_strcat(after_desc, "Start time for the query.");
+        buffer_strcat(before_desc, "End time for the query.");
     }
-    buffer_json_object_close(buffer);
+    
+    // Use the new function for both parameters
+    mcp_schema_add_time_param(buffer, "after", "Start time", buffer_tostring(after_desc), 
+                              "'before'", required ? 0 : MCP_DEFAULT_AFTER_TIME, required);
+    
+    mcp_schema_add_time_param(buffer, "before", "End time", buffer_tostring(before_desc),
+                              "now", required ? 0 : MCP_DEFAULT_BEFORE_TIME, required);
+    
+    buffer_free(after_desc);
+    buffer_free(before_desc);
 }
 
 // Add cardinality limit parameter to schema
@@ -563,6 +503,98 @@ void mcp_schema_add_size_param(
             
         if (max_value < SIZE_MAX)
             buffer_json_member_add_uint64(buffer, "maximum", max_value);
+    }
+    buffer_json_object_close(buffer);
+}
+
+time_t mcp_params_parse_time(struct json_object *params, const char *name, time_t default_value) {
+    if (!params)
+        return default_value;
+
+    struct json_object *obj = NULL;
+    if (!json_object_object_get_ex(params, name, &obj) || !obj)
+        return default_value;
+
+    // First try as integer
+    if (json_object_is_type(obj, json_type_int))
+        return json_object_get_int64(obj);
+
+    // Then try as string
+    if (json_object_is_type(obj, json_type_string)) {
+        const char *val_str = json_object_get_string(obj);
+        if (!val_str || !*val_str)
+            return default_value;
+
+        // Try to parse as RFC3339 first
+        char *endptr = NULL;
+        usec_t timestamp_ut = rfc3339_parse_ut(val_str, &endptr);
+
+        // Check if RFC3339 parsing was successful
+        // Note: We check endptr to see if the entire string was consumed
+        // We don't check timestamp_ut > 0 because dates before 1970 are valid
+        if (endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
+            // Successfully parsed as RFC3339, convert to seconds
+            return (time_t)(timestamp_ut / USEC_PER_SEC);
+        }
+
+        // RFC3339 parsing failed, fall back to parsing as integer
+        // This handles:
+        // - Unix timestamps as strings: "1705318200"
+        // - Relative times as strings: "-3600", "-86400"
+        // - Special values: "0", "now" (handled by str2l)
+        return str2l(val_str);
+    }
+
+    return default_value;
+}
+
+// Schema generation for individual time parameter
+void mcp_schema_add_time_param(
+    BUFFER *buffer,
+    const char *param_name,
+    const char *title,
+    const char *description,
+    const char *relative_to,
+    time_t default_value,
+    bool required
+) {
+    buffer_json_member_add_object(buffer, param_name);
+    {
+        buffer_json_member_add_string(buffer, "title", title);
+
+        if (description && *description)
+            buffer_json_member_add_string(buffer, "description", description);
+        else
+            buffer_json_member_add_string(
+                buffer, "description",
+                "Unix epoch timestamp in seconds (e.g. 1705318200), "
+                "or number of seconds, "
+                "or RFC3339 datetime string");
+
+        // Use anyOf for multiple types
+        buffer_json_member_add_array(buffer, "anyOf");
+        {
+            buffer_json_add_array_item_object(buffer);
+            {
+                buffer_json_member_add_string(buffer, "type", "number");
+                buffer_json_member_add_sprintf(buffer, "description",
+                    "Unix epoch timestamp in seconds (e.g. 1705318200), or number of seconds relative to %s (e.g. -3600 for an hour before %s)",
+                    relative_to ? relative_to : "now", relative_to ? relative_to : "now");
+            }
+            buffer_json_object_close(buffer);
+            
+            buffer_json_add_array_item_object(buffer);
+            {
+                buffer_json_member_add_string(buffer, "type", "string");
+                buffer_json_member_add_string(buffer, "description", "RFC3339 datetime string (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\")");
+            }
+            buffer_json_object_close(buffer);
+        }
+        buffer_json_array_close(buffer);
+
+        if (!required && default_value != 0) {
+            buffer_json_member_add_int64(buffer, "default", default_value);
+        }
     }
     buffer_json_object_close(buffer);
 }

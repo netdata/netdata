@@ -1892,8 +1892,8 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-query-metrics.h
         src/web/mcp/mcp-tools-weights.c
         src/web/mcp/mcp-tools-weights.h
-        src/web/mcp/mcp-time-utils.c
-        src/web/mcp/mcp-time-utils.h
+        src/web/mcp/mcp-tools-alert-transitions.c
+        src/web/mcp/mcp-tools-alert-transitions.h
         src/web/mcp/mcp-params.c
         src/web/mcp/mcp-params.h
         src/web/mcp/mcp-request-id.c

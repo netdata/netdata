@@ -40,16 +40,12 @@ typedef struct mcp_list_tool_config {
         bool has_dimensions;  // Dimensions pattern
         bool has_time_range;  // Has after/before time parameters
         bool has_cardinality_limit; // Has cardinality limit parameter
-        bool has_alert_status; // Has alert status filter parameter
         bool has_alert_pattern; // Has alert name pattern parameter
-        bool has_last_transitions; // Has last N transitions parameter
         
         bool metrics_required; // Is metrics parameter required?
         bool nodes_required;   // Is nodes parameter required?
-        bool alerts_required;  // Is alerts parameter required?
         bool nodes_as_array;   // Should nodes be an array instead of pattern?
         bool metrics_as_array; // Should metrics be an array instead of pattern?
-        bool alerts_as_array;  // Should alerts be an array instead of pattern?
     } params;
     
     // Tool-specific defaults (0 means use global default)

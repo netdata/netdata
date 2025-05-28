@@ -123,6 +123,8 @@ static inline void buffer_freep(BUFFER **bp) {
 void buffer_snprintf(BUFFER *wb, size_t len, const char *fmt, ...) PRINTFLIKE(3, 4);
 void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args);
 void buffer_sprintf(BUFFER *wb, const char *fmt, ...) PRINTFLIKE(2,3);
+void buffer_json_member_add_sprintf(BUFFER *wb, const char *key, const char *fmt, ...) PRINTFLIKE(3,4);
+void buffer_json_add_array_item_sprintf(BUFFER *wb, const char *fmt, ...) PRINTFLIKE(2,3);
 void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 
 void buffer_char_replace(BUFFER *wb, char from, char to);

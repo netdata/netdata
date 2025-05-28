@@ -2,7 +2,6 @@
 
 #include "mcp-tools-weights.h"
 #include "mcp-tools.h"
-#include "mcp-time-utils.h"
 #include "mcp-params.h"
 #include "web/api/web_api.h"
 #include "web/api/queries/weights.h"
@@ -93,6 +92,14 @@ static MCP_RETURN_CODE execute_weights_request(
     size_t cardinality_limit = 50; // Default for MCP
     if (json_object_object_get_ex(params, "cardinality_limit", &obj) && json_object_is_type(obj, json_type_int))
         cardinality_limit = json_object_get_int(obj);
+    
+    // Extract timeout parameter
+    const char *timeout_error = NULL;
+    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, &timeout_error);
+    if (timeout_error) {
+        buffer_sprintf(mcpc->error, "%s", timeout_error);
+        return MCP_RC_BAD_REQUEST;
+    }
         
     // Set time_group parameter based on method
     const char *time_group_options = default_time_group;
@@ -143,7 +150,7 @@ static MCP_RETURN_CODE execute_weights_request(
         .points = 500,  // Default points for weights
         .options = options,
         .tier = 0,
-        .timeout_ms = 30000,  // 30 second timeout
+        .timeout_ms = timeout * 1000,  // Convert seconds to milliseconds
         .cardinality_limit = cardinality_limit,
         .interrupt_callback = NULL,
         .interrupt_callback_data = NULL,
@@ -200,28 +207,29 @@ static MCP_RETURN_CODE execute_weights_request(
 }
 
 // Schema helper for common time window parameters
-static void add_weights_time_parameters(BUFFER *buffer, bool include_baseline) {
-    mcp_schema_add_time_params(buffer, "metrics", true);
+static void add_weights_time_parameters(BUFFER *buffer, bool include_baseline, bool required) {
+
+    // add 'after' and 'before' parameters
+    mcp_schema_add_time_params(buffer, "metrics", required);
     
     if (include_baseline) {
-        buffer_json_member_add_object(buffer, "baseline_after");
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Baseline start time");
-        buffer_json_member_add_string(buffer, "description", 
+        mcp_schema_add_time_param(
+            buffer, "baseline_after",
+            "Baseline start time",
             "Start time for the baseline period to compare against. If not specified, "
-            "automatically set to 4x the query window before the query period. Accepts:\n"
-            "- Unix timestamp in seconds\n"
-            "- Negative values for relative time\n"
-            "- RFC3339 datetime string");
-        buffer_json_object_close(buffer);
+            "automatically set to 4x the query window before the query period.",
+            "'baseline_before'",
+            0,
+            required);
         
-        buffer_json_member_add_object(buffer, "baseline_before");
-        buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Baseline end time");
-        buffer_json_member_add_string(buffer, "description", 
+        mcp_schema_add_time_param(
+            buffer, "baseline_before",
+            "Baseline end time",
             "End time for the baseline period. If not specified, automatically set to "
-            "the start of the query period.");
-        buffer_json_object_close(buffer);
+            "the start of the query period (adjacent to 'after').",
+            "'after'",
+            0,
+            required);
     }
 }
 
@@ -284,7 +292,7 @@ void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer) {
     
     buffer_json_member_add_object(buffer, "properties");
     
-    add_weights_time_parameters(buffer, true);
+    add_weights_time_parameters(buffer, true, true);  // include_baseline=true, required=true
     add_weights_filter_parameters(buffer);
     
     buffer_json_member_add_object(buffer, "method");
@@ -304,6 +312,12 @@ void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer) {
     mcp_schema_add_cardinality_limit(buffer, 
         "Maximum number of results to return",
         50, 200);
+    
+    // Timeout parameter
+    mcp_schema_add_timeout(buffer, "timeout",
+        "Query timeout",
+        "Maximum time to wait for the query to complete (in seconds)",
+        60, 1, 3600, false);
     
     buffer_json_object_close(buffer); // properties
     
@@ -327,12 +341,18 @@ void mcp_tool_find_anomalous_metrics_schema(BUFFER *buffer) {
     
     buffer_json_member_add_object(buffer, "properties");
     
-    add_weights_time_parameters(buffer, false);
+    add_weights_time_parameters(buffer, false, true);  // include_baseline=false, required=true
     add_weights_filter_parameters(buffer);
     
     mcp_schema_add_cardinality_limit(buffer, 
         "Maximum number of results to return",
         50, 200);
+    
+    // Timeout parameter
+    mcp_schema_add_timeout(buffer, "timeout",
+        "Query timeout",
+        "Maximum time to wait for the query to complete (in seconds)",
+        60, 1, 3600, false);
     
     buffer_json_object_close(buffer); // properties
     
@@ -357,12 +377,18 @@ void mcp_tool_find_unstable_metrics_schema(BUFFER *buffer) {
     
     buffer_json_member_add_object(buffer, "properties");
     
-    add_weights_time_parameters(buffer, false);
+    add_weights_time_parameters(buffer, false, true);  // include_baseline=false, required=true
     add_weights_filter_parameters(buffer);
     
     mcp_schema_add_cardinality_limit(buffer, 
         "Maximum number of results to return",
         50, 200);
+    
+    // Timeout parameter
+    mcp_schema_add_timeout(buffer, "timeout",
+        "Query timeout",
+        "Maximum time to wait for the query to complete (in seconds)",
+        60, 1, 3600, false);
     
     buffer_json_object_close(buffer); // properties
     
