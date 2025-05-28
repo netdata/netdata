@@ -8,11 +8,13 @@ metrics:
     symbols:
       - name: hrSWRunPerfMem
         OID: 1.3.6.1.2.1.25.5.1.1.2
-        description: Total amount of real system memory allocated to this process.
+        description: Total amount of real system memory allocated to this process
+        family: Processes/Memory
         unit: "kBy"
       - name: hrSWRunPerfCPU
         OID: 1.3.6.1.2.1.25.5.1.1.1
-        description: The number of centi-seconds of the total system's CPU resources consumed by this process.
+        description: The number of centi-seconds of the total system's CPU resources consumed by this process
+        family: Processes/CPU
         unit: "cs"
     metric_tags:
       - symbol:
@@ -27,8 +29,14 @@ metrics:
     symbols:
       - name: hrSWRunStatus
         OID: 1.3.6.1.2.1.25.4.2.1.7
-        description: The status of this running piece of software.
-        unit: "TBD"
+        description: The status of this running piece of software
+        family: Processes/Status
+        unit: "{status}"
+        mapping:
+          1: running
+          2: runnable
+          3: notRunnable
+          4: invalid
     metric_tags:
       - symbol:
           name: hrSWRunIndex
@@ -42,27 +50,33 @@ metrics:
     symbols:
       - name: ccvpSipIntAvgLatency1
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.5
-        description: Average period of time elapsed between the arrival of a CONNECT message from ICM and when the call is actually answered, on the first transfer request for the calls.
+        description: Average period of time elapsed between the arrival of a CONNECT message from ICM and when the call is actually answered, on the first transfer request for the calls
+        family: Cisco/Voice/CVP/Connects
         unit: "ms"
       - name: ccvpSipIntAvgLatency2
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.6
-        description: Average period of time between the arrival of a CONNECT message from ICM and when the call is actually answered, on the second and subsequent transfer request for the call.
+        description: Average period of time between the arrival of a CONNECT message from ICM and when the call is actually answered, on the second and subsequent transfer request for the call
+        family: Cisco/Voice/CVP/Connects
         unit: "ms"
       - name: ccvpSipIntConnectsRcv
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.4
-        description: Number of CONNECT messages received by the SIP service in order to perform a Customer Voice Portal transfer.
-        unit: "{message}"
+        description: Number of CONNECT messages received by the SIP service in order to perform a Customer Voice Portal transfer
+        family: Cisco/Voice/CVP/Connects
+        unit: "{connect}"
       - name: ccvpSipIntNewCalls
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.3
-        description: Number of SIP INVITE messages received by CVP since system start time.
-        unit: "{call}"
+        description: Number of SIP INVITE messages received by CVP since system start time
+        family: Cisco/Voice/CVP/Invites
+        unit: "{invite}"
       - name: ccvpSipRtActiveCalls
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.1
-        description: Number of active calls being handled by the CVP SIP service.
+        description: Number of active calls being handled by the CVP SIP service
+        family: Cisco/Voice/CVP/Calls
         unit: "{call}"
       - name: ccvpSipRtTotalCallLegs
         OID: 1.3.6.1.4.1.9.9.590.1.6.1.1.2
-        description: Number of SIP call legs being handled by the SIP service.
+        description: Number of SIP call legs being handled by the SIP service
+        family: Cisco/Voice/CVP/Calls
         unit: "{call_leg}"
     metric_tags:
       - symbol:
@@ -76,21 +90,24 @@ metrics:
     symbol:
       name: ccvpLicAggMaxPortsInUse
       OID: 1.3.6.1.4.1.9.9.590.1.2.12.0
-      description: Peak number of simultaneous port licenses used since the start of the system.
-      unit: "{port}"
+      description: Peak number of simultaneous port licenses used since the start of the system
+      family: Cisco/Voice/CVP/Port Licenses
+      unit: "{license}"
   - MIB: CISCO-CVP-MIB
     symbol:
       name: ccvpLicRtPortsInUse
       OID: 1.3.6.1.4.1.9.9.590.1.2.2.0
-      description: Number of port licenses currently in use on the call server.
-      unit: "{port}"
+      description: Number of port licenses currently in use on the call server
+      family: Cisco/Voice/CVP/Port Licenses
+      unit: "{license}"
 
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
     symbol:
       name: ccmRegisteredGateways
       OID: 1.3.6.1.4.1.9.9.156.1.5.8.0
-      description: Number of gateways that are registered and actively in communication with the local call manager.
+      description: Number of gateways that are registered and actively in communication with the local call manager
+      family: Cisco/Voice/UCM/Gateways
       unit: "{gateway}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
@@ -98,6 +115,7 @@ metrics:
       name: ccmRegisteredPhones
       OID: 1.3.6.1.4.1.9.9.156.1.5.5.0
       description: Number of phones that are registered and actively in communication with the local call manager.
+      family: Cisco/Voice/UCM/Phones
       unit: "{phone}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
@@ -105,13 +123,15 @@ metrics:
       name: ccmRejectedPhones
       OID: 1.3.6.1.4.1.9.9.156.1.5.7.0
       description: Number of phones whose registration requests were rejected by the local call manager.
-      unit: "{phone}"
+      family: Cisco/Voice/UCM/Phones
+      unit: "{reject}"
   - MIB: CISCO-CCM-MIB
     metric_type: gauge
     symbol:
       name: ccmUnregisteredPhones
       OID: 1.3.6.1.4.1.9.9.156.1.5.6.0
       description: Number of phone that are unregistered or have lost contact with the local call manager.
+      family: Cisco/Voice/UCM/Phones
       unit: "{phone}"
 
   - MIB: CISCO-VOICE-DIAL-CONTROL-MIB
@@ -122,10 +142,12 @@ metrics:
       - name: cvCallVolMediaIncomingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.1
         description: Total number of inbound active media calls through this IP interface.
+        family: Cisco/Voice/Media Calls
         unit: "{call}"
       - name: cvCallVolMediaOutgoingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.5.1.2
         description: Total number of outbound active media calls through the IP interface.
+        family: Cisco/Voice/Media Calls
         unit: "{call}"
     metric_tags:
       - MIB: IF-MIB
@@ -143,10 +165,12 @@ metrics:
       - name: cvCallVolPeerIncomingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.1
         description: Total number of active calls that has selected the dialpeer as an incoming dialpeer.
+        family: Cisco/Voice/Media Calls
         unit: "{call}"
       - name: cvCallVolPeerOutgoingCalls
         OID: 1.3.6.1.4.1.9.9.63.1.3.8.4.1.2
         description: Total number of active calls that has selected the dialpeer as an outgoing dialpeer.
+        family: Cisco/Voice/Media Calls
         unit: "{call}"
     metric_tags:
       - index: 1
@@ -160,19 +184,23 @@ metrics:
     symbols:
       - name: dialCtlPeerStatsAcceptCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.5
-        description: Number of calls from this peer accepted since system startup.
+        description: Number of calls from this peer accepted since system startup
+        family: Voice/Dial Peers/Calls
         unit: "{call}"
       - name: dialCtlPeerStatsFailCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.4
-        description: Number of failed call attempts to this peer since system startup.
+        description: Number of failed call attempts to this peer since system startup
+        family: Voice/Dial Peers/Calls
         unit: "{call}"
       - name: dialCtlPeerStatsRefuseCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.6
-        description: Number of calls from this peer refused since system startup.
+        description: Number of calls from this peer refused since system startup
+        family: Voice/Dial Peers/Calls
         unit: "{call}"
       - name: dialCtlPeerStatsSuccessCalls
         OID: 1.3.6.1.2.1.10.21.1.2.2.1.3
-        description: Number of completed calls to this peer.
+        description: Number of completed calls to this peer
+        family: Voice/Dial Peers/Calls
         unit: "{call}"
     metric_tags:
       - index: 1
@@ -186,8 +214,18 @@ metrics:
       - name: cccaPimStatus
         OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.4
         description: Last known status of the enterprise contact center application peripheral interface manager functional component.
-        unit: "1"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: Cisco/Voice/CCA/Status
+        unit: "{status}"
+        mapping:
+          1: unknown
+          2: disabled
+          3: stopped
+          4: started
+          5: active
+          6: standby
+          7: disconnected
+          8: uninitialized
+          9: notRoutable
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.473.1.3.6.1.1
@@ -210,15 +248,18 @@ metrics:
       - name: cccaRouterAgentsLoggedOn
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.3
         description: Number of contact center agents currently managed by the enterprise contact center application.
+        family: Cisco/Voice/CCA/Agents
         unit: "{agent}"
       - name: cccaRouterCallsInProgress
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.4
         description: Number of active (voice) calls being managed by the enterprise contact center application.
-        unit: "{call}"
+        family: Cisco/Voice/CCA/Calls
+        unit: "{calls}"
       - name: cccaRouterCallsInQueue
         OID: 1.3.6.1.4.1.9.9.473.1.3.1.1.8
         description: Number of calls queued in all network Voice Response Units (VRUs).
-        unit: "{call}"
+        family: Cisco/Voice/CCA/Calls
+        unit: "{calls}"
     metric_tags:
       - tag: instance_number
-        index: 1  # Index of cccaRouterTable is (cccaInstanceNumber, cccaComponentIndex)
+        index: 1 # Index of cccaRouterTable is (cccaInstanceNumber, cccaComponentIndex)
