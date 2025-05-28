@@ -332,7 +332,7 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
             buffer_json_member_add_uuid(wb, JSKEY(last_transition_id), t->last_transition_id);
             buffer_json_member_add_double(wb,  JSKEY(last_transition_value), t->last_status_change_value);
             buffer_json_member_add_time_t_formatted(wb, JSKEY(last_transition_timestamp), t->last_status_change, ctl->options & CONTEXTS_OPTION_RFC3339);
-            buffer_json_member_add_uuid(wb, JSKEY(configuration_hash), t->config_hash_id);
+            buffer_json_member_add_uuid(wb, JSKEY(config_hash_id), t->config_hash_id);
             buffer_json_member_add_string(wb, JSKEY(source), string2str(t->source));
 
             buffer_json_member_add_string(wb, JSKEY(recipients), string2str(t->recipient));
@@ -411,7 +411,7 @@ void contexts_v2_alerts_to_json_mcp(BUFFER *wb, struct rrdcontext_to_json_v2_dat
         size_t total_alerts = dictionary_entries(ctl->alerts.summary);
         
         // Add header array
-        buffer_json_member_add_array(wb, "header");
+        buffer_json_member_add_array(wb, "all_alerts_header");
         {
             buffer_json_add_array_item_string(wb, "Alert Name");
             buffer_json_add_array_item_string(wb, "Alert Summary");
@@ -470,7 +470,7 @@ void contexts_v2_alerts_to_json_mcp(BUFFER *wb, struct rrdcontext_to_json_v2_dat
         
         // Add info about truncation if needed
         if(cardinality_limit && total_alerts > cardinality_limit) {
-            buffer_json_member_add_object(wb, "__info__");
+            buffer_json_member_add_object(wb, "__all_alerts_info__");
             buffer_json_member_add_string(wb, "status", "truncated");
             buffer_json_member_add_uint64(wb, "total_alerts", total_alerts);
             buffer_json_member_add_uint64(wb, "shown_alerts", alerts_count);

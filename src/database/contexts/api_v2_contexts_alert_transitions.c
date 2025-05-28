@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "api_v2_contexts_alerts.h"
+#include "libnetdata/json/json-keys.h"
 
 struct alert_transitions_facets alert_transition_facets[] = {
     [ATF_STATUS] = {
@@ -311,7 +312,7 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
     for(size_t i = 0; i < ATF_TOTAL_ENTRIES ;i++) {
         data.facets[i].dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(struct facet_entry));
         if(ctl->request->alerts.facets[i])
-            data.facets[i].pattern = simple_pattern_create(ctl->request->alerts.facets[i], ",|", SIMPLE_PATTERN_EXACT, false);
+            data.facets[i].pattern = simple_pattern_create(ctl->request->alerts.facets[i], SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, false);
     }
 
     sql_alert_transitions(
@@ -325,39 +326,42 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
         &data,
         debug);
 
-    buffer_json_member_add_array(wb, "facets");
-    for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
-        buffer_json_add_array_item_object(wb);
-        {
-            buffer_json_member_add_string(wb, "id", alert_transition_facets[i].id);
-            buffer_json_member_add_string(wb, "name", alert_transition_facets[i].name);
-            buffer_json_member_add_uint64(wb, "order", alert_transition_facets[i].order);
-            buffer_json_member_add_array(wb, "options");
+    if(!(ctl->request->options & CONTEXTS_OPTION_MCP)) {
+        buffer_json_member_add_array(wb, "facets");
+        for (size_t i = 0; i < ATF_TOTAL_ENTRIES; i++) {
+            buffer_json_add_array_item_object(wb);
             {
-                struct facet_entry *x;
-                dfe_start_read(data.facets[i].dict, x) {
-                    buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "id", alert_transition_facets[i].id);
+                buffer_json_member_add_string(wb, "name", alert_transition_facets[i].name);
+                buffer_json_member_add_uint64(wb, "order", alert_transition_facets[i].order);
+                buffer_json_member_add_array(wb, "options");
+                {
+                    struct facet_entry *x;
+                    dfe_start_read(data.facets[i].dict, x)
                     {
-                        buffer_json_member_add_string(wb, "id", x_dfe.name);
-                        if (i == ATF_NODE) {
-                            RRDHOST *host = rrdhost_find_by_guid(x_dfe.name);
-                            if (host)
-                                buffer_json_member_add_string(wb, "name", rrdhost_hostname(host));
-                            else
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "id", x_dfe.name);
+                            if (i == ATF_NODE) {
+                                RRDHOST *host = rrdhost_find_by_guid(x_dfe.name);
+                                if (host)
+                                    buffer_json_member_add_string(wb, "name", rrdhost_hostname(host));
+                                else
+                                    buffer_json_member_add_string(wb, "name", x_dfe.name);
+                            } else
                                 buffer_json_member_add_string(wb, "name", x_dfe.name);
-                        } else
-                            buffer_json_member_add_string(wb, "name", x_dfe.name);
-                        buffer_json_member_add_uint64(wb, "count", x->count);
+                            buffer_json_member_add_uint64(wb, "count", x->count);
+                        }
+                        buffer_json_object_close(wb);
                     }
-                    buffer_json_object_close(wb);
+                    dfe_done(x);
                 }
-                dfe_done(x);
+                buffer_json_array_close(wb); // options
             }
-            buffer_json_array_close(wb); // options
+            buffer_json_object_close(wb); // facet
         }
-        buffer_json_object_close(wb); // facet
+        buffer_json_array_close(wb); // facets
     }
-    buffer_json_array_close(wb); // facets
 
     buffer_json_member_add_array(wb, "transitions");
     for(struct sql_alert_transition_fixed_size *t = data.base; t ; t = t->next) {
@@ -365,7 +369,7 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
         {
             RRDHOST *host = rrdhost_find_by_guid(t->machine_guid);
 
-            buffer_json_member_add_uint64(wb, "gi", t->global_id);
+            buffer_json_member_add_uint64(wb, JSKEY(alert_global_id), t->global_id);
             buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
             buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
             buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
@@ -378,8 +382,14 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
             }
 
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
-            buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
-            buffer_json_member_add_string(wb, "instance_n", *t->chart_name ? t->chart_name : NULL);
+
+            if(!(ctl->options & CONTEXTS_OPTION_MCP)) {
+                buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
+                buffer_json_member_add_string(wb, "instance_n", *t->chart_name ? t->chart_name : NULL);
+            }
+            else
+                buffer_json_member_add_string(wb, "instance", *t->chart_name ? t->chart_name : NULL);
+
             buffer_json_member_add_string(wb, "context", *t->chart_context ? t->chart_context : NULL);
             // buffer_json_member_add_string(wb, "family", *t->family ? t->family : NULL);
             buffer_json_member_add_string(wb, "component", *t->component ? t->component : NULL);

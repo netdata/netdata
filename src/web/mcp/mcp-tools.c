@@ -226,7 +226,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
     {
         .name = MCP_TOOL_FIND_UNSTABLE_METRICS,
         .title = "Find metrics with high variability",
-        .description = "Finds metrics with the highest variability using coefficient of variation (standard deviation as % of mean). Useful for identifying unstable or problematic metrics.",
+        .description = "Finds metrics with the highest variability using coefficient of variation (standard deviation as % of mean). Useful for identifying unstable or fluctuating metrics.",
         .execute_callback = mcp_tool_find_unstable_metrics_execute,
         .schema_callback = mcp_tool_find_unstable_metrics_schema,
         .read_only_hint = true,

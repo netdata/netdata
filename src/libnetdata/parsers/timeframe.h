@@ -10,8 +10,6 @@ typedef struct {
     time_t before;
 } TIMEFRAME;
 
-#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
-
 #define API_RELATIVE_TIME_INVALID           (-1000000000)
 
 #define API_RELATIVE_TIME_THIS_MINUTE       (API_RELATIVE_TIME_INVALID - 1) // this minute at 00 seconds

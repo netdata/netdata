@@ -69,7 +69,7 @@ static const JSON_KEY_NAMES json_short_keys = {
     .types = "ty",
     .recipients = "to",
     .source = "src",
-    .configuration_hash = "cfg",
+    .config_hash_id = "cfg",
 };
 
 static const JSON_KEY_NAMES json_long_keys = {
@@ -123,7 +123,7 @@ static const JSON_KEY_NAMES json_long_keys = {
 
     .alerts_index_id = "alerts_array_index_id",
     .alert_global_id = "global_id",
-    .alert_name = "alert_name",
+    .alert_name = "alert",
     .last_transition_id = "last_transition_id",
     .last_transition_value = "last_transition_value",
     .last_transition_timestamp = "last_transition_timestamp",
@@ -138,7 +138,7 @@ static const JSON_KEY_NAMES json_long_keys = {
     .types = "types",
     .recipients = "recipients",
     .source = "source",
-    .configuration_hash = "configuration_hash",
+    .config_hash_id = "config_hash_id",
 };
 
 // Thread-local pointer to the current key names

@@ -91,7 +91,7 @@ typedef struct json_key_names {
     const char *recipients;                 // "to" / "recipients"
 
     const char *source;                     // "src" / "source"
-    const char *configuration_hash;         // "cfg" / "configuration_hash"
+    const char *config_hash_id;         // "cfg" / "configuration_hash"
 } JSON_KEY_NAMES;
 
 // Options type for controlling key format

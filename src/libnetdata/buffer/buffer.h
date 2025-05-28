@@ -9,6 +9,8 @@
 #include "../string/utf8.h"
 #include "../libnetdata.h"
 
+#define API_RELATIVE_TIME_MAX (time_t)(3 * 365 * 86400)
+
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
 // gcc with libstdc++ may require this,
@@ -1059,31 +1061,18 @@ static void buffer_json_add_array_item_time_ms(BUFFER *wb, time_t value) {
     wb->json.stack[wb->json.depth].count++;
 }
 
-ALWAYS_INLINE
-static void buffer_json_add_array_item_time_t2ms(BUFFER *wb, time_t value) {
-    buffer_print_json_comma_newline_spacing(wb);
-
-    buffer_print_int64(wb, value);
-    buffer_fast_strcat(wb, "000", 3);
-    wb->json.stack[wb->json.depth].count++;
-}
-
 void buffer_json_add_array_item_datetime_rfc3339(BUFFER *wb, uint64_t datetime_ut, bool utc);
 
 ALWAYS_INLINE
 static void buffer_json_add_array_item_time_t_formatted(BUFFER *wb, time_t value, bool rfc3339) {
-    if(rfc3339)
-        buffer_json_add_array_item_datetime_rfc3339(wb, (uint64_t)value * USEC_PER_SEC, true);
+    if(unlikely(rfc3339 && (!value || value > API_RELATIVE_TIME_MAX))) {
+        if (!value)
+            buffer_json_add_array_item_string(wb, NULL);
+        else
+            buffer_json_add_array_item_datetime_rfc3339(wb, (uint64_t)value * USEC_PER_SEC, true);
+    }
     else
         buffer_json_add_array_item_time_t(wb, value);
-}
-
-ALWAYS_INLINE
-static void buffer_json_add_array_item_time_t2ms_formatted(BUFFER *wb, time_t value, bool rfc3339) {
-    if(rfc3339)
-        buffer_json_add_array_item_datetime_rfc3339(wb, (uint64_t)value * USEC_PER_MS, true);
-    else
-        buffer_json_add_array_item_time_t2ms(wb, value);
 }
 
 ALWAYS_INLINE
@@ -1107,30 +1096,15 @@ static void buffer_json_member_add_time_t(BUFFER *wb, const char *key, time_t va
 }
 
 ALWAYS_INLINE
-static void buffer_json_member_add_time_t2ms(BUFFER *wb, const char *key, time_t value) {
-    buffer_print_json_comma_newline_spacing(wb);
-    buffer_print_json_key(wb, key);
-    buffer_putc(wb, ':');
-    buffer_print_int64(wb, value);
-    buffer_fast_strcat(wb, "000", 3);
-
-    wb->json.stack[wb->json.depth].count++;
-}
-
-ALWAYS_INLINE
 static void buffer_json_member_add_time_t_formatted(BUFFER *wb, const char *key, time_t value, bool rfc3339) {
-    if(unlikely(rfc3339))
-        buffer_json_member_add_datetime_rfc3339(wb, key, (uint64_t)value * USEC_PER_SEC, true);
+    if(unlikely(rfc3339 && (!value || value > API_RELATIVE_TIME_MAX))) {
+        if(!value)
+            buffer_json_member_add_string(wb, key, NULL);
+        else
+            buffer_json_member_add_datetime_rfc3339(wb, key, (uint64_t)value * USEC_PER_SEC, true);
+    }
     else
         buffer_json_member_add_time_t(wb, key, value);
-}
-
-ALWAYS_INLINE
-static void buffer_json_member_add_time_t2ms_formatted(BUFFER *wb, const char *key, time_t value, bool rfc3339) {
-    if(unlikely(rfc3339))
-        buffer_json_member_add_datetime_rfc3339(wb, key, (uint64_t)value * USEC_PER_MS, true);
-    else
-        buffer_json_member_add_time_t2ms(wb, key, value);
 }
 
 ALWAYS_INLINE

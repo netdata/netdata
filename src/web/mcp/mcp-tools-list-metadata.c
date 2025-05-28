@@ -156,8 +156,8 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
         .title = "List alert transitions",
         .description = "List recent alert state transitions showing how alerts changed over time",
         .output_type = MCP_LIST_OUTPUT_ALERTS,
-        .mode = CONTEXTS_V2_ALERT_TRANSITIONS,
-        .options = 0,  // Minimal options for listing
+        .mode = CONTEXTS_V2_NODES | CONTEXTS_V2_ALERT_TRANSITIONS,
+        .options = CONTEXTS_OPTION_CONFIGURATIONS,
         .params = {
             .has_nodes = true,
             .has_metrics = true,  // Filter by context pattern
@@ -489,6 +489,9 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
             // Parse metrics as string pattern
             metrics_pattern = mcp_params_extract_string(params, "metrics", NULL);
         }
+        if(metrics_pattern && !*metrics_pattern) {
+            metrics_pattern = NULL; // Treat empty string as no metrics specified
+        }
     }
     
     // Handle nodes - either as array or string pattern
@@ -508,6 +511,9 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
         } else {
             // Parse nodes as string pattern
             nodes_pattern = mcp_params_extract_string(params, "nodes", NULL);
+        }
+        if(nodes_pattern && !*nodes_pattern) {
+            nodes_pattern = NULL; // Treat empty string as no nodes specified
         }
     }
     
@@ -560,11 +566,14 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
             // Parse alerts as string pattern
             alert_pattern = mcp_params_extract_string(params, "alerts", NULL);
         }
+        if(alert_pattern && !*alert_pattern) {
+            alert_pattern = NULL; // Treat empty string as no alerts specified
+        }
     }
     
     // Check required alerts parameter
-    if (config->params.alerts_required && !alert_pattern) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'alerts'");
+    if (config->params.alerts_required && (!alert_pattern || !*alert_pattern)) {
+        buffer_sprintf(mcpc->error, "Missing required parameter 'alerts'. You must specify at least one alert name.");
         return MCP_RC_ERROR;
     }
     

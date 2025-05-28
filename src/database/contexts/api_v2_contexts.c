@@ -1200,25 +1200,11 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     int resp = HTTP_RESP_OK;
     bool run = true;
 
-
-    if(mode & (CONTEXTS_V2_AGENTS_INFO))
-        mode |= CONTEXTS_V2_AGENTS;
-
-    if(!(req->options & CONTEXTS_OPTION_MCP) && (mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)))
-        mode |= CONTEXTS_V2_NODES;
-
     if(mode & CONTEXTS_V2_ALERTS) {
-        if(!(req->options & CONTEXTS_OPTION_MCP))
-            mode |= CONTEXTS_V2_NODES;
-
         req->options &= ~CONTEXTS_OPTION_CONFIGURATIONS;
-
-        if(!(req->options & (CONTEXTS_OPTION_SUMMARY | CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES)))
-            req->options |= CONTEXTS_OPTION_SUMMARY;
     }
 
     if(mode & CONTEXTS_V2_ALERT_TRANSITIONS) {
-        mode |= CONTEXTS_V2_NODES;
         req->options &= ~CONTEXTS_OPTION_INSTANCES;
     }
 
