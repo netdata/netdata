@@ -6,6 +6,7 @@
  *
  */
 
+#include "collectors/systemd-journal.plugin/provider/netdata_provider.h"
 #include "systemd-internals.h"
 
 #define ND_SD_JOURNAL_FUNCTION_DESCRIPTION "View, search and analyze systemd journal entries."
@@ -29,7 +30,7 @@ struct lqs_extension {
         usec_t stop_ut;
         usec_t first_msg_ut;
 
-        sd_id128_t first_msg_writer;
+        NsdId128 first_msg_writer;
         uint64_t first_msg_seqnum;
     } query_file;
 
@@ -210,11 +211,11 @@ static SD_JOURNAL_FILE_SOURCE_TYPE get_internal_source_type(const char *value)
     return ND_SD_JF_NONE;
 }
 
-static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp)
+static inline bool nd_sd_journal_seek_to(NsdJournal *j, usec_t timestamp)
 {
-    if (sd_journal_seek_realtime_usec(j, timestamp) < 0) {
+    if (nsd_journal_seek_realtime_usec(j, timestamp) < 0) {
         netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to %" PRIu64, timestamp);
-        if (sd_journal_seek_tail(j) < 0) {
+        if (nsd_journal_seek_tail(j) < 0) {
             netdata_log_error("SYSTEMD-JOURNAL: Failed to seek to journal's tail");
             return false;
         }
@@ -226,7 +227,7 @@ static inline bool nd_sd_journal_seek_to(sd_journal *j, usec_t timestamp)
 #define JD_SOURCE_REALTIME_TIMESTAMP "_SOURCE_REALTIME_TIMESTAMP"
 
 static inline size_t
-nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct nd_journal_file *njf, usec_t *msg_ut)
+nd_sd_journal_process_row(NsdJournal *j, FACETS *facets, struct nd_journal_file *njf, usec_t *msg_ut)
 {
     const void *data;
     size_t length, bytes = 0;
@@ -234,7 +235,7 @@ nd_sd_journal_process_row(sd_journal *j, FACETS *facets, struct nd_journal_file 
     facets_add_key_value_length(
         facets, JOURNAL_KEY_ND_JOURNAL_FILE, sizeof(JOURNAL_KEY_ND_JOURNAL_FILE) - 1, njf->filename, njf->filename_len);
 
-    SD_JOURNAL_FOREACH_DATA(j, data, length)
+    NSD_JOURNAL_FOREACH_DATA(j, data, length)
     {
         const char *key, *value;
         size_t key_length, value_length;
@@ -309,7 +310,7 @@ static inline ND_SD_JOURNAL_STATUS check_stop(const bool *cancelled, const usec_
 }
 
 ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
-    sd_journal *j,
+    NsdJournal *j,
     BUFFER *wb __maybe_unused,
     FACETS *facets,
     struct nd_journal_file *njf,
@@ -339,9 +340,9 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
-    while (status == ND_SD_JOURNAL_OK && sd_journal_previous(j) > 0) {
+    while (status == ND_SD_JOURNAL_OK && nsd_journal_previous(j) > 0) {
         usec_t msg_ut = 0;
-        if (sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
+        if (nsd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
             errors_no_timestamp++;
             continue;
         }
@@ -360,10 +361,10 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
             fqs->c.query_file.first_msg_ut = msg_ut;
 
 #ifdef HAVE_SD_JOURNAL_GET_SEQNUM
-            if (sd_journal_get_seqnum(j, &fqs->c.query_file.first_msg_seqnum, &fqs->c.query_file.first_msg_writer) <
+            if (nsd_journal_get_seqnum(j, &fqs->c.query_file.first_msg_seqnum, &fqs->c.query_file.first_msg_writer) <
                 0) {
                 fqs->c.query_file.first_msg_seqnum = 0;
-                fqs->c.query_file.first_msg_writer = SD_ID128_NULL;
+                fqs->c.query_file.first_msg_writer = NSD_ID128_NULL;
             }
 #endif
         }
@@ -425,7 +426,7 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_backward(
 }
 
 ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
-    sd_journal *j,
+    NsdJournal *j,
     BUFFER *wb __maybe_unused,
     FACETS *facets,
     struct nd_journal_file *njf,
@@ -455,9 +456,9 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
     ND_SD_JOURNAL_STATUS status = ND_SD_JOURNAL_OK;
 
     facets_rows_begin(facets);
-    while (status == ND_SD_JOURNAL_OK && sd_journal_next(j) > 0) {
+    while (status == ND_SD_JOURNAL_OK && nsd_journal_next(j) > 0) {
         usec_t msg_ut = 0;
-        if (sd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
+        if (nsd_journal_get_realtime_usec(j, &msg_ut) < 0 || !msg_ut) {
             errors_no_timestamp++;
             continue;
         }
@@ -532,7 +533,7 @@ ND_SD_JOURNAL_STATUS nd_sd_journal_query_forward(
     return status;
 }
 
-bool nd_sd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t last_modified)
+bool nd_sd_journal_check_if_modified_since(NsdJournal *j, usec_t seek_to, usec_t last_modified)
 {
     // return true, if data have been modified since the timestamp
 
@@ -543,9 +544,9 @@ bool nd_sd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t
         return false;
 
     usec_t first_msg_ut = 0;
-    while (sd_journal_previous(j) > 0) {
+    while (nsd_journal_previous(j) > 0) {
         usec_t msg_ut;
-        if (sd_journal_get_realtime_usec(j, &msg_ut) < 0)
+        if (nsd_journal_get_realtime_usec(j, &msg_ut) < 0)
             continue;
 
         first_msg_ut = msg_ut;
@@ -556,7 +557,7 @@ bool nd_sd_journal_check_if_modified_since(sd_journal *j, usec_t seek_to, usec_t
 }
 
 #ifdef HAVE_SD_JOURNAL_RESTART_FIELDS
-static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, LOGS_QUERY_STATUS *lqs)
+static bool netdata_systemd_filtering_by_journal(NsdJournal *j, FACETS *facets, LOGS_QUERY_STATUS *lqs)
 {
     const char *field = NULL;
     const void *data = NULL;
@@ -565,7 +566,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
     size_t failures = 0;
     size_t filters_added = 0;
 
-    SD_JOURNAL_FOREACH_FIELD(j, field)
+    NSD_JOURNAL_FOREACH_FIELD(j, field)
     { // for each key
         bool interesting;
 
@@ -575,11 +576,11 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
             interesting = facets_key_name_is_facet(facets, field);
 
         if (interesting) {
-            if (sd_journal_query_unique(j, field) >= 0) {
+            if (nsd_journal_query_unique(j, field) >= 0) {
                 bool added_this_key = false;
                 size_t added_values = 0;
 
-                SD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
+                NSD_JOURNAL_FOREACH_UNIQUE(j, data, data_length)
                 { // for each value of the key
                     const char *key, *value;
                     size_t key_length, value_length;
@@ -593,16 +594,16 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
                         continue;
 
                     if (added_keys && !added_this_key) {
-                        if (sd_journal_add_conjunction(j) < 0) // key AND key AND key
+                        if (nsd_journal_add_conjunction(j) < 0) // key AND key AND key
                             failures++;
 
                         added_this_key = true;
                         added_keys++;
                     } else if (added_values)
-                        if (sd_journal_add_disjunction(j) < 0) // value OR value OR value
+                        if (nsd_journal_add_disjunction(j) < 0) // value OR value OR value
                             failures++;
 
-                    if (sd_journal_add_match(j, data, data_length) < 0)
+                    if (nsd_journal_add_match(j, data, data_length) < 0)
                         failures++;
 
                     if (!added_keys) {
@@ -619,7 +620,7 @@ static bool netdata_systemd_filtering_by_journal(sd_journal *j, FACETS *facets, 
 
     if (failures) {
         lqs_log_error(lqs, "failed to setup journal filter, will run the full query.");
-        sd_journal_flush_matches(j);
+        nsd_journal_flush_matches(j);
         return true;
     }
 
@@ -634,7 +635,7 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
     struct nd_journal_file *njf,
     LOGS_QUERY_STATUS *fqs)
 {
-    sd_journal *j = NULL;
+    NsdJournal *j = NULL;
     errno_clear();
 
     fstat_cache_enable_on_thread();
@@ -644,7 +645,7 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
         [1] = NULL,
     };
 
-    if (sd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
+    if (nsd_journal_open_files(&j, paths, ND_SD_JOURNAL_OPEN_FLAGS) < 0 || !j) {
         netdata_log_error("JOURNAL: cannot open file '%s' for query", filename);
         fstat_cache_disable_on_thread();
         return ND_SD_JOURNAL_FAILED_TO_OPEN;
@@ -672,7 +673,7 @@ static ND_SD_JOURNAL_STATUS nd_sd_journal_query_one_file(
     } else
         status = ND_SD_JOURNAL_NO_FILE_MATCHED;
 
-    sd_journal_close(j);
+    nsd_journal_close(j);
     fstat_cache_disable_on_thread();
 
     return status;

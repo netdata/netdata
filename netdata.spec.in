@@ -229,6 +229,7 @@ Suggests: %{name}-plugin-freeipmi = %{version}
 Suggests: %{name}-plugin-cups = %{version}
 %endif
 Recommends: %{name}-plugin-systemd-journal = %{version}
+Recommends: %{name}-plugin-systmed-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
 Recommends: %{name}-plugin-logs-management = %{version}
 %else
@@ -409,6 +410,11 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_PERF=On \
 	-DENABLE_PLUGIN_SLABINFO=On \
 	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
+	%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+	-DENABLE_PLUGIN_SYSTEMD_UNITS=On \
+	%else
+	-DENABLE_PLUGIN_SYSTEMD_UNITS=Off \
+	%endif
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 	-DENABLE_BUNDLED_JSONC=Off \
 	-DENABLE_BUNDLED_YAML=Off \
@@ -953,6 +959,26 @@ fi
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
 
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
+%package plugin-systemd-units
+Summary: The systemd units plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+
+%description plugin-systemd-units
+ This plugin allows Netdata to collect metrics about systemd units.
+
+%pre plugin-systemd-units
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%files plugin-systemd-journal
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/systemd-units.plugin
+%endif
+
 %if %{_have_xenstat}
 %package plugin-xenstat
 Summary: The xenstat plugin for the Netdata Agent
@@ -1020,6 +1046,8 @@ fi
 %{_datadir}/%{name}/web
 
 %changelog
+* Tue May 27 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-32
+- Correctly handle systmed-units plugin as it’s own package
 * Fri Mar 21 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-31
 - Exclude build directory from install to make openSUSE happy
 * Tue Jan 28 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-30

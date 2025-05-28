@@ -343,6 +343,12 @@ prepare_cmake_options() {
 
   enable_feature PLUGIN_SYSTEMD_JOURNAL "${ENABLE_SYSTEMD_JOURNAL}"
 
+  if check_for_module 'libsystemd >= 221'; then
+    enable_feature PLUGIN_SYSTEMD_UNITS 1
+  else
+    enable_feature PLUGIN_SYSTEMD_UNITS 0
+  fi
+
   if command -v cups-config >/dev/null 2>&1 || check_for_module libcups || check_for_module cups; then
     ENABLE_CUPS=1
   else

@@ -5,9 +5,9 @@
 
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
+#include "provider/netdata_provider.h"
 
 #include <linux/capability.h>
-#include <systemd/sd-journal.h>
 #include <syslog.h>
 
 #define ND_SD_JOURNAL_FUNCTION_DESCRIPTION "View, search and analyze systemd journal entries."
@@ -16,10 +16,6 @@
 #define ND_SD_JOURNAL_ENABLE_ESTIMATIONS_FILE_PERCENTAGE 0.01
 #define ND_SD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS 250
 #define ND_SD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
-
-#define ND_SD_UNITS_FUNCTION_DESCRIPTION "View the status of systemd units"
-#define ND_SD_UNITS_FUNCTION_NAME "systemd-list-units"
-#define ND_SD_UNITS_DEFAULT_TIMEOUT 30
 
 extern __thread size_t fstat_thread_calls;
 extern __thread size_t fstat_thread_cached_responses;
@@ -67,8 +63,8 @@ struct nd_journal_file {
 
     uint64_t first_seqnum;
     uint64_t last_seqnum;
-    sd_id128_t first_writer_id;
-    sd_id128_t last_writer_id;
+    NsdId128 first_writer_id;
+    NsdId128 last_writer_id;
 
     uint64_t messages_in_file;
 };
@@ -115,7 +111,7 @@ void nd_sd_journal_transform_gid(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATI
 void nd_sd_journal_transform_cap_effective(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 void nd_sd_journal_transform_timestamp_usec(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
-usec_t nd_journal_file_update_annotation_boot_id(sd_journal *j, struct nd_journal_file *njf, const char *boot_id);
+usec_t nd_journal_file_update_annotation_boot_id(NsdJournal *j, struct nd_journal_file *njf, const char *boot_id);
 
 #define MAX_JOURNAL_DIRECTORIES 100
 struct journal_directory {
@@ -140,18 +136,6 @@ void nd_sd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANS
 
 void *nd_journal_watcher_main(void *arg);
 void nd_journal_watcher_restart(void);
-
-#ifdef ENABLE_SYSTEMD_DBUS
-void function_systemd_units(
-    const char *transaction,
-    char *function,
-    usec_t *stop_monotonic_ut,
-    bool *cancelled,
-    BUFFER *payload,
-    HTTP_ACCESS access __maybe_unused,
-    const char *source,
-    void *data);
-#endif
 
 static inline bool parse_journal_field(
     const char *data,
