@@ -19,6 +19,7 @@ code_samples: 50+
 -->
 
 ## Table of Contents
+
 - [Quick Start Guide](#quick-start-guide) <!-- SECTION_TYPE: tutorial -->
 - [Common Tasks](#common-tasks) <!-- SECTION_TYPE: workflow -->
 - [How-To Guides](#how-to-guides) <!-- SECTION_TYPE: procedures -->
@@ -29,7 +30,7 @@ code_samples: 50+
 
 ## Quick Start Guide
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -43,16 +44,18 @@ In 5 minutes, you'll know how to edit existing alerts, create new ones, and relo
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md)
 
 **Step 2: Edit an Alert**
+
 ```bash
 sudo ./edit-config health.d/cpu.conf
 ```
 
 **Step 3: Apply Changes**
+
 ```bash
 sudo netdatacli reload-health
 ```
 
-:::note 
+:::note
 
 **Key Concept**
 
@@ -66,10 +69,9 @@ While you can view active alerts on both the local dashboard and Netdata Cloud, 
 
 **Next Steps:** Jump to [Common Tasks](#common-tasks) for specific workflows, or continue reading for comprehensive guidance.
 
-
 ## Common Tasks
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -82,6 +84,7 @@ Step-by-step workflows for the most frequent alert configuration tasks.
 **Why This Matters:** Default thresholds may not fit your specific environment or requirements.
 
 **Quick Example:**
+
 ```text
 # Change CPU warning from 85% to 75%
 warn: $this > (($status >= $WARNING) ? (60) : (75))
@@ -89,6 +92,7 @@ crit: $this > (($status == $CRITICAL) ? (75) : (85))
 ```
 
 **Step-by-Step:**
+
 1. Find the alert file: `sudo ./edit-config health.d/cpu.conf`
 2. Locate the alert (e.g., `10min_cpu_usage`)
 3. Modify `warn` and `crit` lines
@@ -96,11 +100,11 @@ crit: $this > (($status == $CRITICAL) ? (75) : (85))
 
 ### Task 2: Disable Unwanted Alerts
 
-| Method | Use Case | How To |
-|--------|----------|--------|
-| Disable all alerts | Testing/maintenance | Set `enabled = no` in `[health]` section |
-| Disable specific alerts | Remove noisy alerts | Set `enabled alarms = !alert_name *` |
-| Silence notifications | Keep monitoring, stop notifications | Change `to: silent` |
+| Method                  | Use Case                            | How To                                   |
+|-------------------------|-------------------------------------|------------------------------------------|
+| Disable all alerts      | Testing/maintenance                 | Set `enabled = no` in `[health]` section |
+| Disable specific alerts | Remove noisy alerts                 | Set `enabled alarms = !alert_name *`     |
+| Silence notifications   | Keep monitoring, stop notifications | Change `to: silent`                      |
 
 ### Task 3: Create a Simple Alert
 
@@ -119,10 +123,9 @@ every: 1m
 
 **Next Steps:** See [How-To Guides](#how-to-guides) for detailed explanations.
 
-
 ## How-To Guides
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -151,10 +154,10 @@ killall -USR2 netdata
 
 **Configuration Locations:**
 
-| Location | Purpose | How to Edit |
-|----------|---------|-------------|
-| `netdata.conf` `[health]` section | Global health behavior | Disable monitoring, change frequencies |
-| `health.d/*.conf` files | Individual alert definitions | Use `edit-config` script |
+| Location                          | Purpose                      | How to Edit                            |
+|-----------------------------------|------------------------------|----------------------------------------|
+| `netdata.conf` `[health]` section | Global health behavior       | Disable monitoring, change frequencies |
+| `health.d/*.conf` files           | Individual alert definitions | Use `edit-config` script               |
 
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and use `edit-config` to make changes to any of these files.
 
@@ -212,10 +215,10 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart you
 
 **Use Case:** Remove known noisy or irrelevant alerts
 
-| Method | Configuration | Result |
-|--------|---------------|---------|
-| Pattern exclusion | `enabled alarms = !oom_kill *` | Loads all alerts except `oom_kill` |
-| Comment out definition | Add `#` before alert lines | Alert won't load |
+| Method                 | Configuration                  | Result                             |
+|------------------------|--------------------------------|------------------------------------|
+| Pattern exclusion      | `enabled alarms = !oom_kill *` | Loads all alerts except `oom_kill` |
+| Comment out definition | Add `#` before alert lines     | Alert won't load                   |
 
 You can also [edit the file where the alert is defined](#how-to-edit-health-configuration-files), comment out its definition, and [reload Netdata's health configuration](#how-to-reload-health-configuration).
 
@@ -239,9 +242,9 @@ This action requires that you [reload Netdata's health configuration](#how-to-re
 
 **Use Case:** Scheduled maintenance or dynamic control
 
-| Scenario | Solution | Method |
-|----------|----------|---------|
-| Disable alerts during backups | Use health management API | API calls without config changes |
+| Scenario                           | Solution                                   | Method                             |
+|------------------------------------|--------------------------------------------|------------------------------------|
+| Disable alerts during backups      | Use health management API                  | API calls without config changes   |
 | Suppress notifications temporarily | Keep checks running, silence notifications | API control of notification system |
 
 :::tip
@@ -289,17 +292,17 @@ lookup: average -1m percentage of used
 
 **Step 3: Understand Each Component**
 
-| Line | Purpose | This Example |
-|------|---------|--------------|
-| `alarm` | Entity name (alphanumeric, `.`, `_` only) | `ram_usage` |
-| `on` | Chart to monitor | `system.ram` |
-| `lookup` | How to process metrics | Average last 1 minute, percentage of `used` dimension |
-| `units` | Display units | Percentages (`%`) |
-| `every` | Check frequency | Every 1 minute |
-| `warn/crit` | Trigger conditions | Warning > 80%, Critical > 90% |
-| `info` | Alert description | Appears in dashboard and notifications |
+| Line        | Purpose                                   | This Example                                          |
+|-------------|-------------------------------------------|-------------------------------------------------------|
+| `alarm`     | Entity name (alphanumeric, `.`, `_` only) | `ram_usage`                                           |
+| `on`        | Chart to monitor                          | `system.ram`                                          |
+| `lookup`    | How to process metrics                    | Average last 1 minute, percentage of `used` dimension |
+| `units`     | Display units                             | Percentages (`%`)                                     |
+| `every`     | Check frequency                           | Every 1 minute                                        |
+| `warn/crit` | Trigger conditions                        | Warning > 80%, Critical > 90%                         |
+| `info`      | Alert description                         | Appears in dashboard and notifications                |
 
-:::note 
+:::note
 
 **Understanding This Example**
 
@@ -315,10 +318,9 @@ When you finish writing this new health entity, [reload Netdata's health configu
 
 **Next Steps:** Explore [Alert Examples](#alert-examples) for more complex scenarios, or dive into the [Alert Configuration Reference](#alert-configuration-reference) for complete syntax details.
 
-
 ## Alert Configuration Reference
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -328,16 +330,16 @@ Complete syntax reference for all alert configuration options. Use this section 
 
 ### Entity Types Overview
 
-| Type | Label | Purpose | Example Use Case |
-|------|-------|---------|------------------|
-| **Alerts** | `alarm:` | Attached to specific charts | Monitor specific server's CPU |
+| Type          | Label       | Purpose                          | Example Use Case               |
+|---------------|-------------|----------------------------------|--------------------------------|
+| **Alerts**    | `alarm:`    | Attached to specific charts      | Monitor specific server's CPU  |
 | **Templates** | `template:` | Apply to all charts of a context | Monitor all network interfaces |
 
 **Alerts** are attached to specific charts and use the `alarm` label.
 
 **Templates** define rules that apply to all charts of a specific context, and use the `template` label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
-:::note 
+:::note
 
 **Precedence**
 
@@ -347,7 +349,7 @@ Alerts have higher precedence and will override templates. If you have `alarm` a
 
 ### Required vs Optional Configuration
 
-:::note 
+:::note
 
 **Configuration Requirements**
 
@@ -365,27 +367,27 @@ Alerts have higher precedence and will override templates. If you have `alarm` a
 
 ### Complete Configuration Reference
 
-| line | required | functionality |
-|------|----------|---------------|
-| [`alarm`/`template`](#alert-line-alarm-or-template) | yes | Name of the alert/template |
-| [`on`](#alert-line-on) | yes | The chart this alert should attach to |
-| [`class`](#alert-line-class) | no | The general alert classification |
-| [`type`](#alert-line-type) | no | What area of the system the alert monitors |
-| [`component`](#alert-line-component) | no | Specific component of the type of the alert |
-| [`lookup`](#alert-line-lookup) | yes | The database lookup to find and process metrics for the chart specified through `on` |
-| [`calc`](#alert-line-calc) | yes (see above) | A calculation to apply to the value found via `lookup` or another variable |
-| [`every`](#alert-line-every) | no | The frequency of the alert |
-| [`green`/`red`](#alert-lines-green-and-red) | no | Set the green and red thresholds of a chart |
-| [`warn`/`crit`](#alert-lines-warn-and-crit) | yes (see above) | Expressions evaluating to true or false, and when true, will trigger the alert |
-| [`to`](#alert-line-to) | no | A list of roles to send notifications to |
-| [`exec`](#alert-line-exec) | no | The script to execute when the alert changes status |
-| [`delay`](#alert-line-delay) | no | Optional hysteresis settings to prevent floods of notifications |
-| [`repeat`](#alert-line-repeat) | no | The interval for sending notifications when an alert is in WARNING or CRITICAL mode |
-| [`options`](#alert-line-options) | no | Add an option to not clear alerts |
-| [`host labels`](#alert-line-host-labels) | no | Restrict an alert or template to a list of matching labels present on a host |
-| [`chart labels`](#alert-line-chart-labels) | no | Restrict an alert or template to a list of matching labels present on a chart |
-| [`summary`](#alert-line-summary) | no | A brief description of the alert |
-| [`info`](#alert-line-info) | no | A longer text field that provides more information about this alert |
+| line                                                | required        | functionality                                                                        |
+|-----------------------------------------------------|-----------------|--------------------------------------------------------------------------------------|
+| [`alarm`/`template`](#alert-line-alarm-or-template) | yes             | Name of the alert/template                                                           |
+| [`on`](#alert-line-on)                              | yes             | The chart this alert should attach to                                                |
+| [`class`](#alert-line-class)                        | no              | The general alert classification                                                     |
+| [`type`](#alert-line-type)                          | no              | What area of the system the alert monitors                                           |
+| [`component`](#alert-line-component)                | no              | Specific component of the type of the alert                                          |
+| [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on` |
+| [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable           |
+| [`every`](#alert-line-every)                        | no              | The frequency of the alert                                                           |
+| [`green`/`red`](#alert-lines-green-and-red)         | no              | Set the green and red thresholds of a chart                                          |
+| [`warn`/`crit`](#alert-lines-warn-and-crit)         | yes (see above) | Expressions evaluating to true or false, and when true, will trigger the alert       |
+| [`to`](#alert-line-to)                              | no              | A list of roles to send notifications to                                             |
+| [`exec`](#alert-line-exec)                          | no              | The script to execute when the alert changes status                                  |
+| [`delay`](#alert-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications                      |
+| [`repeat`](#alert-line-repeat)                      | no              | The interval for sending notifications when an alert is in WARNING or CRITICAL mode  |
+| [`options`](#alert-line-options)                    | no              | Add an option to not clear alerts                                                    |
+| [`host labels`](#alert-line-host-labels)            | no              | Restrict an alert or template to a list of matching labels present on a host         |
+| [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a chart        |
+| [`summary`](#alert-line-summary)                    | no              | A brief description of the alert                                                     |
+| [`info`](#alert-line-info)                          | no              | A longer text field that provides more information about this alert                  |
 
 ### Configuration Line Details
 
@@ -394,16 +396,19 @@ Alerts have higher precedence and will override templates. If you have `alarm` a
 **Purpose:** This line starts an alert or template based on the [entity type](#entity-types-overview) you want to create.
 
 **Alert Syntax:**
+
 ```text
 alarm: NAME
 ```
 
 **Template Syntax:**
+
 ```text
 template: NAME
 ```
 
 **Naming Rules:**
+
 - `NAME` can be any alphanumeric character
 - Only `.` (period) and `_` (underscore) symbols allowed
 - Cannot be `chart name`, `dimension name`, `family name`, or `chart variable names`
@@ -413,6 +418,7 @@ template: NAME
 **Purpose:** This line defines the chart this alert should attach to.
 
 **For Alerts:**
+
 ```text
 on: CHART
 ```
@@ -422,13 +428,14 @@ The value `CHART` should be the unique ID or name of the chart you're interested
 ![Finding the unique ID of a chart](https://user-images.githubusercontent.com/1153921/67443082-43b16e80-f5b8-11e9-8d33-d6ee052c6678.png)
 
 **For Templates:**
+
 ```text
 on: CONTEXT
 ```
 
 The value `CONTEXT` should be the context you want this template to attach to.
 
-:::tip 
+:::tip
 
 **Finding the Context**
 
@@ -454,12 +461,12 @@ class: Latency
 
 **Available Classes:**
 
-| Class | Use Case |
-|-------|----------|
-| Errors | Error rate monitoring |
-| Latency | Response time issues |
-| Utilization | Resource usage monitoring |
-| Workload | Load and throughput monitoring |
+| Class       | Use Case                       |
+|-------------|--------------------------------|
+| Errors      | Error rate monitoring          |
+| Latency     | Response time issues           |
+| Utilization | Resource usage monitoring      |
+| Workload    | Load and throughput monitoring |
 
 :::note
 
@@ -479,31 +486,31 @@ type: Database
 
 **Available Types:**
 
-| Type | Description |
-|------|-------------|
-| Ad Filtering | Services related to Ad Filtering (like pi-hole) |
-| Certificates | Certificate monitoring related |
-| Cgroups | Alerts for CPU and memory usage of control groups |
-| Computing | Alerts for shared computing applications (e.g. boinc) |
-| Containers | Container related alerts (e.g. docker instances) |
-| Database | Database systems (e.g. MySQL, PostgreSQL, etc) |
-| Data Sharing | Used to group together alerts for data sharing applications |
-| DHCP | Alerts for DHCP related services |
-| DNS | Alerts for DNS related services |
-| Kubernetes | Alerts for kubernetes nodes monitoring |
-| KV Storage | Key-Value pairs services alerts (e.g. memcached) |
-| Linux | Services specific to Linux (e.g. systemd) |
-| Messaging | Alerts for message passing services (e.g. vernemq) |
-| Netdata | Internal Netdata components monitoring |
-| Other | When an alert doesn't fit in other types |
-| Power Supply | Alerts from power supply related services (e.g. apcupsd) |
-| Search engine | Alerts for search services (e.g. elasticsearch) |
-| Storage | Class for alerts dealing with storage services (storage devices typically live under `System`) |
-| System | General system alerts (e.g. CPU, network, etc.) |
-| Virtual Machine | Virtual Machine software |
-| Web Proxy | Web proxy software (e.g. squid) |
-| Web Server | Web server software (e.g. Apache, nginx, etc.) |
-| Windows | Alerts for monitoring Windows services |
+| Type            | Description                                                                                    |
+|-----------------|------------------------------------------------------------------------------------------------|
+| Ad Filtering    | Services related to Ad Filtering (like pi-hole)                                                |
+| Certificates    | Certificate monitoring related                                                                 |
+| Cgroups         | Alerts for CPU and memory usage of control groups                                              |
+| Computing       | Alerts for shared computing applications (e.g. boinc)                                          |
+| Containers      | Container related alerts (e.g. docker instances)                                               |
+| Database        | Database systems (e.g. MySQL, PostgreSQL, etc)                                                 |
+| Data Sharing    | Used to group together alerts for data sharing applications                                    |
+| DHCP            | Alerts for DHCP related services                                                               |
+| DNS             | Alerts for DNS related services                                                                |
+| Kubernetes      | Alerts for kubernetes nodes monitoring                                                         |
+| KV Storage      | Key-Value pairs services alerts (e.g. memcached)                                               |
+| Linux           | Services specific to Linux (e.g. systemd)                                                      |
+| Messaging       | Alerts for message passing services (e.g. vernemq)                                             |
+| Netdata         | Internal Netdata components monitoring                                                         |
+| Other           | When an alert doesn't fit in other types                                                       |
+| Power Supply    | Alerts from power supply related services (e.g. apcupsd)                                       |
+| Search engine   | Alerts for search services (e.g. elasticsearch)                                                |
+| Storage         | Class for alerts dealing with storage services (storage devices typically live under `System`) |
+| System          | General system alerts (e.g. CPU, network, etc.)                                                |
+| Virtual Machine | Virtual Machine software                                                                       |
+| Web Proxy       | Web proxy software (e.g. squid)                                                                |
+| Web Server      | Web server software (e.g. Apache, nginx, etc.)                                                 |
+| Windows         | Alerts for monitoring Windows services                                                         |
 
 :::note
 
@@ -532,43 +539,45 @@ As with the `class` and `type` lines, if `component` is missing from the configu
 **Purpose:** This line makes a database lookup to find a value. The result of this lookup is available as `$this`.
 
 **Full Syntax:**
+
 ```text
 lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
 ```
 
 **Required Parameters:**
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `METHOD` | [Grouping method](/src/web/api/queries/README.md#grouping-methods) | `average`, `min`, `max` |
-| `AFTER` | How far back to look (negative number) | `-1m`, `-1h`, `-1d` |
+| Parameter | Description                                                        | Example                 |
+|-----------|--------------------------------------------------------------------|-------------------------|
+| `METHOD`  | [Grouping method](/src/web/api/queries/README.md#grouping-methods) | `average`, `min`, `max` |
+| `AFTER`   | How far back to look (negative number)                             | `-1m`, `-1h`, `-1d`     |
 
 **Optional Parameters:**
 
-| Parameter | Purpose | Details |
-|-----------|---------|---------|
-| `GROUPING OPTIONS` | Conditional processing | `CONDITION VALUE` where condition is `!=`, `=`, `<=`, `<`, `>`, `>=` |
-| `at BEFORE` | End of lookup timeframe | Default is 0 (now) |
-| `every DURATION` | Update frequency | Supports `s`, `m`, `h`, `d` units |
-| `OPTIONS` | Processing modifiers | See options table below |
-| `of DIMENSIONS` | Which dimensions to include | Space-separated list, supports patterns |
+| Parameter          | Purpose                     | Details                                                              |
+|--------------------|-----------------------------|----------------------------------------------------------------------|
+| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `<=`, `<`, `>`, `>=` |
+| `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                   |
+| `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                    |
+| `OPTIONS`          | Processing modifiers        | See options table below                                              |
+| `of DIMENSIONS`    | Which dimensions to include | Space-separated list, supports patterns                              |
 
 **Processing Options:**
 
-| Option | Effect |
-|--------|---------|
-| `percentage` | Calculate percentage of selected dimensions over total |
-| `absolute` | Turn all sample values positive |
-| `min` | Return minimum of all dimensions after time-aggregation |
-| `max` | Return maximum of all dimensions after time-aggregation |
-| `average` | Return average of all dimensions after time-aggregation |
-| `sum` | Return sum of all dimensions (default) |
-| `min2max` | Return delta between min and max of dimensions |
-| `unaligned` | Prevent shifting query window to multiples of duration |
-| `match-ids` | Match dimensions by IDs (default) |
-| `match-names` | Match dimensions by names |
+| Option        | Effect                                                  |
+|---------------|---------------------------------------------------------|
+| `percentage`  | Calculate percentage of selected dimensions over total  |
+| `absolute`    | Turn all sample values positive                         |
+| `min`         | Return minimum of all dimensions after time-aggregation |
+| `max`         | Return maximum of all dimensions after time-aggregation |
+| `average`     | Return average of all dimensions after time-aggregation |
+| `sum`         | Return sum of all dimensions (default)                  |
+| `min2max`     | Return delta between min and max of dimensions          |
+| `unaligned`   | Prevent shifting query window to multiples of duration  |
+| `match-ids`   | Match dimensions by IDs (default)                       |
+| `match-names` | Match dimensions by names                               |
 
 **Example:**
+
 ```text
 lookup: average -10m unaligned of user,system,softirq,irq,guest
 ```
@@ -582,6 +591,7 @@ The result of the lookup will be available as `$this` and `$NAME` in expressions
 **Purpose:** You can design a `calc` to apply some calculation to the values or variables available to the entity.
 
 **Key Points:**
+
 - The result becomes available as `$this` variable
 - Overwrites the value from your `lookup`
 - Can be used without `lookup` if using [other available variables](#variables)
@@ -592,6 +602,7 @@ calc: EXPRESSION
 ```
 
 **When to Use:**
+
 - **With `lookup`:** Perform calculation after database retrieval
 - **Without `lookup`:** When using other available variables
 - **For complex logic:** Mathematical operations, conditions, transformations
@@ -605,8 +616,9 @@ every: DURATION
 ```
 
 **Supported Units:**
+
 - `s` for seconds
-- `m` for minutes  
+- `m` for minutes
 - `h` for hours
 - `d` for days
 
@@ -622,6 +634,7 @@ red: NUMBER
 ```
 
 **Important Notes:**
+
 - Both values are available as `$green` and `$red` in expressions
 - If multiple alerts define different thresholds, the first alert's values are used
 - For multiple threshold sets, use absolute numbers instead of variables
@@ -636,12 +649,14 @@ crit: EXPRESSION
 ```
 
 **Key Points:**
+
 - Optional (but you need at least one)
 - Should evaluate to true/false (or zero/non-zero)
 - Uses Netdata's [expression syntax](#expressions)
 - Can reference variables like `$this`, `$green`, `$red`
 
 **Examples:**
+
 ```text
 warn: $this > 80
 crit: $this > 95
@@ -656,6 +671,7 @@ to: ROLE1 ROLE2 ROLE3 ...
 ```
 
 **How It Works:**
+
 - First parameter passed to the `exec` script
 - Default script (`alarm-notify.sh`) treats this as space-separated list of roles
 - Roles are consulted to find exact recipients per notification method
@@ -669,6 +685,7 @@ exec: SCRIPT
 ```
 
 **Default Behavior:**
+
 - Default script is Netdata's `alarm-notify.sh`
 - Supports all notification methods Netdata supports
 - Includes custom hooks
@@ -684,31 +701,33 @@ These settings don't affect the actual alert - only when the `exec` script is ex
 :::
 
 **Full Syntax:**
+
 ```text
 delay: [[[up U] [down D] multiplier M] max X]
 ```
 
 **Parameters:**
 
-| Parameter | Purpose | Default |
-|-----------|---------|---------|
-| `up U` | Delay for status increases (CLEAR→WARNING, WARNING→CRITICAL) | 0 |
-| `down D` | Delay for status decreases (CRITICAL→WARNING, WARNING→CLEAR) | 0 |
-| `multiplier M` | Multiplies U and D when alert changes state during delay | 1.0 |
-| `max X` | Maximum absolute notification delay | max(U×M, D×M) |
+| Parameter      | Purpose                                                      | Default       |
+|----------------|--------------------------------------------------------------|---------------|
+| `up U`         | Delay for status increases (CLEAR→WARNING, WARNING→CRITICAL) | 0             |
+| `down D`       | Delay for status decreases (CRITICAL→WARNING, WARNING→CLEAR) | 0             |
+| `multiplier M` | Multiplies U and D when alert changes state during delay     | 1.0           |
+| `max X`        | Maximum absolute notification delay                          | max(U×M, D×M) |
 
 **Example with Timeline:**
+
 ```text
 delay: up 10s down 15m multiplier 2 max 1h
 ```
 
 Starting at `00:00:00` with CLEAR status:
 
-| Time | New Status | Delay Applied | Notification At | Reason |
-|------|------------|---------------|-----------------|---------|
-| 00:00:01 | WARNING | `up 10s` | 00:00:11 | First state switch |
-| 00:00:05 | CLEAR | `down 15m x2` | 00:30:05 | Alert changed during delay, so multiplied |
-| 00:00:06 | WARNING | `up 10s x2 x2` | 00:00:26 | Multiplied twice |
+| Time     | New Status | Delay Applied  | Notification At | Reason                                    |
+|----------|------------|----------------|-----------------|-------------------------------------------|
+| 00:00:01 | WARNING    | `up 10s`       | 00:00:11        | First state switch                        |
+| 00:00:05 | CLEAR      | `down 15m x2`  | 00:30:05        | Alert changed during delay, so multiplied |
+| 00:00:06 | WARNING    | `up 10s x2 x2` | 00:00:26        | Multiplied twice                          |
 
 #### Alert Line `repeat`
 
@@ -720,10 +739,10 @@ repeat: [off] [warning DURATION] [critical DURATION]
 
 **Options:**
 
-| Option | Effect |
-|--------|---------|
-| `off` | Turns off repeating for this alert |
-| `warning DURATION` | Repeat interval for WARNING state (use `0s` to disable) |
+| Option              | Effect                                                   |
+|---------------------|----------------------------------------------------------|
+| `off`               | Turns off repeating for this alert                       |
+| `warning DURATION`  | Repeat interval for WARNING state (use `0s` to disable)  |
 | `critical DURATION` | Repeat interval for CRITICAL state (use `0s` to disable) |
 
 **Why Use This:** Overrides default repeat settings from `netdata.conf` health configuration.
@@ -737,9 +756,11 @@ options: no-clear-notification
 ```
 
 **Available Options:**
+
 - `no-clear-notification` - Prevents clearing the alert notification
 
 **When to Use `no-clear-notification`:**
+
 - Alerts comparing two time frames (e.g., last 3 minutes vs last hour)
 - When newer data might "pollute" the baseline comparison
 - When clearing conditions are unreliable due to data characteristics
@@ -753,6 +774,7 @@ options: no-clear-notification
 **Prerequisites:** See our [host labels guide](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for setup instructions.
 
 **Example Configuration:**
+
 ```text
 [host labels]
     installed = 20191211
@@ -760,16 +782,19 @@ options: no-clear-notification
 ```
 
 **Usage in Alerts:**
+
 ```text
 host labels: room = server
 ```
 
 **Pattern Support:**
+
 ```text
 host labels: installed = 201*  # Matches all hosts installed in 2010s
 ```
 
 **How It Works:**
+
 - Space-separated list
 - Accepts [simple patterns](/src/libnetdata/simple_pattern/README.md)
 - Alert only loads on matching hosts
@@ -780,7 +805,7 @@ host labels: installed = 201*  # Matches all hosts installed in 2010s
 
 **How to Find Chart Labels:** Check `http://localhost:19999/api/v1/charts?all`
 
-**Example Use Case:** 
+**Example Use Case:**
 Each `disk_space` chart has a `mount_point` label. To exclude external disk alerts:
 
 ```text
@@ -788,12 +813,15 @@ chart labels: mount_point=!/mnt/disk1 *
 ```
 
 **Multiple Label Logic:**
+
 ```text
 chart labels: mount_point=/mnt/disk1 device=sda
 ```
+
 This requires BOTH conditions to be true (AND logic).
 
 **Important Notes:**
+
 - Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
 - If specified label doesn't exist on chart, chart won't match
 - Multiple labels use AND logic
@@ -808,12 +836,13 @@ summary: Available Ram
 
 **Variable Support:**
 
-| Variable | Replaced With |
-|----------|---------------|
-| `${family}` | Family instance (e.g., eth0) |
-| `${label:LABEL_NAME}` | Chart label value |
+| Variable              | Replaced With                |
+|-----------------------|------------------------------|
+| `${family}`           | Family instance (e.g., eth0) |
+| `${label:LABEL_NAME}` | Chart label value            |
 
 **Example with Variables:**
+
 ```text
 summary: 1 minute received traffic overflow for ${label:device}
 ```
@@ -836,30 +865,34 @@ info: Percentage of estimated amount of RAM available for userspace processes, w
 
 **Variable Support:**
 
-| Variable | Replaced With |
-|----------|---------------|
-| `${family}` | Family instance (e.g., eth0) |
-| `${label:LABEL_NAME}` | Chart label value |
+| Variable              | Replaced With                |
+|-----------------------|------------------------------|
+| `${family}`           | Family instance (e.g., eth0) |
+| `${label:LABEL_NAME}` | Chart label value            |
 
 **Examples with Variables:**
 
 **Family Variable:**
+
 ```text
 info: average inbound utilization for the network interface ${family} over the last minute
 ```
+
 Renders as: `average inbound utilization for the network interface eth0 over the last minute`
 
 **Label Variable:**
+
 ```text
 info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site ${label:target}
 ```
+
 Renders as: `average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/`
 
 **Next Steps:** Continue to [Expressions and Variables](#expressions-and-variables) to understand the calculation syntax, or jump to [Alert Examples](#alert-examples) for practical implementations.
 
 ## Expressions and Variables
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -873,33 +906,36 @@ How to write calculations and use variables in your alert definitions. Essential
 
 **Supported Operators:**
 
-| Type | Operators | Result |
-|------|-----------|---------|
-| Arithmetic | `+`, `-`, `*`, `/` | Numeric values |
+| Type       | Operators                              | Result                    |
+|------------|----------------------------------------|---------------------------|
+| Arithmetic | `+`, `-`, `*`, `/`                     | Numeric values            |
 | Comparison | `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=` | `1` (true) or `0` (false) |
-| Logical | `&&`, `||`, `!`, `AND`, `OR`, `NOT` | `1` (true) or `0` (false) |
+| Logical    | `&&`, `                                |                           |`, `!`, `AND`, `OR`, `NOT` | `1` (true) or `0` (false) |
 
 **Special Functions:**
+
 - `abs()` - Absolute value
 - `(condition) ? (true_expr) : (false_expr)` - Conditional operator
 
 **Special Values:**
 
-| Value | Purpose | Example Use |
-|-------|---------|-------------|
+| Value | Purpose                               | Example Use    |
+|-------|---------------------------------------|----------------|
 | `nan` | Not a number (database lookup failed) | `$this != nan` |
-| `inf` | Infinite (division by zero) | `$this != inf` |
+| `inf` | Infinite (division by zero)           | `$this != inf` |
 
 ### Conditional Operator for Hysteresis
 
 **Why This Matters:** The conditional operator (`? :`) can create "sticky" alert thresholds that prevent alert spam when values fluctuate around a threshold. This is called [hysteresis](https://en.wikipedia.org/wiki/Hysteresis).
 
 **Basic Pattern:**
+
 ```text
 warn: $this > (($status >= $WARNING) ? (lower_threshold) : (higher_threshold))
 ```
 
 **Real Example - CPU Usage Alert:**
+
 ```text
 warn: $this > (($status >= $WARNING)  ? (75) : (85))
 crit: $this > (($status == $CRITICAL) ? (85) : (95))
@@ -907,12 +943,13 @@ crit: $this > (($status == $CRITICAL) ? (85) : (95))
 
 **How This Works:**
 
-| Alert State | Triggers At | Clears At | Explanation |
-|-------------|-------------|-----------|-------------|
-| Warning | 85% CPU | 75% CPU | Creates 10% buffer - CPU must drop below 75% to clear warning |
-| Critical | 95% CPU | 85% CPU | Creates 10% buffer - CPU must drop below 85% to return to warning |
+| Alert State | Triggers At | Clears At | Explanation                                                       |
+|-------------|-------------|-----------|-------------------------------------------------------------------|
+| Warning     | 85% CPU     | 75% CPU   | Creates 10% buffer - CPU must drop below 75% to clear warning     |
+| Critical    | 95% CPU     | 85% CPU   | Creates 10% buffer - CPU must drop below 85% to return to warning |
 
 **Benefits:**
+
 - **Quick alerting** when issues arise
 - **Protection against spam** when values hover near thresholds
 - **Single initial notification** instead of constant alerts during fluctuation
@@ -921,12 +958,12 @@ crit: $this > (($status == $CRITICAL) ? (85) : (95))
 
 ### Variables Reference
 
-**How to Find Available Variables:** 
+**How to Find Available Variables:**
 You can find all variables for a given chart using: `http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME`
 
 **Example:** [Variables for the `system.cpu` chart](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu)
 
-:::note 
+:::note
 
 **Chart vs Template Variables**
 
@@ -939,20 +976,22 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 #### Chart Local Variables
 
 **What's Available:**
+
 - All chart dimensions as variables (e.g., `$user`, `$system` for CPU chart)
 - Values from other configured alerts on the same chart
 - Special chart variables (see table below)
 
 **Special Chart Variables:**
 
-| Variable | Contains |
-|----------|----------|
-| `$last_collected_t` | Unix timestamp of last data collection |
+| Variable               | Contains                                      |
+|------------------------|-----------------------------------------------|
+| `$last_collected_t`    | Unix timestamp of last data collection        |
 | `$collected_total_raw` | Sum of all dimensions (last collected values) |
-| `$update_every` | Update frequency of the chart |
-| `$green`, `$red` | Thresholds defined in alerts |
+| `$update_every`        | Update frequency of the chart                 |
+| `$green`, `$red`       | Thresholds defined in alerts                  |
 
 **Dimension Value Types:**
+
 - **Default:** Last calculated (interpolated) value as shown on charts
 - **Raw suffix:** `$dimension_raw` - Last collected value
 - **Timestamp suffix:** `$dimension_last_collected_t` - Unix timestamp when dimension was last collected
@@ -962,33 +1001,36 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 **What's Available:** All dimensions of all charts, including all alerts, in fullname format.
 
 **Format:** `CHART.VARIABLE`
+
 - `CHART` can be either chart ID or chart name
 - Both formats are supported
 
 **Examples:**
+
 - `$system.cpu.user` - User CPU from system.cpu chart
 - `$disk.sda.reads` - Read operations from sda disk chart
 
 #### Special Variables
 
-| Variable | Contains | Usage |
-|----------|----------|-------|
-| `$this` | Current alert value | Result of `calc` line or current alert |
-| `$status` | Current alert status | Compare with status constants |
-| `$now` | Current unix timestamp | Time-based calculations |
+| Variable  | Contains               | Usage                                  |
+|-----------|------------------------|----------------------------------------|
+| `$this`   | Current alert value    | Result of `calc` line or current alert |
+| `$status` | Current alert status   | Compare with status constants          |
+| `$now`    | Current unix timestamp | Time-based calculations                |
 
 **Alert Status Constants:**
 
-| Constant | Numeric Value | Usage |
-|----------|---------------|-------|
-| `$REMOVED` | -2 | Alert deleted (SIGUSR2 reload) |
-| `$UNINITIALIZED` | -1 | Alert not initialized |
-| `$UNDEFINED` | 0 | Calculation failed |
-| `$CLEAR` | 1 | Alert OK/not triggered |
-| `$WARNING` | 2 | Warning condition met |
-| `$CRITICAL` | 3 | Critical condition met |
+| Constant         | Numeric Value | Usage                          |
+|------------------|---------------|--------------------------------|
+| `$REMOVED`       | -2            | Alert deleted (SIGUSR2 reload) |
+| `$UNINITIALIZED` | -1            | Alert not initialized          |
+| `$UNDEFINED`     | 0             | Calculation failed             |
+| `$CLEAR`         | 1             | Alert OK/not triggered         |
+| `$WARNING`       | 2             | Warning condition met          |
+| `$CRITICAL`      | 3             | Critical condition met         |
 
 **Status Comparison Examples:**
+
 ```text
 # Check if alert is in warning or higher
 warn: $status >= $WARNING
@@ -1008,6 +1050,7 @@ Status values increase with severity, so `$status > $CLEAR` will match both WARN
 **Status Flow:** `UNINITIALIZED` → `UNDEFINED`/`CLEAR` → `WARNING` → `CRITICAL`
 
 **When Status Changes:**
+
 - **`REMOVED`** - Alert deleted during configuration reload
 - **`UNINITIALIZED`** - Alert created but not yet calculated
 - **`UNDEFINED`** - Database lookup failed, division by zero, etc.
@@ -1021,7 +1064,7 @@ Status values increase with severity, so `$status > $CLEAR` will match both WARN
 
 ## Alert Examples
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -1047,18 +1090,19 @@ template: apache_last_collected_secs
 
 **How It Works:**
 
-| Component | Purpose | This Example |
-|-----------|---------|--------------|
-| `template` | Applies to all Apache servers | `apache_last_collected_secs` |
-| `on` | Chart context to monitor | `apache.requests` |
-| `calc` | Time since last data collection | `$now - $last_collected_t` |
-| `every` | Check frequency | Every 10 seconds |
-| `warn` | Warning threshold | 5 missed collection cycles |
-| `crit` | Critical threshold | 10 missed collection cycles |
+| Component  | Purpose                         | This Example                 |
+|------------|---------------------------------|------------------------------|
+| `template` | Applies to all Apache servers   | `apache_last_collected_secs` |
+| `on`       | Chart context to monitor        | `apache.requests`            |
+| `calc`     | Time since last data collection | `$now - $last_collected_t`   |
+| `every`    | Check frequency                 | Every 10 seconds             |
+| `warn`     | Warning threshold               | 5 missed collection cycles   |
+| `crit`     | Critical threshold              | 10 missed collection cycles  |
 
 **Variables Used:**
+
 - `$now` - Current timestamp
-- `$last_collected_t` - Last data collection timestamp  
+- `$last_collected_t` - Last data collection timestamp
 - `$update_every` - Chart update frequency
 - `$this` - Result of calculation (seconds since last collection)
 
@@ -1084,15 +1128,16 @@ template: disk_full_percent
 
 **How It Works:**
 
-| Component | Purpose | This Example |
-|-----------|---------|--------------|
-| `template` | Applies to all disks | `disk_full_percent` |
-| `on` | Chart context | `disk.space` |
-| `calc` | Calculate usage percentage | `$used * 100 / ($avail + $used)` |
-| `warn/crit` | Simple thresholds | 80% warning, 95% critical |
-| `repeat` | Notification frequency | Every 2min (warning), 10sec (critical) |
+| Component   | Purpose                    | This Example                           |
+|-------------|----------------------------|----------------------------------------|
+| `template`  | Applies to all disks       | `disk_full_percent`                    |
+| `on`        | Chart context              | `disk.space`                           |
+| `calc`      | Calculate usage percentage | `$used * 100 / ($avail + $used)`       |
+| `warn/crit` | Simple thresholds          | 80% warning, 95% critical              |
+| `repeat`    | Notification frequency     | Every 2min (warning), 10sec (critical) |
 
 **Variables Used:**
+
 - `$used` - Used disk space dimension
 - `$avail` - Available disk space dimension
 
@@ -1107,6 +1152,7 @@ template: disk_full_percent
 **Why This Matters:** Get advance warning before disk space becomes critical.
 
 **Step 1: Calculate Disk Fill Rate**
+
 ```text
     template: disk_fill_rate
           on: disk.space
@@ -1116,6 +1162,7 @@ template: disk_full_percent
 ```
 
 **Step 2: Predict Hours Until Full**
+
 ```text
     template: disk_full_after_hours
           on: disk.space
@@ -1127,12 +1174,13 @@ template: disk_full_percent
 
 **How It Works:**
 
-| Step | Purpose | Calculation |
-|------|---------|-------------|
-| 1 | Calculate fill rate | `(space_30min_ago - current_space) / 1800_seconds` |
-| 2 | Predict time to full | `current_available / fill_rate / 3600` |
+| Step | Purpose              | Calculation                                        |
+|------|----------------------|----------------------------------------------------|
+| 1    | Calculate fill rate  | `(space_30min_ago - current_space) / 1800_seconds` |
+| 2    | Predict time to full | `current_available / fill_rate / 3600`             |
 
 **Logic:**
+
 - Only positive predictions matter (disk filling up)
 - Warning: Less than 48 hours of space remaining
 - Critical: Less than 24 hours of space remaining
@@ -1157,13 +1205,14 @@ template: 30min_packet_drops
 
 **How It Works:**
 
-| Component | Purpose | This Example |
-|-----------|---------|--------------|
-| `template` | Applies to all network interfaces | `30min_packet_drops` |
-| `lookup` | Sum drops over 30 minutes | `sum -30m unaligned absolute` |
-| `crit` | Any drops trigger critical | `$this > 0` |
+| Component  | Purpose                           | This Example                  |
+|------------|-----------------------------------|-------------------------------|
+| `template` | Applies to all network interfaces | `30min_packet_drops`          |
+| `lookup`   | Sum drops over 30 minutes         | `sum -30m unaligned absolute` |
+| `crit`     | Any drops trigger critical        | `$this > 0`                   |
 
 **Key Points:**
+
 - The drops chart only exists when packets are dropped
 - Alert automatically attaches when first drop is detected
 - Zero tolerance for packet loss
@@ -1200,13 +1249,14 @@ lookup: mean -10s of user
 
 **How It Works:**
 
-| Alert | Purpose | Calculation |
-|-------|---------|-------------|
-| `cpu_user_mean` | Calculate average CPU usage | Mean over 60 seconds |
-| `cpu_user_stddev` | Calculate variability | Standard deviation over 60 seconds |
-| `cpu_user_zscore` | Detect anomalies | `(current - mean) / stddev` |
+| Alert             | Purpose                     | Calculation                        |
+|-------------------|-----------------------------|------------------------------------|
+| `cpu_user_mean`   | Calculate average CPU usage | Mean over 60 seconds               |
+| `cpu_user_stddev` | Calculate variability       | Standard deviation over 60 seconds |
+| `cpu_user_zscore` | Detect anomalies            | `(current - mean) / stddev`        |
 
 **Z-Score Interpretation:**
+
 - **±2**: Moderately unusual (warning)
 - **±3**: Highly unusual (critical)
 - **Negative**: Below normal
@@ -1236,11 +1286,11 @@ template: ml_5min_cpu_chart
 
 **How It Works:**
 
-| Component | Purpose | This Example |
-|-----------|---------|--------------|
-| `lookup` | Average anomaly rate across CPU dimensions | 5-minute rolling window |
-| Hysteresis | Prevent alert flapping | Warning: 20%→5%, Critical: 100%→20% |
-| `anomaly-bit` | ML-generated anomaly indicators | 0 (normal) or 1 (anomalous) |
+| Component     | Purpose                                    | This Example                        |
+|---------------|--------------------------------------------|-------------------------------------|
+| `lookup`      | Average anomaly rate across CPU dimensions | 5-minute rolling window             |
+| Hysteresis    | Prevent alert flapping                     | Warning: 20%→5%, Critical: 100%→20% |
+| `anomaly-bit` | ML-generated anomaly indicators            | 0 (normal) or 1 (anomalous)         |
 
 <br/>
 </details>
@@ -1265,6 +1315,7 @@ template: ml_5min_node
 ```
 
 **Key Differences from Chart-Level:**
+
 - Uses `anomaly_detection.anomaly_rate` chart
 - Monitors `anomaly_rate` dimension
 - Covers all ML-enabled dimensions across the node
@@ -1276,7 +1327,7 @@ template: ml_5min_node
 
 ## Troubleshooting
 
-:::tip 
+:::tip
 
 **What You'll Learn**
 
@@ -1313,10 +1364,10 @@ This will generate a lot of output in debug.log. Use this temporarily for troubl
 **Finding Chart Names:**
 You can find chart information in two places:
 
-| Method | URL | Contains |
-|--------|-----|----------|
-| Configuration | `http://NODE:19999/netdata.conf` | All chart details |
-| API | `http://NODE:19999/api/v1/charts` | JSON chart data |
+| Method        | URL                               | Contains          |
+|---------------|-----------------------------------|-------------------|
+| Configuration | `http://NODE:19999/netdata.conf`  | All chart details |
+| API           | `http://NODE:19999/api/v1/charts` | JSON chart data   |
 
 Replace `NODE` with your server's IP address or hostname.
 
@@ -1326,6 +1377,7 @@ Replace `NODE` with your server's IP address or hostname.
 
 **Check Alert Processing:**
 Visit `http://NODE:19999/api/v1/alarms?all` to see:
+
 - Original expression as written in config
 - Parsed expression with added parentheses showing evaluation flow
 - Current alert status and values
@@ -1335,18 +1387,20 @@ Visit `http://NODE:19999/api/v1/alarms?all` to see:
 Netdata adds parentheses to show how it evaluates your expressions:
 
 **Your Expression:**
+
 ```text
 warn: $this > 80 and $status >= $WARNING
 ```
 
 **Netdata's Interpretation:**
+
 ```text
 warn: (($this > 80) and ($status >= $WARNING))
 ```
 
 ### Troubleshooting Decision Trees
 
-:::note 
+:::note
 
 **How to Use These Decision Trees**
 
@@ -1512,34 +1566,35 @@ flowchart TD
 
 **Possible Causes:**
 
-| Problem | Check This | Solution |
-|---------|------------|----------|
-| Wrong chart name | `on:` line matches actual chart | Use chart ID from dashboard |
-| Incorrect dimensions | Dimension names in `lookup` | Check available dimensions |
-| Missing data | Chart has recent data | Verify data collection |
-| Expression errors | Variables resolve correctly | Use `/api/v1/alarm_variables` |
+| Problem              | Check This                      | Solution                      |
+|----------------------|---------------------------------|-------------------------------|
+| Wrong chart name     | `on:` line matches actual chart | Use chart ID from dashboard   |
+| Incorrect dimensions | Dimension names in `lookup`     | Check available dimensions    |
+| Missing data         | Chart has recent data           | Verify data collection        |
+| Expression errors    | Variables resolve correctly     | Use `/api/v1/alarm_variables` |
 
 #### Issue: Alert Always Triggering
 
 **Possible Causes:**
 
-| Problem | Check This | Solution |
-|---------|------------|----------|
-| Wrong threshold direction | `>` vs `<` in expressions | Review logic |
-| Units mismatch | Comparing percentages to absolute values | Check calculation units |
-| Variable name errors | `$this` vs `$chart.dimension` | Verify variable names |
+| Problem                   | Check This                               | Solution                |
+|---------------------------|------------------------------------------|-------------------------|
+| Wrong threshold direction | `>` vs `<` in expressions                | Review logic            |
+| Units mismatch            | Comparing percentages to absolute values | Check calculation units |
+| Variable name errors      | `$this` vs `$chart.dimension`            | Verify variable names   |
 
 #### Issue: Alert Flapping
 
 **Possible Causes:**
 
-| Problem | Solution |
-|---------|----------|
+| Problem               | Solution                                                     |
+|-----------------------|--------------------------------------------------------------|
 | Values near threshold | Implement [hysteresis](#conditional-operator-for-hysteresis) |
-| Noisy data | Increase lookup time window |
-| Too frequent checks | Increase `every:` interval |
+| Noisy data            | Increase lookup time window                                  |
+| Too frequent checks   | Increase `every:` interval                                   |
 
 **Hysteresis Example:**
+
 ```text
 # Instead of simple threshold
 warn: $this > 80
@@ -1558,13 +1613,13 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
    ```
 
 2. **Verify Chart Context:**
-   - For `alarm:` use chart name
-   - For `template:` use chart context
+    - For `alarm:` use chart name
+    - For `template:` use chart context
 
 3. **Check Variable Syntax:**
-   - Chart local: `$dimension_name`
-   - Host variables: `$chart_name.dimension_name`
-   - Special variables: `$this`, `$now`, `$status`
+    - Chart local: `$dimension_name`
+    - Host variables: `$chart_name.dimension_name`
+    - Special variables: `$this`, `$now`, `$status`
 
 ### Testing Alert Changes
 
@@ -1602,20 +1657,20 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 
 **Alert Impact on System:**
 
-| Factor | Impact | Optimization |
-|--------|--------|-------------|
-| Check frequency (`every:`) | CPU usage | Use appropriate intervals |
-| Lookup timeframe | Memory/CPU | Don't use excessively long periods |
-| Number of alerts | Overall performance | Disable unused alerts |
-| Complex expressions | CPU per check | Simplify where possible |
+| Factor                     | Impact              | Optimization                       |
+|----------------------------|---------------------|------------------------------------|
+| Check frequency (`every:`) | CPU usage           | Use appropriate intervals          |
+| Lookup timeframe           | Memory/CPU          | Don't use excessively long periods |
+| Number of alerts           | Overall performance | Disable unused alerts              |
+| Complex expressions        | CPU per check       | Simplify where possible            |
 
 **Recommended Frequencies:**
 
-| Alert Type | Suggested Frequency | Reason |
-|------------|-------------------|---------|
-| Critical system metrics | 10-30s | Quick response needed |
-| Resource usage | 1-5m | Trends matter more than instant values |
-| Predictive alerts | 15m-1h | Based on longer-term patterns |
+| Alert Type              | Suggested Frequency | Reason                                 |
+|-------------------------|---------------------|----------------------------------------|
+| Critical system metrics | 10-30s              | Quick response needed                  |
+| Resource usage          | 1-5m                | Trends matter more than instant values |
+| Predictive alerts       | 15m-1h              | Based on longer-term patterns          |
 
 ### Getting Help
 
@@ -1642,6 +1697,7 @@ When seeking help, include:
    Relevant entries from `debug.log` (if debug enabled)
 
 **Community Resources:**
+
 - [Netdata GitHub Issues](https://github.com/netdata/netdata/issues)
 - [Netdata Community Forum](https://community.netdata.cloud)
 - [Netdata Discord](https://discord.gg/mPZ6WZKKG2)
