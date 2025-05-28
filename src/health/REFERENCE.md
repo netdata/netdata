@@ -23,6 +23,7 @@ In 5 minutes, you'll know how to edit existing alerts, create new ones, and relo
 ### Get Started in 3 Steps
 
 **Step 1: Find Your Config Directory**
+
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md)
 
 **Step 2: Edit an Alert**
@@ -82,11 +83,11 @@ crit: $this > (($status == $CRITICAL) ? (75) : (85))
 
 ### Task 2: Disable Unwanted Alerts
 
-| Method                  | Use Case                            | How To                                   |
-|-------------------------|-------------------------------------|------------------------------------------|
-| Disable all alerts      | Testing/maintenance                 | Set `enabled = no` in `[health]` section |
-| Disable specific alerts | Remove noisy alerts                 | Set `enabled alarms = !alert_name *`     |
-| Silence notifications   | Keep monitoring, stop notifications | Change `to: silent`                      |
+| Method                  | Use Case                            | Configuration File | How To                                   |
+|-------------------------|-------------------------------------|--------------------|------------------------------------------|
+| Disable all alerts      | Testing/maintenance                 | netdata.conf       | Set `enabled = no` in `[health]` section |
+| Disable specific alerts | Remove noisy alerts                 | netdata.conf       | Set `enabled alarms = !alert_name *`     |
+| Silence notifications   | Keep monitoring, stop notifications | Alert config file  | Change `to: silent`                      |
 
 ### Task 3: Create a Simple Alert
 
@@ -129,17 +130,19 @@ sudo netdatacli reload-health
 If `netdatacli` doesn't work on your system, you can send a `SIGUSR2` signal to the daemon, which reloads health configuration without restarting the entire process.
 
 ```bash
-killall -USR2 netdata
+sudo killall -USR2 netdata
 ```
 
 ### How to Edit Health Configuration Files
 
 **Configuration Locations:**
 
-| Location                          | Purpose                      | How to Edit                            |
-|-----------------------------------|------------------------------|----------------------------------------|
-| `netdata.conf` `[health]` section | Global health behavior       | Disable monitoring, change frequencies |
-| `health.d/*.conf` files           | Individual alert definitions | Use `edit-config` script               |
+**Configuration Locations:**
+
+| Location                          | Purpose                      | Common Tasks                                                                                             | How to Edit                              |
+|-----------------------------------|------------------------------|----------------------------------------------------------------------------------------------------------|------------------------------------------|
+| `netdata.conf` `[health]` section | Global health settings       | • Disable all monitoring (`enabled = no`)<br />• Disable specific alerts<br />• Change check frequencies | Edit directly or use `edit-config`       |
+| `health.d/*.conf` files           | Individual alert definitions | • Modify thresholds<br />• Change notification recipients<br />• Silence alerts (`to: silent`)           | Use `edit-config health.d/filename.conf` |
 
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and use `edit-config` to make changes to any of these files.
 
@@ -153,7 +156,7 @@ sudo ./edit-config health.d/cpu.conf
 
 **Understanding Alert Structure:**
 
-Each health configuration file contains one or more health _entities_, which always begin with `alarm:` or `template:`. Here's the first health entity in `health.d/cpu.conf`:
+Each health configuration file contains one or more health [_entities_](#complete-configuration-reference), which always begin with `alarm:` or `template:`. Here's the first health entity in `health.d/cpu.conf`:
 
 ```text
  template: 10min_cpu_usage
@@ -197,10 +200,7 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart you
 
 **Use Case:** Remove known noisy or irrelevant alerts
 
-| Method                 | Configuration                  | Result                             |
-|------------------------|--------------------------------|------------------------------------|
-| Pattern exclusion      | `enabled alarms = !oom_kill *` | Loads all alerts except `oom_kill` |
-| Comment out definition | Add `#` before alert lines     | Alert won't load                   |
+In the `netdata.conf` `[health]` section, use [pattern](/src/libnetdata/simple_pattern/README.md) exclusion with `enabled alarms = !oom_kill *` to load all alerts except `oom_kill`.
 
 You can also [edit the file where the alert is defined](#how-to-edit-health-configuration-files), comment out its definition, and [reload Netdata's health configuration](#how-to-reload-health-configuration).
 
@@ -208,7 +208,7 @@ You can also [edit the file where the alert is defined](#how-to-edit-health-conf
 
 **Use Case:** Keep monitoring active but stop notifications
 
-You can stop receiving notifications for an individual alert by [changing](#how-to-edit-health-configuration-files) the `to:` line to `silent`.
+You can stop receiving notifications for an individual alert by [changing](#how-to-edit-health-configuration-files) the `to:` line to `silent` in the alert's configuration file.
 
 ```text
       to: silent
@@ -1317,30 +1317,6 @@ How to debug alert issues, understand why alerts aren't working, and get detaile
 
 :::
 
-### Enable Debug Logging
-
-**Why This Matters:** Debug logs show exactly how Netdata processes your alert configurations and calculations.
-
-**Step 1: Compile with Debugging**
-You can compile Netdata with [debugging](/src/daemon/README.md#debugging)
-
-**Step 2: Enable Health Debug Flags**
-Add this to `netdata.conf`:
-
-```text
-[global]
-   debug flags = 0x0000000000800000
-```
-
-**Step 3: Check Debug Output**
-Monitor `/var/log/netdata/debug.log` - it will show detailed alert processing information.
-
-:::important
-
-This will generate a lot of output in the debug.log. Use this temporarily for troubleshooting only.
-
-:::
-
 ### Find Chart and Context Information
 
 **Finding Chart Names:**
@@ -1674,9 +1650,6 @@ When seeking help, include:
    ```
    http://your-server:19999/api/v1/alarms?all
    ```
-
-4. **Debug Logs:**
-   Relevant entries from `debug.log` (if debug enabled)
 
 **Community Resources:**
 
