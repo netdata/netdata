@@ -101,33 +101,43 @@ How to set up automatic Netdata updates on Windows nodes using PowerShell and Ta
 
 ### How to set up
 
-This setup will automatically download and install the latest Netdata nightly build daily at your preferred time.
+This setup will automatically download and install the latest Netdata build (stable or nightly) daily at your preferred time.
 
-**1. Create `C:\netdata` dir.**
+**1. Create the directory and updater script**
 
-```powershell
-New-Item -Path "C:\netdata" -ItemType Directory -Force
-```
+Run one of these PowerShell commands **as Administrator** (choose stable or nightly):
 
-**2. Create `C:\netdata\netdata-updater.ps1`**
+:::info
 
-Create the file with this exact content:
+**Administrator Rights Required**
+
+Creating directories in ProgramData and running Task Scheduler with the highest privileges requires administrator access.
+
+Right-click on PowerShell and select "Run as administrator" before running these commands.
+
+:::
 
 - Stable version
 
    ```powershell
-   Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile C:\netdata\netdata-x64.msi
-   msiexec /qn /i C:\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>" 
+   New-Item -Path "$env:PROGRAMDATA\netdata" -ItemType Directory -Force
+   @'
+   Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile $env:PROGRAMDATA\netdata\netdata-x64.msi
+   msiexec /qn /i $env:PROGRAMDATA\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>"
+   '@ | Out-File -FilePath "$env:PROGRAMDATA\netdata\netdata-updater.ps1" -Encoding UTF8 
    ```
 
 - Nightly version
 
    ```powershell
-   Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile C:\netdata\netdata-x64.msi
-   msiexec /qn /i C:\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>" 
+   New-Item -Path "$env:PROGRAMDATA\netdata" -ItemType Directory -Force
+   @'
+   Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile $env:PROGRAMDATA\netdata\netdata-x64.msi
+   msiexec /qn /i $env:PROGRAMDATA\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>"
+   '@ | Out-File -FilePath "$env:PROGRAMDATA\netdata\netdata-updater.ps1" -Encoding UTF8 
    ```
 
-:::note
+:::info
 
 **Configuration Required**
 
@@ -135,20 +145,17 @@ Replace `<CLAIM_TOKEN>` with your Netdata Cloud claim token and `<ROOM_ID>` with
 
 :::
 
-**3. Create an entry in `Task Scheduler`:**
+**2. Create an entry in `Task Scheduler`**
 
-Configure the task with these specific settings:
-
-**General tab** - check:
-
-- `Run whether user is logged in or not`
-- `Run with highest privileges`
-- `Configure for: Windows Vista, Windows Server 2008`
-
-**Triggers tab** - add an entry for:
-
-- `Daily`
-- Set your preferred time (e.g., `7AM UTC`)
+| Tab          | Setting                              | Value                                                                                |
+|--------------|--------------------------------------|--------------------------------------------------------------------------------------|
+| **General**  | Run whether user is logged in or not | ✓ Checked                                                                            |
+|              | Run with highest privileges          | ✓ Checked                                                                            |
+|              | Configure for                        | Windows Vista, Windows Server 2008                                                   |
+| **Triggers** | Schedule                             | Daily                                                                                |
+|              | Time                                 | Your preferred time (e.g., 7AM UTC)                                                  |
+| **Actions**  | Program/Script                       | `powershell`                                                                         |
+|              | Arguments                            | `-noprofile -executionpolicy bypass -file %PROGRAMDATA%\netdata\netdata-updater.ps1` |
 
 :::tip
 
@@ -161,8 +168,3 @@ Instead of daily updates, you might prefer:
 - Only on specific days of the week
 
 :::
-
-**Actions tab**:
-
-- **Program/Script:** `powershell`
-- **Arguments:** `-noprofile -executionpolicy bypass -file C:\netdata\netdata-updater.ps1`
