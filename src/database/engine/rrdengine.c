@@ -935,14 +935,8 @@ done:
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     __atomic_store_n(&ctx->atomic.now_deleting_files, false, __ATOMIC_RELAXED);
 
-    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED)) {
-        if (!ctx->datafiles.pending_index) {
-            ctx->datafiles.pending_index = true;
-            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-        }
-        else
-            nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d is already pending indexing", ctx->config.tier);
-    }
+    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED))
+       rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     check_and_schedule_db_rotation(ctx);
 }
@@ -2097,9 +2091,8 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
     }
 }
 
-#define NOT_INDEXING_OR_DELETING_FILES(ctx)                                                                            \
-    (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&                                     \
-     !__atomic_load_n(&(ctx)->atomic.now_deleting_files, __ATOMIC_RELAXED))
+#define NOT_DELETING_FILES(ctx)                                                                                        \
+     (!__atomic_load_n(&(ctx)->atomic.now_deleting_files, __ATOMIC_RELAXED))
 
 #define NOT_INDEXING_FILES(ctx)                                                                                        \
     (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED))
@@ -2253,15 +2246,13 @@ void *dbengine_event_loop(void* arg) {
                         __atomic_store_n(&ctx->atomic.needs_indexing, false, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
                     }
-                    else
-                        __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
                     break;
                 }
 
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     ctx->datafiles.pending_rotate = false;
-                    if (NOT_INDEXING_OR_DELETING_FILES(ctx) && ctx->datafiles.first->next != NULL &&
+                    if (NOT_DELETING_FILES(ctx) && ctx->datafiles.first->next != NULL &&
                         ctx->datafiles.first->next->next != NULL && rrdeng_ctx_tier_cap_exceeded(ctx)) {
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate);
