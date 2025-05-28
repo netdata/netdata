@@ -1707,30 +1707,52 @@ NOT_INLINE_HOT void pdc_route_synchronously_first(struct rrdengine_instance *ctx
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_asynchronously);
 }
 
-static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    unsigned count = 0;
+static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(struct rrdengine_instance *ctx, struct rrdengine_datafile *release_datafile)
+{
+    struct rrdengine_datafile *datafile = NULL;
 
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
-    count = 0;
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    if (release_datafile) {
+        datafile = release_datafile->next;
+        datafile_release(release_datafile, DATAFILE_ACQUIRE_INDEXING);
+    }
+    else
+        datafile = ctx->datafiles.first;
+
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
         if(journalfile_v2_data_available(datafile->journalfile)) {
-            // journal file v2 is already there for this datafile
             datafile = datafile->next;
             continue;
         }
+        bool locked = datafile_acquire(datafile, DATAFILE_ACQUIRE_INDEXING);
+        if (locked) {
+            uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+            return datafile;
+        }
+        nd_log_daemon(NDLP_INFO, "DBENGINE: Datafile %d CANNOT be locked for indexing; skipping", datafile->fileno);
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    return NULL;
+}
+
+
+static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void *data, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    unsigned count = 0;
+
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
+    struct rrdengine_datafile *datafile = NULL;
+
+    while ((datafile = release_and_aquire_next_datafile_for_indexing(ctx, datafile))) {
 
         spinlock_lock(&datafile->writers.spinlock);
         bool available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
         spinlock_unlock(&datafile->writers.spinlock);
 
         if(!available) {
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+            nd_log_daemon(NDLP_NOTICE,
                    "DBENGINE: journal file %u needs to be indexed, but it has writers working on it - "
                    "skipping it for now",
                    datafile->fileno);
-
-            datafile = datafile->next;
             continue;
         }
 
@@ -1738,6 +1760,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
             nd_log_daemon(
                 NDLP_INFO, "DBENGINE: tier %d reached quota limit, stopping journal indexing", ctx->config.tier);
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
+            datafile_release(datafile, DATAFILE_ACQUIRE_INDEXING);
             break;
         }
 
@@ -1748,10 +1771,10 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
 
         count++;
 
-        datafile = datafile->next;
-
-        if (unlikely(!ctx_is_available_for_queries(ctx)))
+        if (unlikely(!ctx_is_available_for_queries(ctx))) {
+            datafile_release(datafile, DATAFILE_ACQUIRE_INDEXING);
             break;
+        }
     }
 
     errno_clear();
@@ -2074,9 +2097,12 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
     }
 }
 
-#define NOT_INDEXING_OR_DELETING_FILES(ctx)                                                                                 \
+#define NOT_INDEXING_OR_DELETING_FILES(ctx)                                                                            \
     (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED) &&                                     \
      !__atomic_load_n(&(ctx)->atomic.now_deleting_files, __ATOMIC_RELAXED))
+
+#define NOT_INDEXING_FILES(ctx)                                                                                        \
+    (!__atomic_load_n(&(ctx)->atomic.migration_to_v2_running, __ATOMIC_RELAXED))
 
 void *dbengine_event_loop(void* arg) {
     sanity_check();
@@ -2222,7 +2248,7 @@ void *dbengine_event_loop(void* arg) {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
                     ctx->datafiles.pending_index = false;
-                    if (NOT_INDEXING_OR_DELETING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
+                    if (NOT_INDEXING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
                         __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
                         __atomic_store_n(&ctx->atomic.needs_indexing, false, __ATOMIC_RELAXED);
                         work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing);
