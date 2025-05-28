@@ -590,7 +590,7 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
         .after = after,
         .before = before,
         .cardinality_limit = cardinality_limit,
-        .options = config->options | CONTEXTS_OPTION_MCP | CONTEXTS_OPTION_RFC3339 | CONTEXTS_OPTION_JSON_LONG_KEYS,
+        .options = config->options | CONTEXTS_OPTION_MCP | CONTEXTS_OPTION_RFC3339 | CONTEXTS_OPTION_JSON_LONG_KEYS | CONTEXTS_OPTION_MINIFY,
         .alerts = {
             .alert = alert_pattern,
             .status = config->defaults.alert_status,

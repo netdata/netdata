@@ -401,6 +401,36 @@ void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb)
     lfe_done(labels);
 }
 
+void rrdlabels_key_to_buffer_array_or_string_or_null(RRDLABELS *labels, BUFFER *wb)
+{
+    if(!labels) {
+        buffer_json_add_array_item_string(wb, NULL);
+        return;
+    }
+
+    size_t items = rrdlabels_entries(labels);
+    if(!items) {
+        buffer_json_add_array_item_string(wb, NULL);
+        return;
+    }
+
+    if(items > 1)
+        buffer_json_add_array_item_array(wb);
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+    lfe_start_read(labels, lb, ls) {
+        buffer_json_add_array_item_string(wb, string2str(lb->index.key));
+        if(items == 1)
+            break;
+    }
+    lfe_done(labels);
+
+    if(items > 1)
+        buffer_json_array_close(wb);
+
+}
+
 // ----------------------------------------------------------------------------
 
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key) {
