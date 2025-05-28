@@ -6,8 +6,13 @@
 
 **Merged pull requests:**
 
+- feat\(go.d/dyncfg\): add autodetect\_retry to dyncfg jobs [\#20357](https://github.com/netdata/netdata/pull/20357) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): update otel dependencies version [\#20352](https://github.com/netdata/netdata/pull/20352) ([ilyam8](https://github.com/ilyam8))
+- SNMP: \_generic-ucd.yaml [\#20349](https://github.com/netdata/netdata/pull/20349) ([Ancairon](https://github.com/Ancairon))
 - improvement\(go.d/sd\): better prometheus exporters detection [\#20348](https://github.com/netdata/netdata/pull/20348) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/dyncfg\): fix duplicate potential "name" in userconfig action [\#20346](https://github.com/netdata/netdata/pull/20346) ([ilyam8](https://github.com/ilyam8))
+- SNMP: \_generic-sip.yaml [\#20344](https://github.com/netdata/netdata/pull/20344) ([Ancairon](https://github.com/Ancairon))
+- SNMP: \_generic-rtp.yaml [\#20343](https://github.com/netdata/netdata/pull/20343) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_generic-lldp.yaml [\#20342](https://github.com/netdata/netdata/pull/20342) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/vmware/govmomi from 0.50.0 to 0.51.0 in /src/go [\#20341](https://github.com/netdata/netdata/pull/20341) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Switch back to epoll from poll [\#20337](https://github.com/netdata/netdata/pull/20337) ([ilyam8](https://github.com/ilyam8))
@@ -22,6 +27,7 @@
 - SOC 2 cloud doc update [\#20325](https://github.com/netdata/netdata/pull/20325) ([kanelatechnical](https://github.com/kanelatechnical))
 - dont init dyncfg for vnode [\#20324](https://github.com/netdata/netdata/pull/20324) ([ilyam8](https://github.com/ilyam8))
 - Code cleanup and improvements [\#20323](https://github.com/netdata/netdata/pull/20323) ([stelfrag](https://github.com/stelfrag))
+- add installing flex to install-required-packages.sh [\#20322](https://github.com/netdata/netdata/pull/20322) ([ilyam8](https://github.com/ilyam8))
 - \_generic-tcp.yaml pass [\#20321](https://github.com/netdata/netdata/pull/20321) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/lmittmann/tint from 1.0.7 to 1.1.0 in /src/go [\#20320](https://github.com/netdata/netdata/pull/20320) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): update otel dependencies version [\#20319](https://github.com/netdata/netdata/pull/20319) ([ilyam8](https://github.com/ilyam8))
@@ -461,13 +467,6 @@
 - Fix LSAN and memory leaks [\#19819](https://github.com/netdata/netdata/pull/19819) ([ktsaou](https://github.com/ktsaou))
 - Include libucontext in static builds to vendor libunwind even on POWER. [\#19817](https://github.com/netdata/netdata/pull/19817) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19816](https://github.com/netdata/netdata/pull/19816) ([netdatabot](https://github.com/netdatabot))
-- fix\(go.d/filecheck\): remove dyncfg path validation pattern  [\#19815](https://github.com/netdata/netdata/pull/19815) ([ilyam8](https://github.com/ilyam8))
-- Initial commit with snmp profile code [\#19813](https://github.com/netdata/netdata/pull/19813) ([Ancairon](https://github.com/Ancairon))
-- Acquire datafile for deletion before calculating retention [\#19812](https://github.com/netdata/netdata/pull/19812) ([stelfrag](https://github.com/stelfrag))
-- Detect memory leaks [\#19811](https://github.com/netdata/netdata/pull/19811) ([ktsaou](https://github.com/ktsaou))
-- Avoid zero timeout in libuv timers [\#19810](https://github.com/netdata/netdata/pull/19810) ([stelfrag](https://github.com/stelfrag))
-- fix fsanitize ifdefs [\#19809](https://github.com/netdata/netdata/pull/19809) ([ktsaou](https://github.com/ktsaou))
-- do not change the scheduling policy by default [\#19808](https://github.com/netdata/netdata/pull/19808) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
