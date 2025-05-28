@@ -7,42 +7,42 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.15
         name: cikeTunLifeTime
         description: The negotiated lifetime of the IPsec Phase-1 IKE Tunnel in seconds
-        family: IPsec/Tunnels/Phase-1
+        family: Cisco/IPsec/Tunnels/Phase1/Lifetime
         unit: "s"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.19
         name: cikeTunInOctets
         description: The total number of octets received by this IPsec Phase-1 IKE Tunnel
-        family: IPsec/Tunnels/Phase-1/Traffic
+        family: Cisco/IPsec/Tunnels/Phase1/Traffic
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.27
         name: cikeTunOutOctets
         description: The total number of octets sent by this IPsec Phase-1 IKE Tunnel
-        family: IPsec/Tunnels/Phase-1/Traffic
+        family: Cisco/IPsec/Tunnels/Phase1/Traffic
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.20
         name: cikeTunInPkts
         description: The total number of packets received by this IPsec Phase-1 IKE Tunnel
-        family: IPsec/Tunnels/Phase-1/Received
-        unit: "{received}"
+        family: Cisco/IPsec/Tunnels/Phase1/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.21
         name: cikeTunInDropPkts
         description: The total number of packets dropped by this IPsec Phase-1 IKE Tunnel during receive processing
-        family: IPsec/Tunnels/Phase-1/Dropped
+        family: Cisco/IPsec/Tunnels/Phase1/Drops
         unit: "{drop}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.28
         name: cikeTunOutPkts
         description: The total number of packets sent by this IPsec Phase-1 IKE Tunnel
-        family: IPsec/Tunnels/Phase-1/Sent
-        unit: "{sent}"
+        family: Cisco/IPsec/Tunnels/Phase1/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.29
         name: cikeTunOutDropPkts
         description: The total number of packets dropped by this IPsec Phase-1 IKE Tunnel during send processing
-        family: IPsec/Tunnels/Phase-1/Dropped
+        family: Cisco/IPsec/Tunnels/Phase1/Drops
         unit: "{drop}"
       - OID: 1.3.6.1.4.1.9.9.171.1.2.3.1.35
         name: cikeTunStatus
         description: The status of the IPsec Phase-1 IKE Tunnel
-        family: IPsec/Tunnels/Phase-1/Status
+        family: Cisco/IPsec/Tunnels/Phase1/Status
         unit: "{status}"
         mapping:
           1: active
@@ -73,62 +73,62 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.9
         name: cipSecTunLifeTime
         description: The negotiated lifetime of the IPsec Phase-2 Tunnel in seconds.
-        family: IPsec/Tunnels/Phase-2
+        family: Cisco/IPsec/Tunnels/Phase2/Lifetime
         unit: "s"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.26
         name: cipSecTunInOctets
         description: The total number of octets received by this IPsec Phase-2 Tunnel. This value is accumulated BEFORE determining whether or not the packet should be decompressed
-        family: IPsec/Tunnels/Phase-2/Traffic
+        family: Cisco/IPsec/Tunnels/Phase2/Traffic
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.27
         name: cipSecTunHcInOctets
         description: A high capacity count of the total number of octets received by this IPsec Phase-2 Tunnel. This value is accumulated BEFORE determining whether or not the packet should be decompressed
-        family: IPsec/Tunnels/Phase-2/Traffic
+        family: Cisco/IPsec/Tunnels/Phase2/Traffic
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.32
         name: cipSecTunInPkts
         description: The total number of packets received by this IPsec Phase-2 Tunnel
-        family: IPsec/Tunnels/Phase-2/Received
-        unit: "{received}"
+        family: Cisco/IPsec/Tunnels/Phase2/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.36
         name: cipSecTunInAuthFails
         description: The total number of inbound authentications which ended in failure by this IPsec Phase-2 Tunnel
-        family: IPsec/Tunnels/Phase-2/Authentications
+        family: Cisco/IPsec/Tunnels/Phase2/Errors
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.48
         name: cipSecTunOutAuthFails
         description: The total number of outbound authentications which ended in failure by this IPsec Phase-2 Tunnel.
-        family: IPsec/Tunnels/Phase-2/Authentications
+        family: Cisco/IPsec/Tunnels/Phase2/Errors
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.38
         name: cipSecTunInDecryptFails
         description: The total number of inbound decryptions which ended in failure by this IPsec Phase-2 Tunnel.
-        family: IPsec/Tunnels/Phase-2/Decryptions
+        family: Cisco/IPsec/Tunnels/Phase2/Errors
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.50
         name: cipSecTunOutEncryptFails
         description: The total number of outbound encryptions which ended in failure by this IPsec Phase-2 Tunnel.
-        family: IPsec/Tunnels/Phase-2/Encryptions
+        family: Cisco/IPsec/Tunnels/Phase2/Errors
         unit: "{failure}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.39
         name: cipSecTunOutOctets
         description: The total number of octets sent by this IPsec Phase-2 Tunnel. This value is accumulated AFTER determining whether or not the packet should be compressed
-        family: IPsec/Tunnels/Phase-2/Traffic
+        family: Cisco/IPsec/Tunnels/Phase2/Traffic
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.40
         name: cipSecTunHcOutOctets
         description: A high capacity count of the total number of octets sent by this IPsec Phase-2 Tunnel. This value is accumulated AFTER determining whether or not the packet should be compressed
-        family: IPsec/Tunnels/Phase-2/Traffic
+        family: Cisco/IPsec/Tunnels/Phase2/Traffic
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.45
         name: cipSecTunOutPkts
         description: The total number of packets sent by this IPsec Phase-2 Tunnel
-        family: IPsec/Tunnels/Phase-2/Sent
-        unit: "{sent}"
+        family: Cisco/IPsec/Tunnels/Phase2/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.51
         name: cipSecTunStatus
         description: The status of the IPsec Phase-2 Tunnel
-        family: IPsec/Tunnels/Phase-2/Status
+        family: Cisco/IPsec/Tunnels/Phase2/Status
         unit: "{status}"
         mapping:
           1: active
