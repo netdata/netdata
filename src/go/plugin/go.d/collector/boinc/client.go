@@ -129,7 +129,7 @@ func (c *boincClient) send(req *boincRequest) (*boincReply, error) {
 	}
 
 	if logger.Level.Enabled(slog.LevelDebug) {
-		c.Debugf("received response: %s", string(b.Bytes()))
+		c.Debugf("received response: %s", b.String())
 	}
 
 	respData := cleanReplyData(b.Bytes())

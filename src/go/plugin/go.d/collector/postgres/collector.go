@@ -17,7 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 
 	"github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 //go:embed "config_schema.json"

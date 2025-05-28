@@ -107,7 +107,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 		}
 	}
 
-	if !(c.permitView != nil && len(stats.Views) > 0) {
+	if c.permitView == nil || len(stats.Views) == 0 {
 		return
 	}
 

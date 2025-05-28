@@ -38,9 +38,7 @@ func (t Tags) Merge(tags Tags) {
 func (t Tags) Add(tags Tags) {
 	for tag := range tags {
 		v := strings.TrimPrefix(tag, "-")
-		if _, ok := t[v]; ok {
-			delete(t, v)
-		}
+		delete(t, v)
 		t[tag] = struct{}{}
 	}
 }

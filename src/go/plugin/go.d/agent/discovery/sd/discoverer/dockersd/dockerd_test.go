@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	typesContainer "github.com/docker/docker/api/types/container"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 
-	"github.com/docker/docker/api/types"
 	typesNetwork "github.com/docker/docker/api/types/network"
 )
 
@@ -124,14 +125,14 @@ func TestDiscoverer_Discover(t *testing.T) {
 	}
 }
 
-func prepareNginxContainer(name string) types.Container {
-	return types.Container{
+func prepareNginxContainer(name string) typesContainer.Summary {
+	return typesContainer.Summary{
 		ID:      "id-" + name,
 		Names:   []string{"/" + name},
 		Image:   "nginx-image",
 		ImageID: "nginx-image-id",
 		Command: "nginx-command",
-		Ports: []types.Port{
+		Ports: []typesContainer.Port{
 			{
 				IP:          "0.0.0.0",
 				PrivatePort: 80,
@@ -146,7 +147,7 @@ func prepareNginxContainer(name string) types.Container {
 		}{
 			NetworkMode: "default",
 		},
-		NetworkSettings: &types.SummaryNetworkSettings{
+		NetworkSettings: &typesContainer.NetworkSettingsSummary{
 			Networks: map[string]*typesNetwork.EndpointSettings{
 				"bridge": {IPAddress: "192.0.2.0"},
 			},

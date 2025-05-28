@@ -115,7 +115,7 @@ func (c *Collector) addSmb2CallChart(smb2Call string, chart *module.Chart) {
 }
 
 func extractCallName(s, prefix, suffix string) (string, bool) {
-	if !(strings.HasPrefix(s, prefix) && strings.HasSuffix(s, suffix)) {
+	if !strings.HasPrefix(s, prefix) || !strings.HasSuffix(s, suffix) {
 		return "", false
 	}
 	name := strings.TrimPrefix(s, prefix)

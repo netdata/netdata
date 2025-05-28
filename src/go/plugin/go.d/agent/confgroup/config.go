@@ -40,7 +40,7 @@ type Config map[string]any
 
 func (c Config) HashIncludeMap(_ string, k, _ any) (bool, error) {
 	s := k.(string)
-	return !(strings.HasPrefix(s, "__") || strings.HasSuffix(s, "__")), nil
+	return !strings.HasPrefix(s, "__") && !strings.HasSuffix(s, "__"), nil
 }
 
 func (c Config) Set(key string, value any) Config { c[key] = value; return c }

@@ -114,19 +114,23 @@ var (
 func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 	node := d.client.CoreV1().Nodes()
 	nodeWatcher := &cache.ListWatch{
-		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return node.List(ctx, options) },
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return node.Watch(ctx, options) },
+		ListWithContextFunc: func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			return node.List(ctx, options)
+		},
+		WatchFuncWithContext: func(_ context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			return node.Watch(ctx, options)
+		},
 	}
 
 	pod := d.client.CoreV1().Pods(corev1.NamespaceAll)
 	podWatcher := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+		ListWithContextFunc: func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
 			if myNodeName != "" {
 				options.FieldSelector = "spec.nodeName=" + myNodeName
 			}
 			return pod.List(ctx, options)
 		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+		WatchFuncWithContext: func(_ context.Context, options metav1.ListOptions) (watch.Interface, error) {
 			if myNodeName != "" {
 				options.FieldSelector = "spec.nodeName=" + myNodeName
 			}
@@ -136,20 +140,32 @@ func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 
 	deploy := d.client.AppsV1().Deployments(corev1.NamespaceAll)
 	deployWatcher := &cache.ListWatch{
-		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return deploy.List(ctx, options) },
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return deploy.Watch(ctx, options) },
+		ListWithContextFunc: func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			return deploy.List(ctx, options)
+		},
+		WatchFuncWithContext: func(_ context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			return deploy.Watch(ctx, options)
+		},
 	}
 
 	cj := d.client.BatchV1().CronJobs(corev1.NamespaceAll)
 	cjWatcher := &cache.ListWatch{
-		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return cj.List(ctx, options) },
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return cj.Watch(ctx, options) },
+		ListWithContextFunc: func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			return cj.List(ctx, options)
+		},
+		WatchFuncWithContext: func(_ context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			return cj.Watch(ctx, options)
+		},
 	}
 
 	jobs := d.client.BatchV1().Jobs(corev1.NamespaceAll)
 	jobsWatcher := &cache.ListWatch{
-		ListFunc:  func(options metav1.ListOptions) (runtime.Object, error) { return jobs.List(ctx, options) },
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) { return jobs.Watch(ctx, options) },
+		ListWithContextFunc: func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			return jobs.List(ctx, options)
+		},
+		WatchFuncWithContext: func(_ context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			return jobs.Watch(ctx, options)
+		},
 	}
 
 	return []discoverer{

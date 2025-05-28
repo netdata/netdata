@@ -16,7 +16,9 @@ func (c *Collector) verifyConfig() error {
 		return errors.New("no domains specified")
 	}
 
-	if !(c.Network == "" || c.Network == "udp" || c.Network == "tcp" || c.Network == "tcp-tls") {
+	switch c.Network {
+	case "", "udp", "tcp", "tcp-tls":
+	default:
 		return fmt.Errorf("wrong network transport : %s", c.Network)
 	}
 

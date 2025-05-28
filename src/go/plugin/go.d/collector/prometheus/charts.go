@@ -253,7 +253,7 @@ func getChartTitle(name, help string) string {
 		return fmt.Sprintf("Metric \"%s\"", name)
 	}
 
-	help = strings.Replace(help, "'", "", -1)
+	help = strings.ReplaceAll(help, "'", "")
 	help = strings.TrimSuffix(help, ".")
 
 	return help

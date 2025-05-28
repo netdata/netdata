@@ -16,7 +16,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
-	"github.com/docker/docker/api/types"
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/gohugoio/hashstructure"
@@ -88,7 +87,7 @@ type (
 	}
 	dockerClient interface {
 		NegotiateAPIVersion(context.Context)
-		ContainerList(context.Context, typesContainer.ListOptions) ([]types.Container, error)
+		ContainerList(context.Context, typesContainer.ListOptions) ([]typesContainer.Summary, error)
 		Close() error
 	}
 )
@@ -168,7 +167,7 @@ func (d *Discoverer) listContainers(ctx context.Context, in chan<- []model.Targe
 	return nil
 }
 
-func (d *Discoverer) buildTargetGroup(cntr types.Container) model.TargetGroup {
+func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetGroup {
 	if len(cntr.Names) == 0 || cntr.NetworkSettings == nil || len(cntr.NetworkSettings.Networks) == 0 {
 		return nil
 	}
@@ -220,7 +219,7 @@ func (d *Discoverer) cleanup() {
 	}
 }
 
-func cntrSource(cntr types.Container) string {
+func cntrSource(cntr typesContainer.Summary) string {
 	name := strings.TrimPrefix(cntr.Names[0], "/")
 	return fmt.Sprintf("discoverer=docker,container=%s,image=%s", name, cntr.Image)
 }

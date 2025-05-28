@@ -121,7 +121,6 @@ func sortTargetGroups(tggs []model.TargetGroup) {
 }
 
 type mockSnmpHandler struct {
-	mu sync.Mutex
 	*snmpmock.MockHandler
 	skipOnConnect func(ip string) bool
 }
