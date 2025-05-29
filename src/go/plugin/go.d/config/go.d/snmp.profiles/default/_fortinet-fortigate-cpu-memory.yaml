@@ -1,16 +1,15 @@
 # CPU and memory metrics for Fortinet FortiGate devices
 metrics:
-
   ### CPU
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
       # Current CPU usage (percentage).
       OID: 1.3.6.1.4.1.12356.101.4.1.3.0
-        # core check only
+      # core check only
       name: cpu.usage
-      description: Current CPU usage (percentage)
+      description: Current CPU usage
+      family: Fortinet/Fortigate/CPU/Utilization
       unit: "%"
-
 
   ### Memory
   - MIB: FORTINET-FORTIGATE-MIB
@@ -19,5 +18,6 @@ metrics:
       OID: 1.3.6.1.4.1.12356.101.4.1.4.0
       # core check only
       name: memory.usage
-      description: Current memory utilization (percentage)
+      description: Current memory utilization
+      family: Fortinet/Fortigate/Memory/Utilization
       unit: "%"
