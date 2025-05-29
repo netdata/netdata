@@ -43,10 +43,16 @@
     "      • Structured format: 'labels: {\"key1\": [\"value1\", \"value2\"], \"key2\": \"value3\"}' (array values are ORed, different keys are ANDed)"
 
 // MCP default values for all tools
-#define MCP_DEFAULT_AFTER_TIME     -3600  // 1 hour ago
-#define MCP_DEFAULT_BEFORE_TIME    0      // now
-#define MCP_METADATA_CARDINALITY_LIMIT 50   // For metadata queries (list tools)
-#define MCP_DATA_CARDINALITY_LIMIT 10       // For data queries (metrics query)
+#define MCP_DEFAULT_AFTER_TIME              (-3600) // 1 hour ago
+#define MCP_DEFAULT_BEFORE_TIME             0    // now
+#define MCP_METADATA_CARDINALITY_LIMIT      50   // For metadata queries
+#define MCP_DATA_CARDINALITY_LIMIT          10   // For data queries
+#define MCP_WEIGHTS_CARDINALITY_LIMIT       50   // For weights queries
+#define MCP_METADATA_CARDINALITY_LIMIT_MAX  500  // For metadata queries
+#define MCP_DATA_CARDINALITY_LIMIT_MAX      500  // For data queries
+#define MCP_WEIGHTS_CARDINALITY_LIMIT_MAX   500  // For weights queries
+#define MCP_ALERTS_CARDINALITY_LIMIT        100  // For alert queries
+#define MCP_ALERTS_CARDINALITY_LIMIT_MAX    500  // For alert queries
 
 // MCP query info messages
 #define MCP_QUERY_INFO_SUMMARY_SECTION \

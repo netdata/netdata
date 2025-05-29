@@ -1422,10 +1422,8 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         return MCP_RC_BAD_REQUEST;
     }
 
-    const char *timeout_error = NULL;
-    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, &timeout_error); // Default timeout 60 seconds
-    if (timeout_error) {
-        buffer_sprintf(mcpc->error, "%s", timeout_error);
+    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, mcpc->error); // Default timeout 60 seconds
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
 

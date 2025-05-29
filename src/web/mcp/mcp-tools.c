@@ -39,6 +39,7 @@
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools-weights.h"
 #include "mcp-tools-alert-transitions.h"
+#include "mcp-tools-configured-alerts.h"
 
 // Tool handler function prototypes
 typedef MCP_RETURN_CODE (*mcp_tool_execute_t)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
@@ -250,6 +251,17 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .read_only_hint = true,
         .open_world_hint = false
     },
+
+    // commented for the moment - probably dyncfg is a better way to do this
+//    {
+//        .name = MCP_TOOL_LIST_CONFIGURED_ALERTS,
+//        .title = "List configured alert prototypes",
+//        .description = "Lists all configured alert prototypes (templates) that define how alerts are created. Shows matching criteria, conditions, thresholds, and actions. Useful for understanding what Netdata is configured to monitor.",
+//        .execute_callback = mcp_tool_list_configured_alerts_execute,
+//        .schema_callback = mcp_tool_list_configured_alerts_schema,
+//        .read_only_hint = true,
+//        .open_world_hint = false
+//    },
 
     // Add more tools here
     

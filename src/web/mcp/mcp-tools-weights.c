@@ -42,45 +42,33 @@ static MCP_RETURN_CODE execute_weights_request(
     CLEAN_BUFFER *dimensions_buffer = NULL;
     CLEAN_BUFFER *labels_buffer = NULL;
     
-    const char *error = NULL;
-    
     // Parse metrics as array
-    metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, MCP_TOOL_LIST_METRICS, &error);
-    if (error) {
-        buffer_flush(mcpc->error);
-        buffer_sprintf(mcpc->error, "Invalid metrics parameter: %s", error);
+    metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, false, MCP_TOOL_LIST_METRICS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
     // Parse nodes as array
-    nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, MCP_TOOL_LIST_NODES, &error);
-    if (error) {
-        buffer_flush(mcpc->error);
-        buffer_sprintf(mcpc->error, "Invalid nodes parameter: %s", error);
+    nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, false, MCP_TOOL_LIST_NODES, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
     // Parse instances as array
-    instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_flush(mcpc->error);
-        buffer_sprintf(mcpc->error, "Invalid instances parameter: %s", error);
+    instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
     // Parse dimensions as array
-    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_flush(mcpc->error);
-        buffer_sprintf(mcpc->error, "Invalid dimensions parameter: %s", error);
+    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", false, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
     // Parse labels as object
-    labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_flush(mcpc->error);
-        buffer_sprintf(mcpc->error, "Invalid labels parameter: %s", error);
+    labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -91,10 +79,8 @@ static MCP_RETURN_CODE execute_weights_request(
         cardinality_limit = json_object_get_int(obj);
     
     // Extract timeout parameter
-    const char *timeout_error = NULL;
-    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, &timeout_error);
-    if (timeout_error) {
-        buffer_sprintf(mcpc->error, "%s", timeout_error);
+    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
         
@@ -302,9 +288,11 @@ void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer) {
     buffer_json_member_add_string(buffer, "default", "volume");
     buffer_json_object_close(buffer); // method
     
-    mcp_schema_add_cardinality_limit(buffer, 
+    mcp_schema_add_cardinality_limit(
+        buffer,
         "Maximum number of results to return",
-        50, 200);
+        MCP_WEIGHTS_CARDINALITY_LIMIT,
+        MAX(MCP_WEIGHTS_CARDINALITY_LIMIT, MCP_WEIGHTS_CARDINALITY_LIMIT_MAX));
     
     // Timeout parameter
     mcp_schema_add_timeout(buffer, "timeout",
@@ -337,9 +325,11 @@ void mcp_tool_find_anomalous_metrics_schema(BUFFER *buffer) {
     add_weights_time_parameters(buffer, false, true);  // include_baseline=false, required=true
     add_weights_filter_parameters(buffer);
     
-    mcp_schema_add_cardinality_limit(buffer, 
+    mcp_schema_add_cardinality_limit(
+        buffer,
         "Maximum number of results to return",
-        50, 200);
+        MCP_WEIGHTS_CARDINALITY_LIMIT,
+        MAX(MCP_WEIGHTS_CARDINALITY_LIMIT, MCP_WEIGHTS_CARDINALITY_LIMIT_MAX));
     
     // Timeout parameter
     mcp_schema_add_timeout(buffer, "timeout",
@@ -373,9 +363,11 @@ void mcp_tool_find_unstable_metrics_schema(BUFFER *buffer) {
     add_weights_time_parameters(buffer, false, true);  // include_baseline=false, required=true
     add_weights_filter_parameters(buffer);
     
-    mcp_schema_add_cardinality_limit(buffer, 
+    mcp_schema_add_cardinality_limit(
+        buffer,
         "Maximum number of results to return",
-        50, 200);
+        MCP_WEIGHTS_CARDINALITY_LIMIT,
+        MAX(MCP_WEIGHTS_CARDINALITY_LIMIT, MCP_WEIGHTS_CARDINALITY_LIMIT_MAX));
     
     // Timeout parameter
     mcp_schema_add_timeout(buffer, "timeout",

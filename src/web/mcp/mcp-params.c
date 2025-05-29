@@ -1,16 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-params.h"
-#include "web/api/queries/rrdr.h"
 
 // Utility function to check if a string contains wildcards
 static bool contains_wildcards(const char *str) {
-    if (!str) return false;
-    
+    if (!str || !*str) return false;
+
+    if(*str == '!') {
+        // simple patterns negative match (only if it starts with '!')
+        return true;
+    }
+
     // Check for common wildcard characters
     for (const char *p = str; *p; p++) {
-        if (*p == '*' || *p == '?' || *p == '[' || *p == ']')
+        if (*p == '*') {
+            // simple patterns wildcard match
             return true;
+        }
+
+        // let's check for simple pattern separators
+        for (const char *c = SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS; *c ; c++) {
+            if (*p == *c)
+                return true;
+        }
     }
     return false;
 }
@@ -56,18 +68,36 @@ static int mcp_params_array_to_pipe_string(
 BUFFER *mcp_params_parse_array_to_pattern(
     struct json_object *params,
     const char *param_name,
+    bool required,
     bool allow_wildcards,
     const char *list_tool,
-    const char **error_message
+    BUFFER *error
 ) {
     struct json_object *array_obj = NULL;
     
-    if (!json_object_object_get_ex(params, param_name, &array_obj) || !array_obj)
+    if (!json_object_object_get_ex(params, param_name, &array_obj) || !array_obj) {
+        if (required && error) {
+            buffer_flush(error);
+            buffer_sprintf(error, "Missing required parameter '%s'", param_name);
+        }
         return NULL;  // Parameter not provided
+    }
         
     if (!json_object_is_type(array_obj, json_type_array)) {
-        if (error_message)
-            *error_message = "must be an array of strings";
+        if (error) {
+            buffer_flush(error);
+            buffer_sprintf(error, "%s must be an array of strings, not %s", 
+                    param_name, json_type_to_name(json_object_get_type(array_obj)));
+        }
+        return NULL;
+    }
+    
+    // Check for empty array if required
+    if (required && json_object_array_length(array_obj) == 0) {
+        if (error) {
+            buffer_flush(error);
+            buffer_sprintf(error, "The '%s' parameter cannot be an empty array", param_name);
+        }
         return NULL;
     }
         
@@ -76,28 +106,29 @@ BUFFER *mcp_params_parse_array_to_pattern(
     
     if (result == -2) {
         buffer_free(wb);
-        if (error_message) {
+        if (error) {
+            buffer_flush(error);
             if (allow_wildcards) {
-                *error_message = "invalid array format";
+                buffer_strcat(error, "invalid array format");
             } else {
-                static char error_buffer[256];
                 if (list_tool) {
-                    snprintf(error_buffer, sizeof(error_buffer),
+                    buffer_sprintf(error,
                             "must contain exact values, not patterns. "
                             "Wildcards are not supported. "
                             "Use the '%s' tool to discover exact values.", list_tool);
                 } else {
-                    snprintf(error_buffer, sizeof(error_buffer),
+                    buffer_strcat(error,
                             "must contain exact values, not patterns. Wildcards are not supported.");
                 }
-                *error_message = error_buffer;
             }
         }
         return NULL;
     } else if (result != 0) {
         buffer_free(wb);
-        if (error_message)
-            *error_message = "must be an array of strings";
+        if (error) {
+            buffer_flush(error);
+            buffer_strcat(error, "must be an array of strings");
+        }
         return NULL;
     }
     
@@ -108,7 +139,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
 BUFFER *mcp_params_parse_labels_object(
     struct json_object *params,
     const char *list_tool,
-    const char **error_message
+    BUFFER *error
 ) {
     struct json_object *labels_obj = NULL;
     
@@ -116,8 +147,10 @@ BUFFER *mcp_params_parse_labels_object(
         return NULL;  // Parameter not provided
         
     if (!json_object_is_type(labels_obj, json_type_object)) {
-        if (error_message)
-            *error_message = "must be an object where each key maps to an array of string values";
+        if (error) {
+            buffer_flush(error);
+            buffer_strcat(error, "must be an object where each key maps to an array of string values");
+        }
         return NULL;
     }
         
@@ -133,8 +166,10 @@ BUFFER *mcp_params_parse_labels_object(
         
         if (!json_object_is_type(val, json_type_array)) {
             buffer_free(wb);
-            if (error_message)
-                *error_message = "each label key must map to an array of string values";
+            if (error) {
+                buffer_flush(error);
+                buffer_strcat(error, "each label key must map to an array of string values");
+            }
             return NULL;
         }
         
@@ -143,34 +178,37 @@ BUFFER *mcp_params_parse_labels_object(
             struct json_object *item = json_object_array_get_idx(val, i);
             if (!json_object_is_type(item, json_type_string)) {
                 buffer_free(wb);
-                if (error_message)
-                    *error_message = "label values must be strings";
+                if (error) {
+                    buffer_flush(error);
+                    buffer_strcat(error, "label values must be strings");
+                }
                 return NULL;
             }
             
             const char *value = json_object_get_string(item);
             if (!value || !*value) {
                 buffer_free(wb);
-                if (error_message)
-                    *error_message = "label values cannot be empty";
+                if (error) {
+                    buffer_flush(error);
+                    buffer_strcat(error, "label values cannot be empty");
+                }
                 return NULL;
             }
             
             // Check for wildcards in label values
             if (contains_wildcards(value)) {
                 buffer_free(wb);
-                if (error_message) {
-                    static char labels_error[256];
+                if (error) {
+                    buffer_flush(error);
                     if (list_tool) {
-                        snprintf(labels_error, sizeof(labels_error),
+                        buffer_sprintf(error,
                                 "label values must be exact values, not patterns. "
                                 "Wildcards are not supported. "
                                 "Use the %s tool to discover available label values.", list_tool);
                     } else {
-                        snprintf(labels_error, sizeof(labels_error),
+                        buffer_strcat(error,
                                 "label values must be exact values, not patterns. Wildcards are not supported.");
                     }
-                    *error_message = labels_error;
                 }
                 return NULL;
             }
@@ -320,7 +358,7 @@ size_t mcp_params_extract_size(
     size_t default_value,
     size_t min_value,
     size_t max_value,
-    const char **error_message
+    BUFFER *error
 ) {
     struct json_object *obj = NULL;
     
@@ -328,28 +366,25 @@ size_t mcp_params_extract_size(
         if (json_object_is_type(obj, json_type_int)) {
             int64_t value = json_object_get_int64(obj);
             if (value < 0) {
-                if (error_message) {
-                    static char error_buf[256];
-                    snprintf(error_buf, sizeof(error_buf), 
-                            "%s must be a positive number", param_name);
-                    *error_message = error_buf;
+                if (error) {
+                    buffer_flush(error);
+                    buffer_sprintf(error, "%s must be a positive number", param_name);
                 }
                 return default_value;
             }
             size_t size_value = (size_t)value;
             if (size_value < min_value || (max_value > 0 && size_value > max_value)) {
-                if (error_message) {
-                    static char error_buf[256];
+                if (error) {
+                    buffer_flush(error);
                     if (max_value > 0) {
-                        snprintf(error_buf, sizeof(error_buf),
+                        buffer_sprintf(error,
                                 "%s must be between %zu and %zu",
                                 param_name, min_value, max_value);
                     } else {
-                        snprintf(error_buf, sizeof(error_buf),
+                        buffer_sprintf(error,
                                 "%s must be at least %zu",
                                 param_name, min_value);
                     }
-                    *error_message = error_buf;
                 }
                 return default_value;
             }
@@ -367,7 +402,7 @@ int mcp_params_extract_timeout(
     int default_seconds,
     int min_seconds,
     int max_seconds,
-    const char **error_message
+    BUFFER *error
 ) {
     struct json_object *obj = NULL;
     
@@ -375,18 +410,17 @@ int mcp_params_extract_timeout(
         if (json_object_is_type(obj, json_type_int)) {
             int value = json_object_get_int(obj);
             if (value < min_seconds || (max_seconds > 0 && value > max_seconds)) {
-                if (error_message) {
-                    static char error_buf[256];
+                if (error) {
+                    buffer_flush(error);
                     if (max_seconds > 0) {
-                        snprintf(error_buf, sizeof(error_buf),
+                        buffer_sprintf(error,
                                 "%s must be between %d and %d seconds",
                                 param_name, min_seconds, max_seconds);
                     } else {
-                        snprintf(error_buf, sizeof(error_buf),
+                        buffer_sprintf(error,
                                 "%s must be at least %d seconds",
                                 param_name, min_seconds);
                     }
-                    *error_message = error_buf;
                 }
                 return default_seconds;
             }

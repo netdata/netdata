@@ -90,7 +90,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Limit the response cardinality (number of dimensions, instances, labels, etc.). "
         "When the limit is exceeded, the response will indicate how many items were omitted.",
         MCP_DATA_CARDINALITY_LIMIT,
-        500);
+        MAX(MCP_DATA_CARDINALITY_LIMIT, MCP_DATA_CARDINALITY_LIMIT_MAX));
 
     // Time parameters
     mcp_schema_add_time_params(buffer, "query window", true);
@@ -386,52 +386,34 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Handle nodes array parameter
     CLEAN_BUFFER *nodes_buffer = NULL;
-    const char *error = NULL;
     
-    nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, MCP_TOOL_LIST_NODES, &error);
-    if (error) {
-        buffer_sprintf(mcpc->error, "Invalid nodes parameter: %s", error);
+    nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, false, MCP_TOOL_LIST_NODES, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
     // Handle instances array parameter
     CLEAN_BUFFER *instances_buffer = NULL;
     
-    instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_sprintf(mcpc->error, "Invalid instances parameter: %s", error);
+    instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
     // Handle dimensions array parameter
     CLEAN_BUFFER *dimensions_buffer = NULL;
     
-    // First check if dimensions is provided and is an array (required parameter)
-    if (!json_object_is_type(dimensions_obj, json_type_array)) {
-        buffer_sprintf(mcpc->error, "Dimensions must be an array of strings, not %s", json_type_to_name(json_object_get_type(dimensions_obj)));
-        return MCP_RC_BAD_REQUEST;
-    }
-    
-    // Check for empty array
-    int array_len = json_object_array_length(dimensions_obj);
-    if (array_len == 0) {
-        buffer_sprintf(mcpc->error, "The 'dimensions' parameter cannot be an empty array. "
-                                    "You must explicitly list every dimension you want to query. "
-                                    "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context '%s'.", context);
-        return MCP_RC_BAD_REQUEST;
-    }
-    
-    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_sprintf(mcpc->error, "Invalid dimensions parameter: %s", error);
+    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
+        buffer_strcat(mcpc->error, ". You must explicitly list every dimension you want to query. "
+                                   "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context.");
         return MCP_RC_BAD_REQUEST;
     }
     // Handle labels - expects structured object only
     CLEAN_BUFFER *labels_buffer = NULL;
     
-    labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_sprintf(mcpc->error, "Invalid labels parameter: %s", error);
+    labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -456,16 +438,13 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // No need to check aggregation_obj here - we already have default in group_by struct
     
     // Other parameters
-    const char *size_error = NULL;
-    size_t points = mcp_params_extract_size(params, "points", 0, 0, SIZE_MAX, &size_error);
-    if (size_error) {
-        buffer_sprintf(mcpc->error, "%s", size_error);
+    size_t points = mcp_params_extract_size(params, "points", 0, 0, SIZE_MAX, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
-    size_t cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", MCP_DATA_CARDINALITY_LIMIT, 1, 1000, &size_error);
-    if (size_error) {
-        buffer_sprintf(mcpc->error, "%s", size_error);
+    size_t cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", MCP_DATA_CARDINALITY_LIMIT, 1, 1000, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
 
@@ -486,10 +465,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    const char *timeout_error = NULL;
-    long timeout = mcp_params_extract_timeout(params, "timeout", 0, 0, 3600, &timeout_error);
-    if (timeout_error) {
-        buffer_sprintf(mcpc->error, "%s", timeout_error);
+    long timeout = mcp_params_extract_timeout(params, "timeout", 0, 0, 3600, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -506,9 +483,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     const char *time_group_options = mcp_params_extract_string(params, "time_group_options", NULL);
     
     // Tier selection (give an invalid default to now the caller added a tier to the query)
-    size_t tier = mcp_params_extract_size(params, "tier", nd_profile.storage_tiers + 1, 0, SIZE_MAX, &size_error);
-    if (size_error) {
-        buffer_sprintf(mcpc->error, "%s", size_error);
+    size_t tier = mcp_params_extract_size(params, "tier", nd_profile.storage_tiers + 1, 0, SIZE_MAX, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     if (tier < nd_profile.storage_tiers)
@@ -529,9 +505,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     CLEAN_BUFFER *group_by_buffer = NULL;
     const char *group_by_str = NULL;
     
-    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
-    if (error) {
-        buffer_sprintf(mcpc->error, "Invalid group_by parameter: %s", error);
+    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
     

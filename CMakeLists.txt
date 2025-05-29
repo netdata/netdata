@@ -1894,6 +1894,8 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-weights.h
         src/web/mcp/mcp-tools-alert-transitions.c
         src/web/mcp/mcp-tools-alert-transitions.h
+        src/web/mcp/mcp-tools-configured-alerts.c
+        src/web/mcp/mcp-tools-configured-alerts.h
         src/web/mcp/mcp-params.c
         src/web/mcp/mcp-params.h
         src/web/mcp/mcp-request-id.c

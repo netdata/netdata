@@ -370,18 +370,21 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
             RRDHOST *host = rrdhost_find_by_guid(t->machine_guid);
 
             buffer_json_member_add_uint64(wb, JSKEY(alert_global_id), t->global_id);
-            buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
-            buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
-            buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
+            buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
 
-            if(host) {
-                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+            if(!(ctl->options & CONTEXTS_OPTION_MCP)) {
+                buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
+                buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
 
-                if(!UUIDiszero(host->node_id))
+                if(host && !UUIDiszero(host->node_id))
                     buffer_json_member_add_uuid(wb, "node_id", host->node_id.uuid);
             }
 
-            buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
+            buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
+
+            if(host) {
+                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+            }
 
             if(!(ctl->options & CONTEXTS_OPTION_MCP)) {
                 buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);
@@ -400,12 +403,14 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
             buffer_json_member_add_string(wb, "info", *t->info ? t->info : "");
             buffer_json_member_add_string(wb, "summary", *t->summary ? t->summary : "");
             buffer_json_member_add_string(wb, "units", *t->units ? t->units : NULL);
+
             buffer_json_member_add_object(wb, "new");
             {
                 buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->new_status));
                 buffer_json_member_add_double(wb, "value", t->new_value);
             }
             buffer_json_object_close(wb); // new
+
             buffer_json_member_add_object(wb, "old");
             {
                 buffer_json_member_add_string(wb, "status", rrdcalc_status2string(t->old_status));

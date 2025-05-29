@@ -151,6 +151,34 @@ class MCPSchemaUIGenerator {
 
         const label = document.createElement('label');
         label.className = 'mcp-field-label';
+        
+        // Add tooltip functionality if description exists
+        if (schema.description && this.options.showTooltips) {
+            label.className += ' mcp-field-label-hoverable';
+            
+            // Add hover handlers for proper positioning
+            let tooltipEl = null;
+            label.addEventListener('mouseenter', (e) => {
+                const rect = label.getBoundingClientRect();
+                tooltipEl = document.createElement('div');
+                tooltipEl.className = 'mcp-tooltip-popup';
+                // Convert newlines to <br/> tags
+                tooltipEl.innerHTML = schema.description.replace(/\n/g, '<br/>');
+                tooltipEl.style.position = 'fixed';
+                tooltipEl.style.left = `${rect.left}px`;
+                tooltipEl.style.top = `${rect.top - 5}px`;
+                tooltipEl.style.transform = 'translateY(-100%)';
+                document.body.appendChild(tooltipEl);
+            });
+            
+            label.addEventListener('mouseleave', () => {
+                if (tooltipEl) {
+                    tooltipEl.remove();
+                    tooltipEl = null;
+                }
+            });
+        }
+        
         label.textContent = schema.title || key;
         
         // Mark required fields
@@ -163,37 +191,11 @@ class MCPSchemaUIGenerator {
 
         labelWrapper.appendChild(label);
 
-        // Add tooltip if description exists
-        if (schema.description && this.options.showTooltips) {
-            const tooltip = document.createElement('span');
-            tooltip.className = 'mcp-field-tooltip';
-            tooltip.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm1 12H7v-2h2v2zm0-3H7V4h2v5z"/></svg>';
-            tooltip.setAttribute('data-tooltip', schema.description);
-            
-            // Add hover handlers for proper positioning
-            let tooltipEl = null;
-            tooltip.addEventListener('mouseenter', (e) => {
-                const rect = tooltip.getBoundingClientRect();
-                tooltipEl = document.createElement('div');
-                tooltipEl.className = 'mcp-tooltip-popup';
-                // Convert newlines to <br/> tags
-                tooltipEl.innerHTML = schema.description.replace(/\n/g, '<br/>');
-                tooltipEl.style.position = 'fixed';
-                tooltipEl.style.left = `${rect.left}px`;
-                tooltipEl.style.top = `${rect.top - 5}px`;
-                tooltipEl.style.transform = 'translateY(-100%)';
-                document.body.appendChild(tooltipEl);
-            });
-            
-            tooltip.addEventListener('mouseleave', () => {
-                if (tooltipEl) {
-                    tooltipEl.remove();
-                    tooltipEl = null;
-                }
-            });
-            
-            labelWrapper.appendChild(tooltip);
-        }
+        // Add JSON field name
+        const fieldName = document.createElement('span');
+        fieldName.className = 'mcp-field-json-name';
+        fieldName.textContent = key;
+        labelWrapper.appendChild(fieldName);
 
         container.appendChild(labelWrapper);
 
@@ -1627,6 +1629,7 @@ class MCPSchemaUIGenerator {
                 align-items: center;
                 gap: 6px;
                 margin-bottom: 6px;
+                justify-content: space-between;
             }
 
             .mcp-field-label {
@@ -1637,24 +1640,28 @@ class MCPSchemaUIGenerator {
                 gap: 4px;
             }
 
+            .mcp-field-label-hoverable {
+                cursor: help;
+                position: relative;
+            }
+
+            .mcp-field-label-hoverable:hover {
+                color: #0088cc;
+                text-decoration: underline;
+                text-decoration-style: dotted;
+                text-underline-offset: 2px;
+            }
+
             .mcp-field-required {
                 color: #dc3545;
                 font-weight: normal;
             }
 
-            .mcp-field-tooltip {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 16px;
-                height: 16px;
-                cursor: help;
+            .mcp-field-json-name {
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
                 color: #6c757d;
-                position: relative;
-            }
-
-            .mcp-field-tooltip:hover {
-                color: #495057;
+                margin-left: auto;
             }
 
             .mcp-tooltip-popup {

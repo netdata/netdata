@@ -10,24 +10,26 @@
 
 // Parse array parameters (nodes, instances, dimensions) and convert to pipe-separated string
 // Returns newly allocated BUFFER on success, or NULL if not provided/on error
-// Sets error_message on failure
+// Writes error message to error buffer on failure
+// required: if true, validates parameter exists, is array type, and is non-empty
 // list_tool: tool name to recommend for discovering exact values (e.g., MCP_TOOL_LIST_NODES)
 BUFFER *mcp_params_parse_array_to_pattern(
     struct json_object *params,
     const char *param_name,
+    bool required,
     bool allow_wildcards,
     const char *list_tool,
-    const char **error_message
+    BUFFER *error
 );
 
 // Parse labels object parameter and convert to query string format
 // Returns newly allocated BUFFER on success, or NULL if not provided/on error
-// Sets error_message on failure
+// Writes error message to error buffer on failure
 // list_tool: tool name to recommend for discovering exact values (e.g., MCP_TOOL_GET_METRICS_DETAILS)
 BUFFER *mcp_params_parse_labels_object(
     struct json_object *params,
     const char *list_tool,
-    const char **error_message
+    BUFFER *error
 );
 
 // Add array parameter schema (for nodes, instances, dimensions)
@@ -70,26 +72,26 @@ const char *mcp_params_extract_string(
 
 // Extract numeric size parameter with bounds checking
 // Returns the size value or default_value if not found
-// Sets error_message if value is out of bounds
+// Writes error message to error buffer if value is out of bounds
 size_t mcp_params_extract_size(
     struct json_object *params,
     const char *param_name,
     size_t default_value,
     size_t min_value,
     size_t max_value,
-    const char **error_message
+    BUFFER *error
 );
 
 // Extract timeout parameter (in seconds)
 // Returns the timeout value or default_value if not found
-// Sets error_message if value is out of bounds
+// Writes error message to error buffer if value is out of bounds
 int mcp_params_extract_timeout(
     struct json_object *params,
     const char *param_name,
     int default_seconds,
     int min_seconds,
     int max_seconds,
-    const char **error_message
+    BUFFER *error
 );
 
 // Schema generation for timeout parameter

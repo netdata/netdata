@@ -8,11 +8,15 @@ void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct sql_aler
     bool debug = d->debug;
     d->configs_added++;
 
+    bool is_mcp = d->ctl && (d->ctl->options & CONTEXTS_OPTION_MCP);
+
     if(d->only_one_config)
         buffer_json_add_array_item_object(wb); // alert config
 
     {
-        buffer_json_member_add_string(wb, "name", t->name);
+        if(!is_mcp)
+            buffer_json_member_add_string(wb, "name", t->name);
+
         buffer_json_member_add_uuid_ptr(wb, "config_hash_id", t->config_hash_id);
 
         buffer_json_member_add_object(wb, "selectors");
@@ -62,10 +66,10 @@ void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct sql_aler
                 NETDATA_DOUBLE green = t->status.green ? str2ndd(t->status.green, NULL) : NAN;
                 NETDATA_DOUBLE red = t->status.red ? str2ndd(t->status.red, NULL) : NAN;
 
-                if (!isnan(green) || debug)
+                if (!is_mcp && (!isnan(green) || debug))
                     buffer_json_member_add_double(wb, "green", green);
 
-                if (!isnan(red) || debug)
+                if (!is_mcp && (!isnan(red) || debug))
                     buffer_json_member_add_double(wb, "red", red);
 
                 if (t->status.warn || debug)

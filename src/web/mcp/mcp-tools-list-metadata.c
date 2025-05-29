@@ -93,7 +93,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
     {
         .name = MCP_TOOL_LIST_RAISED_ALERTS,
         .title = "List raised alerts",
-        .description = "List currently active alerts (WARNING and CRITICAL status) across all nodes",
+        .description = "List currently active alerts (WARNING and CRITICAL status)",
         .output_type = MCP_LIST_OUTPUT_ALERTS,
         .mode = CONTEXTS_V2_ALERTS,
         .options = CONTEXTS_OPTION_INSTANCES | CONTEXTS_OPTION_VALUES,
@@ -108,12 +108,13 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
         },
         .defaults = {
             .alert_status = CONTEXT_ALERT_RAISED,  // Only raised alerts
+            .cardinality_limit = 200,
         },
     },
     {
         .name = MCP_TOOL_LIST_ALL_ALERTS,
         .title = "List all alerts",
-        .description = "List all alerts including cleared, undefined, and uninitialized alerts across all nodes",
+        .description = "List all currently running alerts",
         .output_type = MCP_LIST_OUTPUT_ALERTS,
         .mode = CONTEXTS_V2_ALERTS,
         .options = CONTEXTS_OPTION_SUMMARY,
@@ -128,6 +129,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
         },
         .defaults = {
             .alert_status = CONTEXTS_ALERT_STATUSES,  // All statuses
+            .cardinality_limit = 200,
         },
     },
 };
@@ -355,11 +357,12 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
 
     // Add cardinality limit if supported
     if (config->params.has_cardinality_limit) {
+        size_t default_cardinality = config->defaults.cardinality_limit ?: MCP_METADATA_CARDINALITY_LIMIT;
         mcp_schema_add_cardinality_limit(buffer,
             "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
             "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.",
-            MCP_METADATA_CARDINALITY_LIMIT,
-            500);
+            default_cardinality,
+            MAX(default_cardinality, MCP_METADATA_CARDINALITY_LIMIT_MAX));
     }
     
     // Add alert-specific parameters
@@ -411,10 +414,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     if (config->params.has_metrics) {
         if (config->params.metrics_as_array) {
             // Parse metrics as array
-            const char *error_message = NULL;
-            metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, MCP_TOOL_LIST_METRICS, &error_message);
-            if (error_message) {
-                buffer_sprintf(mcpc->error, "%s", error_message);
+            metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, false, MCP_TOOL_LIST_METRICS, mcpc->error);
+            if (buffer_strlen(mcpc->error) > 0) {
                 return MCP_RC_BAD_REQUEST;
             }
             metrics_pattern = buffer_tostring(metrics_buffer);
@@ -434,10 +435,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     if (config->params.has_nodes) {
         if (config->params.nodes_as_array) {
             // Parse nodes as array
-            const char *error_message = NULL;
-            nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, MCP_TOOL_LIST_NODES, &error_message);
-            if (error_message) {
-                buffer_sprintf(mcpc->error, "%s", error_message);
+            nodes_buffer = mcp_params_parse_array_to_pattern(params, "nodes", false, false, MCP_TOOL_LIST_NODES, mcpc->error);
+            if (buffer_strlen(mcpc->error) > 0) {
                 return MCP_RC_BAD_REQUEST;
             }
             nodes_pattern = buffer_tostring(nodes_buffer);
@@ -473,10 +472,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     size_t cardinality_limit = 0;
     if (config->params.has_cardinality_limit) {
         size_t default_cardinality = config->defaults.cardinality_limit ?: MCP_METADATA_CARDINALITY_LIMIT;
-        const char *size_error = NULL;
-        cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", default_cardinality, 1, 500, &size_error);
-        if (size_error) {
-            buffer_sprintf(mcpc->error, "%s", size_error);
+        cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", default_cardinality, 1, 500, mcpc->error);
+        if (buffer_strlen(mcpc->error) > 0) {
             return MCP_RC_BAD_REQUEST;
         }
     }

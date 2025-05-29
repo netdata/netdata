@@ -37,6 +37,7 @@ class JSONPrettyPrinter {
      */
     prettyPrint(obj, indent = 0) {
         if (indent > this.options.maxDepth) {
+            console.warn(`Max depth (${this.options.maxDepth}) reached at indent level ${indent}`);
             return this._colorize('"[Max depth reached]"', 'string');
         }
 
@@ -74,8 +75,11 @@ class JSONPrettyPrinter {
     _formatString(str, indent) {
         // Check if string might contain JSON
         if (this.options.detectNestedJSON && this._looksLikeJSON(str)) {
+            console.log(`Detected nested JSON at indent ${indent}, string length: ${str.length}`);
             try {
+                // First, try to parse as-is
                 const parsed = JSON.parse(str);
+                console.log(`Successfully parsed nested JSON, formatting at indent ${indent + 1}`);
                 // If it's valid JSON, format it as nested JSON
                 const formatted = this.prettyPrint(parsed, indent + 1);
                 // Wrap in quotes but show it's parsed JSON
@@ -84,7 +88,26 @@ class JSONPrettyPrinter {
                        formatted + 
                        this._colorize('"', 'string');
             } catch (e) {
-                // Not valid JSON, continue with normal string formatting
+                // If direct parsing fails, try unescaping first
+                console.log('Direct parse failed, trying to unescape first');
+                console.log('First 200 chars of string:', str.substring(0, 200));
+                try {
+                    // Unescape the string (handle \" -> ")
+                    const unescaped = str.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                    console.log('First 200 chars after unescape:', unescaped.substring(0, 200));
+                    const parsed = JSON.parse(unescaped);
+                    console.log(`Successfully parsed unescaped JSON, formatting at indent ${indent + 1}`);
+                    // If it's valid JSON, format it as nested JSON
+                    const formatted = this.prettyPrint(parsed, indent + 1);
+                    // Wrap in quotes but show it's parsed JSON
+                    return this._colorize('"', 'string') + 
+                           this._colorize('[JSON] ', 'newline') +
+                           formatted + 
+                           this._colorize('"', 'string');
+                } catch (e2) {
+                    console.error('Failed to parse even after unescaping:', e2.message);
+                    // Not valid JSON, continue with normal string formatting
+                }
             }
         }
 

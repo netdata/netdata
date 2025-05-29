@@ -1626,6 +1626,12 @@
                 // Step 1: Connect
                 await new Promise((resolve, reject) => {
                     log('1. Connecting to ' + url + '...');
+                    
+                    // Clear cached data from previous connection
+                    availableTools = {};
+                    availablePrompts = {};
+                    availableResources = {};
+                    
                     ws = new WebSocket(url);
                     
                     ws.onopen = () => {
@@ -1857,6 +1863,12 @@
             }
             
             log('Connecting to ' + url + '...');
+            
+            // Clear cached data from previous connection
+            availableTools = {};
+            availablePrompts = {};
+            availableResources = {};
+            
             ws = new WebSocket(url);
             
             ws.onopen = () => {
