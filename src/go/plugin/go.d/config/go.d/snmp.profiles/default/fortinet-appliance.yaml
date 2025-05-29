@@ -73,57 +73,57 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.12356.103.2.1.1.0
-      description: Current CPU usage (percentage)
-      family: Fortinet/FortiManager/FortiAnalyzer/Compute/CPU
+      description: Current CPU usage
+      family: Fortinet/FMG-FAZ/CPU
       unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.4.1.12356.103.2.1.2.0
       description: Current memory used
-      family: Fortinet/FortiManager/FortiAnalyzer/Memory/RAM
+      family: Fortinet/FMG-FAZ/Memory
       unit: "kBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.12356.103.2.1.3.0
       description: Total physical and swap memory installed
-      family: Fortinet/FortiManager/FortiAnalyzer/Memory/RAM
+      family: Fortinet/FMG-FAZ/Memory
       unit: "kBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmSysDiskUsage
       OID: 1.3.6.1.4.1.12356.103.2.1.4.0
       description: Current hard disk usage
-      family: Fortinet/FortiManager/FortiAnalyzer/Storage/Mount Points
+      family: Fortinet/FMG-FAZ/Storage/Disk
       unit: "MBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmSysDiskCapacity
       OID: 1.3.6.1.4.1.12356.103.2.1.5.0
       description: Total hard disk capacity
-      family: Fortinet/FortiManager/FortiAnalyzer/Storage/Mount Points
+      family: Fortinet/FMG-FAZ/Storage/Disk
       unit: "MBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmSysCpuUsageExcludedNice
       OID: 1.3.6.1.4.1.12356.103.2.1.6.0
       description: Current CPU usage excluded nice processes usage (percentage)
-      family: Fortinet/FortiManager/FortiAnalyzer/Compute/CPU
+      family: Fortinet/FMG-FAZ/CPU
       unit: "%"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmLogRate
       OID: 1.3.6.1.4.1.12356.103.2.1.9.0
       description: Log receiving rate in number of logs per second
-      family: Fortinet/FortiManager/FortiAnalyzer/Logs
-      unit: "{log}/s"
+      family: Fortinet/FMG-FAZ/Logs
+      unit: "{log}"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmRaidLevel
       OID: 1.3.6.1.4.1.12356.103.7.1.1.0
       description: RAID Level
-      family: Fortinet/FortiManager/FortiAnalyzer/Storage/RAID
+      family: Fortinet/FMG-FAZ/Storage/RAID/Status
       unit: "{status}"
       mapping:
         0: unavailable
@@ -146,7 +146,7 @@ metrics:
       name: fmRaidState
       OID: 1.3.6.1.4.1.12356.103.7.1.2.0
       description: RAID Status
-      family: Fortinet/FortiManager/FortiAnalyzer/Storage/RAID
+      family: Fortinet/FMG-FAZ/Storage/RAID/Status
       unit: "{status}"
       mapping:
         0: unavailable
@@ -161,21 +161,21 @@ metrics:
       name: fmRaidSize
       OID: 1.3.6.1.4.1.12356.103.7.1.3.0
       description: Raid size in GB
-      family: Fortinet/FortiManager/FortiAnalyzer/Storage/RAID
+      family: Fortinet/FMG-FAZ/Storage/RAID/Size
       unit: "GBy"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmRaidDiskNumber
       OID: 1.3.6.1.4.1.12356.103.7.1.4.0
       description: Disk numbers in the Raid
-      family: Fortinet/FortiManager/FortiAnalyzer/Storage/RAID
+      family: Fortinet/FMG-FAZ/Storage/RAID/Disks
       unit: "{disk}"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmHaMode
       OID: 1.3.6.1.4.1.12356.103.9.1.1.0
       description: High availability mode
-      family: Fortinet/FortiManager/FortiAnalyzer/High Availability
+      family: Fortinet/FMG-FAZ/High Availability
       unit: "{status}"
       mapping:
         0: standalone
@@ -186,14 +186,14 @@ metrics:
       name: fmHaClusterId
       OID: 1.3.6.1.4.1.12356.103.9.1.2.0
       description: Ha cluster ID
-      family: Fortinet/FortiManager/FortiAnalyzer/High Availability
+      family: Fortinet/FMG-FAZ/High Availability
       unit: "1"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     symbol:
       name: fmHaPeerNumber
       OID: 1.3.6.1.4.1.12356.103.9.1.3.0
       description: Peer numbers in the Ha
-      family: Fortinet/FortiManager/FortiAnalyzer/High Availability
+      family: Fortinet/FMG-FAZ/High Availability
       unit: "{peer}"
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
@@ -203,7 +203,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.4
         name: fmDeviceEntMode
         description: Device management mode
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: unregistered
@@ -213,7 +213,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.10
         name: fmDeviceEntHaMode
         description: Device high availability mode
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: standalone
@@ -225,7 +225,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.12
         name: fmDeviceEntConnectState
         description: Device connection status
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: unknown
@@ -234,7 +234,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.13
         name: fmDeviceEntDbState
         description: Device database status
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: unknown
@@ -244,7 +244,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.14
         name: fmDeviceEntConfigState
         description: Device config status
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: unknown
@@ -253,7 +253,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.6.2.1.15
         name: fmDeviceEntState
         description: Device status
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: none
@@ -276,7 +276,7 @@ metrics:
         OID: 1.3.6.1.4.1.12356.103.6.2.1.18
         name: fmDeviceEntSupportState
         description: The support status of the device
-        family: Fortinet/FortiManager/FortiAnalyzer/Devices
+        family: Fortinet/FMG-FAZ/Devices/Status
         unit: "{status}"
         mapping:
           0: expired
@@ -314,12 +314,12 @@ metrics:
       - name: fmRaidDiskEntSize
         OID: 1.3.6.1.4.1.12356.103.7.2.1.3
         description: Raid disk size in GB
-        family: Fortinet/FortiManager/FortiAnalyzer/Storage/RAID/Disks
+        family: Fortinet/FMG-FAZ/Storage/RAID/Disks
         unit: "GBy"
       - OID: 1.3.6.1.4.1.12356.103.7.2.1.2
         name: fmRaidDiskEntState
         description: Raid disk status
-        family: Fortinet/FortiManager/FortiAnalyzer/Storage/RAID/Disks
+        family: Fortinet/FMG-FAZ/Storage/RAID/Disks
         unit: "{status}"
         mapping:
           0: unavailable
@@ -346,7 +346,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.8.2.1.5
         name: fmSensorEntState
         description: Sensor status
-        family: Fortinet/FortiManager/FortiAnalyzer/Sensors
+        family: Fortinet/FMG-FAZ/Sensors
         unit: "{status}"
         mapping:
           0: ok
@@ -378,7 +378,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.9.2.1.6
         name: fmHaPeerEntState
         description: Peer status
-        family: Fortinet/FortiManager/FortiAnalyzer/High Availability/Peers
+        family: Fortinet/FMG-FAZ/High Availability/Peers
         unit: "{status}"
         mapping:
           0: down
