@@ -5,6 +5,7 @@ package oracledb
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 const queryTablespace = `
@@ -119,12 +120,12 @@ func (c *Collector) collectTablespace(mx map[string]int64) error {
 		case "TABLESPACE_TYPE":
 			ts.typ = value
 		case "AUTOEXTEND_STATUS":
-			switch value {
-			case "YES":
+			switch {
+			case value == "YES":
 				value = "enabled"
-			case "NO":
+			case value == "NO":
 				value = "disabled"
-			case "MIXED":
+			case strings.HasPrefix(value, "MIXED"):
 				value = "mixed"
 			}
 			ts.autoExtent = value
