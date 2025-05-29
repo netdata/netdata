@@ -1,4 +1,4 @@
-TABLESPACE_NAME 	 |      AUT | ALLOCATED_BYTES | MAX_BYTES | USED_BYTES
+TABLESPACE_NAME 	 |      AUTOEXTEND_STATUS | ALLOCATED_BYTES | MAX_BYTES | USED_BYTES
 ------------------------------ --- --------------- ---------- ----------
 SYSTEM			|       YES	| 1415577600 | 3.4360E+10 | 1409679360
 SYSAUX			|       YES	 | 912261120 | 3.4360E+10 |  697237504
