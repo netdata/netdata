@@ -433,12 +433,11 @@ endtransactions:
     netdata_MSSQL_release_results(mdi->parent->conn.dbTransactionSTMT);
 }
 
-/*
 void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 {
 #define NETDATA_MSSQL_MAX_RESOURCE_TYPE (60)
-    char resource_type[NETDATA_MSSQL_MAX_RESOURCE_TYPE + 1];
-    long value;
+    char resource_type[NETDATA_MSSQL_MAX_RESOURCE_TYPE + 1] = {};
+    long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
     SQLCHAR query[sizeof(NETDATA_QUERY_LOCKS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
@@ -492,13 +491,12 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
         if (!mli)
             continue;
 
-        rrddim_set_by_pointer(mli->st_lockWait, mli->rd_lockWait, (collected_number)mli->);
+        mli->lockWait.current.Data = value;
     } while (true);
 
 endlocks:
     netdata_MSSQL_release_results(mdi->parent->conn.dbLocksSTMT);
 }
-*/
 
 int dict_mssql_fill_waits(struct mssql_instance *mi)
 {
@@ -617,8 +615,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     }
 
     dict_mssql_fill_transactions(mdi, dbname);
-    // This query is not returning proper result
-    // dict_mssql_fill_locks(mdi, dbname);
+    dict_mssql_fill_locks(mdi, dbname);
 
 enddrunquery:
     return 1;
@@ -1666,6 +1663,9 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
 
                 if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
                     strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+                if (!strcasecmp(windows_shared_buffer, "_Total"))
+                    continue;
 
                 struct mssql_lock_instance *mli =
                     dictionary_set(mi->locks_instances, windows_shared_buffer, NULL, sizeof(*mli));
