@@ -250,3 +250,37 @@ Log databases often contain out-of-order entries:
 - Plugins run with root/Administrator privileges for full data access
 - User preferences (filters, time windows, facets) persist at dashboard level
 - All queries are logged for audit purposes (standard system logging)
+
+## Integration with Netdata Architecture
+
+### Plugin Communication
+- The facets library runs within plugins (systemd-journal.plugin, windows-events.plugin)
+- Plugins can run anywhere in the Netdata ecosystem (parent nodes, child nodes, etc.)
+- Communication with plugins happens via **rrdfunctions** - Netdata's function execution framework
+- rrdfunctions provide the transport layer to send requests to plugins and receive responses
+
+### MCP (Model Context Protocol) Integration
+- Netdata has an MCP server implementation for LLM interactions
+- Functions that return `has_history=true` (like logs) are currently excluded from MCP's table processing
+- Regular functions return simple table format: `{"type": "table", "data": [...], "columns": {...}}`
+- Logs functions return a different JSON structure with additional fields for:
+  - Faceted search results
+  - Histogram data
+  - Pagination information (anchors)
+  - Time-based navigation
+  - Dynamic field discovery
+
+### Dynamic Schema Challenge
+- systemd-journal can store any structured data with custom fields
+- Plugins discover new fields dynamically as they process data
+- LLMs need a way to discover available fields to build intelligent queries
+- Current MCP implementation doesn't handle this dynamic schema discovery
+
+### Future Direction
+- Evolve MCP's function processing to handle both regular tables and logs uniformly
+- Create MCP tools that:
+  - Support dynamic field discovery
+  - Enable faceted search and analysis
+  - Provide intelligent query building based on discovered schema
+  - Handle pagination and time-based navigation
+  - Leverage the full power of the facets engine
