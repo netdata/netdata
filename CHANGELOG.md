@@ -6,11 +6,20 @@
 
 **Merged pull requests:**
 
+- chore\(otel.plugin\): fix building [\#20368](https://github.com/netdata/netdata/pull/20368) ([ilyam8](https://github.com/ilyam8))
+- SNMP: \_cisco-wlc.yaml [\#20364](https://github.com/netdata/netdata/pull/20364) ([Ancairon](https://github.com/Ancairon))
+- \_cisco-voice.yaml [\#20361](https://github.com/netdata/netdata/pull/20361) ([Ancairon](https://github.com/Ancairon))
+- chore\(go.d\): fix some golangcilint warning [\#20360](https://github.com/netdata/netdata/pull/20360) ([ilyam8](https://github.com/ilyam8))
+- Windows updated [\#20358](https://github.com/netdata/netdata/pull/20358) ([kanelatechnical](https://github.com/kanelatechnical))
 - feat\(go.d/dyncfg\): add autodetect\_retry to dyncfg jobs [\#20357](https://github.com/netdata/netdata/pull/20357) ([ilyam8](https://github.com/ilyam8))
+- SNMP: \_cisco-ipsec-flow-monitor.yaml [\#20353](https://github.com/netdata/netdata/pull/20353) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): update otel dependencies version [\#20352](https://github.com/netdata/netdata/pull/20352) ([ilyam8](https://github.com/ilyam8))
+- SNMP: \_generic-ups.yaml [\#20351](https://github.com/netdata/netdata/pull/20351) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_generic-ucd.yaml [\#20349](https://github.com/netdata/netdata/pull/20349) ([Ancairon](https://github.com/Ancairon))
 - improvement\(go.d/sd\): better prometheus exporters detection [\#20348](https://github.com/netdata/netdata/pull/20348) ([ilyam8](https://github.com/ilyam8))
+- Updated configuration reference [\#20347](https://github.com/netdata/netdata/pull/20347) ([kanelatechnical](https://github.com/kanelatechnical))
 - fix\(go.d/dyncfg\): fix duplicate potential "name" in userconfig action [\#20346](https://github.com/netdata/netdata/pull/20346) ([ilyam8](https://github.com/ilyam8))
+- Split systemd-journal plugin and add Rust-based journal file reader [\#20345](https://github.com/netdata/netdata/pull/20345) ([vkalintiris](https://github.com/vkalintiris))
 - SNMP: \_generic-sip.yaml [\#20344](https://github.com/netdata/netdata/pull/20344) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_generic-rtp.yaml [\#20343](https://github.com/netdata/netdata/pull/20343) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_generic-lldp.yaml [\#20342](https://github.com/netdata/netdata/pull/20342) ([Ancairon](https://github.com/Ancairon))
@@ -458,15 +467,6 @@
 - Fix RRDDIM\_MEM storage engine index [\#19830](https://github.com/netdata/netdata/pull/19830) ([ktsaou](https://github.com/ktsaou))
 - improvement\(go.d/k8state\): add CronJob suspend status [\#19829](https://github.com/netdata/netdata/pull/19829) ([ilyam8](https://github.com/ilyam8))
 - Revert "fix rrdset name crash on rrdset obsoletion" [\#19828](https://github.com/netdata/netdata/pull/19828) ([ktsaou](https://github.com/ktsaou))
-- free strings judy arrays to show leaked strings [\#19827](https://github.com/netdata/netdata/pull/19827) ([ktsaou](https://github.com/ktsaou))
-- rrdhost name fix heap-use-after-free [\#19826](https://github.com/netdata/netdata/pull/19826) ([ktsaou](https://github.com/ktsaou))
-- use notice log level for "machine ID found" [\#19825](https://github.com/netdata/netdata/pull/19825) ([ilyam8](https://github.com/ilyam8))
-- build\(otel-collector\): update to v0.121.0 [\#19824](https://github.com/netdata/netdata/pull/19824) ([ilyam8](https://github.com/ilyam8))
-- Finding leaks No 2 [\#19823](https://github.com/netdata/netdata/pull/19823) ([ktsaou](https://github.com/ktsaou))
-- Free all memory on exit [\#19821](https://github.com/netdata/netdata/pull/19821) ([ktsaou](https://github.com/ktsaou))
-- Fix LSAN and memory leaks [\#19819](https://github.com/netdata/netdata/pull/19819) ([ktsaou](https://github.com/ktsaou))
-- Include libucontext in static builds to vendor libunwind even on POWER. [\#19817](https://github.com/netdata/netdata/pull/19817) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations docs [\#19816](https://github.com/netdata/netdata/pull/19816) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
