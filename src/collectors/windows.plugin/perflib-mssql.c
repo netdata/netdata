@@ -1595,7 +1595,7 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, struct mssql_lock_i
             "locks",
             "mssql.instance_resource_lock_wait",
             "Lock requests that required the caller to wait per resource.",
-            "locks/s",
+            "locks",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_LOCKS_WAIT,
@@ -1604,7 +1604,7 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, struct mssql_lock_i
 
         rrdlabels_add(mli->st_lockWait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mli->st_lockWait->rrdlabels, "resource", resource, RRDLABEL_SRC_AUTO);
-        mli->rd_lockWait = rrddim_add(mli->st_lockWait, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_lockWait = rrddim_add(mli->st_lockWait, "lock", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(mli->st_lockWait, mli->rd_lockWait, (collected_number)mli->lockWait.current.Data);
@@ -1625,7 +1625,7 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, struct mssql_lock_i
             "locks",
             "mssql.instance_resource_deadlocks",
             "Active lock requests that resulted in deadlock per resource.",
-            "deadlocks/s",
+            "deadlocks",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_LOCKS_DEADLOCK_PER_RESOURCE,
@@ -1634,7 +1634,7 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, struct mssql_lock_i
 
         rrdlabels_add(mli->st_deadLocks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mli->st_deadLocks->rrdlabels, "resource", resource, RRDLABEL_SRC_AUTO);
-        mli->rd_deadLocks = rrddim_add(mli->st_deadLocks, "deadlock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_deadLocks = rrddim_add(mli->st_deadLocks, "deadlock", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(mli->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);

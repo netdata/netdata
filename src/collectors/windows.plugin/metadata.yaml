@@ -1939,7 +1939,7 @@ modules:
                 - name: benefit
             - name: mssql.instance_resource_deadlocks
               description: Active lock requests that resulted in deadlock per resource
-              unit: deadlocks/s
+              unit: deadlock
               chart_type: line
               dimensions:
                 - name: alloc_unit
@@ -1958,7 +1958,7 @@ modules:
                 - name: xact
             - name: mssql.instance_resource_lock_wait
               description: Active lock requests that required the caller to wait
-              unit: locks/s
+              unit: lock
               chart_type: line
               dimensions:
                 - name: alloc_unit
