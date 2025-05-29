@@ -24,6 +24,17 @@
 
 extern unsigned rrdeng_pages_per_extent;
 
+#define UNLINK_FILE(ctx, path, ret_var)                                                                                \
+    do {                                                                                                               \
+        uv_fs_t _req;                                                                                                  \
+        (ret_var) = uv_fs_unlink(NULL, &(_req), (path), NULL);                                                         \
+        if ((ret_var) < 0) {                                                                                           \
+            netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", (path), uv_strerror(ret_var));                     \
+            ctx_fs_error(ctx);                                                                                         \
+        }                                                                                                              \
+        uv_fs_req_cleanup(&(_req));                                                                                   \
+    } while (0)
+
 /* Forward declarations */
 struct rrdengine_instance;
 struct rrdeng_cmd;
@@ -375,6 +386,9 @@ struct rrdengine_instance {
 
     struct {
         uv_rwlock_t rwlock;                         // the linked list of datafiles is protected by this lock
+        bool disk_time;                             // true: delete for disk quota, false: delete for retention
+        bool pending_rotate;
+        bool pending_index;
         struct rrdengine_datafile *first;           // oldest - the newest with ->first->prev
     } datafiles;
 
@@ -535,7 +549,12 @@ static inline time_t max_acceptable_collected_time(void) {
     return now_realtime_sec() + 1;
 }
 
-void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
+void datafile_delete(
+    struct rrdengine_instance *ctx,
+    struct rrdengine_datafile *datafile,
+    bool update_retention,
+    bool disk_time,
+    bool worker);
 
 // --------------------------------------------------------------------------------------------------------------------
 // the following functions are used to sort UUIDs in the journal files
