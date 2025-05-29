@@ -1736,6 +1736,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     struct rrdengine_datafile *datafile = NULL;
 
+    bool index_once = false;
     while ((datafile = release_and_aquire_next_datafile_for_indexing(ctx, datafile))) {
 
         spinlock_lock(&datafile->writers.spinlock);
@@ -1750,7 +1751,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             continue;
         }
 
-        if (unlikely(rrdeng_ctx_tier_cap_exceeded(ctx))) {
+        if (index_once && unlikely(rrdeng_ctx_tier_cap_exceeded(ctx))) {
             nd_log_daemon(
                 NDLP_INFO, "DBENGINE: tier %d reached quota limit, stopping journal indexing", ctx->config.tier);
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
@@ -1763,8 +1764,11 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
 
+        index_once = true;
+
         count++;
 
+        // check if we are shutting down
         if (unlikely(!ctx_is_available_for_queries(ctx))) {
             datafile_release(datafile, DATAFILE_ACQUIRE_INDEXING);
             break;
