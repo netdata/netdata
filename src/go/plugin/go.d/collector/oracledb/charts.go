@@ -319,21 +319,22 @@ var (
 	}
 )
 
-func (c *Collector) addTablespaceCharts(tablespace string) {
+func (c *Collector) addTablespaceCharts(ts tablespaceInfo) {
 	charts := tablespaceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, tablespace))
+		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, ts.name))
 		chart.Labels = []module.Label{
-			{Key: "tablespace", Value: tablespace},
+			{Key: "tablespace", Value: ts.name},
+			{Key: "autoextend_status", Value: ts.autoExtent},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, tablespace)
+			dim.ID = fmt.Sprintf(dim.ID, ts.name)
 		}
 	}
 
 	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add tablespace '%s' charts: %v", tablespace, err)
+		c.Warningf("failed to add tablespace '%s' charts: %v", ts.name, err)
 	}
 }
 

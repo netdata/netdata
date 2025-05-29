@@ -34,6 +34,10 @@ modules:
           - `v$system_wait_class`
           - `dba_data_files`
           - `dba_free_space`
+          - `dba_segments`
+          - `dba_temp_files`
+          - `dba_tablespaces`
+          - `v$temp_space_header`
       default_behavior:
         auto_detection:
           description: |
@@ -243,6 +247,8 @@ modules:
           labels:
             - name: tablespace
               description: Tablespace name.
+            - name: autoextend_status
+              description: Autoextend status (enabled, disabled).
           metrics:
             - name: oracledb.tablespace_utilization
               description: Tablespace Utilization
