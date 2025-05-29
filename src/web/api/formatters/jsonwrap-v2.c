@@ -457,8 +457,8 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         
         buffer_json_member_add_uint64(wb, "tiers", nd_profile.storage_tiers);
         buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
-        buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
-        buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
+        buffer_json_member_add_time_t_formatted(wb, "first_entry", qt->db.first_time_s, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "last_entry", qt->db.last_time_s, options & RRDR_OPTION_RFC3339);
 
         query_target_combined_units_v2(wb, qt, r->internal.contexts, true);
         buffer_json_member_add_object(wb, "dimensions");
@@ -476,8 +476,8 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
             buffer_json_member_add_uint64(wb, "queries", qt->db.tiers[tier].queries);
             buffer_json_member_add_uint64(wb, "points", qt->db.tiers[tier].points);
             buffer_json_member_add_time_t(wb, "update_every", qt->db.tiers[tier].update_every);
-            buffer_json_member_add_time_t(wb, "first_entry", qt->db.tiers[tier].retention.first_time_s);
-            buffer_json_member_add_time_t(wb, "last_entry", qt->db.tiers[tier].retention.last_time_s);
+            buffer_json_member_add_time_t_formatted(wb, "first_entry", qt->db.tiers[tier].retention.first_time_s, options & RRDR_OPTION_RFC3339);
+            buffer_json_member_add_time_t_formatted(wb, "last_entry", qt->db.tiers[tier].retention.last_time_s, options & RRDR_OPTION_RFC3339);
             buffer_json_object_close(wb);
         }
         buffer_json_array_close(wb);

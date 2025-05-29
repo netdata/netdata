@@ -47,58 +47,53 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     buffer_json_member_add_object(buffer, "properties");
 
     // Selection parameters
-    mcp_schema_add_array_param(buffer, "nodes",
-        "Nodes",
-        "Array of specific node names to include in the query.\n"
-        "If no nodes are specified, all nodes having data for the context in the specified time-frame will be queried.\n"
-        "Examples: [\"node1\", \"node2\", \"node3\"]\n"
-        "To discover available nodes, first use the " MCP_TOOL_LIST_NODES " tool.\n"
-        "Note: Wildcards are not supported. Use exact node names only.",
-        false);
+    mcp_schema_add_string_param(
+        buffer, "metric", "Metric Name",
+        "The exact metric (context) to query.\n"
+        "Use the '" MCP_TOOL_LIST_METRICS "' tool to discover available metrics.",
+        NULL, true);
 
-    mcp_schema_add_string_param(buffer, "context", "Context Name",
-                               "The exact context name to query. This parameter is required.\n"
-                               "To discover available contexts, first use the " MCP_TOOL_LIST_METRICS " tool.\n"
-                               "Note: Wildcards are not supported. Use exact context name only.",
-                               NULL, true);
-
-
-    mcp_schema_add_array_param(buffer, "instances",
-        "Instances Filter",
-        "List of specific instance names to include in the query.\n"
-        "Each instance must be an exact match - no wildcards or patterns allowed.\n"
-        "Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover available instances for a context.\n"
-        "If no instances are specified, all instances of the context are queried.\n"
-        "Example: [\"eth0\", \"eth1\", \"lo\"]",
-        false);
-
-    mcp_schema_add_array_param(buffer, "dimensions",
+    mcp_schema_add_array_param(
+        buffer, "dimensions",
         "Dimensions Filter",
-        "Array of specific dimension names to include in the query. This parameter is required and cannot be empty.\n"
-        "You must explicitly list every dimension you want to query.\n"
+        "Array of dimensions to include in the query.\n"
         "Examples: [\"read\", \"write\"] or [\"in\", \"out\"] or [\"used\", \"free\", \"cached\"]\n"
-        "To discover available dimensions, use the " MCP_TOOL_GET_METRICS_DETAILS " tool with the context.\n"
-        "Note: Wildcards are not supported. You must specify exact dimension names.",
-        true);
+        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover the available dimensions for a metric.");
 
-    mcp_schema_add_labels_object(buffer,
-        "Labels Filter",
-        "Filter using labels where each key maps to an array of exact values. "
-        "Values in the same array are ORed, different keys are ANDed. "
+    mcp_schema_add_labels_object(
+        buffer, "Labels Filter",
+        "Query only the instances with the given labels. "
         "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}\n"
-        "To discover available labels and their values, use the " MCP_TOOL_GET_METRICS_DETAILS " tool.\n"
-        "Note: Wildcards are not supported. Use exact label keys and values only.",
-        false);
+        "Values in the same array are ORed, different keys are ANDed. "
+        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available labels and values for a metric.");
+
+    mcp_schema_add_array_param(
+        buffer, "instances",
+        "Instances Filter",
+        "Query only the given instances.\n"
+        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available instances for a metric.\n"
+        "If no instances are specified, all instances of the metric are queried.\n"
+        "Example: [\"instance1\", \"instance2\", \"instance3\"]\n."
+        "IMPORTANT: when you have a choice, prefer to filter by labels instead of instances, because many monitored "
+        "components may change instance names over time.");
+
+    mcp_schema_add_array_param(
+        buffer, "nodes",
+        "Nodes Filter",
+        "Array of nodes to include in the query.\n"
+        "If no nodes are specified, all nodes having data for the given metrics in the specified time-frame will be queried.\n"
+        "Examples: [\"node1\", \"node2\", \"node3\"]\n"
+        "Use the '" MCP_TOOL_LIST_NODES "' tool to discover the available nodes.");
 
     // Add cardinality limit
     mcp_schema_add_cardinality_limit(buffer,
-        "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
-        "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.",
+        "Limit the response cardinality (number of dimensions, instances, labels, etc.). "
+        "When the limit is exceeded, the response will indicate how many items were omitted.",
         MCP_DATA_CARDINALITY_LIMIT,
         500);
 
     // Time parameters
-    mcp_schema_add_time_params(buffer, "data", true);
+    mcp_schema_add_time_params(buffer, "query window", true);
 
     buffer_json_member_add_object(buffer, "points");
     {
@@ -113,8 +108,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "number");
         buffer_json_member_add_string(buffer, "title", "Timeout");
-        buffer_json_member_add_string(buffer, "description", "Query timeout in milliseconds.");
-        buffer_json_member_add_uint64(buffer, "default", 30000);
+        buffer_json_member_add_string(buffer, "description", "Query timeout in seconds.");
+        buffer_json_member_add_uint64(buffer, "default", 60);
     }
     buffer_json_object_close(buffer); // timeout
 
@@ -122,13 +117,14 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Query Options");
-        buffer_json_member_add_string(buffer, "description", "Space-separated list of additional query options:\n\n"
-                                                             "'percentage': Return values as percentages of total\n\n"
-                                                             "'absolute' or 'absolute-sum': Return absolute values for stacked charts\n\n"
-                                                             "'display-absolute': Convert percentage values to absolute before application of grouping functions\n\n"
-                                                             "'all-dimensions': Include all dimensions, even those with just zero values\n\n"
-                                                             "Example: 'absolute percentage'");
-        buffer_json_member_add_string(buffer, "default", NULL);
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Space-separated list of additional query options:\n"
+            "'percentage': Return values as percentages of total\n"
+            "'absolute' or 'absolute-sum': Return absolute values for stacked charts\n"
+            "'display-absolute': Convert percentage values to absolute before application of grouping functions\n"
+            "'all-dimensions': Include all dimensions, even those with just zero values\n"
+            "Example: 'absolute percentage'");
     }
     buffer_json_object_close(buffer); // options
 
@@ -165,9 +161,11 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Time Group Options");
-        buffer_json_member_add_string(buffer, "description", "Additional options for time grouping. For 'percentile', specify a percentage (0-100). "
-                                                             "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
-        buffer_json_member_add_string(buffer, "default", NULL);
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Additional options for time grouping.\n"
+            "For 'percentile', specify a percentage (0-100).\n"
+            "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
     }
     buffer_json_object_close(buffer); // time_group_options
 
@@ -176,50 +174,80 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "number");
         buffer_json_member_add_string(buffer, "title", "Storage Tier");
-        buffer_json_member_add_string(buffer, "description", "Storage tier to query from.\n"
-                                                             "If not specified, Netdata will automatically pick the best tier based on the time-frame and points requested.");
-        buffer_json_member_add_string(buffer, "default", NULL);
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Storage tier to query from.\n"
+            "If not specified, Netdata will automatically pick the best tier based on the time-frame and points requested.\n"
+            "CAUTION: specifying a high-resolution tier (like 0) over long time-frames (like days) may consume significant system resources.");
     }
     buffer_json_object_close(buffer); // tier
 
     // Group by parameters
     buffer_json_member_add_object(buffer, "group_by");
     {
-        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", "Group By");
-        buffer_json_member_add_string(buffer, "description", "Specifies how to group metrics across different time-series. This parameter is required.\n\n"
-                                                             "'dimension': Groups metrics by dimension name across all instances/nodes. If monitoring disks having reads and writes, this will produce the aggregate read and writes for all disks of all nodes.\n\n"
-                                                             "'instance': Groups metrics by instance across all nodes. If monitoring disks, the result will be 1 metric per disk, aggregating its reads and writes.\n\n"
-                                                             "'node': Groups metrics from the same node. If monitoring disks, the result will be 1 metric per node, aggregating its reads and writes across all its disks.\n\n"
-                                                             "'label': Groups metrics with the same value for the specified label (requires group_by_label). Example: if the label has 2 values: physical and virtual, the result will be 2 metrics: physical and virtual.\n\n"
-                                                             "Multiple groupings can be combined, e.g., 'node,dimension' will produce separate read and write metrics for each node.");
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Specifies how to group metrics across different time-series.\n"
+            "- 'dimension': Groups by dimension name across all instances/nodes. Example: for disks it provides the aggregate of reads and writes across all disks of all nodes.\n"
+            "- 'instance': Groups by instance across all nodes. Example: for disks, it provides the aggregate per disk name (sda, sdb, etc), aggregating their reads and writes, across all nodes.\n"
+            "- 'node': Groups by node. Example: for disks, it provides one metric per node, aggregating reads and writes across all its disks.\n"
+            "- 'label': Groups by the given label key (use the parameter 'group_by_label' to set the key). Example: for disks, aggregate over key 'disk_type' to get an group all 'physical', 'virtual' and 'partition' separately.\n"
+            "Multiple groupings can be combined. Example: '[\"dimension\", \"label\"]'.");
+        buffer_json_member_add_array(buffer, "default");
+        buffer_json_add_array_item_string(buffer, "dimension");
+        buffer_json_array_close(buffer);
+        
+        // Define items schema with enum values
+        buffer_json_member_add_object(buffer, "items");
+        {
+            buffer_json_member_add_string(buffer, "type", "string");
+            buffer_json_member_add_array(buffer, "enum");
+            buffer_json_add_array_item_string(buffer, "dimension");
+            buffer_json_add_array_item_string(buffer, "instance");
+            buffer_json_add_array_item_string(buffer, "node");
+            buffer_json_add_array_item_string(buffer, "label");
+
+            // we don't offer these to MCP clients.
+            // buffer_json_add_array_item_string(buffer, "context");
+            // buffer_json_add_array_item_string(buffer, "units");
+            buffer_json_array_close(buffer);
+        }
+        buffer_json_object_close(buffer); // items
     }
     buffer_json_object_close(buffer); // group_by
 
-    mcp_schema_add_string_param(buffer, "group_by_label", "Group By Label",
-                               "When group_by includes 'label', this parameter specifies which label key to group by. For example, if metrics have a 'disk_type' label with values like 'ssd' or 'hdd', setting group_by_label to 'disk_type' would aggregate metrics separately for SSDs and HDDs.",
-                               NULL, false);
+    mcp_schema_add_string_param(
+        buffer, "group_by_label",
+        "Group By Label",
+        "When 'group_by' includes 'label', this parameter specifies the label key to group by.\n"
+        "Example: if metrics have an 'interface_type' label with values like 'real' or 'virtual', "
+        "setting 'group_by_label' to 'interface_type' would aggregate metrics separately for physical and virtual network interfaces.",
+        NULL, false);
 
     buffer_json_member_add_object(buffer, "aggregation");
     {
         buffer_json_member_add_string(buffer, "type", "string");
-        buffer_json_member_add_string(buffer, "title", "Aggregation Function");
-        buffer_json_member_add_string(buffer, "description", "Function to use when aggregating grouped metrics. This parameter is required.\n\n"
-                                                             "'sum': Sum of all grouped metrics (useful for additive metrics like bytes transferred, operations, etc.)\n\n"
-                                                             "'min': Minimum value among all grouped metrics (useful for finding best performance metrics)\n\n"
-                                                             "'max': Maximum value among all grouped metrics (useful for finding worst performance metrics, peak resource usage)\n\n"
-                                                             "'average': Average of all grouped metrics (CAUTION: When group_by doesn't include 'dimension', this averages different metric types together - e.g., CPU user + system + idle - which is rarely meaningful)\n\n"
-                                                             "'percentage': Expresses each grouped metric as a percentage of its group's total (useful for seeing proportional contributions)\n\n"
-                                                             "'extremes': For each group, shows maximum value for positive metrics and minimum value for negative metrics (useful for showing both highest peaks and lowest dips)");
-        
+        buffer_json_member_add_string(buffer, "title", "Aggregation Method");
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Method to use when aggregating grouped metrics.\n"
+            "- 'sum': Sum of all grouped metrics (useful for additive metrics like bytes transferred, operations, etc.)\n"
+            "- 'min': Minimum value among all grouped metrics (useful for finding best performance metrics)\n"
+            "- 'max': Maximum value among all grouped metrics (useful for finding worst performance metrics, peak resource usage)\n"
+            "- 'extremes': When values are both positive and negative, shows the maximum value for positive metrics and the minimum value for negative metrics\n"
+            "- 'average': Average of all grouped metrics (CAUTION: When 'group_by' doesn't include 'dimension', this averages different metric types together - e.g., CPU user + system + idle - which is rarely meaningful)\n"
+            "- 'percentage': Expresses each grouped metric as a percentage of its group's total (useful for seeing proportional contributions)\n");
+
         // Define enum of possible values
         buffer_json_member_add_array(buffer, "enum");
         buffer_json_add_array_item_string(buffer, "sum");
         buffer_json_add_array_item_string(buffer, "min");
         buffer_json_add_array_item_string(buffer, "max");
+        buffer_json_add_array_item_string(buffer, "extremes");
         buffer_json_add_array_item_string(buffer, "average");
         buffer_json_add_array_item_string(buffer, "percentage");
-        buffer_json_add_array_item_string(buffer, "extremes");
         buffer_json_array_close(buffer);
     }
     buffer_json_object_close(buffer); // aggregation
@@ -228,7 +256,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
 
     // Required fields
     buffer_json_member_add_array(buffer, "required");
-    buffer_json_add_array_item_string(buffer, "context");
+    buffer_json_add_array_item_string(buffer, "metric");
     buffer_json_add_array_item_string(buffer, "dimensions");
     buffer_json_add_array_item_string(buffer, "after");
     buffer_json_add_array_item_string(buffer, "before");
@@ -273,11 +301,11 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     usec_t received_ut = now_monotonic_usec();
     
     // Extract and validate context parameter
-    const char *context = mcp_params_extract_string(params, "context", NULL);
+    const char *context = mcp_params_extract_string(params, "metric", NULL);
     
     // Validate required parameters with detailed error messages
     if (!context || !*context) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'context'. This parameter specifies which metric context to query. Use the " MCP_TOOL_LIST_METRICS " tool to discover available contexts.");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'metric'. Use the '" MCP_TOOL_LIST_METRICS "' tool to discover available metrics/contexts.");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -294,17 +322,17 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     struct json_object *group_by_obj = NULL, *aggregation_obj = NULL, *dimensions_obj = NULL;
     
     if (!json_object_object_get_ex(params, "dimensions", &dimensions_obj) || !dimensions_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. This parameter specifies which dimensions to include in the query. Use [] to include all dimensions, or specify an array of dimension names like [\"read\", \"write\"].");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. Use the '" MCP_TOOL_LIST_METRICS "' to get the list of dimensions for this metric/context.");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "after", &after_obj) || !after_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (epoch timestamp in seconds or negative value for relative time).");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (Unix epoch timestamp in seconds, or negative value relative to 'before', or RFC3339 datetime string).");
         return MCP_RC_BAD_REQUEST;
     }
     
     if (!json_object_object_get_ex(params, "before", &before_obj) || !before_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'before'. This parameter defines the end time for your query (epoch timestamp in seconds or negative value for relative time).");
+        buffer_sprintf(mcpc->error, "Missing required parameter 'before'. This parameter defines the end time for your query (Unix epoch timestamp in seconds, or negative value relative to now, or RFC3339 datetime string).");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -389,7 +417,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     if (array_len == 0) {
         buffer_sprintf(mcpc->error, "The 'dimensions' parameter cannot be an empty array. "
                                     "You must explicitly list every dimension you want to query. "
-                                    "Use the " MCP_TOOL_GET_METRICS_DETAILS " tool to discover available dimensions for the context '%s'.", context);
+                                    "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context '%s'.", context);
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -459,7 +487,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     }
     
     const char *timeout_error = NULL;
-    int timeout = mcp_params_extract_timeout(params, "timeout", 0, 0, 3600, &timeout_error);
+    long timeout = mcp_params_extract_timeout(params, "timeout", 0, 0, 3600, &timeout_error);
     if (timeout_error) {
         buffer_sprintf(mcpc->error, "%s", timeout_error);
         return MCP_RC_BAD_REQUEST;
@@ -497,9 +525,20 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         },
     };
     
-    const char *group_by_str = mcp_params_extract_string(params, "group_by", NULL);
-    if (group_by_str && *group_by_str)
+    // Handle group_by array parameter and convert to comma-separated string
+    CLEAN_BUFFER *group_by_buffer = NULL;
+    const char *group_by_str = NULL;
+    
+    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", false, MCP_TOOL_GET_METRICS_DETAILS, &error);
+    if (error) {
+        buffer_sprintf(mcpc->error, "Invalid group_by parameter: %s", error);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    if (group_by_buffer && buffer_strlen(group_by_buffer) > 0) {
+        group_by_str = buffer_tostring(group_by_buffer);
         group_by[0].group_by = group_by_parse(group_by_str);
+    }
     
     const char *group_by_label = mcp_params_extract_string(params, "group_by_label", NULL);
     if (group_by_label && *group_by_label) {
@@ -534,7 +573,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         .instances = NULL,          // Don't use instances parameter here (we use scope_instances)
         .dimensions = NULL,         // Don't use dimensions parameter here (we use scope_dimensions)
         .alerts = NULL,
-        .timeout_ms = timeout,
+        .timeout_ms = timeout * MSEC_PER_SEC,
         .points = points,
         .format = DATASOURCE_JSON2,
         .options = options |
@@ -594,7 +633,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                 error_desc = "bad request parameters";
                 break;
             case HTTP_RESP_NOT_FOUND:
-                error_desc = "context or metrics not found";
+                error_desc = "metric/context not found";
                 break;
             case HTTP_RESP_GATEWAY_TIMEOUT:
             case HTTP_RESP_SERVICE_UNAVAILABLE:

@@ -15,9 +15,6 @@ static MCP_RETURN_CODE execute_weights_request(
     WEIGHTS_METHOD method,
     const char *default_time_group
 ) {
-    // Initialize response
-    mcp_init_success_result(mcpc, id);
-    
     // Extract time parameters using common parsing functions
     time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
     time_t before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
@@ -39,7 +36,7 @@ static MCP_RETURN_CODE execute_weights_request(
     
     // Parse filter parameters using common parsing functions
     // Use CLEAN_BUFFER for automatic cleanup
-    CLEAN_BUFFER *contexts_buffer = NULL;
+    CLEAN_BUFFER *metrics_buffer = NULL;
     CLEAN_BUFFER *nodes_buffer = NULL;
     CLEAN_BUFFER *instances_buffer = NULL;
     CLEAN_BUFFER *dimensions_buffer = NULL;
@@ -47,11 +44,11 @@ static MCP_RETURN_CODE execute_weights_request(
     
     const char *error = NULL;
     
-    // Parse contexts as array
-    contexts_buffer = mcp_params_parse_contexts_array(params, false, MCP_TOOL_LIST_METRICS, &error);
+    // Parse metrics as array
+    metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, MCP_TOOL_LIST_METRICS, &error);
     if (error) {
         buffer_flush(mcpc->error);
-        buffer_sprintf(mcpc->error, "Invalid contexts parameter: %s", error);
+        buffer_sprintf(mcpc->error, "Invalid metrics parameter: %s", error);
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -122,7 +119,7 @@ static MCP_RETURN_CODE execute_weights_request(
         .version = 2,
         .host = NULL,  // Will query all hosts
         .scope_nodes = buffer_tostring(nodes_buffer),
-        .scope_contexts = buffer_tostring(contexts_buffer),
+        .scope_contexts = buffer_tostring(metrics_buffer),
         .scope_instances = buffer_tostring(instances_buffer),
         .scope_labels = buffer_tostring(labels_buffer),
         .scope_dimensions = buffer_tostring(dimensions_buffer),
@@ -165,7 +162,6 @@ static MCP_RETURN_CODE execute_weights_request(
     
     // Handle response
     if (http_code != HTTP_RESP_OK) {
-        buffer_flush(mcpc->result);
         buffer_flush(mcpc->error);
         
         switch (http_code) {
@@ -187,6 +183,9 @@ static MCP_RETURN_CODE execute_weights_request(
         }
     }
     
+    // Initialize response
+    mcp_init_success_result(mcpc, id);
+
     // Wrap the response in MCP JSON-RPC format
     buffer_json_member_add_array(mcpc->result, "content");
     {
@@ -235,37 +234,31 @@ static void add_weights_time_parameters(BUFFER *buffer, bool include_baseline, b
 
 // Schema helper for common filter parameters
 static void add_weights_filter_parameters(BUFFER *buffer) {
-    mcp_schema_add_contexts_array(buffer,
-        "Filter by metric contexts",
-        "Array of exact context names to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries']). "
-        "Wildcards are not supported. Use exact context names only.",
-        false);
+    mcp_schema_add_array_param(
+        buffer, "metrics",
+        "Filter by metrics",
+        "Array of metrics (contexts) to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries'])");
     
-    mcp_schema_add_array_param(buffer, "nodes",
+    mcp_schema_add_array_param(
+        buffer, "nodes",
         "Filter by nodes",
-        "Array of exact node names to filter (e.g., ['web-server-1', 'database-primary']). "
-        "Wildcards are not supported. Use exact node names only.",
-        false);
+        "Array of nodes to filter (e.g., ['web-server-1', 'database-primary'])");
     
-    mcp_schema_add_array_param(buffer, "instances",
+    mcp_schema_add_array_param(
+        buffer, "instances",
         "Filter by instances",
-        "Array of exact instance names to filter (e.g., ['eth0', 'sda', 'production_db']). "
-        "Wildcards are not supported. Use exact instance names only.",
-        false);
+        "Array of metric instances to filter (e.g., ['eth0', 'sda', 'production_db'])");
     
     mcp_schema_add_array_param(buffer, "dimensions",
         "Filter by dimensions",
-        "Array of exact dimension names to filter (e.g., ['user', 'writes', 'slow_queries']). "
-        "Wildcards are not supported. Use exact dimension names only.",
-        false);
+        "Array of dimension names to filter (e.g., ['user', 'writes', 'slow_queries'])");
     
     mcp_schema_add_labels_object(buffer,
         "Filter by labels",
         "Filter using labels where each key maps to an array of exact values. "
         "Values in the same array are ORed, different keys are ANDed. "
         "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}\n"
-        "Note: Wildcards are not supported. Use exact label keys and values only.",
-        false);
+        "Note: Wildcards are not supported. Use exact label keys and values only.");
 }
 
 // find_correlated_metrics implementation

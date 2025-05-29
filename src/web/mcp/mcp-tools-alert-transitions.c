@@ -20,8 +20,7 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         "Each node must be an exact match - no wildcards or patterns allowed. "
         "Use 'list_nodes' to discover available nodes. "
         "If not specified, all nodes are included. "
-        "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]",
-        false);
+        "Examples: [\"node1\", \"node2\"], [\"web-server-01\", \"db-server-01\"]");
     
     // Time range
     mcp_schema_add_time_params(buffer, 

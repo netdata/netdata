@@ -85,7 +85,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
                     snprintf(error_buffer, sizeof(error_buffer),
                             "must contain exact values, not patterns. "
                             "Wildcards are not supported. "
-                            "Use the %s tool to discover exact values.", list_tool);
+                            "Use the '%s' tool to discover exact values.", list_tool);
                 } else {
                     snprintf(error_buffer, sizeof(error_buffer),
                             "must contain exact values, not patterns. Wildcards are not supported.");
@@ -102,16 +102,6 @@ BUFFER *mcp_params_parse_array_to_pattern(
     }
     
     return wb;  // Success - return the buffer
-}
-
-// Parse contexts parameter as an array
-BUFFER *mcp_params_parse_contexts_array(
-    struct json_object *params,
-    bool allow_wildcards,
-    const char *list_tool,
-    const char **error_message
-) {
-    return mcp_params_parse_array_to_pattern(params, "contexts", allow_wildcards, list_tool, error_message);
 }
 
 // Parse labels object parameter
@@ -204,8 +194,7 @@ void mcp_schema_add_array_param(
     BUFFER *buffer,
     const char *param_name,
     const char *title,
-    const char *description,
-    bool required
+    const char *description
 ) {
     buffer_json_member_add_object(buffer, param_name);
     {
@@ -215,34 +204,15 @@ void mcp_schema_add_array_param(
         buffer_json_member_add_object(buffer, "items");
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_object_close(buffer); // items
-        if (!required) {
-            buffer_json_member_add_string(buffer, "default", NULL);
-        }
     }
     buffer_json_object_close(buffer);
-}
-
-// Add contexts array parameter schema
-void mcp_schema_add_contexts_array(
-    BUFFER *buffer,
-    const char *title,
-    const char *description,
-    bool required
-) {
-    mcp_schema_add_array_param(buffer, "contexts", 
-        title ? title : "Filter by metric contexts",
-        description ? description : 
-            "Array of exact context names to include (e.g., ['system.cpu', 'disk.io']). "
-            "Wildcards are not supported. Use exact context names only.",
-        required);
 }
 
 // Add labels object parameter schema
 void mcp_schema_add_labels_object(
     BUFFER *buffer,
     const char *title,
-    const char *description,
-    bool required
+    const char *description
 ) {
     buffer_json_member_add_object(buffer, "labels");
     {
@@ -263,9 +233,6 @@ void mcp_schema_add_labels_object(
             buffer_json_object_close(buffer); // items
         }
         buffer_json_object_close(buffer); // additionalProperties
-        if (!required) {
-            buffer_json_member_add_string(buffer, "default", NULL);
-        }
     }
     buffer_json_object_close(buffer); // labels
 }
@@ -309,9 +276,11 @@ void mcp_schema_add_cardinality_limit(
     buffer_json_member_add_object(buffer, "cardinality_limit");
     {
         buffer_json_member_add_string(buffer, "type", "number");
-        buffer_json_member_add_string(buffer, "title", "Maximum results");
-        buffer_json_member_add_string(buffer, "description", 
-            description ? description : "Maximum number of items to return");
+        buffer_json_member_add_string(buffer, "title", "Cardinality Limit");
+        buffer_json_member_add_string(
+            buffer, "description",
+            description ? description : "When multiple nodes, instances, dimensions, labels are queried, "
+                                        "limit their numbers to prevent response size explosion.");
         
         if (default_value > 0)
             buffer_json_member_add_uint64(buffer, "default", default_value);
@@ -472,7 +441,7 @@ void mcp_schema_add_string_param(
         buffer_json_member_add_string(buffer, "title", title);
         buffer_json_member_add_string(buffer, "description", description);
         
-        if (!required)
+        if (!required && default_value)
             buffer_json_member_add_string(buffer, "default", default_value);
     }
     buffer_json_object_close(buffer);

@@ -250,8 +250,8 @@ static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *
     }
 
     // Flush buffers before processing the request
-    buffer_flush(mcpc->result);
-    buffer_flush(mcpc->error);
+    buffer_reset(mcpc->result);
+    buffer_reset(mcpc->error);
     
     // Extract JSON-RPC fields
     struct json_object *method_obj = NULL;

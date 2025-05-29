@@ -20,17 +20,6 @@ BUFFER *mcp_params_parse_array_to_pattern(
     const char **error_message
 );
 
-// Parse contexts parameter as an array and convert to pipe-separated string
-// Returns newly allocated BUFFER on success, or NULL if not provided/on error
-// Sets error_message on failure
-// list_tool: tool name to recommend for discovering exact values (e.g., MCP_TOOL_LIST_METRICS)
-BUFFER *mcp_params_parse_contexts_array(
-    struct json_object *params,
-    bool allow_wildcards,
-    const char *list_tool,
-    const char **error_message
-);
-
 // Parse labels object parameter and convert to query string format
 // Returns newly allocated BUFFER on success, or NULL if not provided/on error
 // Sets error_message on failure
@@ -41,32 +30,19 @@ BUFFER *mcp_params_parse_labels_object(
     const char **error_message
 );
 
-
-// Common schema generation functions
-
 // Add array parameter schema (for nodes, instances, dimensions)
 void mcp_schema_add_array_param(
     BUFFER *buffer,
     const char *param_name,
     const char *title,
-    const char *description,
-    bool required
-);
-
-// Add contexts array parameter schema
-void mcp_schema_add_contexts_array(
-    BUFFER *buffer,
-    const char *title,
-    const char *description,
-    bool required
+    const char *description
 );
 
 // Add labels object parameter schema
 void mcp_schema_add_labels_object(
     BUFFER *buffer,
     const char *title,
-    const char *description,
-    bool required
+    const char *description
 );
 
 // Add time window parameters (after, before) to schema
