@@ -1063,7 +1063,8 @@ time_t find_uuid_first_time(
         journalfile_v2_data_release(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
         if (!any_matching) {
-            datafile_release(datafile, DATAFILE_ACQUIRE_RETENTION);
+            if (datafile)
+                datafile_release(datafile, DATAFILE_ACQUIRE_RETENTION);
             break;
         }
     }
