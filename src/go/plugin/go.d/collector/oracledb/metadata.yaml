@@ -248,7 +248,7 @@ modules:
             - name: tablespace
               description: Tablespace name.
             - name: autoextend_status
-              description: Autoextend status (enabled, disabled).
+              description: Autoextend status (enabled, disabled, mixed).
           metrics:
             - name: oracledb.tablespace_utilization
               description: Tablespace Utilization
