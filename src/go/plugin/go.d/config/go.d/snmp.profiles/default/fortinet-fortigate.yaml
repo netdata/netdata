@@ -68,7 +68,6 @@ metrics:
   ### CPU
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
-      # Current CPU usage (percentage).
       OID: 1.3.6.1.4.1.12356.101.4.1.3.0
       name: fgSysCpuUsage
       description: Current CPU usage
@@ -76,31 +75,27 @@ metrics:
       unit: "%"
 
   ### Processors
-  # Only valid for processors types that support these statistics.
   - MIB: FORTINET-FORTIGATE-MIB
     table:
       OID: 1.3.6.1.4.1.12356.101.4.4.2
       name: fgProcessorTable
     metric_type: monotonic_count_and_rate
     symbols:
-      # The total number of packets received by this processor.
       - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.6
         name: fgProcessorPktRxCount
         description: Number of packets received by this processor
-        family: Fortinet/Fortigate/Network/Received
-        unit: "{received}"
-      # The total number of packets transmitted by this processor.
+        family: Fortinet/Fortigate/CPU/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.7
         name: fgProcessorPktTxCount
         description: Number of packets transmitted by this processor
-        family: Fortinet/Fortigate/Network/Transmitted
-        unit: "{transmitted}"
-      # The total number of packets dropped by this processor.
+        family: Fortinet/Fortigate/CPU/Packets
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.8
         name: fgProcessorPktDroppedCount
         description: Number of packets dropped by this processor
-        family: Fortinet/Fortigate/Network/Dropped
-        unit: "{dropped}"
+        family: Fortinet/Fortigate/CPU/Packets
+        unit: "{drop}"
     metric_tags:
       # A unique identifier within the fgProcessorTable.
       - tag: processor_index
@@ -138,7 +133,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.101.4.1.4.0
       name: fgSysMemUsage
       description: Current memory utilization
-      family: Fortinet/Fortigate/Memory/Utilization
+      family: Fortinet/Fortigate/Memory
       unit: "%"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -204,7 +199,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.4
         name: fgVdEntHaState
         description: HA cluster member state of the virtual domain
-        family: Fortinet/Fortigate/Virtual Domains/High Availability Clusters
+        family: Fortinet/Fortigate/Virtual Domains/High Availability
         unit: "{status}"
         mapping:
           1: master
@@ -227,7 +222,7 @@ metrics:
         name: fgVdEntSesCount
         description: Number of active sessions on the virtual domain
         family: Fortinet/Fortigate/Virtual Domains/Sessions
-        unit: "{active}"
+        unit: "{session}"
       # The session setup rate on the virtual domain.
       - OID: 1.3.6.1.4.1.12356.101.3.2.1.1.8
         name: fgVdEntSesRate
@@ -287,26 +282,26 @@ metrics:
 
   ### Interfaces
   # Fortinet specific extensions to MIB-2 ifTable.
-  - MIB: FORTINET-FORTIGATE-MIB
-    table:
-      OID: 1.3.6.1.4.1.12356.101.7.2.1
-      name: fgIntfTable
-    symbols:
-      - OID: 1.3.6.1.4.1.12356.101.7.2.1.1.1
-        name: fgIntfEntVdom
-        description: The virtual domain the interface belongs to. This index corresponds to the index used by fgVdTable.
-        unit: "1"
-    metric_tags:
-      - tag: virtualdomain_index
-        symbol:
-          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
-          name: fgVdEntIndex
-      - MIB: IF-MIB
-        symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        table: ifXTable
-        tag: interface
+  #  - MIB: FORTINET-FORTIGATE-MIB
+  #    table:
+  #      OID: 1.3.6.1.4.1.12356.101.7.2.1
+  #      name: fgIntfTable
+  #    symbols:
+  #      - OID: 1.3.6.1.4.1.12356.101.7.2.1.1.1
+  #        name: fgIntfEntVdom
+  #        description: The virtual domain the interface belongs to. This index corresponds to the index used by fgVdTable.
+  #        unit: "1"
+  #    metric_tags:
+  #      - tag: virtualdomain_index
+  #        symbol:
+  #          OID: 1.3.6.1.4.1.12356.101.3.2.1.1.1
+  #          name: fgVdEntIndex
+  #      - MIB: IF-MIB
+  #        symbol:
+  #          OID: 1.3.6.1.2.1.31.1.1.1.1
+  #          name: ifName
+  #        table: ifXTable
+  #        tag: interface
 
   ### Sessions
   - MIB: FORTINET-FORTIGATE-MIB
@@ -316,7 +311,7 @@ metrics:
       name: fgSysSesCount
       description: Number of active sessions on the device
       family: Fortinet/Fortigate/Sessions
-      unit: "{active}"
+      unit: "{session}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
       # The average session setup rate over the past minute.
@@ -331,7 +326,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.101.4.1.15.0
       name: fgSysSes6Count
       description: Number of active IPv6 sessions on the device
-      family: Fortinet/Fortigate/Sessions/IPv6
+      family: Fortinet/Fortigate/Sessions
       unit: "{session}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -339,7 +334,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.101.4.1.16.0
       name: fgSysSes6Rate1
       description: Average IPv6 session setup rate over the past minute
-      family: Fortinet/Fortigate/Sessions/IPv6
+      family: Fortinet/Fortigate/Sessions
       unit: "1.s"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -347,7 +342,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.101.10.100.4.0
       name: fgApHTTPConnections
       description: Current number of HTTP proxy connections
-      family: Fortinet/Fortigate/Connections/HTTP/Proxy
+      family: Fortinet/Fortigate/HTTPProxy/Connections
       unit: "{connection}"
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
@@ -355,7 +350,7 @@ metrics:
       OID: 1.3.6.1.4.1.12356.101.10.100.5.0
       name: fgApHTTPMaxConnections
       description: Maximum number of connections supported by HTTP proxy
-      family: Fortinet/Fortigate/Connections/HTTP/Proxy
+      family: Fortinet/Fortigate/HTTP/Proxy/Connections
       unit: "{connection}"
 
   ### Firewall
@@ -371,7 +366,7 @@ metrics:
         name: fgFwPolPktCount
         description: Number of packets matched to firewall policy
         family: Fortinet/Fortigate/Firewall/Policy/Packets
-        unit: "{matched}"
+        unit: "{packet}"
       # Number of bytes in packets matching the policy.
       - OID: 1.3.6.1.4.1.12356.101.5.1.2.1.1.3
         name: fgFwPolByteCount
