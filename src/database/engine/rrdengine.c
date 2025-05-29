@@ -1746,11 +1746,13 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
         bool available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
         spinlock_unlock(&datafile->writers.spinlock);
 
+        journalfile_v1_generate_path(datafile, path, sizeof(path));
+
         if(!available) {
             nd_log_daemon(NDLP_NOTICE,
-                   "DBENGINE: journal file %u needs to be indexed, but it has writers working on it - "
+                   "DBENGINE: journal file \"%s\" needs to be indexed, but it has writers working on it - "
                    "skipping it for now",
-                   datafile->fileno);
+                   path);
             continue;
         }
 
@@ -1761,8 +1763,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             datafile_release(datafile, DATAFILE_ACQUIRE_INDEXING);
             break;
         }
-        journalfile_v1_generate_path(datafile, path, sizeof(path));
-        nd_log_daemon(NDLP_INFO, "DBENGINE: journal file '%s' is ready to be indexed", path);
+        nd_log_daemon(NDLP_INFO, "DBENGINE: journal file \"%s\" is ready to be indexed", path);
 
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);

@@ -189,20 +189,14 @@ int close_data_file(struct rrdengine_datafile *datafile)
 int unlink_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
 
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
+    UNLINK_FILE(ctx, path, ret);
+    if (ret == 0)
+        __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
 
     return ret;
 }
@@ -488,7 +482,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
     char path[RRDENG_PATH_MAX];
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "DBENGINE: creating new data and journal files in path %s",
+           "DBENGINE: creating new data and journal files in path \"%s\"",
            ctx->config.dbfiles_path);
 
     datafile = datafile_alloc_and_init(ctx, 1, fileno);
@@ -497,8 +491,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
         goto error_after_datafile;
 
     generate_datafilepath(datafile, path, sizeof(path));
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "DBENGINE: created data file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: created data file \"%s\".", path);
 
     journalfile = journalfile_alloc_and_init(datafile);
     ret = journalfile_create(journalfile, datafile);
@@ -506,8 +499,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
         goto error_after_journalfile;
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "DBENGINE: created journal file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: created journal file \"%s\".", path);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile, having_lock);
