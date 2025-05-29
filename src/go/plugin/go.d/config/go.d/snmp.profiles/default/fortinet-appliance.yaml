@@ -378,7 +378,7 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.103.9.2.1.6
         name: fmHaPeerEntState
         description: Peer status
-        family: Fortinet/FMG-FAZ/High Availability/Peers
+        family: Fortinet/FMG-FAZ/High Availability
         unit: "{status}"
         mapping:
           0: down
