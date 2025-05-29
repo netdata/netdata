@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-
 // the default value is set in ND_PROFILE, not here
 time_t dbengine_journal_v2_unmount_time = 120;
 
@@ -265,8 +264,8 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
             if (nd_munmap(journalfile->mmap.data, journalfile->mmap.size)) {
                 char path[RRDENG_PATH_MAX];
                 journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
-                netdata_log_error("DBENGINE: failed to unmap index file '%s'", path);
-                internal_fatal(true, "DBENGINE: failed to unmap file '%s'", path);
+                netdata_log_error("DBENGINE: failed to unmap index file \"%s\"", path);
+                internal_fatal(true, "DBENGINE: failed to unmap file \"%s\"", path);
                 ctx_fs_error(datafile_ctx(journalfile->datafile));
             }
             else {
@@ -430,6 +429,9 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
     njfv2idx_remove(journalfile->datafile);
 
     bool has_references = false;
+    char path_v2[RRDENG_PATH_MAX];
+
+    journalfile_v2_generate_path(journalfile->datafile, path_v2, sizeof(path_v2));
 
     do {
         if (has_references)
@@ -450,7 +452,8 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
         }
         else {
             has_references = true;
-            internal_error(true, "DBENGINE JOURNALFILE: waiting for journalfile to be available to unmap...");
+            nd_log_limit_static_global_var(journalfile_erl, 10, 0);
+            nd_log_limit(&journalfile_erl, NDLS_DAEMON, NDLP_WARNING, "DBENGINE: journalfile \"%s\" is not available for unmap", path_v2);
         }
 
         spinlock_unlock(&journalfile->data_spinlock);
@@ -478,7 +481,7 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
         journalfile_v1_generate_path(datafile, path, sizeof(path));
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(\"%s\"): %s", path, uv_strerror(ret));
         ctx_fs_error(datafile_ctx(datafile));
     }
     uv_fs_req_cleanup(&req);
@@ -499,20 +502,14 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 {
     struct rrdengine_datafile *datafile = journalfile->datafile;
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
-    char path[RRDENG_PATH_MAX];
 
+    char path[RRDENG_PATH_MAX];
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+    UNLINK_FILE(ctx, path, ret);
+    if (ret == 0)
+        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
 
     return ret;
 }
@@ -520,7 +517,6 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
@@ -528,32 +524,20 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
 
-    if (journalfile->file) {
-        ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
-        if (ret < 0) {
-            netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-            ctx_fs_error(ctx);
-        }
-        uv_fs_req_cleanup(&req);
+    if (journalfile->file)
         (void)close_uv_file(datafile, journalfile->file);
-    }
 
     // This is the new journal v2 index file
-    ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    int deleted = 0;
+    UNLINK_FILE(ctx, path_v2, ret);
+    if (ret == 0)
+       deleted++;
 
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    UNLINK_FILE(ctx, path, ret);
+    if (ret == 0)
+        deleted++;
 
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 2, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.journalfile_deletions, deleted, __ATOMIC_RELAXED);
 
     if(journalfile_v2_data_available(journalfile))
         journalfile_v2_data_unmap_permanently(journalfile);
@@ -604,7 +588,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
         journalfile_destroy_unsafe(journalfile, datafile);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
-        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create journlfile %s", path);
+        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create journlfile \"%s\"", path);
         return ret;
     }
 
@@ -1074,13 +1058,13 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         if (errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
-        netdata_log_error("DBENGINE: failed to open '%s'", path_v2);
+        netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
         return 1;
     }
 
     ret = fstat(fd, &statbuf);
     if (ret) {
-        netdata_log_error("DBENGINE: failed to get file information for '%s'", path_v2);
+        netdata_log_error("DBENGINE: failed to get file information for \"%s\"", path_v2);
         close(fd);
         return 1;
     }
@@ -1088,7 +1072,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     journal_v2_file_size = (size_t)statbuf.st_size;
 
     if (journal_v2_file_size < sizeof(struct journal_v2_header)) {
-        error_report("Invalid file %s. Not the expected size", path_v2);
+        error_report("Invalid file \"%s\". Not the expected size", path_v2);
         close(fd);
         return 1;
     }
@@ -1100,7 +1084,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of '%s'", path_v2);
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of \"%s\"", path_v2);
 
     usec_t validation_start_ut = now_monotonic_usec();
 
@@ -1115,14 +1099,14 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     if (unlikely(rc)) {
         if (rc == 2)
-            error_report("File %s needs to be rebuilt", path_v2);
+            error_report("File \"%s\" needs to be rebuilt", path_v2);
         else if (rc == 3)
-            error_report("File %s will be skipped", path_v2);
+            error_report("File \"%s\" will be skipped", path_v2);
         else
-            error_report("File %s is invalid and it will be rebuilt", path_v2);
+            error_report("File \"%s\" is invalid and it will be rebuilt", path_v2);
 
         if (unlikely(nd_munmap(data_start, journal_v2_file_size)))
-            netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
+            netdata_log_error("DBENGINE: failed to unmap \"%s\"", path_v2);
 
         close(fd);
         return rc;
@@ -1133,7 +1117,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     if (unlikely(!entries)) {
         if (unlikely(nd_munmap(data_start, journal_v2_file_size)))
-            netdata_log_error("DBENGINE: failed to unmap '%s'", path_v2);
+            netdata_log_error("DBENGINE: failed to unmap \"%s\"", path_v2);
 
         close(fd);
         return 1;
@@ -1141,7 +1125,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     usec_t finished_ut = now_monotonic_usec();
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal v2 '%s' loaded, size: %0.2f MiB, metrics: %0.2f k, "
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal v2 \"%s\" loaded, size: %0.2f MiB, metrics: %0.2f k, "
          "mmap: %0.2f ms, validate: %0.2f ms"
          , path_v2
          , (double)journal_v2_file_size / 1024 / 1024
@@ -1318,7 +1302,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
-    netdata_log_info("DBENGINE: indexing file '%s': extents %zu, metrics %zu, pages %zu",
+    netdata_log_info("DBENGINE: indexing file \"%s\": extents %zu, metrics %zu, pages %zu",
         path,
         number_of_extents,
         number_of_metrics,
@@ -1357,7 +1341,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     int fd_v2;
     uint8_t *data_start = nd_mmap_advanced(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     if(!data_start) {
-        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file '%s'. Will retry later", total_file_size, path);
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
         return false;
     }
 
@@ -1510,7 +1494,9 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             internal_error(
                 true, "DBENGINE: FILE COMPLETED --------> %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
-            netdata_log_info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
+            char size_for_humans[128];
+            size_snprintf(size_for_humans, sizeof(size_for_humans), total_file_size, "B", false);
+            netdata_log_info("DBENGINE: migrated journal file \"%s\", file size %zu bytes (%s)", path, total_file_size, size_for_humans);
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
@@ -1523,12 +1509,12 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         }
     }
     else {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to write journal file '%s' (SIGBUS)", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to write journal file \"%s\" (SIGBUS)", path);
     }
 
     freez(uuid_list);
 
-    netdata_log_info("DBENGINE: failed to build index '%s', file will be skipped", path);
+    netdata_log_info("DBENGINE: failed to build index \"%s\", file will be skipped", path);
 
     nd_munmap(data_start, total_file_size);
     unlink(path);
@@ -1579,19 +1565,19 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     ret = journalfile_check_superblock(file);
     if (ret) {
-        netdata_log_info("DBENGINE: invalid journal file '%s' ; superblock check failed.", path);
+        netdata_log_info("DBENGINE: invalid journal file \"%s\" ; superblock check failed.", path);
         error = ret;
         goto cleanup;
     }
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: loading journal file '%s'", path);
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: loading journal file \"%s\"", path);
 
     max_id = journalfile_iterate_transactions(ctx, journalfile);
 
     __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file '%s' loaded (size:%" PRIu64 ").", path, file_size);
+    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {
@@ -1610,7 +1596,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 cleanup:
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
+        netdata_log_error("DBENGINE: uv_fs_close(\"%s\"): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);

@@ -33,6 +33,7 @@ typedef enum __attribute__ ((__packed__)) {
     DATAFILE_ACQUIRE_OPEN_CACHE = 0,
     DATAFILE_ACQUIRE_PAGE_DETAILS,
     DATAFILE_ACQUIRE_RETENTION,
+    DATAFILE_ACQUIRE_INDEXING,
 
     // terminator
     DATAFILE_ACQUIRE_MAX,
