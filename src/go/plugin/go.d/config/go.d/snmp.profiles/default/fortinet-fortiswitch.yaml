@@ -1,10 +1,10 @@
 extends:
   - fortinet.yaml
 sysobjectid:
-  - 1.3.6.1.4.1.12356.106.1.*       # FortiSwitch
-  - 1.3.6.1.4.1.12356.106.1.1486    # FortiSwitch-148F-FPOE
-  - 1.3.6.1.4.1.12356.106.1.1248    # FortiSwitch-148E-FPOE
-  - 1.3.6.1.4.1.12356.106.1.2485    # FortiSwitch-248E-POE
+  - 1.3.6.1.4.1.12356.106.1.* # FortiSwitch
+  - 1.3.6.1.4.1.12356.106.1.1486 # FortiSwitch-148F-FPOE
+  - 1.3.6.1.4.1.12356.106.1.1248 # FortiSwitch-148E-FPOE
+  - 1.3.6.1.4.1.12356.106.1.2485 # FortiSwitch-248E-POE
 metadata:
   device:
     fields:
@@ -15,31 +15,36 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.12356.106.4.1.2.0
-    description: Current CPU usage (percentage)
-    unit: "%"
+      description: Current CPU usage
+      family: Fortinet/FortiSwitch/CPU/Utilization
+      unit: "%"
   - MIB: FORTINET-FORTISWITCH-MIB
     symbol:
       name: memory.used
       OID: 1.3.6.1.4.1.12356.106.4.1.3.0
-    description: Current system memory usage (KB)
-    unit: "kBy"
+      description: Current system memory usage
+      family: Fortinet/FortiSwitch/Memory
+      unit: "kBy"
   - MIB: FORTINET-FORTISWITCH-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.12356.106.4.1.4.0
-    description: Total physical memory (RAM) installed (KB)
-    unit: "kBy"
+      description: Total physical memory installed
+      family: Fortinet/FortiSwitch/Memory
+      unit: "kBy"
   - MIB: FORTINET-FORTISWITCH-MIB
     symbol:
       name: fsSysDiskUsage
       OID: 1.3.6.1.4.1.12356.106.4.1.5.0
-    description: Current hard disk usage (KB), if disk is present
-    unit: "kBy"
+      description: Current hard disk usage
+      family: Fortinet/FortiSwitch/Storage/Disk
+      unit: "kBy"
   - MIB: FORTINET-FORTISWITCH-MIB
     symbol:
       name: fsSysDiskCapacity
       OID: 1.3.6.1.4.1.12356.106.4.1.6.0
-    description: Total hard disk capacity (KB), if disk is present
+    description: Total hard disk capacity
+    family: Fortinet/FortiSwitch/Storage/Disk
     unit: "kBy"
 metric_tags:
   - OID: 1.3.6.1.4.1.12356.106.1.1.1.0
