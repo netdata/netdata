@@ -32,6 +32,10 @@ It establishes a connection to the Oracle DB instance via a TCP or UNIX socket a
 - `v$system_wait_class`
 - `dba_data_files`
 - `dba_free_space`
+- `dba_segments`
+- `dba_temp_files`
+- `dba_tablespaces`
+- `v$temp_space_header`
 
 
 This collector is supported on all platforms.
@@ -103,6 +107,7 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 | tablespace | Tablespace name. |
+| autoextend_status | Autoextend status (enabled, disabled, mixed). |
 
 Metrics:
 
