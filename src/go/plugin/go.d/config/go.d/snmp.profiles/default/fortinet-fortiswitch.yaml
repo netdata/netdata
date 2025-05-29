@@ -16,7 +16,7 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.12356.106.4.1.2.0
       description: Current CPU usage
-      family: Fortinet/FortiSwitch/CPU/Utilization
+      family: Fortinet/FortiSwitch/CPU
       unit: "%"
   - MIB: FORTINET-FORTISWITCH-MIB
     symbol:
