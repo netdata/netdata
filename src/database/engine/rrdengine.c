@@ -1324,7 +1324,9 @@ void datafile_delete(
     freez(datafile);
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
-    netdata_log_info("DBENGINE: reclaimed %zu bytes of disk space.", deleted_bytes);
+    char size_for_humans[128];
+    size_snprintf(size_for_humans, sizeof(size_for_humans), deleted_bytes, "B", false);
+    netdata_log_info("DBENGINE: reclaimed %zu bytes (%s) of disk space.", deleted_bytes, size_for_humans);
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1723,7 +1725,7 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
             uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
             return datafile;
         }
-        nd_log_daemon(NDLP_INFO, "DBENGINE: Datafile %d CANNOT be locked for indexing; skipping", datafile->fileno);
+        nd_log_daemon(NDLP_INFO, "DBENGINE: Datafile %u CANNOT be locked for indexing; skipping", datafile->fileno);
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
     return NULL;
@@ -1735,6 +1737,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
 
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     struct rrdengine_datafile *datafile = NULL;
+    char path[RRDENG_PATH_MAX];
 
     bool index_once = false;
     while ((datafile = release_and_aquire_next_datafile_for_indexing(ctx, datafile))) {
@@ -1758,8 +1761,8 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             datafile_release(datafile, DATAFILE_ACQUIRE_INDEXING);
             break;
         }
-
-        nd_log_daemon(NDLP_INFO, "DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
+        journalfile_v1_generate_path(datafile, path, sizeof(path));
+        nd_log_daemon(NDLP_INFO, "DBENGINE: journal file '%s' is ready to be indexed", path);
 
         pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                      journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
