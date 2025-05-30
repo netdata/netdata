@@ -5,7 +5,6 @@
 
 #include "mcp.h"
 #include "mcp-tools-execute-function-internal.h"
-#include "libnetdata/template-enum.h"
 
 // Registry entry TTL in seconds (10 minutes)
 #define MCP_FUNCTIONS_REGISTRY_TTL 600
@@ -17,6 +16,7 @@ typedef enum mcp_required_params_type {
 } MCP_REQUIRED_PARAMS_TYPE;
 
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_REQUIRED_PARAMS_TYPE)
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_PAGINATION_UNITS)
 
 // Parameter option structure
 typedef struct mcp_function_param_option {
@@ -36,6 +36,14 @@ typedef struct mcp_function_param {
     MCP_FUNCTION_PARAM_OPTION *options;
 } MCP_FUNCTION_PARAM;
 
+// Pagination structure for MCP-compliant cursor-based pagination
+typedef struct mcp_function_pagination {
+    bool enabled;                       // whether pagination is supported
+    STRING *key;                        // parameter name for pagination (e.g., "anchor")
+    STRING *column;                     // column name in data (e.g., "timestamp")
+    MCP_PAGINATION_UNITS units;         // units of the column - only known types supported
+} MCP_FUNCTION_PAGINATION;
+
 // Registry entry structure
 typedef struct mcp_function_registry_entry {
     RW_SPINLOCK spinlock;               // Read/write lock for thread-safe access
@@ -50,12 +58,12 @@ typedef struct mcp_function_registry_entry {
     MCP_FUNCTION_PARAM *required_params; // array of required parameters
     // Supported optional parameters (detected from accepted_params)
     bool has_timeframe;                 // supports after, before parameters
-    bool has_anchor;                    // supports anchor parameter for pagination
     bool has_last;                      // supports last parameter (row limit)
     bool has_data_only;                 // supports data_only parameter
     bool has_direction;                 // supports direction parameter
     bool has_query;                     // supports query parameter for full-text search
     bool has_slice;                     // supports slice parameter for database-level filtering
+    MCP_FUNCTION_PAGINATION pagination; // MCP-compliant cursor pagination support
     time_t last_update;                 // timestamp of last info update
     time_t expires;                     // expiration timestamp
 } MCP_FUNCTION_REGISTRY_ENTRY;

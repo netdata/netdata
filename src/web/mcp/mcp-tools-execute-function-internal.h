@@ -6,6 +6,12 @@
 #include "mcp.h"
 #include "database/contexts/rrdcontext.h"
 
+// Pagination units enumeration - only supported types enable cursor pagination
+typedef enum mcp_pagination_units {
+    MCP_PAGINATION_UNITS_UNKNOWN = 0,      // Unknown units - pagination disabled
+    MCP_PAGINATION_UNITS_TIMESTAMP_USEC,   // Microsecond timestamps
+} MCP_PAGINATION_UNITS;
+
 // Define operator types for faster comparison
 typedef enum {
     OP_EQUALS,           // ==
@@ -116,11 +122,19 @@ typedef struct {
         // Time-based and history parameters
         time_t after;                   // Start time for the query (0 = not specified)
         time_t before;                  // End time for the query (0 = not specified)
-        usec_t anchor;                  // Pagination anchor timestamp (0 = not specified)
+        const char *cursor;             // Pagination cursor (MCP standard) (referenced from json-c, not owned)
+        usec_t anchor;                  // Internal anchor timestamp converted from cursor (0 = not specified)
         size_t last;                    // Number of last rows (0 = not specified)
         const char *direction;          // Query direction: "forward" or "backward" (referenced from json-c, not owned)
         const char *query;              // Full-text search query (referenced from json-c, not owned)
     } request;
+    
+    // Pagination settings (copied from registry_entry to avoid keeping it locked)
+    struct {
+        bool enabled;                   // whether pagination is supported
+        MCP_PAGINATION_UNITS units;     // units of the pagination column
+        STRING *column;                 // column name in data (owned copy)
+    } pagination;
     
     // Input data from the function
     struct {

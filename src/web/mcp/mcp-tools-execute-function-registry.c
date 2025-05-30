@@ -12,6 +12,14 @@ ENUM_STR_MAP_DEFINE(MCP_REQUIRED_PARAMS_TYPE) = {
 
 ENUM_STR_DEFINE_FUNCTIONS(MCP_REQUIRED_PARAMS_TYPE, MCP_REQUIRED_PARAMS_TYPE_SELECT, "select")
 
+// Pagination units string mappings
+ENUM_STR_MAP_DEFINE(MCP_PAGINATION_UNITS) = {
+    { MCP_PAGINATION_UNITS_TIMESTAMP_USEC, "timestamp_usec" },
+    { 0, NULL }
+};
+
+ENUM_STR_DEFINE_FUNCTIONS(MCP_PAGINATION_UNITS, MCP_PAGINATION_UNITS_UNKNOWN, "unknown")
+
 // Static dictionary to store function registry entries
 static DICTIONARY *functions_registry = NULL;
 
@@ -22,6 +30,10 @@ static void registry_entry_cleanup(MCP_FUNCTION_REGISTRY_ENTRY *entry) {
     
     // Free STRING pointers
     string_freez(entry->help);
+    
+    // Free pagination fields
+    string_freez(entry->pagination.key);
+    string_freez(entry->pagination.column);
     
     // Free parameters
     for (size_t i = 0; i < entry->required_params_count; i++) {
@@ -66,6 +78,7 @@ static bool registry_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe
     SWAP(old_entry->help, new_entry->help);
     SWAP(old_entry->required_params_count, new_entry->required_params_count);
     SWAP(old_entry->required_params, new_entry->required_params);
+    SWAP(old_entry->pagination, new_entry->pagination);
     SWAP(old_entry->last_update, new_entry->last_update);
     SWAP(old_entry->expires, new_entry->expires);
     
@@ -162,10 +175,6 @@ static int parse_function_info(struct json_object *json_obj, MCP_FUNCTION_REGIST
                     if (strcmp(param_name, "after") == 0 || strcmp(param_name, "before") == 0) {
                         entry->has_timeframe = true;
                     }
-                    // Check for other specific parameters
-                    else if (strcmp(param_name, "anchor") == 0) {
-                        entry->has_anchor = true;
-                    }
                     else if (strcmp(param_name, "last") == 0) {
                         entry->has_last = true;
                     }
@@ -180,6 +189,46 @@ static int parse_function_info(struct json_object *json_obj, MCP_FUNCTION_REGIST
                     }
                     else if (strcmp(param_name, "slice") == 0) {
                         entry->has_slice = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Parse pagination object
+    if (json_object_object_get_ex(json_obj, "pagination", &jobj)) {
+        if (json_object_is_type(jobj, json_type_object)) {
+            struct json_object *field;
+            
+            // Parse enabled flag
+            if (json_object_object_get_ex(jobj, "enabled", &field) && 
+                json_object_is_type(field, json_type_boolean)) {
+                entry->pagination.enabled = json_object_get_boolean(field);
+            }
+            
+            // Only parse other fields if pagination is enabled
+            if (entry->pagination.enabled) {
+                // Parse key
+                if (json_object_object_get_ex(jobj, "key", &field) && 
+                    json_object_is_type(field, json_type_string)) {
+                    entry->pagination.key = string_strdupz(json_object_get_string(field));
+                }
+                
+                // Parse column
+                if (json_object_object_get_ex(jobj, "column", &field) && 
+                    json_object_is_type(field, json_type_string)) {
+                    entry->pagination.column = string_strdupz(json_object_get_string(field));
+                }
+                
+                // Parse units
+                if (json_object_object_get_ex(jobj, "units", &field) && 
+                    json_object_is_type(field, json_type_string)) {
+                    const char *units_str = json_object_get_string(field);
+                    entry->pagination.units = MCP_PAGINATION_UNITS_2id(units_str);
+                    
+                    // If units are unknown, disable pagination
+                    if (entry->pagination.units == MCP_PAGINATION_UNITS_UNKNOWN) {
+                        entry->pagination.enabled = false;
                     }
                 }
             }
