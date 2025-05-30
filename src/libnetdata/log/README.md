@@ -222,6 +222,18 @@ journalctl -u netdata --namespace=netdata
 journalctl -u netdata --namespace=netdata -r
 ```
 
+## Using Windows Event Viewer to View Netdata Logs
+
+By default, the Netdata service executable on Microsoft systems stores logs in Event Viewer.
+To access these logs, follow these steps:
+
+1. Click the `Start` menu.
+2. Type `Evet Viwer`, then click on `Run as Administrator`.
+3. When the window opens, click `Applications and Services Logs`.
+4. Then, click `Netdata`
+
+Under the `Netdata` section, you’ll find all the logs listed [above](#log-sources).
+
 ## Using Event Tracing for Windows (ETW)
 
 ETW requires the publisher `Netdata` to be registered. Our Windows installer does this automatically.
