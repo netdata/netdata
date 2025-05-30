@@ -26,7 +26,6 @@
  */
 
 #include "mcp-completion.h"
-#include "mcp-initialize.h"
 
 // Implementation of completion/complete (transport-agnostic)
 static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
@@ -72,7 +71,7 @@ static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct j
     // Add completion data (sample implementation with a few static options)
     buffer_json_member_add_object(mcpc->result, "completion");
     
-    // Add values array with sample completion options
+    // Add values-array with sample completion options
     buffer_json_member_add_array(mcpc->result, "values");
     buffer_json_add_array_item_string(mcpc->result, "option1");
     buffer_json_add_array_item_string(mcpc->result, "option2");

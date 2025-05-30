@@ -26,11 +26,11 @@
 
 #include "mcp.h"
 #include "mcp-logging.h"
-#include "mcp-initialize.h"
 
 // Implementation of logging/setLevel (transport-agnostic)
 static MCP_RETURN_CODE mcp_logging_method_setLevel(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0) return MCP_RC_ERROR;
+    if (!mcpc || id == 0)
+        return MCP_RC_ERROR;
     
     // Extract level parameter
     struct json_object *level_obj = NULL;
@@ -65,7 +65,7 @@ static MCP_RETURN_CODE mcp_logging_method_setLevel(MCP_CLIENT *mcpc, struct json
     // Log that we received this request and set the level
     netdata_log_info("MCP client %s logging level set to: %s", string2str(mcpc->client_name), MCP_LOGGING_LEVEL_2str(parsed_level));
     
-    // Initialize success response with empty result object
+    // Initialize success' response with an empty result object
     mcp_init_success_result(mcpc, id);
     buffer_json_finalize(mcpc->result);
     

@@ -2,7 +2,6 @@
 
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-execute-function-internal.h"
-#include "mcp-tools-execute-function-logs.h"
 #include "mcp-tools-execute-function-registry.h"
 #include "mcp-params.h"
 #include "database/rrdfunctions.h"
@@ -164,7 +163,7 @@ static struct json_object *transform_value_for_mcp(struct json_object *val, RRDF
 
 // Extract column transform information from column definitions
 static void extract_column_transforms(struct json_object *columns_obj, 
-                                    int *column_indices, 
+                                    const int *column_indices,
                                     char **column_names,
                                     size_t selected_count,
                                     COLUMN_TRANSFORM_INFO *col_transforms) {
@@ -242,10 +241,11 @@ void mcp_functions_free_condition_patterns(CONDITION_ARRAY *condition_array) {
 }
 
 // Check if a single value matches a condition
-static bool value_matches_condition(struct json_object *value, const CONDITION *condition) {
+static bool value_matches_condition(struct json_object *value, const CONDITION *condition)
+{
     if (!value || !condition)
         return false;
-    
+
     // Handle NULL values
     if (json_object_is_type(value, json_type_null)) {
         if (condition->v_type == COND_VALUE_NULL) {
@@ -254,7 +254,7 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
             return (condition->op == OP_NOT_EQUALS);
         }
     }
-    
+
     // Handle MATCH and NOT MATCH operators (pattern matching) - always convert to strings
     if (condition->op == OP_MATCH || condition->op == OP_NOT_MATCH) {
         if (condition->pattern) {
@@ -264,7 +264,7 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
         }
         return false;
     }
-    
+
     // Handle comparisons based on condition value type
     if (condition->v_type == COND_VALUE_NUMBER) {
         // Try to get numeric value from JSON
@@ -284,7 +284,7 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
             // Can't convert to number, treat as not equal
             return (condition->op == OP_NOT_EQUALS);
         }
-        
+
         switch (condition->op) {
             case OP_EQUALS:
                 return (val_num == condition->v_num);
@@ -301,10 +301,9 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
             default:
                 return false;
         }
-    }
-    else if (condition->v_type == COND_VALUE_BOOLEAN) {
+    } else if (condition->v_type == COND_VALUE_BOOLEAN) {
         bool val_bool = json_object_get_boolean(value);
-        
+
         switch (condition->op) {
             case OP_EQUALS:
                 return (val_bool == condition->v_bool);
@@ -315,40 +314,43 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
                 return false;
         }
     }
-    
+
 string_compare:
-    // String comparisons (including when condition is string or as fallback)
-    const char *val_str = json_object_get_string(value);
-    const char *cond_str = condition->v_str;
-    
-    // Handle NULL condition string
-    if (!cond_str) {
-        if (condition->v_type == COND_VALUE_NULL) {
-            return (condition->op == OP_EQUALS && !val_str);
+    {
+        // String comparisons (including when condition is string or as fallback)
+        const char *val_str = json_object_get_string(value);
+        const char *cond_str = condition->v_str;
+
+        // Handle NULL condition string
+        if (!cond_str) {
+            if (condition->v_type == COND_VALUE_NULL) {
+                return (condition->op == OP_EQUALS && !val_str);
+            }
+            // Use empty string for comparison
+            cond_str = "";
         }
-        // Use empty string for comparison
-        cond_str = "";
-    }
-    
-    if (!val_str) val_str = "";
-    
-    int cmp = strcmp(val_str, cond_str);
-    
-    switch (condition->op) {
-        case OP_EQUALS:
-            return (cmp == 0);
-        case OP_NOT_EQUALS:
-            return (cmp != 0);
-        case OP_LESS:
-            return (cmp < 0);
-        case OP_LESS_EQUALS:
-            return (cmp <= 0);
-        case OP_GREATER:
-            return (cmp > 0);
-        case OP_GREATER_EQUALS:
-            return (cmp >= 0);
-        default:
-            return false;
+
+        if (!val_str)
+            val_str = "";
+
+        int cmp = strcmp(val_str, cond_str);
+
+        switch (condition->op) {
+            case OP_EQUALS:
+                return (cmp == 0);
+            case OP_NOT_EQUALS:
+                return (cmp != 0);
+            case OP_LESS:
+                return (cmp < 0);
+            case OP_LESS_EQUALS:
+                return (cmp <= 0);
+            case OP_GREATER:
+                return (cmp > 0);
+            case OP_GREATER_EQUALS:
+                return (cmp >= 0);
+            default:
+                return false;
+        }
     }
 }
 
@@ -1396,47 +1398,34 @@ static MCP_RETURN_CODE mcp_parse_conditions_early(CONDITION_ARRAY *condition_arr
 static void build_function_name_with_params(BUFFER *dest, const char *function_name, struct json_object *selections, MCP_FUNCTION_DATA *data, MCP_FUNCTION_REGISTRY_ENTRY *entry) {
     buffer_strcat(dest, function_name);
     
-    bool first = true;
-    
     // Add time-based parameters if supported and specified
-    if (entry->has_timeframe && data->request.after > 0) {
-        buffer_sprintf(dest, "%s after:%ld", first ? " " : " ", data->request.after);
-        first = false;
+    if (entry->has_timeframe) {
+        buffer_sprintf(dest, " after:%ld", data->request.after);
+        buffer_sprintf(dest, " before:%ld", data->request.before);
     }
-    
-    if (entry->has_timeframe && data->request.before > 0) {
-        buffer_sprintf(dest, "%s before:%ld", first ? " " : " ", data->request.before);
-        first = false;
-    }
-    
-    if (entry->has_anchor && data->request.anchor > 0) {
-        buffer_sprintf(dest, "%s anchor:%llu", first ? " " : " ", (unsigned long long)data->request.anchor);
-        first = false;
+
+    if (entry->has_anchor) {
+        buffer_sprintf(dest, " anchor:%llu", (unsigned long long)data->request.anchor);
     }
     
     if (entry->has_last && data->request.last > 0) {
-        buffer_sprintf(dest, "%s last:%zu", first ? " " : " ", data->request.last);
-        first = false;
+        buffer_sprintf(dest, " last:%zu", data->request.last);
     }
     
-    if (entry->has_direction && data->request.direction) {
-        buffer_sprintf(dest, "%s direction:%s", first ? " " : " ", data->request.direction);
-        first = false;
+    if (entry->has_direction && data->request.direction && *data->request.direction) {
+        buffer_sprintf(dest, " direction:%s", data->request.direction);
     }
     
-    if (entry->has_query && data->request.query) {
-        buffer_sprintf(dest, "%s query:%s", first ? " " : " ", data->request.query);
-        first = false;
+    if (entry->has_query && data->request.query && *data->request.query) {
+        buffer_sprintf(dest, " query:%s", data->request.query);
     }
     
     if (entry->has_data_only) {
-        buffer_sprintf(dest, "%s data_only:true", first ? " " : " ");
-        first = false;
+        buffer_sprintf(dest, " data_only:true");
     }
     
-    if (entry->has_all_fields_selected) {
-        buffer_sprintf(dest, "%s all_fields_selected:true", first ? " " : " ");
-        first = false;
+    if (entry->has_slice) {
+        buffer_sprintf(dest, " slice:true");
     }
     
     // Add selections parameters
@@ -1453,8 +1442,7 @@ static void build_function_name_with_params(BUFFER *dest, const char *function_n
                 continue;
             }
             
-            buffer_sprintf(dest, "%s %s:", first ? " " : " ", key);
-            first = false;
+            buffer_sprintf(dest, " %s:", key);
             
             if (json_object_is_type(val, json_type_string)) {
                 // Single string value
@@ -1511,13 +1499,74 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
         buffer_json_member_add_boolean(payload, "data_only", true);
     }
     
-    if (entry->has_all_fields_selected) {
-        buffer_json_member_add_boolean(payload, "all_fields_selected", true);
+    if (entry->has_slice) {
+        buffer_json_member_add_boolean(payload, "slice", true);
     }
     
-    // Add selections if provided
-    if (selections && json_object_is_type(selections, json_type_object)) {
+    // Build selections object - start with provided selections and add condition-based selections for has_history functions
+    bool selections_added = false;
+    
+    // For has_history functions, add selections based on conditions with == or match operators
+    if (entry->has_history && data->request.conditions.count > 0) {
         buffer_json_member_add_object(payload, "selections");
+        selections_added = true;
+        
+        for (size_t i = 0; i < data->request.conditions.count; i++) {
+            CONDITION *cond = &data->request.conditions.items[i];
+            
+            // Skip wildcard searches and unsupported operators (these were validated earlier)
+            if (cond->column_index == -1 || (cond->op != OP_EQUALS && cond->op != OP_MATCH)) {
+                continue;
+            }
+            
+            const char *column_name = cond->column_name;
+            
+            if (cond->op == OP_EQUALS && cond->v_type == COND_VALUE_STRING) {
+                // Single value equality: key == value -> "key": ["value"]
+                buffer_json_member_add_array(payload, column_name);
+                buffer_json_add_array_item_string(payload, cond->v_str);
+                buffer_json_array_close(payload);
+            } 
+            else if (cond->op == OP_MATCH && cond->v_type == COND_VALUE_STRING) {
+                // Pattern match without wildcards: key match a|b|c -> "key": ["a", "b", "c"]
+                const char *pattern_str = cond->v_str;
+                
+                // Parse the pipe-separated values
+                buffer_json_member_add_array(payload, column_name);
+                
+                CLEAN_BUFFER *temp_value = buffer_create(0, NULL);
+                const char *current = pattern_str;
+                const char *pipe_pos;
+                
+                while ((pipe_pos = strchr(current, '|')) != NULL) {
+                    // Extract value between current and pipe_pos
+                    buffer_flush(temp_value);
+                    buffer_strncat(temp_value, current, pipe_pos - current);
+                    
+                    // Add to array if non-empty
+                    if (buffer_strlen(temp_value) > 0) {
+                        buffer_json_add_array_item_string(payload, buffer_tostring(temp_value));
+                    }
+                    
+                    current = pipe_pos + 1;
+                }
+                
+                // Add the last value after the final pipe (or the only value if no pipes)
+                if (*current) {
+                    buffer_json_add_array_item_string(payload, current);
+                }
+                
+                buffer_json_array_close(payload);
+            }
+        }
+    }
+    
+    // Add user-provided selections if provided
+    if (selections && json_object_is_type(selections, json_type_object)) {
+        if (!selections_added) {
+            buffer_json_member_add_object(payload, "selections");
+            selections_added = true;
+        }
         
         struct json_object_iterator it = json_object_iter_begin(selections);
         struct json_object_iterator itEnd = json_object_iter_end(selections);
@@ -1532,8 +1581,10 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
             }
             
             if (json_object_is_type(val, json_type_string)) {
-                // Single string value
-                buffer_json_member_add_string(payload, key, json_object_get_string(val));
+                // Single string value - convert to array for consistency
+                buffer_json_member_add_array(payload, key);
+                buffer_json_add_array_item_string(payload, json_object_get_string(val));
+                buffer_json_array_close(payload);
             } else if (json_object_is_type(val, json_type_array)) {
                 // Array of values
                 buffer_json_member_add_array(payload, key);
@@ -1551,7 +1602,9 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
             
             json_object_iter_next(&it);
         }
-        
+    }
+    
+    if (selections_added) {
         buffer_json_object_close(payload); // close "selections"
     }
     
@@ -1571,7 +1624,17 @@ static void generate_required_params_message(BUFFER *message, MCP_FUNCTION_REGIS
         buffer_strcat(message,
             "TIMEFRAME PARAMETERS (Required):\n"
             "- 'after': Start time (timestamp in seconds or RFC3339 datetime string)\n"
-            "- 'before': End time (timestamp in seconds or RFC3339 datetime string)\n\n");
+            "- 'before': End time (timestamp in seconds or RFC3339 datetime string)\n");
+        
+        // Add optional time-based parameters that are commonly used with history functions
+        if (entry->has_direction) {
+            buffer_strcat(message, "- 'direction': Query direction ('forward' or 'backward')\n");
+        }
+        if (entry->has_last) {
+            buffer_strcat(message, "- 'limit': Maximum number of entries to return\n");
+        }
+        
+        buffer_strcat(message, "\n");
     }
     
     for (size_t i = 0; i < entry->required_params_count; i++) {
@@ -1588,9 +1651,26 @@ static void generate_required_params_message(BUFFER *message, MCP_FUNCTION_REGIS
         }
         
         for (size_t j = 0; j < param->options_count; j++) {
-            buffer_sprintf(message, "   - '%s': %s\n", 
-                         string2str(param->options[j].id), 
-                         string2str(param->options[j].name));
+            const char *id = string2str(param->options[j].id);
+            const char *name = string2str(param->options[j].name);
+            const char *info = string2str(param->options[j].info);
+            
+            // Only show name if it's different from id
+            bool show_name = (name && *name && strcmp(id, name) != 0);
+            
+            if (info && *info) {
+                if (show_name) {
+                    buffer_sprintf(message, "   - '%s': %s (%s)\n", id, name, info);
+                } else {
+                    buffer_sprintf(message, "   - '%s' (%s)\n", id, info);
+                }
+            } else {
+                if (show_name) {
+                    buffer_sprintf(message, "   - '%s': %s\n", id, name);
+                } else {
+                    buffer_sprintf(message, "   - '%s'\n", id);
+                }
+            }
         }
         
         if (i < entry->required_params_count - 1) {
@@ -1604,6 +1684,14 @@ static void generate_required_params_message(BUFFER *message, MCP_FUNCTION_REGIS
     if (entry->has_timeframe) {
         buffer_strcat(message, "  \"after\": 1648627200,\n");
         buffer_strcat(message, "  \"before\": 1648630800,\n");
+        
+        // Add optional time-based parameters to the example
+        if (entry->has_direction) {
+            buffer_strcat(message, "  \"direction\": \"backward\",\n");
+        }
+        if (entry->has_last) {
+            buffer_strcat(message, "  \"limit\": 100,\n");
+        }
     }
     
     // Add selections if there are required params
@@ -1863,7 +1951,7 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload
     int ret = rrd_function_run(
         data->request.host,
         result_buffer,
-        data->request.timeout,
+        (int)data->request.timeout,
         data->request.auth->access,
         data->request.function,
         true,
@@ -1989,53 +2077,80 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
     return MCP_RC_OK;
 }
 
-MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
-{
-    if (!mcpc || id == 0 || !params)
-        return MCP_RC_ERROR;
-
-    // Create and initialize function data structure
-    MCP_FUNCTION_DATA data;
-    mcp_functions_data_init(&data);
+// Check all requirements and violations collectively for a function execution
+// Returns true if all checks pass, false if there are violations
+// If false is returned, mcpc->error and mcpc->result contain appropriate error messages
+static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data, 
+                                               MCP_FUNCTION_REGISTRY_ENTRY *registry_entry,
+                                               struct json_object *selections,
+                                               MCP_REQUEST_ID id) {
+    MCP_CLIENT *mcpc = data->request.mcpc;
+    CLEAN_BUFFER *violations = buffer_create(0, NULL);
+    bool has_violations = false;
     
-    // Parse the request
-    MCP_RETURN_CODE rc = mcp_parse_function_request(&data, mcpc, params);
-    if (rc != MCP_RC_OK) {
-        mcp_functions_data_cleanup(&data);
-        return rc;
-    }
-    
-    // Get function registry entry
-    CLEAN_BUFFER *registry_error = buffer_create(0, NULL);
-    MCP_FUNCTION_REGISTRY_ENTRY *registry_entry = mcp_functions_registry_get(data.request.host, data.request.function, registry_error);
-    
-    if (!registry_entry) {
-        buffer_sprintf(mcpc->error, "Failed to get function info: %s", buffer_tostring(registry_error));
-        mcp_functions_data_cleanup(&data);
-        return MCP_RC_ERROR;
-    }
-    
-    // Check if function requires parameters
-    struct json_object *selections = NULL;
-    if (json_object_object_get_ex(params, "selections", &selections)) {
-        // Selections provided - validate they are an object
-        if (!json_object_is_type(selections, json_type_object)) {
-            buffer_strcat(mcpc->error, "The 'selections' parameter must be an object with key-value pairs where values are arrays of strings");
-            mcp_functions_registry_release(registry_entry);
-            mcp_functions_data_cleanup(&data);
-            return MCP_RC_BAD_REQUEST;
+    // Check 1: Functions with has_history=false should not receive time parameters
+    if (!registry_entry->has_history) {
+        if (data->request.after > 0 || data->request.before > 0 || 
+            data->request.anchor > 0 || data->request.direction || 
+            data->request.last > 0) {
+            buffer_strcat(violations, "• This function does not support time-based parameters (after, before, anchor, direction, limit). ");
+            buffer_strcat(violations, "These parameters are only available for functions with history support.\n");
+            has_violations = true;
         }
     }
     
-    // Check if timeframe parameters are required but missing
-    if (registry_entry->has_timeframe && data.request.after == 0 && data.request.before == 0) {
-        buffer_sprintf(mcpc->error, "This function requires timeframe parameters 'after' and 'before' to be specified.");
-        mcp_functions_registry_release(registry_entry);
-        mcp_functions_data_cleanup(&data);
-        return MCP_RC_BAD_REQUEST;
+    // Check 2: Functions with has_history=true should have required parameters
+    if (registry_entry->has_history) {
+        bool missing_timeframe = (data->request.after == 0 || data->request.before == 0);
+        bool missing_selections = !selections || json_object_object_length(selections) == 0;
+        
+        if (missing_timeframe && missing_selections) {
+            buffer_strcat(violations, "• Functions with history support require both timeframe (after, before) and selections parameters.\n");
+            has_violations = true;
+        } else if (missing_timeframe) {
+            buffer_strcat(violations, "• This function requires timeframe parameters 'after' and 'before' to be specified.\n");
+            has_violations = true;
+        } else if (missing_selections) {
+            buffer_strcat(violations, "• This function requires 'selections' parameter for efficient filtering.\n");
+            has_violations = true;
+        }
+        
+        // Check 3: Functions with has_history=true should not use unsupported operations
+        if (data->request.conditions.count > 0) {
+            for (size_t i = 0; i < data->request.conditions.count; i++) {
+                CONDITION *cond = &data->request.conditions.items[i];
+                
+                // Check for unsupported operators
+                if (cond->op != OP_EQUALS && cond->op != OP_MATCH) {
+                    buffer_sprintf(violations, "• Condition on column '%s' uses unsupported operator. ", 
+                                 cond->column_name);
+                    buffer_strcat(violations, "History functions only support equality (==) and simple value lists (match without patterns).\n");
+                    has_violations = true;
+                    continue;
+                }
+                
+                // Check for pattern matching with wildcards
+                if (cond->op == OP_MATCH && cond->pattern) {
+                    const char *pattern_str = cond->v_str;
+                    if (pattern_str && (strchr(pattern_str, '*') || strchr(pattern_str, '?'))) {
+                        buffer_sprintf(violations, "• Condition on column '%s' uses pattern matching with wildcards. ", 
+                                     cond->column_name);
+                        buffer_strcat(violations, "History functions only support exact value lists (e.g., 'value1|value2|value3').\n");
+                        has_violations = true;
+                    }
+                }
+            }
+        }
+        
+        // Check 4: Functions with has_history=true should not use column sorting
+        if (data->request.sort.column) {
+            buffer_strcat(violations, "• Column-based sorting is not supported for history functions. ");
+            buffer_strcat(violations, "Use the 'direction' parameter to control time-based sorting.\n");
+            has_violations = true;
+        }
     }
     
-    // Check if required parameters are missing or empty
+    // Check 5: Required parameters validation
     bool missing_required_params = false;
     if (registry_entry->required_params_count > 0) {
         if (!selections) {
@@ -2080,10 +2195,24 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
                 }
             }
         }
+        
+        if (missing_required_params) {
+            buffer_strcat(violations, "• Required parameters are missing or empty.\n");
+            has_violations = true;
+        }
+    } else {
+        // Function has no required parameters - selections should not be provided
+        if (selections && json_object_is_type(selections, json_type_object) && 
+            json_object_object_length(selections) > 0) {
+            buffer_strcat(violations, "• This function does not accept selections parameters. ");
+            buffer_strcat(violations, "Only functions with required parameters support selections.\n");
+            has_violations = true;
+        }
     }
     
-    if (missing_required_params) {
-        // Function requires parameters but none provided or empty - generate helpful message
+    // If we have violations, generate error response
+    if (has_violations) {
+        // Always generate a proper MCP result response
         mcp_init_success_result(mcpc, id);
         buffer_json_member_add_array(mcpc->result, "content");
         buffer_json_add_array_item_object(mcpc->result);
@@ -2091,17 +2220,86 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
             buffer_json_member_add_string(mcpc->result, "type", "text");
             
             CLEAN_BUFFER *message = buffer_create(0, NULL);
-            generate_required_params_message(message, registry_entry);
+            
+            if (missing_required_params) {
+                // Generate helpful parameter message for missing required params
+                generate_required_params_message(message, registry_entry);
+                
+                // Only add other violations if they are NOT about missing required params or missing timeframe/selections
+                // Check if violations contain only redundant messages
+                const char *violations_str = buffer_tostring(violations);
+                bool has_non_redundant_violations = false;
+                
+                if (strstr(violations_str, "• Required parameters are missing") == NULL &&
+                    strstr(violations_str, "• Functions with history support require both timeframe") == NULL &&
+                    buffer_strlen(violations) > 0) {
+                    has_non_redundant_violations = true;
+                }
+                
+                if (has_non_redundant_violations) {
+                    buffer_strcat(message, "\n\nAdditional issues found:\n");
+                    buffer_strcat(message, buffer_tostring(violations));
+                }
+            } else {
+                // Just show violations
+                buffer_sprintf(message, "Function execution requirements not met:\n%s", buffer_tostring(violations));
+            }
+            
             buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(message));
         }
         buffer_json_object_close(mcpc->result);
         buffer_json_array_close(mcpc->result);
         buffer_json_object_close(mcpc->result);
         buffer_json_finalize(mcpc->result);
-        
+        return false;
+    }
+    
+    return true;
+}
+
+MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
+{
+    if (!mcpc || id == 0 || !params)
+        return MCP_RC_ERROR;
+
+    // Create and initialize function data structure
+    MCP_FUNCTION_DATA data;
+    mcp_functions_data_init(&data);
+    
+    // Parse the request
+    MCP_RETURN_CODE rc = mcp_parse_function_request(&data, mcpc, params);
+    if (rc != MCP_RC_OK) {
+        mcp_functions_data_cleanup(&data);
+        return rc;
+    }
+    
+    // Get function registry entry
+    CLEAN_BUFFER *registry_error = buffer_create(0, NULL);
+    MCP_FUNCTION_REGISTRY_ENTRY *registry_entry = mcp_functions_registry_get(data.request.host, data.request.function, registry_error);
+    
+    if (!registry_entry) {
+        buffer_sprintf(mcpc->error, "Failed to get function info: %s", buffer_tostring(registry_error));
+        mcp_functions_data_cleanup(&data);
+        return MCP_RC_ERROR;
+    }
+    
+    // Check if function requires parameters
+    struct json_object *selections = NULL;
+    if (json_object_object_get_ex(params, "selections", &selections)) {
+        // Selections provided - validate they are an object
+        if (!json_object_is_type(selections, json_type_object)) {
+            buffer_strcat(mcpc->error, "The 'selections' parameter must be an object with key-value pairs where values are arrays of strings");
+            mcp_functions_registry_release(registry_entry);
+            mcp_functions_data_cleanup(&data);
+            return MCP_RC_BAD_REQUEST;
+        }
+    }
+    
+    // Check all requirements and violations collectively
+    if (!check_requirements_and_violations(&data, registry_entry, selections, id)) {
         mcp_functions_registry_release(registry_entry);
         mcp_functions_data_cleanup(&data);
-        return MCP_RC_OK;
+        return MCP_RC_OK;  // We've already set up the response in the validation function
     }
     
     // Build the actual function name to execute and POST payload if needed

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-tools-weights.h"
-#include "mcp-tools.h"
 #include "mcp-params.h"
 #include "web/api/web_api.h"
 #include "web/api/queries/weights.h"
 #include "web/api/queries/query.h"
 
-// Common function to execute the weights request
+// Common function to execute the 'weights' request
 static MCP_RETURN_CODE execute_weights_request(
     MCP_CLIENT *mcpc,
     struct json_object *params,
@@ -42,7 +41,7 @@ static MCP_RETURN_CODE execute_weights_request(
     CLEAN_BUFFER *dimensions_buffer = NULL;
     CLEAN_BUFFER *labels_buffer = NULL;
     
-    // Parse metrics as array
+    // Parse metrics as an array
     metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, false, MCP_TOOL_LIST_METRICS, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
@@ -54,7 +53,7 @@ static MCP_RETURN_CODE execute_weights_request(
         return MCP_RC_BAD_REQUEST;
     }
     
-    // Parse instances as array
+    // Parse instances as an array
     instances_buffer = mcp_params_parse_array_to_pattern(params, "instances", false, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
@@ -84,7 +83,7 @@ static MCP_RETURN_CODE execute_weights_request(
         return MCP_RC_BAD_REQUEST;
     }
         
-    // Set time_group parameter based on method
+    // Set time_group parameter based on the method
     const char *time_group_options = default_time_group;
     RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
     
@@ -100,7 +99,7 @@ static MCP_RETURN_CODE execute_weights_request(
     // Set options
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NONZERO;
 
-    // Build the weights request structure
+    // Build the 'weights' request structure
     QUERY_WEIGHTS_REQUEST qwr = {
         .version = 2,
         .host = NULL,  // Will query all hosts
@@ -133,14 +132,14 @@ static MCP_RETURN_CODE execute_weights_request(
         .points = 500,  // Default points for weights
         .options = options,
         .tier = 0,
-        .timeout_ms = timeout * 1000,  // Convert seconds to milliseconds
+        .timeout_ms = (int)(timeout * 1000),  // Convert seconds to milliseconds
         .cardinality_limit = cardinality_limit,
         .interrupt_callback = NULL,
         .interrupt_callback_data = NULL,
         .transaction = NULL,
     };
     
-    // Create a temporary buffer for the weights API response
+    // Create a temporary buffer for the 'weights' API response
     CLEAN_BUFFER *tmp_buffer = buffer_create(0, NULL);
     
     // Call the weights API function with the temporary buffer

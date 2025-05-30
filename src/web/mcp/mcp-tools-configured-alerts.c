@@ -3,10 +3,6 @@
 #include "mcp-tools-configured-alerts.h"
 #include "mcp-params.h"
 #include "health/health_internals.h"
-#include "health/health_prototypes.h"
-
-// Forward declarations for health functions
-extern const char *dyncfg_id2source_type(DYNCFG_SOURCE_TYPE source_type);
 
 // Schema for list_configured_alerts - no parameters
 void mcp_tool_list_configured_alerts_schema(BUFFER *buffer) {
@@ -27,7 +23,7 @@ MCP_RETURN_CODE mcp_tool_list_configured_alerts_execute(MCP_CLIENT *mcpc, struct
     if (!mcpc || id == 0)
         return MCP_RC_ERROR;
     
-    // Create temporary buffer for the result
+    // Create a temporary buffer for the result
     CLEAN_BUFFER *t = buffer_create(0, NULL);
     size_t count = 0;
 
@@ -107,7 +103,7 @@ MCP_RETURN_CODE mcp_tool_list_configured_alerts_execute(MCP_CLIENT *mcpc, struct
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
-    // Start building content array for the result
+    // Start building a content array for the result
     buffer_json_member_add_array(mcpc->result, "content");
     {
         // Return text content for LLM compatibility

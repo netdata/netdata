@@ -22,6 +22,7 @@ ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_REQUIRED_PARAMS_TYPE)
 typedef struct mcp_function_param_option {
     STRING *id;
     STRING *name;
+    STRING *info;  // Additional information about the option (e.g., file count, size, coverage)
 } MCP_FUNCTION_PARAM_OPTION;
 
 // Parameter structure
@@ -54,7 +55,7 @@ typedef struct mcp_function_registry_entry {
     bool has_data_only;                 // supports data_only parameter
     bool has_direction;                 // supports direction parameter
     bool has_query;                     // supports query parameter for full-text search
-    bool has_all_fields_selected;       // supports all_fields_selected parameter
+    bool has_slice;                     // supports slice parameter for database-level filtering
     time_t last_update;                 // timestamp of last info update
     time_t expires;                     // expiration timestamp
 } MCP_FUNCTION_REGISTRY_ENTRY;

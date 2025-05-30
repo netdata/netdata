@@ -1891,8 +1891,6 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-execute-function-internal.h
         src/web/mcp/mcp-tools-execute-function-registry.c
         src/web/mcp/mcp-tools-execute-function-registry.h
-        src/web/mcp/mcp-tools-execute-function-logs.c
-        src/web/mcp/mcp-tools-execute-function-logs.h
         src/web/mcp/mcp-tools-query-metrics.c
         src/web/mcp/mcp-tools-query-metrics.h
         src/web/mcp/mcp-tools-weights.c

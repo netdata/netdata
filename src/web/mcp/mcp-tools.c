@@ -29,9 +29,6 @@
  */
 
 #include "mcp-tools.h"
-#include "mcp-params.h"
-#include "mcp-initialize.h"
-#include "database/contexts/rrdcontext.h"
 
 // Include tool-specific header files
 #include "mcp-tools-list-metadata.h"
@@ -54,8 +51,8 @@ typedef struct {
     
     // UI/UX annotations
     const char *title;        // Human-readable title
-    bool read_only_hint;      // If true, tool doesn't modify state
-    bool open_world_hint;     // If true, tool interacts with external world
+    bool read_only_hint;      // If true, the tool doesn't modify a state
+    bool open_world_hint;     // If true, the tool interacts with the external world
 } MCP_TOOL_DEF;
 
 // Wrapper functions for unified list tools
@@ -252,7 +249,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
         .open_world_hint = false
     },
 
-    // commented for the moment - probably dyncfg is a better way to do this
+    // Commented for the moment - probably dyncfg is a better way to do this
 //    {
 //        .name = MCP_TOOL_LIST_CONFIGURED_ALERTS,
 //        .title = "List configured alert prototypes",
@@ -273,19 +270,20 @@ static const MCP_TOOL_DEF mcp_tools[] = {
 
 // Return a list of available tools
 static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0) return MCP_RC_ERROR;
+    if (!mcpc || id == 0)
+        return MCP_RC_ERROR;
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
-    // Create tools array
+    // Create tool-array
     buffer_json_member_add_array(mcpc->result, "tools");
     
     // Iterate through all defined tools and add them to the response
     for (size_t i = 0; mcp_tools[i].name != NULL; i++) {
         const MCP_TOOL_DEF *tool = &mcp_tools[i];
         
-        // Add tool object
+        // Add a tool object
         buffer_json_add_array_item_object(mcpc->result);
         
         // Add basic properties
@@ -315,7 +313,8 @@ static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_objec
 
 // Main execute method that routes to specific tool handlers
 static MCP_RETURN_CODE mcp_tools_method_call(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || !params || id == 0) return MCP_RC_ERROR;
+    if (!mcpc || !params || id == 0)
+        return MCP_RC_ERROR;
     
     // Extract tool name
     struct json_object *name_obj = NULL;
@@ -368,7 +367,7 @@ MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct jso
         rc = mcp_tools_method_list(mcpc, params, id);
     }
     else if (strcmp(method, "call") == 0) {
-        // Execute a tool - standard method in MCP specification
+        // Execute a tool; standard method in MCP specification
         rc = mcp_tools_method_call(mcpc, params, id);
     }
     else {

@@ -54,27 +54,6 @@ ENUM_STR_MAP_DEFINE(MCP_LOGGING_LEVEL) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(MCP_LOGGING_LEVEL, MCP_LOGGING_LEVEL_UNKNOWN, "unknown");
 
-// Decode a URI component using mcpc's pre-allocated buffer
-// Returns a pointer to the decoded string which is valid until the next call
-const char *mcp_uri_decode(MCP_CLIENT *mcpc, const char *src) {
-    if(!mcpc || !src || !*src)
-        return src;
-
-    // Prepare the buffer
-    buffer_flush(mcpc->uri);
-    buffer_need_bytes(mcpc->uri, strlen(src) + 1);
-
-    // Perform URL decoding
-    char *d = url_decode_r(mcpc->uri->buffer, src, mcpc->uri->size);
-    if (!d || !*d)
-        return src;
-
-    // Ensure the buffer's length is updated
-    mcpc->uri->len = strlen(d);
-
-    return buffer_tostring(mcpc->uri);
-}
-
 // Create a response context for a transport session
 MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
     MCP_CLIENT *mcpc = callocz(1, sizeof(MCP_CLIENT));
@@ -412,7 +391,7 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
     
     // Check if this is a batch request (JSON array)
     if (json_object_get_type(request) == json_type_array) {
-        int array_len = json_object_array_length(request);
+        int array_len = (int)json_object_array_length(request);
         
         // Empty batch should return nothing according to JSON-RPC 2.0 spec
         if (array_len == 0) {

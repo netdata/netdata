@@ -474,14 +474,18 @@ static int nd_journal_file_to_json_array_cb(const DICTIONARY_ITEM *item, void *e
             "s",
             true);
 
+        char last_ut[RFC3339_MAX_LENGTH];
+        rfc3339_datetime_ut(last_ut, sizeof(last_ut), nd_jfs->last_ut, 0, true);
+
         char info[1024];
         snprintfz(
             info,
             sizeof(info),
-            "%zu files, with a total size of %s, covering %s",
+            "%zu files, total size %s, covering %s, last entry at %s",
             nd_jfs->count,
             size_for_humans,
-            duration_for_humans);
+            duration_for_humans,
+            last_ut);
 
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);

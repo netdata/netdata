@@ -92,7 +92,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
         return NULL;
     }
     
-    // Check for empty array if required
+    // Check for an empty array if required
     if (required && json_object_array_length(array_obj) == 0) {
         if (error) {
             buffer_flush(error);
@@ -127,7 +127,7 @@ BUFFER *mcp_params_parse_array_to_pattern(
         buffer_free(wb);
         if (error) {
             buffer_flush(error);
-            buffer_strcat(error, "must be an array of strings");
+            buffer_sprintf(error, "%s must be an array of strings", param_name);
         }
         return NULL;
     }
@@ -275,7 +275,7 @@ void mcp_schema_add_labels_object(
     buffer_json_object_close(buffer); // labels
 }
 
-// Add time window parameters to schema
+// Add time window parameters to the schema
 void mcp_schema_add_time_params(
     BUFFER *buffer,
     const char *time_description_prefix,

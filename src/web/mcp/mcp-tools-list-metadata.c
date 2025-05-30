@@ -55,7 +55,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_metrics = true,  // Filters nodes that collect these metrics
             .has_time_range = true,
             .has_cardinality_limit = true,
-            .metrics_as_array = true,  // list_nodes uses array for metrics filter
+            .metrics_as_array = true,  // list_nodes uses an array for metrics filter
         },
     },
     {
@@ -104,7 +104,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_time_range = false,  // Raised alerts are current, not historical
             .has_cardinality_limit = true,
             .nodes_as_array = true,
-            .metrics_as_array = true,  // Metrics should be array for alerts
+            .metrics_as_array = true,  // Metrics should be an array for alerts
         },
         .defaults = {
             .alert_status = CONTEXT_ALERT_RAISED,  // Only raised alerts
@@ -125,7 +125,7 @@ static const MCP_LIST_TOOL_CONFIG mcp_list_tools[] = {
             .has_time_range = true,
             .has_cardinality_limit = true,
             .nodes_as_array = true,
-            .metrics_as_array = true,  // Metrics should be array for alerts
+            .metrics_as_array = true,  // Metrics should be an array for alerts
         },
         .defaults = {
             .alert_status = CONTEXTS_ALERT_STATUSES,  // All statuses
@@ -142,19 +142,6 @@ const MCP_LIST_TOOL_CONFIG *mcp_get_list_tool_config(const char *name) {
         }
     }
     return NULL;
-}
-
-// Get tool by index
-const MCP_LIST_TOOL_CONFIG *mcp_get_list_tool_by_index(size_t index) {
-    if (index >= sizeof(mcp_list_tools) / sizeof(mcp_list_tools[0])) {
-        return NULL;
-    }
-    return &mcp_list_tools[index];
-}
-
-// Get total count of list tools
-size_t mcp_get_list_tools_count(void) {
-    return sizeof(mcp_list_tools) / sizeof(mcp_list_tools[0]);
 }
 
 // Unified schema generation
@@ -193,10 +180,10 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
     // Properties
     buffer_json_member_add_object(buffer, "properties");
 
-    // Add metrics pattern if supported
+    // Add a metrics pattern if supported
     if (config->params.has_metrics) {
         if (config->params.metrics_as_array) {
-            // Use array for metrics
+            // Use an array for metrics
             if (config->output_type != MCP_LIST_OUTPUT_METRICS) {
                 // This is a node/function/alert query - metrics acts as a filter
                 if (config->output_type == MCP_LIST_OUTPUT_ALERTS) {
@@ -293,10 +280,10 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
         buffer_json_object_close(buffer); // q
     }
 
-    // Add nodes pattern if supported
+    // Add a nodes' pattern if supported
     if (config->params.has_nodes) {
         if (config->params.nodes_as_array) {
-            // Use array for nodes
+            // Use an array for nodes
             mcp_schema_add_array_param(buffer, "nodes",
                 config->params.nodes_required ? "Specify the nodes" : "Filter by nodes",
                 config->params.nodes_required ?
@@ -329,7 +316,7 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
                           "Use pipe (|) to separate multiple patterns. Wildcards (*) are supported for flexible matching. "
                           "Examples: 'node1|node2' (exact names), '*web*' (contains 'web'), 'prod-*' (starts with 'prod-'), '*db*|*cache*' (contains 'db' OR 'cache')");
             } else {
-                // This is a metrics query - nodes acts as a filter
+                // This is a metrics query - 'nodes' acts as a filter
                 snprintfz(description, sizeof(description),
                           "Filter %s to only those collected by these nodes. "
                           "Use pipe (|) to separate multiple patterns. "
@@ -413,14 +400,14 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     
     if (config->params.has_metrics) {
         if (config->params.metrics_as_array) {
-            // Parse metrics as array
+            // Parse metrics as an array
             metrics_buffer = mcp_params_parse_array_to_pattern(params, "metrics", false, false, MCP_TOOL_LIST_METRICS, mcpc->error);
             if (buffer_strlen(mcpc->error) > 0) {
                 return MCP_RC_BAD_REQUEST;
             }
             metrics_pattern = buffer_tostring(metrics_buffer);
         } else {
-            // Parse metrics as string pattern
+            // Parse metrics as a string pattern
             metrics_pattern = mcp_params_extract_string(params, "metrics", NULL);
         }
         if(metrics_pattern && !*metrics_pattern) {
@@ -441,7 +428,7 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
             }
             nodes_pattern = buffer_tostring(nodes_buffer);
         } else {
-            // Parse nodes as string pattern
+            // Parse nodes as a string pattern
             nodes_pattern = mcp_params_extract_string(params, "nodes", NULL);
         }
         if(nodes_pattern && !*nodes_pattern) {
@@ -460,7 +447,7 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
         return MCP_RC_ERROR;
     }
 
-    // Extract time parameters (only if tool supports them)
+    // Extract time parameters (only if the tool supports them)
     time_t after = 0;
     time_t before = 0;
     if (config->params.has_time_range) {
@@ -482,7 +469,7 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     const char *alert_pattern = NULL;
     
     if (config->params.has_alert_pattern) {
-        // Parse alerts as string pattern
+        // Parse alerts as a string pattern
         alert_pattern = mcp_params_extract_string(params, "alerts", NULL);
         if(alert_pattern && !*alert_pattern) {
             alert_pattern = NULL; // Treat empty string as no alerts specified
@@ -524,7 +511,7 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     {
-        // Start building content array for the result
+        // Start building a content array for the result
         buffer_json_member_add_array(mcpc->result, "content");
         {
             // Return text content for LLM compatibility

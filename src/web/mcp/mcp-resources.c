@@ -54,7 +54,7 @@ typedef enum {
     RESOURCE_AUDIENCE_BOTH      = RESOURCE_AUDIENCE_USER | RESOURCE_AUDIENCE_ASSISTANT
 } RESOURCE_AUDIENCE;
 
-// Function pointer type for resource read callbacks
+// Function pointer type for resource-read callbacks
 typedef MCP_RETURN_CODE (*resource_read_fn)(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 
 // Function pointer type for resource size callbacks
@@ -89,7 +89,7 @@ static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_o
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
-    // Create an empty resources array object
+    // Create an empty resource array object
     buffer_json_member_add_array(mcpc->result, "resources");
     buffer_json_array_close(mcpc->result); // Close resources array
 
@@ -148,7 +148,7 @@ static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-// Resources namespace method dispatcher (transport-agnostic)
+// Resource namespace method dispatcher (transport-agnostic)
 MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
@@ -176,7 +176,7 @@ MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct
         rc = mcp_resources_method_unsubscribe(mcpc, params, id);
     }
     else {
-        // Method not found in resources namespace
+        // Method not found in resource namespace
         buffer_sprintf(mcpc->error, "Method 'resources/%s' not implemented yet", method);
         rc = MCP_RC_NOT_IMPLEMENTED;
     }

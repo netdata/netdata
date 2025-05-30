@@ -34,6 +34,7 @@ static void registry_entry_cleanup(MCP_FUNCTION_REGISTRY_ENTRY *entry) {
         for (size_t j = 0; j < param->options_count; j++) {
             string_freez(param->options[j].id);
             string_freez(param->options[j].name);
+            string_freez(param->options[j].info);
         }
         freez(param->options);
     }
@@ -71,7 +72,7 @@ static bool registry_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe
     // Release the lock
     rw_spinlock_write_unlock(&old_entry->spinlock);
     
-    // Cleanup the new entry (which now contains the old data)
+    // Clean up the new entry (which now contains the old data)
     registry_entry_cleanup(new_entry);
     
     // Return false to reject the new value (we've already updated old_value)
@@ -81,11 +82,11 @@ static bool registry_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe
 static void registry_entry_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     MCP_FUNCTION_REGISTRY_ENTRY *entry = (MCP_FUNCTION_REGISTRY_ENTRY *)value;
     
-    // Cleanup the entry data
+    // Clean up the entry data
     registry_entry_cleanup(entry);
 }
 
-// Initialize the functions registry
+// Initialize the functions-registry
 void mcp_functions_registry_init(void) {
     if (functions_registry)
         return;
@@ -100,7 +101,7 @@ void mcp_functions_registry_init(void) {
     dictionary_register_conflict_callback(functions_registry, registry_entry_conflict_callback, NULL);
 }
 
-// Cleanup the functions registry
+// Clean up the functions-registry
 void mcp_functions_registry_cleanup(void) {
     if (!functions_registry)
         return;
@@ -177,8 +178,8 @@ static int parse_function_info(struct json_object *json_obj, MCP_FUNCTION_REGIST
                     else if (strcmp(param_name, "query") == 0) {
                         entry->has_query = true;
                     }
-                    else if (strcmp(param_name, "all_fields_selected") == 0) {
-                        entry->has_all_fields_selected = true;
+                    else if (strcmp(param_name, "slice") == 0) {
+                        entry->has_slice = true;
                     }
                 }
             }
@@ -233,6 +234,9 @@ static int parse_function_info(struct json_object *json_obj, MCP_FUNCTION_REGIST
                                     
                                     if (json_object_object_get_ex(opt_obj, "name", &opt_field))
                                         opt->name = string_strdupz(json_object_get_string(opt_field));
+                                    
+                                    if (json_object_object_get_ex(opt_obj, "info", &opt_field))
+                                        opt->info = string_strdupz(json_object_get_string(opt_field));
                                 }
                             }
                         }
@@ -268,7 +272,7 @@ static MCP_FUNCTION_REGISTRY_ENTRY *mcp_function_get_info(RRDHOST *host, const c
         .client_name = "mcp-tools-execute-function-registry",
     };
 
-    // Create source buffer from user_auth
+    // Create a source buffer from user_auth
     CLEAN_BUFFER *source = buffer_create(0, NULL);
     user_auth_to_source_buffer(&auth, source);
     buffer_strcat(source, ",modelcontextprotocol");
@@ -333,7 +337,7 @@ static MCP_FUNCTION_REGISTRY_ENTRY *mcp_function_get_info(RRDHOST *host, const c
     return entry;
 }
 
-// Create dictionary key from host and function name
+// Create a dictionary key from host and function name
 static void create_registry_key(BUFFER *key_buffer, RRDHOST *host, const char *function_name) {
     buffer_flush(key_buffer);
     buffer_sprintf(key_buffer, "%s|%s", rrdhost_hostname(host), function_name);
@@ -346,14 +350,14 @@ MCP_FUNCTION_REGISTRY_ENTRY *mcp_functions_registry_get(RRDHOST *host, const cha
         return NULL;
     }
     
-    // Create dictionary key
+    // Create a dictionary key
     CLEAN_BUFFER *key = buffer_create(0, NULL);
     create_registry_key(key, host, function_name);
     const char *key_str = buffer_tostring(key);
     
     time_t now = now_realtime_sec();
     
-    // Try to get existing entry
+    // Try to get an existing entry
     MCP_FUNCTION_REGISTRY_ENTRY *entry = dictionary_get(functions_registry, key_str);
     MCP_FUNCTION_REGISTRY_ENTRY *old_entry = NULL;
 

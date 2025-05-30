@@ -15,7 +15,7 @@ typedef enum {
     OP_GREATER,          // >
     OP_GREATER_EQUALS,   // >=
     OP_MATCH,            // simple pattern
-    OP_NOT_MATCH,        // not simple pattern
+    OP_NOT_MATCH,        // a negative match of a simple pattern
     OP_UNKNOWN           // unknown operator
 } OPERATOR_TYPE;
 
@@ -114,8 +114,8 @@ typedef struct {
         CONDITION_ARRAY conditions;    // Preprocessed conditions
         
         // Time-based and history parameters
-        time_t after;                   // Start time for query (0 = not specified)
-        time_t before;                  // End time for query (0 = not specified) 
+        time_t after;                   // Start time for the query (0 = not specified)
+        time_t before;                  // End time for the query (0 = not specified)
         usec_t anchor;                  // Pagination anchor timestamp (0 = not specified)
         size_t last;                    // Number of last rows (0 = not specified)
         const char *direction;          // Query direction: "forward" or "backward" (referenced from json-c, not owned)
@@ -134,7 +134,7 @@ typedef struct {
     // Output data after processing
     struct {
         MCP_TABLE_RESULT_STATUS status; // Result of processing
-        BUFFER *result;                // Response to send to client
+        BUFFER *result;                // Response to send to the client
         size_t rows;                   // Number of rows after filtering
         size_t columns;                // Number of columns selected
     } output;

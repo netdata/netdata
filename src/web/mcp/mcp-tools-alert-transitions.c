@@ -2,7 +2,6 @@
 
 #include "mcp-tools-alert-transitions.h"
 #include "mcp-params.h"
-#include "database/contexts/api_v2_contexts.h"
 #include "database/contexts/rrdcontext.h"
 
 // Schema for alert transitions
@@ -330,7 +329,7 @@ MCP_RETURN_CODE mcp_tool_list_alert_transitions_execute(MCP_CLIENT *mcpc, struct
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
-    // Start building content array for the result
+    // Start building a content-array for the result
     buffer_json_member_add_array(mcpc->result, "content");
     {
         // Return text content for LLM compatibility

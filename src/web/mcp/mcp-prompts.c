@@ -37,16 +37,16 @@
  */
 
 #include "mcp-prompts.h"
-#include "mcp-initialize.h"
 
 // Implementation of prompts/list (transport-agnostic)
 static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0) return MCP_RC_ERROR;
+    if (!mcpc || id == 0)
+        return MCP_RC_ERROR;
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
-    // Add empty prompts array
+    // Add an empty prompts array
     buffer_json_member_add_array(mcpc->result, "prompts");
     buffer_json_array_close(mcpc->result); // Close prompts array
     

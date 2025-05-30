@@ -34,10 +34,8 @@
 
 // Initialize handler - provides information about what's available (transport-agnostic)
 MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc) {
-        buffer_strcat(mcpc->error, "Invalid MCP client context");
+    if (!mcpc)
         return MCP_RC_ERROR;
-    }
 
     // Extract client's requested protocol version
     struct json_object *protocol_version_obj = NULL;

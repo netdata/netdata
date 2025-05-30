@@ -24,6 +24,7 @@ void cgroup_netdev_link_destroy(void);
 void bearer_tokens_destroy(void);
 void alerts_by_x_cleanup(void);
 void websocket_threads_join(void);
+void mcp_functions_registry_cleanup(void);
 
 static bool abort_on_fatal = true;
 
@@ -333,6 +334,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_main_spawn_server_cleanup();
 
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
+    mcp_functions_registry_cleanup();
     rrdhost_free_all();
     dyncfg_shutdown();
     rrd_functions_inflight_destroy();

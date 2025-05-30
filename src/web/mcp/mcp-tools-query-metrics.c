@@ -362,7 +362,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    // Get time_group value to check if it's percentile or countif
+    // Get time_group value to check if it's a percentile or countif
     const char *time_group_str = NULL;
     if (json_object_is_type(time_group_obj, json_type_string)) {
         time_group_str = json_object_get_string(time_group_obj);
@@ -409,7 +409,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                                    "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context.");
         return MCP_RC_BAD_REQUEST;
     }
-    // Handle labels - expects structured object only
+    // Handle labels - expects a structured object only
     CLEAN_BUFFER *labels_buffer = NULL;
     
     labels_buffer = mcp_params_parse_labels_object(params, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
@@ -435,7 +435,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    // No need to check aggregation_obj here - we already have default in group_by struct
+    // No need to check aggregation_obj here - we already have a default in group_by struct
     
     // Other parameters
     size_t points = mcp_params_extract_size(params, "points", 0, 0, SIZE_MAX, mcpc->error);
@@ -531,7 +531,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         .id = id
     };
     
-    // Prepare query target request
+    // Prepare a query target request
     QUERY_TARGET_REQUEST qtr = {
         .version = 3,
         .scope_nodes = buffer_tostring(nodes_buffer),       // Use nodes as scope_nodes
@@ -543,12 +543,12 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         .before = before,
         .host = NULL,
         .st = NULL,
-        .nodes = NULL,              // Don't use nodes parameter here (we use scope_nodes)
-        .contexts = NULL,           // Don't use contexts parameter here (we use scope_contexts)
-        .instances = NULL,          // Don't use instances parameter here (we use scope_instances)
-        .dimensions = NULL,         // Don't use dimensions parameter here (we use scope_dimensions)
+        .nodes = NULL,              // Don't use the 'nodes' parameter here (we use scope_nodes)
+        .contexts = NULL,           // Don't use the 'contexts' parameter here (we use scope_contexts)
+        .instances = NULL,          // Don't use the 'instances' parameter here (we use scope_instances)
+        .dimensions = NULL,         // Don't use the 'dimensions' parameter here (we use scope_dimensions)
         .alerts = NULL,
-        .timeout_ms = timeout * MSEC_PER_SEC,
+        .timeout_ms = (int)(timeout * MSEC_PER_SEC),
         .points = points,
         .format = DATASOURCE_JSON2,
         .options = options |
@@ -577,7 +577,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     for (size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES; g++)
         qtr.group_by[g] = group_by[g];
     
-    // Create query target
+    // Create a query target
     QUERY_TARGET *qt = query_target_create(&qtr);
     if (!qt) {
         buffer_sprintf(mcpc->error, "Failed to prepare the query.");
@@ -643,10 +643,10 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             }
             buffer_json_object_close(mcpc->result);
             
-            // Add warning about potentially misleading aggregation
+            // Add a warning about potentially misleading aggregation
             bool warn_aggregation = false;
             // Only warn if using average without dimension grouping AND multiple dimensions selected
-            int dimensions_count = json_object_array_length(dimensions_obj);
+            int dimensions_count = (int)json_object_array_length(dimensions_obj);
             if (dimensions_count > 1 &&
                 group_by[0].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && 
                 !(group_by[0].group_by & RRDR_GROUP_BY_DIMENSION)) {
@@ -675,7 +675,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                 buffer_json_object_close(mcpc->result);
             }
             
-            // Add instance usage warning if applicable
+            // Add an instance usage warning if applicable
             if (using_instances) {
                 buffer_json_add_array_item_object(mcpc->result);
                 {

@@ -59,10 +59,6 @@ typedef struct mcp_list_tool_config {
 // Get tool configuration by name
 const MCP_LIST_TOOL_CONFIG *mcp_get_list_tool_config(const char *name);
 
-// Iterate through all list tools
-const MCP_LIST_TOOL_CONFIG *mcp_get_list_tool_by_index(size_t index);
-size_t mcp_get_list_tools_count(void);
-
 // Unified functions
 void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *config);
 MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_TOOL_CONFIG *config, 
