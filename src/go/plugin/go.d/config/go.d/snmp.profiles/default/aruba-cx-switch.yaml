@@ -55,10 +55,11 @@ metrics:
           name: arubaWiredTempSensorName
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1.1.5
         tag: aruba_wired_temp_sensor_name
-      - symbol:
-          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1.1.6
-          name: arubaWiredTempSensorState
-        tag: aruba_wired_temp_sensor_state
+  # TODO: find mapping and make it a metric
+  #      - symbol:
+  #          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1.1.6
+  #          name: arubaWiredTempSensorState
+  #        tag: aruba_wired_temp_sensor_state
   - MIB: ARUBAWIRED-POWERSUPPLY-MIB
     table:
       OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1
@@ -91,10 +92,12 @@ metrics:
           name: arubaWiredPSUAirflowDirection
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.10
         tag: aruba_wired_psu_airflow_direction
-      - symbol:
-          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.4
-          name: arubaWiredPSUState
-        tag: aruba_wired_psu_state
+  # TODO: find mapping and make it a metric
+  #      - symbol:
+  #          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.4
+  #          name: arubaWiredPSUState
+  #        tag: aruba_wired_psu_state
+
   # - MIB: ARUBAWIRED-FANTRAY-MIB
   #   table:
   #     OID: 1.3.6.1.4.1.47196.4.1.1.3.11.4.1
@@ -149,7 +152,8 @@ metrics:
           name: arubaWiredFanAirflowDirection
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.9
         tag: aruba_wired_fan_airflow_direction
-      - symbol:
-          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.5
-          name: arubaWiredFanState
-        tag: aruba_wired_fan_state
+# TODO: find mapping and make it a metric
+#      - symbol:
+#          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.5
+#          name: arubaWiredFanState
+#        tag: aruba_wired_fan_state
