@@ -8,6 +8,7 @@
 #include "mcp-prompts.h"
 #include "mcp-logging.h"
 #include "mcp-completion.h"
+#include "mcp-tools-execute-function-registry.h"
 #include "adapters/mcp-websocket.h"
 
 // Define the enum to string mapping for protocol versions
@@ -483,7 +484,9 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
 
 // Initialize the MCP subsystem
 void mcp_initialize_subsystem(void) {
-    netdata_log_info("MCP subsystem initialized");
+    mcp_functions_registry_init();
 
-    debug_flags |= D_MCP;
+    // debug_flags |= D_MCP;
+
+    netdata_log_info("MCP subsystem initialized");
 }

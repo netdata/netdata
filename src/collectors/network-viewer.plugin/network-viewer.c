@@ -27,7 +27,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #include "libnetdata/os/system-maps/system-services.h"
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
-#define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics. To change detail level, append parameter to function name: 'network-connections' (default, aggregated by PID/type) or 'network-connections sockets:detailed' (shows individual connections with client IPs/ports)."
+#define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS

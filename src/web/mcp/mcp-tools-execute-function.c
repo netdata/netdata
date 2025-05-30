@@ -3,6 +3,7 @@
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-execute-function-internal.h"
 #include "mcp-tools-execute-function-logs.h"
+#include "mcp-tools-execute-function-registry.h"
 #include "mcp-params.h"
 #include "database/rrdfunctions.h"
 
@@ -783,6 +784,40 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
                              "Maximum number of rows to return",
                              0, 0, SIZE_MAX, false);
     
+    // Time-based parameters for functions with history
+    mcp_schema_add_time_param(buffer, "after", "Start time",
+                             "Start time for query window (timestamp in seconds or RFC3339 datetime string)",
+                             "now", 0, false);
+    
+    mcp_schema_add_time_param(buffer, "before", "End time", 
+                             "End time for query window (timestamp in seconds or RFC3339 datetime string)",
+                             "now", 0, false);
+    
+    mcp_schema_add_size_param(buffer, "anchor", "Pagination anchor",
+                             "Timestamp anchor for pagination (used internally for paging)",
+                             0, 0, SIZE_MAX, false);
+    
+    mcp_schema_add_size_param(buffer, "limit", "Entries to return",
+                             "Number of entries to return",
+                             0, 0, SIZE_MAX, false);
+    
+    buffer_json_member_add_object(buffer, "direction");
+    {
+        buffer_json_member_add_string(buffer, "type", "string");
+        buffer_json_member_add_string(buffer, "title", "Query direction");
+        buffer_json_member_add_string(buffer, "description", "Direction for query processing: 'forward' (oldest first) or 'backward' (newest first)");
+        buffer_json_member_add_string(buffer, "default", "backward");
+        buffer_json_member_add_array(buffer, "enum");
+        buffer_json_add_array_item_string(buffer, "forward");
+        buffer_json_add_array_item_string(buffer, "backward");
+        buffer_json_array_close(buffer);
+    }
+    buffer_json_object_close(buffer); // direction
+    
+    mcp_schema_add_string_param(buffer, "q", "Full-text search",
+                               "Full-text search query to filter results",
+                               NULL, false);
+    
     buffer_json_member_add_object(buffer, "conditions");
     {
         buffer_json_member_add_string(buffer, "type", "array");
@@ -862,6 +897,19 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // conditions
 
+    buffer_json_member_add_object(buffer, "selections");
+    {
+        buffer_json_member_add_string(buffer, "type", "object");
+        buffer_json_member_add_string(buffer, "title", "Function parameter selections");
+        buffer_json_member_add_string(buffer, "description", 
+            "Key-value pairs where each key is a parameter name and the value depends on the parameter type: "
+            "for 'select' type parameters, use a single string value; "
+            "for 'multiselect' type parameters, use an array of strings. "
+            "Functions that require selections will prompt you with available options when called without this parameter. "
+            "Example: {\"param1\": \"single_value\", \"param2\": [\"value1\", \"value2\"]}");
+    }
+    buffer_json_object_close(buffer); // selections
+
     buffer_json_object_close(buffer); // properties
 
     // Required fields
@@ -900,7 +948,7 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     }
 
     // Check if it's a processable table format
-    if (data->input.type != FN_TYPE_TABLE) {
+    if (data->input.type != FN_TYPE_TABLE && data->input.type != FN_TYPE_TABLE_WITH_HISTORY) {
         buffer_strcat(data->output.result, json_str); // Not a processable table format
         data->output.status = MCP_TABLE_NOT_PROCESSABLE;
         return;
@@ -1344,6 +1392,263 @@ static MCP_RETURN_CODE mcp_parse_conditions_early(CONDITION_ARRAY *condition_arr
     return MCP_RC_OK;
 }
 
+// Build the function name with GET parameters appended
+static void build_function_name_with_params(BUFFER *dest, const char *function_name, struct json_object *selections, MCP_FUNCTION_DATA *data, MCP_FUNCTION_REGISTRY_ENTRY *entry) {
+    buffer_strcat(dest, function_name);
+    
+    bool first = true;
+    
+    // Add time-based parameters if supported and specified
+    if (entry->has_timeframe && data->request.after > 0) {
+        buffer_sprintf(dest, "%s after:%ld", first ? " " : " ", data->request.after);
+        first = false;
+    }
+    
+    if (entry->has_timeframe && data->request.before > 0) {
+        buffer_sprintf(dest, "%s before:%ld", first ? " " : " ", data->request.before);
+        first = false;
+    }
+    
+    if (entry->has_anchor && data->request.anchor > 0) {
+        buffer_sprintf(dest, "%s anchor:%llu", first ? " " : " ", (unsigned long long)data->request.anchor);
+        first = false;
+    }
+    
+    if (entry->has_last && data->request.last > 0) {
+        buffer_sprintf(dest, "%s last:%zu", first ? " " : " ", data->request.last);
+        first = false;
+    }
+    
+    if (entry->has_direction && data->request.direction) {
+        buffer_sprintf(dest, "%s direction:%s", first ? " " : " ", data->request.direction);
+        first = false;
+    }
+    
+    if (entry->has_query && data->request.query) {
+        buffer_sprintf(dest, "%s query:%s", first ? " " : " ", data->request.query);
+        first = false;
+    }
+    
+    if (entry->has_data_only) {
+        buffer_sprintf(dest, "%s data_only:true", first ? " " : " ");
+        first = false;
+    }
+    
+    if (entry->has_all_fields_selected) {
+        buffer_sprintf(dest, "%s all_fields_selected:true", first ? " " : " ");
+        first = false;
+    }
+    
+    // Add selections parameters
+    if (selections && json_object_is_type(selections, json_type_object)) {
+        struct json_object_iterator it = json_object_iter_begin(selections);
+        struct json_object_iterator itEnd = json_object_iter_end(selections);
+        
+        while (!json_object_iter_equal(&it, &itEnd)) {
+            const char *key = json_object_iter_peek_name(&it);
+            struct json_object *val = json_object_iter_peek_value(&it);
+            
+            if (!val) {
+                json_object_iter_next(&it);
+                continue;
+            }
+            
+            buffer_sprintf(dest, "%s %s:", first ? " " : " ", key);
+            first = false;
+            
+            if (json_object_is_type(val, json_type_string)) {
+                // Single string value
+                buffer_strcat(dest, json_object_get_string(val));
+            } else if (json_object_is_type(val, json_type_array)) {
+                // Array of values
+                size_t array_len = json_object_array_length(val);
+                for (size_t i = 0; i < array_len; i++) {
+                    if (i > 0) buffer_strcat(dest, ",");
+                    struct json_object *item = json_object_array_get_idx(val, i);
+                    if (item && json_object_is_type(item, json_type_string)) {
+                        buffer_strcat(dest, json_object_get_string(item));
+                    }
+                }
+            }
+            
+            json_object_iter_next(&it);
+        }
+    }
+}
+
+// Build POST payload for v3+ functions
+// Format: { "after": timestamp, "before": timestamp, "last": N, "data_only": true, "selections": { "key1": ["value1", "value2"] } }
+static BUFFER *build_post_payload_with_selections(struct json_object *selections, MCP_FUNCTION_DATA *data, MCP_FUNCTION_REGISTRY_ENTRY *entry) {
+    BUFFER *payload = buffer_create(0, NULL);
+    buffer_json_initialize(payload, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    
+    // Add time-based parameters if supported and specified
+    if (entry->has_timeframe && data->request.after > 0) {
+        buffer_json_member_add_uint64(payload, "after", data->request.after);
+    }
+    
+    if (entry->has_timeframe && data->request.before > 0) {
+        buffer_json_member_add_uint64(payload, "before", data->request.before);
+    }
+    
+    if (entry->has_anchor && data->request.anchor > 0) {
+        buffer_json_member_add_uint64(payload, "anchor", data->request.anchor);
+    }
+    
+    if (entry->has_last && data->request.last > 0) {
+        buffer_json_member_add_uint64(payload, "last", data->request.last);
+    }
+    
+    if (entry->has_direction && data->request.direction) {
+        buffer_json_member_add_string(payload, "direction", data->request.direction);
+    }
+    
+    if (entry->has_query && data->request.query) {
+        buffer_json_member_add_string(payload, "query", data->request.query);
+    }
+    
+    if (entry->has_data_only) {
+        buffer_json_member_add_boolean(payload, "data_only", true);
+    }
+    
+    if (entry->has_all_fields_selected) {
+        buffer_json_member_add_boolean(payload, "all_fields_selected", true);
+    }
+    
+    // Add selections if provided
+    if (selections && json_object_is_type(selections, json_type_object)) {
+        buffer_json_member_add_object(payload, "selections");
+        
+        struct json_object_iterator it = json_object_iter_begin(selections);
+        struct json_object_iterator itEnd = json_object_iter_end(selections);
+        
+        while (!json_object_iter_equal(&it, &itEnd)) {
+            const char *key = json_object_iter_peek_name(&it);
+            struct json_object *val = json_object_iter_peek_value(&it);
+            
+            if (!val) {
+                json_object_iter_next(&it);
+                continue;
+            }
+            
+            if (json_object_is_type(val, json_type_string)) {
+                // Single string value
+                buffer_json_member_add_string(payload, key, json_object_get_string(val));
+            } else if (json_object_is_type(val, json_type_array)) {
+                // Array of values
+                buffer_json_member_add_array(payload, key);
+                
+                size_t array_len = json_object_array_length(val);
+                for (size_t i = 0; i < array_len; i++) {
+                    struct json_object *item = json_object_array_get_idx(val, i);
+                    if (item && json_object_is_type(item, json_type_string)) {
+                        buffer_json_add_array_item_string(payload, json_object_get_string(item));
+                    }
+                }
+                
+                buffer_json_array_close(payload);
+            }
+            
+            json_object_iter_next(&it);
+        }
+        
+        buffer_json_object_close(payload); // close "selections"
+    }
+    
+    buffer_json_finalize(payload);
+    
+    return payload;
+}
+
+// Generate helpful message about required parameters
+static void generate_required_params_message(BUFFER *message, MCP_FUNCTION_REGISTRY_ENTRY *entry) {
+    buffer_sprintf(message, 
+        "This function has some required parameters.\n"
+        "Please repeat the request adding the following:\n\n");
+    
+    // Add timeframe requirements if needed
+    if (entry->has_timeframe) {
+        buffer_strcat(message,
+            "TIMEFRAME PARAMETERS (Required):\n"
+            "- 'after': Start time (timestamp in seconds or RFC3339 datetime string)\n"
+            "- 'before': End time (timestamp in seconds or RFC3339 datetime string)\n\n");
+    }
+    
+    for (size_t i = 0; i < entry->required_params_count; i++) {
+        MCP_FUNCTION_PARAM *param = &entry->required_params[i];
+        
+        buffer_sprintf(message, "SELECTION %zu:\n", i + 1);
+        buffer_sprintf(message, "Description: %s\n", string2str(param->help));
+        buffer_sprintf(message, "key: '%s'\n", string2str(param->id));
+        
+        if (param->type == MCP_REQUIRED_PARAMS_TYPE_SELECT) {
+            buffer_strcat(message, "With one of the following values:\n");
+        } else {
+            buffer_strcat(message, "With one or more of the following values:\n");
+        }
+        
+        for (size_t j = 0; j < param->options_count; j++) {
+            buffer_sprintf(message, "   - '%s': %s\n", 
+                         string2str(param->options[j].id), 
+                         string2str(param->options[j].name));
+        }
+        
+        if (i < entry->required_params_count - 1) {
+            buffer_strcat(message, "\n");
+        }
+    }
+    
+    buffer_strcat(message, "\nExample:\n\n```json\n{\n");
+    
+    // Add timeframe parameters to example if required
+    if (entry->has_timeframe) {
+        buffer_strcat(message, "  \"after\": 1648627200,\n");
+        buffer_strcat(message, "  \"before\": 1648630800,\n");
+    }
+    
+    // Add selections if there are required params
+    if (entry->required_params_count > 0) {
+        buffer_strcat(message, "  \"selections\": {\n");
+    }
+    
+    for (size_t i = 0; i < entry->required_params_count; i++) {
+        if (i > 0) buffer_strcat(message, ",\n");
+        MCP_FUNCTION_PARAM *param = &entry->required_params[i];
+        
+        if (param->type == MCP_REQUIRED_PARAMS_TYPE_SELECT) {
+            // For select type, show single value (not array)
+            if (param->options_count > 0) {
+                buffer_sprintf(message, "    \"%s\": \"%s\"", 
+                             string2str(param->id), 
+                             string2str(param->options[0].id));
+            } else {
+                buffer_sprintf(message, "    \"%s\": \"value\"", string2str(param->id));
+            }
+        } else {
+            // For multiselect type, show array
+            buffer_sprintf(message, "    \"%s\": [", string2str(param->id));
+            if (param->options_count > 0) {
+                // Show first few options as examples
+                size_t examples = param->options_count > 2 ? 2 : param->options_count;
+                for (size_t j = 0; j < examples; j++) {
+                    if (j > 0) buffer_strcat(message, ", ");
+                    buffer_sprintf(message, "\"%s\"", string2str(param->options[j].id));
+                }
+            } else {
+                buffer_strcat(message, "\"value1\", \"value2\"");
+            }
+            buffer_strcat(message, "]");
+        }
+    }
+    
+    // Close selections object if it was opened
+    if (entry->required_params_count > 0) {
+        buffer_strcat(message, "\n  }");
+    }
+    
+    buffer_strcat(message, "\n}\n```");
+}
+
 // Parse the request parameters and populate the MCP_FUNCTION_DATA structure
 static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_CLIENT *mcpc, struct json_object *params) {
     if (!data || !mcpc || !params)
@@ -1384,6 +1689,44 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
     }
     
     // Parse optional filtering parameters
+    
+    // Parse time-based parameters
+    data->request.after = mcp_params_parse_time(params, "after", 0);
+    data->request.before = mcp_params_parse_time(params, "before", 0);
+    
+    // Check if timeframe parameters are required but missing (will be validated later with registry entry)
+    
+    data->request.anchor = (usec_t)mcp_params_extract_size(params, "anchor", 0, 0, SIZE_MAX, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    data->request.last = (size_t)mcp_params_extract_size(params, "limit", 0, 0, SIZE_MAX, mcpc->error);
+    if (buffer_strlen(mcpc->error) > 0) {
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // direction parameter
+    if (json_object_object_get_ex(params, "direction", &obj) && 
+        json_object_is_type(obj, json_type_string)) {
+        const char *direction = json_object_get_string(obj);
+        if (direction && (strcmp(direction, "forward") == 0 || strcmp(direction, "backward") == 0)) {
+            data->request.direction = direction;
+        } else if (direction) {
+            buffer_sprintf(mcpc->error, "Invalid direction: '%s'. Valid options are 'forward' or 'backward'.", direction);
+            return MCP_RC_BAD_REQUEST;
+        }
+    }
+    
+    // query parameter for full-text search
+    if (json_object_object_get_ex(params, "q", &obj) &&
+        json_object_is_type(obj, json_type_string)) {
+        const char *query = json_object_get_string(obj);
+        if (query && *query) {
+            data->request.query = query;
+        }
+    }
+    
     
     // columns array - parse it early
     if (json_object_object_get_ex(params, "columns", &obj) && 
@@ -1450,6 +1793,31 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
         }
     }
     
+    // Convert query parameter to a full-text search condition
+    if (data->request.query && *data->request.query) {
+        // Check if we have room for one more condition
+        if (data->request.conditions.count >= MAX_CONDITIONS) {
+            buffer_sprintf(mcpc->error, "Too many search criteria. Cannot add full-text search query on top of %zu existing conditions. Maximum is %d.", 
+                          data->request.conditions.count, MAX_CONDITIONS);
+            return MCP_RC_BAD_REQUEST;
+        }
+        
+        // Add a wildcard search condition for the query
+        CONDITION *query_condition = &data->request.conditions.items[data->request.conditions.count];
+        query_condition->column_name = "*";
+        query_condition->column_index = -1; // Will be set properly during resolve
+        query_condition->op = OP_MATCH;
+        query_condition->v_type = COND_VALUE_STRING;
+        query_condition->v_str = data->request.query;
+        
+        // Create pattern with wildcards around the search term for substring matching
+        CLEAN_BUFFER *pattern_buffer = buffer_create(0, NULL);
+        buffer_sprintf(pattern_buffer, "*%s*", data->request.query);
+        query_condition->pattern = string_to_simple_pattern_nocase_substring(buffer_tostring(pattern_buffer));
+        
+        data->request.conditions.count++;
+    }
+    
     // Find the host
     data->request.host = rrdhost_find_by_hostname(data->request.node);
     if (!data->request.host) {
@@ -1472,7 +1840,7 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
 }
 
 // Execute the function and populate the input section of data
-static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data) {
+static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload) {
     if (!data || !data->request.host || !data->request.function)
         return MCP_RC_ERROR;
     
@@ -1506,7 +1874,7 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data) {
         NULL,
         NULL,
         NULL,
-        NULL,
+        payload,
         buffer_tostring(source),
         false
     );
@@ -1551,7 +1919,7 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
         buffer_strcat(data->output.result, buffer_tostring(data->input.json));
         add_table_messages_to_mcp_result(data, NULL);
     }
-    else if (data->input.type == FN_TYPE_NOT_TABLE) {
+    else if (data->input.type == FN_TYPE_NOT_TABLE && data->input.type != FN_TYPE_TABLE_WITH_HISTORY) {
         // Not a processable table format
         data->output.status = MCP_TABLE_NOT_PROCESSABLE;
         buffer_strcat(data->output.result, buffer_tostring(data->input.json));
@@ -1637,19 +2005,136 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         return rc;
     }
     
+    // Get function registry entry
+    CLEAN_BUFFER *registry_error = buffer_create(0, NULL);
+    MCP_FUNCTION_REGISTRY_ENTRY *registry_entry = mcp_functions_registry_get(data.request.host, data.request.function, registry_error);
+    
+    if (!registry_entry) {
+        buffer_sprintf(mcpc->error, "Failed to get function info: %s", buffer_tostring(registry_error));
+        mcp_functions_data_cleanup(&data);
+        return MCP_RC_ERROR;
+    }
+    
+    // Check if function requires parameters
+    struct json_object *selections = NULL;
+    if (json_object_object_get_ex(params, "selections", &selections)) {
+        // Selections provided - validate they are an object
+        if (!json_object_is_type(selections, json_type_object)) {
+            buffer_strcat(mcpc->error, "The 'selections' parameter must be an object with key-value pairs where values are arrays of strings");
+            mcp_functions_registry_release(registry_entry);
+            mcp_functions_data_cleanup(&data);
+            return MCP_RC_BAD_REQUEST;
+        }
+    }
+    
+    // Check if timeframe parameters are required but missing
+    if (registry_entry->has_timeframe && data.request.after == 0 && data.request.before == 0) {
+        buffer_sprintf(mcpc->error, "This function requires timeframe parameters 'after' and 'before' to be specified.");
+        mcp_functions_registry_release(registry_entry);
+        mcp_functions_data_cleanup(&data);
+        return MCP_RC_BAD_REQUEST;
+    }
+    
+    // Check if required parameters are missing or empty
+    bool missing_required_params = false;
+    if (registry_entry->required_params_count > 0) {
+        if (!selections) {
+            missing_required_params = true;
+        } else {
+            // Check if all required parameters have non-empty values
+            for (size_t i = 0; i < registry_entry->required_params_count; i++) {
+                const char *param_id = string2str(registry_entry->required_params[i].id);
+                MCP_FUNCTION_PARAM *param = &registry_entry->required_params[i];
+                struct json_object *param_value = NULL;
+                
+                if (!json_object_object_get_ex(selections, param_id, &param_value)) {
+                    missing_required_params = true;
+                    break;
+                }
+                
+                // Validate based on parameter type
+                if (param->type == MCP_REQUIRED_PARAMS_TYPE_SELECT) {
+                    // For select type, accept either string or array with single element
+                    if (json_object_is_type(param_value, json_type_string)) {
+                        const char *str_val = json_object_get_string(param_value);
+                        if (!str_val || !*str_val) {
+                            missing_required_params = true;
+                            break;
+                        }
+                    } else if (json_object_is_type(param_value, json_type_array)) {
+                        if (json_object_array_length(param_value) == 0) {
+                            missing_required_params = true;
+                            break;
+                        }
+                    } else {
+                        missing_required_params = true;
+                        break;
+                    }
+                } else {
+                    // For multiselect type, require array with at least one element
+                    if (!json_object_is_type(param_value, json_type_array) ||
+                        json_object_array_length(param_value) == 0) {
+                        missing_required_params = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (missing_required_params) {
+        // Function requires parameters but none provided or empty - generate helpful message
+        mcp_init_success_result(mcpc, id);
+        buffer_json_member_add_array(mcpc->result, "content");
+        buffer_json_add_array_item_object(mcpc->result);
+        {
+            buffer_json_member_add_string(mcpc->result, "type", "text");
+            
+            CLEAN_BUFFER *message = buffer_create(0, NULL);
+            generate_required_params_message(message, registry_entry);
+            buffer_json_member_add_string(mcpc->result, "text", buffer_tostring(message));
+        }
+        buffer_json_object_close(mcpc->result);
+        buffer_json_array_close(mcpc->result);
+        buffer_json_object_close(mcpc->result);
+        buffer_json_finalize(mcpc->result);
+        
+        mcp_functions_registry_release(registry_entry);
+        mcp_functions_data_cleanup(&data);
+        return MCP_RC_OK;
+    }
+    
+    // Build the actual function name to execute and POST payload if needed
+    CLEAN_BUFFER *actual_function = buffer_create(0, NULL);
+    CLEAN_BUFFER *post_payload = NULL;
+    
+    if (registry_entry->supports_post) {
+        // v3+ function with POST support - create POST payload (even if no selections)
+        buffer_strcat(actual_function, data.request.function);
+        post_payload = build_post_payload_with_selections(selections, &data, registry_entry);
+    } else if (selections) {
+        // GET function with parameters - append to function name
+        build_function_name_with_params(actual_function, data.request.function, selections, &data, registry_entry);
+    } else {
+        // No parameters needed or provided
+        buffer_strcat(actual_function, data.request.function);
+    }
+    
+    // Update the function name in data
+    data.request.function = buffer_tostring(actual_function);
+    
+    // Release registry entry - we're done with it
+    mcp_functions_registry_release(registry_entry);
+    
     // Execute the function
-    rc = mcp_function_run(&data);
+    rc = mcp_function_run(&data, post_payload);
     if (rc != MCP_RC_OK) {
         mcp_functions_data_cleanup(&data);
         return rc;
     }
     
-    // Process based on response type
-    if (data.input.type == FN_TYPE_TABLE_WITH_HISTORY) {
-        rc = mcp_functions_process_logs(&data, id);
-    } else {
-        rc = mcp_functions_process_table(&data, id);
-    }
+    // Process the response (all function types use table processing now)
+    rc = mcp_functions_process_table(&data, id);
     
     // Cleanup
     mcp_functions_data_cleanup(&data);

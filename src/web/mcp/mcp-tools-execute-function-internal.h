@@ -112,6 +112,14 @@ typedef struct {
         } columns;                     // Selected columns
 
         CONDITION_ARRAY conditions;    // Preprocessed conditions
+        
+        // Time-based and history parameters
+        time_t after;                   // Start time for query (0 = not specified)
+        time_t before;                  // End time for query (0 = not specified) 
+        usec_t anchor;                  // Pagination anchor timestamp (0 = not specified)
+        size_t last;                    // Number of last rows (0 = not specified)
+        const char *direction;          // Query direction: "forward" or "backward" (referenced from json-c, not owned)
+        const char *query;              // Full-text search query (referenced from json-c, not owned)
     } request;
     
     // Input data from the function
