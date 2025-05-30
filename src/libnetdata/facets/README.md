@@ -76,6 +76,15 @@ Each source includes:
 - **Entry count** (unique to Windows)
 - `default_selected` flag (indicates if selected by default)
 
+**Windows Events Performance Optimization:**
+- Windows Events have few native fields (Level, TimeCreated, EventID, etc.)
+- Additional data is stored in XML format within each event
+- XML parsing is expensive, so windows-events.plugin uses **lazy loading**:
+  - XML is parsed only for rows that will be returned to the user
+  - For full-text search, XML is fetched and searched but not parsed
+  - Field extraction from XML happens only for visible rows
+- This approach balances search capability with performance
+
 ## Query Parameters
 
 ### Core Parameters
@@ -270,11 +279,100 @@ Log databases often contain out-of-order entries:
   - Time-based navigation
   - Dynamic field discovery
 
+#### JSON Structure Differences: Regular Tables vs Logs
+
+**Regular Table Functions** (e.g., processes, network connections):
+```json
+{
+  "status": 200,
+  "type": "table",
+  "has_history": false,
+  "columns": { /* column definitions */ },
+  "data": [ /* simple arrays of values */ ],
+  "charts": { /* optional chart configs */ }
+}
+```
+
+**Logs Functions** (e.g., systemd-journal, Windows events):
+```json
+{
+  "status": 200,
+  "type": "table",
+  "has_history": true,
+  "_request": { /* complete request parameters */ },
+  "columns": { /* column definitions with facet support */ },
+  "data": [ 
+    /* arrays starting with timestamp, rowOptions, then values */
+  ],
+  "facets": { /* available filters with counts */ },
+  "histogram": { /* time-series visualization */ },
+  "pagination": { /* anchor-based navigation */ },
+  "_journal_files": { /* source metadata */ },
+  "_sampling": { /* sampling statistics */ },
+  "items": 12345,
+  "last_modified": 1234567890,
+  /* many more metadata fields */
+}
+```
+
+Key differences:
+- Logs have 20+ additional top-level fields
+- Data rows include timestamps and metadata
+- Built-in support for faceted filtering and time navigation
+- Rich metadata about data sources and query performance
+
 ### Dynamic Schema Challenge
 - systemd-journal can store any structured data with custom fields
 - Plugins discover new fields dynamically as they process data
 - LLMs need a way to discover available fields to build intelligent queries
 - Current MCP implementation doesn't handle this dynamic schema discovery
+
+#### Example: Schema Variability in systemd-journal
+The same systemd-journal can contain completely different datasets with different schemas:
+
+1. **Standard System Logs** - Traditional journal fields:
+   - System fields: `_HOSTNAME`, `_UID`, `_GID`, `_PID`, `_COMM`, `_EXE`
+   - Message fields: `MESSAGE`, `PRIORITY`, `SYSLOG_FACILITY`, `SYSLOG_IDENTIFIER`
+   - Systemd fields: `_SYSTEMD_UNIT`, `_SYSTEMD_CGROUP`, `_SYSTEMD_SLICE`
+   - Boot/runtime fields: `_BOOT_ID`, `_MACHINE_ID`, `_RUNTIME_SCOPE`
+   
+2. **Netdata Agent Events** - Custom application data with `AE_` prefix:
+   - Agent metadata: `AE_AGENT_ID`, `AE_AGENT_VERSION`, `AE_AGENT_STATUS`
+   - Hardware info: `AE_HW_BOARD_NAME`, `AE_HW_CHASSIS_TYPE`, `AE_HW_SYS_VENDOR`
+   - Cloud/container: `AE_HOST_CLOUD_PROVIDER`, `AE_HOST_CONTAINER`, `AE_AGENT_KUBERNETES`
+   - Crash analytics: `AE_AGENT_CRASHES`, `AE_FATAL_FAULT_ADDRESS`, `AE_FATAL_THREAD`
+   - Performance: `AE_AGENT_UPTIME`, `AE_AGENT_TIMINGS_INIT`, `AE_AGENT_TIMINGS_EXIT`
+
+3. **Other Structured Data** - Any application can log structured data:
+   - Netdata alerts: `ND_ALERT_NAME`, `ND_ALERT_STATUS`, `ND_ALERT_CLASS`
+   - Custom applications: Arbitrary fields specific to each application
+   - IoT devices: Sensor readings, device states, telemetry data
+   - Business applications: Transaction IDs, user actions, audit trails
+
+This variability means:
+- The same logs query API must handle completely different schemas
+- Fields available for filtering/faceting vary by dataset
+- LLMs need to discover what fields exist before building meaningful queries
+- Traditional fixed-schema approaches don't work
+
+#### Platform-Specific Schema Characteristics
+
+**Linux (systemd-journal)**:
+- All fields are native journal fields - no lazy loading needed
+- Can have **thousands** of different fields in a single dataset
+- Multiple datasets can be queried in parallel (multiplexed, interleaved)
+- Fields are discovered dynamically as data is processed
+- Fast field access and filtering
+- This massive scalability and flexibility makes systemd-journal extremely powerful as a structured data store
+
+**Windows (Event logs)**:
+- Limited native fields (Level, TimeCreated, EventID, Provider, etc.)
+- Rich data stored in XML format within each event
+- Lazy XML parsing for performance:
+  - Full-text search scans XML without parsing
+  - XML parsing happens only for returned rows
+  - Balances search capability with performance constraints
+- Field discovery requires XML inspection
 
 ### Future Direction
 - Evolve MCP's function processing to handle both regular tables and logs uniformly

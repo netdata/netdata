@@ -730,6 +730,7 @@
         let ws = null;
         let currentRequestId = 1;
         let serverCapabilities = {};
+        let isUpdatingFromCode = false; // Flag to prevent recursive updates between JSON editor and form
         let availableTools = {};
         let availablePrompts = {};
         let availableResources = {};
@@ -1140,6 +1141,23 @@
         clearParamsBtn.addEventListener('click', clearCurrentToolParams);
         clearHistoryBtn.addEventListener('click', clearRequestHistory);
         
+        // JSON editor change detection
+        let jsonEditorChangeTimer = null;
+        
+        jsonEditor.addEventListener('input', () => {
+            // Skip if this change was triggered by code (not user)
+            if (isUpdatingFromCode) return;
+            
+            // Debounce the update to avoid excessive updates while typing
+            clearTimeout(jsonEditorChangeTimer);
+            jsonEditorChangeTimer = setTimeout(() => {
+                // Only update form if we're on the edit tab and have a schema
+                if (currentActiveTab === 'editRequest' && schemaFormGenerator) {
+                    updateFormFromRaw();
+                }
+            }, 500); // 500ms delay
+        });
+        
         // Flow selection
         flowsList.addEventListener('click', (e) => {
             const flowItem = e.target.closest('.flow-item');
@@ -1388,7 +1406,9 @@
             if (template.id !== undefined) {
                 template.id = currentRequestId;
             }
+            isUpdatingFromCode = true;
             jsonEditor.value = JSON.stringify(template, null, 2);
+            setTimeout(() => { isUpdatingFromCode = false; }, 10);
             
             // Update schema form if we have a schema for this method
             if (method.dynamic && method.schema) {
@@ -1437,6 +1457,9 @@
                 // Initialize generator with the container
                 schemaFormGenerator = new MCPSchemaUIGenerator(formContainer, {
                     onChange: (value) => {
+                        // Skip if this change was triggered by code (not user)
+                        if (isUpdatingFromCode) return;
+                        
                         // Clear any validation messages when user edits
                         const existingMsg = schemaFormEditor.querySelector('.validation-message');
                         if (existingMsg && !existingMsg.classList.contains('success')) {
@@ -1518,7 +1541,11 @@
                     currentRequest.params = formData;
                 }
                 
+                // Set flag to prevent recursive updates
+                isUpdatingFromCode = true;
                 jsonEditor.value = JSON.stringify(currentRequest, null, 2);
+                // Reset flag after a small delay to ensure the event has been processed
+                setTimeout(() => { isUpdatingFromCode = false; }, 10);
             } catch (e) {
                 console.error('Error updating raw JSON:', e);
             }
@@ -1540,7 +1567,18 @@
                     }
                 }
                 
+                // Set flag to prevent onChange from updating JSON back
+                isUpdatingFromCode = true;
                 schemaFormGenerator.setValue(value);
+                // Reset flag after a delay to ensure all events have processed
+                setTimeout(() => { 
+                    isUpdatingFromCode = false;
+                    
+                    // Save the updated parameters to local storage after form is updated
+                    if (currentMethodSchema && currentMethodSchema.toolName && value) {
+                        saveToolParams(currentMethodSchema.toolName, value);
+                    }
+                }, 50);
             } catch (e) {
                 console.error('Error updating form from JSON:', e);
             }
@@ -2044,7 +2082,9 @@
         function formatJSON() {
             try {
                 const json = JSON.parse(jsonEditor.value);
+                isUpdatingFromCode = true;
                 jsonEditor.value = JSON.stringify(json, null, 2);
+                setTimeout(() => { isUpdatingFromCode = false; }, 10);
             } catch (e) {
                 alert('Invalid JSON: ' + e.message);
             }
@@ -2251,7 +2291,9 @@
         }
         
         // Set initial JSON
+        isUpdatingFromCode = true;
         jsonEditor.value = JSON.stringify(flows.initialization.methods[0].template, null, 2);
+        setTimeout(() => { isUpdatingFromCode = false; }, 10);
         
         // Import from LLM functions
         function openImportModal() {
@@ -2357,7 +2399,9 @@
                 }
                 
                 // Step 4: Update the JSON editor
+                isUpdatingFromCode = true;
                 jsonEditor.value = JSON.stringify(jsonRpcRequest, null, 2);
+                setTimeout(() => { isUpdatingFromCode = false; }, 10);
                 
                 // Step 5: Update the form if in edit mode
                 if (currentActiveTab === 'editRequest' && currentMethodSchema) {

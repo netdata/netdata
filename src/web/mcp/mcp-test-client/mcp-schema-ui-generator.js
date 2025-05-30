@@ -380,6 +380,11 @@ class MCPSchemaUIGenerator {
             return this._createArrayEnumCheckboxes(key, schema, value);
         }
         
+        // Check if this is a tuple array with oneOf items
+        if (schema.items && schema.items.type === 'array' && schema.items.items && schema.items.items.oneOf) {
+            return this._createTupleArrayInput(key, schema, value);
+        }
+        
         // Regular array interface
         const container = document.createElement('div');
         container.className = 'mcp-array-container';
@@ -475,6 +480,305 @@ class MCPSchemaUIGenerator {
     }
 
     /**
+     * Create tuple array input (array of arrays with specific types at each position)
+     */
+    _createTupleArrayInput(key, schema, value) {
+        const container = document.createElement('div');
+        container.className = 'mcp-array-container mcp-tuple-array-container';
+
+        const items = Array.isArray(value) ? value : (schema.default || []);
+        this.value[key] = [...items];
+
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'mcp-array-items';
+
+        const renderItems = () => {
+            itemsContainer.innerHTML = '';
+            this.value[key].forEach((item, index) => {
+                const itemEl = this._createTupleArrayItem(key, schema.items, item, index);
+                itemsContainer.appendChild(itemEl);
+            });
+        };
+
+        renderItems();
+        container.appendChild(itemsContainer);
+
+        // Add button
+        const addButton = document.createElement('button');
+        addButton.type = 'button';
+        addButton.className = 'mcp-button mcp-button-add';
+        addButton.textContent = `Add ${schema.title || key}`;
+        addButton.addEventListener('click', () => {
+            // Create a new tuple with default values for each position
+            const newTuple = this._createDefaultTuple(schema.items);
+            if (!Array.isArray(this.value[key])) {
+                this.value[key] = [];
+            }
+            this.value[key].push(newTuple);
+            renderItems();
+            this._onChange();
+        });
+
+        container.appendChild(addButton);
+
+        return container;
+    }
+
+    /**
+     * Create a tuple array item (array with specific types at each position)
+     */
+    _createTupleArrayItem(arrayKey, tupleSchema, tupleValue, index) {
+        const container = document.createElement('div');
+        container.className = 'mcp-array-item mcp-tuple-item';
+
+        const fieldsWrapper = document.createElement('div');
+        fieldsWrapper.className = 'mcp-tuple-fields';
+
+        // Ensure the tuple value is an array
+        if (!Array.isArray(tupleValue)) {
+            tupleValue = this._createDefaultTuple(tupleSchema);
+            this.value[arrayKey][index] = tupleValue;
+        }
+
+        // Handle oneOf items - each position in the tuple has a specific type
+        if (tupleSchema.items && tupleSchema.items.oneOf && Array.isArray(tupleSchema.items.oneOf)) {
+            tupleSchema.items.oneOf.forEach((positionSchema, positionIndex) => {
+                const fieldContainer = document.createElement('div');
+                fieldContainer.className = 'mcp-tuple-field';
+                
+                // Create label if we can determine what this position represents
+                const label = document.createElement('label');
+                label.className = 'mcp-tuple-field-label';
+                if (positionIndex === 0) label.textContent = 'Column';
+                else if (positionIndex === 1) label.textContent = 'Operator';
+                else if (positionIndex === 2) label.textContent = 'Value';
+                else label.textContent = `Field ${positionIndex + 1}`;
+                fieldContainer.appendChild(label);
+
+                // Get the value for this position
+                const positionValue = tupleValue[positionIndex];
+                
+                // For the value field with oneOf, create a special multi-type input
+                if (positionSchema.oneOf && positionIndex === 2) {
+                    const multiTypeContainer = this._createTupleMultiTypeInput(
+                        arrayKey, index, positionIndex, positionSchema, positionValue
+                    );
+                    fieldContainer.appendChild(multiTypeContainer);
+                } else {
+                    // Create regular input for this position
+                    const input = this._createInput(`${arrayKey}[${index}][${positionIndex}]`, positionSchema, positionValue);
+                    
+                    // We need to handle the value updates ourselves
+                    const newInput = input.cloneNode(true);
+                    input.parentNode?.replaceChild(newInput, input);
+                    
+                    // For select elements, we need to set the value after cloning
+                    if (newInput.tagName === 'SELECT' && positionValue !== undefined && positionValue !== null) {
+                        newInput.value = positionValue;
+                    }
+                    
+                    const updateValue = () => {
+                        if (!Array.isArray(this.value[arrayKey])) {
+                            this.value[arrayKey] = [];
+                        }
+                        if (!Array.isArray(this.value[arrayKey][index])) {
+                            this.value[arrayKey][index] = [];
+                        }
+                        
+                        let newValue;
+                        if (positionSchema.type === 'number' || positionSchema.type === 'integer') {
+                            newValue = newInput.value === '' ? undefined : Number(newInput.value);
+                        } else if (positionSchema.type === 'boolean') {
+                            newValue = newInput.checked;
+                        } else {
+                            newValue = newInput.value;
+                        }
+                        
+                        this.value[arrayKey][index][positionIndex] = newValue;
+                        this._onChange();
+                    };
+
+                    if (newInput.tagName === 'INPUT' || newInput.tagName === 'SELECT' || newInput.tagName === 'TEXTAREA') {
+                        newInput.addEventListener(newInput.type === 'checkbox' ? 'change' : 'input', updateValue);
+                    }
+
+                    fieldContainer.appendChild(newInput);
+                }
+                
+                fieldsWrapper.appendChild(fieldContainer);
+            });
+        }
+
+        container.appendChild(fieldsWrapper);
+
+        // Remove button
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'mcp-button mcp-button-remove';
+        removeButton.innerHTML = '×';
+        removeButton.title = 'Remove';
+        removeButton.addEventListener('click', () => {
+            if (!Array.isArray(this.value[arrayKey])) {
+                this.value[arrayKey] = [];
+            }
+            this.value[arrayKey].splice(index, 1);
+            
+            // Re-render the parent array container
+            // Find the parent array container and its render function
+            const arrayContainer = container.closest('.mcp-tuple-array-container');
+            if (arrayContainer) {
+                const itemsContainer = arrayContainer.querySelector('.mcp-array-items');
+                if (itemsContainer) {
+                    // Re-render all items
+                    itemsContainer.innerHTML = '';
+                    if (Array.isArray(this.value[arrayKey])) {
+                        this.value[arrayKey].forEach((item, idx) => {
+                            const itemEl = this._createTupleArrayItem(arrayKey, tupleSchema, item, idx);
+                            itemsContainer.appendChild(itemEl);
+                        });
+                    }
+                }
+            }
+            
+            this._onChange();
+        });
+        container.appendChild(removeButton);
+
+        return container;
+    }
+
+    /**
+     * Create a default tuple based on the schema
+     */
+    _createDefaultTuple(tupleSchema) {
+        if (tupleSchema.items && tupleSchema.items.oneOf && Array.isArray(tupleSchema.items.oneOf)) {
+            return tupleSchema.items.oneOf.map(positionSchema => {
+                return this._getDefaultValue(positionSchema);
+            });
+        }
+        return [];
+    }
+
+    /**
+     * Create a multi-type input specifically for tuple arrays
+     */
+    _createTupleMultiTypeInput(arrayKey, tupleIndex, positionIndex, schema, value) {
+        const container = document.createElement('div');
+        container.className = 'mcp-tuple-multitype-container';
+        
+        // Get the options from oneOf
+        const options = schema.oneOf || [];
+        
+        // Create type selector tabs
+        const tabsContainer = document.createElement('div');
+        tabsContainer.className = 'mcp-anyof-tabs mcp-tuple-anyof-tabs';
+        
+        const inputContainer = document.createElement('div');
+        inputContainer.className = 'mcp-tuple-multitype-input';
+        
+        let activeType = 'string';
+        let currentInput = null;
+        
+        // Try to determine the current type based on value
+        if (value !== undefined && value !== null) {
+            if (typeof value === 'boolean') {
+                activeType = 'boolean';
+            } else if (typeof value === 'number') {
+                activeType = 'number';
+            } else {
+                activeType = 'string';
+            }
+        }
+        
+        // Create tabs for each type
+        const tabs = {};
+        options.forEach((optionSchema, optionIndex) => {
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'mcp-anyof-tab';
+            tab.textContent = optionSchema.type || 'unknown';
+            
+            if (optionSchema.type === activeType) {
+                tab.classList.add('active');
+            }
+            
+            tab.addEventListener('click', () => {
+                // Update active tab
+                Object.values(tabs).forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Create new input for this type
+                activeType = optionSchema.type;
+                this._updateTupleMultiTypeInput(
+                    inputContainer, arrayKey, tupleIndex, positionIndex, 
+                    optionSchema, activeType === 'boolean' ? false : (activeType === 'number' ? 0 : '')
+                );
+            });
+            
+            tabs[optionSchema.type] = tab;
+            tabsContainer.appendChild(tab);
+        });
+        
+        container.appendChild(tabsContainer);
+        container.appendChild(inputContainer);
+        
+        // Create initial input
+        const initialSchema = options.find(o => o.type === activeType) || options[0];
+        this._updateTupleMultiTypeInput(inputContainer, arrayKey, tupleIndex, positionIndex, initialSchema, value);
+        
+        return container;
+    }
+    
+    /**
+     * Update the input in a tuple multi-type container
+     */
+    _updateTupleMultiTypeInput(container, arrayKey, tupleIndex, positionIndex, schema, value) {
+        container.innerHTML = '';
+        
+        let input;
+        if (schema.type === 'boolean') {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'mcp-checkbox';
+            input.checked = !!value;
+        } else if (schema.type === 'number') {
+            input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'mcp-input';
+            input.value = value !== undefined ? value : '';
+        } else {
+            input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'mcp-input';
+            input.value = value || '';
+        }
+        
+        const updateValue = () => {
+            if (!Array.isArray(this.value[arrayKey])) {
+                this.value[arrayKey] = [];
+            }
+            if (!Array.isArray(this.value[arrayKey][tupleIndex])) {
+                this.value[arrayKey][tupleIndex] = [];
+            }
+            
+            let newValue;
+            if (schema.type === 'boolean') {
+                newValue = input.checked;
+            } else if (schema.type === 'number') {
+                newValue = input.value === '' ? undefined : Number(input.value);
+            } else {
+                newValue = input.value;
+            }
+            
+            this.value[arrayKey][tupleIndex][positionIndex] = newValue;
+            this._onChange();
+        };
+        
+        input.addEventListener(schema.type === 'boolean' ? 'change' : 'input', updateValue);
+        container.appendChild(input);
+    }
+
+    /**
      * Create array item
      */
     _createArrayItem(arrayKey, schema, value, index) {
@@ -492,6 +796,11 @@ class MCPSchemaUIGenerator {
         // because they would try to set this.value["dimensions[0]"] instead of this.value["dimensions"][0]
         const newInput = input.cloneNode(true);
         input.parentNode?.replaceChild(newInput, input);
+        
+        // For select elements, we need to set the value after cloning
+        if (newInput.tagName === 'SELECT' && value !== undefined && value !== null) {
+            newInput.value = value;
+        }
         
         // Add our own handler to update the array properly
         const updateValue = () => {
@@ -1250,8 +1559,11 @@ class MCPSchemaUIGenerator {
      * Update field values from current value
      */
     _updateFieldValues() {
-        // TODO: Implement updating input values when setValue is called
-        // This would require storing references to input elements
+        // Re-render the entire form with the new values
+        // This is simpler than trying to update individual fields
+        if (this.schema) {
+            this.render();
+        }
     }
 
     /**
@@ -2032,6 +2344,116 @@ class MCPSchemaUIGenerator {
 
             .mcp-nested-object .mcp-field:last-child {
                 margin-bottom: 0;
+            }
+
+            /* Tuple array styles */
+            .mcp-tuple-array-container {
+                background: #f0f0f0;
+            }
+
+            .mcp-tuple-item {
+                background: white;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px;
+            }
+
+            .mcp-tuple-fields {
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+                flex: 1;
+            }
+
+            .mcp-tuple-field {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .mcp-tuple-field:first-child {
+                flex: 1.6; /* Column name - 20% narrower than before */
+            }
+
+            .mcp-tuple-field:nth-child(2) {
+                flex: 0.75; /* Operator - half width */
+            }
+
+            .mcp-tuple-field:nth-child(3) {
+                flex: 2; /* Value */
+            }
+
+            .mcp-tuple-field-label {
+                font-size: 11px;
+                color: #666;
+                margin-bottom: 4px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .mcp-tuple-field input,
+            .mcp-tuple-field select {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .mcp-array-item.mcp-tuple-item {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .mcp-array-item.mcp-tuple-item .mcp-button-remove {
+                flex-shrink: 0;
+                align-self: flex-start;
+                margin-top: 20px; /* Align with inputs */
+            }
+
+            /* Tuple multi-type input styles */
+            .mcp-tuple-multitype-container {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .mcp-tuple-anyof-tabs {
+                display: flex;
+                gap: 2px;
+                background: #f0f0f0;
+                padding: 2px;
+                border-radius: 4px;
+            }
+
+            .mcp-tuple-anyof-tabs .mcp-anyof-tab {
+                padding: 2px 8px;
+                font-size: 11px;
+                border: none;
+                background: transparent;
+                color: #666;
+                cursor: pointer;
+                border-radius: 3px;
+                transition: all 0.15s ease;
+            }
+
+            .mcp-tuple-anyof-tabs .mcp-anyof-tab:hover {
+                background: #e0e0e0;
+            }
+
+            .mcp-tuple-anyof-tabs .mcp-anyof-tab.active {
+                background: white;
+                color: #333;
+                font-weight: 500;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            }
+
+            .mcp-tuple-multitype-input {
+                min-height: 32px;
+                display: flex;
+                align-items: center;
+            }
+
+            .mcp-tuple-multitype-input input[type="checkbox"] {
+                margin: 0;
             }
         `;
 
