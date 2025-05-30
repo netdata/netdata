@@ -120,21 +120,21 @@ Right-click on PowerShell and select "Run as administrator" before running these
 - Stable version
 
    ```powershell
-   New-Item -Path "$env:PROGRAMDATA\netdata" -ItemType Directory -Force
+   New-Item -Path "$env:PROGRAMDATA\Netdata" -ItemType Directory -Force
    @'
-   Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile $env:PROGRAMDATA\netdata\netdata-x64.msi
-   msiexec /qn /i $env:PROGRAMDATA\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>"
-   '@ | Out-File -FilePath "$env:PROGRAMDATA\netdata\netdata-updater.ps1" -Encoding UTF8 
+   Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile $env:PROGRAMDATA\Netdata\netdata-x64.msi
+   msiexec /qn /i $env:PROGRAMDATA\Netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>"
+   '@ | Out-File -FilePath "$env:PROGRAMDATA\Netdata\netdata-updater.ps1" -Encoding UTF8
    ```
 
 - Nightly version
 
    ```powershell
-   New-Item -Path "$env:PROGRAMDATA\netdata" -ItemType Directory -Force
+   New-Item -Path "$env:PROGRAMDATA\Netdata" -ItemType Directory -Force
    @'
-   Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile $env:PROGRAMDATA\netdata\netdata-x64.msi
-   msiexec /qn /i $env:PROGRAMDATA\netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>"
-   '@ | Out-File -FilePath "$env:PROGRAMDATA\netdata\netdata-updater.ps1" -Encoding UTF8 
+   Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile $env:PROGRAMDATA\Netdata\netdata-x64.msi
+   msiexec /qn /i $env:PROGRAMDATA\Netdata\netdata-x64.msi TOKEN="<CLAIM_TOKEN>" ROOMS="<ROOM_ID>"
+   '@ | Out-File -FilePath "$env:PROGRAMDATA\Netdata\netdata-updater.ps1" -Encoding UTF8
    ```
 
 :::info
@@ -155,7 +155,7 @@ Replace `<CLAIM_TOKEN>` with your Netdata Cloud claim token and `<ROOM_ID>` with
 | **Triggers** | Schedule                             | Daily                                                                                |
 |              | Time                                 | Your preferred time (e.g., 7AM UTC)                                                  |
 | **Actions**  | Program/Script                       | `powershell`                                                                         |
-|              | Arguments                            | `-noprofile -executionpolicy bypass -file %PROGRAMDATA%\netdata\netdata-updater.ps1` |
+|              | Arguments                            | `-noprofile -executionpolicy bypass -file %PROGRAMDATA%\Netdata\netdata-updater.ps1` |
 
 :::tip
 
