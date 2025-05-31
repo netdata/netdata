@@ -617,11 +617,36 @@ static MCP_TABLE_ADDITIONAL_CONTENT generate_table_error_message(MCP_FUNCTION_DA
             additional_content = MCP_TABLE_ADD_RAW_DATA;
             break;
             
-        case MCP_TABLE_EMPTY_RESULT:
+        case MCP_TABLE_EMPTY_RESULT: {
             buffer_strcat(data->request.mcpc->error,
                 "The function returned an empty result (no rows).");
-            additional_content = MCP_TABLE_ADD_RAW_DATA;
+            
+            // Add contextual tips based on what parameters were used
+            bool has_history = (data->input.type == FN_TYPE_TABLE_WITH_HISTORY);
+            bool has_query = (data->request.query && *data->request.query);
+            bool has_conditions = (data->request.conditions.count > (has_query ? 1 : 0));
+
+            if(has_history || has_query || has_conditions) {
+                buffer_strcat(data->request.mcpc->error, "\n\nTips:");
+            }
+
+            if (has_history)
+                buffer_strcat(data->request.mcpc->error, "\n• Expand the search time window by adjusting 'after' and 'before' parameters");
+            
+            if (has_query)
+                buffer_strcat(data->request.mcpc->error,
+                    "\n• Review the search query terms in 'q' parameter"
+                    "\n  - Use wildcards: '*error*', '*warning*', '*fail*'"
+                    "\n  - Combine terms: '*systemd*|*kernel*', '*eth0*|*eth1*'");
+            
+            if (has_conditions) {
+                buffer_strcat(data->request.mcpc->error,
+                    "\n• Review the conditions - ensure column names and values match");
+            }
+            
+            additional_content = MCP_TABLE_ADD_COLUMNS;
             break;
+        }
             
         case MCP_TABLE_INFO_MISSING_COLUMNS_FOUND_RESULTS:
             buffer_strcat(data->request.mcpc->error,
@@ -660,7 +685,7 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_
                 "  - Single value: [\"column\", \"==\", \"exact_value\"]\n"
                 "  - Multiple values: [\"column\", \"match\", \"value1|value2|value3\"] (values are OR'd)\n"
                 "• **limit**: Control number of rows returned (e.g., 10)\n"
-                "• **q**: Full-text search across all columns (supports wildcards like \"*pattern*\")\n"
+                "• **q**: Full-text search across all columns (simple patterns like \"*term1*|*term2*\")\n"
                 "• **direction**: Controls time-based sorting (\"forward\" or \"backward\")\n"
                 "\n"
                 "Example filtering:\n"
@@ -671,7 +696,7 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_
                 "    [\"PRIORITY\", \"match\", \"1|2|3\"],\n"
                 "    [\"_HOSTNAME\", \"=\", \"server1\"]\n"
                 "  ],\n"
-                "  \"q\": \"*systemd*\",\n"
+                "  \"q\": \"*systemd*|*logind*|*dbus*\",\n"
                 "  \"direction\": \"backward\",\n"
                 "  \"limit\": 20\n"
                 "}\n"
@@ -679,7 +704,7 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_
                 "\n"
                 "Valid operators for history functions: == (exact match), match (value set with | separator)\n"
                 "Invalid operators: !=, <>, not match, <, <=, >, >=\n"
-                "Full-text search: Use 'q' parameter with wildcards like '*pat*tern*' to search all columns\n"
+                "Full-text search: Use 'q' parameter with wildcards like '*pattern1*|*pattern2*' to search all columns\n"
                 "Sorting: Use 'direction' parameter only - column sorting is not supported for history functions"
             );
         } else {
@@ -689,6 +714,7 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_
                 "• **columns**: Select specific columns to reduce width (e.g., [\"Column1\", \"Column2\", \"Column3\"])\n"
                 "• **conditions**: Filter rows using [ [column1, operator1, value1], [column2, operator2, value2], ... ]\n"
                 "• **limit**: Control number of rows returned (e.g., 10)\n"
+                "• **q**: Full-text search across all columns (supports wildcards like \"*term1*|*term2*\")\n"
                 "• **sort_column** + **sort_order**: Order results by a column ('asc' or 'desc')\n"
                 "\n"
                 "Example filtering:\n"
@@ -698,7 +724,6 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_
                 "  \"conditions\": [\n"
                 "    [\"Memory\", \">\", 1.0],\n"
                 "    [\"CmdLine\", \"match\", \"*systemd*|*postgresql*|*docker*\"],\n"
-                "    [\"*\", \"match\", \"*error*|*warning*\"]  // Search all columns\n"
                 "  ],\n"
                 "  \"sort_column\": \"CPU\",\n"
                 "  \"sort_order\": \"desc\",\n"
@@ -708,7 +733,6 @@ static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_
                 "\n"
                 "Operators: ==, !=, <, <=, >, >=, match (simple pattern), not match (simple pattern)\n"
                 "Simple patterns: '*this*|*that*|*other*' (wildcard search to find strings that include 'this', or 'that', or 'other')\n"
-                "Full-text search: Use '*' or '' as column name to search across all columns"
             );
         }
     }
@@ -781,7 +805,11 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     // Tool input schema
     buffer_json_member_add_object(buffer, "inputSchema");
     buffer_json_member_add_string(buffer, "type", "object");
-    buffer_json_member_add_string(buffer, "title", "Execute a function on a specific node. Functions provide live information and they are automatically routed and executed to Netdata running on the given node.");
+    buffer_json_member_add_string(
+        buffer, "title",
+        "Execute a function on a specific node. "
+        "Functions provide live information and they are automatically routed "
+        "and executed to Netdata running on the given node.");
 
     // Properties
     buffer_json_member_add_object(buffer, "properties");
@@ -790,7 +818,10 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "The node on which to execute the function");
-        buffer_json_member_add_string(buffer, "description", "The hostname or machine_guid or node_id of the node where the function should be executed. The node needs to be online (live) and reachable.");
+        buffer_json_member_add_string(
+            buffer, "description",
+            "The hostname or machine_guid or node_id of the node where the function should be executed. "
+            "The node needs to be online (live) and reachable.");
     }
     buffer_json_object_close(buffer); // node
 
@@ -802,15 +833,19 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // function
     
-    mcp_schema_add_timeout(buffer, "timeout", "Execution timeout in seconds",
-                          "Maximum time to wait for function execution (default: 60)",
-                          60, 1, 3600, false);
+    mcp_schema_add_timeout(
+        buffer, "timeout", "Execution timeout in seconds",
+        "Maximum time to wait for function execution (default: 60)",
+        60, 1, 3600, false);
 
     buffer_json_member_add_object(buffer, "columns");
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", "Columns to include");
-        buffer_json_member_add_string(buffer, "description", "Array of column names to include in the result. Each function has its own columns, so first check the function without this parameter.");
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Array of column names to include in the result. "
+            "Each function has its own columns, so first check the function without this parameter.");
         
         buffer_json_member_add_object(buffer, "items");
         {
@@ -820,15 +855,18 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // columns
 
-    mcp_schema_add_string_param(buffer, "sort_column", "Column to sort by",
-                               "Name of the column to sort the results by.",
-                               NULL, false);
+    mcp_schema_add_string_param(
+        buffer, "sort_column", "Column to sort by",
+        "Name of the column to sort the results by.",
+        NULL, false);
 
     buffer_json_member_add_object(buffer, "sort_order");
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Sort order");
-        buffer_json_member_add_string(buffer, "description", "Order to sort results: 'asc' for ascending, 'desc' for descending");
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Order to sort results: 'asc' for ascending, 'desc' for descending");
         buffer_json_member_add_string(buffer, "default", "desc");
         buffer_json_member_add_array(buffer, "enum");
         buffer_json_add_array_item_string(buffer, "asc");
@@ -837,32 +875,39 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // sort_order
 
-    mcp_schema_add_size_param(buffer, "limit", "Row limit",
-                             "Maximum number of rows to return",
-                             0, 0, SIZE_MAX, false);
+    mcp_schema_add_size_param(
+        buffer, "limit", "Row limit",
+        "Maximum number of rows to return",
+        0, 0, SIZE_MAX, false);
     
     // Time-based parameters for functions with history
-    mcp_schema_add_time_param(buffer, "after", "Start time",
-                             "Start time for query window (timestamp in seconds or RFC3339 datetime string)",
-                             "now", 0, false);
+    mcp_schema_add_time_param(
+        buffer, "after", "Start time",
+        "Start time for query window (timestamp in seconds or RFC3339 datetime string)",
+        "now", 0, false);
     
-    mcp_schema_add_time_param(buffer, "before", "End time", 
-                             "End time for query window (timestamp in seconds or RFC3339 datetime string)",
-                             "now", 0, false);
+    mcp_schema_add_time_param(
+        buffer, "before", "End time",
+        "End time for query window (timestamp in seconds or RFC3339 datetime string)",
+        "now", 0, false);
     
-    mcp_schema_add_string_param(buffer, "cursor", "Pagination cursor",
-                               "Opaque cursor for pagination (follows MCP standard)",
-                               NULL, false);
+    mcp_schema_add_string_param(
+        buffer, "cursor", "Pagination cursor",
+        "Opaque cursor for pagination (follows MCP standard)",
+        NULL, false);
     
-    mcp_schema_add_size_param(buffer, "limit", "Entries to return",
-                             "Number of entries to return",
-                             0, 0, SIZE_MAX, false);
+    mcp_schema_add_size_param(
+        buffer, "limit", "Entries to return",
+        "Number of entries to return",
+        0, 0, SIZE_MAX, false);
     
     buffer_json_member_add_object(buffer, "direction");
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Query direction");
-        buffer_json_member_add_string(buffer, "description", "Direction for query processing: 'forward' (oldest first) or 'backward' (newest first)");
+        buffer_json_member_add_string(
+            buffer, "description",
+            "Direction for query processing: 'forward' (oldest first) or 'backward' (newest first)");
         buffer_json_member_add_string(buffer, "default", "backward");
         buffer_json_member_add_array(buffer, "enum");
         buffer_json_add_array_item_string(buffer, "forward");
@@ -871,15 +916,18 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     }
     buffer_json_object_close(buffer); // direction
     
-    mcp_schema_add_string_param(buffer, "q", "Full-text search",
-                               "Full-text search query to filter results",
-                               NULL, false);
+    mcp_schema_add_string_param(
+        buffer, "q", "Full-text search",
+        "Full-text search to filter results, use pipe (|) to separate multiple Netdata simple-patterns. "
+        "Example: '*term1*|*term2*|*term3'.",
+        NULL, false);
     
     buffer_json_member_add_object(buffer, "conditions");
     {
         buffer_json_member_add_string(buffer, "type", "array");
         buffer_json_member_add_string(buffer, "title", "Filter conditions");
-        buffer_json_member_add_string(buffer, "description",
+        buffer_json_member_add_string(
+            buffer, "description",
             "Array of conditions to filter rows. "
             "Each condition is an array of [column, operator, value] where operator "
             "can be ==, !=, <>, <, <=, >, >=, match, not match. "
@@ -958,7 +1006,8 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "object");
         buffer_json_member_add_string(buffer, "title", "Function parameter selections");
-        buffer_json_member_add_string(buffer, "description", 
+        buffer_json_member_add_string(
+            buffer, "description",
             "Key-value pairs where each key is a parameter name and the value depends on the parameter type: "
             "for 'select' type parameters, use a single string value; "
             "for 'multiselect' type parameters, use an array of strings. "
@@ -2266,7 +2315,7 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
                 // Empty result
                 data->output.status = MCP_TABLE_EMPTY_RESULT;
                 buffer_strcat(data->output.result, buffer_tostring(data->input.json));
-                add_table_messages_to_mcp_result(data, NULL);
+                add_table_messages_to_mcp_result(data, columns_obj);
             }
             else {
                 // Process the table with filtering
