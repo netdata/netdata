@@ -111,6 +111,7 @@ static inline bool string_entry_check_and_acquire(STRING *se) {
     return true;
 }
 
+ALWAYS_INLINE
 STRING *string_dup(STRING *string) {
     if(unlikely(!string)) return NULL;
 
@@ -133,7 +134,7 @@ STRING *string_dup(STRING *string) {
 }
 
 // Search the index and return an ACQUIRED string entry, or NULL
-static inline STRING *string_index_search(const char *str, size_t length) {
+static STRING *string_index_search(const char *str, size_t length) {
     STRING *string;
 
     uint8_t partition = string_partition_str(str);
@@ -176,7 +177,7 @@ static inline STRING *string_index_search(const char *str, size_t length) {
 // The returned entry is ACQUIRED, and it can either be:
 //   1. a new item inserted, or
 //   2. an item found in the index that is not currently deleted
-static inline STRING *string_index_insert(const char *str, size_t length) {
+static STRING *string_index_insert(const char *str, size_t length) {
     STRING *string;
 
     uint8_t partition = string_partition_str(str);
@@ -253,7 +254,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 }
 
 // delete an entry from the index
-static inline void string_index_delete(STRING *string) {
+static void string_index_delete(STRING *string) {
     uint8_t partition = string_partition(string);
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
@@ -301,6 +302,7 @@ static inline void string_index_delete(STRING *string) {
     rw_spinlock_write_unlock(&string_base[partition].spinlock);
 }
 
+ALWAYS_INLINE
 STRING *string_strdupz(const char *str) {
     if(unlikely(!str || !*str)) return NULL;
 
@@ -330,6 +332,7 @@ STRING *string_strdupz(const char *str) {
     return string;
 }
 
+ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
 
@@ -355,6 +358,7 @@ STRING *string_strndupz(const char *str, size_t len) {
     return string;
 }
 
+ALWAYS_INLINE
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
 
@@ -370,16 +374,19 @@ void string_freez(STRING *string) {
     string_stats_atomic_increment(partition, releases);
 }
 
-inline size_t string_strlen(const STRING *string) {
+ALWAYS_INLINE
+size_t string_strlen(const STRING *string) {
     if(unlikely(!string)) return 0;
     return string->length - 1;
 }
 
-inline const char *string2str(const STRING *string) {
+ALWAYS_INLINE
+const char *string2str(const STRING *string) {
     if(unlikely(!string)) return "";
     return string->str;
 }
 
+ALWAYS_INLINE
 bool string_ends_with_string(const STRING *whole, const STRING *end) {
     if(whole == end) return true;
     if(!whole || !end) return false;
@@ -390,12 +397,41 @@ bool string_ends_with_string(const STRING *whole, const STRING *end) {
     return strncmp(we, end->str, string_strlen(end)) == 0;
 }
 
+ALWAYS_INLINE
+bool string_ends_with_string_nocase(const STRING *whole, const STRING *end) {
+    if(whole == end) return true;
+    if(!whole || !end) return false;
+    if(end->length > whole->length) return false;
+    if(end->length == whole->length) return strcasecmp(string2str(whole), string2str(end)) == 0;
+    const char *we = string2str(whole);
+    we = &we[string_strlen(whole) - string_strlen(end)];
+    return strncasecmp(we, end->str, string_strlen(end)) == 0;
+}
+
+ALWAYS_INLINE
 bool string_starts_with_string(const STRING *whole, const STRING *end) {
     if(whole == end) return true;
     if(!whole || !end) return false;
     if(end->length > whole->length) return false;
     if(end->length == whole->length) return strcmp(string2str(whole), string2str(end)) == 0;
     return strncmp(string2str(whole), string2str(end), string_strlen(end)) == 0;
+}
+
+ALWAYS_INLINE
+bool string_starts_with_string_nocase(const STRING *whole, const STRING *prefix) {
+    if(whole == prefix) return true;
+    if(!whole || !prefix) return false;
+    if(prefix->length > whole->length) return false;
+    if(prefix->length == whole->length) return strcasecmp(string2str(whole), string2str(prefix)) == 0;
+    return strncasecmp(string2str(whole), string2str(prefix), string_strlen(prefix)) == 0;
+}
+
+ALWAYS_INLINE
+bool string_equals_string_nocase(const STRING *a, const STRING *b) {
+    if(a == b) return true;
+    if(!a || !b) return false;
+    if(a->length != b->length) return false;
+    return strcasecmp(string2str(a), string2str(b)) == 0;
 }
 
 // Static X used by string_2way_merge

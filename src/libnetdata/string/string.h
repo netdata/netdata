@@ -18,6 +18,9 @@ size_t string_strlen(const STRING *string);
 const char *string2str(const STRING *string) NEVERNULL;
 bool string_ends_with_string(const STRING *whole, const STRING *end);
 bool string_starts_with_string(const STRING *whole, const STRING *end);
+bool string_ends_with_string_nocase(const STRING *whole, const STRING *end);
+bool string_starts_with_string_nocase(const STRING *whole, const STRING *prefix);
+bool string_equals_string_nocase(const STRING *a, const STRING *b);
 size_t string_destroy(void);
 
 // keep common prefix/suffix and replace everything else with [x]
