@@ -458,6 +458,9 @@ typedef enum {
     MCP_TABLE_ADD_FILTERING_INSTRUCTIONS = 1 << 2
 } MCP_TABLE_ADDITIONAL_CONTENT;
 
+// Forward declaration
+static usec_t calculate_next_cursor_from_input(MCP_FUNCTION_DATA *data);
+
 // Initialize MCP_FUNCTION_DATA structure
 void mcp_functions_data_init(MCP_FUNCTION_DATA *data) {
     memset(data, 0, sizeof(MCP_FUNCTION_DATA));
@@ -1230,7 +1233,11 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
 
     // Apply row limit
     size_t limit = row_idx;
-    if (data->request.limit > 0 && data->request.limit < limit) {
+    if (data->request.limit > 0 && data->request.limit < limit && data->input.type == FN_TYPE_TABLE) {
+        // we don't limit history functions, only regular tables
+        // for history functions, we sent the limit to the backend
+        // so whatever it returns is what we show
+        // This is important, otherwise the cursor will be wrong!
         limit = data->request.limit;
     }
 
@@ -1328,6 +1335,16 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
         // Set status flag if we used wildcard search and found results
         if (data->request.conditions.has_missing_columns && row_idx > 0) {
             data->output.status = MCP_TABLE_INFO_MISSING_COLUMNS_FOUND_RESULTS;
+        }
+        
+        // Add nextCursor for pagination if applicable (only for successful results)
+        if (data->pagination.enabled && data->input.rows > 0) {
+            usec_t next_cursor_timestamp = calculate_next_cursor_from_input(data);
+            if (next_cursor_timestamp > 0) {
+                CLEAN_BUFFER *cursor_str = buffer_create(0, NULL);
+                buffer_sprintf(cursor_str, "%" PRIu64, next_cursor_timestamp);
+                json_object_object_add(filtered_result, "nextCursor", json_object_new_string(buffer_tostring(cursor_str)));
+            }
         }
         
         // Convert to string and store result
@@ -1519,7 +1536,7 @@ static void build_function_name_with_params(BUFFER *dest, const char *function_n
 // Calculate nextCursor from original input data for MCP-compliant pagination
 // Returns the next cursor timestamp, or 0 if not applicable
 static usec_t calculate_next_cursor_from_input(MCP_FUNCTION_DATA *data) {
-    if (!data->pagination.enabled || data->output.rows == 0 || !data->input.jobj) {
+    if (!data->pagination.enabled || data->input.rows == 0 || !data->input.jobj) {
         return 0;
     }
 
@@ -2288,8 +2305,8 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
     
     buffer_json_array_close(data->request.mcpc->result);  // Close content array
     
-    // Add nextCursor for pagination if applicable
-    if (data->pagination.enabled && data->output.rows > 0) {
+    // Add nextCursor for pagination if applicable (only for successful results)
+    if (data->pagination.enabled && data->input.rows > 0 && data->output.status == MCP_TABLE_OK) {
         usec_t next_cursor_timestamp = calculate_next_cursor_from_input(data);
         if (next_cursor_timestamp > 0) {
             CLEAN_BUFFER *cursor_str = buffer_create(0, NULL);
