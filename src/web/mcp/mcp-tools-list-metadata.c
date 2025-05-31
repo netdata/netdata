@@ -314,7 +314,7 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
                 snprintfz(description, sizeof(description),
                           "Search for nodes by hostname patterns. This is the primary way to find specific nodes without retrieving the full list. "
                           "Use pipe (|) to separate multiple patterns. Wildcards (*) are supported for flexible matching. "
-                          "Examples: 'node1|node2' (exact names), '*web*' (contains 'web'), 'prod-*' (starts with 'prod-'), '*db*|*cache*' (contains 'db' OR 'cache')");
+                          "Examples: 'node1|node2' (exact names), '*web*' (contains 'web'), 'prod-*' (starts with 'prod-'), '*db*|*cache*' (contains 'db' or 'cache')");
             } else {
                 // This is a metrics query - 'nodes' acts as a filter
                 snprintfz(description, sizeof(description),

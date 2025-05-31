@@ -195,7 +195,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
     {
         .name = MCP_TOOL_FIND_CORRELATED_METRICS,
         .title = "Find metrics that changed during an incident",
-        .description = "Finds metrics that changed significantly during an incident by comparing a problem time period with a normal baseline period. Essential for root cause analysis.",
+        .description = "Finds metrics that changed significantly during an incident by comparing a problem time period with a normal baseline period. Essential for root cause analysis. IMPORTANT: For large infrastructures, use filters (metrics, nodes, instances, dimensions, or labels) to narrow the scope and avoid timeouts.",
         .execute_callback = mcp_tool_find_correlated_metrics_execute,
         .schema_callback = mcp_tool_find_correlated_metrics_schema,
         .read_only_hint = true,
@@ -204,7 +204,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
     {
         .name = MCP_TOOL_FIND_ANOMALOUS_METRICS,
         .title = "Find metrics with highest anomaly rates",
-        .description = "Finds metrics that were behaving anomalously according to Netdata's ML models. Returns metrics ranked by their anomaly rates (0 to 1, representing 0-100% of time anomalous).",
+        .description = "Finds metrics that were behaving anomalously according to Netdata's ML models. Returns metrics ranked by their anomaly rates (0 to 1, representing 0-100% of time anomalous). IMPORTANT: For large infrastructures, use filters (metrics, nodes, instances, dimensions, or labels) to narrow the scope and avoid timeouts.",
         .execute_callback = mcp_tool_find_anomalous_metrics_execute,
         .schema_callback = mcp_tool_find_anomalous_metrics_schema,
         .read_only_hint = true,
@@ -213,7 +213,7 @@ static const MCP_TOOL_DEF mcp_tools[] = {
     {
         .name = MCP_TOOL_FIND_UNSTABLE_METRICS,
         .title = "Find metrics with high variability",
-        .description = "Finds metrics with the highest variability using coefficient of variation (standard deviation as % of mean). Useful for identifying unstable or fluctuating metrics.",
+        .description = "Finds metrics with the highest variability using coefficient of variation (standard deviation as % of mean). Useful for identifying unstable or fluctuating metrics. IMPORTANT: For large infrastructures, use filters (metrics, nodes, instances, dimensions, or labels) to narrow the scope and avoid timeouts.",
         .execute_callback = mcp_tool_find_unstable_metrics_execute,
         .schema_callback = mcp_tool_find_unstable_metrics_schema,
         .read_only_hint = true,

@@ -78,7 +78,7 @@ static MCP_RETURN_CODE execute_weights_request(
         cardinality_limit = json_object_get_int(obj);
     
     // Extract timeout parameter
-    int timeout = mcp_params_extract_timeout(params, "timeout", 60, 1, 3600, mcpc->error);
+    int timeout = mcp_params_extract_timeout(params, "timeout", 120, 1, 3600, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
@@ -222,28 +222,29 @@ static void add_weights_filter_parameters(BUFFER *buffer) {
     mcp_schema_add_array_param(
         buffer, "metrics",
         "Filter by metrics",
-        "Array of metrics (contexts) to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries'])");
+        "Array of metrics (contexts) to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries']). Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics.");
     
     mcp_schema_add_array_param(
         buffer, "nodes",
         "Filter by nodes",
-        "Array of nodes to filter (e.g., ['web-server-1', 'database-primary'])");
+        "Array of nodes to filter (e.g., ['web-server-1', 'database-primary']). Use '" MCP_TOOL_LIST_NODES "' to discover available nodes.");
     
     mcp_schema_add_array_param(
         buffer, "instances",
         "Filter by instances",
-        "Array of metric instances to filter (e.g., ['eth0', 'sda', 'production_db'])");
+        "Array of metric instances to filter (e.g., ['eth0', 'sda', 'production_db']). Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover instances for a metric.");
     
     mcp_schema_add_array_param(buffer, "dimensions",
         "Filter by dimensions",
-        "Array of dimension names to filter (e.g., ['user', 'writes', 'slow_queries'])");
+        "Array of dimension names to filter (e.g., ['user', 'writes', 'slow_queries']). Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover dimensions for a metric.");
     
     mcp_schema_add_labels_object(buffer,
         "Filter by labels",
         "Filter using labels where each key maps to an array of exact values. "
         "Values in the same array are ORed, different keys are ANDed. "
         "Example: {\"disk_type\": [\"ssd\", \"nvme\"], \"mount_point\": [\"/\"]}\n"
-        "Note: Wildcards are not supported. Use exact label keys and values only.");
+        "Note: Wildcards are not supported. Use exact label keys and values only. "
+        "Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover available labels.");
 }
 
 // find_correlated_metrics implementation
@@ -297,7 +298,7 @@ void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer) {
     mcp_schema_add_timeout(buffer, "timeout",
         "Query timeout",
         "Maximum time to wait for the query to complete (in seconds)",
-        60, 1, 3600, false);
+        120, 1, 3600, false);
     
     buffer_json_object_close(buffer); // properties
     
@@ -334,7 +335,7 @@ void mcp_tool_find_anomalous_metrics_schema(BUFFER *buffer) {
     mcp_schema_add_timeout(buffer, "timeout",
         "Query timeout",
         "Maximum time to wait for the query to complete (in seconds)",
-        60, 1, 3600, false);
+        120, 1, 3600, false);
     
     buffer_json_object_close(buffer); // properties
     
@@ -372,7 +373,7 @@ void mcp_tool_find_unstable_metrics_schema(BUFFER *buffer) {
     mcp_schema_add_timeout(buffer, "timeout",
         "Query timeout",
         "Maximum time to wait for the query to complete (in seconds)",
-        60, 1, 3600, false);
+        120, 1, 3600, false);
     
     buffer_json_object_close(buffer); // properties
     

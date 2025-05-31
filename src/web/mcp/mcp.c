@@ -10,6 +10,7 @@
 #include "mcp-completion.h"
 #include "mcp-tools-execute-function-registry.h"
 #include "adapters/mcp-websocket.h"
+#include "mcp-api-key.h"
 
 // Define the enum to string mapping for protocol versions
 ENUM_STR_MAP_DEFINE(MCP_PROTOCOL_VERSION) = {
@@ -464,6 +465,10 @@ MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request
 // Initialize the MCP subsystem
 void mcp_initialize_subsystem(void) {
     mcp_functions_registry_init();
+
+#ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
+    mcp_api_key_initialize();
+#endif
 
     // debug_flags |= D_MCP;
 

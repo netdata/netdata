@@ -918,8 +918,9 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     
     mcp_schema_add_string_param(
         buffer, "q", "Full-text search",
-        "Full-text search to filter results, use pipe (|) to separate multiple Netdata simple-patterns. "
-        "Example: '*term1*|*term2*|*term3'.",
+        "Full-text search to filter results. Use pipe character (|) to separate multiple search patterns. "
+        "Example: '*fail*|*error*|*systemd*'. "
+        "Wildcards (*) are supported for pattern matching.",
         NULL, false);
     
     buffer_json_member_add_object(buffer, "conditions");
@@ -1078,7 +1079,7 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     data->input.columns = column_count;
 
     // Check if we need to show guidance - only when no filtering is specified
-    if (result_size > max_size_threshold && data->request.columns.count == 0 && !data->request.sort.column && 
+    if (result_size > max_size_threshold && data->request.columns.count == 0 && 
         (data->request.conditions.count == 0 || (data->request.conditions.count == 1 && data->request.query && *data->request.query))) {
         // Store first row in result for guidance
         data->output.status = MCP_TABLE_RESPONSE_TOO_BIG;
@@ -2213,13 +2214,6 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
 static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload) {
     if (!data || !data->request.host || !data->request.function)
         return MCP_RC_ERROR;
-    
-#if 1
-    // Override auth for testing
-    data->request.auth->access = HTTP_ACCESS_ALL;
-    data->request.auth->method = USER_AUTH_METHOD_CLOUD;
-    data->request.auth->user_role = HTTP_USER_ROLE_ADMIN;
-#endif
     
     // Create source buffer from user_auth
     CLEAN_BUFFER *source = buffer_create(0, NULL);
