@@ -24,6 +24,7 @@ void cgroup_netdev_link_destroy(void);
 void bearer_tokens_destroy(void);
 void alerts_by_x_cleanup(void);
 void websocket_threads_join(void);
+void mcp_functions_registry_cleanup(void);
 
 static bool abort_on_fatal = true;
 
@@ -300,10 +301,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
 
     websocket_threads_join();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
+
     nd_thread_join_threads();
+    watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
+
     sqlite_close_databases();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
 
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
@@ -329,6 +334,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_main_spawn_server_cleanup();
 
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
+    mcp_functions_registry_cleanup();
     rrdhost_free_all();
     dyncfg_shutdown();
     rrd_functions_inflight_destroy();
@@ -390,6 +396,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(strings_referenced)
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
                 strings_referenced);
+
+    fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
 
     fprintf(stderr, "All done, exiting...\n");
 #endif

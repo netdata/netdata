@@ -277,3 +277,23 @@ When you start using Netdata with TLS, you may find errors in the Netdata log, w
 Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`.
 
 </details>
+
+### WebSocket Support
+
+<details><summary>details</summary>
+
+Netdata supports WebSocket connections for real-time data streaming and interactive features. For detailed information on WebSocket protocols, configuration options, and examples, see the [WebSocket documentation](/src/web/websocket/README.md).
+
+#### WebSocket Frame Size Configuration
+
+Netdata automatically fragments large WebSocket messages to ensure browser compatibility. The default maximum outgoing frame size is 4MB, which works well for most browsers.
+
+For clients with specific requirements, you can customize the maximum frame size on a per-connection basis by adding the `max_frame_size` parameter to the WebSocket URL:
+
+```
+ws://localhost:19999/echo?max_frame_size=32768
+```
+
+This is particularly useful for resource-constrained devices or network environments with specific limitations.
+
+</details>

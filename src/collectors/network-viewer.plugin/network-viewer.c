@@ -27,7 +27,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #include "libnetdata/os/system-maps/system-services.h"
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
-#define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"
+#define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS
@@ -750,7 +750,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
             // RTT
             buffer_rrdf_table_add_field(wb, field_id++, "RTT", aggregated ? "Max Smoothed Round Trip Time" : "Smoothed Round Trip Time",
-                                        RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                         2, "ms", st.max.tcpi_rtt / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                         RRDF_FIELD_OPTS_VISIBLE,
@@ -758,7 +758,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
             // Asymmetry RTT
             buffer_rrdf_table_add_field(wb, field_id++, "RecvRTT", aggregated ? "Max Receiver ACKs RTT" : "Receiver ACKs RTT",
-                                        RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                        RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                         2, "ms", st.max.tcpi_rcv_rtt / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                         RRDF_FIELD_OPTS_VISIBLE,

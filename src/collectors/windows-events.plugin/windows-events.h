@@ -133,7 +133,7 @@ typedef enum {
 #define ON_FTS_PRELOAD_XML          0
 #define ON_FTS_PRELOAD_EVENT_DATA   1
 
-#define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze the Microsoft Windows Events log."
+#define WEVT_FUNCTION_DESCRIPTION    "Provides full access to Windows Event logs with search, filtering, and analysis capabilities."
 #define WEVT_FUNCTION_NAME           "windows-events"
 
 #define WINDOWS_EVENTS_WORKER_THREADS 5

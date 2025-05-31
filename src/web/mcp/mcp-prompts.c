@@ -3,22 +3,21 @@
 /**
  * MCP Prompts Namespace
  * 
- * The MCP Prompts namespace provides methods for managing and executing prompts.
+ * The MCP Prompts namespace provides methods for managing prompts.
  * In the MCP protocol, prompts are text templates that guide AI generation for specific tasks.
  * Prompts are user-controlled interactions that leverage AI capabilities in predefined ways.
  * 
- * Key features of the prompts namespace:
+ * Standard methods in the MCP specification:
  * 
- * 1. Prompt Management:
- *    - List available prompts (prompts/list)
- *    - Get details about specific prompts (prompts/get)
- *    - Save custom prompts (prompts/save)
- *    - Delete prompts (prompts/delete)
- *    - Organize prompts into categories (prompts/getCategories)
+ * 1. prompts/list - Lists available prompts
+ *    - Returns a collection of prompts the server offers
+ *    - Includes prompt names, descriptions, and potentially argument information
+ *    - Can be paginated for large prompt collections
  * 
- * 2. Prompt Execution:
- *    - Execute prompts with input parameters (prompts/execute)
- *    - View execution history (prompts/getHistory)
+ * 2. prompts/get - Gets details about a specific prompt
+ *    - Takes a prompt name and returns its full definition
+ *    - Returns the prompt template, messages, and metadata
+ *    - May include information about required arguments
  * 
  * Prompts differ from tools in that they are:
  *    - More flexible and text-oriented
@@ -38,16 +37,16 @@
  */
 
 #include "mcp-prompts.h"
-#include "mcp-initialize.h"
 
 // Implementation of prompts/list (transport-agnostic)
-static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id) {
-    if (!mcpc || id == 0) return MCP_RC_ERROR;
+static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
+    if (!mcpc || id == 0)
+        return MCP_RC_ERROR;
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
     
-    // Add empty prompts array
+    // Add an empty prompts array
     buffer_json_member_add_array(mcpc->result, "prompts");
     buffer_json_array_close(mcpc->result); // Close prompts array
     
@@ -58,38 +57,18 @@ static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_obj
 }
 
 // Stub implementations for other prompts methods (transport-agnostic)
-static MCP_RETURN_CODE mcp_prompts_method_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'prompts/execute' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
 
-static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
+static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
     buffer_sprintf(mcpc->error, "Method 'prompts/get' not implemented yet");
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
-static MCP_RETURN_CODE mcp_prompts_method_save(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'prompts/save' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
 
-static MCP_RETURN_CODE mcp_prompts_method_delete(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'prompts/delete' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
 
-static MCP_RETURN_CODE mcp_prompts_method_getCategories(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'prompts/getCategories' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
 
-static MCP_RETURN_CODE mcp_prompts_method_getHistory(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, uint64_t id __maybe_unused) {
-    buffer_sprintf(mcpc->error, "Method 'prompts/getHistory' not implemented yet");
-    return MCP_RC_NOT_IMPLEMENTED;
-}
 
 // Prompts namespace method dispatcher (transport-agnostic)
-MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, uint64_t id) {
+MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
     
     netdata_log_debug(D_MCP, "MCP prompts method: %s", method);
@@ -103,23 +82,8 @@ MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct j
     if (strcmp(method, "list") == 0) {
         rc = mcp_prompts_method_list(mcpc, params, id);
     }
-    else if (strcmp(method, "execute") == 0) {
-        rc = mcp_prompts_method_execute(mcpc, params, id);
-    }
     else if (strcmp(method, "get") == 0) {
         rc = mcp_prompts_method_get(mcpc, params, id);
-    }
-    else if (strcmp(method, "save") == 0) {
-        rc = mcp_prompts_method_save(mcpc, params, id);
-    }
-    else if (strcmp(method, "delete") == 0) {
-        rc = mcp_prompts_method_delete(mcpc, params, id);
-    }
-    else if (strcmp(method, "getCategories") == 0) {
-        rc = mcp_prompts_method_getCategories(mcpc, params, id);
-    }
-    else if (strcmp(method, "getHistory") == 0) {
-        rc = mcp_prompts_method_getHistory(mcpc, params, id);
     }
     else {
         // Method not found in prompts namespace

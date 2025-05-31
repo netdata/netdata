@@ -119,7 +119,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     wrapper_begin_t wrapper_begin = rrdr_json_wrapper_begin;
     wrapper_end_t wrapper_end = rrdr_json_wrapper_end;
 
-    if(qt->request.version == 2) {
+    if(qt->request.version >= 2) {
         wrapper_begin = rrdr_json_wrapper_begin2;
         wrapper_end = rrdr_json_wrapper_end2;
     }

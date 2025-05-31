@@ -298,10 +298,14 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
         char entries_for_humans[128];
         entries_snprintf(entries_for_humans, sizeof(entries_for_humans), s->entries, "", false);
 
+        char last_ut[RFC3339_MAX_LENGTH];
+        rfc3339_datetime_ut(last_ut, sizeof(last_ut), s->last_ut, 0, true);
+
         char info[1024];
-        snprintfz(info, sizeof(info), "%zu channel%s, with a total size of %s, covering %s%s%s%s",
-                s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans,
-                s->entries ? ", having " : "", s->entries ? entries_for_humans : "", s->entries ? " entries" : "");
+        snprintfz(info, sizeof(info), "%zu channel%s, total size %s, covering %s%s%s%s, last entry at %s",
+                  s->count, s->count > 1 ? "s":"", size_for_humans, duration_for_humans,
+                  s->entries ? ", having " : "", s->entries ? entries_for_humans : "", s->entries ? " entries" : "",
+                  last_ut);
 
         buffer_json_member_add_string(wb, "id", name);
         buffer_json_member_add_string(wb, "name", name);

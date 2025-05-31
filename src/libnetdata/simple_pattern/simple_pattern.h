@@ -49,11 +49,15 @@ void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
 int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 
+// check if string contains pattern wildcards (*, ! prefix, or separators)
+bool simple_pattern_contains_wildcards(const char *str, const char *separators);
+
 #define SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS ",|\t\r\n\f\v"
 
 #define is_valid_sp(x) ((x) && *(x) && !((x)[0] == '*' && (x)[1] == '\0'))
 
 #define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true) : NULL)
 #define string_to_simple_pattern_nocase(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, false) : NULL)
+#define string_to_simple_pattern_nocase_substring(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_SUBSTRING, false) : NULL)
 
 #endif //NETDATA_SIMPLE_PATTERN_H

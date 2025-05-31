@@ -4,8 +4,10 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode) {
-    struct api_v2_contexts_request req = { 0 };
+int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, CONTEXTS_V2_MODE mode, CONTEXTS_OPTIONS options) {
+    struct api_v2_contexts_request req = {
+        .options = options,
+    };
 
     while(url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -29,13 +31,15 @@ int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w,
         else if((mode & CONTEXTS_V2_SEARCH) && !strcmp(name, "q"))
             req.q = value;
         else if(!strcmp(name, "options"))
-            req.options = contexts_options_str_to_id(value);
+            req.options |= contexts_options_str_to_id(value);
         else if(!strcmp(name, "after"))
             req.after = str2l(value);
         else if(!strcmp(name, "before"))
             req.before = str2l(value);
         else if(!strcmp(name, "timeout"))
             req.timeout_ms = str2l(value);
+        else if(!strcmp(name, "cardinality") || !strcmp(name, "cardinality_limit"))
+            req.cardinality_limit = str2ul(value);
         else if(mode & (CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) {
             if (!strcmp(name, "alert"))
                 req.alerts.alert = value;
@@ -73,6 +77,7 @@ int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w,
 
 int api_v2_contexts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     return api_v2_contexts_internal(
-        host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS);
+        host, w, url, CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_NODES | CONTEXTS_V2_AGENTS | CONTEXTS_V2_VERSIONS,
+        CONTEXTS_OPTION_PRIORITIES | CONTEXTS_OPTION_RETENTION | CONTEXTS_OPTION_LIVENESS | 
+        CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_UNITS);
 }
-

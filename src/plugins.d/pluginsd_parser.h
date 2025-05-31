@@ -57,7 +57,7 @@ typedef struct parser_user_object {
     struct plugind *cd;
     int trust_durations;
     RRDLABELS *new_host_labels;
-    RRDLABELS *chart_rrdlabels_linked_temporarily;
+    size_t clabel_count;
     size_t data_collections_count;
     int enabled;
 

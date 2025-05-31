@@ -86,6 +86,7 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
+    parser->user.clabel_count = 0;
 }
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
@@ -115,6 +116,7 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
     st->pluginsd.pos = 0;
     parser->user.st = st;
     parser->user.cleanup_slots = false;
+    parser->user.clabel_count = 0;
 
     return true;
 }

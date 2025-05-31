@@ -57,7 +57,7 @@ int journal_direct_fd(const char *path) {
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    strncpyz(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
     // Connect the socket (optional, but can simplify send operations)
     if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {

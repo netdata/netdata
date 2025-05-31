@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "json.h"
+#include "../jsonwrap-internal.h"
+#include "web/mcp/mcp.h"
+#include "libnetdata/json/json-keys.h"
 
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
 void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
+    json_keys_init((options & RRDR_OPTION_LONG_JSON_KEYS) ? JSON_KEYS_OPTION_LONG_KEYS : 0);
+    
     //netdata_log_info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                        // key quote
@@ -100,6 +105,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     size_t normal_annotation_len = strlen(normal_annotation);
     size_t overflow_annotation_len = strlen(overflow_annotation);
     size_t object_rows_time_len = strlen(object_rows_time);
+
+    // RFC3339 buffer - allocated once and reused
+    char rfc3339_buf[RFC3339_MAX_LENGTH];
 
     // -------------------------------------------------------------------------
     // print the JSON header
@@ -201,11 +209,21 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
+            if(unlikely(options & RRDR_OPTION_RFC3339)) {
+                // Output RFC3339 timestamp
+                usec_t timestamp_ut = (usec_t)r->t[i] * USEC_PER_SEC;
+                rfc3339_datetime_ut(rfc3339_buf, sizeof(rfc3339_buf), timestamp_ut, 0, true);
+                buffer_strcat(wb, "\"");
+                buffer_strcat(wb, rfc3339_buf);
+                buffer_strcat(wb, "\"");
+            }
+            else {
+                buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
 
-            // in ms
-            if(unlikely(options & RRDR_OPTION_MILLISECONDS))
-                buffer_fast_strcat(wb, "000", 3);
+                // in ms
+                if(unlikely(options & RRDR_OPTION_MILLISECONDS))
+                    buffer_fast_strcat(wb, "000", 3);
+            }
 
             buffer_fast_strcat(wb, post_date, post_date_len);
         }
@@ -254,6 +272,9 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "result");
 
+    if(options & RRDR_OPTION_MCP_INFO)
+        buffer_json_member_add_string(wb, "info", MCP_QUERY_INFO_RESULT_SECTION);
+
     buffer_json_member_add_array(wb, "labels");
     buffer_json_add_array_item_string(wb, "time");
     long d, i;
@@ -267,12 +288,12 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     }
     buffer_json_array_close(wb); // labels
 
-    buffer_json_member_add_object(wb, "point");
+    buffer_json_member_add_object(wb, JSKEY(point_schema));
     {
         size_t point_count = 0;
         buffer_json_member_add_uint64(wb, "value", point_count++);
-        buffer_json_member_add_uint64(wb, "arp", point_count++);
-        buffer_json_member_add_uint64(wb, "pa", point_count++);
+        buffer_json_member_add_uint64(wb, JSKEY(anomaly_rate), point_count++);
+        buffer_json_member_add_uint64(wb, JSKEY(point_annotations), point_count++);
         if (send_count)
             buffer_json_member_add_uint64(wb, "count", point_count++);
         if (send_hidden)
@@ -303,7 +324,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
             if (options & RRDR_OPTION_MILLISECONDS)
                 buffer_json_add_array_item_time_ms(wb, now); // the time
             else
-                buffer_json_add_array_item_time_t(wb, now); // the time
+                buffer_json_add_array_item_time_t_formatted(wb, now, options & RRDR_OPTION_RFC3339); // the time
 
             for (d = 0; d < used; d++) {
                 if (!rrdr_dimension_should_be_exposed(r->od[d], options))

@@ -200,6 +200,8 @@ dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
 
         rrdset_done(p->st_service_state);
     }
+
+    return 1;
 }
 
 int do_PerflibServices(int update_every, usec_t dt __maybe_unused)

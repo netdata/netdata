@@ -174,10 +174,8 @@ int main(int argc, char **argv)
     command_string_size = 0;
     command_string[0] = '\0';
     for (i = 1 ; i < argc ; ++i) {
-        size_t to_copy;
-
-        to_copy = MIN(strlen(argv[i]), MAX_COMMAND_LENGTH - 1 - command_string_size);
-        strncpy(command_string + command_string_size, argv[i], to_copy);
+        size_t to_copy = MIN(strlen(argv[i]), MAX_COMMAND_LENGTH - 1 - command_string_size);
+        memcpy(command_string + command_string_size, argv[i], to_copy);
         command_string_size += to_copy;
         command_string[command_string_size] = '\0';
 

@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netdata MCP Web Client</title>
+    <!-- Custom MCP Schema UI Generator -->
+    <script src="mcp-schema-ui-generator.js"></script>
+    <!-- JSON Pretty Printer -->
+    <script src="json-pretty-printer.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            color: #333;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 {
+            color: #0088cc;
+            margin: 10px;
+        }
+        .connection-panel {
+            background-color: #e2f4ff;
+            padding: 8px;
+            border-radius: 5px;
+            margin: 0 10px 10px 10px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .four-column-layout {
+            display: grid;
+            grid-template-columns: 112px 216px 1fr 2fr;
+            gap: 10px;
+            flex: 1;
+            padding: 0 10px 10px 10px;
+            overflow: hidden;
+        }
+        .column {
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+        /* Keep methods column scrollable */
+        .column:nth-child(2) {
+            overflow: hidden !important;
+        }
+        .column:nth-child(2) .column-content {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+        }
+        .column-header {
+            margin-top: 0;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+            font-size: 1.2em;
+            color: #0088cc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .column-content {
+            overflow-y: auto;
+            overflow-x: hidden;
+            flex: 1;
+        }
+        .flow-item, .method-item {
+            padding: 8px;
+            margin-bottom: 6px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .flow-item {
+            font-size: 0.9em;
+        }
+        .method-item {
+            font-size: 0.85em;
+            padding: 10px 8px;
+        }
+        .method-item .tool-name {
+            font-weight: bold;
+            font-size: 0.95em;
+            color: #333;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .method-item .tool-title {
+            font-size: 0.85em;
+            color: #666;
+            display: block;
+            margin-bottom: 2px;
+            line-height: 1.3;
+        }
+        .method-item .tool-method {
+            font-size: 0.75em;
+            color: #999;
+            display: block;
+        }
+        .flow-item:hover, .method-item:hover {
+            background-color: #e0e0e0;
+        }
+        .flow-item.active, .method-item.active {
+            background-color: #d0e8f2;
+            font-weight: bold;
+        }
+        .method-item.dynamic {
+            border-left: 3px solid #0088cc;
+            background-color: #f0f8ff;
+        }
+        .method-item.dynamic:hover {
+            background-color: #e0f0ff;
+        }
+        /* Smaller font for method descriptions in tooltips */
+        .method-item .tooltip {
+            font-size: 0.8em;
+            margin-left: 4px;
+        }
+        .method-item.history {
+            border-left: 3px solid #666;
+            background-color: #f8f8f8;
+        }
+        .method-item.history:hover {
+            background-color: #eeeeee;
+        }
+        .method-item.history.error {
+            border-left-color: #d00;
+            background-color: #fff5f5;
+        }
+        .method-item.history.error:hover {
+            background-color: #ffeeee;
+        }
+        #jsonEditor {
+            width: 100%;
+            height: 100%;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: none;
+        }
+        /* JSON syntax highlighting */
+        .json-string { 
+            color: #008800; 
+            font-weight: bold;
+            display: inline-block;
+        }
+        .json-number { color: #0055aa; font-weight: bold; }
+        .json-boolean-true { color: #008800; font-weight: bold; }
+        .json-boolean-false { color: #dd0000; font-weight: bold; }
+        .json-null { color: #666666; font-weight: bold; }
+        .json-key { color: #555555; }
+        .json-bracket { color: #aaaaaa; }
+        .json-comma { color: #aaaaaa; }
+        .json-colon { color: #aaaaaa; }
+        button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #006699;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        /* Send without validation button - orange color to indicate caution */
+        #sendFromFormBtn {
+            background-color: #ff8c00;
+        }
+        #sendFromFormBtn:hover {
+            background-color: #e67e00;
+        }
+        /* Validate & send button - green for safe operation */
+        #validateAndSendBtn {
+            background-color: #28a745;
+        }
+        #validateAndSendBtn:hover {
+            background-color: #218838;
+        }
+        #validateAndSendBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        /* Send without validation button - disabled state */
+        #sendFromFormBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        /* Validate button - disabled state */
+        #validateFormBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .button-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .connected {
+            color: green;
+        }
+        .disconnected {
+            color: red;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 9999;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        /* Specific positioning for method tooltips */
+        .method-item.tooltip .tooltiptext {
+            position: fixed;
+            z-index: 9999;
+            width: 300px;
+            max-width: 400px;
+            height: auto !important;
+            min-height: fit-content;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Ensure JSON content wraps properly */
+        pre, #responseViewer {
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
+            overflow-x: auto !important;
+        }
+        
+        /* Tab styles */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 10px;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            margin-right: 4px;
+            transition: background-color 0.2s;
+            font-size: 0.9em;
+            pointer-events: auto;
+            position: relative;
+            z-index: 10;
+        }
+        .tab:hover {
+            background-color: #e0e0e0;
+        }
+        .tab.active {
+            background-color: white;
+            font-weight: bold;
+            border-bottom: 2px solid white;
+            margin-bottom: -2px;
+        }
+        .tab-content {
+            display: none;
+            height: 100%;
+            position: relative;
+            background-color: white;
+            opacity: 0;
+            visibility: hidden;
+        }
+        .tab-content.active {
+            display: block;
+            opacity: 1;
+            visibility: visible;
+        }
+        #editRequestContent.active {
+            display: flex !important;
+        }
+        /* Custom Schema Form Editor */
+        #editRequestContent {
+            height: 100%;
+            overflow: hidden;
+            flex-direction: column;
+        }
+        #schemaFormEditor {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 0;
+        }
+        #noSchemaMessage {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        /* Response viewer styles */
+        #responseViewer {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background-color: #f8f8f8;
+            padding: 10px !important;
+            border-radius: 4px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        /* JSON Pretty Printer styles */
+        .json-entry {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .json-entry:last-child {
+            border-bottom: none;
+        }
+        .json-timestamp {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .json-direction {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .json-sent {
+            color: #0088cc;
+        }
+        .json-received {
+            color: #00aa00;
+        }
+        #clearLogBtn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            padding: 4px 8px;
+            font-size: 12px;
+            background-color: #dc3545;
+            z-index: 10;
+        }
+        #clearLogBtn:hover {
+            background-color: #c82333;
+        }
+        .response-nav-buttons {
+            position: absolute;
+            top: 5px;
+            right: 80px;
+            z-index: 10;
+            display: flex;
+            gap: 5px;
+        }
+        .nav-button {
+            padding: 4px 8px;
+            font-size: 12px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .nav-button:hover {
+            background-color: #5a6268;
+        }
+        .nav-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        /* Method count badge */
+        .method-count {
+            background-color: #0088cc;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+        /* History count */
+        .history-count {
+            background-color: #666;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            margin-left: auto;
+        }
+        .method-header {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .method-text {
+            flex: 1;
+        }
+        /* Validation message */
+        .validation-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px;
+            font-size: 0.85em;
+            border: 1px solid #f5c6cb;
+        }
+        .validation-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        /* Saved indicator */
+        .saved-indicator {
+            position: absolute;
+            top: 8px;
+            right: 120px;
+            background-color: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+        .saved-indicator.show {
+            opacity: 1;
+        }
+        /* Storage controls */
+        .storage-controls {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+            font-size: 12px;
+        }
+        .storage-btn {
+            padding: 2px 6px;
+            font-size: 11px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .storage-btn:hover {
+            background-color: #5a6268;
+        }
+        .storage-btn.clear {
+            background-color: #dc3545;
+        }
+        .storage-btn.clear:hover {
+            background-color: #c82333;
+        }
+        /* JSON header line */
+        .json-header-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        /* Entry-level controls */
+        .entry-controls {
+            display: flex;
+            gap: 3px;
+        }
+        .entry-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .entry-btn:hover {
+            background: #5a6268;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .modal-close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+        .modal-close:hover,
+        .modal-close:focus {
+            color: #000;
+        }
+        .modal-body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-textarea {
+            flex: 1;
+            width: 100%;
+            font-family: monospace;
+            font-size: 13px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+            min-height: 300px;
+        }
+        .modal-footer {
+            margin-top: 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .import-example {
+            background-color: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-panel">
+        <label for="serverUrl">Netdata MCP Test Client:</label>
+        <input type="text" id="serverUrl" value="ws://localhost:19999/mcp" style="width: 300px;">
+        <button id="connectBtn">Connect</button>
+        <button id="connectAndInitBtn">Connect and Handshake</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+        <span id="status" class="status disconnected">Disconnected</span>
+    </div>
+    
+    <div class="four-column-layout">
+        <!-- First Column - Flows -->
+        <div class="column">
+            <h3 class="column-header">Flows</h3>
+            <div class="column-content" id="flowsList">
+                <div class="flow-item active" data-flow="initialization">Initialize</div>
+                <div class="flow-item" data-flow="tools">Tools</div>
+                <div class="flow-item" data-flow="prompts">Prompts</div>
+                <div class="flow-item" data-flow="resources">Resources</div>
+                <div class="flow-item" data-flow="logging">Logging</div>
+                <div class="flow-item" data-flow="sampling">Sampling</div>
+                <div class="flow-item" data-flow="roots">Roots</div>
+                <div class="flow-item" data-flow="custom">History</div>
+            </div>
+        </div>
+        
+        <!-- Second Column - Methods -->
+        <div class="column">
+            <h3 class="column-header">
+                <span>Methods</span>
+                <span id="methodCount" class="method-count">0</span>
+            </h3>
+            <div class="column-content" id="methodsList"></div>
+        </div>
+        
+        <!-- Third Column - Request -->
+        <div class="column">
+            <h3 class="column-header">
+                <span>Request</span>
+                <span id="currentToolName" style="font-weight: normal; font-size: 0.9em; color: #666;"></span>
+                <div class="storage-controls">
+                    <button id="clearParamsBtn" class="storage-btn clear" title="Clear saved parameters for current tool">Clear Params</button>
+                    <button id="clearHistoryBtn" class="storage-btn clear" title="Clear request history">Clear History</button>
+                </div>
+                <div id="savedIndicator" class="saved-indicator">Saved!</div>
+            </h3>
+            <div class="tabs">
+                <div class="tab" onclick="switchTab('rawRequest')">Raw JSON</div>
+                <div class="tab active" onclick="switchTab('editRequest')">Edit Form</div>
+                <div class="tab" onclick="switchTab('viewSchema')">Schema</div>
+            </div>
+            <div class="column-content" style="display: flex; flex-direction: column; padding: 0; position: relative;">
+                <div id="rawRequestContent" class="tab-content" style="position: absolute; inset: 0; display: flex; flex-direction: column;">
+                    <textarea id="jsonEditor" style="flex: 1;"></textarea>
+                    <div class="button-row" style="padding: 8px;">
+                        <button id="sendBtn" disabled>Send</button>
+                        <button id="formatBtn">Format JSON</button>
+                        <button id="copyBtn">Copy</button>
+                        <button id="importLLMBtn">Import from LLM</button>
+                    </div>
+                </div>
+                <div id="editRequestContent" class="tab-content active" style="position: absolute; inset: 0; overflow: hidden;">
+                    <div id="noSchemaMessage">
+                        Select a method to see its parameters
+                    </div>
+                    <div id="schemaFormEditor" style="display: none;">
+                        <!-- Form will be rendered here -->
+                    </div>
+                    <div class="button-row" style="padding: 8px; background: white; border-top: 1px solid #ddd;">
+                        <button id="sendFromFormBtn" disabled title="Send request without validation (for testing server-side validation)">Send w/o Validation</button>
+                        <button id="validateFormBtn" title="Validate form data against schema">Validate</button>
+                        <button id="validateAndSendBtn" disabled title="Validate first, then send request">Validate & Send</button>
+                    </div>
+                </div>
+                <div id="viewSchemaContent" class="tab-content" style="position: absolute; inset: 0; overflow: hidden;">
+                    <div id="schemaViewer" style="height: 100%; overflow-y: auto; padding: 10px; background-color: #f8f8f8; font-family: 'Courier New', monospace; font-size: 13px;">
+                        <div id="noSchemaAvailable" style="text-align: center; color: #666; padding: 20px;">
+                            No schema available. Select a tool to view its schema.
+                        </div>
+                        <pre id="schemaDisplay" style="display: none; margin: 0;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fourth Column - Response -->
+        <div class="column">
+            <h3 class="column-header">
+                Response
+                <div class="response-nav-buttons">
+                    <button id="prevResponseBtn" class="nav-button" title="Previous response (↑)">↑</button>
+                    <button id="nextResponseBtn" class="nav-button" title="Next response (↓)">↓</button>
+                </div>
+                <button id="clearLogBtn">Clear</button>
+            </h3>
+            <pre id="responseViewer" class="column-content" style="padding: 0; margin: 0;"></pre>
+        </div>
+    </div>
+    
+    <!-- Import from LLM Modal -->
+    <div id="importLLMModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Request from LLM</h2>
+                <span class="modal-close" onclick="closeImportModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="import-example">
+                    Example: Paste LLM requests that use backticks (`) instead of quotes ("). The JSON-RPC wrapper will be added automatically.
+                </div>
+                <textarea id="llmImportTextarea" class="modal-textarea" placeholder='Paste your LLM request here, e.g.:
+{
+  `after`: `-604800`,
+  `before`: `0`,
+  `cardinality_limit`: 20,
+  `instances`: [
+    `*lab-child-host1*`
+  ],
+  `nodes`: [
+    `beast`
+  ]
+}'></textarea>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeImportModal()">Cancel</button>
+                <button onclick="importFromLLM()" style="background-color: #28a745;">Import</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let ws = null;
+        let currentRequestId = 1;
+        let serverCapabilities = {};
+        let isUpdatingFromCode = false; // Flag to prevent recursive updates between JSON editor and form
+        let availableTools = {};
+        let availablePrompts = {};
+        let availableResources = {};
+        let requestHistory = [];
+        let currentActiveTab = 'editRequest';
+        let schemaFormGenerator = null;
+        let currentMethodSchema = null;
+        let jsonPrinter = null;
+        let pendingRequests = new Map(); // Track request timestamps by ID
+        let responseEntries = []; // Track response entries for navigation
+        let currentResponseIndex = -1;
+        
+        // Local storage keys
+        const STORAGE_KEYS = {
+            TOOL_PARAMS: 'mcp_tool_params',
+            REQUEST_HISTORY: 'mcp_request_history',
+            SERVER_URL: 'mcp_server_url'
+        };
+        
+        // Local Storage utility functions
+        function saveToLocalStorage(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.warn('Failed to save to localStorage:', e);
+            }
+        }
+        
+        function loadFromLocalStorage(key, defaultValue = null) {
+            try {
+                const item = localStorage.getItem(key);
+                return item ? JSON.parse(item) : defaultValue;
+            } catch (e) {
+                console.warn('Failed to load from localStorage:', e);
+                return defaultValue;
+            }
+        }
+        
+        // Save tool parameters
+        function saveToolParams(toolName, params) {
+            const savedParams = loadFromLocalStorage(STORAGE_KEYS.TOOL_PARAMS, {});
+            savedParams[toolName] = {
+                params: params,
+                timestamp: Date.now()
+            };
+            saveToLocalStorage(STORAGE_KEYS.TOOL_PARAMS, savedParams);
+        }
+        
+        // Load tool parameters
+        function loadToolParams(toolName) {
+            const savedParams = loadFromLocalStorage(STORAGE_KEYS.TOOL_PARAMS, {});
+            return savedParams[toolName]?.params || {};
+        }
+        
+        // Save request to history
+        function saveRequestToHistory(request, method, toolName = null, error = false) {
+            const historyItem = {
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                timestamp: new Date().toISOString(),
+                displayTime: new Date().toLocaleString(),
+                method: method,
+                toolName: toolName,
+                request: JSON.parse(JSON.stringify(request)), // Deep clone to avoid reference issues
+                error: error
+            };
+            
+            let history = loadFromLocalStorage(STORAGE_KEYS.REQUEST_HISTORY, []);
+            history.unshift(historyItem);
+            
+            // Keep only last 20 requests
+            if (history.length > 20) {
+                history = history.slice(0, 20);
+            }
+            
+            saveToLocalStorage(STORAGE_KEYS.REQUEST_HISTORY, history);
+            return historyItem;
+        }
+        
+        // Load request history
+        function loadRequestHistory() {
+            return loadFromLocalStorage(STORAGE_KEYS.REQUEST_HISTORY, []);
+        }
+        
+        // Save server URL
+        function saveServerUrl(url) {
+            saveToLocalStorage(STORAGE_KEYS.SERVER_URL, url);
+        }
+        
+        // Load server URL
+        function loadServerUrl() {
+            return loadFromLocalStorage(STORAGE_KEYS.SERVER_URL, 'ws://localhost:19999/mcp');
+        }
+        
+        // Clear saved parameters for current tool
+        function clearCurrentToolParams() {
+            if (!currentMethodSchema || !currentMethodSchema.toolName) {
+                alert('No tool selected or tool has no parameters to clear');
+                return;
+            }
+            
+            if (confirm(`Clear saved parameters for ${currentMethodSchema.toolName}?`)) {
+                const savedParams = loadFromLocalStorage(STORAGE_KEYS.TOOL_PARAMS, {});
+                delete savedParams[currentMethodSchema.toolName];
+                saveToLocalStorage(STORAGE_KEYS.TOOL_PARAMS, savedParams);
+                
+                // Reset form to defaults
+                if (schemaFormGenerator && currentMethodSchema.schema) {
+                    schemaFormGenerator.setSchema(currentMethodSchema.schema.inputSchema, {});
+                }
+                
+                alert('Parameters cleared!');
+            }
+        }
+        
+        // Clear request history
+        function clearRequestHistory() {
+            if (confirm('Clear all request history? This cannot be undone.')) {
+                saveToLocalStorage(STORAGE_KEYS.REQUEST_HISTORY, []);
+                requestHistory = [];
+                
+                // Refresh custom flow if currently displayed
+                const activeFlow = document.querySelector('.flow-item.active');
+                if (activeFlow && activeFlow.dataset.flow === 'custom') {
+                    displayMethods('custom');
+                }
+                
+                // Update history flow indicator
+                updateHistoryFlowIndicator();
+                
+                alert('Request history cleared!');
+            }
+        }
+        
+        // Show save indicator
+        function showSaveIndicator() {
+            savedIndicator.classList.add('show');
+            setTimeout(() => {
+                savedIndicator.classList.remove('show');
+            }, 2000);
+        }
+        
+        // Flow definitions
+        const flows = {
+            initialization: {
+                name: 'Initialization',
+                methods: [
+                    { 
+                        name: 'initialize', 
+                        type: 'request',
+                        description: 'Initialize the connection with the server and exchange capabilities',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "initialize",
+                            params: {
+                                protocolVersion: "2024-11-05",
+                                capabilities: {
+                                    roots: { listChanged: true },
+                                    sampling: {}
+                                },
+                                clientInfo: {
+                                    name: "Netdata MCP Test Client",
+                                    version: "1.0.0"
+                                }
+                            }
+                        }
+                    },
+                    { 
+                        name: 'initialized', 
+                        type: 'notification',
+                        description: 'Notify the server that initialization is complete',
+                        template: {
+                            jsonrpc: "2.0",
+                            method: "notifications/initialized"
+                        }
+                    },
+                    { 
+                        name: 'ping', 
+                        type: 'request',
+                        description: 'Ping the server to check if it\'s alive',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "ping"
+                        }
+                    }
+                ]
+            },
+            tools: {
+                name: 'Tools',
+                methods: [
+                    { 
+                        name: 'tools/list', 
+                        type: 'request',
+                        description: 'List all available tools from the server',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "tools/list"
+                        }
+                    },
+                    { 
+                        name: 'tools/call', 
+                        type: 'request',
+                        description: 'Call a specific tool with arguments',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "tools/call",
+                            params: {
+                                name: "example_tool",
+                                arguments: {}
+                            }
+                        }
+                    }
+                ]
+            },
+            prompts: {
+                name: 'Prompts',
+                methods: [
+                    { 
+                        name: 'prompts/list', 
+                        type: 'request',
+                        description: 'List all available prompts from the server',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "prompts/list"
+                        }
+                    },
+                    { 
+                        name: 'prompts/get', 
+                        type: 'request',
+                        description: 'Get a specific prompt by name',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "prompts/get",
+                            params: {
+                                name: "example_prompt",
+                                arguments: {}
+                            }
+                        }
+                    }
+                ]
+            },
+            resources: {
+                name: 'Resources',
+                methods: [
+                    { 
+                        name: 'resources/list', 
+                        type: 'request',
+                        description: 'List all available resources from the server',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "resources/list"
+                        }
+                    },
+                    { 
+                        name: 'resources/read', 
+                        type: 'request',
+                        description: 'Read a specific resource by URI',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "resources/read",
+                            params: {
+                                uri: "example://resource"
+                            }
+                        }
+                    },
+                    { 
+                        name: 'resources/subscribe', 
+                        type: 'request',
+                        description: 'Subscribe to updates for a specific resource',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "resources/subscribe",
+                            params: {
+                                uri: "example://resource"
+                            }
+                        }
+                    },
+                    { 
+                        name: 'resources/unsubscribe', 
+                        type: 'request',
+                        description: 'Unsubscribe from updates for a specific resource',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "resources/unsubscribe",
+                            params: {
+                                uri: "example://resource"
+                            }
+                        }
+                    }
+                ]
+            },
+            logging: {
+                name: 'Logging',
+                methods: [
+                    { 
+                        name: 'logging/setLevel', 
+                        type: 'request',
+                        description: 'Set the logging level for server messages',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "logging/setLevel",
+                            params: {
+                                level: "info"
+                            }
+                        }
+                    }
+                ]
+            },
+            sampling: {
+                name: 'Sampling',
+                methods: [
+                    { 
+                        name: 'sampling/createMessage', 
+                        type: 'request',
+                        description: 'Request the server to create a message using LLM',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "sampling/createMessage",
+                            params: {
+                                messages: [
+                                    {
+                                        role: "user",
+                                        content: {
+                                            type: "text",
+                                            text: "Hello"
+                                        }
+                                    }
+                                ],
+                                maxTokens: 100
+                            }
+                        }
+                    }
+                ]
+            },
+            roots: {
+                name: 'Roots',
+                methods: [
+                    { 
+                        name: 'roots/list', 
+                        type: 'request',
+                        description: 'List root directories the client has access to',
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "roots/list",
+                            params: {}
+                        }
+                    }
+                ]
+            },
+            custom: {
+                name: 'Request History',
+                methods: []
+            }
+        };
+        
+        // DOM elements
+        const connectBtn = document.getElementById('connectBtn');
+        const connectAndInitBtn = document.getElementById('connectAndInitBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const sendFromFormBtn = document.getElementById('sendFromFormBtn');
+        const validateFormBtn = document.getElementById('validateFormBtn');
+        const validateAndSendBtn = document.getElementById('validateAndSendBtn');
+        const formatBtn = document.getElementById('formatBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const importLLMBtn = document.getElementById('importLLMBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const prevResponseBtn = document.getElementById('prevResponseBtn');
+        const nextResponseBtn = document.getElementById('nextResponseBtn');
+        const clearParamsBtn = document.getElementById('clearParamsBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const savedIndicator = document.getElementById('savedIndicator');
+        const jsonEditor = document.getElementById('jsonEditor');
+        const responseViewer = document.getElementById('responseViewer');
+        const statusElement = document.getElementById('status');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const flowsList = document.getElementById('flowsList');
+        const methodsList = document.getElementById('methodsList');
+        const noSchemaMessage = document.getElementById('noSchemaMessage');
+        const schemaFormEditor = document.getElementById('schemaFormEditor');
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        connectAndInitBtn.addEventListener('click', connectAndInitialize);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendRequest);
+        sendFromFormBtn.addEventListener('click', sendFromForm);
+        validateFormBtn.addEventListener('click', validateForm);
+        validateAndSendBtn.addEventListener('click', validateAndSendFromForm);
+        formatBtn.addEventListener('click', formatJSON);
+        copyBtn.addEventListener('click', copyJSON);
+        importLLMBtn.addEventListener('click', openImportModal);
+        clearLogBtn.addEventListener('click', clearLog);
+        prevResponseBtn.addEventListener('click', navigateToPrevResponse);
+        nextResponseBtn.addEventListener('click', navigateToNextResponse);
+        clearParamsBtn.addEventListener('click', clearCurrentToolParams);
+        clearHistoryBtn.addEventListener('click', clearRequestHistory);
+        
+        // JSON editor change detection
+        let jsonEditorChangeTimer = null;
+        
+        jsonEditor.addEventListener('input', () => {
+            // Skip if this change was triggered by code (not user)
+            if (isUpdatingFromCode) return;
+            
+            // Debounce the update to avoid excessive updates while typing
+            clearTimeout(jsonEditorChangeTimer);
+            jsonEditorChangeTimer = setTimeout(() => {
+                // Only update form if we're on the edit tab and have a schema
+                if (currentActiveTab === 'editRequest' && schemaFormGenerator) {
+                    updateFormFromRaw();
+                }
+            }, 500); // 500ms delay
+        });
+        
+        // Flow selection
+        flowsList.addEventListener('click', (e) => {
+            const flowItem = e.target.closest('.flow-item');
+            if (flowItem) {
+                document.querySelectorAll('.flow-item').forEach(item => item.classList.remove('active'));
+                flowItem.classList.add('active');
+                const flowName = flowItem.dataset.flow;
+                displayMethods(flowName);
+            }
+        });
+        
+        // Initialize from storage
+        function initializeFromStorage() {
+            // Load server URL
+            const savedServerUrl = loadServerUrl();
+            if (savedServerUrl) {
+                serverUrlInput.value = savedServerUrl;
+            }
+            
+            // Load request history
+            requestHistory = loadRequestHistory();
+            
+            // Update history flow indicator
+            updateHistoryFlowIndicator();
+        }
+        
+        // Update history flow indicator
+        function updateHistoryFlowIndicator() {
+            const historyCount = loadRequestHistory().length;
+            const historyFlow = document.querySelector('[data-flow="custom"]');
+            
+            if (historyCount > 0) {
+                historyFlow.textContent = `History (${historyCount})`;
+                historyFlow.style.fontWeight = 'bold';
+                historyFlow.style.color = '#0088cc';
+            } else {
+                historyFlow.textContent = 'History';
+                historyFlow.style.fontWeight = '';
+                historyFlow.style.color = '';
+            }
+        }
+        
+        // Initialize JSON pretty printer
+        jsonPrinter = new JSONPrettyPrinter({
+            indent: 2,
+            visualizeNewlines: true,
+            detectNestedJSON: true,
+            syntaxHighlight: true
+        });
+        
+        // Initialize with saved data
+        initializeFromStorage();
+        
+        // Initialize with first flow
+        displayMethods('initialization');
+        updateNavButtons();
+        
+        // Keyboard shortcuts for response navigation
+        document.addEventListener('keydown', (e) => {
+            // Only work when not focused on an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return;
+            }
+            
+            if (e.key === 'ArrowUp' && e.ctrlKey) {
+                e.preventDefault();
+                navigateToPrevResponse();
+            } else if (e.key === 'ArrowDown' && e.ctrlKey) {
+                e.preventDefault();
+                navigateToNextResponse();
+            }
+        });
+        
+        // Tab switching
+        function switchTab(tabName) {
+            currentActiveTab = tabName;
+            
+            // Update tab active states
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+                const tabText = tab.textContent;
+                if ((tabName === 'rawRequest' && tabText.includes('Raw JSON')) ||
+                    (tabName === 'editRequest' && tabText.includes('Edit Form')) ||
+                    (tabName === 'viewSchema' && tabText.includes('Schema'))) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Show/hide content
+            document.getElementById('rawRequestContent').classList.toggle('active', tabName === 'rawRequest');
+            document.getElementById('editRequestContent').classList.toggle('active', tabName === 'editRequest');
+            document.getElementById('viewSchemaContent').classList.toggle('active', tabName === 'viewSchema');
+            
+            // Update form from raw JSON when switching to edit tab
+            if (tabName === 'editRequest' && currentMethodSchema) {
+                updateFormFromRaw();
+            }
+        }
+        
+        // Display methods for a flow
+        function displayMethods(flowName) {
+            const flow = flows[flowName];
+            if (!flow) return;
+            
+            methodsList.innerHTML = '';
+            let allMethods = [...flow.methods];
+            
+            // Add dynamic methods for tools
+            if (flowName === 'tools' && Object.keys(availableTools).length > 0) {
+                for (const [toolName, tool] of Object.entries(availableTools)) {
+                    allMethods.push({
+                        name: toolName,
+                        title: tool.inputSchema?.title || tool.title || '',
+                        type: 'request',
+                        description: tool.description || 'No description available',
+                        dynamic: true,
+                        toolName: toolName,
+                        schema: tool,
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "tools/call",
+                            params: {
+                                name: toolName,
+                                arguments: {}
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // Add history for custom flow
+            if (flowName === 'custom') {
+                const savedHistory = loadRequestHistory();
+                savedHistory.forEach((item, index) => {
+                    let displayName = `${item.displayTime} - ${item.method}`;
+                    if (item.toolName) {
+                        displayName += ` (${item.toolName})`;
+                    }
+                    
+                    // For history items that are tool calls, try to find the schema
+                    let toolSchema = null;
+                    if (item.toolName && availableTools[item.toolName]) {
+                        toolSchema = availableTools[item.toolName];
+                    }
+                    
+                    allMethods.push({
+                        name: displayName,
+                        type: 'history',
+                        description: `Historical request #${index + 1} - ${item.toolName ? `Tool: ${item.toolName}` : item.method}`,
+                        template: JSON.parse(JSON.stringify(item.request)), // Clone the request to avoid editing original
+                        error: item.error,
+                        toolName: item.toolName,
+                        savedItem: item,
+                        dynamic: !!toolSchema, // Mark as dynamic if we have a schema
+                        schema: toolSchema // Include the schema for form generation
+                    });
+                });
+            }
+            
+            // Update method count
+            document.getElementById('methodCount').textContent = allMethods.length;
+            
+            // Create method items
+            allMethods.forEach(method => {
+                const methodDiv = document.createElement('div');
+                methodDiv.className = `method-item tooltip ${method.dynamic ? 'dynamic' : ''} ${method.type === 'history' ? 'history' : ''} ${method.error ? 'error' : ''}`;
+                
+                if (method.dynamic && method.toolName) {
+                    // Special layout for tools
+                    const toolName = document.createElement('div');
+                    toolName.className = 'tool-name';
+                    toolName.textContent = method.toolName;
+                    methodDiv.appendChild(toolName);
+                    
+                    if (method.title) {
+                        const toolTitle = document.createElement('div');
+                        toolTitle.className = 'tool-title';
+                        toolTitle.textContent = method.title;
+                        methodDiv.appendChild(toolTitle);
+                    }
+                    
+                    const toolMethod = document.createElement('div');
+                    toolMethod.className = 'tool-method';
+                    toolMethod.textContent = 'tools/call';
+                    methodDiv.appendChild(toolMethod);
+                } else {
+                    // Regular layout for other methods
+                    const methodHeader = document.createElement('div');
+                    methodHeader.className = 'method-header';
+                    
+                    const methodText = document.createElement('span');
+                    methodText.className = 'method-text';
+                    methodText.textContent = method.name;
+                    methodHeader.appendChild(methodText);
+                    
+                    if (method.type === 'history') {
+                        const count = document.createElement('span');
+                        count.className = 'history-count';
+                        count.textContent = `#${requestHistory.length - requestHistory.indexOf(requestHistory.find(h => h.request === method.template))}`;
+                        methodHeader.appendChild(count);
+                    }
+                    
+                    methodDiv.appendChild(methodHeader);
+                }
+                
+                // Add tooltip
+                const tooltipText = document.createElement('span');
+                tooltipText.className = 'tooltiptext';
+                tooltipText.textContent = method.description;
+                methodDiv.appendChild(tooltipText);
+                
+                // Position tooltip on hover
+                methodDiv.addEventListener('mouseenter', (e) => {
+                    const rect = methodDiv.getBoundingClientRect();
+                    tooltipText.style.left = `${rect.left + rect.width + 10}px`;
+                    tooltipText.style.top = `${rect.top}px`;
+                    tooltipText.style.bottom = 'auto';
+                    tooltipText.style.transform = 'none';
+                });
+                
+                methodDiv.addEventListener('click', () => selectMethod(method));
+                methodsList.appendChild(methodDiv);
+            });
+        }
+        
+        // Select a method
+        function selectMethod(method) {
+            // Update active state
+            document.querySelectorAll('.method-item').forEach(item => item.classList.remove('active'));
+            event.target.closest('.method-item').classList.add('active');
+            
+            // Update current tool name display
+            const currentToolNameElement = document.getElementById('currentToolName');
+            if (method.toolName) {
+                currentToolNameElement.textContent = `: ${method.toolName}`;
+            } else if (method.name) {
+                currentToolNameElement.textContent = `: ${method.name}`;
+            } else {
+                currentToolNameElement.textContent = '';
+            }
+            
+            // Set the template in the editor (deep clone to avoid modifying original)
+            const template = JSON.parse(JSON.stringify(method.template));
+            // Always use the current next ID
+            if (template.id !== undefined) {
+                template.id = currentRequestId;
+            }
+            isUpdatingFromCode = true;
+            jsonEditor.value = JSON.stringify(template, null, 2);
+            setTimeout(() => { isUpdatingFromCode = false; }, 10);
+            
+            // Update schema form if we have a schema for this method
+            if (method.dynamic && method.schema) {
+                currentMethodSchema = method;
+                updateSchemaForm(method.schema);
+            } else {
+                currentMethodSchema = null;
+                updateSchemaForm(null);
+                // Update message for methods without parameters
+                if (method.name && !method.dynamic) {
+                    noSchemaMessage.innerHTML = 'This method has no parameters.<br><br>Click "Send" to execute it.';
+                }
+            }
+        }
+        
+        // Update schema form
+        function updateSchemaForm(schema) {
+            // Update schema viewer
+            const noSchemaAvailable = document.getElementById('noSchemaAvailable');
+            const schemaDisplay = document.getElementById('schemaDisplay');
+            
+            if (!schema || !schema.inputSchema) {
+                noSchemaMessage.style.display = 'block';
+                schemaFormEditor.style.display = 'none';
+                noSchemaAvailable.style.display = 'block';
+                schemaDisplay.style.display = 'none';
+                return;
+            }
+            
+            noSchemaMessage.style.display = 'none';
+            schemaFormEditor.style.display = 'block';
+            
+            // Update schema viewer with pretty-printed schema
+            noSchemaAvailable.style.display = 'none';
+            schemaDisplay.style.display = 'block';
+            schemaDisplay.innerHTML = jsonPrinter.toHTMLContent(schema.inputSchema);
+            
+            // Clear and create new form
+            schemaFormEditor.innerHTML = '';
+            
+            try {
+                // Create form container
+                const formContainer = document.createElement('div');
+                schemaFormEditor.appendChild(formContainer);
+                
+                // Initialize generator with the container
+                schemaFormGenerator = new MCPSchemaUIGenerator(formContainer, {
+                    onChange: (value) => {
+                        // Skip if this change was triggered by code (not user)
+                        if (isUpdatingFromCode) return;
+                        
+                        // Clear any validation messages when user edits
+                        const existingMsg = schemaFormEditor.querySelector('.validation-message');
+                        if (existingMsg && !existingMsg.classList.contains('success')) {
+                            existingMsg.remove();
+                        }
+                        
+                        // Save parameters to local storage for tools
+                        if (currentMethodSchema && currentMethodSchema.toolName) {
+                            saveToolParams(currentMethodSchema.toolName, value);
+                            showSaveIndicator();
+                        }
+                        
+                        if (currentActiveTab === 'editRequest') {
+                            updateRawFromForm();
+                        }
+                    },
+                    showDescriptions: false,
+                    showTooltips: true
+                });
+                
+                // Get start value - prioritize JSON editor for history items, then saved parameters, then defaults
+                let startValue = {};
+                
+                // First try to get from JSON editor (this contains the historical data when loading history items)
+                try {
+                    const currentRequest = JSON.parse(jsonEditor.value);
+                    if (currentRequest.params && currentRequest.params.arguments) {
+                        startValue = currentRequest.params.arguments;
+                    }
+                } catch (e) {
+                    // JSON parse failed, continue to saved parameters
+                }
+                
+                // If no JSON editor data, try to load saved parameters for this tool
+                if (Object.keys(startValue).length === 0 && currentMethodSchema && currentMethodSchema.toolName) {
+                    const savedParams = loadToolParams(currentMethodSchema.toolName);
+                    if (Object.keys(savedParams).length > 0) {
+                        startValue = savedParams;
+                    }
+                }
+                
+                // Set schema with validation
+                try {
+                    schemaFormGenerator.setSchema(schema.inputSchema, startValue);
+                    
+                    // Update raw JSON if we loaded saved parameters
+                    if (Object.keys(startValue).length > 0) {
+                        updateRawFromForm();
+                    }
+                } catch (validationError) {
+                    // Show validation error
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'validation-message';
+                    errorDiv.innerHTML = `<strong>Schema Validation Error:</strong><br><pre>${validationError.message}</pre>`;
+                    schemaFormEditor.appendChild(errorDiv);
+                    schemaFormGenerator = null;
+                }
+                
+            } catch (e) {
+                console.error('Error creating form:', e);
+                noSchemaMessage.style.display = 'block';
+                schemaFormEditor.style.display = 'none';
+            }
+        }
+        
+        // Update raw JSON from form
+        function updateRawFromForm() {
+            if (!schemaFormGenerator || !currentMethodSchema) return;
+            
+            try {
+                const formData = schemaFormGenerator.getValue();
+                const currentRequest = JSON.parse(jsonEditor.value);
+                
+                if (currentMethodSchema.toolName) {
+                    // For tools/call, update the arguments
+                    currentRequest.params.arguments = formData;
+                } else {
+                    // For other methods, update params directly
+                    currentRequest.params = formData;
+                }
+                
+                // Set flag to prevent recursive updates
+                isUpdatingFromCode = true;
+                jsonEditor.value = JSON.stringify(currentRequest, null, 2);
+                // Reset flag after a small delay to ensure the event has been processed
+                setTimeout(() => { isUpdatingFromCode = false; }, 10);
+            } catch (e) {
+                console.error('Error updating raw JSON:', e);
+            }
+        }
+        
+        // Update form from raw JSON
+        function updateFormFromRaw() {
+            if (!schemaFormGenerator || !currentMethodSchema) return;
+            
+            try {
+                const currentRequest = JSON.parse(jsonEditor.value);
+                let value = {};
+                
+                if (currentRequest.params) {
+                    if (currentMethodSchema.toolName && currentRequest.params.arguments) {
+                        value = currentRequest.params.arguments;
+                    } else {
+                        value = currentRequest.params;
+                    }
+                }
+                
+                // Set flag to prevent onChange from updating JSON back
+                isUpdatingFromCode = true;
+                schemaFormGenerator.setValue(value);
+                // Reset flag after a delay to ensure all events have processed
+                setTimeout(() => { 
+                    isUpdatingFromCode = false;
+                    
+                    // Save the updated parameters to local storage after form is updated
+                    if (currentMethodSchema && currentMethodSchema.toolName && value) {
+                        saveToolParams(currentMethodSchema.toolName, value);
+                    }
+                }, 50);
+            } catch (e) {
+                console.error('Error updating form from JSON:', e);
+            }
+        }
+        
+        // Validate form
+        function validateForm() {
+            if (!schemaFormGenerator) {
+                alert('No form to validate');
+                return;
+            }
+            
+            // Clear any previous errors first
+            schemaFormGenerator.clearErrors();
+            
+            const isValid = schemaFormGenerator.validate();
+            
+            // Show validation result
+            const existingMsg = schemaFormEditor.querySelector('.validation-message');
+            if (existingMsg) existingMsg.remove();
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `validation-message ${isValid ? 'success' : ''}`;
+            
+            if (isValid) {
+                msgDiv.textContent = '✓ Form is valid!';
+            } else {
+                const errors = Object.entries(schemaFormGenerator.errors).map(([field, error]) => `${field}: ${error}`);
+                msgDiv.innerHTML = '<strong>Validation errors:</strong><br>' + errors.join('<br>');
+            }
+            
+            schemaFormEditor.insertBefore(msgDiv, schemaFormEditor.firstChild);
+            
+            // Auto-remove success message after 3 seconds
+            if (isValid) {
+                setTimeout(() => msgDiv.remove(), 3000);
+            }
+        }
+        
+        // Send from form (without validation)
+        function sendFromForm() {
+            if (!schemaFormGenerator) {
+                // No form, but we can still send the request if there's no schema required
+                sendRequest();
+                return;
+            }
+            
+            // Update raw JSON and send WITHOUT validation
+            updateRawFromForm();
+            sendRequest();
+        }
+        
+        // Validate and send from form
+        function validateAndSendFromForm() {
+            if (!schemaFormGenerator) {
+                // No form, but we can still send the request if there's no schema required
+                sendRequest();
+                return;
+            }
+            
+            // Validate first
+            if (!schemaFormGenerator.validate()) {
+                validateForm();
+                return;
+            }
+            
+            // Update raw JSON and send
+            updateRawFromForm();
+            sendRequest();
+        }
+        
+        // Connect and Handshake automation
+        async function connectAndInitialize() {
+            const url = serverUrlInput.value;
+            if (!url) {
+                alert('Please enter a WebSocket URL');
+                return;
+            }
+
+            try {
+                log('Starting automated connection and handshake...');
+                
+                // Step 1: Connect
+                await new Promise((resolve, reject) => {
+                    log('1. Connecting to ' + url + '...');
+                    
+                    // Clear cached data from previous connection
+                    availableTools = {};
+                    availablePrompts = {};
+                    availableResources = {};
+                    
+                    ws = new WebSocket(url);
+                    
+                    ws.onopen = () => {
+                        log('✓ Connected to ' + url);
+                        updateStatus(true);
+                        saveServerUrl(url);
+                        resolve();
+                    };
+                    
+                    ws.onerror = (error) => {
+                        log('✗ WebSocket connection error: ' + error);
+                        reject(new Error('Connection failed'));
+                    };
+                    
+                    ws.onclose = () => {
+                        if (ws.readyState !== WebSocket.OPEN) {
+                            log('✗ Connection closed before opening');
+                            reject(new Error('Connection closed'));
+                        }
+                    };
+                    
+                    // Set up message handler for responses
+                    ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            
+                            // Calculate metrics
+                            let responseTime = null;
+                            if (data.id !== undefined && pendingRequests.has(data.id)) {
+                                responseTime = Date.now() - pendingRequests.get(data.id);
+                                pendingRequests.delete(data.id);
+                            }
+                            
+                            const responseSize = new Blob([event.data]).size;
+                            const estimatedTokens = estimateTokens(event.data);
+                            
+                            logMessage(data, 'received', {
+                                responseTime,
+                                responseSize,
+                                estimatedTokens
+                            });
+                            
+                            // Handle specific responses
+                            if (data.id && data.result) {
+                                handleResponse(data);
+                            }
+                        } catch (e) {
+                            log('← Received (raw): ' + event.data);
+                        }
+                    };
+                });
+                
+                // Step 2: Send initialize
+                await new Promise((resolve, reject) => {
+                    log('2. Sending initialize request...');
+                    
+                    const initRequest = {
+                        jsonrpc: "2.0",
+                        id: currentRequestId++,
+                        method: "initialize",
+                        params: {
+                            protocolVersion: "2024-11-05",
+                            capabilities: {
+                                roots: { listChanged: true },
+                                sampling: {}
+                            },
+                            clientInfo: {
+                                name: "Netdata MCP Test Client",
+                                version: "1.0.0"
+                            }
+                        }
+                    };
+                    
+                    // Track this request
+                    pendingRequests.set(initRequest.id, Date.now());
+                    
+                    // Set up one-time response handler
+                    const originalHandler = ws.onmessage;
+                    let responseReceived = false;
+                    
+                    const timeout = setTimeout(() => {
+                        if (!responseReceived) {
+                            ws.onmessage = originalHandler;
+                            reject(new Error('Initialize request timed out'));
+                        }
+                    }, 10000); // 10 second timeout
+                    
+                    ws.onmessage = (event) => {
+                        // Call original handler first
+                        originalHandler(event);
+                        
+                        if (responseReceived) return;
+                        
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.id === initRequest.id) {
+                                responseReceived = true;
+                                clearTimeout(timeout);
+                                ws.onmessage = originalHandler;
+                                
+                                if (data.error) {
+                                    log('✗ Initialize failed: ' + JSON.stringify(data.error));
+                                    reject(new Error('Initialize failed: ' + data.error.message));
+                                } else {
+                                    log('✓ Initialize successful');
+                                    resolve();
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore parsing errors for this handler
+                        }
+                    };
+                    
+                    ws.send(JSON.stringify(initRequest));
+                    logMessage(initRequest, 'sent');
+                });
+                
+                // Step 3: Send initialized notification
+                log('3. Sending initialized notification...');
+                const initializedNotification = {
+                    jsonrpc: "2.0",
+                    method: "notifications/initialized"
+                };
+                
+                ws.send(JSON.stringify(initializedNotification));
+                logMessage(initializedNotification, 'sent');
+                log('✓ Initialized notification sent');
+                
+                // Small delay to ensure notification is processed
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Step 4: Send tools/list
+                await new Promise((resolve, reject) => {
+                    log('4. Requesting tools list...');
+                    
+                    const toolsRequest = {
+                        jsonrpc: "2.0",
+                        id: currentRequestId++,
+                        method: "tools/list"
+                    };
+                    
+                    // Track this request
+                    pendingRequests.set(toolsRequest.id, Date.now());
+                    
+                    // Set up one-time response handler
+                    const originalHandler = ws.onmessage;
+                    let responseReceived = false;
+                    
+                    const timeout = setTimeout(() => {
+                        if (!responseReceived) {
+                            ws.onmessage = originalHandler;
+                            reject(new Error('Tools list request timed out'));
+                        }
+                    }, 10000); // 10 second timeout
+                    
+                    ws.onmessage = (event) => {
+                        // Call original handler first
+                        originalHandler(event);
+                        
+                        if (responseReceived) return;
+                        
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.id === toolsRequest.id) {
+                                responseReceived = true;
+                                clearTimeout(timeout);
+                                ws.onmessage = originalHandler;
+                                
+                                if (data.error) {
+                                    log('✗ Tools list failed: ' + JSON.stringify(data.error));
+                                    reject(new Error('Tools list failed: ' + data.error.message));
+                                } else {
+                                    log('✓ Tools list received (' + (data.result.tools ? data.result.tools.length : 0) + ' tools)');
+                                    resolve();
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore parsing errors for this handler
+                        }
+                    };
+                    
+                    ws.send(JSON.stringify(toolsRequest));
+                    logMessage(toolsRequest, 'sent');
+                });
+                
+                // Step 5: Set up proper persistent event handlers
+                log('5. Setting up persistent connection handlers...');
+                ws.onerror = (error) => {
+                    log('WebSocket error: ' + error);
+                };
+                
+                ws.onclose = () => {
+                    log('Disconnected');
+                    updateStatus(false);
+                    ws = null;
+                };
+                log('✓ Persistent handlers configured');
+                
+                // Step 6: Switch to Tools flow
+                log('6. Switching to Tools flow...');
+                document.querySelectorAll('.flow-item').forEach(item => item.classList.remove('active'));
+                const toolsFlow = document.querySelector('[data-flow="tools"]');
+                if (toolsFlow) {
+                    toolsFlow.classList.add('active');
+                    displayMethods('tools');
+                    log('✓ Switched to Tools flow');
+                } else {
+                    log('⚠ Tools flow not found');
+                }
+                
+                log('🎉 Automated connection and handshake completed successfully!');
+                
+            } catch (error) {
+                log('❌ Automated connection and handshake failed: ' + error.message);
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                    updateStatus(false);
+                }
+            }
+        }
+
+        // WebSocket functions
+        function connect() {
+            const url = serverUrlInput.value;
+            if (!url) {
+                alert('Please enter a WebSocket URL');
+                return;
+            }
+            
+            log('Connecting to ' + url + '...');
+            
+            // Clear cached data from previous connection
+            availableTools = {};
+            availablePrompts = {};
+            availableResources = {};
+            
+            ws = new WebSocket(url);
+            
+            ws.onopen = () => {
+                log('Connected to ' + url);
+                updateStatus(true);
+                // Save successful connection URL
+                saveServerUrl(url);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Calculate metrics
+                    let responseTime = null;
+                    if (data.id !== undefined && pendingRequests.has(data.id)) {
+                        responseTime = Date.now() - pendingRequests.get(data.id);
+                        pendingRequests.delete(data.id);
+                    }
+                    
+                    const responseSize = new Blob([event.data]).size;
+                    const estimatedTokens = estimateTokens(event.data);
+                    
+                    logMessage(data, 'received', {
+                        responseTime,
+                        responseSize,
+                        estimatedTokens
+                    });
+                    
+                    // Handle specific responses
+                    if (data.id && data.result) {
+                        handleResponse(data);
+                    }
+                } catch (e) {
+                    log('← Received (raw): ' + event.data);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log('WebSocket error: ' + error);
+            };
+            
+            ws.onclose = () => {
+                log('Disconnected');
+                updateStatus(false);
+                ws = null;
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+        
+        function sendRequest() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to server');
+                return;
+            }
+            
+            try {
+                const request = JSON.parse(jsonEditor.value);
+                
+                // Track request timestamp if it has an ID
+                if (request.id !== undefined) {
+                    pendingRequests.set(request.id, Date.now());
+                }
+                
+                // Determine tool name if it's a tools/call request
+                let toolName = null;
+                if (request.method === 'tools/call' && request.params && request.params.name) {
+                    toolName = request.params.name;
+                }
+                
+                // Save to history
+                const historyItem = saveRequestToHistory(request, request.method, toolName, false);
+                
+                // Update in-memory history for immediate UI updates
+                const oldHistoryItem = {
+                    timestamp: new Date().toLocaleTimeString(),
+                    method: request.method,
+                    request: JSON.parse(JSON.stringify(request)), // Deep clone here too
+                    error: false
+                };
+                requestHistory.unshift(oldHistoryItem);
+                if (requestHistory.length > 50) {
+                    requestHistory = requestHistory.slice(0, 50);
+                }
+                
+                // Update history flow indicator
+                updateHistoryFlowIndicator();
+                
+                ws.send(JSON.stringify(request));
+                logMessage(request, 'sent');
+                
+                // Increment ID after sending for next request
+                if (request.id !== undefined && request.id === currentRequestId) {
+                    currentRequestId++;
+                }
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                
+                // Save error to history
+                saveRequestToHistory({ error: e.message }, 'Invalid JSON', null, true);
+                
+                // Add error to in-memory history
+                const historyItem = {
+                    timestamp: new Date().toLocaleTimeString(),
+                    method: 'Invalid JSON',
+                    request: { error: e.message },
+                    error: true
+                };
+                requestHistory.unshift(historyItem);
+                
+                // Update history flow indicator
+                updateHistoryFlowIndicator();
+            }
+        }
+        
+        function handleResponse(response) {
+            // Handle initialize response
+            if (response.result && response.result.capabilities) {
+                serverCapabilities = response.result.capabilities;
+                log('Server capabilities: ' + JSON.stringify(serverCapabilities, null, 2));
+            }
+            
+            // Handle tools/list response
+            if (response.result && response.result.tools) {
+                availableTools = {};
+                response.result.tools.forEach(tool => {
+                    availableTools[tool.name] = tool;
+                });
+                log(`Loaded ${Object.keys(availableTools).length} tools`);
+                // Refresh tools methods if currently viewing
+                const activeFlow = document.querySelector('.flow-item.active');
+                if (activeFlow && activeFlow.dataset.flow === 'tools') {
+                    displayMethods('tools');
+                }
+            }
+            
+            // Handle prompts/list response
+            if (response.result && response.result.prompts) {
+                availablePrompts = {};
+                response.result.prompts.forEach(prompt => {
+                    availablePrompts[prompt.name] = prompt;
+                });
+                log(`Loaded ${Object.keys(availablePrompts).length} prompts`);
+            }
+            
+            // Handle resources/list response
+            if (response.result && response.result.resources) {
+                availableResources = {};
+                response.result.resources.forEach(resource => {
+                    availableResources[resource.uri] = resource;
+                });
+                log(`Loaded ${Object.keys(availableResources).length} resources`);
+            }
+        }
+        
+        function updateStatus(connected) {
+            statusElement.textContent = connected ? 'Connected' : 'Disconnected';
+            statusElement.className = 'status ' + (connected ? 'connected' : 'disconnected');
+            connectBtn.disabled = connected;
+            connectAndInitBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+            sendBtn.disabled = !connected;
+            sendFromFormBtn.disabled = !connected;
+            validateFormBtn.disabled = !connected;
+            validateAndSendBtn.disabled = !connected;
+        }
+        
+        function formatJSON() {
+            try {
+                const json = JSON.parse(jsonEditor.value);
+                isUpdatingFromCode = true;
+                jsonEditor.value = JSON.stringify(json, null, 2);
+                setTimeout(() => { isUpdatingFromCode = false; }, 10);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        function copyJSON() {
+            jsonEditor.select();
+            document.execCommand('copy');
+            
+            // Visual feedback
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 1000);
+        }
+        
+        function clearLog() {
+            responseViewer.innerHTML = '';
+            responseEntries = [];
+            currentResponseIndex = -1;
+            updateNavButtons();
+        }
+        
+        // Navigate to previous response
+        function navigateToPrevResponse() {
+            if (currentResponseIndex > 0) {
+                currentResponseIndex--;
+                responseEntries[currentResponseIndex].scrollIntoView({ behavior: 'auto', block: 'start' });
+                updateNavButtons();
+            }
+        }
+        
+        // Navigate to next response
+        function navigateToNextResponse() {
+            if (currentResponseIndex < responseEntries.length - 1) {
+                currentResponseIndex++;
+                responseEntries[currentResponseIndex].scrollIntoView({ behavior: 'auto', block: 'start' });
+                updateNavButtons();
+            }
+        }
+        
+        // Update navigation button states
+        function updateNavButtons() {
+            prevResponseBtn.disabled = currentResponseIndex <= 0 || responseEntries.length === 0;
+            nextResponseBtn.disabled = currentResponseIndex >= responseEntries.length - 1 || responseEntries.length === 0;
+            
+            // Add keyboard shortcuts hint in title
+            if (responseEntries.length > 0) {
+                prevResponseBtn.title = `Previous response (${currentResponseIndex}/${responseEntries.length}) [↑]`;
+                nextResponseBtn.title = `Next response (${currentResponseIndex + 1}/${responseEntries.length}) [↓]`;
+            }
+        }
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'json-entry';
+            entry.innerHTML = `<div class="json-timestamp">[${timestamp}]</div><div>${message}</div>`;
+            responseViewer.appendChild(entry);
+            responseViewer.scrollTop = responseViewer.scrollHeight;
+        }
+        
+        function logMessage(obj, direction, metrics = {}) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'json-entry';
+            
+            const directionClass = direction === 'sent' ? 'json-sent' : 'json-received';
+            const arrow = direction === 'sent' ? '→' : '←';
+            
+            // Build metrics string
+            let metricsHtml = '';
+            if (direction === 'received' && (metrics.responseTime || metrics.responseSize || metrics.estimatedTokens)) {
+                const parts = [];
+                if (metrics.responseTime !== null) {
+                    parts.push(`${metrics.responseTime}ms`);
+                }
+                if (metrics.responseSize) {
+                    parts.push(`${formatBytes(metrics.responseSize)}`);
+                }
+                if (metrics.estimatedTokens) {
+                    parts.push(`~${metrics.estimatedTokens} tokens`);
+                }
+                if (parts.length > 0) {
+                    metricsHtml = ` <span style="color: #666; font-size: 0.85em;">(${parts.join(', ')})</span>`;
+                }
+            }
+            
+            // Add entry-level Raw and Copy buttons for responses
+            let entryButtons = '';
+            if (direction === 'received') {
+                const entryId = 'entry_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                entryButtons = `<span class="entry-controls">
+                    <button class="entry-btn" onclick="showRawEntry('${entryId}')" title="Show raw JSON">Raw</button>
+                    <button class="entry-btn" onclick="copyEntryJSON('${entryId}')" title="Copy JSON">Copy</button>
+                </span>`;
+                
+                // Store the JSON data for later retrieval
+                entry.dataset.entryId = entryId;
+                entry.dataset.rawJson = JSON.stringify(obj);
+            }
+            
+            entry.innerHTML = `<div class="json-timestamp">[${timestamp}]</div><div class="json-header-line"><span class="json-direction ${directionClass}">${arrow} ${direction === 'sent' ? 'Sent' : 'Received'}:</span>${metricsHtml}${entryButtons}</div><div id="raw-container-${direction === 'received' ? entry.dataset.entryId : ''}" style="margin-top: 5px;"></div><div style="margin-top: 5px;">${jsonPrinter.toHTMLContent(obj)}</div>`;
+            
+            responseViewer.appendChild(entry);
+            
+            // Track response entries for navigation
+            if (direction === 'received') {
+                responseEntries.push(entry);
+                currentResponseIndex = responseEntries.length - 1;
+                updateNavButtons();
+                
+                // Small delay to ensure DOM is updated
+                setTimeout(() => {
+                    entry.scrollIntoView({ behavior: 'auto', block: 'start' });
+                }, 5);
+            } else {
+                // For sent messages, continue scrolling to bottom
+                responseViewer.scrollTop = responseViewer.scrollHeight;
+            }
+        }
+        
+        // Estimate tokens (rough approximation)
+        function estimateTokens(text) {
+            // Simple estimation: ~4 characters per token on average
+            // This is a rough approximation - actual tokenization varies by model
+            return Math.ceil(text.length / 4);
+        }
+        
+        // Format bytes to human readable
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        // Functions for entry-level Raw and Copy
+        function showRawEntry(entryId) {
+            const entry = document.querySelector(`[data-entry-id="${entryId}"]`);
+            const btn = document.querySelector(`[onclick="showRawEntry('${entryId}')"]`);
+            const rawContainer = document.getElementById(`raw-container-${entryId}`);
+            
+            if (entry && rawContainer) {
+                // Check if raw view already exists
+                let rawView = rawContainer.querySelector('.raw-json-view');
+                
+                if (rawView) {
+                    // Toggle existing raw view
+                    if (rawView.style.display === 'none') {
+                        rawView.style.display = 'block';
+                        btn.textContent = 'Hide Raw';
+                        btn.style.background = '#28a745';
+                    } else {
+                        rawView.style.display = 'none';
+                        btn.textContent = 'Raw';
+                        btn.style.background = '';
+                    }
+                } else {
+                    // Create new raw view at the top
+                    rawView = document.createElement('div');
+                    rawView.className = 'raw-json-view';
+                    rawView.style.cssText = `
+                        margin-bottom: 10px; 
+                        padding: 10px; 
+                        background: #f8f8f8; 
+                        border: 1px solid #ddd; 
+                        border-radius: 4px; 
+                        font-family: 'Courier New', monospace; 
+                        font-size: 12px; 
+                        white-space: pre-wrap; 
+                        overflow-x: auto;
+                        max-height: 400px;
+                        overflow-y: auto;
+                    `;
+                    
+                    const rawJson = entry.dataset.rawJson;
+                    const formattedJson = JSON.stringify(JSON.parse(rawJson), null, 2);
+                    rawView.textContent = formattedJson;
+                    
+                    rawContainer.appendChild(rawView);
+                    btn.textContent = 'Hide Raw';
+                    btn.style.background = '#28a745';
+                }
+            }
+        }
+        
+        function copyEntryJSON(entryId) {
+            const entry = document.querySelector(`[data-entry-id="${entryId}"]`);
+            if (entry) {
+                const rawJson = entry.dataset.rawJson;
+                navigator.clipboard.writeText(JSON.stringify(JSON.parse(rawJson), null, 2)).then(() => {
+                    // Visual feedback
+                    const btn = document.querySelector(`[onclick="copyEntryJSON('${entryId}')"]`);
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    btn.style.background = '#28a745';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.style.background = '';
+                    }, 1000);
+                });
+            }
+        }
+        
+        // Set initial JSON
+        isUpdatingFromCode = true;
+        jsonEditor.value = JSON.stringify(flows.initialization.methods[0].template, null, 2);
+        setTimeout(() => { isUpdatingFromCode = false; }, 10);
+        
+        // Import from LLM functions
+        function openImportModal() {
+            document.getElementById('importLLMModal').style.display = 'block';
+            document.getElementById('llmImportTextarea').value = '';
+            document.getElementById('llmImportTextarea').focus();
+        }
+        
+        function closeImportModal() {
+            document.getElementById('importLLMModal').style.display = 'none';
+        }
+        
+        function importFromLLM() {
+            const textarea = document.getElementById('llmImportTextarea');
+            const input = textarea.value.trim();
+            
+            if (!input) {
+                alert('Please paste a request to import');
+                return;
+            }
+            
+            try {
+                // Step 1: Replace backticks with quotes
+                let converted = input.replace(/`/g, '"');
+                
+                // Step 2: Try to parse as JSON to validate it
+                let parsedParams;
+                try {
+                    parsedParams = JSON.parse(converted);
+                } catch (e) {
+                    // If direct parsing fails, try to extract just the parameters object
+                    // This handles cases where the user might paste including method name or other context
+                    const match = converted.match(/\{[\s\S]*\}/);
+                    if (match) {
+                        parsedParams = JSON.parse(match[0]);
+                    } else {
+                        throw new Error('Could not find valid JSON object in the input');
+                    }
+                }
+                
+                // Step 3: Determine if this is a tools/call request based on current context
+                let jsonRpcRequest;
+                
+                // Check if we have a tool selected
+                if (currentMethodSchema && currentMethodSchema.toolName) {
+                    // It's a tool call
+                    jsonRpcRequest = {
+                        jsonrpc: "2.0",
+                        id: currentRequestId,
+                        method: "tools/call",
+                        params: {
+                            name: currentMethodSchema.toolName,
+                            arguments: parsedParams
+                        }
+                    };
+                } else {
+                    // Try to detect the method from the current selection or default to tools/call
+                    const activeMethod = document.querySelector('.method-item.active');
+                    let method = "tools/call";
+                    
+                    if (activeMethod) {
+                        const methodText = activeMethod.querySelector('.method-text');
+                        if (methodText) {
+                            method = methodText.textContent;
+                        }
+                    }
+                    
+                    // For tools/call, wrap in arguments, otherwise use directly as params
+                    if (method === "tools/call") {
+                        // Try to guess the tool name from the parameters
+                        // Common patterns: metrics, nodes, contexts suggest weights tools
+                        let toolName = "unknown_tool";
+                        
+                        if (parsedParams.contexts || parsedParams.metrics) {
+                            if (parsedParams.method === "ks2" || parsedParams.method === "volume") {
+                                toolName = "find_correlated_metrics";
+                            } else if (parsedParams.baseline_after !== undefined || parsedParams.baseline_before !== undefined) {
+                                toolName = "find_correlated_metrics";
+                            } else {
+                                toolName = "list_metrics";
+                            }
+                        }
+                        
+                        jsonRpcRequest = {
+                            jsonrpc: "2.0",
+                            id: currentRequestId,
+                            method: "tools/call",
+                            params: {
+                                name: toolName,
+                                arguments: parsedParams
+                            }
+                        };
+                        
+                        alert(`Note: No tool was selected. Guessing tool name as "${toolName}". Please select the correct tool from the Methods list if this is incorrect.`);
+                    } else {
+                        jsonRpcRequest = {
+                            jsonrpc: "2.0",
+                            id: currentRequestId,
+                            method: method,
+                            params: parsedParams
+                        };
+                    }
+                }
+                
+                // Step 4: Update the JSON editor
+                isUpdatingFromCode = true;
+                jsonEditor.value = JSON.stringify(jsonRpcRequest, null, 2);
+                setTimeout(() => { isUpdatingFromCode = false; }, 10);
+                
+                // Step 5: Update the form if in edit mode
+                if (currentActiveTab === 'editRequest' && currentMethodSchema) {
+                    updateFormFromRaw();
+                }
+                
+                // Step 6: Close modal
+                closeImportModal();
+                
+                // Step 7: Switch to Raw JSON tab to show the result
+                switchTab('rawRequest');
+                
+                // Visual feedback
+                formatJSON();
+                
+            } catch (error) {
+                alert('Error converting LLM request:\n\n' + error.message + '\n\nPlease ensure the input is a valid JSON-like structure with backticks.');
+            }
+        }
+        
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('importLLMModal');
+            if (event.target === modal) {
+                closeImportModal();
+            }
+        }
+    </script>
+</body>
+</html>

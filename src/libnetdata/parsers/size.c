@@ -130,7 +130,7 @@ bool size_parse(const char *size_str, uint64_t *result, const char *default_unit
         su = su_def;
     else {
         if (unit_len >= sizeof(unit)) unit_len = sizeof(unit) - 1;
-        strncpy(unit, unit_start, unit_len);
+        memcpy(unit, unit_start, unit_len);
         unit[unit_len] = '\0';
         su = size_find_unit(unit);
         if (!su) {

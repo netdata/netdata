@@ -6,7 +6,7 @@
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
 
-#define RRDFUNCTIONS_NETDEV_HELP "View network interface statistics"
+#define RRDFUNCTIONS_NETDEV_HELP "Shows real-time network interface performance including traffic rates, packet counts, drops, and link status."
 
 #define STATE_LENGTH_MAX 32
 

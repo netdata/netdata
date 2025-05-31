@@ -725,7 +725,7 @@ void send_resource_usage_to_netdata(usec_t dt);
 void send_proc_states_count(usec_t dt);
 #endif
 
-#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
+#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Provides detailed process information including CPU usage, memory consumption, I/O statistics, file descriptors, page faults, and parent-child relationships (PPID) for all processes including those in containers."
 void function_processes(const char *transaction, char *function,
                         usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                         BUFFER *payload __maybe_unused, HTTP_ACCESS access,

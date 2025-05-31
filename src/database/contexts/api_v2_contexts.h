@@ -7,7 +7,6 @@
 
 typedef enum __attribute__ ((__packed__)) {
     FTS_MATCHED_NONE = 0,
-    FTS_MATCHED_HOST,
     FTS_MATCHED_CONTEXT,
     FTS_MATCHED_INSTANCE,
     FTS_MATCHED_DIMENSION,
@@ -71,7 +70,6 @@ struct rrdcontext_to_json_v2_data {
     } alerts;
 
     struct {
-        FTS_MATCH host_match;
         char host_node_id_str[UUID_STR_LEN];
         SIMPLE_PATTERN *pattern;
         FTS_INDEX fts;

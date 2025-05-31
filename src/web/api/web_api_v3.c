@@ -12,7 +12,7 @@ static struct web_api_command api_commands_v3[] = {
         .hash = 0,
         .acl = HTTP_ACL_METRICS,
         .access = HTTP_ACCESS_ANONYMOUS_DATA,
-        .callback = api_v2_data,
+        .callback = api_v3_data,
         .allow_subpaths = 0
     },
     // badges

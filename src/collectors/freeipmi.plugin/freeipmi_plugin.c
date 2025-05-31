@@ -20,7 +20,7 @@
 
 #define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
         fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n", \
-                5, "Displays current sensor state and readings",                                                     \
+                5, "Shows IPMI hardware sensor readings including temperatures, voltages, fan speeds, and component health status.",                                                     \
                 (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_NONE), 100); \
     } while(0)
 
