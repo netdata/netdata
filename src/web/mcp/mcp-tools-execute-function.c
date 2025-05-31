@@ -643,36 +643,71 @@ static MCP_TABLE_ADDITIONAL_CONTENT generate_table_error_message(MCP_FUNCTION_DA
 }
 
 // Helper to add filtering instructions as a separate content entry
-static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc) {
+static void add_filtering_instructions_to_mcp_result(MCP_CLIENT *mcpc, bool has_history) {
     buffer_json_add_array_item_object(mcpc->result);
     {
         buffer_json_member_add_string(mcpc->result, "type", "text");
-        buffer_json_member_add_string(mcpc->result, "text",
-            "FILTERING INSTRUCTIONS:\n"
-            "• **columns**: Select specific columns to reduce width (e.g., [\"Column1\", \"Column2\", \"Column3\"])\n"
-            "• **conditions**: Filter rows using [ [column1, operator1, value1], [column2, operator2, value2], ... ]\n"
-            "• **limit**: Control number of rows returned (e.g., 10)\n"
-            "• **sort_column** + **sort_order**: Order results by a column ('asc' or 'desc')\n"
-            "\n"
-            "Example filtering:\n"
-            "```json\n"
-            "{\n"
-            "  \"columns\": [\"CmdLine\", \"CPU\", \"Memory\", \"Status\"],\n"
-            "  \"conditions\": [\n"
-            "    [\"Memory\", \">\", 1.0],\n"
-            "    [\"CmdLine\", \"match\", \"*systemd*|*postgresql*|*docker*\"],\n"
-            "    [\"*\", \"match\", \"*error*|*warning*\"]  // Search all columns\n"
-            "  ],\n"
-            "  \"sort_column\": \"CPU\",\n"
-            "  \"sort_order\": \"desc\",\n"
-            "  \"limit\": 10\n"
-            "}\n"
-            "```\n"
-            "\n"
-            "Operators: ==, !=, <, <=, >, >=, match (simple pattern), not match (simple pattern)\n"
-            "Simple patterns: '*this*|*that*|*other*' (wildcard search to find strings that include 'this', or 'that', or 'other')\n"
-            "Full-text search: Use '*' or '' as column name to search across all columns"
-        );
+        
+        if (has_history) {
+            // Instructions for history/logs functions (limited capabilities)
+            buffer_json_member_add_string(mcpc->result, "text",
+                "FILTERING INSTRUCTIONS:\n"
+                "• **columns**: Select specific columns to reduce width (e.g., [\"Column1\", \"Column2\", \"Column3\"])\n"
+                "• **conditions**: Filter rows using exact matches and value sets:\n"
+                "  - Single value: [\"column\", \"==\", \"exact_value\"]\n"
+                "  - Multiple values: [\"column\", \"match\", \"value1|value2|value3\"] (values are OR'd)\n"
+                "• **limit**: Control number of rows returned (e.g., 10)\n"
+                "• **q**: Full-text search across all columns (supports wildcards like \"*pattern*\")\n"
+                "• **direction**: Controls time-based sorting (\"forward\" or \"backward\")\n"
+                "\n"
+                "Example filtering:\n"
+                "```json\n"
+                "{\n"
+                "  \"columns\": [\"MESSAGE\", \"PRIORITY\", \"_HOSTNAME\"],\n"
+                "  \"conditions\": [\n"
+                "    [\"PRIORITY\", \"match\", \"1|2|3\"],\n"
+                "    [\"_HOSTNAME\", \"=\", \"server1\"]\n"
+                "  ],\n"
+                "  \"q\": \"*systemd*\",\n"
+                "  \"direction\": \"backward\",\n"
+                "  \"limit\": 20\n"
+                "}\n"
+                "```\n"
+                "\n"
+                "Valid operators for history functions: == (exact match), match (value set with | separator)\n"
+                "Invalid operators: !=, <>, not match, <, <=, >, >=\n"
+                "Full-text search: Use 'q' parameter with wildcards like '*pat*tern*' to search all columns\n"
+                "Sorting: Use 'direction' parameter only - column sorting is not supported for history functions"
+            );
+        } else {
+            // Instructions for regular functions (full capabilities)
+            buffer_json_member_add_string(mcpc->result, "text",
+                "FILTERING INSTRUCTIONS:\n"
+                "• **columns**: Select specific columns to reduce width (e.g., [\"Column1\", \"Column2\", \"Column3\"])\n"
+                "• **conditions**: Filter rows using [ [column1, operator1, value1], [column2, operator2, value2], ... ]\n"
+                "• **limit**: Control number of rows returned (e.g., 10)\n"
+                "• **sort_column** + **sort_order**: Order results by a column ('asc' or 'desc')\n"
+                "\n"
+                "Example filtering:\n"
+                "```json\n"
+                "{\n"
+                "  \"columns\": [\"CmdLine\", \"CPU\", \"Memory\", \"Status\"],\n"
+                "  \"conditions\": [\n"
+                "    [\"Memory\", \">\", 1.0],\n"
+                "    [\"CmdLine\", \"match\", \"*systemd*|*postgresql*|*docker*\"],\n"
+                "    [\"*\", \"match\", \"*error*|*warning*\"]  // Search all columns\n"
+                "  ],\n"
+                "  \"sort_column\": \"CPU\",\n"
+                "  \"sort_order\": \"desc\",\n"
+                "  \"limit\": 10\n"
+                "}\n"
+                "```\n"
+                "\n"
+                "Operators: ==, !=, <, <=, >, >=, match (simple pattern), not match (simple pattern)\n"
+                "Simple patterns: '*this*|*that*|*other*' (wildcard search to find strings that include 'this', or 'that', or 'other')\n"
+                "Full-text search: Use '*' or '' as column name to search across all columns"
+            );
+        }
     }
     buffer_json_object_close(mcpc->result);
 }
@@ -723,7 +758,8 @@ static void add_table_messages_to_mcp_result(MCP_FUNCTION_DATA *data,
     
     // Add filtering instructions if requested
     if (additional_content & MCP_TABLE_ADD_FILTERING_INSTRUCTIONS) {
-        add_filtering_instructions_to_mcp_result(data->request.mcpc);
+        bool has_history = (data->input.type == FN_TYPE_TABLE_WITH_HISTORY);
+        add_filtering_instructions_to_mcp_result(data->request.mcpc, has_history);
     }
     
     // Add raw data if requested
@@ -991,7 +1027,7 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
 
     // Check if we need to show guidance - only when no filtering is specified
     if (result_size > max_size_threshold && data->request.columns.count == 0 && !data->request.sort.column && 
-        data->request.conditions.count == 0) {
+        (data->request.conditions.count == 0 || (data->request.conditions.count == 1 && data->request.query && *data->request.query))) {
         // Store first row in result for guidance
         data->output.status = MCP_TABLE_RESPONSE_TOO_BIG;
         data->request.limit = 1;
@@ -1620,12 +1656,12 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
     buffer_json_initialize(payload, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     
     // Add time-based parameters if supported and specified
-    if (entry->has_timeframe && data->request.after > 0) {
-        buffer_json_member_add_uint64(payload, "after", data->request.after);
+    if (entry->has_timeframe && data->request.after != 0) {
+        buffer_json_member_add_time_t(payload, "after", data->request.after);
     }
     
-    if (entry->has_timeframe && data->request.before > 0) {
-        buffer_json_member_add_uint64(payload, "before", data->request.before);
+    if (entry->has_timeframe && data->request.before != 0) {
+        buffer_json_member_add_time_t(payload, "before", data->request.before);
     }
     
     if (entry->pagination.enabled && data->request.anchor > 0) {
@@ -2080,10 +2116,8 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
         query_condition->v_type = COND_VALUE_STRING;
         query_condition->v_str = data->request.query;
         
-        // Create pattern with wildcards around the search term for substring matching
-        CLEAN_BUFFER *pattern_buffer = buffer_create(0, NULL);
-        buffer_sprintf(pattern_buffer, "*%s*", data->request.query);
-        query_condition->pattern = string_to_simple_pattern_nocase_substring(buffer_tostring(pattern_buffer));
+        // Create pattern using substring function (no need to add wildcards manually)
+        query_condition->pattern = string_to_simple_pattern_nocase_substring(data->request.query);
         
         data->request.conditions.count++;
     }
@@ -2328,8 +2362,8 @@ static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data,
                     continue;
                 }
                 
-                // Check for pattern matching with wildcards
-                if (cond->op == OP_MATCH && cond->pattern) {
+                // Check for pattern matching with wildcards (except for "*" column which is full-text search)
+                if (cond->op == OP_MATCH && cond->pattern && strcmp(cond->column_name, "*") != 0) {
                     const char *pattern_str = cond->v_str;
                     if (pattern_str && (strchr(pattern_str, '*') || strchr(pattern_str, '?'))) {
                         invalid_wildcard_patterns = true;
