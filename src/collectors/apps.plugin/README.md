@@ -122,30 +122,124 @@ interpreters: process1 process2 process3
 
 ### Matching processes
 
-The following methods are used for matching against the specified patterns:
+`apps.plugin` uses different fields for process matching depending on the operating system:
 
-| Method  | Description                                                          |
-|---------|----------------------------------------------------------------------|
-| comm    | Process name as reported by `ps -e` or `cat /proc/{PID}/comm`        |
-| cmdline | The complete command line (`cat /proc/{PID}/cmdline \| tr '\0' ' '`) |
+#### Unix-like systems (Linux, FreeBSD, macOS)
 
-> On Linux, the **comm** field is limited to 15 characters.
+| Field    | Description                                                          | Example              |
+|----------|----------------------------------------------------------------------|----------------------|
+| comm     | Process name (command)                                               | `chrome`             |
+| cmdline  | Full command line with arguments                                     | `/usr/bin/chrome --enable-features=...` |
+
+> **Note:** On Linux specifically, the **comm** field is limited to 15 characters from `/proc/{PID}/comm`.
 > `apps.plugin` attempts to obtain the full process name by searching for it in the **cmdline**.
 > If successful, the entire process name is used; otherwise, the shortened version is used.
 
+#### Windows process fields
+
+| Field    | Description                                                          | Example              |
+|----------|----------------------------------------------------------------------|----------------------|
+| comm     | Performance Monitor instance name (may include instance numbers)      | `chrome#12`          |
+| cmdline  | Full path to the executable (without command line arguments)         | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
+| name     | Friendly name from file description or service display name          | `Google Chrome`      |
+
+> On Windows:
+> - All pattern types (exact, prefix, suffix, substring) also match against the **name** field
+> - The **name** field is preferred for default grouping when no pattern matches
+> - Instance numbers (e.g., `#1`, `#2`) are automatically stripped from the **comm** field
+> - The `.exe` extension is automatically removed for cleaner display
+> - For services (especially `svchost.exe`), the service display name is resolved
+
+#### Pattern matching
+
 You can use asterisks (`*`) to create patterns:
 
-| Mode      | Pattern  | Description                              |
-|-----------|----------|------------------------------------------|
-| prefix    | `name*`  | Matches a **comm** that begins with name |
-| suffix    | `*name`  | Matches a **comm** that ends with name   |
-| substring | `*name*` | Searches for name within the **cmdline** |
+> **Version differences:**
+> - **Netdata v2.5.2 and earlier**: Pattern matching is case sensitive
+> - **Netdata v2.5.3 and later**: Pattern matching is case insensitive
+> - **Netdata v2.5.2 and earlier**: Windows patterns match against `comm` and `cmdline` fields
+> - **Netdata v2.5.3 and later**: Windows patterns match against `comm`, `cmdline`, and `name` (friendly name) fields
 
-- Asterisks can be placed anywhere within name (e.g., `na*me`) without affecting the matching criteria (**comm** or **cmdline**).
+| Mode      | Pattern     | Description                                 | Unix-like | Windows |
+|-----------|-------------|---------------------------------------------|-----------|---------|
+| exact     | `firefox`   | Matches **comm** exactly                    | ✓ Yes     | ✓ Yes   |
+| prefix    | `firefox*`  | Matches **comm** starting with firefox     | ✓ Yes     | ✓ Yes   |
+| suffix    | `*fox`      | Matches **comm** ending with fox           | ✓ Yes     | ✓ Yes   |
+| substring | `*firefox*` | Searches within **cmdline**                 | ✓ Yes (full command line) | ✓ Yes (full path) |
+
+**Note on substring matching (`*pattern*`):**
+- On Unix-like systems: Searches within the full command line including arguments
+- On Windows: Searches within the full executable path (e.g., `C:\Program Files\Mozilla Firefox\firefox.exe`)
+
+- Asterisks can be placed anywhere within pattern (e.g., `fi*fox`) without affecting the matching criteria (**comm** or **cmdline**).
 - To include process names with spaces, enclose them in quotes (single or double), like this: `'Plex Media Serv'` or `"my other process"`.
 - To include processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`.
 - To include processes with double quotes, enclose them in single quotes: `'process with this " double quote'`.
 - The order of the entries in the configuration list is crucial. The first matching entry will be used, so it's important to follow a top-down hierarchy. Processes that don't match any entry will inherit the group from their parent processes.
+
+#### Windows default grouping behavior
+
+On Windows, when a process doesn't match any pattern in `apps_groups.conf`:
+- The **name** field (friendly name from file description or service display name) is used as the default group/category if available
+- If no **name** field exists, the **comm** field is used
+- This provides better default grouping for Windows services and applications with descriptive names
+
+For example, a process might have:
+- **comm**: `svchost`
+- **name**: `Windows Update`
+- **Default category**: `Windows Update` (uses the friendly name)
+
+### Windows path handling
+
+When configuring `apps_groups.conf` on Windows systems:
+
+1. **No backslash escaping needed** - Windows paths with backslashes are handled as literal strings:
+   ```text
+   sqlserver: "C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Binn\sqlservr.exe"
+   ```
+
+2. **Use quotes for paths with spaces**:
+   ```text
+   office: "Microsoft Word" "Microsoft Excel"
+   browsers: chrome firefox msedge
+   ```
+
+3. **Prefer process names over full paths** - This is more portable and easier to maintain:
+   ```text
+   # Recommended - matches all SQL Server processes regardless of version/instance
+   sqlserver: sqlservr
+   
+   # Also works but less flexible
+   sqlserver: "C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Binn\sqlservr.exe"
+   ```
+
+4. **Use wildcards for flexible path matching**:
+   ```text
+   # Match anything from Program Files
+   programfiles: "*Program Files*"
+   
+   # Match SQL Server components across versions
+   mssql: "*\Microsoft SQL Server\*"
+   
+   # Match enterprise backup solutions
+   backup: "*\Veeam\*" "*\Veritas\*" "*\CommVault\*"
+   ```
+
+### Verifying your configuration
+
+You can use the Netdata `processes` function to verify that your `apps_groups.conf` configuration is working correctly:
+
+1. **Access the processes function** through Netdata Cloud (required for security reasons)
+2. **Review the output** to see:
+   - Current running processes with their `comm`, `cmdline`, and (on Windows) `name` fields
+   - The **Category** column shows which group from `apps_groups.conf` each process has been assigned to
+   - Resource utilization for each process
+
+3. **Troubleshooting tips**:
+   - If a process shows the wrong Category, check the exact process name in the function output
+   - On Windows, remember that the `name` field is used for default categories but NOT for pattern matching
+   - Remember that the first matching pattern wins - check your pattern order
+   - For inherited groups, verify the parent process has the correct Category
 
 There are a few command line options you can pass to `apps.plugin`. The list of available options can be acquired with the `--help` flag.
 The options can be set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
