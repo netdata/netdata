@@ -83,7 +83,30 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     request = json_tokener_parse_verbose(message, &jerr);
     
     if (!request || jerr != json_tokener_success) {
-        websocket_error(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
+        // Log the full error with payload for debugging
+        websocket_error(wsc, "Failed to parse JSON-RPC request: %s | Payload (length=%zu): '%.*s'", 
+                        json_tokener_error_desc(jerr), 
+                        length,
+                        (int)(length > 1000 ? 1000 : length), // Limit to 1000 chars in log
+                        message);
+        
+        // Also log the hex dump of first few bytes to catch non-printable characters
+        if (length > 0) {
+            char hex_dump[256];
+            size_t hex_len = 0;
+            size_t bytes_to_dump = (length > 32) ? 32 : length;
+            
+            for (size_t i = 0; i < bytes_to_dump && hex_len < sizeof(hex_dump) - 6; i++) {
+                hex_len += snprintf(hex_dump + hex_len, sizeof(hex_dump) - hex_len, 
+                                   "%02X ", (unsigned char)message[i]);
+            }
+            if (bytes_to_dump < length) {
+                hex_len += snprintf(hex_dump + hex_len, sizeof(hex_dump) - hex_len, "...");
+            }
+            
+            websocket_error(wsc, "First %zu bytes hex dump: %s", bytes_to_dump, hex_dump);
+        }
+        
         return;
     }
     

@@ -384,6 +384,15 @@ void *websocket_thread(void *ptr) {
                 continue;
             }
 
+            // Push client connection info to log stack for all subsequent logs
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_U64(NDF_CONNECTION_ID, wsc->id),
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, wsc->client_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, wsc->client_port),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
             // Check for errors
             if(ev.events & ND_POLL_HUP) {
                 websocket_thread_client_socket_error(wth, wsc, "Client hangup");
