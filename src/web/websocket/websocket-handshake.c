@@ -425,7 +425,7 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_disconnect = mcp_websocket_on_disconnect;
             websocket_debug(wsc, "Setting up MCP protocol callbacks");
             break;
-            
+
 #ifdef NETDATA_INTERNAL_CHECKS
         case WS_PROTOCOL_JSONRPC:
             // Set up callbacks for jsonrpc protocol

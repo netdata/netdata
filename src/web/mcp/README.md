@@ -48,27 +48,6 @@ The configuration of most AI assistants is done via a configuration file, which 
 }
 ```
 
-If you need to configure multiple MCP servers, you can add them under the `mcpServers` section with different names. Example:
-
-```json
-{
-  "mcpServers": {
-    "netdata-production": {
-      "command": "/usr/bin/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
-    },
-    "netdata-testing": {
-      "command": "/usr/bin/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
-
 The program `nd-mcp` is the bridge program that converts `stdio` communication to `WebSocket` communication. This program is part of all Netdata installations, so by installing Netdata on your personal computer (Linux, MacOS, Windows) you will have it available.
 
 There may be different paths for it, depending on how you installed Netdata:
@@ -337,5 +316,34 @@ Sometimes you need instruct them to use their MCP connection. So instead of sayi
 ### Use AI Assistants to do your DevOps/SRE/SysAdmin "laundry"
 
 Our advice is to use AI assistants to do "your laundry": Give them specific tasks, check the queries they did to get that information, and when possible ask them to cross-check their answers using a different tool/source. AI assistants usually rush to make conclusions, so **challenge them** and they will go deeper and correct themselves. Remember that you always need to verify their answers, especially for critical tasks.
+
+### Multiple Netdata MCP servers for a single AI assistant
+
+If you need to configure multiple MCP servers, you can add them under the `mcpServers` section with different names. Example:
+
+```json
+{
+  "mcpServers": {
+    "netdata-production": {
+      "command": "/usr/bin/nd-mcp",
+      "args": [
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+      ]
+    },
+    "netdata-testing": {
+      "command": "/usr/bin/nd-mcp",
+      "args": [
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+However, when multiple netdata MCP servers are configured, all AI assistants have difficulties to determine which one to use:
+
+- **Claude Desktop**: it seems there is no way to instruct it to use the right one. There is an enable/disable toggle for each MCP server, which however does not work properly. So, it is best to configure only one MCP server at a time.
+- **Cursor**: Similarly, it is impossible to instruct it to use the right one. However, there is a toggle and it works properly, but you still need to ensure that the Netdata server you want to use is the only one enabled.
+- **Claude Code**: this project has a different philosophy: you can have a different `.mcp.json` file in each project directory (the current directory from which you run it), so you can have different configurations for each project/directory. Since **Claude Code** also supports a `Claude.md` file with default instructions to the AI assistant, you can have different directories with different instructions and configurations, so you can use multiple Netdata MCP servers by spawning multiple Claude Code instances in different directories.
 
 For more information about Netdata, visit [netdata.cloud](https://netdata.cloud)
