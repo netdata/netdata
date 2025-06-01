@@ -417,6 +417,15 @@ short int websocket_handle_handshake(struct web_client *w) {
 
     // Set up protocol-specific callbacks based on the selected protocol
     switch (wsc->protocol) {
+        case WS_PROTOCOL_MCP:
+            // Set up callbacks for MCP protocol
+            wsc->on_connect = mcp_websocket_on_connect;
+            wsc->on_message = mcp_websocket_on_message;
+            wsc->on_close = mcp_websocket_on_close;
+            wsc->on_disconnect = mcp_websocket_on_disconnect;
+            websocket_debug(wsc, "Setting up MCP protocol callbacks");
+            break;
+            
 #ifdef NETDATA_INTERNAL_CHECKS
         case WS_PROTOCOL_JSONRPC:
             // Set up callbacks for jsonrpc protocol
@@ -434,15 +443,6 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_close = echo_on_close;
             wsc->on_disconnect = echo_on_disconnect;
             websocket_debug(wsc, "Setting up echo protocol callbacks");
-            break;
-
-        case WS_PROTOCOL_MCP:
-            // Set up callbacks for MCP protocol
-            wsc->on_connect = mcp_websocket_on_connect;
-            wsc->on_message = mcp_websocket_on_message;
-            wsc->on_close = mcp_websocket_on_close;
-            wsc->on_disconnect = mcp_websocket_on_disconnect;
-            websocket_debug(wsc, "Setting up MCP protocol callbacks");
             break;
 #endif
 

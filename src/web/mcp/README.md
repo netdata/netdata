@@ -106,8 +106,6 @@ or
 sudo cat /opt/netdata/var/lib/netdata/mcp_dev_preview_api_key
 ```
 
-Some versions of `cat` add a percent character at the end of the output, which is not part of the API key. If you copy-paste the API key, make sure to remove any trailing percent character.
-
 ### Claude Desktop
 
 To add Netdata MCP to Claude Desktop:
