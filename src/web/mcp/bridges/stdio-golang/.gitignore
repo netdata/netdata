@@ -1,10 +1,6 @@
 # Binary
 nd-mcp
 
-# Go module files
-go.mod
-go.sum
-
 # Build cache and directories
 /bin/
 /pkg/

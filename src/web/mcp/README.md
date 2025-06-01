@@ -1,164 +1,159 @@
 # Netdata Model Context Protocol (MCP) Integration
 
-All Netdata Agents provide a Model Context Protocol (MCP) server that enable AI assistants like Claude to interact with your infrastructure monitoring data. This integration allows AI assistants to access metrics, logs, alerts, and system information, acting as a capable DevOps/SRE/SysAdmin assistant.
+Netdata Agents (and soon Netdata Cloud) provide a Model Context Protocol (MCP) server that enables AI assistants like Claude or Cursos to interact with your infrastructure monitoring data. This integration allows AI assistants to access metrics, logs, alerts, and live system information (processes, services, containers, VMs, network connections, etc), acting as a capable DevOps/SRE/SysAdmin assistant.
 
 ## Overview
 
-When connected to a Netdata parent node, the MCP integration provides complete visibility across all child nodes connected to that parent. This makes it an ideal solution for infrastructure-wide observability through AI assistants.
+The AI assistants have different visibility on your infrastructure, depending on where in a Netdata hierarchy they are connected:
+
+ - **Netdata Cloud**: (not yet available) AI assistants connected to Netdata Cloud will have full visibility across all nodes in your infrastructure.
+ - **Netdata Parent Node**: AI assistants connected to a Netdata parent node will have visibility across all child nodes connected to that parent.
+ - **Netdata Child Node**: AI assistants connected to a Netdata child node will only have visibility into that specific node.
+ - **Netdata Standalone Node**: AI assistants connected to a standalone Netdata node will only have visibility into that specific node.
+
+## Supported AI Assistants
+
+You can use Netdata with the following AI assistants:
+
+- [Claude Desktop](https://claude.ai/download): supports flat-fee usage for unlimited access
+- [Claude Code](https://claude.ai/code): supports flat-fee usage for unlimited access
+- [Cursor](https://www.cursor.com/): supports flat-fee usage for unlimited access. Enables Netdata use with multiple AI assistants, including Claude, ChatGPT, and Gemini.
+
+Probably more: Check the [MCP documentation](https://modelcontextprotocol.io/clients) for a full list of supported AI assistants.
+
+All these AI assistants need local access to the MCP servers. This means that the application you run locally on your computer (Claude Desktop, Cursor, etc) needs to be able to connect to the Netdata using `stdio` communication. However, since your Netdata runs remotely on a server, you need a bridge to convert the `stdio` communication to `WebSocket` communication. Netdata provides bridges in multiple languages (Node.js, Python, Go) to facilitate this.
+
+Once MCP is integrated into Netdata Cloud, Web-based AI assistants will also be supported. For Web-based AI assistants, the backend of the assistant connects to a publicly accessible MCP server (i.e. Netdata Cloud) to access infrastructure observability data, without needing a bridge.
 
 ## Installation
 
-The MCP server is built into Netdata and requires no additional installation. Simply ensure you have a recent version of Netdata installed.
+The MCP server is built into Netdata and requires no additional installation. Just ensure you have a recent version of Netdata installed.
 
-## Configuration
+To use the MCP integration of Netdata with AI clients, you need to configure them and bridge them to the Netdata MCP server.
 
-### 1. Enable MCP in Netdata
+## Configuration of AI Assistants
 
-MCP is enabled by default in Netdata. The server communicates via WebSocket on the same port as the Netdata web interface.
+The configuration of most AI assistants is done via a configuration file, which is almost identical for all of them.
 
-### 2. Generate API Key (Dev Preview)
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "command": "/usr/bin/nd-mcp",
+      "args": [
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
 
-During the dev preview phase, Netdata automatically generates a random API key stored at:
+If you need to configure multiple MCP servers, you can add them under the `mcpServers` section with different names. Example:
+
+```json
+{
+  "mcpServers": {
+    "netdata-production": {
+      "command": "/usr/bin/nd-mcp",
+      "args": [
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+      ]
+    },
+    "netdata-testing": {
+      "command": "/usr/bin/nd-mcp",
+      "args": [
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+The program `nd-mcp` is the bridge program that converts `stdio` communication to `WebSocket` communication. This program is part of all Netdata installations, so by installing Netdata on your personal computer (Linux, MacOS, Windows) you will have it available.
+
+There may be different paths for it, depending on how you installed Netdata:
+
+- `/usr/bin/nd-mcp`: Linux native packages
+- `/opt/netdata/usr/bin/nd-mcp`: Linux static Netdata installations
+- `/usr/local/netdata/usr/bin/nd-mcp`: MacOS installations from source
+- `C:\\Program Files\\Netdata\\usr\\bin\\nd-mcp`: Windows installations
+
+You will also need:
+
+`IP_OF_YOUR_NETDATA`, is the IP address or hostname of the Netdata instance you want to connect to. This will eventually be replaced by the Netdata Cloud URL. For this dev preview, use any Netdata, preferably one of your parent nodes. Remember that the AI assistant will "see" only the nodes that are connected to that Netdata instance.
+
+`YOUR_API_KEY` is the API key that allows the AI assistant to access sensitive functions like logs and live system information. Just start Netdata and it will automatically generate a random UUID for you. You can find it at:
+
 ```
 /var/lib/netdata/mcp_dev_preview_api_key
 ```
+
+or, if you installed a static Netdata package, it may be located at:
+
+```
+/opt/netdata/var/lib/netdata/mcp_dev_preview_api_key
+```
+
 
 To view your API key:
 ```bash
 sudo cat /var/lib/netdata/mcp_dev_preview_api_key
 ```
 
-**Important**: 
-- In future releases, this feature will be available exclusively for Netdata Cloud users
-- For full access to sensitive functions (logs and live functions), your Netdata agent must be claimed to Netdata Cloud
-- Without an API key or unclaimed agent, all features work except functions and logs
-
-### 3. Install a Bridge
-
-Claude Desktop and Claude Code communicate via stdio, while Netdata's MCP server uses WebSocket. You need a bridge to convert between these protocols. Netdata provides bridges in multiple languages:
-
-- **Node.js bridge**: `src/web/mcp/bridges/stdio-nodejs/`
-- **Python bridge**: `src/web/mcp/bridges/stdio-python/`
-- **Go bridge**: `src/web/mcp/bridges/stdio-golang/`
-
-Each of these directories includes `build.sh` script to install dependencies and prepare the bridge.
-The Go bridge provides also a `build.bat` script for Windows users.
-
-Choose the bridge that matches your environment.
-
-#### Installing the Node.js Bridge
+or
 
 ```bash
-bash /path/to/netdata.git/src/web/mcp/bridges/stdio-nodejs/build.sh
+sudo cat /opt/netdata/var/lib/netdata/mcp_dev_preview_api_key
 ```
 
-### 4. Configure Claude Desktop
+Some versions of `cat` add a percent character at the end of the output, which is not part of the API key. If you copy-paste the API key, make sure to remove any trailing percent character.
+
+### Claude Desktop
 
 To add Netdata MCP to Claude Desktop:
 
 1. Open Claude Desktop
 2. Navigate to the Developer settings:
-   - **Windows/Linux**: File → Settings → Developer (or use Ctrl+,)
-   - **macOS**: Claude → Settings → Developer (or use Cmd+,)
+  - **Windows/Linux**: File → Settings → Developer (or use Ctrl+,)
+  - **macOS**: Claude → Settings → Developer (or use Cmd+,)
 3. Click the "Edit Config" button (below the server list)
 4. This will open or show the exact configuration file location
-5. Add the following configuration to the file:
+5. Add the configuration mentioned above to that file.
 
-```json
-{
-  "mcpServers": {
-    "netdata": {
-      "command": "/path/to/netdata.git/src/web/mcp/bridges/stdio-nodejs/nd-mcp.js",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
+**Linux Users**: Claude Desktop is available via a community project (https://github.com/fsoft72/claude-desktop-to-appimage). It works best with https://github.com/TheAssassin/AppImageLauncher.
 
-**Linux Users**: If using the AppImage version (https://github.com/fsoft72/claude-desktop-to-appimage), it works best with https://github.com/TheAssassin/AppImageLauncher
-
-Replace:
-- `/path/to/netdata/` with the actual path to your Netdata source directory
-- `ws://localhost:19999/api/v2/mcp` with your Netdata WebSocket URL if different
-- `your_api_key_here` with the actual API key from `/var/lib/netdata/mcp_dev_preview_api_key`
-
-### 5. Configure Claude Code
-
-For Claude Code (claude.ai/code), add to your project's `.mcp.json` file:
-
-```json
-{
-  "mcpServers": {
-    "netdata": {
-      "command": "/path/to/netdata.git/src/web/mcp/bridges/stdio-nodejs/nd-mcp.js",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
-
-### 6. Verify the Connection
-
-Once configured correctly, you should see "netdata" appear in Claude Desktop:
+Once configured correctly, you will need to restart Claude Desktop.
+Once restarted, you should see "netdata" appear in Claude Desktop:
 - Click the "Search and tools" button (just below the prompt)
 - You should see "netdata" listed among the available tools
 - If you don't see it, check your configuration and ensure the bridge is accessible
 
-## Using Alternative Bridges
+### Claude Code
 
-### Python Bridge
+For [Claude Code](https://claude.ai/code), add to your project's root, the file `.mcp.json`, with the contents given above. This file will be automatically detected by Claude Code the next time it starts in that directory.
 
-If you prefer Python:
+Once configured correctly, issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
 
-```bash
-bash /path/to/netdata.git/src/web/mcp/bridges/stdio-python/build.sh
-```
+### Cursor
 
-Then use `python` as the command and `bridge.py` as the script:
+For [Cursor](https://www.cursor.com/), add the configuration to the MCP settings.
 
-```json
-{
-  "mcpServers": {
-    "netdata": {
-      "command": "/path/to/netdata.git/src/web/mcp/bridges/stdio-python/nd-mcp.py",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
+## Alternative `stdio` to `websocket` Bridges
 
-### Go Bridge
+We provide 3 different bridges for you to choose the one that best fits your environment:
 
-For Go users:
+1. **Go bridge**: Located at `src/web/mcp/bridges/stdio-golang/`
+2. **Node.js bridge**: Located at `src/web/mcp/bridges/stdio-nodejs/`
+3. **Python bridge**: Located at `src/web/mcp/bridges/stdio-python/`
 
-```bash
-bash /path/to/netdata.git/src/web/mcp/bridges/stdio-golang/build.sh
-```
+All these bridges should provide exactly the same functionality, so you can choose the one that best fits your environment.
 
-Then use the compiled binary:
-
-```json
-{
-  "mcpServers": {
-    "netdata": {
-      "command": "/path/to/netdata.git/src/web/mcp/bridges/stdio-golang/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
+Each of these directories includes `build.sh` script to install dependencies and prepare the bridge.
+The Go bridge provides also a `build.bat` script for Windows users.
 
 ## Capabilities
 
-The MCP integration provides access to:
+The MCP integration provides AI assistants with access to:
 
 ### Infrastructure Discovery
 - **Nodes information**: Complete visibility across all connected nodes in your infrastructure
@@ -236,7 +231,7 @@ The integration provides access to all metrics categories collected by Netdata i
 
 ## Usage Examples
 
-Once configured, you can ask Claude questions like:
+Once configured, you can ask questions like:
 
 ### Infrastructure Overview
 - "Show me all connected nodes and their status"
@@ -284,11 +279,65 @@ Once configured, you can ask Claude questions like:
 4. **Missing data**: Check that the Netdata agent has the required collectors enabled
 5. **Limited access**: Without API key or unclaimed agent, functions and logs won't be available
 
-## Future Enhancements
+## FAQ
 
-- Integration with Netdata Cloud for enhanced authentication
-- Support for dynamic configuration management
-- Extended function capabilities
-- Custom alert rule creation through MCP
+- **Q: Can I use MCP with other AI assistants?**
+  - A: Yes, MCP supports multiple AI assistants. Check the [MCP documentation](https://modelcontextprotocol.io/clients) for a full list.
+
+- **Q: Do I need to run a bridge on my local machine?**
+- A: Yes, the bridge converts `stdio` communication to `WebSocket` for remote access to Netdata. The bridge is run on your local machine (personal computer) to connect to the Netdata instance.
+
+- **Q: How do I find my API key?**
+  - A: The API key is automatically generated by Netdata and stored in `/var/lib/netdata/mcp_dev_preview_api_key` or `/opt/netdata/var/lib/netdata/mcp_dev_preview_api_key` on the Netdata Agent you will connect to. Use `sudo cat` to view it.
+
+- **Q: Can I use MCP with Netdata Cloud?**
+  - A: Yes, once MCP is integrated into Netdata Cloud, you will be able to use it with web-based AI assistants without needing a bridge.
+
+- **Q: What data can I access with MCP?**
+  - A: You can access metrics, logs, alerts, live system information (processes, services, containers, network connections), and more.
+
+- **Q: Can I use MCP with my existing Netdata installation?**
+  - A: Yes, as long as you have a recent version of Netdata installed, you can use the MCP integration without any additional installation.
+
+- **Q: Is MCP secure?**
+  - A: Yes, MCP currently provides read-only access. Sensitive functions like logs and live system information require an API key, and the agent should be claimed to Netdata Cloud for production use.
+
+- **Q: Will my observability data be exposed to AI companies?**
+  - A: Yes, but it depends on the AI assistant you use and the subscription you have. For example, Claude promises that your data will not be used to train their models for certain subscriptions, and Cursor allows you to use multiple AI assistants. Always check the privacy policies of the AI assistant you choose.
+
+- **Q: Are the responses of AI assistants accurate?**
+  - A: AI assistants like Claude are designed to provide accurate and relevant responses based on the data they have access to. However, they may not always be perfect, or they may have not checked all the aspects before giving answers. It's important to verify critical information.
+
+## Best Practices
+
+### AI Assistants sampling data
+
+Sometimes, when you ask generic questions about your infrastructure, AI assistants do a simple sampling on a few nodes of the infrastructure, instead of querying all nodes. In Netdata we have provided the tools to properly do that, but AI assistants may not use them.
+
+Examples:
+
+Q: "which are the top processes/containers/VMs/services running on my servers?"
+
+The AI assistant may respond with a list of processes/containers/VMs/services from a few nodes, instead of querying all nodes.
+
+The proper way in Netdata is to query:
+
+ - `app.*` charts/contexts for `processes`, which will return the processes running on all nodes grouped by category.
+ - `systemd.*` to get the services running on all nodes.
+ - `cgroup.*` to get the all the containers and VMs on all nodes.
+
+For all such queries, Netdata responses return cardinality information (much like the NIDL charts on your Netdata dashboard), so the AI assistant could get a much better picture instead of sampling data. When you notice that, you could ask the AI assistant to find the answer using more generic queries.
+
+### AI Assistants missing newer Netdata features
+
+Sometimes you ask AI assistants about features that have been recently added to Netdata (eg logs, or windows capabilities), and the AI assistant instead of checking what is available via their MCP connection, they say that Netdata does not support that feature. Answering "check your MCP tools, features, functions" is usually enough for the AI assistant to check the available features and start using them.
+
+### AI Assistants not using MCP at all
+
+Sometimes you need instruct them to use their MCP connection. So instead of saying "check the performance of my production db", you can say "use netdata to check the performance of my production db". This way, the AI assistant will use its MCP connection to query the Netdata instance and provide you with the relevant information.
+
+### Use AI Assistants to do your DevOps/SRE/SysAdmin "laundry"
+
+Our advice is to use AI assistants to do "your laundry": Give them specific tasks, check the queries they did to get that information, and when possible ask them to cross-check their answers using a different tool/source. AI assistants usually rush to make conclusions, so **challenge them** and they will go deeper and correct themselves. Remember that you always need to verify their answers, especially for critical tasks.
 
 For more information about Netdata, visit [netdata.cloud](https://netdata.cloud)
