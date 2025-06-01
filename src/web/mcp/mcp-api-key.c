@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <limits.h>
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
 
@@ -14,72 +15,78 @@ static bool mcp_api_key_generate_and_save(void) {
     nd_uuid_t uuid;
     uuid_generate_random(uuid);
     
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, uuid_str);
+    // Unparse directly to the destination buffer
+    uuid_unparse_lower(uuid, mcp_dev_preview_api_key);
     
-    // Create directory if it doesn't exist
-    char *dir = "/var/lib/netdata";
-    if (mkdir(dir, 0755) == -1 && errno != EEXIST) {
-        netdata_log_error("MCP: Failed to create directory %s: %s", dir, strerror(errno));
-        return false;
-    }
+    // Construct full path
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
     
     // Open file with O_CREAT | O_EXCL to ensure we don't overwrite
-    int fd = open(MCP_DEV_PREVIEW_API_KEY_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd == -1) {
         netdata_log_error("MCP: Failed to create API key file %s: %s", 
-                         MCP_DEV_PREVIEW_API_KEY_PATH, strerror(errno));
+                         path, strerror(errno));
         return false;
     }
     
-    // Write the UUID
-    ssize_t written = write(fd, uuid_str, strlen(uuid_str));
-    if (written != (ssize_t)strlen(uuid_str)) {
+    // Write the UUID with newline
+    char buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 2]; // +1 for newline, +1 for null
+    snprintf(buffer, sizeof(buffer), "%s\n", mcp_dev_preview_api_key);
+    
+    ssize_t written = write(fd, buffer, MCP_DEV_PREVIEW_API_KEY_LENGTH + 1); // +1 for newline
+    if (written != (ssize_t)(MCP_DEV_PREVIEW_API_KEY_LENGTH + 1)) {
         netdata_log_error("MCP: Failed to write API key to file: %s", strerror(errno));
         close(fd);
-        unlink(MCP_DEV_PREVIEW_API_KEY_PATH);
+        unlink(path);
         return false;
     }
     
     close(fd);
     
     // Ensure file permissions are correct (only owner can read/write)
-    if (chmod(MCP_DEV_PREVIEW_API_KEY_PATH, 0600) == -1) {
+    if (chmod(path, 0600) == -1) {
         netdata_log_error("MCP: Failed to set permissions on API key file: %s", strerror(errno));
-        unlink(MCP_DEV_PREVIEW_API_KEY_PATH);
+        unlink(path);
         return false;
     }
-    
-    strncpy(mcp_dev_preview_api_key, uuid_str, MCP_DEV_PREVIEW_API_KEY_LENGTH);
-    mcp_dev_preview_api_key[MCP_DEV_PREVIEW_API_KEY_LENGTH] = '\0';
     
     netdata_log_info("MCP: Generated new developer preview API key");
     return true;
 }
 
 static bool mcp_api_key_load(void) {
-    int fd = open(MCP_DEV_PREVIEW_API_KEY_PATH, O_RDONLY);
+    // Construct full path
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
+    
+    int fd = open(path, O_RDONLY);
     if (fd == -1) {
         if (errno == ENOENT) {
             // File doesn't exist, this is expected on first run
             return false;
         }
         netdata_log_error("MCP: Failed to open API key file %s: %s", 
-                         MCP_DEV_PREVIEW_API_KEY_PATH, strerror(errno));
+                         path, strerror(errno));
         return false;
     }
     
-    char buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1];
-    ssize_t bytes_read = read(fd, buffer, MCP_DEV_PREVIEW_API_KEY_LENGTH);
+    char buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 2]; // +1 for potential newline, +1 for null
+    ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
     close(fd);
     
-    if (bytes_read != MCP_DEV_PREVIEW_API_KEY_LENGTH) {
-        netdata_log_error("MCP: Invalid API key file size: expected %d bytes, got %zd", 
-                         MCP_DEV_PREVIEW_API_KEY_LENGTH, bytes_read);
+    if (bytes_read < MCP_DEV_PREVIEW_API_KEY_LENGTH || bytes_read > MCP_DEV_PREVIEW_API_KEY_LENGTH + 1) {
+        netdata_log_error("MCP: Invalid API key file size: expected %d or %d bytes, got %zd", 
+                         MCP_DEV_PREVIEW_API_KEY_LENGTH, MCP_DEV_PREVIEW_API_KEY_LENGTH + 1, bytes_read);
         return false;
     }
     
-    buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH] = '\0';
+    buffer[bytes_read] = '\0';
+    
+    // Strip trailing newline if present
+    if (bytes_read > 0 && buffer[bytes_read - 1] == '\n') {
+        buffer[bytes_read - 1] = '\0';
+    }
     
     // Basic validation - should be a valid UUID format
     nd_uuid_t uuid;
@@ -105,7 +112,9 @@ void mcp_api_key_initialize(void) {
         }
     }
     
-    netdata_log_info("MCP: Developer preview API key initialized. Location: %s", MCP_DEV_PREVIEW_API_KEY_PATH);
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
+    netdata_log_info("MCP: Developer preview API key initialized. Location: %s", path);
 }
 
 bool mcp_api_key_verify(const char *api_key) {

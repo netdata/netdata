@@ -3289,6 +3289,13 @@ if(ENABLE_PLUGIN_GO)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
+
+    # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
+    add_go_target(nd-mcp-target nd-mcp src/web/mcp/bridges/stdio-golang .)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/nd-mcp
+            COMPONENT plugin-go
+            DESTINATION "${BINDIR}")
 endif()
 
 #
