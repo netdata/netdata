@@ -9,7 +9,7 @@
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
 
-#define MCP_DEV_PREVIEW_API_KEY_PATH "/var/lib/netdata/mcp_dev_preview_api_key"
+#define MCP_DEV_PREVIEW_API_KEY_FILENAME "mcp_dev_preview_api_key"
 #define MCP_DEV_PREVIEW_API_KEY_LENGTH 36  // UUID format: 8-4-4-4-12 = 32 hex chars + 4 hyphens
 
 // Initialize the MCP API key subsystem - creates key file if it doesn't exist
