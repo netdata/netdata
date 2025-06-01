@@ -70,6 +70,12 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
         return;
     }
     
+    // Silently ignore standalone "PING" messages (legacy MCP client behavior)
+    if (length == 4 && strncmp(message, "PING", 4) == 0) {
+        websocket_debug(wsc, "Ignoring legacy PING message");
+        return;
+    }
+    
     // Get the MCP context
     MCP_CLIENT *mcpc = mcp_websocket_get_context(wsc);
     if (!mcpc) {
