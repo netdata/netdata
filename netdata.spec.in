@@ -525,6 +525,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}
 %{_sbindir}/%{name}
 %{_sbindir}/netdatacli
+%{_sbindir}/nd-mcp
 %if %{_have_log2journal}
 %{_sbindir}/log2journal
 %endif
