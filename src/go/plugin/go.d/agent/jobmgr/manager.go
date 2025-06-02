@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +60,7 @@ type Manager struct {
 	PluginName     string
 	Out            io.Writer
 	Modules        module.Registry
+	RunJob         []string
 	ConfigDefaults confgroup.Registry
 	VarLibDir      string
 	FnReg          FunctionRegistry
@@ -130,6 +132,11 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 			for _, gr := range groups {
 				a, r := m.discoveredConfigs.add(gr)
 				m.Debugf("received configs: %d/+%d/-%d ('%s')", len(gr.Configs), len(a), len(r), gr.Source)
+				if len(m.RunJob) > 0 {
+					a = slices.DeleteFunc(a, func(config confgroup.Config) bool {
+						return !slices.ContainsFunc(m.RunJob, func(name string) bool { return config.Name() == name })
+					})
+				}
 				sendConfigs(m.ctx, m.rmCh, r...)
 				sendConfigs(m.ctx, m.addCh, a...)
 			}
