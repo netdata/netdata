@@ -6,8 +6,10 @@
 
 **Merged pull requests:**
 
+- apps.plugin documentation and grouping matches improvements [\#20386](https://github.com/netdata/netdata/pull/20386) ([ktsaou](https://github.com/ktsaou))
 - SNMP: aruba-switch.yaml [\#20385](https://github.com/netdata/netdata/pull/20385) ([Ancairon](https://github.com/Ancairon))
 - SNMP: aruba-cx-switch.yaml [\#20383](https://github.com/netdata/netdata/pull/20383) ([Ancairon](https://github.com/Ancairon))
+- SNMP: aruba-clearpass.yaml [\#20382](https://github.com/netdata/netdata/pull/20382) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_aruba-switch-cpu-memory.yaml [\#20381](https://github.com/netdata/netdata/pull/20381) ([Ancairon](https://github.com/Ancairon))
 - Update documentation [\#20380](https://github.com/netdata/netdata/pull/20380) ([thiagoftsm](https://github.com/thiagoftsm))
 - test\(go.d/oracledb\): fix test [\#20378](https://github.com/netdata/netdata/pull/20378) ([ilyam8](https://github.com/ilyam8))
@@ -468,8 +470,6 @@
 - make sure alerts are concurrently altered by dyncfg [\#19854](https://github.com/netdata/netdata/pull/19854) ([ktsaou](https://github.com/ktsaou))
 - fix contexts labels to avoid clearing the rrdlabels pointer [\#19853](https://github.com/netdata/netdata/pull/19853) ([ktsaou](https://github.com/ktsaou))
 - fix updating on RPi2+ [\#19850](https://github.com/netdata/netdata/pull/19850) ([ilyam8](https://github.com/ilyam8))
-- minor fixes [\#19849](https://github.com/netdata/netdata/pull/19849) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump k8s.io/client-go from 0.32.2 to 0.32.3 in /src/go [\#19848](https://github.com/netdata/netdata/pull/19848) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
