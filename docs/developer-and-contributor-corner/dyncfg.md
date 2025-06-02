@@ -14,13 +14,13 @@ Dynamic Configuration (DynCfg) enables your plugins and modules to expose their 
 
 DynCfg provides a complete configuration management system that handles:
 
-| Feature | What It Does |
-|---------|--------------|
-| **Configuration Registration** | Register your plugin's configuration objects with Netdata |
-| **User Interface Generation** | Automatically create UI forms from JSON Schema definitions |
-| **Configuration Persistence** | Save and restore configurations across Netdata agent restarts |
-| **Validation Pipeline** | Route configuration changes back to your plugin for validation |
-| **Standardized Experience** | Provide users with consistent configuration workflows |
+| Feature                        | What It Does                                                   |
+|--------------------------------|----------------------------------------------------------------|
+| **Configuration Registration** | Register your plugin's configuration objects with Netdata      |
+| **User Interface Generation**  | Automatically create UI forms from JSON Schema definitions     |
+| **Configuration Persistence**  | Save and restore configurations across Netdata agent restarts  |
+| **Validation Pipeline**        | Route configuration changes back to your plugin for validation |
+| **Standardized Experience**    | Provide users with consistent configuration workflows          |
 
 :::info
 
@@ -65,18 +65,18 @@ graph TB
 
 1. **DynCfg Manager** - Tracks all configurations and routes commands between components
 2. **Internal Plugin API** - For modules built into the Netdata agent
-3. **External Plugin API** - For independent plugins using the plugins.d protocol  
+3. **External Plugin API** - For independent plugins using the plugins.d protocol
 4. **Web API** - Exposes configuration management to users and applications
 
 ## Configuration Types You Can Create
 
 Choose the configuration type that matches your use case:
 
-| Type | Use Case | Example |
-|------|----------|---------|
-| **SINGLE** | One standalone configuration | systemd-journal directories |
-| **TEMPLATE** | Blueprint for creating multiple configurations | Nginx collector template |
-| **JOB** | Specific instance created from a template | Individual Nginx server to monitor |
+| Type         | Use Case                                       | Example                            |
+|--------------|------------------------------------------------|------------------------------------|
+| **SINGLE**   | One standalone configuration                   | systemd-journal directories        |
+| **TEMPLATE** | Blueprint for creating multiple configurations | Nginx collector template           |
+| **JOB**      | Specific instance created from a template      | Individual Nginx server to monitor |
 
 ## Implementation Guides
 
@@ -114,7 +114,7 @@ Are you developing a module that's built into the Netdata agent?
 <br/>
 </details>
 
-### For External Plugins  
+### For External Plugins
 
 Are you developing a standalone plugin that communicates with Netdata using the plugins.d protocol?
 
@@ -154,7 +154,7 @@ The health module manages alert definitions through DynCfg:
 
 External C plugin that manages journal directory configurations:
 
-- **File**: `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`  
+- **File**: `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`
 - **Pattern**: SINGLE configuration type
 - **Use Case**: Managing journal directory paths
 
