@@ -105,7 +105,7 @@ You can access the Dynamic Configuration Manager in multiple ways:
 
 1. Go to **Space Settings** on your Dashboard
 2. Navigate to the **Configurations** section
-3. Explore, create and edit collector, health and logs configurations
+3. Explore, create, and edit collector, health and logs configurations
 
 <br/>
 </details><br/>
@@ -137,7 +137,7 @@ To help you get started with the Dynamic Configuration Manager, try using the Ne
 <details>
 <summary><strong>Creating Alerts from Charts</strong></summary><br/>
 
-Learn more about this access method: [From Any Chart](#from-any-chart)
+Learn more about this access method: [From Any Chart](#quick-access-methods)
 
 1. Navigate to the chart (context) you want to create an alert for
 2. Click on the Alert icon (bell icon) on top of the chart to edit an existing alert or create a new one
@@ -150,7 +150,7 @@ Learn more about this access method: [From Any Chart](#from-any-chart)
 <details>
 <summary><strong>Managing Alerts from the Alerts Tab</strong></summary><br/>
 
-Learn more about this access method: [From the Alerts Tab](#from-the-alerts-tab)
+Learn more about this access method: [From the Alerts Tab](#quick-access-methods)
 
 1. Go to the Alerts tab on your Netdata dashboard
 2. Locate the alert you wish to modify and click on it
@@ -163,7 +163,7 @@ Learn more about this access method: [From the Alerts Tab](#from-the-alerts-tab)
 <details>
 <summary><strong>Configuring Collectors from Integrations</strong></summary><br/>
 
-Learn more about this access method: [From the Integrations Section](#from-the-integrations-section)
+Learn more about this access method: [From the Integrations Section](#quick-access-methods)
 
 1. Navigate to the Integrations section on the dashboard
 2. Browse through the available collectors
@@ -176,11 +176,11 @@ Learn more about this access method: [From the Integrations Section](#from-the-i
 <details>
 <summary><strong>Managing Configurations from Space Settings</strong></summary><br/>
 
-Learn more about this access method: [From Space Settings](#from-space-settings)
+Learn more about this access method: [From Space Settings](#quick-access-methods)
 
 1. Go to **Space Settings** on your Dashboard
 2. Navigate to the **Configurations** section
-3. Explore, create and edit collector, health and logs configurations
+3. Explore, create, and edit collector, health and logs configurations
 
 <br/>
 </details>
@@ -235,7 +235,7 @@ Every job has a designated "source type" indicating its origin:
 
 :::important
 
-Only jobs created through Dynamic Configuration can be removed. Other job types originate from files on the node and cannot be deleted through the UI.
+Only jobs created through Dynamic Configuration can be removed. Other job types originate from files on the node and can’t be deleted through the UI.
 
 :::
 

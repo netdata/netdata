@@ -35,7 +35,7 @@ DynCfg provides a complete configuration management system that handles:
 
 ## How DynCfg Works
 
-The system consists of four main components working together:
+The system consists of four main parts working together:
 
 ```mermaid
 graph TB
@@ -96,7 +96,7 @@ Ready to make your plugin configurable through the Netdata UI? Choose your imple
 
 ### For Internal Modules
 
-Are you developing a module that's built into the Netdata agent?
+Are you developing a module built into the Netdata agent?
 
 👉 **[Internal DynCfg Implementation Guide](/src/daemon/dyncfg/README.md)**
 
