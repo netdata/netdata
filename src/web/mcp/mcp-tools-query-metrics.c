@@ -90,6 +90,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Limit the response cardinality (number of dimensions, instances, labels, etc.). "
         "When the limit is exceeded, the response will indicate how many items were omitted.",
         MCP_DATA_CARDINALITY_LIMIT,
+        1,  // minimum
         MAX(MCP_DATA_CARDINALITY_LIMIT, MCP_DATA_CARDINALITY_LIMIT_MAX));
 
     // Time parameters

@@ -129,6 +129,7 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
         buffer,
         "Number of most recent alert transitions to return",
         MCP_ALERTS_CARDINALITY_LIMIT,  // default value
+        1,  // minimum
         MAX(MCP_ALERTS_CARDINALITY_LIMIT, MCP_ALERTS_CARDINALITY_LIMIT_MAX));  // max value
 
     // Pagination cursor

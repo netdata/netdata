@@ -309,6 +309,7 @@ void mcp_schema_add_cardinality_limit(
     BUFFER *buffer,
     const char *description,
     size_t default_value,
+    size_t min_value,
     size_t max_value
 ) {
     buffer_json_member_add_object(buffer, "cardinality_limit");
@@ -323,7 +324,7 @@ void mcp_schema_add_cardinality_limit(
         if (default_value > 0)
             buffer_json_member_add_uint64(buffer, "default", default_value);
         
-        buffer_json_member_add_uint64(buffer, "minimum", 1);
+        buffer_json_member_add_uint64(buffer, "minimum", min_value > 0 ? min_value : 1);
         
         if (max_value > 0)
             buffer_json_member_add_uint64(buffer, "maximum", max_value);

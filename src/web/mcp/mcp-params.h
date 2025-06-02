@@ -59,6 +59,7 @@ void mcp_schema_add_cardinality_limit(
     BUFFER *buffer,
     const char *description,
     size_t default_value,
+    size_t min_value,
     size_t max_value
 );
 

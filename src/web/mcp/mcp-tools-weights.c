@@ -292,6 +292,7 @@ void mcp_tool_find_correlated_metrics_schema(BUFFER *buffer) {
         buffer,
         "Maximum number of results to return",
         MCP_WEIGHTS_CARDINALITY_LIMIT,
+        30,  // minimum for weights
         MAX(MCP_WEIGHTS_CARDINALITY_LIMIT, MCP_WEIGHTS_CARDINALITY_LIMIT_MAX));
     
     // Timeout parameter
@@ -329,6 +330,7 @@ void mcp_tool_find_anomalous_metrics_schema(BUFFER *buffer) {
         buffer,
         "Maximum number of results to return",
         MCP_WEIGHTS_CARDINALITY_LIMIT,
+        30,  // minimum for weights
         MAX(MCP_WEIGHTS_CARDINALITY_LIMIT, MCP_WEIGHTS_CARDINALITY_LIMIT_MAX));
     
     // Timeout parameter
@@ -367,6 +369,7 @@ void mcp_tool_find_unstable_metrics_schema(BUFFER *buffer) {
         buffer,
         "Maximum number of results to return",
         MCP_WEIGHTS_CARDINALITY_LIMIT,
+        30,  // minimum for weights
         MAX(MCP_WEIGHTS_CARDINALITY_LIMIT, MCP_WEIGHTS_CARDINALITY_LIMIT_MAX));
     
     // Timeout parameter

@@ -349,6 +349,7 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
             "Maximum number of items to return per category (dimensions, instances, labels, etc.). "
             "Prevents response explosion. When exceeded, the response will indicate how many items were omitted.",
             default_cardinality,
+            1,  // minimum
             MAX(default_cardinality, MCP_METADATA_CARDINALITY_LIMIT_MAX));
     }
     

@@ -1844,7 +1844,7 @@ static size_t registered_results_to_json_mcp(
     
     // Get cardinality limit from query weights data
     size_t cardinality_limit = qwd && qwd->qwr ? qwd->qwr->cardinality_limit : 50;
-    if (cardinality_limit == 0) cardinality_limit = 50;
+    if (cardinality_limit < 30) cardinality_limit = 30;
     
     // Set up state for callback
     struct mcp_output_state state = {
