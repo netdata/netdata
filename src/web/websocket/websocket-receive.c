@@ -386,7 +386,7 @@ static bool websocket_protocol_validate_header(
     }
 
     // Validate payload length against limits
-    if (payload_length > (uint64_t)WS_MAX_FRAME_LENGTH) {
+    if (payload_length > (uint64_t)WS_MAX_INCOMING_FRAME_SIZE) {
         websocket_error(wsc, "Invalid frame: Payload too large (%llu bytes)",
                    (unsigned long long)payload_length);
         websocket_protocol_exception(wsc, WS_CLOSE_MESSAGE_TOO_BIG, "Frame payload too large");

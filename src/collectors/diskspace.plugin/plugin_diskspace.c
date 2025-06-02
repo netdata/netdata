@@ -9,7 +9,7 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
-#define RRDFUNCTIONS_DISKSPACE_HELP "View mount point statistics"
+#define RRDFUNCTIONS_DISKSPACE_HELP "Displays filesystem mount points with space utilization, available capacity, and inode usage statistics."
 
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5

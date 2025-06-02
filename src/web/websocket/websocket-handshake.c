@@ -5,6 +5,7 @@
 #include "websocket-jsonrpc.h"
 #include "websocket-echo.h"
 #include "../mcp/adapters/mcp-websocket.h"
+#include "../mcp/mcp-api-key.h"
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
@@ -287,6 +288,8 @@ static bool websocket_send_first_response(WS_CLIENT *wsc, const char *accept_key
 
 // Handle the WebSocket handshake procedure
 short int websocket_handle_handshake(struct web_client *w) {
+    web_client_ensure_proper_authorization(w);
+
     if (!websocket_detect_handshake_request(w))
         return HTTP_RESP_BAD_REQUEST;
 
@@ -299,8 +302,65 @@ short int websocket_handle_handshake(struct web_client *w) {
     WS_CLIENT *wsc = websocket_client_create();
 
     // Copy client information
-    strncpyz(wsc->client_ip, w->client_ip, sizeof(wsc->client_ip));
+    strncpyz(wsc->client_ip, w->user_auth.client_ip, sizeof(wsc->client_ip));
     strncpyz(wsc->client_port, w->client_port, sizeof(wsc->client_port));
+
+    // Copy user authentication and authorization information
+    wsc->user_auth = w->user_auth;
+
+    // Check for max_frame_size parameter in the URL query string
+    if (w->url_query_string_decoded && buffer_strlen(w->url_query_string_decoded) > 0) {
+        const char *query = buffer_tostring(w->url_query_string_decoded);
+        char *max_frame_size_str = strstr(query, "max_frame_size=");
+        
+        if (max_frame_size_str) {
+            max_frame_size_str += strlen("max_frame_size=");
+            
+            char *end_ptr;
+            size_t max_frame_size = strtoull(max_frame_size_str, &end_ptr, 10);
+            
+            // Validate the max frame size with reasonable bounds
+            if (max_frame_size > 0) {
+                // Set minimum and maximum limits
+                if (max_frame_size < 1024) // Minimum 1KB
+                    max_frame_size = 1024;
+                else if (max_frame_size > (20ULL * 1024 * 1024)) // Maximum 20MB
+                    max_frame_size = 20ULL * 1024 * 1024;
+                
+                // Set the client's max outbound frame size
+                wsc->max_outbound_frame_size = max_frame_size;
+                websocket_debug(wsc, "Setting custom max outbound frame size: %zu bytes", max_frame_size);
+            }
+        }
+        
+#ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
+        // Check for api_key parameter for MCP developer preview
+        char *api_key_str = strstr(query, "api_key=");
+        if (api_key_str) {
+            api_key_str += strlen("api_key=");
+            
+            // Extract the API key value (until & or end of string)
+            char api_key_buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1];
+            size_t i = 0;
+            while (api_key_str[i] && api_key_str[i] != '&' && i < MCP_DEV_PREVIEW_API_KEY_LENGTH) {
+                api_key_buffer[i] = api_key_str[i];
+                i++;
+            }
+            api_key_buffer[i] = '\0';
+            
+            // Verify the API key
+            if (mcp_api_key_verify(api_key_buffer)) {
+                // Override authentication with god mode
+                wsc->user_auth.access = HTTP_ACCESS_ALL;
+                wsc->user_auth.method = USER_AUTH_METHOD_GOD;
+                wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
+                websocket_debug(wsc, "MCP developer preview API key verified - enabling full access");
+            } else {
+                websocket_debug(wsc, "Invalid MCP developer preview API key provided");
+            }
+        }
+#endif
+    }
 
     bool url_protocol = false;
     wsc->protocol = w->websocket.protocol;
@@ -357,6 +417,15 @@ short int websocket_handle_handshake(struct web_client *w) {
 
     // Set up protocol-specific callbacks based on the selected protocol
     switch (wsc->protocol) {
+        case WS_PROTOCOL_MCP:
+            // Set up callbacks for MCP protocol
+            wsc->on_connect = mcp_websocket_on_connect;
+            wsc->on_message = mcp_websocket_on_message;
+            wsc->on_close = mcp_websocket_on_close;
+            wsc->on_disconnect = mcp_websocket_on_disconnect;
+            websocket_debug(wsc, "Setting up MCP protocol callbacks");
+            break;
+
 #ifdef NETDATA_INTERNAL_CHECKS
         case WS_PROTOCOL_JSONRPC:
             // Set up callbacks for jsonrpc protocol
@@ -374,15 +443,6 @@ short int websocket_handle_handshake(struct web_client *w) {
             wsc->on_close = echo_on_close;
             wsc->on_disconnect = echo_on_disconnect;
             websocket_debug(wsc, "Setting up echo protocol callbacks");
-            break;
-
-        case WS_PROTOCOL_MCP:
-            // Set up callbacks for MCP protocol
-            wsc->on_connect = mcp_websocket_on_connect;
-            wsc->on_message = mcp_websocket_on_message;
-            wsc->on_close = mcp_websocket_on_close;
-            wsc->on_disconnect = mcp_websocket_on_disconnect;
-            websocket_debug(wsc, "Setting up MCP protocol callbacks");
             break;
 #endif
 
@@ -420,7 +480,8 @@ short int websocket_handle_handshake(struct web_client *w) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "WebSocket connection established with %s:%s using protocol: %s (client ID: %u, thread: %zu), "
            "compression: %s (client context takeover: %s, server context takeover: %s, "
-           "client window bits: %d, server window bits: %d)",
+           "client window bits: %d, server window bits: %d), "
+           "max outbound frame size: %zu bytes",
            wsc->client_ip, wsc->client_port,
            WEBSOCKET_PROTOCOL_2str(wsc->protocol),
            wsc->id, wth->id,
@@ -428,7 +489,8 @@ short int websocket_handle_handshake(struct web_client *w) {
            wsc->compression.client_context_takeover ? "enabled" : "disabled",
            wsc->compression.server_context_takeover ? "enabled" : "disabled",
            wsc->compression.client_max_window_bits,
-           wsc->compression.server_max_window_bits);
+           wsc->compression.server_max_window_bits,
+           wsc->max_outbound_frame_size);
 
     // Important: This code doesn't actually get sent to the client since we've already
     // taken over the socket. It's just used by the caller to identify what happened.

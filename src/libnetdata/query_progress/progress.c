@@ -569,7 +569,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         // duration
         buffer_rrdf_table_add_field(wb, field_id++, "Duration", "Query Duration",
-                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
                                     2, "ms", (double)max_duration_ut / USEC_PER_MS, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);

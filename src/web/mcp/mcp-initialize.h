@@ -6,6 +6,6 @@
 #include "mcp.h"
 
 // Initialize method handler (transport-agnostic)
-MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id);
+MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id);
 
 #endif // NETDATA_MCP_INITIALIZE_H

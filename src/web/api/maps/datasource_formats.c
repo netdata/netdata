@@ -18,7 +18,7 @@ static struct {
     , {NULL,        0, 0}
 };
 
-inline DATASOURCE_FORMAT google_data_format_str_to_id(char *name) {
+inline DATASOURCE_FORMAT google_data_format_str_to_id(const char *name) {
     uint32_t hash = simple_hash(name);
     int i;
 
@@ -57,7 +57,7 @@ static struct {
     , {NULL, 0, 0}
 };
 
-DATASOURCE_FORMAT datasource_format_str_to_id(char *name) {
+DATASOURCE_FORMAT datasource_format_str_to_id(const char *name) {
     uint32_t hash = simple_hash(name);
     int i;
 

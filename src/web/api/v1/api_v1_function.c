@@ -34,9 +34,9 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     uuid_unparse_lower_compact(w->transaction, transaction);
 
     CLEAN_BUFFER *source = buffer_create(100, NULL);
-    web_client_api_request_vX_source_to_buffer(w, source);
+    user_auth_to_source_buffer(&w->user_auth, source);
 
-    return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
+    return rrd_function_run(host, wb, timeout, w->user_auth.access, function, true, transaction,
                             NULL, NULL,
                             web_client_progress_functions_update, w,
                             web_client_interrupt_callback, w, w->payload,

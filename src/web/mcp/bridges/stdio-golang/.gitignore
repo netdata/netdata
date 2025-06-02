@@ -1,0 +1,19 @@
+# Binary
+nd-mcp
+
+# Build cache and directories
+/bin/
+/pkg/
+
+# Debug files
+*.debug
+*.test
+debug
+debug.test
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

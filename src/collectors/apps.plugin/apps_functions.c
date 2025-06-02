@@ -361,6 +361,7 @@ void function_processes(const char *transaction, char *function,
 #endif
 #endif
         add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(total_cpu) / cpu_divisor);
+
         add_value_field_ndd_with_max(wb, UserCPU, (NETDATA_DOUBLE)(p->values[PDF_UTIME]) / cpu_divisor);
         add_value_field_ndd_with_max(wb, SysCPU, (NETDATA_DOUBLE)(p->values[PDF_STIME]) / cpu_divisor);
 #if (PROCESSES_HAVE_CPU_GUEST_TIME)
@@ -392,6 +393,7 @@ void function_processes(const char *transaction, char *function,
 #endif
 
         add_value_field_ndd_with_max(wb, VMSize, (NETDATA_DOUBLE)p->values[PDF_VMSIZE] / memory_divisor);
+
 #if (PROCESSES_HAVE_VMSWAP == 1)
         add_value_field_ndd_with_max(wb, Swap, (NETDATA_DOUBLE)p->values[PDF_VMSWAP] / memory_divisor);
 #endif
@@ -435,6 +437,7 @@ void function_processes(const char *transaction, char *function,
         add_value_field_ndd_with_max(wb, FDsLimitPercent, p->openfds_limits_percent);
 #endif
         add_value_field_llu_with_max(wb, FDs, pid_openfds_sum(p));
+
         add_value_field_llu_with_max(wb, Files, p->openfds.files);
         add_value_field_llu_with_max(wb, Pipes, p->openfds.pipes);
         add_value_field_llu_with_max(wb, Sockets, p->openfds.sockets);
@@ -543,6 +546,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", CPU_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+
         buffer_rrdf_table_add_field(wb, field_id++, "UserCPU", "User CPU time (100% = 1 core)",
                                     RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2, "%", UserCPU_max,
@@ -738,6 +742,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, "fds", FDs_max, RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+
         buffer_rrdf_table_add_field(wb, field_id++, "Files", "Open Files", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 0,
                                     "fds",

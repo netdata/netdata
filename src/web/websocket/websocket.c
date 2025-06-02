@@ -86,7 +86,7 @@ static struct websocket_server ws_server = (struct websocket_server){
 
 // Initialize WebSocket subsystem
 void websocket_initialize(void) {
-    debug_flags |= D_WEBSOCKET;
+    // debug_flags |= D_WEBSOCKET;
 
     // Initialize thread system
     websocket_threads_init();
@@ -110,6 +110,7 @@ WS_CLIENT *websocket_client_create(void) {
 
     wsc->connected_t = now_realtime_sec();
     wsc->last_activity_t = wsc->connected_t;
+    wsc->max_outbound_frame_size = WS_MAX_OUTGOING_FRAME_SIZE; // Default value
 
     // initialize callbacks to NULL
     wsc->on_connect = NULL;
@@ -130,6 +131,9 @@ WS_CLIENT *websocket_client_create(void) {
     // Initialize uncompressed buffer with a larger size since decompressed data can expand
     // For compressed content, the expanded data can be much larger than the input
     wsb_init(&wsc->u_payload, WEBSOCKET_UNPACKED_INITIAL_SIZE);
+    
+    // Initialize compressed output buffer for outbound messages
+    wsb_init(&wsc->c_payload, WEBSOCKET_PAYLOAD_INITIAL_SIZE);
 
     // Set the initial message state
     wsc->opcode = WS_OPCODE_TEXT; // Default opcode
@@ -162,9 +166,10 @@ void websocket_client_free(WS_CLIENT *wsc) {
     cbuffer_cleanup(&wsc->in_buffer);
     cbuffer_cleanup(&wsc->out_buffer);
 
-    // Cleanup pre-allocated message and uncompressed buffers
+    // Cleanup pre-allocated message, uncompressed, and compressed buffers
     wsb_cleanup(&wsc->payload);
     wsb_cleanup(&wsc->u_payload);
+    wsb_cleanup(&wsc->c_payload);
 
     // Clean up compression resources if needed
     websocket_compression_cleanup(wsc);
@@ -247,18 +252,11 @@ int websocket_broadcast_message(const char *message, WEBSOCKET_OPCODE opcode) {
 int websocket_send_message(WS_CLIENT *wsc, const char *message, size_t length, WEBSOCKET_OPCODE opcode) {
     if (!wsc || !message || wsc->state != WS_STATE_OPEN)
         return -1;
-    
-    // Use the appropriate protocol function based on opcode
-    if (opcode == WS_OPCODE_TEXT) {
-        return websocket_protocol_send_text(wsc, message);
-    } else if (opcode == WS_OPCODE_BINARY) {
-        return websocket_protocol_send_binary(wsc, message, length);
-    } else {
-        // For other opcodes, use the generic frame sender
-        bool use_compression = wsc->compression.enabled && 
-                             !websocket_frame_is_control_opcode(opcode) &&
-                             length >= WS_COMPRESS_MIN_SIZE;
-        
-        return websocket_protocol_send_frame(wsc, message, length, opcode, use_compression);
-    }
+
+    // For other opcodes, use the generic frame sender
+    bool use_compression = wsc->compression.enabled &&
+                           !websocket_frame_is_control_opcode(opcode) &&
+                           length >= WS_COMPRESS_MIN_SIZE;
+
+    return websocket_protocol_send_payload(wsc, message, length, opcode, use_compression);
 }

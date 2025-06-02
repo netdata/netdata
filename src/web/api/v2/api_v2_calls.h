@@ -8,11 +8,12 @@
 int api_v2_info(RRDHOST *host, struct web_client *w, char *url);
 
 int api_v2_data(RRDHOST *host, struct web_client *w, char *url);
+int api_v3_data(RRDHOST *host, struct web_client *w, char *url);
 int api_v2_weights(RRDHOST *host, struct web_client *w, char *url);
 
 int api_v2_alert_config(RRDHOST *host, struct web_client *w, char *url);
 
-int api_v2_contexts_internal(RRDHOST *host, struct web_client *w, char *url, CONTEXTS_V2_MODE mode);
+int api_v2_contexts_internal(RRDHOST *host, struct web_client *w, char *url, CONTEXTS_V2_MODE mode, CONTEXTS_OPTIONS options);
 int api_v2_contexts(RRDHOST *host, struct web_client *w, char *url);
 int api_v2_alert_transitions(RRDHOST *host, struct web_client *w, char *url);
 int api_v2_alerts(RRDHOST *host, struct web_client *w, char *url);

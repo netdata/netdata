@@ -257,7 +257,7 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
             "Settings API is only allowed for the agent node.",
             HTTP_RESP_BAD_REQUEST);
 
-    if(web_client_flags_check_auth(w) != WEB_CLIENT_FLAG_AUTH_BEARER && strcmp(file, "default") != 0)
+    if(w->user_auth.method != USER_AUTH_METHOD_BEARER && strcmp(file, "default") != 0)
         return rrd_call_function_error(
             w->response.data,
             "Only the 'default' settings file is allowed for anonymous users",
