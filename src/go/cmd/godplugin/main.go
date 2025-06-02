@@ -55,6 +55,7 @@ func main() {
 		CollectorsConfigWatchPath: cfg.collectorsWatchPath,
 		VarLibDir:                 cfg.varLibDir,
 		RunModule:                 opts.Module,
+		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,
 	})
 
