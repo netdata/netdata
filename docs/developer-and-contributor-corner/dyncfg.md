@@ -175,32 +175,14 @@ Go-based plugin managing multiple data collector configurations:
 
 ## Implementation Best Practices
 
-<details>
-<summary><strong>Configuration Design</strong></summary><br/>
-
-- **Use clear ID structure** - Follow the `component:category:name` pattern consistently
-- **Choose logical paths** - The path parameter affects how configurations appear in the UI
-- **Design intuitive schemas** - Include helpful descriptions and examples in your JSON Schema
-
-<br/>
-</details>
-
-<details>
-<summary><strong>Validation and Error Handling</strong></summary><br/>
-
-- **Validate thoroughly** - Always validate configuration changes before accepting them
-- **Provide helpful errors** - Give users clear explanations when configurations are rejected
-- **Return appropriate codes** - Use correct HTTP status codes for different situations
-
-<br/>
-</details>
-
-<details>
-<summary><strong>User Experience</strong></summary><br/>
-
-- **Respect type-action relationships** - Different actions behave differently for each configuration type
-- **Test your UI** - Verify that your JSON Schema generates usable forms
-- **Document your options** - Help users understand what each configuration option does
-
-<br/>
-</details>
+| Category                          | Best Practice                     | Description                                                      |
+|-----------------------------------|-----------------------------------|------------------------------------------------------------------|
+| **Configuration Design**          | Use clear ID structure            | Follow the `component:category:name` pattern consistently        |
+|                                   | Choose logical paths              | The path parameter affects how configurations appear in the UI   |
+|                                   | Design intuitive schemas          | Include helpful descriptions and examples in your JSON Schema    |
+| **Validation and Error Handling** | Validate thoroughly               | Always validate configuration changes before accepting them      |
+|                                   | Provide helpful errors            | Give users clear explanations when configurations are rejected   |
+|                                   | Return appropriate codes          | Use correct HTTP status codes for different situations           |
+| **User Experience**               | Respect type-action relationships | Different actions behave differently for each configuration type |
+|                                   | Test your UI                      | Verify that your JSON Schema generates usable forms              |
+|                                   | Document your options             | Help users understand what each configuration option does        |
