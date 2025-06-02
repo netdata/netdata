@@ -1,206 +1,116 @@
 # Developing with Dynamic Configuration (DynCfg)
 
-:::tip
+Dynamic Configuration (DynCfg) is a system in Netdata that enables both internal and external plugins/modules to expose their configurations dynamically to users through a unified interface. This document provides an overview of the DynCfg system and directs developers to detailed implementation documentation.
 
-**What You'll Learn**
+## Overview
 
-How to integrate Dynamic Configuration into your Netdata plugins and modules to create configurable, user-friendly monitoring solutions.
+DynCfg provides a centralized mechanism for:
 
-:::
+1. Registering configuration objects from any plugin or module
+2. Providing a unified interface for users to view and modify these configurations
+3. Persisting configurations between Netdata agent restarts
+4. Validating configuration changes through the originating plugin/module
+5. Standardizing configuration UI using JSON Schema
 
-Dynamic Configuration (DynCfg) enables your plugins and modules to expose their configurations through Netdata's unified interface. Instead of requiring users to manually edit configuration files, they can configure your plugin directly through the Netdata UI.
+Key features:
 
-## What DynCfg Does for You
+- Plugins can expose multiple configuration objects
+- Each configuration object has a unique ID
+- The owning plugin validates configuration changes before being committed
+- The DynCfg manager maintains the state of all dynamic configurations
+- JSON Schema is used to define the structure of configuration objects
+- The UI is based on adaptations of the react-jsonschema-form project
 
-DynCfg provides a complete configuration management system that handles:
+## Architecture
 
-| Feature | What It Does |
-|---------|--------------|
-| **Configuration Registration** | Register your plugin's configuration objects with Netdata |
-| **User Interface Generation** | Automatically create UI forms from JSON Schema definitions |
-| **Configuration Persistence** | Save and restore configurations across Netdata agent restarts |
-| **Validation Pipeline** | Route configuration changes back to your plugin for validation |
-| **Standardized Experience** | Provide users with consistent configuration workflows |
+DynCfg consists of these key components:
 
-:::info
+1. **DynCfg Manager**: Core system that tracks configurations and routes commands
+2. **Internal Plugin API**: Used by modules inside the Netdata agent
+3. **External Plugin API**: Used by independent plugins communicating via plugins.d protocol
+4. **Web API**: Exposes configuration management to users and applications
 
-**Key Benefits**
+## Configuration Types
 
-- Users configure your plugin through the UI instead of editing files
-- JSON Schema automatically generates user-friendly forms
-- Your plugin validates all configuration changes before they're applied
-- Configurations persist automatically across restarts
+DynCfg supports three types of configurations:
 
-:::
+- **SINGLE**: A standalone configuration object (e.g., systemd-journal directories)
+- **TEMPLATE**: A blueprint for creating multiple related configurations (e.g., Nginx collector template)
+- **JOB**: A specific configuration instance derived from a template (e.g., a specific Nginx server to monitor)
 
-## How DynCfg Works
+## Implementation Documentation
 
-The system consists of four main components working together:
+For detailed implementation guidance, refer to these documents:
 
-```mermaid
-graph TB
-    DM("**DynCfg Manager**<br/><br/>Tracks all configurations<br/>Routes commands between<br/>components")
-    
-    IPA("**Internal Plugin API**<br/><br/>For modules built into<br/>the Netdata agent")
-    
-    EPA("**External Plugin API**<br/><br/>For independent plugins<br/>using plugins.d protocol")
-    
-    WA("**Web API**<br/><br/>Exposes configuration<br/>management to users<br/>and applications")
-    
-    %% Connections showing data flow
-    DM <--> IPA
-    DM <--> EPA
-    DM <--> WA
-    
-    %% Style definitions
-    classDef manager fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef api fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef web fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    
-    %% Apply styles
-    class DM manager
-    class IPA,EPA api
-    class WA web
-```
+### For Internal Modules/Plugins
 
-1. **DynCfg Manager** - Tracks all configurations and routes commands between components
-2. **Internal Plugin API** - For modules built into the Netdata agent
-3. **External Plugin API** - For independent plugins using the plugins.d protocol  
-4. **Web API** - Exposes configuration management to users and applications
+If you're developing an internal Netdata module or plugin, see:
 
-## Configuration Types You Can Create
+👉 [**Internal DynCfg Implementation Guide**](/src/daemon/dyncfg/README.md)
 
-Choose the configuration type that matches your use case:
+This document covers:
 
-| Type | Use Case | Example |
-|------|----------|---------|
-| **SINGLE** | One standalone configuration | systemd-journal directories |
-| **TEMPLATE** | Blueprint for creating multiple configurations | Nginx collector template |
-| **JOB** | Specific instance created from a template | Individual Nginx server to monitor |
-
-## Implementation Guides
-
-### Getting Started
-
-1. **Choose your implementation path** - Internal module or external plugin?
-2. **Read the relevant implementation guide** - Follow the detailed documentation for your chosen approach
-3. **Study working examples** - Look at existing implementations for patterns and best practices
-4. **Start with simple configurations** - Begin with basic SINGLE type configurations before moving to TEMPLATE/JOB patterns
-5. **Test thoroughly** - Verify your configurations work correctly through both API and UI
-
-:::tip
-
-Ready to make your plugin configurable through the Netdata UI? Choose your implementation guide and start building!
-
-:::
-
-### For Internal Modules
-
-Are you developing a module that's built into the Netdata agent?
-
-👉 **[Internal DynCfg Implementation Guide](/src/daemon/dyncfg/README.md)**
-
-<details>
-<summary><strong>This guide covers:</strong></summary><br/>
-
-- Low-level and high-level APIs for internal modules
-- Configuration ID structure and naming conventions
+- Low-level and high-level APIs
+- Configuration ID structure
 - Response codes and status handling
 - Action behavior for different configuration types
-- JSON Schema implementation details
-- API access patterns and endpoints
-- Implementation best practices
+- JSON Schema implementation
+- API access and endpoints
+- Best practices
 
-<br/>
-</details>
+### For External Plugins
 
-### For External Plugins  
+If you're developing an external plugin that communicates with Netdata using the plugins.d protocol, see:
 
-Are you developing a standalone plugin that communicates with Netdata using the plugins.d protocol?
+👉 [**External Plugin DynCfg Implementation Guide**](/src/plugins.d/DYNCFG.md)
 
-👉 **[External Plugin DynCfg Implementation Guide](/src/plugins.d/DYNCFG.md)**
+This document covers:
 
-<details>
-<summary><strong>This guide covers:</strong></summary><br/>
+- Plugin protocol commands and responses
+- Registering configurations
+- Handling configuration commands
+- Responding to status changes
+- Schema handling
+- Working examples
 
-- Plugin protocol commands and response formats
-- Configuration registration process
-- Handling incoming configuration commands
-- Responding to status changes and validation requests
-- Schema definition and management
-- Complete working examples with code
+## Example Implementations
 
-<br/>
-</details>
+For reference, you can study these existing implementations:
 
-## Learn from Working Examples
+### Health Alerts System (Internal)
 
-Study these real implementations to understand DynCfg patterns:
+The health module uses DynCfg to manage alert definitions. Key files:
 
-<details>
-<summary><strong>Health Alerts System (Internal Module)</strong></summary><br/>
+- `src/health/health_dyncfg.c`: Implements DynCfg integration for health alerts
+- Uses the high-level API for internal plugins
 
-The health module manages alert definitions through DynCfg:
+### systemd-journal.plugin (External)
 
-- **File**: `src/health/health_dyncfg.c`
-- **Pattern**: Uses high-level internal API
-- **Type**: TEMPLATE and JOB configurations for alert definitions
+The systemd-journal.plugin is a C-based external plugin that uses DynCfg. Key files:
 
-<br/>
-</details>
+- `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`: Implements a SINGLE configuration for journal directories
 
-<details>
-<summary><strong>systemd-journal.plugin (External Plugin, C)</strong></summary><br/>
+### go.d.plugin (External)
 
-External C plugin that manages journal directory configurations:
+go.d.plugin is a Go-based external plugin that uses DynCfg to manage job configurations:
 
-- **File**: `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`  
-- **Pattern**: SINGLE configuration type
-- **Use Case**: Managing journal directory paths
+- Implements templates and jobs for various data collectors
+- Dynamically generates JSON Schema based on Go struct tags
 
-<br/>
-</details>
+## Best Practices
 
-<details>
-<summary><strong>go.d.plugin (External Plugin, Go)</strong></summary><br/>
+When implementing DynCfg for your module or plugin:
 
-Go-based plugin managing multiple data collector configurations:
+1. **Use Clear ID Structure**: Follow the component:category:name pattern
+2. **Choose Logical Paths**: The path parameter affects UI organization
+3. **Validate Thoroughly**: Always validate configuration changes before accepting
+4. **Provide Detailed Errors**: Help users understand why a configuration was rejected
+5. **Document Your Schema**: Include good descriptions in your JSON Schema
+6. **Respect Type-Action Relationships**: Different actions behave differently for each configuration type
+7. **Return Appropriate Status Codes**: Use the correct response codes for each situation
 
-- **Pattern**: TEMPLATE and JOB configurations
-- **Feature**: Dynamically generates JSON Schema from Go struct tags
-- **Scale**: Manages dozens of different collector types
+## More Information
 
-<br/>
-</details>
+For more details about using the Netdata Agent UI to manage dynamic configurations, see the [Netdata Cloud documentation](https://learn.netdata.cloud/docs/agent/web/gui/).
 
-## Implementation Best Practices
-
-<details>
-<summary><strong>Configuration Design</strong></summary><br/>
-
-- **Use clear ID structure** - Follow the `component:category:name` pattern consistently
-- **Choose logical paths** - The path parameter affects how configurations appear in the UI
-- **Design intuitive schemas** - Include helpful descriptions and examples in your JSON Schema
-
-<br/>
-</details>
-
-<details>
-<summary><strong>Validation and Error Handling</strong></summary><br/>
-
-- **Validate thoroughly** - Always validate configuration changes before accepting them
-- **Provide helpful errors** - Give users clear explanations when configurations are rejected
-- **Return appropriate codes** - Use correct HTTP status codes for different situations
-
-<br/>
-</details>
-
-<details>
-<summary><strong>User Experience</strong></summary><br/>
-
-- **Respect type-action relationships** - Different actions behave differently for each configuration type
-- **Test your UI** - Verify that your JSON Schema generates usable forms
-- **Document your options** - Help users understand what each configuration option does
-
-<br/>
-</details>
+To learn about developing for Netdata, see the [Developer Corner](https://learn.netdata.cloud/docs/agent/contribute/).

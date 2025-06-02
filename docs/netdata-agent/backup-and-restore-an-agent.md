@@ -1,10 +1,4 @@
-# Backing up a Netdata Agent
-
-:::tip
-
-**What You'll Learn**
-
-How to backup and restore Netdata Agent data including configuration, metrics, and identity files for disaster recovery scenarios.
+ Agent data including configuration, metrics, and identity files for disaster recovery scenarios.
 
 :::
 
@@ -140,3 +134,4 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 
 <br/>
 </details>
+
