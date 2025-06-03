@@ -296,10 +296,8 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metri
                 if(datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) { // for pd
                     struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
                     pd->datafile.ptr = pgc_page_data(page);
-                    pd->datafile.file = xio->file;
-                    pd->datafile.extent.pos = xio->pos;
-                    pd->datafile.extent.bytes = xio->bytes;
-                    pd->datafile.fileno = pd->datafile.ptr->fileno;
+                    pd->datafile.block = xio->block;
+                    pd->datafile.bytes = xio->bytes;
                     pd->status |= PDC_PAGE_DATAFILE_ACQUIRED | PDC_PAGE_DISK_PENDING;
                 }
                 else {
@@ -587,17 +585,14 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 }
 
                 uint32_t page_update_every_s = page_entry_in_journal->update_every_s;
-                size_t page_length = page_entry_in_journal->page_length;
 
                 if (datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) {
                     //for open cache item
                     // add this page to open cache
                     bool added = false;
                     struct extent_io_data ei = {0};
-                    ei.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
+                    ei.block = (extent_list[page_entry_in_journal->extent_index].datafile_offset) >> 12;
                     ei.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
-                    ei.page_length = page_length;
-                    ei.file = datafile->file;
                     ei.fileno = datafile->fileno;
 
                     PGC_ENTRY e = {0};
@@ -657,10 +652,8 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     struct page_details *pd = page_details_get();
     *PValue = pd;
 
-    pd->datafile.extent.pos = ei->pos;
-    pd->datafile.extent.bytes = ei->bytes;
-    pd->datafile.file = ei->file;
-    pd->datafile.fileno = ei->fileno;
+    pd->datafile.block = ei->block;
+    pd->datafile.bytes = ei->bytes;
     pd->first_time_s = pgc_page_start_time_s(page);
     pd->last_time_s = pgc_page_end_time_s(page);
     pd->datafile.ptr = datafile;
@@ -1043,18 +1036,24 @@ struct pgc_page *pg_cache_lookup_next(
     return page;
 }
 
-void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, uint32_t update_every_s,
-           struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length) {
+void pgc_open_add_hot_page(
+    Word_t section,
+    Word_t metric_id,
+    time_t start_time_s,
+    time_t end_time_s,
+    uint32_t update_every_s,
+    struct rrdengine_datafile *datafile,
+    uint64_t extent_offset,
+    unsigned extent_size)
+{
 
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) // for open cache item
         fatal("DBENGINE: cannot acquire datafile to put page in open cache");
 
     struct extent_io_data ext_io_data = {
-            .file  = datafile->file,
             .fileno = datafile->fileno,
-            .pos = extent_offset,
+            .block = extent_offset >> 12,
             .bytes = extent_size,
-            .page_length = page_length
     };
 
     PGC_ENTRY page_entry = {
