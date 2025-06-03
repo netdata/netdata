@@ -2484,15 +2484,15 @@ void pgc_open_cache_to_journal_v2(
         // update the extents JudyL
 
         size_t current_extent_index_id;
-        Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
+        Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->block, PJE0);
         if(!PValue || PValue == PJERR)
             fatal("CACHE: JudyLIns(JudyL_extents_pos, %" PRIu64 ") failed, JudyL_extents_pos = %p, result = %p",
-                  xio->pos, JudyL_extents_pos, PValue);
+                  (uint64_t) xio->block << 12, JudyL_extents_pos, PValue);
 
         struct jv2_extents_info *ei;
         if(!*PValue) {
             ei = aral_mallocz(ar_ei); // callocz(1, sizeof(struct jv2_extents_info));
-            ei->pos = xio->pos;
+            ei->block = xio->block;
             ei->bytes = xio->bytes;
             ei->number_of_pages = 1;
             ei->index = master_extent_index_id++;
