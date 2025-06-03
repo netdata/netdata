@@ -21,7 +21,7 @@ This method assumes you installed Netdata using the `kickstart.sh` or `netdata-i
 
 :::
 
-Similarly with our documentation on updating Netdata, you need to [determine your installation type](/packaging/installer/UPDATE.md).
+Similarly, with our documentation on updating Netdata, you need to [determine your installation type](/packaging/installer/UPDATE.md).
 
 :::important
 
@@ -33,7 +33,7 @@ If your installation type indicates a [native package](https://learn.netdata.clo
 
 ### Automated Uninstallation
 
-The recommended way to uninstall Netdata is to use the same script you used for installation. Just add the `--uninstall` flag:
+The recommended way to uninstall Netdata is to use the same script you used for installation. Add the `--uninstall` flag:
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
@@ -61,7 +61,7 @@ If you installed Netdata with a custom prefix (different directory location), yo
 
 Most official installations of Netdata include an uninstaller script that can be manually invoked instead of using the kickstart script (internally, the kickstart script also uses this uninstaller script, it just handles the process outlined below for you).
 
-This uninstaller script is self-contained, other than requiring a `.environment` file that was generated during installation. In most cases, this will be found in `/etc/netdata/.environment`, though if you used a custom installation prefix it be located under that directory.
+This uninstaller script is self-contained, other than requiring a `.environment` file that was generated during installation. In most cases, this will be found in `/etc/netdata/.environment`, though if you used a custom installation prefix, it will be located under that directory.
 
 #### Manual Uninstallation Steps
 

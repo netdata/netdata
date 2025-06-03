@@ -10,10 +10,10 @@ How to update Netdata based on your installation method, determine your installa
 
 The update process can differ based on the installation type:
 
-- Install types starting with `binpkg` or ending with `build` or `static` can be updated using our [kickstart script update method](#unix).
+- Install types starting with `binpkg` or ending with `build` or `static` can be updated using our [kickstart script update method](#update-methods-by-platform).
 - Installs with an installation type of `custom` usually indicate installing a third-party package through the system package manager. To update these installations, you should update the package just like you would any other package on your system.
-- macOS users should check [our update instructions for macOS](#macos).
-- Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
+- macOS users should check [our update instructions for macOS](#update-methods-by-platform).
+- Manually built installs should check [our update instructions for manual builds](#update-methods-by-platform).
 
 ## Determine which installation method you used
 
@@ -49,9 +49,9 @@ If you installed Netdata using an installation prefix, you will need to add an `
 
 :::
 
-If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#unix) will work for you.
+If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#update-methods-by-platform) will work for you.
 
-Otherwise, it should either indicate that the installation type is not supported (which probably means you either have a `custom` install or built Netdata manually) or indicate that it would create a new install (which means that you either used a non-standard install path, or that you don't actually have Netdata installed).
+Otherwise, it should either indicate that the installation type is not supported (which probably means you either have a `custom` install or built Netdata manually) or indicate that it would create a new install (which means that you either used a non-standard installation path, or that you don't have Netdata installed).
 
 :::
 
@@ -89,7 +89,7 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 <details>
 <summary><strong>Windows</strong></summary><br/>
 
-To update Netdata, [download](/packaging/windows/WINDOWS_INSTALLER.md#download-the-msi-installer) the latest installer and reinstall the Agent.
+To update Netdata, [download](/packaging/windows/WINDOWS_INSTALLER.md#download-the-windows-installer-msi) the latest installer and reinstall the Agent.
 
 For automatic updates, see our [Windows automatic updates guide](https://learn.netdata.cloud/docs/netdata-agent/installation/windows#automatic-updates).
 
@@ -166,5 +166,5 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | **manual-static-ARCH**     | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
 | **custom**                 | System package manager | Use your system's package manager                                                                          |
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
-| **Manual Git**             | Git + installer        | See [manual installation steps](#manual-installation-from-git)                                             |
+| **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
 | **Windows**                | MSI installer          | Download and run latest installer                                                                          |
