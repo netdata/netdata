@@ -20,7 +20,7 @@ In most cases, you need to **restart the Netdata service** to apply changes to c
 
 :::warning
 
-**Service Restart Impact** 
+**Service Restart Impact**
 
 Restarting the Netdata Agent will cause temporary gaps in your collected metrics. This occurs while the netdata process reinitializes its data collectors and database engine.
 
@@ -30,11 +30,11 @@ Restarting the Netdata Agent will cause temporary gaps in your collected metrics
 
 ### Using `systemctl`, `service`, or `init.d`
 
-| Action  | Systemd                         | Non-systemd                    |
-|---------|---------------------------------|--------------------------------|
-| start   | `sudo systemctl start netdata`  | `sudo service netdata start`   |
-| stop    | `sudo systemctl stop netdata`   | `sudo service netdata stop`    |
-| restart | `sudo systemctl restart netdata`| `sudo service netdata restart` |
+| Action  | Systemd                          | Non-systemd                    |
+|---------|----------------------------------|--------------------------------|
+| start   | `sudo systemctl start netdata`   | `sudo service netdata start`   |
+| stop    | `sudo systemctl stop netdata`    | `sudo service netdata stop`    |
+| restart | `sudo systemctl restart netdata` | `sudo service netdata restart` |
 
 ### Using `netdata`
 
@@ -92,18 +92,18 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 
 ### UNIX Commands Summary
 
-| Task | Systemd | Non-systemd | Direct Command |
-|------|---------|-------------|----------------|
-| **Start** | `sudo systemctl start netdata` | `sudo service netdata start` | `sudo netdata` |
-| **Stop** | `sudo systemctl stop netdata` | `sudo service netdata stop` | `sudo killall netdata` |
-| **Restart** | `sudo systemctl restart netdata` | `sudo service netdata restart` | Stop + Start |
-| **Reload Health** | `sudo netdatacli reload-health` | `sudo netdatacli reload-health` | `sudo netdatacli reload-health` |
-| **Shutdown** | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` |
+| Task              | Systemd                          | Non-systemd                      | Direct Command                   |
+|-------------------|----------------------------------|----------------------------------|----------------------------------|
+| **Start**         | `sudo systemctl start netdata`   | `sudo service netdata start`     | `sudo netdata`                   |
+| **Stop**          | `sudo systemctl stop netdata`    | `sudo service netdata stop`      | `sudo killall netdata`           |
+| **Restart**       | `sudo systemctl restart netdata` | `sudo service netdata restart`   | Stop + Start                     |
+| **Reload Health** | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  | `sudo netdatacli reload-health`  |
+| **Shutdown**      | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` | `sudo netdatacli shutdown-agent` |
 
 ### Windows Commands Summary
 
-| Task | PowerShell Command | GUI Location |
-|------|-------------------|--------------|
-| **Start** | `Start-Service Netdata` | Task Manager > Services > Netdata |
-| **Stop** | `Stop-Service Netdata` | Task Manager > Services > Netdata |
+| Task        | PowerShell Command        | GUI Location                      |
+|-------------|---------------------------|-----------------------------------|
+| **Start**   | `Start-Service Netdata`   | Task Manager > Services > Netdata |
+| **Stop**    | `Stop-Service Netdata`    | Task Manager > Services > Netdata |
 | **Restart** | `Restart-Service Netdata` | Task Manager > Services > Netdata |

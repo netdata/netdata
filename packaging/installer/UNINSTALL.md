@@ -79,7 +79,7 @@ This uninstaller script is self-contained, other than requiring a `.environment`
     <details>
     <summary><strong>Interactive mode (Default)</strong></summary><br/>
 
-    The default mode in the uninstaller script is **interactive**. This means that the script provides you the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each Netdata asset in the filesystem.
+   The default mode in the uninstaller script is **interactive**. This means that the script provides you the option to reply with "yes" (`y`/`Y`) or "no" (`n`/`N`) to control the removal of each Netdata asset in the filesystem.
 
     ```sh
     ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --env <environment_file>
@@ -91,7 +91,7 @@ This uninstaller script is self-contained, other than requiring a `.environment`
     <details>
     <summary><strong>Non-interactive mode</strong></summary><br/>
 
-    If you're sure, and you know what you're doing, you can speed up the removal of the Netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the Netdata assets in a **non-interactive** mode.
+   If you're sure, and you know what you're doing, you can speed up the removal of the Netdata assets from the filesystem without any questions by using the force option (`-f`/`--force`). This option will remove all the Netdata assets in a **non-interactive** mode.
 
     ```sh
     ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh --yes --force --env <environment_file>

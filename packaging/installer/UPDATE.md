@@ -148,23 +148,23 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 
 **Available Configuration Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `NETDATA_UPDATER_JITTER` | Sets an upper limit in seconds on the random delay in the updater script when running as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to the Cloud at the same time. Most users shouldn't ever need to change this. | 3600 (one hour) |
-| `NETDATA_MAJOR_VERSION_UPDATES` | If set to a value other than 0, then new major versions will be installed without user confirmation. Must be set to a non-zero value for automated updates to install new major versions. | 0 |
-| `NETDATA_NO_SYSTEMD_JOURNAL` | If set to a value other than 0, skip attempting to install the `netdata-plugin-systemd-journal` package on supported systems on update. The updater will install this optional package by default on supported systems if this option is not set. It only affects systems using native packages. | 0 |
+| Option                          | Description                                                                                                                                                                                                                                                                                      | Default         |
+|---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| `NETDATA_UPDATER_JITTER`        | Sets an upper limit in seconds on the random delay in the updater script when running as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to the Cloud at the same time. Most users shouldn't ever need to change this.                  | 3600 (one hour) |
+| `NETDATA_MAJOR_VERSION_UPDATES` | If set to a value other than 0, then new major versions will be installed without user confirmation. Must be set to a non-zero value for automated updates to install new major versions.                                                                                                        | 0               |
+| `NETDATA_NO_SYSTEMD_JOURNAL`    | If set to a value other than 0, skip attempting to install the `netdata-plugin-systemd-journal` package on supported systems on update. The updater will install this optional package by default on supported systems if this option is not set. It only affects systems using native packages. | 0               |
 
 ## Quick Reference
 
 ### Update Commands by Installation Type
 
-| Installation Type | Update Method | Command |
-|-------------------|---------------|---------|
-| **binpkg-rpm/deb** | Kickstart script | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
-| **kickstart-build/static** | Kickstart script | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
-| **legacy-build/static** | Kickstart script | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
-| **manual-static-ARCH** | Kickstart script | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
-| **custom** | System package manager | Use your system's package manager |
-| **macOS (Homebrew)** | Homebrew | `brew upgrade netdata` |
-| **Manual Git** | Git + installer | See [manual installation steps](#manual-installation-from-git) |
-| **Windows** | MSI installer | Download and run latest installer |
+| Installation Type          | Update Method          | Command                                                                                                    |
+|----------------------------|------------------------|------------------------------------------------------------------------------------------------------------|
+| **binpkg-rpm/deb**         | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
+| **kickstart-build/static** | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
+| **legacy-build/static**    | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
+| **manual-static-ARCH**     | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
+| **custom**                 | System package manager | Use your system's package manager                                                                          |
+| **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
+| **Manual Git**             | Git + installer        | See [manual installation steps](#manual-installation-from-git)                                             |
+| **Windows**                | MSI installer          | Download and run latest installer                                                                          |

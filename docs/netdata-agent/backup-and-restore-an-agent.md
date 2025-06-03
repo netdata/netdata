@@ -68,11 +68,11 @@ graph TB
    Verify that the directory paths in the table above contain the information you expect.
 
    :::note
-   
+
    **Path Variations**
-   
+
    The specific paths may vary depending on installation method, Operating System, and whether it is a Docker/Kubernetes deployment.
-   
+
    :::
 
 2. **Stop the Netdata Agent**
@@ -117,15 +117,15 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
    ```
 
    :::warning
-   
+
    **Database File Restoration**
-   
+
    If you are going to restore the database files, then you should first ensure that the Metrics directory is empty.
 
    ```bash
    sudo rm -Rf /var/cache/netdata
    ```
-   
+
    :::
 
 2. **Restore from backup archive**
