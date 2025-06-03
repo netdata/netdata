@@ -709,9 +709,14 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             mrg_metric_expand_retention(main_mrg, metric, vd.start_time_s, vd.end_time_s, vd.update_every_s);
 
         pgc_open_add_hot_page(
-                (Word_t)ctx, metric_id, vd.start_time_s, vd.end_time_s, vd.update_every_s,
-                journalfile->datafile,
-                jf_metric_data->extent_offset, jf_metric_data->extent_size, jf_metric_data->descr[i].page_length);
+            (Word_t)ctx,
+            metric_id,
+            vd.start_time_s,
+            vd.end_time_s,
+            vd.update_every_s,
+            journalfile->datafile,
+            jf_metric_data->extent_offset,
+            jf_metric_data->extent_size);
 
         extent_first_time_s = MIN(extent_first_time_s, vd.start_time_s);
 
@@ -1179,7 +1184,7 @@ void *journalfile_v2_write_extent_list(Pvoid_t JudyL_extents_pos, void *data)
         ext_info = *PValue;
         size_t index = ext_info->index;
         j2_extent_base[index].file_index = 0;
-        j2_extent_base[index].datafile_offset = ext_info->pos;
+        j2_extent_base[index].datafile_offset = ((uint64_t) ext_info->block) << 12;
         j2_extent_base[index].datafile_size = ext_info->bytes;
         j2_extent_base[index].pages = ext_info->number_of_pages;
         count++;
@@ -1246,14 +1251,12 @@ void *journalfile_v2_write_data_page(struct journal_v2_header *j2_header, void *
     if (journalfile_verify_space(j2_header, data, sizeof(*data_page)))
         return NULL;
 
-    struct extent_io_data *ei = page_info->custom_data;
-
     data_page->delta_start_s = (uint32_t) (page_info->start_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
     data_page->delta_end_s = (uint32_t) (page_info->end_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
     data_page->extent_index = page_info->extent_index;
 
     data_page->update_every_s = page_info->update_every_s;
-    data_page->page_length = (uint16_t) (ei ? ei->page_length : page_info->page_length);
+    data_page->page_length = 0;
     data_page->type = 0;
 
     return ++data_page;
