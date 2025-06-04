@@ -189,11 +189,6 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
         bool do_it = dictionary_acquired_item_value(item) == rc;
 
-        if(do_it) {
-            worker_is_busy(WORKER_JOB_DEQUEUE);
-            rrdcontext_del_from_hub_queue(rc, true);
-        }
-
         spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
         if(item) {
@@ -249,12 +244,18 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
                     else
                         rrdcontext_unlock(rc);
                 }
+                else
+                    do_it = false;
             }
 
             dictionary_acquired_item_release(host->rrdctx.contexts, item);
         }
-
         spinlock_lock(&host->rrdctx.hub_queue.spinlock);
+
+        if(do_it) {
+            worker_is_busy(WORKER_JOB_DEQUEUE);
+            rrdcontext_del_from_hub_queue(rc, true);
+        }
     }
     spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
