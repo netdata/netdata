@@ -1,15 +1,31 @@
 # Configuring Metrics Centralization Points
 
+:::tip
+
+**What You'll Learn**
+
+How to configure streaming between Netdata Children and Parents using stream.conf, including basic setup, TLS/SSL encryption, and troubleshooting connection issues.
+
+:::
+
 Metrics streaming configuration for both Netdata Children and Parents is done via `stream.conf`.
 
+:::important
+
+**Configuration File Security**
+
 `netdata.conf` and `stream.conf` have the same `ini` format, but `netdata.conf` is considered a non-sensitive file, while `stream.conf` contains API keys, IPs and other sensitive information that enable communication between Netdata Agents.
+
+:::
+
+## Understanding stream.conf Structure
 
 `stream.conf` has two main sections:
 
 - The `[stream]` section includes options for the **sending Netdata** (i.e., Netdata Children, or Netdata Parents that stream to Grand Parents, or to other sibling Netdata Parents in a cluster).
 - The rest includes multiple sections that define API keys for the **receiving Netdata** (i.e., Netdata Parents).
 
-## Edit `stream.conf`
+## Edit stream.conf
 
 To edit `stream.conf`, run this on your terminal:
 
@@ -20,7 +36,10 @@ sudo ./edit-config stream.conf
 
 Your editor will open, with defaults and commented `stream.conf` options.
 
-## Configuring a Netdata Parent
+## Configuration Steps
+
+<details>
+<summary><strong>Configuring a Netdata Parent</strong></summary><br/>
 
 To enable the reception of metrics from Netdata Children, generate a random API key with this command:
 
@@ -38,7 +57,11 @@ Then, copy the UUID generated, [edit `stream.conf`](#edit-streamconf), find the 
 
 Save the file and restart Netdata.
 
-## Configuring Netdata Children
+<br/>
+</details>
+
+<details>
+<summary><strong>Configuring Netdata Children</strong></summary><br/>
 
 To enable streaming metrics to a Netdata Parent, [edit `stream.conf`](#edit-streamconf), and at the `[stream]` section at the top, set:
 
@@ -54,15 +77,25 @@ To enable streaming metrics to a Netdata Parent, [edit `stream.conf`](#edit-stre
 
 Save the file and restart Netdata.
 
-## Enable TLS/SSL Communication
+<br/>
+</details>
+
+<details>
+<summary><strong>Enable TLS/SSL Communication</strong></summary><br/>
 
 While encrypting the connection between your parent and child nodes is recommended for security, it's not required to get started.
 
 This example uses self-signed certificates.
 
-> **Note**  
-> This section assumes you have read the documentation on [how to edit the Netdata configuration files](/docs/netdata-agent/configuration/README.md).
-<!-- here we need a link to the section that will contain the restarting instructions -->
+:::note
+
+**Prerequisites**
+
+This section assumes you have read the documentation on [how to edit the Netdata configuration files](/docs/netdata-agent/configuration/README.md).
+
+:::
+
+### SSL Setup Process
 
 1. **Parent node**  
    To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](/src/web/server/README.md#enable-httpstls-support) in our Documentation.
@@ -78,26 +111,46 @@ This example uses self-signed certificates.
         api key = 11111111-2222-3333-4444-555555555555
     ```
 
-3. Restart the Netdata Agent on both the parent and child nodes to stream encrypted metrics using TLS/SSL.
+3. **Restart both nodes**  
+   Restart the Netdata Agent on both the parent and child nodes to stream encrypted metrics using TLS/SSL.
+
+<br/>
+</details>
 
 ## Troubleshooting Streaming Connections
 
 You can find any issues related to streaming at Netdata logs.
 
-### From the UI
+<details>
+<summary><strong>From the UI</strong></summary><br/>
 
 Netdata logs to systemd-journald by default, and its logs are available at the `Logs` tab of the UI. At the `MESSAGE_ID` field look for `Netdata connection from child` and `Netdata connection to parent`.
 
-### From the terminal
+<br/>
+</details>
 
-On the Parents:
+<details>
+<summary><strong>From the terminal</strong></summary><br/>
+
+**On the Parents:**
 
 ```bash
 journalctl -r --namespace=netdata MESSAGE_ID=ed4cdb8f1beb4ad3b57cb3cae2d162fa
 ```
 
-On the Children:
+**On the Children:**
 
 ```bash
 journalctl -r --namespace=netdata MESSAGE_ID=6e2e3839067648968b646045dbf28d66
 ```
+
+<br/>
+</details>
+
+## Next Steps
+
+### Sizing Netdata Parents
+
+After configuring your metrics centralization setup, you'll want to properly size your Netdata Parents to handle the expected load from your Children nodes.
+
+For detailed information on resource requirements and optimization strategies, see [Resource Utilization](https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/).
