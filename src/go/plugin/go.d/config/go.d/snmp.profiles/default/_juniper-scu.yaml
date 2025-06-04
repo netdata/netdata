@@ -10,12 +10,12 @@ metrics:
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.4
         name: jnxScuStatsPackets
         description: Number of packets sent out of destination interface that match the source class and address family
-        family: Juniper/SCU/Interfaces/Address Families/Packets
+        family: Juniper/SCU/Interfaces/Packets
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.5
         name: jnxScuStatsBytes
         description: Number of bytes sent out of destination interface that match the source class and address family
-        family: Juniper/SCU/Interfaces/Address Families/Bytes
+        family: Juniper/SCU/Interfaces/Traffic
         unit: "By"
     metric_tags:
       - symbol:
