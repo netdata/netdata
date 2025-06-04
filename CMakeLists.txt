@@ -196,6 +196,7 @@ cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter moni
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_UNITS "Enable systemd units information collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_UPSD "Enable UPSd monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 
 # Metrics exporters
@@ -2839,6 +2840,29 @@ if(ENABLE_PLUGIN_CUPS)
                         ${PKG_FILES_PATH}/copyright
                         COMPONENT plugin-cups
                         DESTINATION usr/share/doc/netdata-plugin-cups)
+        endif()
+    endif()
+endif()
+
+if(ENABLE_PLUGIN_UPSD)
+    pkg_check_modules(UPSD libupsclient-dev)
+    if(NOT UPSD_FOUND)
+        message(WARNING "Could not find package libupsclient-dev.")
+    else()
+        set(UPSD_PLUGIN_FILES src/collectors/upsd.plugin/upsd_plugin.c)
+        add_executable(upsd.plugin ${UPSD_PLUGIN_FILES})
+        target_link_libraries (upsd.plugin libnetdata ${UPSD_LIBRARIES})
+        target_compile_options(upsd.plugin PRIVATE ${UPSD_CFLAGS_OTHER})
+
+        install(TARGETS upsd.plugin
+                COMPONENT plugin-upsd
+                DESTINATION usr/libexec/netdata/plugins.d)
+
+        if(BUILD_FOR_PACKAGING)
+            install(FILES
+                    ${PKG_FILES_PATH}/copyright
+                    COMPONENT plugin-upsd
+                    DESTINATION usr/share/doc/netdata-plugin-upsd)
         endif()
     endif()
 endif()

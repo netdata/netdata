@@ -384,6 +384,7 @@ prepare_cmake_options() {
   check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
   check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
   check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
+  check_for_feature PLUGIN_UPSD "${ENABLE_UPSD}" libupsclient-dev
 }
 
 # -----------------------------------------------------------------------------
