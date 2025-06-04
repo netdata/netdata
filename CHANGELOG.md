@@ -6,8 +6,18 @@
 
 **Merged pull requests:**
 
+- SNMP: \_juniper-userfirewall.yaml [\#20409](https://github.com/netdata/netdata/pull/20409) ([Ancairon](https://github.com/Ancairon))
+- SNMP: \_juniper-scu.yaml [\#20408](https://github.com/netdata/netdata/pull/20408) ([Ancairon](https://github.com/Ancairon))
+- SNMP: \_juniper-firewall.yaml [\#20407](https://github.com/netdata/netdata/pull/20407) ([Ancairon](https://github.com/Ancairon))
+- SNMP: \_juniper-dcu.yaml [\#20406](https://github.com/netdata/netdata/pull/20406) ([Ancairon](https://github.com/Ancairon))
+- Rename nd-mcp on windows [\#20404](https://github.com/netdata/netdata/pull/20404) ([stelfrag](https://github.com/stelfrag))
+- Maintenance: update restart, backup, uninstall, and restore docs [\#20398](https://github.com/netdata/netdata/pull/20398) ([kanelatechnical](https://github.com/kanelatechnical))
+- feat\(go.d\): allow to debug a specific job [\#20394](https://github.com/netdata/netdata/pull/20394) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d/httpcheck\): add resp validation debug logging [\#20392](https://github.com/netdata/netdata/pull/20392) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/docker/docker from 28.2.1+incompatible to 28.2.2+incompatible in /src/go [\#20387](https://github.com/netdata/netdata/pull/20387) ([dependabot[bot]](https://github.com/apps/dependabot))
 - apps.plugin documentation and grouping matches improvements [\#20386](https://github.com/netdata/netdata/pull/20386) ([ktsaou](https://github.com/ktsaou))
 - SNMP: aruba-switch.yaml [\#20385](https://github.com/netdata/netdata/pull/20385) ([Ancairon](https://github.com/Ancairon))
+- Improve DynCfg documentation [\#20384](https://github.com/netdata/netdata/pull/20384) ([kanelatechnical](https://github.com/kanelatechnical))
 - SNMP: aruba-cx-switch.yaml [\#20383](https://github.com/netdata/netdata/pull/20383) ([Ancairon](https://github.com/Ancairon))
 - SNMP: aruba-clearpass.yaml [\#20382](https://github.com/netdata/netdata/pull/20382) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_aruba-switch-cpu-memory.yaml [\#20381](https://github.com/netdata/netdata/pull/20381) ([Ancairon](https://github.com/Ancairon))
@@ -34,6 +44,7 @@
 - SNMP: \_cisco-ipsec-flow-monitor.yaml [\#20353](https://github.com/netdata/netdata/pull/20353) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): update otel dependencies version [\#20352](https://github.com/netdata/netdata/pull/20352) ([ilyam8](https://github.com/ilyam8))
 - SNMP: \_generic-ups.yaml [\#20351](https://github.com/netdata/netdata/pull/20351) ([Ancairon](https://github.com/Ancairon))
+- Improve retention calculation after datafile deletion [\#20350](https://github.com/netdata/netdata/pull/20350) ([stelfrag](https://github.com/stelfrag))
 - SNMP: \_generic-ucd.yaml [\#20349](https://github.com/netdata/netdata/pull/20349) ([Ancairon](https://github.com/Ancairon))
 - improvement\(go.d/sd\): better prometheus exporters detection [\#20348](https://github.com/netdata/netdata/pull/20348) ([ilyam8](https://github.com/ilyam8))
 - Updated configuration reference [\#20347](https://github.com/netdata/netdata/pull/20347) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -83,6 +94,7 @@
 - Cisco yaml pass [\#20291](https://github.com/netdata/netdata/pull/20291) ([Ancairon](https://github.com/Ancairon))
 - Minor code adjustments [\#20290](https://github.com/netdata/netdata/pull/20290) ([stelfrag](https://github.com/stelfrag))
 - Fix when docker socket group id points to an existing group in container [\#20288](https://github.com/netdata/netdata/pull/20288) ([felipecrs](https://github.com/felipecrs))
+- Model Context Protocol \(MCP\) Part 2 [\#20287](https://github.com/netdata/netdata/pull/20287) ([ktsaou](https://github.com/ktsaou))
 - add "unix://" scheme to DOCKER\_HOST in run.sh [\#20286](https://github.com/netdata/netdata/pull/20286) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20284](https://github.com/netdata/netdata/pull/20284) ([netdatabot](https://github.com/netdatabot))
 - Improved StatsD documentation [\#20282](https://github.com/netdata/netdata/pull/20282) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -408,7 +420,6 @@
 - improvement\(health/dyncfg\): add widget to load available contexts [\#19904](https://github.com/netdata/netdata/pull/19904) ([ilyam8](https://github.com/ilyam8))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 - Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
-- Large-scale cleanup of static build infrastructure. [\#19852](https://github.com/netdata/netdata/pull/19852) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
@@ -457,19 +468,6 @@
 - fixed sentry version [\#19868](https://github.com/netdata/netdata/pull/19868) ([ktsaou](https://github.com/ktsaou))
 - fixed sentry dedup [\#19867](https://github.com/netdata/netdata/pull/19867) ([ktsaou](https://github.com/ktsaou))
 - fix\(freebsd.plugin\): correct disks/network devices charts [\#19866](https://github.com/netdata/netdata/pull/19866) ([ilyam8](https://github.com/ilyam8))
-- improvement\(macos.plugin\): add options to filter net ifaces and mountpoints [\#19865](https://github.com/netdata/netdata/pull/19865) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/prometheus/common from 0.62.0 to 0.63.0 in /src/go [\#19864](https://github.com/netdata/netdata/pull/19864) ([dependabot[bot]](https://github.com/apps/dependabot))
-- daemon status file 16 [\#19863](https://github.com/netdata/netdata/pull/19863) ([ktsaou](https://github.com/ktsaou))
-- Release memory on shutdown - detect invalid extent in journal files [\#19861](https://github.com/netdata/netdata/pull/19861) ([stelfrag](https://github.com/stelfrag))
-- restore needed variables for pluginsd [\#19860](https://github.com/netdata/netdata/pull/19860) ([ktsaou](https://github.com/ktsaou))
-- fix\(macos.plugin\): correct disks/network devices charts [\#19859](https://github.com/netdata/netdata/pull/19859) ([ilyam8](https://github.com/ilyam8))
-- disable UNW\_LOCAL\_ONLY on static builds [\#19858](https://github.com/netdata/netdata/pull/19858) ([ktsaou](https://github.com/ktsaou))
-- daemon status 15 [\#19857](https://github.com/netdata/netdata/pull/19857) ([ktsaou](https://github.com/ktsaou))
-- fix crashes identified by sentry [\#19856](https://github.com/netdata/netdata/pull/19856) ([ktsaou](https://github.com/ktsaou))
-- netdata-uninstaller: improve input prompt with more descriptive guidance [\#19855](https://github.com/netdata/netdata/pull/19855) ([ilyam8](https://github.com/ilyam8))
-- make sure alerts are concurrently altered by dyncfg [\#19854](https://github.com/netdata/netdata/pull/19854) ([ktsaou](https://github.com/ktsaou))
-- fix contexts labels to avoid clearing the rrdlabels pointer [\#19853](https://github.com/netdata/netdata/pull/19853) ([ktsaou](https://github.com/ktsaou))
-- fix updating on RPi2+ [\#19850](https://github.com/netdata/netdata/pull/19850) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
