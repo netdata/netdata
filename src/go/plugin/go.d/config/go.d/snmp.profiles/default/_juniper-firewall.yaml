@@ -9,11 +9,13 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.2636.3.5.2.1.4
         name: jnxFWCounterPacketCount
-        description: The number of packets being counted pertaining to the specified counter or policer.
+        description: The number of packets being counted pertaining to the specified counter or policer
+        family: Juniper/Firewall/Filters/Packets
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.5.2.1.5
         name: jnxFWCounterByteCount
-        description: The number of bytes being counted pertaining to the specified counter. For policers, this field is always zero because policers do not count number of bytes.
+        description: The number of bytes being counted pertaining to the specified counter. For policers, this field is always zero because policers do not count number of bytes
+        family: Juniper/Firewall/Filters/Bytes
         unit: "By"
     metric_tags:
       - symbol:
