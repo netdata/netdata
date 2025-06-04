@@ -200,6 +200,8 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ----------------------------------------------------------------------------
 // ACLK interface
 
+#define CTX_FORCE_SNAPSHOT_VERSION_HASH (1)
+
 void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
@@ -236,8 +238,27 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
     uint64_t our_version_hash = rrdcontext_version_hash(host);
 
-    if(cmd->version_hash != our_version_hash) {
+    bool force_snapshot = (cmd->version_hash == CTX_FORCE_SNAPSHOT_VERSION_HASH);
+
+    if (force_snapshot) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDCONTEXT: received force context snapshot for host '%s', our version hash is %"PRIu64". ",
+               rrdhost_hostname(host), our_version_hash);
+
+        if (our_version_hash == 0) {
+            bool pending_load = rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+            nd_log(
+                NDLS_DAEMON,
+                NDLP_NOTICE,
+                "RRDCONTEXT: received force context snapshot for host '%s', but %s",
+                pending_load ? "we have not loaded contexts yet." : "we have no contexts to send.",
+                rrdhost_hostname(host));
+        }
+    }
+
+    if(cmd->version_hash != our_version_hash) {
+        if (!force_snapshot)
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". "
                "Sending snapshot of all contexts.",
                cmd->version_hash, rrdhost_hostname(host), our_version_hash);
@@ -258,6 +279,10 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
 
         // send it
         aclk_send_contexts_snapshot(bundle);
+        if (force_snapshot)
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "RRDCONTEXT: sent force context snapshot for host '%s', our version hash is %"PRIu64". ",
+                   rrdhost_hostname(host), our_version_hash);
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -301,15 +326,11 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
                "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "
                "but node '%s' does not have active context streaming. Ignoring command.",
                cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
-
-        return;
+    } else {
+        nd_log(
+            NDLS_DAEMON, NDLP_NOTICE, "RRDCONTEXT: host '%s' disabling streaming of contexts", rrdhost_hostname(host));
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     }
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRDCONTEXT: host '%s' disabling streaming of contexts",
-           rrdhost_hostname(host));
-
-    rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
 ALWAYS_INLINE
