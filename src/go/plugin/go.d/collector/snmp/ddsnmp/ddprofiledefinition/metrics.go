@@ -81,14 +81,14 @@ type SymbolConfig struct {
 	MetricType  ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 	Unit        string            `yaml:"unit,omitempty" json:"unit,omitempty"`
 	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
+	Mapping     map[string]string `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 }
 
 // Clone creates a duplicate of this SymbolConfig
 func (s SymbolConfig) Clone() SymbolConfig {
-	// SymbolConfig has no mutable members, so simple assignment copies it.
-	// (technically this is false - regexes in go are mutable SOLELY through the
-	// .Longest() method. But we never use that, so we ignore it here)
-	return s
+	ss := s
+	ss.Mapping = maps.Clone(ss.Mapping)
+	return ss
 }
 
 // MetricTagConfig holds metric tag info
@@ -97,6 +97,8 @@ type MetricTagConfig struct {
 
 	// Table config
 	Index uint `yaml:"index,omitempty" json:"index,omitempty"`
+
+	Table string `yaml:"table,omitempty" json:"table,omitempty"`
 
 	// DEPRECATED: Use .Symbol instead
 	Column SymbolConfig `yaml:"column,omitempty" json:"-"`

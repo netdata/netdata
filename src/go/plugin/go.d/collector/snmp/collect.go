@@ -30,7 +30,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		if c.EnableProfiles {
-			c.snmpProfiles = ddsnmp.Find(c.sysInfo.SysObjectID)
+			c.snmpProfiles = ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
 		}
 	}
 

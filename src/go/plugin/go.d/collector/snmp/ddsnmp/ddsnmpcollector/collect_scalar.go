@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package ddsnmpcollector
+
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/gosnmp/gosnmp"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+)
+
+func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
+	var oids []string
+
+	for _, m := range prof.Definition.Metrics {
+		if m.IsScalar() {
+			oids = append(oids, m.Symbol.OID)
+		}
+	}
+
+	slices.Sort(oids)
+	oids = slices.Compact(oids)
+
+	pdus, err := c.snmpGet(oids)
+	if err != nil {
+		return nil, err
+	}
+
+	metrics := make([]Metric, 0, len(prof.Definition.Metrics))
+	var errs []error
+
+	for _, cfg := range prof.Definition.Metrics {
+		if !cfg.IsScalar() {
+			continue
+		}
+
+		metric, err := c.collectScalarMetric(cfg, pdus)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("metric '%s': %w", cfg.Symbol.Name, err))
+			c.log.Debugf("Error processing scalar metric '%s': %v", cfg.Symbol.Name, err)
+			continue
+		}
+
+		if metric != nil {
+			metrics = append(metrics, *metric)
+		}
+	}
+
+	if len(metrics) == 0 && len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+
+	return metrics, nil
+}
+
+func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*Metric, error) {
+	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
+	if !ok {
+		return nil, nil
+	}
+
+	value, err := processSymbolValue(cfg.Symbol, pdu)
+	if err != nil {
+		return nil, fmt.Errorf("error processing value: %w", err)
+	}
+
+	tags := make(map[string]string)
+
+	for _, tag := range cfg.StaticTags {
+		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
+			tags[n] = v
+		}
+	}
+
+	return &Metric{
+		Name:        cfg.Symbol.Name,
+		Value:       value,
+		Tags:        tags,
+		Unit:        cfg.Symbol.Unit,
+		Description: cfg.Symbol.Description,
+		MetricType:  string(getMetricType(cfg.Symbol, pdu)),
+	}, nil
+}
+
+func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+	var value int64
+
+	if isPduNumericType(pdu) {
+		value = gosnmp.ToBigInt(pdu.Value).Int64()
+	} else {
+		s, err := convPduToStringf(pdu, sym.Format)
+		if err != nil {
+			return 0, err
+		}
+		switch {
+		case sym.ExtractValueCompiled != nil:
+			if sm := sym.ExtractValueCompiled.FindStringSubmatch(s); len(sm) > 1 {
+				s = sm[1]
+			}
+		case sym.MatchPatternCompiled != nil:
+			if sm := sym.MatchPatternCompiled.FindStringSubmatch(s); len(sm) > 0 {
+				s = replaceSubmatches(sym.MatchValue, sm)
+			}
+		}
+		if v, ok := sym.Mapping[s]; ok {
+			s = v
+		}
+
+		value, err = strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if sym.ScaleFactor != 0 {
+		value = int64(float64(value) * sym.ScaleFactor)
+	}
+
+	return value, nil
+}

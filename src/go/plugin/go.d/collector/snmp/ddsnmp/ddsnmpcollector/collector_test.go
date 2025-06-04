@@ -1,0 +1,643 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package ddsnmpcollector
+
+import (
+	"errors"
+	"regexp"
+	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/gosnmp/gosnmp"
+	"github.com/stretchr/testify/assert"
+
+	snmpmock "github.com/gosnmp/gosnmp/mocks"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+)
+
+func TestCollector_Collect(t *testing.T) {
+	tests := map[string]struct {
+		name           string
+		profiles       []*ddsnmp.Profile
+		setupMock      func(m *snmpmock.MockHandler)
+		expectedResult []*ProfileMetrics
+		expectedError  bool
+		errorContains  string
+	}{
+		"successful collection with scalar metrics only": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.5.0",
+									Name: "sysName",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get(gomock.InAnyOrder([]string{"1.3.6.1.2.1.1.3.0", "1.3.6.1.2.1.1.5.0"})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.TimeTicks,
+								Value: uint32(123456),
+							},
+							{
+								Name:  "1.3.6.1.2.1.1.5.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("test-host"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "sysUpTime",
+							Value:      123456,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+						},
+						// sysName will be skipped because it can't be converted to int64
+					},
+				},
+			},
+			expectedError: false, // Changed to false - partial success is not an error
+		},
+		"successful collection with global tags": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						MetricTags: []ddprofiledefinition.MetricTagConfig{
+							{
+								Tag: "device_vendor",
+								Symbol: ddprofiledefinition.SymbolConfigCompat{
+									OID:  "1.3.6.1.2.1.1.1.0",
+									Name: "sysDescr",
+								},
+							},
+						},
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				// First call for global tags
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.1.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("Cisco IOS"),
+							},
+						},
+					}, nil,
+				)
+				// Second call for metrics
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.TimeTicks,
+								Value: uint32(123456),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "sysUpTime",
+							Value:      123456,
+							Tags:       map[string]string{"device_vendor": "Cisco IOS"},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"successful collection with device metadata": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metadata: ddprofiledefinition.MetadataConfig{
+							"device": ddprofiledefinition.MetadataResourceConfig{
+								Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+									"vendor": {
+										Value: "dell",
+									},
+									"serial_number": {
+										Symbol: ddprofiledefinition.SymbolConfig{
+											OID:  "1.3.6.1.4.1.674.10892.5.1.3.2.0",
+											Name: "chassisSerialNumber",
+										},
+									},
+								},
+							},
+						},
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				// First call for device metadata
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.1.3.2.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.674.10892.5.1.3.2.0",
+								Type:  gosnmp.OctetString,
+								Value: []byte("ABC123"),
+							},
+						},
+					}, nil,
+				)
+				// Second call for metrics
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.TimeTicks,
+								Value: uint32(123456),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: map[string]string{
+						"vendor":        "dell",
+						"serial_number": "ABC123",
+					},
+					Metrics: []Metric{
+						{
+							Name:       "sysUpTime",
+							Value:      123456,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"metric with scale factor": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:         "1.3.6.1.4.1.12124.1.1.2",
+									Name:        "memoryKilobytes",
+									ScaleFactor: 1000, // Convert KB to bytes
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.2"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.2",
+								Type:  gosnmp.Gauge32,
+								Value: uint(1024),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "memoryKilobytes",
+							Value:      1024000, // 1024 * 1000
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"OID not found - returns empty metrics": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.NoSuchObject,
+								Value: nil,
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics:        []Metric{},
+				},
+			},
+			expectedError: false,
+		},
+		"SNMP error": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					(*gosnmp.SnmpPacket)(nil),
+					errors.New("SNMP timeout"),
+				)
+			},
+			expectedResult: nil,
+			expectedError:  true,
+			errorContains:  "SNMP timeout",
+		},
+		"multiple profiles - one fails": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.5.0",
+									Name: "sysName",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				// First profile succeeds
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.TimeTicks,
+								Value: uint32(123456),
+							},
+						},
+					}, nil,
+				)
+				// Second profile fails
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
+					(*gosnmp.SnmpPacket)(nil),
+					errors.New("connection refused"),
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "sysUpTime",
+							Value:      123456,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false, // Should return partial results
+		},
+		"metric with extract_value": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:                  "1.3.6.1.4.1.12124.1.1.8",
+									Name:                 "temperature",
+									ExtractValueCompiled: mustCompileRegex(`(\d+)C`),
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.8"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.8",
+								Type:  gosnmp.OctetString,
+								Value: []byte("25C"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "temperature",
+							Value:      25,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"metric with mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.12124.1.1.2",
+									Name: "clusterHealth",
+									Mapping: map[string]string{
+										"OK":       "0",
+										"WARNING":  "1",
+										"CRITICAL": "2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.2"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.2",
+								Type:  gosnmp.OctetString,
+								Value: []byte("WARNING"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "clusterHealth",
+							Value:      1,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"global tags with mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						MetricTags: []ddprofiledefinition.MetricTagConfig{
+							{
+								Tag: "device_type",
+								Symbol: ddprofiledefinition.SymbolConfigCompat{
+									OID:  "1.3.6.1.2.1.1.2.0",
+									Name: "sysObjectID",
+								},
+								Mapping: map[string]string{
+									"1.3.6.1.4.1.9.1.1": "router",
+									"1.3.6.1.4.1.9.1.2": "switch",
+								},
+							},
+						},
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				// First call for global tags
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.2.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.2.0",
+								Type:  gosnmp.ObjectIdentifier,
+								Value: "1.3.6.1.4.1.9.1.1",
+							},
+						},
+					}, nil,
+				)
+				// Second call for metrics
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.TimeTicks,
+								Value: uint32(123456),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "sysUpTime",
+							Value:      123456,
+							Tags:       map[string]string{"device_type": "router"},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"empty profile - no metrics defined": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "empty-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics:        []Metric{},
+				},
+			},
+			expectedError: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Create gomock controller
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			// Create mock SNMP client
+			mockHandler := snmpmock.NewMockHandler(ctrl)
+			tc.setupMock(mockHandler)
+
+			// Create logger
+			log := logger.New()
+
+			// Create collector
+			collector := New(mockHandler, tc.profiles, log)
+
+			// Execute
+			result, err := collector.Collect()
+
+			// Verify error
+			if tc.expectedError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Verify result
+			if tc.expectedResult != nil {
+				assert.Equal(t, len(tc.expectedResult), len(result))
+				for i := range tc.expectedResult {
+					assert.Equal(t, tc.expectedResult[i].DeviceMetadata, result[i].DeviceMetadata)
+					assert.ElementsMatch(t, tc.expectedResult[i].Metrics, result[i].Metrics)
+				}
+			} else {
+				assert.Nil(t, result)
+			}
+		})
+	}
+}
+
+func mustCompileRegex(pattern string) *regexp.Regexp {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		panic(err)
+	}
+	return re
+}
