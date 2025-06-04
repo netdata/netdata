@@ -1001,7 +1001,7 @@ void mssql_fill_initial_instances(struct mssql_instance *mi)
         "Xact",
         NULL};
     for (int i = 0; keys[i]; i++) {
-        (void)dictionary_set(mi->locks_instances, keys[i], NULL, sizeof(*mli));
+        (void)dictionary_set(mi->locks_instances, keys[i], NULL, sizeof(struct mssql_lock_instance));
     }
 }
 
