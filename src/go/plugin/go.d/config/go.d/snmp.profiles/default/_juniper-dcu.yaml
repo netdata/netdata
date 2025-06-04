@@ -10,7 +10,7 @@ metrics:
       - OID: 1.3.6.1.4.1.2636.3.6.2.1.4
         name: jnxDcuStatsPackets
         description: The number of packets received on this interface, belonging to this address family that match this Destination Class
-        family: Juniper/DCU/Interfaces/Address Families/Received
+        family: Juniper/DCU/Interfaces/Address Families/Packets
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.6.2.1.5
         name: jnxDcuStatsBytes
