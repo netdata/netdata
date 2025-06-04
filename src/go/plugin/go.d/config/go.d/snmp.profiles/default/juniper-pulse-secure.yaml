@@ -10,77 +10,77 @@ metrics:
       OID: 1.3.6.1.4.1.12532.10.0
       name: cpu.usage
       description: The cpu utilization of the ive system
-      family: Juniper/IVE/CPU
+      family: Juniper/VPN/IVE/CPU
       unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.11.0
       name: memory.usage
       description: The memory utilization of the ive system
-      family: Juniper/IVE/Memory
+      family: Juniper/VPN/IVE/Memory
       unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.24.0
       name: juniper.ive.iveSwapUtil
       description: The swap utilization of the ive system
-      family: Juniper/IVE/Memory
+      family: Juniper/VPN/IVE/Memory
       unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.1.0
       name: juniper.ive.logFullPercent
       description: Percentage of log file full
-      family: Juniper/IVE/Logs
+      family: Juniper/VPN/IVE/Logs
       unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.25.0
       name: juniper.ive.diskFullPercent
       description: Percentage of disk space full
-      family: Juniper/IVE/Storage/Disk
+      family: Juniper/VPN/IVE/Storage/Disk
       unit: "%"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.42.0
       name: juniper.ive.iveTemperature
       description: The Temperature of MAG application blade
-      family: Juniper/IVE/Temperature
+      family: Juniper/VPN/IVE/Temperature
       unit: "Cel"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.2.0
       name: juniper.ive.signedInWebUsers
       description: Number of signed-in web users
-      family: Juniper/IVE/Users/Web
+      family: Juniper/VPN/IVE/Users/Web
       unit: "{user}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.3.0
       name: juniper.ive.signedInMailUsers
       description: Number of signed-in mail users
-      family: Juniper/IVE/Users/Mail
+      family: Juniper/VPN/IVE/Users/Mail
       unit: "{user}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.43.0
       name: juniper.ive.iveVPNTunnels
       description: The number of concurrent pulse ipsec and nc users
-      family: Juniper/IVE/Users/Concurrent
+      family: Juniper/VPN/IVE/Users/Concurrent
       unit: "{user}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.12.0
       name: juniper.ive.iveConcurrentUsers
       description: The total number of concurrent user licenses used for the ive node
-      family: Juniper/IVE/Users/Licenses
+      family: Juniper/VPN/IVE/Users/Licenses
       unit: "{license}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.13.0
       name: juniper.ive.clusterConcurrentUsers
       description: The total number of concurrent user licenses used for the cluster
-      family: Juniper/IVE/Users/Licenses
+      family: Juniper/VPN/IVE/Users/Licenses
       unit: "{license}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -88,7 +88,7 @@ metrics:
       name: juniper.ive.iveTotalHits
       metric_type: monotonic_count
       description: The total number of hits to the ive since last reboot
-      family: Juniper/IVE/Hits/Total
+      family: Juniper/VPN/IVE/Hits/Total
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -96,7 +96,7 @@ metrics:
       name: juniper.ive.iveFileHits
       metric_type: monotonic_count
       description: The total number of file hits to the ive since last reboot
-      family: Juniper/IVE/Hits/File
+      family: Juniper/VPN/IVE/Hits/File
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -104,7 +104,7 @@ metrics:
       name: juniper.ive.iveWebHits
       metric_type: monotonic_count
       description: The total number of hits via the web interface since the last reboot
-      family: Juniper/IVE/Hits/Web Interface
+      family: Juniper/VPN/IVE/Hits/Web Interface
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -112,7 +112,7 @@ metrics:
       name: juniper.ive.iveAppletHits
       metric_type: monotonic_count
       description: The total number of applet hits to the ive since last reboot
-      family: Juniper/IVE/Hits/Applet
+      family: Juniper/VPN/IVE/Hits/Applet
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -120,7 +120,7 @@ metrics:
       name: juniper.ive.ivetermHits
       metric_type: monotonic_count
       description: The total number of terminal hits to the ive since last reboot
-      family: Juniper/IVE/Hits/Terminal
+      family: Juniper/VPN/IVE/Hits/Terminal
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -128,7 +128,7 @@ metrics:
       name: juniper.ive.iveSAMHits
       metric_type: monotonic_count
       description: The total number of sam secure application manager hits since last reboot
-      family: Juniper/IVE/Hits/SAM
+      family: Juniper/VPN/IVE/Hits/SAM
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -136,7 +136,7 @@ metrics:
       name: juniper.ive.iveNCHits
       metric_type: monotonic_count
       description: The total number of nc network connect hits since last reboot
-      family: Juniper/IVE/Hits/NC
+      family: Juniper/VPN/IVE/Hits/NC
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
@@ -144,14 +144,14 @@ metrics:
       name: juniper.ive.meetingHits
       metric_type: monotonic_count
       description: The total number of meeting hits since last reboot
-      family: Juniper/IVE/Hits/Meeting
+      family: Juniper/VPN/IVE/Hits/Meeting
       unit: "{hit}"
   - MIB: JUNIPER-IVE-MIB
     symbol:
       OID: 1.3.6.1.4.1.12532.44.0
       name: juniper.ive.iveSSLConnections
       description: Total number of ssl connection
-      family: Juniper/IVE/SSL/Connections
+      family: Juniper/VPN/IVE/SSL/Connections
       unit: "{connection}"
 # Commented since iveTotalSignedInUsers is not present in the most recent JUNIPER-IVE-MIB we managed to find
 #  - MIB: JUNIPER-IVE-MIB
