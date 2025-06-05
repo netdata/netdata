@@ -277,6 +277,12 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m unbound
   ```
 
+  To debug a specific job:
+
+  ```bash
+  ./go.d.plugin -d -m unbound -j jobName
+  ```
+
 ### Getting Logs
 
 If you're encountering problems with the `unbound` collector, follow these steps to retrieve logs and identify potential issues:
