@@ -81,6 +81,7 @@ type SymbolConfig struct {
 	MetricType  ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 	Unit        string            `yaml:"unit,omitempty" json:"unit,omitempty"`
 	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
+	Family      string            `yaml:"family,omitempty" json:"family,omitempty"`
 	Mapping     map[string]string `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 }
 
