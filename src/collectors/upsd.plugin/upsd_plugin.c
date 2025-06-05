@@ -581,6 +581,9 @@ int main(int argc, char *argv[]) {
     char buf[BUFLEN];
     unsigned int first_ups_count = 0;
 
+    nd_log_initialize_for_external_plugins("upsd.plugin");
+    netdata_threads_init_for_external_plugins(0);
+
     parse_command_line(argc, argv);
 
     // If we fail to initialize libupsclient or connect to a local
