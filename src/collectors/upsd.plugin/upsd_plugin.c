@@ -660,6 +660,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    time_t started_t = now_monotonic_sec();
+
     heartbeat_t hb;
     heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
     for (;;) {
