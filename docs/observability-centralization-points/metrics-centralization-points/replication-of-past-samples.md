@@ -82,13 +82,13 @@ The current implementation is optimized to replicate small durations and have mi
 <summary><strong>What Can and Cannot Be Replicated</strong></summary><br/>
 
 1. **Append-only replication**.
-Replication can only append samples to metrics. Only missing samples at the end of each time-series are replicated.
+   Replication can only append samples to metrics. Only missing samples at the end of each time-series are replicated.
 
 2. **Tier0 samples only**.
-Only `tier0` samples are replicated. Samples of higher tiers in Netdata are derived from `tier0` samples, and therefore there is no mechanism for ingesting them directly. This means that the maximum retention that can be replicated across Netdata is limited by the samples available in `tier0` of the sending Netdata.
+   Only `tier0` samples are replicated. Samples of higher tiers in Netdata are derived from `tier0` samples, and therefore there is no mechanism for ingesting them directly. This means that the maximum retention that can be replicated across Netdata is limited by the samples available in `tier0` of the sending Netdata.
 
 3. **Active metrics only**.
-Only samples of metrics that are currently being collected are replicated. Archived metrics (or even archived nodes) will be replicated when and if they are collected again. 
+   Only samples of metrics that are currently being collected are replicated. Archived metrics (or even archived nodes) will be replicated when and if they are collected again.
 
 :::note
 
@@ -107,7 +107,7 @@ Netdata archives metrics 1 hour after they stop being collected, so Netdata Pare
 Configure these options in `netdata.conf` on your Parent systems:
 
 - `[db].replication period`
-Sets the maximum time window for replication. Default is 1 day. Remember, you're also limited by how much tier0 data your Child systems have kept.
+  Sets the maximum time window for replication. Default is 1 day. Remember, you're also limited by how much tier0 data your Child systems have kept.
 
 <br/>
 </details>
@@ -118,10 +118,10 @@ Sets the maximum time window for replication. Default is 1 day. Remember, you're
 Configure these options in `netdata.conf` on your Child systems or Parents that send to other Parents:
 
 - `[db].replication threads`
-Controls how many parallel threads handle replication. Default is 1 thread. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.
+  Controls how many parallel threads handle replication. Default is 1 thread. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.
 
 - `[db].cleanup obsolete charts after`
-Controls how long after metrics stop being collected they'll still be available for replication. Default is 1 hour (3600 seconds). If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer.
+  Controls how long after metrics stop being collected they'll still be available for replication. Default is 1 hour (3600 seconds). If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer.
 
 <br/>
 </details>

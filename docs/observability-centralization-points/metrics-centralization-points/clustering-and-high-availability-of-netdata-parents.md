@@ -40,10 +40,10 @@ Netdata supports building Parent clusters of 2+ nodes. Clustering and high avail
 **How Failover Works**
 
 1. **Configure your Children to connect to all Parents**.
-Each Child will use the first working Parent it finds, and automatically switch to backup Parents if the connection fails.
+   Each Child will use the first working Parent it finds, and automatically switch to backup Parents if the connection fails.
 
 2. **Configure your Parents to sync with each other**.
-Each Parent connects to other Parents in the cluster, using the first working connection and failing over to others when needed.
+   Each Parent connects to other Parents in the cluster, using the first working connection and failing over to others when needed.
 
 :::
 
@@ -79,9 +79,9 @@ If your Children don't have enough historical data to fill gaps on the restored 
 You have two options to block Children while allowing Parent-to-Parent sync:
 
 1. **Use firewall rules**.
-Block port 19999 access from your Children's IP ranges to the restored Parent
+   Block port 19999 access from your Children's IP ranges to the restored Parent
 2. **Use separate API keys**.
-Configure different streaming keys in `stream.conf` for Children vs Parents, then disable the Children's key until sync completes
+   Configure different streaming keys in `stream.conf` for Children vs Parents, then disable the Children's key until sync completes
 
 <br/>
 </details>
@@ -104,7 +104,7 @@ Don't start your new Parent with default settings because it might delete the co
 Before starting your new Parent, configure these settings in `netdata.conf` to match your existing Parent:
 
 - `[db].dbengine tier 0 retention size` - Maximum disk space for high-resolution data (default: 1GiB)
-- `[db].dbengine tier 1 retention size` - Maximum disk space for medium-resolution data (default: 1GiB)  
+- `[db].dbengine tier 1 retention size` - Maximum disk space for medium-resolution data (default: 1GiB)
 - `[db].dbengine tier 2 retention size` - Maximum disk space for low-resolution data (default: 1GiB)
 
 <br/>

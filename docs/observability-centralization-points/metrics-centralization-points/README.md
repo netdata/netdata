@@ -1,4 +1,3 @@
-
 # nd configure Netdata Parent systems to centralize metrics from multiple production systems, including streaming, replication, and high availability configurations.
 
 :::
