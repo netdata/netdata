@@ -135,6 +135,8 @@ There are no alerts configured by default for this integration.
 
 #### Configure SQL Server for Monitoring
 
+For **each SQL Server** instance you want to monitor, complete the following steps:
+
 1. **Create Monitoring User**
 
    Create an SQL Server user with the necessary permissions to collect monitoring data:
@@ -169,6 +171,30 @@ There are no alerts configured by default for this integration.
    DEALLOCATE nd_user_cursor
    GO
    ```
+
+3. **Configure SQL Server Network Settings**
+
+   Enable SQL Server to accept TCP connections:
+
+  - Open `SQL Server Configuration Manager`
+  - Expand `SQL Server Network Configuration`
+  - Select `Protocols for <instance name>` in the console panel
+  - Double-click the `TCP` protocol in the details panel and set `Enabled` to `Yes`
+  - Go to the `IP Address` tab and locate the `IPAII` section:
+    - Clear any value from the `TCP Dynamic Ports` field
+    - Enter a port number in the `TCP Port` field (default is `1433`)
+  - Select `SQL Server Services` and restart your SQL Server instance
+
+4. **Configure SQL Server Authentication (Optional)**
+
+   If you're using SQL Server authentication (rather than Windows authentication):
+
+  - Open `SQL Server Management Studio`
+  - Right-click your server and select `Properties`
+  - Select `Security` in the left panel
+  - Choose `SQL Server and Windows Authentication mode` under `Server authentication`
+  - Click `OK`
+  - Right-click your server and select `Restart`
 
 
 
