@@ -590,7 +590,7 @@ int main(int argc, char *argv[]) {
     // UPS, then there's nothing more to be done; Netdata should disable
     // this plugin, since it cannot offer any metrics.
     if (-1 == upscli_init(0, NULL, NULL, NULL)) {
-        fputs("error: failed to initialize libupsclient", stderr);
+        netdata_log_error("failed to initialize libupsclient");
         puts("DISABLE");
         exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
     }
@@ -599,7 +599,7 @@ int main(int argc, char *argv[]) {
     if ((-1 == upscli_connect(&ups1, "127.0.0.1", 3493, 0)) ||
         (-1 == upscli_connect(&ups2, "127.0.0.1", 3493, 0))) {
         upscli_cleanup();
-        fputs("error: failed to connect to upsd at 127.0.0.1:3493", stderr);
+        netdata_log_error("failed to connect to upsd at 127.0.0.1:3493");
         puts("DISABLE");
         exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
     }
@@ -721,14 +721,14 @@ int main(int argc, char *argv[]) {
         // stdout, stderr are connected to pipes.
         // So, if they are closed then netdata must have exited.
         if (ferror(stdout) && errno == EPIPE) {
-            perror("fflush(3)");
+            netdata_log_error("fflush(3)");
             return EXIT_FAILURE;
         }
 
         // If the last UPS count does not match the current UPS count, then there's a real
         // chance that our UPS information is outdated; restart this plugin to get accurate UPSes.
         if (unlikely(first_ups_count != this_ups_count)) {
-            fprintf(stderr, "Detected change in UPSes (count: %u -> %u); restarting to read UPS data.\n",
+            netdata_log_error("Detected change in UPSes (count: %u -> %u); restarting to read UPS data.",
                 first_ups_count, this_ups_count);
             break;
         }
