@@ -21,11 +21,11 @@ func (c *Collector) collectDeviceMetadata(prof *ddsnmp.Profile) (map[string]stri
 	var tagOIDs []string
 	tags := make(map[string]string)
 
-	for resName, metaCfg := range prof.Definition.Metadata {
+	for resName, cfg := range prof.Definition.Metadata {
 		if !ddprofiledefinition.IsMetadataResourceWithScalarOids(resName) {
 			continue
 		}
-		for name, field := range metaCfg.Fields {
+		for name, field := range cfg.Fields {
 			switch {
 			case field.Value != "":
 				tags[name] = field.Value
@@ -55,11 +55,11 @@ func (c *Collector) collectDeviceMetadata(prof *ddsnmp.Profile) (map[string]stri
 
 	var errs []error
 
-	for resName, metaCfg := range prof.Definition.Metadata {
+	for resName, cfg := range prof.Definition.Metadata {
 		if !ddprofiledefinition.IsMetadataResourceWithScalarOids(resName) {
 			continue
 		}
-		for name, field := range metaCfg.Fields {
+		for name, field := range cfg.Fields {
 			switch {
 			case field.Symbol.OID != "":
 				v, err := processSymbolTagValue(field.Symbol, pdus)
@@ -88,26 +88,31 @@ func (c *Collector) collectDeviceMetadata(prof *ddsnmp.Profile) (map[string]stri
 	return tags, nil
 }
 
-func processSymbolTagValue(symCfg ddprofiledefinition.SymbolConfig, result map[string]gosnmp.SnmpPDU) (string, error) {
-	pdu, ok := result[trimOID(symCfg.OID)]
+func processSymbolTagValue(cfg ddprofiledefinition.SymbolConfig, result map[string]gosnmp.SnmpPDU) (string, error) {
+	pdu, ok := result[trimOID(cfg.OID)]
 	if !ok {
 		return "", nil
 	}
 
-	val, err := convPduToStringf(pdu, symCfg.Format)
+	val, err := convPduToStringf(pdu, cfg.Format)
 	if err != nil {
 		return "", err
 	}
 
 	switch {
-	case symCfg.ExtractValueCompiled != nil:
-		if sm := symCfg.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
-			return sm[1], nil
+	case cfg.ExtractValueCompiled != nil:
+		if sm := cfg.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
+			val = sm[1]
 		}
-	case symCfg.MatchPatternCompiled != nil:
-		if sm := symCfg.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
-			return replaceSubmatches(symCfg.MatchValue, sm), nil
+	case cfg.MatchPatternCompiled != nil:
+		if sm := cfg.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
+			val = replaceSubmatches(cfg.MatchValue, sm)
 		}
 	}
+
+	if v, ok := cfg.Mapping[val]; ok {
+		val = v
+	}
+
 	return val, nil
 }
