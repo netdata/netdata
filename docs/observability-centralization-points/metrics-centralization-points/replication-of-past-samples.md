@@ -101,29 +101,25 @@ Netdata archives metrics 1 hour after they stop being collected, so Netdata Pare
 
 ## Configuration Options
 
+Configure these options in `netdata.conf` on the respective systems.
+
 <details>
 <summary><strong>Receiving Side Configuration (Netdata Parent)</strong></summary><br/>
 
-Configure these options in `netdata.conf` on your Parent systems:
+| Setting                   | Description                                                                                                                      | Default |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------|---------|
+| `[db].replication period` | Sets the maximum time window for replication. Remember, you're also limited by how much tier0 data your Child systems have kept. | 1 day   |
 
-- `[db].replication period`
-  Sets the maximum time window for replication. Default is 1 day. Remember, you're also limited by how much tier0 data your Child systems have kept.
-
-<br/>
 </details>
 
 <details>
 <summary><strong>Sending Side Configuration (Netdata Children or clustered Parents)</strong></summary><br/>
 
-Configure these options in `netdata.conf` on your Child systems or Parents that send to other Parents:
+| Setting                              | Description                                                                                                                                                                                                                                                                                                         | Default                   |
+|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `[db].replication threads`           | Controls how many parallel threads handle replication. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.                                                                                                                     | 1 thread                  |
+| `[db].cleanup obsolete charts after` | Controls how long metrics remain available for replication after collection stops. If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer. | 1 hour<br/>(3600 seconds) |
 
-- `[db].replication threads`
-  Controls how many parallel threads handle replication. Default is one thread. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.
-
-- `[db].cleanup obsolete charts after`
-  Controls how long metrics remain available for replication after collection stops. Default is 1 hour (3600 seconds). If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer.
-
-<br/>
 </details>
 
 ## Monitoring Replication Progress
@@ -138,7 +134,7 @@ You can monitor how replication is progressing through both your dashboard and A
 
 ### Dashboard Monitoring
 
-Check your replication progress right in your dashboard using the Netdata Function `Streaming`, under the `Top` tab.
+Check your replication progress right in your dashboard using the Netdata Function `Netdata-streaming`, under the `Top` tab.
 
 ### API Monitoring
 

@@ -103,9 +103,11 @@ Don't start your new Parent with default settings because it might delete the co
 
 Before starting your new Parent, configure these settings in `netdata.conf` to match your existing Parent:
 
-- `[db].dbengine tier 0 retention size` - Maximum disk space for high-resolution data (default: 1GiB)
-- `[db].dbengine tier 1 retention size` - Maximum disk space for medium-resolution data (default: 1GiB)
-- `[db].dbengine tier 2 retention size` - Maximum disk space for low-resolution data (default: 1GiB)
+| Section | Setting                          | Description                                   | Default |
+|---------|----------------------------------|-----------------------------------------------|---------|
+| `[db]`  | `dbengine tier 0 retention size` | Maximum disk space for high-resolution data   | 1GiB    |
+| `[db]`  | `dbengine tier 1 retention size` | Maximum disk space for medium-resolution data | 1GiB    |
+| `[db]`  | `dbengine tier 2 retention size` | Maximum disk space for low-resolution data    | 1GiB    |
 
 <br/>
 </details>
