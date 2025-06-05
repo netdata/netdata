@@ -33,6 +33,7 @@ int do_PerflibADCS(int update_every, usec_t dt);
 int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibServices(int update_every, usec_t dt);
+int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
