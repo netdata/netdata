@@ -11,7 +11,7 @@ Answers to common questions about scaling Netdata Parents, clustering, retention
 <details>
 <summary><strong>How much can a Netdata Parent node scale?</strong></summary><br/>
 
-Netdata Parents generally scale well. According [to our tests](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/) Netdata Parents scale better than Prometheus for the same workload: -35% CPU utilization, -49% Memory Consumption, -12% Network Bandwidth, -98% Disk I/O, -75% Disk footprint.
+Netdata Parents generally scale well. According [to our tests](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/), Netdata Parents scale better than Prometheus for the same workload: -35% CPU utilization, -49% Memory Consumption, -12% Network Bandwidth, -98% Disk I/O, -75% Disk footprint.
 
 For more information, Check [Sizing Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md).
 
@@ -19,7 +19,7 @@ For more information, Check [Sizing Netdata Parents](/docs/observability-central
 </details>
 
 <details>
-<summary><strong>If I set up a parents cluster, will I be able to have more Child nodes stream to them?</strong></summary><br/>
+<summary><strong>If I set up a Parent cluster, will I be able to have more Child nodes stream to them?</strong></summary><br/>
 
 No. When you set up an active-active cluster, even if child nodes connect randomly to one or the other, all the parent nodes receive all the metrics of all the child nodes. So, all of them do all the work.
 
@@ -32,7 +32,7 @@ No. When you set up an active-active cluster, even if child nodes connect random
 Child nodes need to have only the retention required to connect to another Parent if one fails or stops for maintenance.
 
 - If you have a cluster of parents, 5 to 10 minutes in `alloc` mode is usually enough.
-- If you have only one parent, it would be better to run the child nodes with `dbengine` so that they will have enough retention to back-fill the parent node if it stops for maintenance.
+- If you have only one parent, it would be better to run the child nodes with `dbengine` so that they will have enough retention to backfill the parent node if it stops for maintenance.
 
 <br/>
 </details>

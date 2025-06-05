@@ -79,7 +79,7 @@ The current implementation is optimized to replicate small durations and have mi
 :::
 
 <details>
-<summary><strong>What Can and Cannot Be Replicated</strong></summary><br/>
+<summary><strong>What Can and Can’t Be Replicated</strong></summary><br/>
 
 1. **Append-only replication**.
    Replication can only append samples to metrics. Only missing samples at the end of each time-series are replicated.
@@ -118,10 +118,10 @@ Configure these options in `netdata.conf` on your Parent systems:
 Configure these options in `netdata.conf` on your Child systems or Parents that send to other Parents:
 
 - `[db].replication threads`
-  Controls how many parallel threads handle replication. Default is 1 thread. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.
+  Controls how many parallel threads handle replication. Default is one thread. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.
 
 - `[db].cleanup obsolete charts after`
-  Controls how long after metrics stop being collected they'll still be available for replication. Default is 1 hour (3600 seconds). If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer.
+  Controls how long metrics remain available for replication after collection stops. Default is 1 hour (3600 seconds). If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer.
 
 <br/>
 </details>

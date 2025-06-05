@@ -70,7 +70,7 @@ Children only need to keep data long enough to handle Parent switchovers. When a
 <details>
 <summary><strong>Bringing a Parent back online after maintenance</strong></summary><br/>
 
-When you bring a Parent back online after extended maintenance, you need to be careful about data gaps. Check the [replication limitations](/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md#replication-limitations) to understand the constraints.
+When you bring a Parent back online after extended maintenance, you need to be careful about data gaps. Check the [replication limitations](/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md#understanding-limitations) to understand the constraints.
 
 If your Children don't have enough historical data to fill gaps on the restored Parent, temporarily block Children from connecting to it until it syncs with other Parents in your cluster.
 
