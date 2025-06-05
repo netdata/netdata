@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v2"
 
@@ -19,29 +20,34 @@ import (
 
 var log = logger.New().With("component", "snmp/ddsnmp")
 
-var ddProfiles []*Profile
+var (
+	ddProfiles []*Profile
+	loadOnce   sync.Once
+)
 
-func init() {
-	dir := getProfilesDir()
+func load() {
+	loadOnce.Do(func() {
+		dir := getProfilesDir()
 
-	profiles, err := loadProfiles(dir)
-	if err != nil {
-		log.Errorf("failed to loadProfiles dd snmp profiles: %v", err)
-		return
-	}
+		profiles, err := loadProfiles(dir)
+		if err != nil {
+			log.Errorf("failed to loadProfiles dd snmp profiles: %v", err)
+			return
+		}
 
-	if len(profiles) == 0 {
-		log.Warningf("no dd snmp profiles found in '%s'", dir)
-		return
-	}
+		if len(profiles) == 0 {
+			log.Warningf("no dd snmp profiles found in '%s'", dir)
+			return
+		}
 
-	log.Infof("found %d profiles in '%s'", len(profiles), dir)
-	ddProfiles = profiles
-
-	return
+		log.Infof("found %d profiles in '%s'", len(profiles), dir)
+		ddProfiles = profiles
+	})
 }
 
 func FindProfiles(sysObjId string) []*Profile {
+	load()
+
 	var profiles []*Profile
 
 	for _, prof := range ddProfiles {
