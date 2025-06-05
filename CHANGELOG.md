@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix context updates [\#20416](https://github.com/netdata/netdata/pull/20416) ([stelfrag](https://github.com/stelfrag))
+- improvement\(go.d\): add ddsnmp profile collector \(scalar only\) [\#20415](https://github.com/netdata/netdata/pull/20415) ([ilyam8](https://github.com/ilyam8))
 - SNMP: \_juniper-userfirewall.yaml [\#20409](https://github.com/netdata/netdata/pull/20409) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-scu.yaml [\#20408](https://github.com/netdata/netdata/pull/20408) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-firewall.yaml [\#20407](https://github.com/netdata/netdata/pull/20407) ([Ancairon](https://github.com/Ancairon))
@@ -465,9 +467,6 @@
 - sentry events annotations [\#19872](https://github.com/netdata/netdata/pull/19872) ([ktsaou](https://github.com/ktsaou))
 - Remove tj-actions/changed-files from CI jobs. [\#19870](https://github.com/netdata/netdata/pull/19870) ([Ferroin](https://github.com/Ferroin))
 - daemon status file 17 [\#19869](https://github.com/netdata/netdata/pull/19869) ([ktsaou](https://github.com/ktsaou))
-- fixed sentry version [\#19868](https://github.com/netdata/netdata/pull/19868) ([ktsaou](https://github.com/ktsaou))
-- fixed sentry dedup [\#19867](https://github.com/netdata/netdata/pull/19867) ([ktsaou](https://github.com/ktsaou))
-- fix\(freebsd.plugin\): correct disks/network devices charts [\#19866](https://github.com/netdata/netdata/pull/19866) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
