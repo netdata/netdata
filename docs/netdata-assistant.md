@@ -8,17 +8,17 @@ This comprehensive system combines **real-time alert assistance** for emergency 
 
 Netdata Insights serves different moments in your engineering workflow through two distinct but complementary capabilities:
 
-| Aspect | **Real-time Alert Assistant** | **Strategic Insights Reports** |
-|--------|-------------------------------|--------------------------------|
-| **Primary Use** | **Immediate incident response** | Strategic planning & analysis |
-| **When You Use It** | During active alerts | Post-incident, planning sessions |
-| **Mindset** | "The building is on fire" | "Let's understand and plan better" |
-| **Response Time** | **Instant contextual help** | **2-3 minutes for comprehensive analysis** |
-| **Scope** | Single alert or immediate issue | Infrastructure-wide trends and patterns |
-| **Output** | Quick explanations and next steps | Detailed reports with embedded visualizations, **downloadable as PDFs**, **shareable via email** |
-| **Typical Scenario** | 3 AM emergency response | Monday morning incident review |
+| Aspect               | **Real-time Alert Assistant**     | **Strategic Insights Reports**                                                                   |
+|----------------------|-----------------------------------|--------------------------------------------------------------------------------------------------|
+| **Primary Use**      | **Immediate incident response**   | Strategic planning & analysis                                                                    |
+| **When You Use It**  | During active alerts              | Post-incident, planning sessions                                                                 |
+| **Mindset**          | "The building is on fire"         | "Let's understand and plan better"                                                               |
+| **Response Time**    | **Instant contextual help**       | **2-3 minutes for comprehensive analysis**                                                       |
+| **Scope**            | Single alert or immediate issue   | Infrastructure-wide trends and patterns                                                          |
+| **Output**           | Quick explanations and next steps | Detailed reports with embedded visualizations, **downloadable as PDFs**, **shareable via email** |
+| **Typical Scenario** | 3 AM emergency response           | Monday morning incident review                                                                   |
 
-:::tip 
+:::tip
 
 These serve fundamentally different moments in an engineer's workflow. The **Assistant** is for high-stress situations when you need immediate context, while **Insights Reports** are for when you have time to think strategically about your infrastructure's health and future needs.
 
@@ -27,6 +27,7 @@ These serve fundamentally different moments in an engineer's workflow. The **Ass
 :::note
 
 **Netdata Insights is currently in beta as a research preview:**
+
 - Available in Netdata Cloud for Business users and Free Trial participants
 - Works with any infrastructure where you've deployed Netdata agents
 - No additional configuration or new pipelines required
@@ -138,12 +139,12 @@ flowchart LR
 
 ### Four Types of Strategic Analysis
 
-| Report Type | What It Provides | Key Capabilities | Best Used For |
-|-------------|------------------|------------------|---------------|
-| **Infrastructure Summary** | Complete timeline of incidents, performance changes, and system behavior | **What happened**: Timeline reconstruction **Impact assessment**: Affected services **Current status**: Action items | Weekend incident recovery, executive updates, team handoffs |
-| **Capacity Planning** | Data-driven projections with concrete recommendations | **Trend analysis**: Resource utilization patterns **Bottleneck prediction**: Inflection-point dates **Scaling recommendations**: Hardware suggestions | Quarterly planning, budget justification, infrastructure roadmaps |
-| **Performance Optimization** | Synthesized analysis of system inefficiencies and improvement opportunities | **Contention patterns**: Resource conflicts **Optimization opportunities**: Tuning recommendations **Impact prioritization**: Biggest improvement areas | Performance debugging, system tuning, SRE optimization projects |
-| **Anomaly Analysis** | Context-aware detection and explanation of unusual infrastructure behavior | **Pattern recognition**: Abnormal behavior **Root cause analysis**: Why anomalies occurred **Trend correlation**: Cross-infrastructure connections | Post-incident analysis, proactive issue detection, system health assessment |
+| Report Type                  | What It Provides                                                            | Key Capabilities                                                                                                                                        | Best Used For                                                               |
+|------------------------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| **Infrastructure Summary**   | Complete timeline of incidents, performance changes, and system behavior    | **What happened**: Timeline reconstruction **Impact assessment**: Affected services **Current status**: Action items                                    | Weekend incident recovery, executive updates, team handoffs                 |
+| **Capacity Planning**        | Data-driven projections with concrete recommendations                       | **Trend analysis**: Resource utilization patterns **Bottleneck prediction**: Inflection-point dates **Scaling recommendations**: Hardware suggestions   | Quarterly planning, budget justification, infrastructure roadmaps           |
+| **Performance Optimization** | Synthesized analysis of system inefficiencies and improvement opportunities | **Contention patterns**: Resource conflicts **Optimization opportunities**: Tuning recommendations **Impact prioritization**: Biggest improvement areas | Performance debugging, system tuning, SRE optimization projects             |
+| **Anomaly Analysis**         | Context-aware detection and explanation of unusual infrastructure behavior  | **Pattern recognition**: Abnormal behavior **Root cause analysis**: Why anomalies occurred **Trend correlation**: Cross-infrastructure connections      | Post-incident analysis, proactive issue detection, system health assessment |
 
 :::tip
 
@@ -166,6 +167,7 @@ Your Netdata agents continue collecting metrics every second, storing them local
 <summary><strong>2. Context Compression</strong></summary><br/>
 
 Raw telemetry data is compressed into structured context bundles that include:
+
 - **Statistical summaries** (percentiles, trends, correlation coefficients)
 - **Detected anomalies** with confidence scores and affected metrics
 - **Event timelines** (alerts, deployments, configuration changes)
@@ -177,7 +179,7 @@ Raw telemetry data is compressed into structured context bundles that include:
 <details>
 <summary><strong>3. AI Analysis</strong></summary><br/>
 
-**Advanced language models process the compressed context** to generate structured reports with natural-language explanations, relevant visualizations, and actionable recommendations. 
+**Advanced language models process the compressed context** to generate structured reports with natural-language explanations, relevant visualizations, and actionable recommendations.
 
 :::important
 
