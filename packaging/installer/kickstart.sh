@@ -362,7 +362,7 @@ trap_handler() {
     0) printf >&2 "%s\n" "This is almost certainly the result of a bug. If you have time, please report it at ${AGENT_BUG_REPORT_URL}." ;;
     *)
       printf >&2 "%s\n" "This is probably a result of a transient issue on your system. Things should work correctly if you try again."
-      printf >&2 "%s\n" "If you continue to experience this issue, you can reacn out to us for support on:"
+      printf >&2 "%s\n" "If you continue to experience this issue, you can reach out to us for support on:"
       support_list
       ;;
   esac
