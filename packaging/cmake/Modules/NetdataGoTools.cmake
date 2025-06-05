@@ -28,9 +28,27 @@ macro(add_go_target target output build_src build_dir)
         "${build_src}/go.sum"
     )
 
+    set(GO_ENV_VARS "GOROOT=${GO_ROOT}" "CGO_ENABLED=0" "GOPROXY=https://proxy.golang.org,direct")
+
+    if(DEFINED ENV{GOARCH})
+        list(APPEND GO_ENV_VARS "GOARCH=$ENV{GOARCH}")
+    endif()
+    if(DEFINED ENV{GOARM})
+        list(APPEND GO_ENV_VARS "GOARM=$ENV{GOARM}")
+    endif()
+    if(DEFINED ENV{GOARM64})
+        list(APPEND GO_ENV_VARS "GOARM64=$ENV{GOARM64}")
+    endif()
+    if(DEFINED ENV{GOAMD64})
+        list(APPEND GO_ENV_VARS "GOAMD64=$ENV{GOAMD64}")
+    endif()
+    if(DEFINED ENV{GOPPC64})
+        list(APPEND GO_ENV_VARS "GOPPC64=$ENV{GOPPC64}")
+    endif()
+
     add_custom_command(
         OUTPUT ${output}
-        COMMAND "${CMAKE_COMMAND}" -E env GOROOT=${GO_ROOT} CGO_ENABLED=0 GOPROXY=https://proxy.golang.org,direct "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS}" -o "${CMAKE_BINARY_DIR}/${output}" "./${build_dir}"
+        COMMAND "${CMAKE_COMMAND}" -E env ${GO_ENV_VARS} "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS}" -o "${CMAKE_BINARY_DIR}/${output}" "./${build_dir}"
         DEPENDS ${${target}_DEPS}
         COMMENT "Building Go component ${output}"
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/${build_src}"
