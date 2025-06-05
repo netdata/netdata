@@ -1755,7 +1755,7 @@ modules:
                  GO
                  ```
 
-              3.  **Configure SQL Server Network Settings**
+              3. **Configure SQL Server Network Settings**
 
                  Enable SQL Server to accept TCP connections:
 
@@ -1768,9 +1768,9 @@ modules:
                   - Enter a port number in the `TCP Port` field (default is `1433`)
                 - Select `SQL Server Services` and restart your SQL Server instance
 
-              4 **Configure SQL Server Authentication (Optional)**
+              4. **Configure SQL Server Authentication (Optional)**
 
-                If you're using SQL Server authentication (rather than Windows authentication):
+                 If you're using SQL Server authentication (rather than Windows authentication):
 
                 - Open `SQL Server Management Studio`
                 - Right-click your server and select `Properties`
