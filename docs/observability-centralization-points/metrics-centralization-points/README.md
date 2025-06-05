@@ -1,28 +1,60 @@
-# Metrics Centralization Points (Netdata Parents)
+# Configure Netdata Parents to centralize metrics from multiple production systems with streaming, replication, and high availability configurations.
+
+:::
+
+## How Metrics Centralization Works
 
 ```mermaid
 flowchart BT
-    C1["Netdata Child 1"]
-    C2["Netdata Child 2"]
-    C3["Netdata Child N"]
-    P1["Netdata Parent 1"]
+    C1("**Netdata Child 1**<br/><br/>Production System")
+    C2("**Netdata Child 2**<br/><br/>Production System")
+    C3("**Netdata Child N**<br/><br/>Production System")
+    P1("**Netdata Parent 1**<br/><br/>Centralization Point")
     C1 -->|stream| P1
     C2 -->|stream| P1
     C3 -->|stream| P1
+    
+    %% Style definitions
+    classDef child fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef parent fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    
+    %% Apply styles
+    class C1,C2,C3 child
+    class P1 parent
 ```
 
-- **Netdata Streaming and Replication**:
-    - Copies **recent past samples** (replication) and **real-time new samples** (streaming) from production systems (**Netdata Children**) to **metrics centralization points** (**Netdata Parents**).
-    - **Netdata Parents** store the database for these metrics based on **retention settings**.
+## Key Features
 
-- **Netdata Child Behavior**:
-    - Each **Netdata Child** can stream to **only one** Netdata Parent at a time.
-    - Multiple **Netdata Parents** can be configured for **high availability**, but only the **first working one** will be used.
+:::important
 
-- **Netdata Parent Capabilities**:
-    - Receives metric samples **from multiple Netdata Children**.
-    - Can **re-stream** received metrics to another **Netdata Parent**, forming an **infinite hierarchy** of Parents.
-    - Supports **Netdata Parents Clusters** for **high availability**.
+**Netdata Streaming and Replication**
+
+Copies **recent past samples** (replication) and **real-time new samples** (streaming) from production systems (**Netdata Children**) to **metrics centralization points** (**Netdata Parents**). **Netdata Parents** store the database for these metrics based on **retention settings**.
+
+:::
+
+### How Your Systems Connect
+
+<details>
+<summary><strong>Netdata Child Behavior</strong></summary><br/>
+
+- Each **Netdata Child** can stream to **only one** Netdata Parent at a time.
+- Multiple **Netdata Parents** can be configured for **high availability**, but only the **first working one** will be used.
+
+<br/>
+</details>
+
+<details>
+<summary><strong>Netdata Parent Capabilities</strong></summary><br/>
+
+- Receives metric samples **from multiple Netdata Children**.
+- Can **re-stream** received metrics to another **Netdata Parent**, forming an **infinite hierarchy** of Parents.
+- Supports **Netdata Parents Clusters** for **high availability**.
+
+<br/>
+</details>
+
+## Feature Comparison
 
 | Feature                    | Netdata Child (Production System)                 | Netdata Parent (Centralization Point)                 |
 |----------------------------|---------------------------------------------------|-------------------------------------------------------|
