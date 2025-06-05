@@ -30,21 +30,13 @@ macro(add_go_target target output build_src build_dir)
 
     set(GO_ENV_VARS "GOROOT=${GO_ROOT}" "CGO_ENABLED=0" "GOPROXY=https://proxy.golang.org,direct")
 
-    if(DEFINED ENV{GOARCH})
-        list(APPEND GO_ENV_VARS "GOARCH=$ENV{GOARCH}")
-    endif()
-    if(DEFINED ENV{GOARM})
-        list(APPEND GO_ENV_VARS "GOARM=$ENV{GOARM}")
-    endif()
-    if(DEFINED ENV{GOARM64})
-        list(APPEND GO_ENV_VARS "GOARM64=$ENV{GOARM64}")
-    endif()
-    if(DEFINED ENV{GOAMD64})
-        list(APPEND GO_ENV_VARS "GOAMD64=$ENV{GOAMD64}")
-    endif()
-    if(DEFINED ENV{GOPPC64})
-        list(APPEND GO_ENV_VARS "GOPPC64=$ENV{GOPPC64}")
-    endif()
+    set(GO_ARCH_VARS GOARCH GOARM GOARM64 GOAMD64 GOPPC64)
+
+    foreach(var IN LISTS GO_ARCH_VARS)
+        if(DEFINED ENV{${var}})
+            list(APPEND GO_ENV_VARS "${var}=$ENV{${var}}")
+        endif()
+    endforeach()
 
     add_custom_command(
         OUTPUT ${output}
