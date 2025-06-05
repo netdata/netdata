@@ -1718,7 +1718,7 @@ modules:
         list:
           - title: Configure SQL Server for Monitoring
             description: |
-              With the exception of step 4, which depends on server configuration, all other steps must be performed for each SQL Server instance you want to monitor.
+              For **each SQL Server** instance you want to monitor, complete the following steps:
 
               1. **Create Monitoring User**
               
@@ -1768,7 +1768,7 @@ modules:
                   - Enter a port number in the `TCP Port` field (default is `1433`)
                 - Select `SQL Server Services` and restart your SQL Server instance
 
-              4 **Configure SQL Server Authentication**
+              4 **Configure SQL Server Authentication (Optional)**
 
                 If you're using SQL Server authentication (rather than Windows authentication):
 
