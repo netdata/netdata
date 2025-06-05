@@ -350,11 +350,11 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	%else
 	-DENABLE_PLUGIN_CUPS=Off \
 	%endif
-    %if %{_have_upsd}
-    -DENABLE_PLUGIN_UPSD=On \
-    %else
-    -DENABLE_PLUGIN_UPSD=Off \
-    %endif
+	%if %{_have_upsd}
+	-DENABLE_PLUGIN_UPSD=On \
+	%else
+	-DENABLE_PLUGIN_UPSD=Off \
+	%endif
 	%if %{_have_ebpf}
 	-DENABLE_PLUGIN_EBPF=On \
 	%if 0%{?centos_ver:1}
