@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 type ProfileMetrics struct {
@@ -24,8 +25,9 @@ type ProfileMetrics struct {
 type Metric struct {
 	Name        string
 	Description string
+	Family      string
 	Unit        string
-	MetricType  string
+	MetricType  ddprofiledefinition.ProfileMetricType
 	Tags        map[string]string
 	Mappings    map[int64]string
 	Value       int64

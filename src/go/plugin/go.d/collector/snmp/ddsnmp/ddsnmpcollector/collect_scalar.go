@@ -102,8 +102,9 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		Tags:        tags,
 		Unit:        cfg.Symbol.Unit,
 		Description: cfg.Symbol.Description,
+		Family:      cfg.Symbol.Family,
 		Mappings:    mappings,
-		MetricType:  string(getMetricType(cfg.Symbol, pdu)),
+		MetricType:  getMetricType(cfg.Symbol, pdu),
 	}, nil
 }
 
