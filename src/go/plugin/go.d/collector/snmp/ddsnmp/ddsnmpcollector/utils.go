@@ -214,3 +214,17 @@ func ternary[T any](cond bool, a, b T) T {
 	}
 	return b
 }
+
+func isInt(s string) bool {
+	_, err := strconv.ParseInt(s, 10, 64)
+	return err == nil
+}
+
+func isMappingKeysNumeric(mapping map[string]string) bool {
+	for k := range mapping {
+		if !isInt(k) {
+			return false
+		}
+	}
+	return true
+}
