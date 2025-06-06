@@ -3094,3 +3094,87 @@ modules:
                 - name: pause_pending
                 - name: paused
                 - name: unknown
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibExchange
+      monitored_instance:
+        name: MS Exchange
+        link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "exchange.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - exchange
+        - mail
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Microsoft Exchange.
+        method_description: |
+          It queries different Exchange objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibExchange
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Windows Exchange
+          description: "These metrics refer to Windows Exchange."
+          labels: []
+          metrics:
+            - name: exchange.autodiscover_requests
+              description: Autodiscover service requests processed
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: processed
