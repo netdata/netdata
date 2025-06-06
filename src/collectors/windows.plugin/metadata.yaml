@@ -3172,6 +3172,18 @@ modules:
           description: "These metrics refer to Windows Exchange."
           labels: []
           metrics:
+            - name: exchange.owa_current_unique_users
+              description: Unique users currently logged on to Outlook Web App.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: users
+            - name: exchange.owa_requests_total
+              description: Requests handled by Outlook Web App.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
             - name: exchange.autodiscover_requests
               description: Autodiscover service requests processed
               unit: requests/s
