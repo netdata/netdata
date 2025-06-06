@@ -124,7 +124,6 @@ typedef struct {
         time_t before;                  // End time for the query (0 = not specified)
         const char *cursor;             // Pagination cursor (MCP standard) (referenced from json-c, not owned)
         usec_t anchor;                  // Internal anchor timestamp converted from cursor (0 = not specified)
-        size_t last;                    // Number of last rows (0 = not specified)
         const char *direction;          // Query direction: "forward" or "backward" (referenced from json-c, not owned)
         const char *query;              // Full-text search query (referenced from json-c, not owned)
     } request;
