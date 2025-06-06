@@ -15,7 +15,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.1.1.6
         name: bsnAPOperationStatus
         description: Operation State of the AP
-        family: Airespace/AP/Status
+        family: Access Points/Airespace/Status
         unit: "{status}"
         mapping:
           1: associated
@@ -24,7 +24,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.1.1.37
         name: bsnAPAdminStatus
         description: Admin State of the AP
-        family: Airespace/AP/Status
+        family: Access Points/Airespace/Status
         unit: "{status}"
         mapping:
           1: enable
@@ -57,7 +57,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.12
         name: bsnAPIfOperStatus
         description: Operational status of the interface
-        family: Airespace/AP/Interfaces/Status
+        family: Access Points/Airespace/Interfaces/Status
         unit: "{status}"
         mapping:
           1: down
@@ -65,7 +65,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.34
         name: bsnAPIfAdminStatus
         description: Admin status of the interface
-        family: Airespace/AP/Interfaces/Status
+        family: Access Points/Airespace/Interfaces/Status
         unit: "{status}"
         mapping:
           1: enable
@@ -117,7 +117,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.15
         name: bsnApIfNoOfUsers
         description: "Number of users associated with this radio"
-        family: Airespace/AP/Interfaces/Users
+        family: Access Points/Airespace/Interfaces/Users
         unit: "{user}"
     metric_tags:
       - symbol:
@@ -167,22 +167,22 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.1
         name: bsnAPIfLoadRxUtilization
         description: "Percentage of time the Airespace AP receiver is busy operating on packets"
-        family: Airespace/AP/Receiver/Utilization
+        family: Access Points/Airespace/Receiver/Utilization
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.2
         name: bsnAPIfLoadTxUtilization
         description: "Percentage of time the Airespace AP transmitter is busy operating on packets"
-        family: Airespace/AP/Transmitter/Utilization
+        family: Access Points/Airespace/Transmitter/Utilization
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.24
         name: bsnAPIfPoorSNRClients
         description: "Number of clients with poor SNR attached to this Airespace AP at the last measurement interval"
-        family: Airespace/AP/Clients
+        family: Access Points/Airespace/Clients
         unit: "{client}"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.3
         name: bsnAPIfLoadChannelUtilization
         description: "Channel utilization"
-        family: Airespace/AP/Channel/Utilization
+        family: Access Points/Airespace/Channel/Utilization
         unit: "%"
     metric_tags:
       - symbol:
@@ -233,7 +233,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.6
         name: bsnDot11EssAdminStatus
         description: Administrative Status of ESS(WLAN)
-        family: Airespace/AP/WLAN/Status
+        family: Access Points/Airespace/WLAN/Status
         unit: "{status}"
         mapping:
           0: disable
@@ -241,7 +241,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.60
         name: bsnDot11EssRowStatus
         description: Row status type for the bsnDot11EssEntry
-        family: Airespace/AP/WLAN/Status
+        family: Access Points/Airespace/WLAN/Status
         unit: "{status}"
         mapping:
           1: active
@@ -253,7 +253,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.38
         name: bsnDot11EssNumberOfMobileStations
         description: Number of mobile stations currently associated with the WLAN
-        family: Airespace/AP/WLAN/Mobile Stations
+        family: Access Points/Airespace/WLAN/Mobile Stations
         unit: "{station}"
     metric_tags:
       - symbol:
