@@ -5,9 +5,9 @@ metadata:
   device:
     fields:
       vendor:
-        value: "mikrotik"
+        value: "MikroTik"
       type:
-        value: "router"
+        value: "Router"
 sysobjectid:
   - 1.3.6.1.4.1.14988.1.*
 metrics:

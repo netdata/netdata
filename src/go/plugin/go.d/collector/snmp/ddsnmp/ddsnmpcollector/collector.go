@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -82,6 +83,23 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 		c.log.Debugf("collecting metrics: %v", errors.Join(errs...))
 	}
 
+	for _, ps := range c.profiles {
+		if !ps.initialized {
+			continue
+		}
+		if res, ok := ps.profile.Definition.Metadata["device"]; ok {
+			if dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value; dt != "" && dv != "" {
+				for _, pm := range metrics {
+					for i := range pm.Metrics {
+						m := &pm.Metrics[i]
+						m.Family = processMetricFamily(m.Family, dt, dv)
+					}
+				}
+				break
+			}
+		}
+	}
+
 	return metrics, nil
 }
 
@@ -116,7 +134,6 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		DeviceMetadata: maps.Clone(ps.deviceMetadata),
 		Metrics:        metrics,
 	}, nil
-
 }
 
 func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
@@ -136,4 +153,21 @@ func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	}
 
 	return pdus, nil
+}
+
+func processMetricFamily(family, devType, vendor string) string {
+	prefix := strings.TrimPrefix(devType+"s/"+vendor, "s/")
+	if prefix == "" {
+		return family
+	}
+	if family == "" {
+		return prefix
+	}
+
+	parts := strings.Split(family, "/")
+	parts = slices.DeleteFunc(parts, func(s string) bool {
+		return s == devType || s == devType+"s" || s == vendor
+	})
+
+	return strings.TrimSuffix(prefix+"/"+strings.Join(parts, "/"), "/")
 }
