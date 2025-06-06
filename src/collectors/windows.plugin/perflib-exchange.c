@@ -45,14 +45,52 @@ void netdata_exchange_auto_discover(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
     rrdset_done(st_exchange_auto_discover_request_total);
 }
 
+static
+void netdata_exchange_availability_service(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA exchangeAvailServiceRequests = {.key = "Availability Requests (sec)" };
+
+    static RRDSET *st_exchange_avail_service_requests = NULL;
+    static RRDDIM *rd_exchange_avail_service_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeAvailServiceRequests)) {
+        return;
+    }
+
+    if (unlikely(!st_exchange_avail_service_requests)) {
+        st_exchange_avail_service_requests = rrdset_create_localhost(
+            "exchange",
+            "exchange_avail_service_requests",
+            NULL,
+            "requests",
+            "exchange.avail_service_requests",
+            "Requests serviced.",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_AUTO_AVAILABILITY_SERVICES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_exchange_avail_service_requests =
+            rrddim_add(st_exchange_avail_service_requests, "serviced", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_exchange_avail_service_requests,
+        rd_exchange_avail_service_requests,
+        (collected_number)exchangeAvailServiceRequests.current.Data);
+    rrdset_done(st_exchange_avail_service_requests);
+}
+
 struct netdata_exchange_objects {
     void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int);
     char *object;
 } exchange_obj[] = {
-    {.fcnt = netdata_exchange_auto_discover, .object = "MSExchangeAutodiscover"},
+    {.fnct = netdata_exchange_auto_discover, .object = "MSExchangeAutodiscover"},
+    {.fnct = netdata_exchange_availability_service, .object = "MSExchange Availability Service"},
 
     // This is the end of the loop
-    {.fcnt = NULL, .object = NULL}};
+    {.fnct = NULL, .object = NULL}};
 
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused)
 {
@@ -63,7 +101,7 @@ int do_PerflibExchange(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    for (int i = 0; exchange_obj[i]; i++) {
+    for (int i = 0; exchange_obj[i].fnct ; i++) {
         DWORD id = RegistryFindIDByName(exchange_obj[i].object);
         if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
             continue;
