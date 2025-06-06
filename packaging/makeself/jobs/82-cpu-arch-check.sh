@@ -10,21 +10,54 @@
 check_files="${NETDATA_INSTALL_PATH}/bin/netdata ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/go.d.plugin"
 
 case "${BUILDARCH}" in
-    aarch64) ELF_MACHINE="AArch64" ;;
-    armv6l|armv7l) ELF_MACHINE="ARM" ;;
-    ppc64le) ELF_MACHINE="PowerPC64" ;;
-    x86_64) ELF_MACHINE="X86-64" ;;
-    *)
-        echo "Buildarch is not recognized for architecture check."
-        exit 1
-        ;;
+  aarch64)
+    ELF_MACHINE="AArch64"
+    ELF_CLASS="ELF64"
+    ;;
+  armv6l | armv7l)
+    ELF_MACHINE="ARM"
+    ELF_CLASS="ELF32"
+    ;;
+  ppc64le)
+    ELF_MACHINE="PowerPC64"
+    ELF_CLASS="ELF64"
+    ;;
+  x86_64)
+    ELF_MACHINE="X86-64"
+    ELF_CLASS="ELF64"
+    ;;
+  *)
+    echo "Buildarch is not recognized for architecture check."
+    exit 1
+    ;;
 esac
 
 for f in ${check_files}; do
-    if [ "$(readelf -h "${f}" | grep 'Machine' | rev | awk '{print $1}' | rev)" != "${ELF_MACHINE}" ]; then
-        echo "${f} was built for the wrong architecture"
-        exit 1
-    fi
+  if [ ! -f "${f}" ]; then
+    echo "File ${f} not found, skipping check"
+    continue
+  fi
+
+  # Get both the machine type and the class (32-bit vs 64-bit)
+  elf_info=$(readelf -h "${f}")
+  file_machine=$(echo "${elf_info}" | grep 'Machine:' | awk -F: '{print $2}' | xargs)
+  file_class=$(echo "${elf_info}" | grep 'Class:' | awk -F: '{print $2}' | xargs)
+
+  echo "Checking ${f}:"
+  echo "  Expected: Class=${ELF_CLASS}, Machine=${ELF_MACHINE}"
+  echo "  Found:    Class=${file_class}, Machine=${file_machine}"
+
+  # Check both class and machine type
+  if [ "${file_class}" != "${ELF_CLASS}" ]; then
+    echo "ERROR: ${f} has wrong ELF class (${file_class} instead of ${ELF_CLASS})"
+    echo "This indicates a 32-bit/64-bit mismatch!"
+    exit 1
+  fi
+
+  if [ "${file_machine}" != "${ELF_MACHINE}" ]; then
+    echo "ERROR: ${f} was built for the wrong architecture (${file_machine} instead of ${ELF_MACHINE})"
+    exit 1
+  fi
 done
 
 # shellcheck disable=SC2015
