@@ -39,15 +39,18 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
     freez(tmp);
 }
 
-static void stream_execute_function_progress_callback(void *data, size_t done, size_t all) {
+static void stream_execute_function_progress_callback(nd_uuid_t *transaction, void *data, size_t done, size_t all) {
     struct inflight_stream_function *tmp = data;
     struct sender_state *s = tmp->sender;
 
     if(rrdhost_can_stream_metadata_to_parent(s->host)) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
+        char transaction_str[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(*transaction, transaction_str);
+
         buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
-                       string2str(tmp->transaction), done, all);
+                       transaction_str, done, all);
 
         sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }

@@ -20,7 +20,7 @@ struct web_client;
 
 void nd_web_api_init(void);
 
-void web_client_progress_functions_update(void *data, size_t done, size_t all);
+void web_client_progress_functions_update(nd_uuid_t *transaction, void *data, size_t done, size_t all);
 
 void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key);
 
