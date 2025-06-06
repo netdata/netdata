@@ -3172,6 +3172,24 @@ modules:
           description: "These metrics refer to Windows Exchange."
           labels: []
           metrics:
+            - name: exchange.activesync_ping_cmds_pending
+              description: Ping commands pending in queue.
+              unit: commands
+              chart_type: line
+              dimensions:
+                - name: ping
+            - name: exchange.activesync_requests
+              description: HTTP requests received from ASP.NET.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: exchange.activesync_sync_cmds
+              description: Sync commands processed.
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: sync
             - name: exchange.owa_current_unique_users
               description: Unique users currently logged on to Outlook Web App.
               unit: users
