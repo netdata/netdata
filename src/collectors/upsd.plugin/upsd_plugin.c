@@ -628,7 +628,6 @@ int main(int argc, char *argv[]) {
                 (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal")))
                 continue;
 
-            // TODO: do not hardcode update_every
             // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
             printf("CHART '%s_%s.%s' '%s' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '%s' '%s'\n",
                    NETDATA_PLUGIN_NAME, clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
@@ -639,7 +638,7 @@ int main(int argc, char *argv[]) {
                    chart->chart_context,  // context
                    chart->chart_type,     // charttype
                    chart->chart_priority, // priority
-                   1,                     // update_every
+                   netdata_update_every,  // update_every
                    "",                    // options
                    NETDATA_PLUGIN_NAME);  // plugin
 
