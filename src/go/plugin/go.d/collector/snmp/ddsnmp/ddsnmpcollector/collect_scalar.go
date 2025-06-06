@@ -67,7 +67,7 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 
 	value, err := processSymbolValue(cfg.Symbol, pdu)
 	if err != nil {
-		return nil, fmt.Errorf("error processing value: %w", err)
+		return nil, fmt.Errorf("error processing value for OID %s (%s): %w", cfg.Symbol.Name, cfg.Symbol.OID, err)
 	}
 
 	tags := make(map[string]string)
@@ -78,13 +78,33 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		}
 	}
 
+	var mappings map[int64]string
+
+	if len(cfg.Symbol.Mapping) > 0 {
+		mappings = make(map[int64]string)
+		if isMappingKeysNumeric(cfg.Symbol.Mapping) {
+			for k, v := range cfg.Symbol.Mapping {
+				intKey, _ := strconv.ParseInt(k, 10, 64)
+				mappings[intKey] = v
+			}
+		} else {
+			for k, v := range cfg.Symbol.Mapping {
+				if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
+					mappings[intVal] = k
+				}
+			}
+		}
+	}
+
 	return &Metric{
 		Name:        cfg.Symbol.Name,
 		Value:       value,
 		Tags:        tags,
 		Unit:        cfg.Symbol.Unit,
 		Description: cfg.Symbol.Description,
-		MetricType:  string(getMetricType(cfg.Symbol, pdu)),
+		Family:      cfg.Symbol.Family,
+		Mappings:    mappings,
+		MetricType:  getMetricType(cfg.Symbol, pdu),
 	}, nil
 }
 
@@ -93,11 +113,18 @@ func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU
 
 	if isPduNumericType(pdu) {
 		value = gosnmp.ToBigInt(pdu.Value).Int64()
+		if len(sym.Mapping) > 0 {
+			s := strconv.FormatInt(value, 10)
+			if v, ok := sym.Mapping[s]; ok && isInt(v) {
+				value, _ = strconv.ParseInt(v, 10, 64)
+			}
+		}
 	} else {
 		s, err := convPduToStringf(pdu, sym.Format)
 		if err != nil {
 			return 0, err
 		}
+
 		switch {
 		case sym.ExtractValueCompiled != nil:
 			if sm := sym.ExtractValueCompiled.FindStringSubmatch(s); len(sm) > 1 {
@@ -108,7 +135,15 @@ func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU
 				s = replaceSubmatches(sym.MatchValue, sm)
 			}
 		}
-		if v, ok := sym.Mapping[s]; ok {
+
+		// Handle mapping based on the mapping type:
+		// 1. Int -> String mapping (e.g., {"1": "up", "2": "down"}):
+		//    - Used for creating dimensions later
+		//    - Value remains numeric, no conversion needed here
+		// 2. String -> Int mapping (e.g., {"OK": "0", "WARNING": "1"}):
+		//    - Used to convert string values to numeric values
+		//    - Apply the mapping to get the numeric representation
+		if v, ok := sym.Mapping[s]; ok && isInt(v) {
 			s = v
 		}
 

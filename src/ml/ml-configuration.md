@@ -19,21 +19,24 @@ Netdata implements machine learning using the lightweight [dlib](https://github.
 
 ```mermaid
 flowchart TD
-    %% Node styling
-    classDef neutral fill:#f9f9f9,stroke:#000000,color:#000000,stroke-width:2px
-    classDef success fill:#4caf50,stroke:#000000,color:#000000,stroke-width:2px
-    classDef warning fill:#ffeb3b,stroke:#000000,color:#000000,stroke-width:2px
-    classDef danger fill:#f44336,stroke:#000000,color:#000000,stroke-width:2px
+    Dlib("dlib C++ Library<br/><br/>Implementation")
     
-    Dlib[dlib C++ Library Implementation]
+    Efficiency("Run efficiently on<br/><br/>any system without<br/><br/>heavy dependencies")
+    Resources("Minimize resource usage<br/><br/>while maintaining<br/><br/>high accuracy")
+    Codebase("Operate within the<br/><br/>constraints of agent's<br/><br/>C/C++ codebase")
     
-    Dlib --> Efficiency[Run efficiently on<br/>any system without<br/>heavy dependencies]
-    Dlib --> Resources[Minimize resource usage<br/>while maintaining<br/>high accuracy]
-    Dlib --> Codebase[Operate within the<br/>constraints of agent's<br/>C/C++ codebase]
+    Dlib --> Efficiency
+    Dlib --> Resources
+    Dlib --> Codebase
+    
+    %% Style definitions
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     
     %% Apply styles
-    class Dlib warning
-    class Efficiency,Resources,Codebase success
+    class Dlib process
+    class Efficiency,Resources,Codebase complete
 ```
 
 :::note
@@ -92,51 +95,74 @@ When your system detects a potential anomaly:
 
 ```mermaid
 flowchart TD
-    %% Node styling
-    classDef neutral fill:#f9f9f9,stroke:#000000,color:#000000,stroke-width:2px
-    classDef success fill:#4caf50,stroke:#000000,color:#000000,stroke-width:2px
-    classDef warning fill:#ffeb3b,stroke:#000000,color:#000000,stroke-width:2px
-    classDef danger fill:#f44336,stroke:#000000,color:#000000,stroke-width:2px
+    NewData("**New Metric<br/><br/>Data Point**")
     
-    %% Input data
-    NewData[New Metric Data Point] --> M1 & M2 & M3 & M4
+    M1("**Model 1<br/><br/>Recent 3h**")
+    M2("**Model 2<br/><br/>3-6h ago**")
+    M3("**Model 3<br/><br/>6-9h ago**")
+    M4("**Model N<br/><br/>Older periods**")
     
-    %% Models
-    subgraph Models[Multiple Time-Scale Models]
-        M1[Model 1<br/>Recent 3h]
-        M2[Model 2<br/>3-6h ago]
-        M3[Model 3<br/>6-9h ago]
-        M4[Model N<br/>Older periods]
-    end
+    D1("**Anomalous?**")
+    D2("**Anomalous?**")
+    D3("**Anomalous?**")
+    D4("**Anomalous?**")
     
-    %% Decisions
-    M1 --> D1{Anomalous?}
-    M2 --> D2{Anomalous?}
-    M3 --> D3{Anomalous?}
-    M4 --> D4{Anomalous?}
+    R1("**Model 1:<br/><br/>Anomaly**")
+    N1("**Model 1:<br/><br/>Normal**")
+    R2("**Model 2:<br/><br/>Anomaly**")
+    N2("**Model 2:<br/><br/>Normal**")
+    R3("**Model 3:<br/><br/>Anomaly**")
+    N3("**Model 3:<br/><br/>Normal**")
+    R4("**Model N:<br/><br/>Anomaly**")
+    N4("**Model N:<br/><br/>Normal**")
     
-    %% Results
-    D1 -->|Yes| R1[Model 1: Anomaly]
-    D1 -->|No| N1[Model 1: Normal]
-    D2 -->|Yes| R2[Model 2: Anomaly]
-    D2 -->|No| N2[Model 2: Normal]
-    D3 -->|Yes| R3[Model 3: Anomaly]
-    D3 -->|No| N3[Model 3: Normal]
-    D4 -->|Yes| R4[Model N: Anomaly]
-    D4 -->|No| N4[Model N: Normal]
+    AllYes("**All<br/><br/>Models<br/><br/>Agree?**")
+    AllNo("**Set Anomaly Bit = 0**<br/><br/>Normal")
+    AllAnom("**Set Anomaly Bit = 1**<br/><br/>Anomalous")
     
-    %% Consensus
-    R1 & R2 & R3 & R4 --> AllYes{All<br/>Models<br/>Agree?}
-    N1 & N2 & N3 & N4 ---> AllNo[Set Anomaly Bit = 0<br/>Normal]
-    AllYes -->|Yes| AllAnom[Set Anomaly Bit = 1<br/>Anomalous]
+    NewData --> M1
+    NewData --> M2
+    NewData --> M3
+    NewData --> M4
+    
+    M1 --> D1
+    M2 --> D2
+    M3 --> D3
+    M4 --> D4
+    
+    D1 -->|Yes| R1
+    D1 -->|No| N1
+    D2 -->|Yes| R2
+    D2 -->|No| N2
+    D3 -->|Yes| R3
+    D3 -->|No| N3
+    D4 -->|Yes| R4
+    D4 -->|No| N4
+    
+    R1 --> AllYes
+    R2 --> AllYes
+    R3 --> AllYes
+    R4 --> AllYes
+    N1 --> AllNo
+    N2 --> AllNo
+    N3 --> AllNo
+    N4 --> AllNo
+    
+    AllYes -->|Yes| AllAnom
     AllYes -->|No| AllNo
+    
+    %% Style definitions
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef anomaly fill:#f44336,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     
     %% Apply styles
     class NewData neutral
-    class M1,M2,M3,M4 success
-    class D1,D2,D3,D4,AllYes warning
-    class R1,R2,R3,R4,AllAnom danger
-    class N1,N2,N3,N4,AllNo neutral
+    class M1,M2,M3,M4 complete
+    class D1,D2,D3,D4,AllYes process
+    class R1,R2,R3,R4,AllAnom anomaly
+    class N1,N2,N3,N4,AllNo complete
 ```
 
 :::note
@@ -159,24 +185,24 @@ This example assumes three child nodes [streaming](/docs/observability-centraliz
 
 ```mermaid
 flowchart BT
-    %% Node styling
-    classDef neutral fill:#f9f9f9,stroke:#000000,color:#000000,stroke-width:2px
-    classDef success fill:#4caf50,stroke:#000000,color:#000000,stroke-width:2px
-    classDef warning fill:#ffeb3b,stroke:#000000,color:#000000,stroke-width:2px
-    classDef danger fill:#f44336,stroke:#000000,color:#000000,stroke-width:2px
+    C1("**Netdata Child 0**<br/><br/>ML enabled")
+    C2("**Netdata Child 1**<br/><br/>ML enabled")
+    C3("**Netdata Child 2**<br/><br/>ML disabled")
+    P1("**Netdata Parent**<br/><br/>(ML enabled for itself<br/><br/>and Child 1 & 2)")
     
-    C1["Netdata Child 0<br/>ML enabled"]
-    C2["Netdata Child 1<br/>ML enabled"]
-    C3["Netdata Child 2<br/>ML disabled"]
-    P1["Netdata Parent<br/>(ML enabled for itself<br/>and Child 1 & 2)"]
     C1 --> P1
     C2 --> P1
     C3 --> P1
     
+    %% Style definitions
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    
     %% Apply styles
-    class C1,C2 success
+    class C1,C2 complete
     class C3 neutral
-    class P1 warning
+    class P1 process
 ```
 
 ```text

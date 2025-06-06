@@ -4,9 +4,12 @@ package snmp
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 const (
@@ -19,6 +22,8 @@ const (
 	prioNetIfaceAdminStatus
 	prioNetIfaceOperStatus
 	prioSysUptime
+
+	prioProfileChart
 )
 
 var netIfaceChartsTmpl = module.Charts{
@@ -308,4 +313,70 @@ func newUserInputChart(cfg ChartConfig) (*module.Chart, error) {
 	}
 
 	return chart, nil
+}
+
+func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
+	if m.Name == "" {
+		return
+	}
+
+	r := strings.NewReplacer(".", "_", " ", "_")
+	chart := &module.Chart{
+		ID:       fmt.Sprintf("snmp_device_prof_%s", r.Replace(m.Name)),
+		Title:    m.Description,
+		Units:    m.Unit,
+		Fam:      m.Family,
+		Ctx:      fmt.Sprintf("snmp.device_prof_%s", r.Replace(m.Name)),
+		Priority: prioProfileChart,
+	}
+	if chart.Title == "" {
+		chart.Title = fmt.Sprintf("SNMP metric %s", m.Name)
+	}
+	if chart.Units == "" {
+		chart.Units = "1"
+	}
+	if chart.Fam == "" {
+		chart.Fam = m.Name
+	}
+
+	tags := map[string]string{
+		"vendor":  c.sysInfo.Organization,
+		"sysName": c.sysInfo.Name,
+	}
+	maps.Copy(tags, m.Tags)
+	for k, v := range tags {
+		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+	}
+
+	if len(m.Mappings) > 0 {
+		for _, v := range m.Mappings {
+			id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
+			chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+		}
+	} else {
+		id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+		chart.Dims = module.Dims{
+			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
+		}
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) removeProfileScalarMetricChart(metricName string) {
+	r := strings.NewReplacer(".", "_", " ", "_")
+	id := fmt.Sprintf("snmp_device_prof_%s", r.Replace(metricName))
+	if chart := c.Charts().Get(id); chart != nil {
+		chart.MarkRemove()
+		chart.MarkNotCreated()
+	}
+}
+
+func dimAlgoFromDdSnmpType(m ddsnmpcollector.Metric) module.DimAlgo {
+	if m.MetricType == ddprofiledefinition.ProfileMetricTypeGauge {
+		return module.Absolute
+	}
+	return module.Incremental
 }

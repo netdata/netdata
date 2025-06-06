@@ -2,17 +2,29 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.3...HEAD)
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20430](https://github.com/netdata/netdata/pull/20430) ([netdatabot](https://github.com/netdatabot))
+- Update MSSQL Metadata [\#20429](https://github.com/netdata/netdata/pull/20429) ([thiagoftsm](https://github.com/thiagoftsm))
+- update ddsnmp mikrotik-router.yaml [\#20428](https://github.com/netdata/netdata/pull/20428) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): lazy ddsnmp profile loading [\#20427](https://github.com/netdata/netdata/pull/20427) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/snmp\): enable profile scalar metrics collection [\#20426](https://github.com/netdata/netdata/pull/20426) ([ilyam8](https://github.com/ilyam8))
+- ML: Add documentation for Netdata Insights [\#20425](https://github.com/netdata/netdata/pull/20425) ([kanelatechnical](https://github.com/kanelatechnical))
+- docs: remove sizing-netdata-parents.md [\#20421](https://github.com/netdata/netdata/pull/20421) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): correctly handle all mapping types [\#20420](https://github.com/netdata/netdata/pull/20420) ([ilyam8](https://github.com/ilyam8))
+- SNMP: apc\_ups.yaml [\#20419](https://github.com/netdata/netdata/pull/20419) ([Ancairon](https://github.com/Ancairon))
+- update\_installer: Update remove instruction [\#20418](https://github.com/netdata/netdata/pull/20418) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix context updates [\#20416](https://github.com/netdata/netdata/pull/20416) ([stelfrag](https://github.com/stelfrag))
 - improvement\(go.d\): add ddsnmp profile collector \(scalar only\) [\#20415](https://github.com/netdata/netdata/pull/20415) ([ilyam8](https://github.com/ilyam8))
+- Improve metrics centralization points documentation [\#20412](https://github.com/netdata/netdata/pull/20412) ([kanelatechnical](https://github.com/kanelatechnical))
 - SNMP: \_juniper-userfirewall.yaml [\#20409](https://github.com/netdata/netdata/pull/20409) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-scu.yaml [\#20408](https://github.com/netdata/netdata/pull/20408) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-firewall.yaml [\#20407](https://github.com/netdata/netdata/pull/20407) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-dcu.yaml [\#20406](https://github.com/netdata/netdata/pull/20406) ([Ancairon](https://github.com/Ancairon))
 - Rename nd-mcp on windows [\#20404](https://github.com/netdata/netdata/pull/20404) ([stelfrag](https://github.com/stelfrag))
+- docs\(go.d\): add example how to debug a specific job [\#20399](https://github.com/netdata/netdata/pull/20399) ([ilyam8](https://github.com/ilyam8))
 - Maintenance: update restart, backup, uninstall, and restore docs [\#20398](https://github.com/netdata/netdata/pull/20398) ([kanelatechnical](https://github.com/kanelatechnical))
 - feat\(go.d\): allow to debug a specific job [\#20394](https://github.com/netdata/netdata/pull/20394) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d/httpcheck\): add resp validation debug logging [\#20392](https://github.com/netdata/netdata/pull/20392) ([ilyam8](https://github.com/ilyam8))
@@ -135,6 +147,10 @@
 - Improve MSSQL \(Part III\) [\#20230](https://github.com/netdata/netdata/pull/20230) ([thiagoftsm](https://github.com/thiagoftsm))
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
 - ci: ignore changes in src/go/otel-collector/release-config.yaml.in [\#20222](https://github.com/netdata/netdata/pull/20222) ([ilyam8](https://github.com/ilyam8))
+
+## [v2.5.3](https://github.com/netdata/netdata/tree/v2.5.3) (2025-06-05)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.2...v2.5.3)
 
 ## [v2.5.2](https://github.com/netdata/netdata/tree/v2.5.2) (2025-05-22)
 
@@ -453,20 +469,6 @@
 - Update DEB/RPM package signing key info. [\#19888](https://github.com/netdata/netdata/pull/19888) ([Ferroin](https://github.com/Ferroin))
 - fix\(go.d/snmp/ddsnmp\): correct profile directory path [\#19887](https://github.com/netdata/netdata/pull/19887) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp/ddsnmp\): use dd profile definition [\#19886](https://github.com/netdata/netdata/pull/19886) ([ilyam8](https://github.com/ilyam8))
-- daemon status 18b [\#19884](https://github.com/netdata/netdata/pull/19884) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19883](https://github.com/netdata/netdata/pull/19883) ([netdatabot](https://github.com/netdatabot))
-- docs\(go.d/snmp\): improve auto-detection section [\#19882](https://github.com/netdata/netdata/pull/19882) ([ilyam8](https://github.com/ilyam8))
-- ci: use step-security/changed-files [\#19881](https://github.com/netdata/netdata/pull/19881) ([ilyam8](https://github.com/ilyam8))
-- change log priorities on agent-events [\#19880](https://github.com/netdata/netdata/pull/19880) ([ktsaou](https://github.com/ktsaou))
-- add stack trace information to the compiler and linker [\#19879](https://github.com/netdata/netdata/pull/19879) ([ktsaou](https://github.com/ktsaou))
-- SIGABRT and already running are fatal conditions [\#19878](https://github.com/netdata/netdata/pull/19878) ([ktsaou](https://github.com/ktsaou))
-- daemon-status-18 [\#19876](https://github.com/netdata/netdata/pull/19876) ([ktsaou](https://github.com/ktsaou))
-- do not lose exit reasons [\#19875](https://github.com/netdata/netdata/pull/19875) ([ktsaou](https://github.com/ktsaou))
-- make sure the daemon status hash does not depend on random bytes [\#19874](https://github.com/netdata/netdata/pull/19874) ([ktsaou](https://github.com/ktsaou))
-- add the fatal to the exit reasons [\#19873](https://github.com/netdata/netdata/pull/19873) ([ktsaou](https://github.com/ktsaou))
-- sentry events annotations [\#19872](https://github.com/netdata/netdata/pull/19872) ([ktsaou](https://github.com/ktsaou))
-- Remove tj-actions/changed-files from CI jobs. [\#19870](https://github.com/netdata/netdata/pull/19870) ([Ferroin](https://github.com/Ferroin))
-- daemon status file 17 [\#19869](https://github.com/netdata/netdata/pull/19869) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 

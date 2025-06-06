@@ -37,14 +37,15 @@ Run the command prompt as Administrator.
 
 ### Installation Command Options
 
-| Option       | Description                                                            |
-|--------------|------------------------------------------------------------------------|
-| `/qn`        | Enables silent mode (no user interaction)                              |
-| `/i`         | Specifies the path to the MSI installer                                |
-| `TOKEN=`     | Claim token from your Netdata Cloud Space                              |
-| `ROOMS=`     | Comma-separated Room IDs for your node                                 |
-| `PROXY=`     | (Optional) Proxy address if required                                   |
-| `INSECURE=1` | (Optional) Allow insecure connections (hostname verification disabled) |
+| Option          | Description                                                               |
+|-----------------|---------------------------------------------------------------------------|
+| `/qn`           | Enables silent mode (no user interaction)                                 |
+| `/i`            | Specifies the path to the MSI installer                                   |
+| `TOKEN=`        | Claim token from your Netdata Cloud Space                                 |
+| `ROOMS=`        | Comma-separated Room IDs for your node                                    |
+| `PROXY=`        | (Optional) Proxy address if required                                      |
+| `INSECURE=1`    | (Optional) Allow insecure connections (hostname verification disabled)    |
+| `REINSTALL=ALL` | (Optional) It forces a complete reinstallation of all Netdata components. |
 
 ### Example Command
 

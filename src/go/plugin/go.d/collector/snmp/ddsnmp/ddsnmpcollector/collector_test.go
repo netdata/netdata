@@ -10,6 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
 
@@ -448,56 +449,6 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"metric with mapping": {
-			profiles: []*ddsnmp.Profile{
-				{
-					SourceFile: "test-profile.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								Symbol: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.4.1.12124.1.1.2",
-									Name: "clusterHealth",
-									Mapping: map[string]string{
-										"OK":       "0",
-										"WARNING":  "1",
-										"CRITICAL": "2",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
-				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.2"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{
-								Name:  "1.3.6.1.4.1.12124.1.1.2",
-								Type:  gosnmp.OctetString,
-								Value: []byte("WARNING"),
-							},
-						},
-					}, nil,
-				)
-			},
-			expectedResult: []*ProfileMetrics{
-				{
-					DeviceMetadata: nil,
-					Metrics: []Metric{
-						{
-							Name:       "clusterHealth",
-							Value:      1,
-							Tags:       map[string]string{},
-							MetricType: "gauge",
-						},
-					},
-				},
-			},
-			expectedError: false,
-		},
 		"global tags with mapping": {
 			profiles: []*ddsnmp.Profile{
 				{
@@ -589,28 +540,367 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"metric with string to int mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.12124.1.1.2",
+									Name: "clusterHealth",
+									Mapping: map[string]string{
+										"OK":       "0",
+										"WARNING":  "1",
+										"CRITICAL": "2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.2"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.2",
+								Type:  gosnmp.OctetString,
+								Value: []byte("WARNING"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "clusterHealth",
+							Value:      1,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+							Mappings: map[int64]string{
+								0: "OK",
+								1: "WARNING",
+								2: "CRITICAL",
+							},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"metric with int to string mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2.1.8",
+									Name: "ifOperStatus",
+									Mapping: map[string]string{
+										"1": "up",
+										"2": "down",
+										"3": "testing",
+										"4": "unknown",
+										"5": "dormant",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.2.2.1.8"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.2.2.1.8",
+								Type:  gosnmp.Integer,
+								Value: 2, // down
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "ifOperStatus",
+							Value:      2,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+							Mappings: map[int64]string{
+								1: "up",
+								2: "down",
+								3: "testing",
+								4: "unknown",
+								5: "dormant",
+							},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"metric with extract_value and int to string mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:                  "1.3.6.1.4.1.12124.1.1.8",
+									Name:                 "fanStatus",
+									ExtractValueCompiled: mustCompileRegex(`Fan(\d+)`),
+									Mapping: map[string]string{
+										"1": "normal",
+										"2": "warning",
+										"3": "critical",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.8"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.8",
+								Type:  gosnmp.OctetString,
+								Value: []byte("Fan2"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "fanStatus",
+							Value:      2,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+							Mappings: map[int64]string{
+								1: "normal",
+								2: "warning",
+								3: "critical",
+							},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"metric with int to int mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2.1.7",
+									Name: "ifAdminStatus",
+									Mapping: map[string]string{
+										"1": "1", // up -> 1
+										"2": "0", // down -> 0
+										"3": "0", // testing -> 0
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.2.2.1.7"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.2.2.1.7",
+								Type:  gosnmp.Integer,
+								Value: 2, // down
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "ifAdminStatus",
+							Value:      0, // mapped from 2 -> 0
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+							Mappings: map[int64]string{
+								1: "1",
+								2: "0",
+								3: "0",
+							},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"metric with partial string to int mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.12124.1.1.2",
+									Name: "clusterHealth",
+									Mapping: map[string]string{
+										"OK":      "0",
+										"WARNING": "1",
+										// CRITICAL is not mapped
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.2"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.2",
+								Type:  gosnmp.OctetString,
+								Value: []byte("CRITICAL"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: nil,
+			expectedError:  true,
+		},
+		"metric with mixed mapping values": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.12124.1.1.2",
+									Name: "deviceStatus",
+									Mapping: map[string]string{
+										"OK":      "0",
+										"WARNING": "1",
+										"ERROR":   "invalid", // This will cause metric to be skipped
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12124.1.1.2"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12124.1.1.2",
+								Type:  gosnmp.OctetString,
+								Value: []byte("ERROR"),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: nil,
+			expectedError:  true,
+		},
+		"metric with no mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.2.1.1.3.0",
+								Type:  gosnmp.TimeTicks,
+								Value: uint32(123456),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "sysUpTime",
+							Value:      123456,
+							Tags:       map[string]string{},
+							MetricType: "gauge",
+							Mappings:   nil, // No mappings
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// Create gomock controller
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			// Create mock SNMP client
 			mockHandler := snmpmock.NewMockHandler(ctrl)
 			tc.setupMock(mockHandler)
 
-			// Create logger
-			log := logger.New()
+			collector := New(mockHandler, tc.profiles, logger.New())
 
-			// Create collector
-			collector := New(mockHandler, tc.profiles, log)
-
-			// Execute
 			result, err := collector.Collect()
 
-			// Verify error
 			if tc.expectedError {
 				assert.Error(t, err)
 				if tc.errorContains != "" {
@@ -620,9 +910,8 @@ func TestCollector_Collect(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			// Verify result
 			if tc.expectedResult != nil {
-				assert.Equal(t, len(tc.expectedResult), len(result))
+				require.Equal(t, len(tc.expectedResult), len(result))
 				for i := range tc.expectedResult {
 					assert.Equal(t, tc.expectedResult[i].DeviceMetadata, result[i].DeviceMetadata)
 					assert.ElementsMatch(t, tc.expectedResult[i].Metrics, result[i].Metrics)

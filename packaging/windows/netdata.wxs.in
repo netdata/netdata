@@ -212,7 +212,7 @@
                                 Name="Netdata"
                                 Stop="both"
                                 Start="install"
-                                Remove="uninstall"
+                                Remove="both"
                                 Wait="yes" />
 
                  <RegistryValue Root="HKLM"

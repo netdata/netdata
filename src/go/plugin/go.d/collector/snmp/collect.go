@@ -37,7 +37,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	if err := c.collectProfiles(mx); err != nil {
-		return nil, err
+		c.Infof("failed to collect profiles: %v", err)
 	}
 
 	if err := c.collectSysUptime(mx); err != nil {
