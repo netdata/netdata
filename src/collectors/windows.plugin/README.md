@@ -31,6 +31,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibAD = yes
         # PerflibADCS = yes
         # PerflibADFS = yes
+        # PerflibExchange = yes
 ```
 
 ## Microsoft SQL Server Integration
