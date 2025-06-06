@@ -745,5 +745,5 @@ int main(int argc, char *argv[]) {
     upscli_disconnect(&ups2);
     upscli_cleanup();
 
-    return NETDATA_PLUGIN_EXIT_AND_RESTART
+    return NETDATA_PLUGIN_EXIT_AND_RESTART;
 }
