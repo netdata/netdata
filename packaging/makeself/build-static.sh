@@ -44,7 +44,7 @@ case "${BUILDARCH}" in
         QEMU_CPU="cortex-a7"
         TUNING_FLAGS="-march=armv7-a"
         GOARM="7"
-        GOARCH="arm"
+#        GOARCH="arm"
         ;;
     aarch64) # Baseline ARMv8 CPU
         QEMU_ARCH="aarch64"
