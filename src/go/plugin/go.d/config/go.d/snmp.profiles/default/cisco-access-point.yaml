@@ -1,15 +1,20 @@
 extends:
   - cisco.yaml
+
+metadata:
+  device:
+    fields:
+      type:
+        value: Access Point
+      vendor:
+        value: Cisco
+
 sysobjectid:
   - 1.3.6.1.4.1.9.1.525 # Cisco AIR AP 1210
   - 1.3.6.1.4.1.9.1.618 # Cisco AIR AP 1130
   - 1.3.6.1.4.1.9.1.1660 # AIR-SAP1602E-C-K9
   - 1.3.6.1.4.1.9.1.2371 # Cisco Aironet 1830
-metadata:
-  device:
-    fields:
-      type:
-        value: "access_point"
+
 metrics:
   - MIB: CISCO-DOT11-ASSOCIATION-MIB
     table:
@@ -19,53 +24,53 @@ metrics:
       - name: cDot11ActiveWirelessClients
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.1
         description: Number of wireless clients currently associating with this device on this interface
-        family: Access Points/Cisco/Interfaces/Clients/Wireless
+        family: Interfaces/Clients/Wireless
         unit: "{client}"
       - name: cDot11ActiveBridges
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.2
         description: Number of bridges currently associating with this device on this interface
-        family: Access Points/Cisco/Interfaces/Bridges
+        family: Interfaces/Bridges
         unit: "{bridge}"
       - name: cDot11ActiveRepeaters
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.3
         description: Number of repeaters currently associating with this device on this interface
-        family: Access Points/Cisco/Interfaces/Repeaters
+        family: Interfaces/Repeaters
         unit: "{repeater}"
       - name: cDot11AssStatsAssociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.1
         metric_type: monotonic_count
         description: Number of stations associated with this device on this interface since device re-started
-        family: Access Points/Cisco/Interfaces/Stations/Associated
+        family: Interfaces/Stations/Associated
         unit: "{station}"
       - name: cDot11AssStatsAuthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.2
         metric_type: monotonic_count
         description: Number of stations authenticated with this device on this interface since device re-started
-        family: Access Points/Cisco/Interfaces/Stations/Authenticated
+        family: Interfaces/Stations/Authenticated
         unit: "{station}"
       - name: cDot11AssStatsRoamedIn
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.3
         metric_type: monotonic_count
         description: Number of stations roamed from another device to this device on this interface since device re-started
-        family: Access Points/Cisco/Interfaces/Stations/Roamed
+        family: Interfaces/Stations/Roamed
         unit: "{station}"
       - name: cDot11AssStatsRoamedAway
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.4
         metric_type: monotonic_count
         description: Number of stations roamed away from this device on this interface since device re-started
-        family: Access Points/Cisco/Interfaces/Stations/Roamed
+        family: Interfaces/Stations/Roamed
         unit: "{station}"
       - name: cDot11AssStatsDeauthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.5
         metric_type: monotonic_count
         description: Number of stations deauthenticated with this device on this interface since device re-started
-        family: Access Points/Cisco/Interfaces/Stations/Deauthenticated
+        family: Interfaces/Stations/Deauthenticated
         unit: "{station}"
       - name: cDot11AssStatsDisassociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.6
         metric_type: monotonic_count
         description: Number of stations disassociated with this device on this interface since device re-started
-        family: Access Points/Cisco/Interfaces/Stations/Disassociated
+        family: Interfaces/Stations/Disassociated
         unit: "{station}"
     metric_tags:
       - tag: if_name

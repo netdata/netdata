@@ -19,7 +19,7 @@ metrics:
       - name: cefcFRUPowerAdminStatus
         OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
         description: Administratively desired FRU power state
-        family: FRU/Cisco/Power/Status
+        family: Power/Status
         unit: "{status}"
         mapping:
           1: on
@@ -30,7 +30,7 @@ metrics:
       - name: cefcFRUPowerOperStatus
         OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
         description: Operational FRU power state
-        family: FRU/Cisco/Power/Status
+        family: Power/Status
         unit: "{status}"
         mapping:
           1: off_env_other
@@ -48,7 +48,7 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.3
         name: cefcFRUCurrent
         description: Current supplied by the FRU or current required to operate the FRU
-        family: FRU/Cisco/Power/Current
+        family: Power/Current
         unit: "A"
     metric_tags:
       - index: 1
@@ -61,22 +61,22 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.10
         name: cpmCPUTotalMonIntervalValue
         description: Overall CPU busy percentage in the last monitoring interval
-        family: Cisco/CPM/CPU/Usage
+        family: CPU/Usage
         unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7
         name: cpmCPUTotal1minRev
         description: Overall CPU busy percentage in the last 1 minute period
-        family: Cisco/CPM/CPU/Usage
+        family: CPU/Usage
         unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.12
         name: cpmCPUMemoryUsed
         description: Overall CPU wide system memory which is currently under use
-        family: Cisco/CPM/CPU/Memory
+        family: CPU/Memory
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.13
         name: cpmCPUMemoryFree
         description: Overall CPU wide system memory which is currently free
-        family: Cisco/CPM/CPU/Memory
+        family: CPU/Memory
         unit: "By"
     metric_tags:
       - index: 1
@@ -90,7 +90,7 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.2.1.1
         name: cieIfResetCount
         description: Number of times the interface was internally reset and brought up
-        family: Cisco/Network/Interfaces/Resets
+        family: Interfaces/Resets
         unit: "{reset}"
     metric_tags:
       - MIB: IF-MIB
@@ -107,12 +107,12 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.3
         name: ciscoEnvMonTemperatureStatusValue
         description: Current measurement of the testpoint
-        family: Cisco/Environment/Temperature
+        family: Environment/Temperature
         unit: "Cel"
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.6
         name: ciscoEnvMonTemperatureState
         tag: temp_state
-        family: Cisco/Environment/Temperature
+        family: Environment/Temperature
         unit: "{status}"
         mapping:
           1: normal
@@ -134,7 +134,7 @@ metrics:
         name: ciscoEnvMonSupplyState
         description: Current state of the power supply
         unit: "{status}"
-        family: Cisco/Environment/Power Supplies/Status
+        family: Environment/Power Supplies/Status
         tag: cisco_env_mon_supply_state
         mapping:
           1: normal
@@ -169,7 +169,7 @@ metrics:
         description: Current state of the fan
         unit: "{status}"
         tag: fan_state
-        family: Cisco/Environment/Fans/Status
+        family: Environment/Fans/Status
         mapping:
           1: normal
           2: warning
@@ -197,7 +197,7 @@ metrics:
         name: cswStackPortOperStatus
         description: State of the stackport
         unit: "{status}"
-        family: Cisco/StackWise/Stack Port/Status
+        family: StackWise/Stack Port/Status
         mapping:
           1: up
           2: down
@@ -221,7 +221,7 @@ metrics:
         name: cswSwitchState
         description: Current state of a switch
         unit: "{status}"
-        family: Cisco/StackWise/Switches/Status
+        family: StackWise/Status
         mapping:
           1: waiting
           2: progressing
@@ -256,7 +256,7 @@ metrics:
         name: cefcFanTrayOperStatus
         description: Operational state of the fan or fan tray
         unit: "{status}"
-        family: FRU/Cisco/Fans/Status
+        family: Fans/Status
         tag: cefc_fan_tray_oper_status
         mapping:
           1: unknown
@@ -283,17 +283,17 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5
         name: ciscoMemoryPoolUsed
         description: Number of bytes from the memory pool currently in use
-        family: Cisco/Memory Pool/Usage
+        family: Memory/Pool/Usage
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
         description: Number of bytes from the memory pool currently unused
-        family: Cisco/Memory Pool/Usage
+        family: Memory/Pool/Usage
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
         description: Largest number of contiguous bytes from the memory pool currently unused
-        family: Cisco/Memory Pool/Usage
+        family: Memory/Pool/Usage
         unit: "By"
     metric_tags:
       - symbol:
@@ -310,7 +310,7 @@ metrics:
         name: cfwConnectionStatCount
         description: Integer that contains the value of the resource statistic.
         unit: "1"
-        family: Firewall/Cisco/Connections
+        family: Connections
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.1
@@ -368,7 +368,7 @@ metrics:
         name: cfwHardwareStatusValue
         description: Current status of the resource
         unit: "{status}"
-        family: Firewall/Cisco/Hardware/Status
+        family: Hardware/Status
         mapping:
           1: other
           2: up
@@ -397,7 +397,7 @@ metrics:
         name: cvsChassisUpTime
         description: Up time for the chassis since last re-initialization
         unit: "cs"
-        family: Cisco/Chassis/Uptime
+        family: Chassis/Uptime
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.1
@@ -419,7 +419,7 @@ metrics:
   #        name: rttMonLatestRttOperSense
   #        description: Sense code for the completion status of the latest RTT operation
   #        unit: "{status}"
-  #        family: Cisco/RTT/Operations/Status
+  #        family: RTT/Operations/Status
   #        mapping:
   #          0: other
   #          1: ok
@@ -448,7 +448,7 @@ metrics:
   #      #   tag: rtt_type
   #      #   description: Type of RTT operation to be performed.
   #      #   unit: "{status}"
-  #      #   family: Cisco/RTT/Operations
+  #      #   family: RTT/Operations
   #      #   mapping:
   #      #     1: echo
   #      #     2: path_echo
@@ -501,7 +501,7 @@ metrics:
         tag: rtt_state
         description: Used to manage the state of the probe that is implementing conceptual RTT control row.
         unit: "{status}"
-        family: Cisco/RTT/Operations/Status
+        family: RTT/Operations/Status
         mapping:
           1: reset
           2: orderly_stop
@@ -514,7 +514,7 @@ metrics:
         name: rttMonCtrlOperTimeoutOccurred
         description: Indicates if a timeout occurred for the RTT operation
         unit: "{status}"
-        family: Cisco/RTT/Operations/Status
+        family: RTT/Operations/Status
         mapping:
           1: timeout_occurred
           2: no_timeout
