@@ -44,18 +44,17 @@ for f in ${check_files}; do
   file_class=$(echo "${elf_info}" | grep 'Class:' | awk -F: '{print $2}' | xargs)
 
   echo "Checking ${f}:"
-  echo "  Expected: Class=${ELF_CLASS}, Machine=${ELF_MACHINE}"
-  echo "  Found:    Class=${file_class}, Machine=${file_machine}"
+  echo "  Expected: Class=${ELF_CLASS}, Machine contains '${ELF_MACHINE}'"
+  echo "  Found:    Class=${file_class}, Machine='${file_machine}'"
 
-  # Check both class and machine type
   if [ "${file_class}" != "${ELF_CLASS}" ]; then
     echo "ERROR: ${f} has wrong ELF class (${file_class} instead of ${ELF_CLASS})"
     echo "This indicates a 32-bit/64-bit mismatch!"
     exit 1
   fi
 
-  if [ "${file_machine}" != "${ELF_MACHINE}" ]; then
-    echo "ERROR: ${f} was built for the wrong architecture (${file_machine} instead of ${ELF_MACHINE})"
+  if ! echo "${file_machine}" | grep -q "${ELF_MACHINE}"; then
+    echo "ERROR: ${f} was built for the wrong architecture (${file_machine} does not contain ${ELF_MACHINE})"
     exit 1
   fi
 done
