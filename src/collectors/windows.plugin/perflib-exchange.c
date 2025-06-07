@@ -73,13 +73,11 @@ void netdata_exchange_owa(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObject
     static COUNTER_DATA exchangeOWACurrentUniqueUser = {.key = "Current Unique Users" };
     static COUNTER_DATA exchangeOWARequestsTotal = {.key = "Requests/sec" };
 
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeOWACurrentUniqueUser) ||
-        !perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeOWARequestsTotal)) {
-        return;
-    }
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeOWACurrentUniqueUser))
+        netdata_exchange_owa_current_unique_users(&exchangeOWACurrentUniqueUser, update_every);
 
-    netdata_exchange_owa_current_unique_users(&exchangeOWACurrentUniqueUser, update_every);
-    netdata_exchange_owa_request_total(&exchangeOWARequestsTotal, update_every);
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeOWARequestsTotal))
+        netdata_exchange_owa_request_total(&exchangeOWARequestsTotal, update_every);
 }
 
 static void netdata_exchange_active_ping_cmd(COUNTER_DATA *value, int update_every) {
@@ -178,15 +176,15 @@ void netdata_exchange_active_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
     static COUNTER_DATA exchangeSyncCommands = {.key = "Sync Commands/sec" };
     static COUNTER_DATA exchangeActiveRequests = {.key = "Requests/sec" };
 
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &exchangePingCommands) ||
-        !perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeSyncCommands) ||
-        !perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeActiveRequests)) {
-        return;
-    }
 
-    netdata_exchange_active_ping_cmd(&exchangePingCommands, update_every);
-    netdata_exchange_active_requests(&exchangeActiveRequests, update_every);
-    netdata_exchange_sync_cmds(&exchangeSyncCommands, update_every);
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangePingCommands))
+        netdata_exchange_active_ping_cmd(&exchangePingCommands, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeSyncCommands))
+        netdata_exchange_sync_cmds(&exchangeSyncCommands, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeActiveRequests))
+        netdata_exchange_active_requests(&exchangeActiveRequests, update_every);
 }
 
 static
