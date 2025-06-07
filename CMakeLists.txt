@@ -2048,6 +2048,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-rrd.h
         src/collectors/windows.plugin/perflib-ad.c
         src/collectors/windows.plugin/perflib-mssql.c
+        src/collectors/windows.plugin/perflib-mssql-queries.h
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c
