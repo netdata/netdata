@@ -124,7 +124,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS,
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, x-goog-api-key, anthropic-version',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, x-goog-api-key, anthropic-version, anthropic-beta',
       'Access-Control-Max-Age': '86400'
     });
     res.end();
@@ -231,6 +231,11 @@ const server = http.createServer(async (req, res) => {
   if (req.headers['anthropic-version']) {
     headers['anthropic-version'] = req.headers['anthropic-version'];
   }
+  
+  // Forward anthropic-beta header if present (for caching and other beta features)
+  if (req.headers['anthropic-beta']) {
+    headers['anthropic-beta'] = req.headers['anthropic-beta'];
+  }
 
   // Forward other relevant headers
   ['content-length', 'accept-encoding'].forEach(header => {
@@ -272,7 +277,7 @@ const server = http.createServer(async (req, res) => {
       const responseHeaders = {
         'Access-Control-Allow-Origin': ALLOWED_ORIGINS,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, x-goog-api-key, anthropic-version'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, x-goog-api-key, anthropic-version, anthropic-beta'
       };
 
       // Forward relevant response headers

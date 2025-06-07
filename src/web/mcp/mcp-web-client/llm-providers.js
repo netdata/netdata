@@ -89,7 +89,7 @@ class OpenAIProvider extends LLMProvider {
                 url: this.apiUrl
             });
             if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                throw new Error('Connection Error: Cannot reach OpenAI API. Please ensure the proxy server is running on port 8081.');
+                throw new Error(`Connection Error: Cannot reach OpenAI API at ${this.apiUrl}. Please ensure the proxy server is running.`);
             }
             throw error;
         }
@@ -161,23 +161,37 @@ class AnthropicProvider extends LLMProvider {
     }
 
     async sendMessage(messages, tools = [], temperature = 0.7) {
-        // Convert messages to Anthropic format
-        const anthropicMessages = this.convertMessages(messages);
+        // Convert messages to Anthropic format with caching
+        const anthropicMessages = this.convertMessagesWithCaching(messages);
         
-        // Convert tools to Anthropic format
+        // Convert tools to Anthropic format (no cache control on tools)
         const anthropicTools = tools.map(tool => ({
             name: tool.name,
             description: tool.description,
             input_schema: tool.inputSchema || {}
         }));
 
+        // Find system message (no cache control on system message)
+        let system = undefined;
+        const systemMsg = messages.find(m => m.role === 'system');
+        if (systemMsg) {
+            system = [
+                {
+                    type: "text",
+                    text: systemMsg.content
+                }
+            ];
+        }
+
         const requestBody = {
             model: this.model,
             messages: anthropicMessages,
+            system: system,
             tools: anthropicTools.length > 0 ? anthropicTools : undefined,
             max_tokens: 4096,
             temperature: temperature
         };
+
 
         this.log('sent', JSON.stringify(requestBody, null, 2), { 
             provider: 'anthropic', 
@@ -191,7 +205,8 @@ class AnthropicProvider extends LLMProvider {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'anthropic-version': '2023-06-01'
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-beta': 'prompt-caching-2024-07-31' // Enable caching
                 },
                 body: JSON.stringify(requestBody)
             });
@@ -202,7 +217,7 @@ class AnthropicProvider extends LLMProvider {
                 url: this.apiUrl
             });
             if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                throw new Error('Connection Error: Cannot reach Anthropic API. Please ensure the proxy server is running on port 8081.');
+                throw new Error(`Connection Error: Cannot reach Anthropic API at ${this.apiUrl}. Please ensure the proxy server is running.`);
             }
             throw error;
         }
@@ -242,29 +257,103 @@ class AnthropicProvider extends LLMProvider {
             usage: data.usage ? {
                 promptTokens: data.usage.input_tokens,
                 completionTokens: data.usage.output_tokens,
-                totalTokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0)
+                totalTokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
+                cacheCreationInputTokens: data.usage.cache_creation_input_tokens,
+                cacheReadInputTokens: data.usage.cache_read_input_tokens
             } : null
         };
     }
 
+    convertMessagesWithCaching(messages) {
+        // Convert messages WITHOUT adding cache control yet
+        const converted = [];
+        let lastRole = null;
+        
+        for (let i = 0; i < messages.length; i++) {
+            const msg = messages[i];
+            
+            if (msg.role === 'system') {
+                // System messages are handled separately in sendMessage
+                continue;
+            }
+            
+            const role = msg.role;
+            
+            // Check if we need to merge consecutive messages with same role
+            if (role === lastRole && converted.length > 0) {
+                const last = converted[converted.length - 1];
+                
+                // Convert string content to array if needed
+                if (typeof last.content === 'string') {
+                    last.content = [{ type: 'text', text: last.content }];
+                }
+                
+                // Merge content
+                if (typeof msg.content === 'string') {
+                    last.content.push({ type: 'text', text: msg.content });
+                } else if (Array.isArray(msg.content)) {
+                    // Important: clone the content blocks to avoid modifying the original
+                    const clonedBlocks = msg.content.map(block => ({...block}));
+                    last.content.push(...clonedBlocks);
+                }
+            } else {
+                // Process the message content
+                let processedContent = msg.content;
+                
+                if (typeof msg.content === 'string') {
+                    processedContent = [{
+                        type: 'text',
+                        text: msg.content
+                    }];
+                } else if (Array.isArray(msg.content)) {
+                    // Important: clone the content blocks to avoid modifying the original
+                    processedContent = msg.content.map(block => ({...block}));
+                }
+                
+                converted.push({
+                    role: role,
+                    content: processedContent
+                });
+                lastRole = role;
+            }
+        }
+        
+        // Now find the absolute last content block across all messages
+        let lastContentBlock = null;
+        
+        // Iterate backwards through messages to find the last content block
+        for (let i = converted.length - 1; i >= 0; i--) {
+            const msg = converted[i];
+            if (Array.isArray(msg.content) && msg.content.length > 0) {
+                // Found a message with content, get its last block
+                lastContentBlock = msg.content[msg.content.length - 1];
+                break;
+            }
+        }
+        
+        // Add cache_control to only the very last content block
+        if (lastContentBlock) {
+            lastContentBlock.cache_control = { type: 'ephemeral' };
+        }
+        
+        return converted;
+    }
+
     convertMessages(messages) {
-        // With our new structure, messages should already be properly formatted
-        // We just need to handle system messages and ensure alternating pattern
+        // Fallback method without caching for compatibility
         const converted = [];
         let lastRole = null;
         
         for (const msg of messages) {
             if (msg.role === 'system') {
-                // System messages will be prepended to first user message
+                // System messages will be handled separately
                 continue;
             }
             
-            // Messages should already be in the correct format from processMessageWithTools
             const role = msg.role;
             
             // Check if we need to merge consecutive messages with same role
             if (role === lastRole && converted.length > 0) {
-                // This should rarely happen with our new structure, but handle it gracefully
                 const last = converted[converted.length - 1];
                 
                 // Convert string content to array if needed
@@ -285,17 +374,6 @@ class AnthropicProvider extends LLMProvider {
                     content: msg.content
                 });
                 lastRole = role;
-            }
-        }
-        
-        // Add system message to first user message if exists
-        const systemMsg = messages.find(m => m.role === 'system');
-        if (systemMsg && converted.length > 0 && converted[0].role === 'user') {
-            const firstMsg = converted[0];
-            if (typeof firstMsg.content === 'string') {
-                firstMsg.content = systemMsg.content + '\n\n' + firstMsg.content;
-            } else if (Array.isArray(firstMsg.content)) {
-                firstMsg.content.unshift({ type: 'text', text: systemMsg.content });
             }
         }
         
@@ -390,7 +468,7 @@ class GoogleProvider extends LLMProvider {
                 url: this.apiUrl
             });
             if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                throw new Error('Connection Error: Cannot reach Google AI API. Please ensure the proxy server is running on port 8081.');
+                throw new Error(`Connection Error: Cannot reach Google AI API at ${this.apiUrl}. Please ensure the proxy server is running.`);
             }
             throw error;
         }
