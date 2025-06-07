@@ -115,7 +115,7 @@ Alternativley you can add using a claude cli command like below:
 claude mcp add netdata /usr/bin/nd-mcp ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY
 ```
 
-Once configured correctly, issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
+Once configured correctly, run `claude mcp list` or you can issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
 
 ### Cursor
 
