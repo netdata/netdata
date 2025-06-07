@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Mcp3 [\#20435](https://github.com/netdata/netdata/pull/20435) ([ktsaou](https://github.com/ktsaou))
+- Adjust stream connector timeout during agent shutdown [\#20434](https://github.com/netdata/netdata/pull/20434) ([stelfrag](https://github.com/stelfrag))
+- Improve statement finalization and cleanup [\#20433](https://github.com/netdata/netdata/pull/20433) ([stelfrag](https://github.com/stelfrag))
+- Fix heap-use-after-free in query progress updates [\#20431](https://github.com/netdata/netdata/pull/20431) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#20430](https://github.com/netdata/netdata/pull/20430) ([netdatabot](https://github.com/netdatabot))
 - Update MSSQL Metadata [\#20429](https://github.com/netdata/netdata/pull/20429) ([thiagoftsm](https://github.com/thiagoftsm))
 - update ddsnmp mikrotik-router.yaml [\#20428](https://github.com/netdata/netdata/pull/20428) ([ilyam8](https://github.com/ilyam8))
@@ -23,6 +27,7 @@
 - SNMP: \_juniper-scu.yaml [\#20408](https://github.com/netdata/netdata/pull/20408) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-firewall.yaml [\#20407](https://github.com/netdata/netdata/pull/20407) ([Ancairon](https://github.com/Ancairon))
 - SNMP: \_juniper-dcu.yaml [\#20406](https://github.com/netdata/netdata/pull/20406) ([Ancairon](https://github.com/Ancairon))
+- Enforce correct CPU architecture for Go plugin builds. [\#20405](https://github.com/netdata/netdata/pull/20405) ([Ferroin](https://github.com/Ferroin))
 - Rename nd-mcp on windows [\#20404](https://github.com/netdata/netdata/pull/20404) ([stelfrag](https://github.com/stelfrag))
 - docs\(go.d\): add example how to debug a specific job [\#20399](https://github.com/netdata/netdata/pull/20399) ([ilyam8](https://github.com/ilyam8))
 - Maintenance: update restart, backup, uninstall, and restore docs [\#20398](https://github.com/netdata/netdata/pull/20398) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -437,7 +442,6 @@
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
 - improvement\(health/dyncfg\): add widget to load available contexts [\#19904](https://github.com/netdata/netdata/pull/19904) ([ilyam8](https://github.com/ilyam8))
 - new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
-- Store alert config asynchronously [\#19885](https://github.com/netdata/netdata/pull/19885) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
@@ -465,10 +469,6 @@
 - do not recurse cleanup on shutdown [\#19894](https://github.com/netdata/netdata/pull/19894) ([ktsaou](https://github.com/ktsaou))
 - make sure all rrdcalcs are unlinked the moment they are deleted [\#19893](https://github.com/netdata/netdata/pull/19893) ([ktsaou](https://github.com/ktsaou))
 - Fix typo in README title [\#19891](https://github.com/netdata/netdata/pull/19891) ([felipecrs](https://github.com/felipecrs))
-- remove deadlock from dyncfg health [\#19890](https://github.com/netdata/netdata/pull/19890) ([ktsaou](https://github.com/ktsaou))
-- Update DEB/RPM package signing key info. [\#19888](https://github.com/netdata/netdata/pull/19888) ([Ferroin](https://github.com/Ferroin))
-- fix\(go.d/snmp/ddsnmp\): correct profile directory path [\#19887](https://github.com/netdata/netdata/pull/19887) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp/ddsnmp\): use dd profile definition [\#19886](https://github.com/netdata/netdata/pull/19886) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
