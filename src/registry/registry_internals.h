@@ -49,6 +49,10 @@ struct registry {
     // open files
     FILE *log_fp;
 
+    // save failure tracking
+    time_t last_save_failure;
+    int consecutive_save_failures;
+
     // the database
     DICTIONARY *persons;    // dictionary of REGISTRY_PERSON *,  with key the REGISTRY_PERSON.guid
     DICTIONARY *machines;   // dictionary of REGISTRY_MACHINE *, with key the REGISTRY_MACHINE.guid
