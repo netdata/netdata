@@ -166,7 +166,7 @@ func processMetricFamily(family, devType, vendor string) string {
 
 	parts := strings.Split(family, "/")
 	parts = slices.DeleteFunc(parts, func(s string) bool {
-		return s == devType || s == devType+"s" || s == vendor
+		return strings.EqualFold(s, devType) || strings.EqualFold(s, devType+"s") || strings.EqualFold(s, vendor)
 	})
 
 	return strings.TrimSuffix(prefix+"/"+strings.Join(parts, "/"), "/")
