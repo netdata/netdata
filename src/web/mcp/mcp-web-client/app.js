@@ -11,7 +11,10 @@ class NetdataMCPChat {
         this.currentChatId = null;
         this.communicationLog = []; // Universal log (not saved)
         this.tokenUsageHistory = new Map(); // Track token usage per chat
-        this.pendingAssistantMetrics = null; // Store metrics to add at end of assistant message
+        this.metricsIdCounter = 0; // Auto-increment ID for metrics placeholders
+        this.toolInclusionStates = new Map(); // Track which tools are included/excluded per chat
+        this.shouldStopProcessing = false; // Flag to stop processing between requests
+        this.isProcessing = false; // Track if we're currently processing messages
         
         // Single source of truth for all model information
         this.models = {
@@ -88,9 +91,33 @@ class NetdataMCPChat {
         }
         
         // Default system prompt
-        this.defaultSystemPrompt = `You are a helpful assistant with access to Netdata monitoring data through MCP (Model Context Protocol) tools. 
-You can query metrics, check alerts, analyze system performance, and help users understand their infrastructure health.
-When users ask about their systems, use the available MCP tools to fetch real data and provide insights.`;
+        this.defaultSystemPrompt = `You are the Netdata assistant, with access to Netdata monitoring data via your tools.
+
+When you receive a user request, you MUST follow this process:
+
+## STEP 1: IDENTIFY WHAT IS RELEVANT
+
+Identify the relevant parts of the infrastructure. Infrastructures can be vast, so start with \`list_metrics\` (full text search) and \`list_nodes\` (hostname matches) giving the terms the user provided.
+
+If the user does not provide any clues on "what", but provides a "when", you can narrow down the scope using:
+
+- \`list_alert_transitions\`: to get the list of alerts over the given time window
+- \`find_anomalous_metrics\`: identify metrics and nodes that had anomalies over the given time window (use cardinality_limit 100+ for best results).
+
+## STEP 2: FIND DATA TO ANSWER THE QUESTION
+
+Once the relevant infrastructure components have been identified, run targeted queries on their metrics, alerts, or functions.
+
+Remember: Netdata has tiered storage, high-resolution (per-second), mid-resolution (per-minute), low-resolution (per-hour). Tiers are automatically selected based on availability and resolution (points) requested.
+
+## RESPONSE STYLE
+
+- Be concise and direct - avoid verbose preambles
+- Use bullet points and structured formatting for clarity
+- Focus on answering the specific question asked
+- When showing metrics, include relevant context (units, time ranges)
+- If you find issues or anomalies, highlight them clearly
+- Use technical but accessible language`;
         
         // Load last used system prompt from localStorage or use default
         this.lastSystemPrompt = localStorage.getItem('lastSystemPrompt') || this.defaultSystemPrompt;
@@ -104,6 +131,20 @@ When users ask about their systems, use the available MCP tools to fetch real da
     getModelsForProviderType(providerType) {
         // Use the single source of truth for models
         return this.models[providerType] || [];
+    }
+    
+    // Get model info by model ID
+    getModelInfo(modelId) {
+        if (!modelId) return null;
+        
+        // Search through all providers
+        for (const [provider, models] of Object.entries(this.models)) {
+            const model = models.find(m => m.value === modelId);
+            if (model) {
+                return model;
+            }
+        }
+        return null;
     }
 
     initializeUI() {
@@ -127,13 +168,33 @@ When users ask about their systems, use the available MCP tools to fetch real da
         this.sendMessageBtn = document.getElementById('sendMessageBtn');
         this.reconnectMcpBtn = document.getElementById('reconnectMcpBtn');
         
-        this.sendMessageBtn.addEventListener('click', () => this.sendMessage());
+        this.sendMessageBtn.addEventListener('click', () => this.handleSendButtonClick());
         this.reconnectMcpBtn.addEventListener('click', () => this.reconnectCurrentMcp());
+        
+        // Copy metrics button
+        this.copyMetricsBtn = document.getElementById('copyMetricsBtn');
+        this.copyMetricsBtn.addEventListener('click', () => this.copyConversationMetrics());
+        
+        // Include all tools toggle button - three state: all on, all off, mixed
+        this.globalToolToggleBtn = document.getElementById('globalToolToggleBtn');
+        this.globalToolToggleBtn.addEventListener('click', () => {
+            this.cycleGlobalToolToggle();
+        });
+        
+        // Generate title button
+        this.generateTitleBtn = document.getElementById('generateTitleBtn');
+        this.generateTitleBtn.addEventListener('click', () => this.handleGenerateTitleClick());
+        
         this.chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
             }
+        });
+        
+        // Update send button state when input changes
+        this.chatInput.addEventListener('input', () => {
+            this.updateSendButton();
         });
         
         // Log panel
@@ -342,6 +403,17 @@ When users ask about their systems, use the available MCP tools to fetch real da
         const newTheme = currentTheme === 'light' ? 'dark' : 'light';
         html.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
+        
+        // Update Tippy theme for existing tooltips
+        const isDarkTheme = newTheme === 'dark';
+        const allTippyInstances = document.querySelectorAll('[data-tooltip]');
+        allTippyInstances.forEach(element => {
+            if (element._tippy) {
+                element._tippy.setProps({
+                    theme: isDarkTheme ? 'light-border' : 'light'
+                });
+            }
+        });
     }
 
     initializeResizable() {
@@ -521,6 +593,46 @@ When users ask about their systems, use the available MCP tools to fetch real da
             this.scrollToBottom();
         }
     }
+    
+    showErrorWithRetry(message, retryCallback) {
+        // Show error toast
+        const toast = document.createElement('div');
+        toast.className = 'error-toast';
+        toast.textContent = message;
+        document.getElementById('errorToastContainer').appendChild(toast);
+        
+        // Remove after animation
+        setTimeout(() => toast.remove(), 3000);
+        
+        // Log error
+        this.addLogEntry('ERROR', {
+            timestamp: new Date().toISOString(),
+            direction: 'error',
+            message: message
+        });
+        
+        // Also show in chat with retry button if there's an active chat
+        if (this.currentChatId) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message error';
+            messageDiv.innerHTML = `
+                <div>❌ ${message}</div>
+                <button class="btn btn-warning btn-small" style="margin-top: 8px;">
+                    🔄 Retry
+                </button>
+            `;
+            
+            const retryBtn = messageDiv.querySelector('button');
+            retryBtn.onclick = async () => {
+                retryBtn.disabled = true;
+                retryBtn.textContent = 'Retrying...';
+                await retryCallback();
+            };
+            
+            this.chatMessages.appendChild(messageDiv);
+            this.scrollToBottom();
+        }
+    }
 
     addLogEntry(source, entry) {
         const logEntry = {
@@ -615,6 +727,83 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 button.textContent = originalText;
                 button.style.color = '';
             }, 1500);
+        }
+    }
+    
+    // Redo from a specific point in the conversation
+    async redoFromMessage(messageIndex) {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return;
+        
+        // Find the message to redo from
+        const message = chat.messages[messageIndex];
+        if (!message) return;
+        
+        // Remove all messages after this point
+        chat.messages = chat.messages.slice(0, messageIndex + 1);
+        this.saveSettings();
+        
+        // Reload the chat to show the truncated history
+        this.loadChat(this.currentChatId);
+        
+        // Get the MCP connection and provider
+        const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
+        const proxyProvider = this.llmProviders.get(chat.llmProviderId);
+        
+        if (!mcpConnection || !proxyProvider || !chat.model) {
+            this.showError('Cannot redo: MCP server or LLM provider not available');
+            return;
+        }
+        
+        // Parse model format
+        const [providerType, modelName] = chat.model.split(':');
+        if (!providerType || !modelName) {
+            this.showError('Invalid model format in chat');
+            return;
+        }
+        
+        // Create the LLM provider
+        const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+        provider.onLog = proxyProvider.onLog;
+        
+        // Show loading spinner
+        this.processRenderEvent({ type: 'show-spinner' });
+        
+        try {
+            if (message.type === 'user') {
+                // Redo from user message - resend it
+                await this.processMessageWithTools(chat, mcpConnection, provider, message.content);
+            } else if (message.type === 'assistant') {
+                // Redo from assistant message - find previous user message and resend
+                let lastUserMessage = null;
+                for (let i = messageIndex - 1; i >= 0; i--) {
+                    if (chat.messages[i].type === 'user' && !chat.messages[i].isTitleRequest) {
+                        lastUserMessage = chat.messages[i];
+                        break;
+                    }
+                }
+                
+                if (lastUserMessage) {
+                    // Remove the assistant message we're redoing from
+                    chat.messages = chat.messages.slice(0, messageIndex);
+                    this.saveSettings();
+                    this.loadChat(this.currentChatId);
+                    
+                    await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
+                } else {
+                    this.showError('Cannot find previous user message to redo from');
+                }
+            } else if (message.type === 'tool-results') {
+                // Redo from tool results - continue conversation
+                // This essentially just continues the conversation from this point
+                const fakeUserMessage = "[Continue from tool results]";
+                await this.processMessageWithTools(chat, mcpConnection, provider, fakeUserMessage);
+            }
+        } catch (error) {
+            this.showError(`Redo failed: ${error.message}`);
+        } finally {
+            // Hide spinner
+            this.processRenderEvent({ type: 'hide-spinner' });
         }
     }
 
@@ -997,6 +1186,31 @@ When users ask about their systems, use the available MCP tools to fetch real da
     // Chat Management
     showNewChatModal() {
         this.updateNewChatSelectors();
+        
+        // Restore last selected values from localStorage
+        const lastChatConfig = localStorage.getItem('lastChatConfig');
+        if (lastChatConfig) {
+            try {
+                const config = JSON.parse(lastChatConfig);
+                if (config.mcpServerId && this.mcpServers.has(config.mcpServerId)) {
+                    this.newChatMcpServer.value = config.mcpServerId;
+                }
+                if (config.llmProviderId && this.llmProviders.has(config.llmProviderId)) {
+                    this.newChatLlmProvider.value = config.llmProviderId;
+                    // Trigger model update
+                    this.updateNewChatModels();
+                    // After models are loaded, restore the selected model
+                    setTimeout(() => {
+                        if (config.model) {
+                            this.newChatModel.value = config.model;
+                        }
+                    }, 100);
+                }
+            } catch (e) {
+                console.error('Failed to restore last chat config:', e);
+            }
+        }
+        
         this.showModal('newChatModal');
     }
 
@@ -1117,7 +1331,9 @@ When users ask about their systems, use the available MCP tools to fetch real da
             temperature: 0.7, // Default temperature
             systemPrompt: this.lastSystemPrompt, // Use the last system prompt
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            currentTurn: 0, // Track conversation turns
+            toolInclusionMode: 'auto' // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
         };
         
         this.chats.set(chatId, chat);
@@ -1128,6 +1344,13 @@ When users ask about their systems, use the available MCP tools to fetch real da
             requests: [],
             model: selectedModel
         });
+        
+        // Save the selections for next time
+        localStorage.setItem('lastChatConfig', JSON.stringify({
+            mcpServerId: mcpServerId,
+            llmProviderId: llmProviderId,
+            model: selectedModel
+        }));
         
         this.saveSettings();
         this.updateChatSessions();
@@ -1167,23 +1390,24 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 modelDisplay = parts.length > 1 ? parts[1] : chat.model;
             }
             
-            // Calculate context usage percentage if available
+            // Calculate context usage from token history
             let contextInfo = '';
-            if (chat.contextUsage && chat.lastModel) {
+            const tokenHistory = this.getTokenUsageForChat(chat.id);
+            if (tokenHistory.totalTokens > 0 && chat.model) {
                 // Extract model name from format "provider:model-name" if needed
-                let modelName = chat.lastModel;
+                let modelName = chat.model;
                 if (modelName && modelName.includes(':')) {
                     modelName = modelName.split(':')[1];
                 }
                 const limit = this.modelLimits[modelName] || 4096;
-                const percentage = Math.round((chat.contextUsage / limit) * 100);
-                const contextK = (chat.contextUsage / 1000).toFixed(1);
+                const percentage = Math.round((tokenHistory.totalTokens / limit) * 100);
+                const contextK = (tokenHistory.totalTokens / 1000).toFixed(1);
                 contextInfo = ` • ${contextK}k/${(limit/1000).toFixed(0)}k`;
             }
             
             sessionDiv.innerHTML = `
                 <div class="session-content" onclick="app.loadChat('${chat.id}')">
-                    <div class="session-title">${chat.title}</div>
+                    <div class="session-title" title="${chat.title}">${chat.title}</div>
                     <div class="session-meta">
                         <span>${modelDisplay}${contextInfo}</span>
                         <span>${new Date(chat.updatedAt).toLocaleDateString()}</span>
@@ -1211,6 +1435,25 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 requests: [],
                 model: chat.model
             });
+            
+            // Rebuild token history from saved messages
+            let reconstructedRequests = [];
+            for (const msg of chat.messages) {
+                if (msg.usage && msg.usage.totalTokens) {
+                    reconstructedRequests.push({
+                        timestamp: msg.timestamp || new Date().toISOString(),
+                        promptTokens: msg.usage.promptTokens || 0,
+                        completionTokens: msg.usage.completionTokens || 0,
+                        totalTokens: msg.usage.totalTokens,
+                        cacheCreationInputTokens: msg.usage.cacheCreationInputTokens || 0,
+                        cacheReadInputTokens: msg.usage.cacheReadInputTokens || 0
+                    });
+                }
+            }
+            
+            if (reconstructedRequests.length > 0) {
+                this.tokenUsageHistory.get(chatId).requests = reconstructedRequests;
+            }
         }
         
         const server = this.mcpServers.get(chat.mcpServerId);
@@ -1271,89 +1514,351 @@ When users ask about their systems, use the available MCP tools to fetch real da
         // Load messages
         this.chatMessages.innerHTML = '';
         this.currentAssistantGroup = null; // Reset any current group
+        this.metricsIdMapping = {}; // Reset metrics ID mapping
+        this.currentStepInTurn = 1; // Initialize step counter
+        this.lastDisplayedTurn = 0; // Track last displayed turn for separators
+        
+        // Update global toggle UI based on chat's tool inclusion mode
+        this.updateGlobalToggleUI();
         
         // Display system prompt as first message
         this.displaySystemPrompt(chat.systemPrompt || this.defaultSystemPrompt);
         
-        for (const msg of chat.messages) {
+        // Track previous prompt tokens for delta calculation
+        let previousPromptTokens = 0;
+        
+        let inTitleGeneration = false;
+        
+        for (let i = 0; i < chat.messages.length; i++) {
+            const msg = chat.messages[i];
             if (msg.role === 'system') continue;
-            this.displayStoredMessage(msg);
+            
+            // Check if this is the start of title generation
+            if (msg.isTitleRequest && msg.type === 'user' && !inTitleGeneration) {
+                inTitleGeneration = true;
+                // Add the separator for title generation
+                const separatorDiv = document.createElement('div');
+                separatorDiv.className = 'message system';
+                separatorDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--info-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
+                separatorDiv.textContent = '📝 Generating chat title...';
+                this.chatMessages.appendChild(separatorDiv);
+            }
+            
+            // Store previous tokens before displaying
+            this.previousPromptTokensForDisplay = previousPromptTokens;
+            
+            // Pass the message index to displayStoredMessage
+            this.displayStoredMessage(msg, i);
+            
+            // Update previous tokens if this message had usage
+            if (msg.usage && msg.usage.promptTokens) {
+                previousPromptTokens = msg.usage.promptTokens;
+            }
+            
+            // Check if title generation completed
+            if (inTitleGeneration && msg.isTitleRequest && msg.type === 'assistant') {
+                inTitleGeneration = false;
+                // Add the success message
+                const successDiv = document.createElement('div');
+                successDiv.className = 'message system';
+                successDiv.style.cssText = 'margin: 10px auto 20px; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
+                successDiv.textContent = `✅ Chat title updated: "${chat.title}"`;
+                this.chatMessages.appendChild(successDiv);
+            }
+            
+            // Reset assistant group after each message to ensure proper separation
+            if (msg.type === 'tool-results') {
+                this.currentAssistantGroup = null;
+            }
         }
         // Clear current group after loading
         this.currentAssistantGroup = null;
+        
+        // Update global toggle UI to reflect loaded tools state
+        this.updateGlobalToggleUI();
+        
+        // Update tool checkboxes based on mode
+        if (chat.toolInclusionMode === 'auto') {
+            this.updateToolCheckboxesForAutoMode();
+        } else if (chat.toolInclusionMode === 'cached') {
+            // In cached mode, all tools are on and disabled
+            this.setAllToolStates(true);
+            this.disableAllToolCheckboxes();
+        }
         
         // Update context window indicator
         const tokenHistory = this.getTokenUsageForChat(chatId);
         const model = chat.model || (provider ? provider.model : null);
         
-        // Also check if we have saved context usage in the chat
-        if (chat.contextUsage && chat.contextUsage > 0) {
-            // Use the actual model from the chat, not lastModel which might be in wrong format
-            this.updateContextWindowIndicator(chat.contextUsage, model || chat.model || 'unknown');
-        } else if (tokenHistory.totalTokens > 0 && model) {
+        // Always calculate token usage from the history
+        if (tokenHistory.totalTokens > 0 && model) {
             this.updateContextWindowIndicator(tokenHistory.totalTokens, model);
         } else {
             // Show empty context window with the correct model
             this.updateContextWindowIndicator(0, model || chat.model || 'unknown');
         }
         
+        // Update cumulative token counters
+        const tokenCounters = document.getElementById('tokenCounters');
+        if (tokenCounters) {
+            tokenCounters.style.display = 'flex';
+        }
+        this.updateCumulativeTokenDisplay();
+        
         this.scrollToBottom();
     }
 
-    displayStoredMessage(msg) {
+    displayStoredMessage(msg, messageIndex) {
+        // Handle turn tracking for stored messages
+        if (msg.type === 'user' && !msg.isTitleRequest) {
+            const chat = this.chats.get(this.currentChatId);
+            const msgTurn = msg.turn || 0;
+            
+            // Add turn separator if we're entering a new turn
+            if (msgTurn > 0 && msgTurn !== this.lastDisplayedTurn) {
+                this.addTurnSeparator(msgTurn);
+                this.currentStepInTurn = 1;
+                this.lastDisplayedTurn = msgTurn;
+            }
+        }
+        
+        // Convert stored message to event stream
+        const events = this.convertMessageToEvents(msg);
+        
+        // Process each event
+        for (const event of events) {
+            // Pass turn info to events if available
+            if (msg.turn !== undefined) {
+                event.turn = msg.turn;
+            }
+            // Pass message index for redo functionality
+            if (messageIndex !== undefined) {
+                event.messageIndex = messageIndex;
+            }
+            this.processRenderEvent(event);
+        }
+    }
+    
+    // Convert a stored message into a sequence of rendering events
+    convertMessageToEvents(msg) {
+        const events = [];
+        
         switch(msg.type) {
             case 'user':
-                // User messages reset the assistant group
-                this.currentAssistantGroup = null;
-                this.addMessage('user', msg.content);
+                if (msg.isTitleRequest) {
+                    events.push({ type: 'user-message', content: `[System Request] ${msg.content}` });
+                } else {
+                    events.push({ type: 'user-message', content: msg.content });
+                }
                 break;
                 
             case 'assistant':
-                // Create new assistant group for this message
-                this.currentAssistantGroup = null;
-                // Display assistant message with saved statistics
+                // Add metrics placeholder event (like we do in live chats)
+                const metricsId = `metrics-stored-${this.metricsIdCounter++}`;
+                events.push({ type: 'metrics-placeholder', id: metricsId });
+                
+                // Add assistant message event
                 if (msg.content) {
-                    this.addMessage('assistant', msg.content, msg.usage, msg.responseTime);
+                    events.push({ type: 'assistant-message', content: msg.content });
                 }
-                // Display any tool calls in the same group
+                
+                // Add tool calls
                 if (msg.toolCalls && msg.toolCalls.length > 0) {
-                    // Ensure we have a group even if there was no content
-                    if (!this.currentAssistantGroup) {
-                        this.addMessage('assistant', '', msg.usage, msg.responseTime);
-                    }
                     for (const toolCall of msg.toolCalls) {
-                        this.addToolCall(toolCall.name, toolCall.arguments);
+                        events.push({ 
+                            type: 'tool-call', 
+                            name: toolCall.name, 
+                            arguments: toolCall.arguments,
+                            includeInContext: toolCall.includeInContext !== false,
+                            turn: msg.turn
+                        });
                     }
+                }
+                
+                // Update metrics event
+                if (msg.usage || msg.responseTime) {
+                    events.push({ 
+                        type: 'update-metrics', 
+                        id: metricsId,
+                        usage: msg.usage, 
+                        responseTime: msg.responseTime,
+                        previousPromptTokens: this.previousPromptTokensForDisplay
+                    });
                 }
                 break;
                 
             case 'tool-results':
-                // Display all tool results in the current group
+                // Add tool results with their inclusion state
                 for (const result of msg.results) {
-                    this.addToolResult(result.name, result.result);
+                    events.push({ 
+                        type: 'tool-result', 
+                        name: result.name, 
+                        result: result.result,
+                        includeInContext: result.includeInContext
+                    });
                 }
+                // Reset assistant group after tool results
+                events.push({ type: 'reset-assistant-group' });
                 break;
                 
             // Handle old format for backward compatibility
             case 'tool-call':
-                this.addToolCall(msg.toolName, msg.args);
+                events.push({ type: 'tool-call', name: msg.toolName, arguments: msg.args });
                 break;
             case 'tool-result':
-                this.addToolResult(msg.toolName, msg.result, 0, null);
+                events.push({ type: 'tool-result', name: msg.toolName, result: msg.result });
                 break;
                 
             case 'system':
-                this.addSystemMessage(msg.content);
+                events.push({ type: 'system-message', content: msg.content });
                 break;
                 
             case 'error':
-                // Just display the error in chat, don't trigger full error handling
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message error';
-                messageDiv.textContent = `❌ [Previous session error] ${msg.content}`;
-                this.chatMessages.appendChild(messageDiv);
+                events.push({ type: 'error-message', content: msg.content });
                 break;
         }
+        
+        return events;
+    }
+    
+    // Process a single rendering event
+    processRenderEvent(event) {
+        switch(event.type) {
+            case 'user-message':
+                this.currentAssistantGroup = null;
+                const chat = this.chats.get(this.currentChatId);
+                const turn = event.turn !== undefined ? event.turn : (chat ? chat.currentTurn : 0);
+                
+                // For live messages, add turn separator if this is a new turn
+                if (event.turn === undefined && chat && chat.currentTurn > 0 && chat.currentTurn !== this.lastDisplayedTurn) {
+                    this.addTurnSeparator(chat.currentTurn);
+                    this.currentStepInTurn = 1; // Reset step counter
+                    this.lastDisplayedTurn = chat.currentTurn;
+                }
+                
+                this.addMessage('user', event.content, event.messageIndex);
+                if (turn > 0) {
+                    this.addStepNumber(turn, this.currentStepInTurn++);
+                }
+                break;
+                
+            case 'metrics-placeholder':
+                const placeholder = this.addMetricsPlaceholder();
+                // Store mapping of event ID to actual DOM ID
+                if (event.id) {
+                    this.metricsIdMapping = this.metricsIdMapping || {};
+                    this.metricsIdMapping[event.id] = placeholder;
+                }
+                break;
+                
+            case 'assistant-message':
+                this.addMessage('assistant', event.content, event.messageIndex);
+                const chat2 = this.chats.get(this.currentChatId);
+                const turn2 = event.turn !== undefined ? event.turn : (chat2 ? chat2.currentTurn : 0);
+                if (turn2 > 0 && this.currentAssistantGroup) {
+                    this.addStepNumber(turn2, this.currentStepInTurn++, this.currentAssistantGroup);
+                }
+                break;
+                
+            case 'tool-call':
+                // Ensure we have a group
+                if (!this.currentAssistantGroup) {
+                    this.addMessage('assistant', '');
+                }
+                this.addToolCall(event.name, event.arguments, event.includeInContext !== false, event.turn, event.messageIndex);
+                break;
+                
+            case 'tool-result':
+                this.addToolResult(event.name, event.result, event.responseTime || 0, event.responseSize || null, event.includeInContext, event.messageIndex);
+                break;
+                
+            case 'update-metrics':
+                // Find the placeholder by mapped ID
+                const domId = this.metricsIdMapping?.[event.id] || event.id;
+                this.updateMetricsPlaceholder(domId, event.usage, event.responseTime, event.previousPromptTokens);
+                break;
+                
+            case 'system-message':
+                this.addSystemMessage(event.content);
+                break;
+                
+            case 'error-message':
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message error';
+                messageDiv.innerHTML = `
+                    <div>❌ ${event.content}</div>
+                    <button class="btn btn-warning btn-small" style="margin-top: 8px;">
+                        🔄 Retry
+                    </button>
+                `;
+                
+                const retryBtn = messageDiv.querySelector('button');
+                retryBtn.onclick = async () => {
+                    retryBtn.disabled = true;
+                    retryBtn.textContent = 'Retrying...';
+                    
+                    // Get the current chat and find the last user message
+                    const chat = this.chats.get(this.currentChatId);
+                    if (!chat) return;
+                    
+                    const lastUserMessage = chat.messages.filter(m => m.type === 'user' && !m.isTitleRequest).pop();
+                    if (lastUserMessage) {
+                        // Remove messages from the error onwards
+                        const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
+                        if (errorIndex !== -1) {
+                            chat.messages = chat.messages.slice(0, errorIndex);
+                            this.saveSettings();
+                            
+                            // Reload chat to show cleaned history
+                            this.loadChat(this.currentChatId);
+                            
+                            // Retry processing
+                            try {
+                                const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
+                                const proxyProvider = this.llmProviders.get(chat.llmProviderId);
+                                
+                                if (mcpConnection && proxyProvider && chat.model) {
+                                    // Parse model format: "provider:model-name"
+                                    const [providerType, modelName] = chat.model.split(':');
+                                    if (!providerType || !modelName) {
+                                        this.showError('Invalid model format in chat');
+                                        return;
+                                    }
+                                    
+                                    // Create the actual LLM provider instance
+                                    const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+                                    provider.onLog = proxyProvider.onLog;
+                                    
+                                    await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
+                                } else {
+                                    this.showError('Cannot retry: MCP server or LLM provider not available');
+                                }
+                            } catch (retryError) {
+                                this.showError(`Retry failed: ${retryError.message}`);
+                            }
+                        }
+                    }
+                };
+                
+                this.chatMessages.appendChild(messageDiv);
+                break;
+                
+            case 'show-spinner':
+                this.showLoadingSpinner(event.text || 'Thinking...');
+                break;
+                
+            case 'hide-spinner':
+                this.hideLoadingSpinner();
+                break;
+                
+            case 'reset-assistant-group':
+                // Reset the current assistant group so next content starts fresh
+                this.currentAssistantGroup = null;
+                break;
+        }
+        
+        this.scrollToBottom();
+        this.moveSpinnerToBottom();
     }
 
     deleteChat(chatId) {
@@ -1385,10 +1890,50 @@ When users ask about their systems, use the available MCP tools to fetch real da
                     indicator.style.display = 'flex';
                     this.updateContextWindowIndicator(0, 'unknown');
                 }
+                // Hide token counters when no chat is selected
+                const tokenCounters = document.getElementById('tokenCounters');
+                if (tokenCounters) {
+                    tokenCounters.style.display = 'none';
+                }
             }
         }
     }
 
+    // Update send button appearance based on processing state
+    updateSendButton() {
+        if (this.isProcessing) {
+            this.sendMessageBtn.textContent = 'Stop';
+            this.sendMessageBtn.classList.remove('btn-send');
+            this.sendMessageBtn.classList.add('btn-danger');
+            this.sendMessageBtn.disabled = false;
+        } else {
+            this.sendMessageBtn.textContent = 'Send';
+            this.sendMessageBtn.classList.remove('btn-danger');
+            this.sendMessageBtn.classList.add('btn-send');
+            this.sendMessageBtn.disabled = !this.chatInput.value.trim();
+        }
+    }
+    
+    // Show system message in chat
+    showSystemMessage(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message system';
+        messageDiv.textContent = message;
+        this.chatMessages.appendChild(messageDiv);
+        this.scrollToBottom();
+    }
+    
+    // Handle send/stop button click
+    handleSendButtonClick() {
+        if (this.isProcessing) {
+            // Set flag to stop processing
+            this.shouldStopProcessing = true;
+            this.showSystemMessage('⏹️ Stopping after current request completes...');
+        } else {
+            this.sendMessage();
+        }
+    }
+    
     // Messaging
     async sendMessage() {
         const message = this.chatInput.value.trim();
@@ -1426,29 +1971,58 @@ When users ask about their systems, use the available MCP tools to fetch real da
         // Clear any current assistant group since we're starting a new conversation turn
         this.currentAssistantGroup = null;
         
-        // Disable input
+        // Disable input and update button to Stop
         this.chatInput.value = '';
         this.chatInput.disabled = true;
-        this.sendMessageBtn.disabled = true;
+        this.isProcessing = true;
+        this.shouldStopProcessing = false;
+        this.updateSendButton();
         
-        // Add user message
-        this.addMessage('user', message);
-        chat.messages.push({ type: 'user', role: 'user', content: message });
+        // Increment turn counter for new user message
+        chat.currentTurn = (chat.currentTurn || 0) + 1;
         
-        // Show loading spinner
-        this.showLoadingSpinner();
+        // Process user message event
+        this.processRenderEvent({ type: 'user-message', content: message });
+        chat.messages.push({ type: 'user', role: 'user', content: message, turn: chat.currentTurn });
+        
+        // Show loading spinner event
+        this.processRenderEvent({ type: 'show-spinner' });
         
         try {
             await this.processMessageWithTools(chat, mcpConnection, provider, message);
+            
+            // Check if we should generate a title (first user message and got a response)
+            const userMessages = chat.messages.filter(m => m.type === 'user' && !m.isTitleRequest);
+            const assistantMessages = chat.messages.filter(m => m.type === 'assistant' && !m.isTitleRequest);
+            
+            if (userMessages.length === 1 && assistantMessages.length > 0 && !chat.titleGenerated) {
+                // Generate title automatically
+                await this.generateChatTitle(chat, mcpConnection, provider);
+            }
         } catch (error) {
-            this.showError(`Error: ${error.message}`);
+            // Show error with retry button
+            this.showErrorWithRetry(`Error: ${error.message}`, async () => {
+                // Retry the last message
+                const lastUserMessage = chat.messages.filter(m => m.type === 'user').pop();
+                if (lastUserMessage) {
+                    // Remove the error message and the failed attempt's messages
+                    const lastUserIndex = chat.messages.lastIndexOf(lastUserMessage);
+                    chat.messages = chat.messages.slice(0, lastUserIndex + 1);
+                    this.saveSettings();
+                    
+                    // Reload chat and retry
+                    this.loadChat(this.currentChatId);
+                    try {
+                        await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
+                    } catch (retryError) {
+                        this.showError(`Retry failed: ${retryError.message}`);
+                    }
+                }
+            });
             chat.messages.push({ type: 'error', content: error.message });
         } finally {
-            // Remove loading spinner
-            this.hideLoadingSpinner();
-            
-            // Finalize assistant group with metrics at bottom
-            this.finalizeAssistantGroup();
+            // Remove loading spinner event
+            this.processRenderEvent({ type: 'hide-spinner' });
             
             // Clear current assistant group after processing is complete
             this.currentAssistantGroup = null;
@@ -1456,12 +2030,19 @@ When users ask about their systems, use the available MCP tools to fetch real da
             chat.updatedAt = new Date().toISOString();
             this.saveSettings();
             this.chatInput.disabled = false;
-            this.sendMessageBtn.disabled = false;
+            this.isProcessing = false;
+            this.shouldStopProcessing = false;
+            this.updateSendButton();
             this.chatInput.focus();
+            
+            // Update tool checkboxes if in auto mode
+            if (chat.toolInclusionMode === 'auto') {
+                this.updateToolCheckboxesForAutoMode();
+            }
         }
     }
 
-    async processMessageWithTools(chat, mcpConnection, provider, userMessage) {
+    async processMessageWithTools(chat, mcpConnection, provider, userMessage, firstMetricsId = null) {
         // Build conversation history
         const messages = [];
         
@@ -1470,9 +2051,16 @@ When users ask about their systems, use the available MCP tools to fetch real da
             messages.push({ role: 'system', content: chat.systemPrompt || this.defaultSystemPrompt });
         }
         
+        // Determine tool inclusion mode
+        const toolMode = chat.toolInclusionMode || 'auto';
+        const currentTurn = chat.currentTurn || 0;
+        
         // Add conversation history with our simplified structure
         for (let i = 0; i < chat.messages.length; i++) {
             const msg = chat.messages[i];
+            
+            // Check if we should include tool calls/results for this message
+            const shouldIncludeTools = this.shouldIncludeToolsForMessage(msg, toolMode, currentTurn);
             
             if (msg.type === 'user') {
                 // Simple user message
@@ -1482,7 +2070,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 // Assistant message with potential tool calls
                 const cleanedContent = msg.content ? this.cleanContentForAPI(msg.content) : '';
                 
-                if (msg.toolCalls && msg.toolCalls.length > 0) {
+                if (msg.toolCalls && msg.toolCalls.length > 0 && shouldIncludeTools) {
                     // Assistant with tool calls
                     if (provider.type === 'anthropic') {
                         // Anthropic format with content blocks
@@ -1525,26 +2113,31 @@ When users ask about their systems, use the available MCP tools to fetch real da
                     messages.push({ role: 'assistant', content: cleanedContent });
                 }
                 
-            } else if (msg.type === 'tool-results') {
-                // Tool results
-                if (provider.type === 'anthropic') {
-                    // Anthropic wants tool results in a user message
-                    messages.push({
-                        role: 'user',
-                        content: msg.results.map(tr => ({
-                            type: 'tool_result',
-                            tool_use_id: tr.toolCallId,
-                            content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
-                        }))
-                    });
-                } else {
-                    // OpenAI and others want individual tool messages
-                    for (const tr of msg.results) {
-                        messages.push(provider.formatToolResponse(
-                            tr.toolCallId,
-                            tr.result,
-                            tr.name
-                        ));
+            } else if (msg.type === 'tool-results' && shouldIncludeTools) {
+                // Filter tool results based on includeInContext flag
+                const includedResults = msg.results.filter(tr => tr.includeInContext !== false);
+                
+                if (includedResults.length > 0) {
+                    // Tool results
+                    if (provider.type === 'anthropic') {
+                        // Anthropic wants tool results in a user message
+                        messages.push({
+                            role: 'user',
+                            content: includedResults.map(tr => ({
+                                type: 'tool_result',
+                                tool_use_id: tr.toolCallId,
+                                content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
+                            }))
+                        });
+                    } else {
+                        // OpenAI and others want individual tool messages
+                        for (const tr of includedResults) {
+                            messages.push(provider.formatToolResponse(
+                                tr.toolCallId,
+                                tr.result,
+                                tr.name
+                            ));
+                        }
                     }
                 }
             }
@@ -1555,19 +2148,41 @@ When users ask about their systems, use the available MCP tools to fetch real da
         const tools = Array.from(mcpConnection.tools.values());
         
         let attempts = 0;
-        const maxAttempts = 10;
+        // No limit on attempts - let the LLM decide when it's done
         
         // Create assistant group at the start of processing
         // We'll add all content from this conversation turn to this single group
         this.currentAssistantGroup = null;
         
-        while (attempts < maxAttempts) {
-            attempts++;
+        while (true) {
+            attempts++
+            
+            // Check if we should stop processing
+            if (this.shouldStopProcessing) {
+                this.showSystemMessage('⏹️ Stopped by user');
+                break;
+            }
+            
+            let metricsId;
+            if (attempts === 1 && firstMetricsId) {
+                // First iteration - use the metrics placeholder already added after user message
+                metricsId = firstMetricsId;
+            } else {
+                // Subsequent iterations - add new metrics placeholder
+                const eventId = `metrics-live-${this.metricsIdCounter++}`;
+                this.processRenderEvent({ type: 'metrics-placeholder', id: eventId });
+                metricsId = this.metricsIdMapping?.[eventId] || eventId;
+            }
             
             // Send to LLM with current temperature
             const temperature = this.getCurrentTemperature();
             const llmStartTime = Date.now();
             const response = await provider.sendMessage(messages, tools, temperature);
+            console.log('LLM response:', { 
+                content: response.content?.substring(0, 200), 
+                hasThinking: response.content?.includes('<thinking>'),
+                toolCalls: response.toolCalls?.length 
+            });
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Track token usage
@@ -1575,22 +2190,27 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
             }
             
+            // Update the metrics placeholder with actual data
+            this.processRenderEvent({ 
+                type: 'update-metrics', 
+                id: metricsId,
+                usage: response.usage, 
+                responseTime: llmResponseTime,
+                previousPromptTokens: this.getPreviousPromptTokens()
+            });
+            
             // If no tool calls, display response and finish
             if (!response.toolCalls || response.toolCalls.length === 0) {
                 if (response.content) {
-                    // Create assistant group on first response with content
-                    if (!this.currentAssistantGroup) {
-                        this.addMessage('assistant', response.content, response.usage, llmResponseTime);
-                    } else {
-                        // Add content to existing group
-                        this.addContentToAssistantGroup(response.content);
-                    }
+                    // Process assistant message event
+                    this.processRenderEvent({ type: 'assistant-message', content: response.content });
                     chat.messages.push({ 
                         type: 'assistant', 
                         role: 'assistant', 
                         content: response.content,
                         usage: response.usage || null,
-                        responseTime: llmResponseTime || null
+                        responseTime: llmResponseTime || null,
+                        turn: chat.currentTurn
                     });
                     // Clean content before sending back to API
                     const cleanedContent = this.cleanContentForAPI(response.content);
@@ -1601,17 +2221,15 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 break;
             }
             
+            // Initialize assistantMessageIndex here so it's available for tool execution
+            let assistantMessageIndex = null;
+            
             // Store assistant message with tool calls if any
             if (response.content || response.toolCalls) {
                 // Display the message
                 if (response.content) {
-                    // Create assistant group on first response with content
-                    if (!this.currentAssistantGroup) {
-                        this.addMessage('assistant', response.content, response.usage, llmResponseTime);
-                    } else {
-                        // Add content to existing group
-                        this.addContentToAssistantGroup(response.content);
-                    }
+                    // Process assistant message event
+                    this.processRenderEvent({ type: 'assistant-message', content: response.content });
                 }
                 
                 // Store in our improved internal format
@@ -1619,11 +2237,16 @@ When users ask about their systems, use the available MCP tools to fetch real da
                     type: 'assistant',
                     role: 'assistant',
                     content: response.content || '',
-                    toolCalls: response.toolCalls || [],
+                    toolCalls: (response.toolCalls || []).map(tc => ({
+                        ...tc,
+                        includeInContext: true  // Default to included
+                    })),
                     usage: response.usage || null,
-                    responseTime: llmResponseTime || null
+                    responseTime: llmResponseTime || null,
+                    turn: chat.currentTurn
                 };
                 chat.messages.push(assistantMessage);
+                assistantMessageIndex = chat.messages.length - 1;
                 
                 // Build the message for the API
                 const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
@@ -1664,9 +2287,12 @@ When users ask about their systems, use the available MCP tools to fetch real da
             
             // Execute tool calls and collect results
             if (response.toolCalls && response.toolCalls.length > 0) {
+                // Hide the spinner before tool execution starts
+                this.processRenderEvent({ type: 'hide-spinner' });
+                
                 // Ensure we have an assistant group even if there was no content
                 if (!this.currentAssistantGroup) {
-                    this.addMessage('assistant', '', response.usage, llmResponseTime);
+                    this.processRenderEvent({ type: 'assistant-message', content: '' });
                 }
                 
                 const toolResults = [];
@@ -1674,7 +2300,12 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 for (const toolCall of response.toolCalls) {
                     try {
                         // Show tool call in UI
-                        this.addToolCall(toolCall.name, toolCall.arguments);
+                        this.processRenderEvent({ 
+                            type: 'tool-call', 
+                            name: toolCall.name, 
+                            arguments: toolCall.arguments,
+                            includeInContext: toolCall.includeInContext !== false 
+                        });
                         
                         // Execute tool and track timing
                         const toolStartTime = Date.now();
@@ -1690,66 +2321,103 @@ When users ask about their systems, use the available MCP tools to fetch real da
                             : JSON.stringify(result).length;
                         
                         // Show result in UI with timing and size
-                        this.addToolResult(toolCall.name, result, toolResponseTime, responseSize);
+                        this.processRenderEvent({ type: 'tool-result', name: toolCall.name, result: result, responseTime: toolResponseTime, responseSize: responseSize, messageIndex: assistantMessageIndex });
                         
                         // Collect result
                         toolResults.push({
                             toolCallId: toolCall.id,
                             name: toolCall.name,
-                            result: result
+                            result: result,
+                            includeInContext: true  // Will be updated based on checkbox state
                         });
                         
                     } catch (error) {
                         const errorMsg = `Tool error (${toolCall.name}): ${error.message}`;
-                        this.addToolResult(toolCall.name, { error: errorMsg }, 0, errorMsg.length);
+                        this.processRenderEvent({ type: 'tool-result', name: toolCall.name, result: { error: errorMsg }, responseTime: 0, responseSize: errorMsg.length, messageIndex: assistantMessageIndex });
                         
                         // Collect error result
                         toolResults.push({
                             toolCallId: toolCall.id,
                             name: toolCall.name,
-                            result: { error: errorMsg }
+                            result: { error: errorMsg },
+                            includeInContext: true  // Will be updated based on checkbox state
                         });
                     }
                 }
                 
-                // Store all tool results together
+                // Update tool results with inclusion state from checkboxes
                 if (toolResults.length > 0) {
-                    chat.messages.push({
-                        type: 'tool-results',
-                        results: toolResults
-                    });
-                    
-                    // Add to conversation based on provider
-                    if (provider.type === 'anthropic') {
-                        // Anthropic wants tool results in a user message
-                        messages.push({
-                            role: 'user',
-                            content: toolResults.map(tr => ({
-                                type: 'tool_result',
-                                tool_use_id: tr.toolCallId,
-                                content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
-                            }))
-                        });
-                    } else {
-                        // OpenAI and others want individual tool messages
-                        for (const tr of toolResults) {
-                            messages.push(provider.formatToolResponse(
-                                tr.toolCallId,
-                                tr.result,
-                                tr.name
-                            ));
+                    // Check current checkbox states
+                    if (this.currentChatId) {
+                        const chat = this.chats.get(this.currentChatId);
+                        const chatToolStates = this.toolInclusionStates.get(this.currentChatId) || new Map();
+                        
+                        // In cached mode, all tools are always included
+                        if (chat && chat.toolInclusionMode === 'cached') {
+                            toolResults.forEach(tr => {
+                                tr.includeInContext = true;
+                            });
+                        } else {
+                            toolResults.forEach(tr => {
+                                // Find the tool div by tool name
+                                const toolDivs = document.querySelectorAll(`.tool-block[data-tool-name="${tr.name}"]`);
+                                for (const toolDiv of toolDivs) {
+                                    const checkbox = toolDiv.querySelector('.tool-include-checkbox');
+                                    if (checkbox) {
+                                        tr.includeInContext = checkbox.checked;
+                                        break;
+                                    }
+                                }
+                            });
                         }
                     }
+                    
+                    // Store all tool results together
+                    chat.messages.push({
+                        type: 'tool-results',
+                        results: toolResults,
+                        turn: chat.currentTurn
+                    });
+                    
+                    // Filter included results for API
+                    const includedResults = toolResults.filter(tr => tr.includeInContext !== false);
+                    
+                    if (includedResults.length > 0) {
+                        // Add to conversation based on provider
+                        if (provider.type === 'anthropic') {
+                            // Anthropic wants tool results in a user message
+                            messages.push({
+                                role: 'user',
+                                content: includedResults.map(tr => ({
+                                    type: 'tool_result',
+                                    tool_use_id: tr.toolCallId,
+                                    content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
+                                }))
+                            });
+                        } else {
+                            // OpenAI and others want individual tool messages
+                            for (const tr of includedResults) {
+                                messages.push(provider.formatToolResponse(
+                                    tr.toolCallId,
+                                    tr.result,
+                                    tr.name
+                                ));
+                            }
+                        }
+                    }
+                    
+                    // Reset assistant group after tool results so next metrics appears separately
+                    this.processRenderEvent({ type: 'reset-assistant-group' });
+                    
+                    // Show thinking spinner again before next LLM call
+                    this.processRenderEvent({ type: 'show-spinner', text: 'Thinking...' });
                 }
             }
         }
-        
-        if (attempts >= maxAttempts) {
-            this.showError('Maximum tool call attempts reached');
-        }
     }
 
-    addMessage(role, content, usage = null, responseTime = null) {
+    addMessage(role, content, messageIndex) {
+        console.log(`addMessage called with role: ${role}, content preview: ${content?.substring(0, 100)}...`);
         let messageDiv;
         
         if (role === 'assistant') {
@@ -1758,11 +2426,6 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 // Create new assistant group
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'assistant-group';
-                
-                // Store metrics to add later at the bottom
-                if (usage || responseTime) {
-                    this.pendingAssistantMetrics = { usage, responseTime };
-                }
                 
                 this.currentAssistantGroup = groupDiv;
                 this.chatMessages.appendChild(groupDiv);
@@ -1776,6 +2439,16 @@ When users ask about their systems, use the available MCP tools to fetch real da
             messageDiv.className = `message ${role}`;
         }
         
+        // Add redo button if we have a message index
+        if (messageIndex !== undefined && role !== 'system') {
+            const redoBtn = document.createElement('button');
+            redoBtn.className = 'redo-button';
+            redoBtn.textContent = 'Redo';
+            redoBtn.onclick = () => this.redoFromMessage(messageIndex);
+            messageDiv.style.position = 'relative';
+            messageDiv.appendChild(redoBtn);
+        }
+        
         // Check if content has thinking tags
         const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
         const hasThinking = thinkingRegex.test(content);
@@ -1787,6 +2460,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         
         // Process content
         if (hasThinking && role === 'assistant') {
+            console.log('Found thinking tags in assistant message:', content);
             // Reset regex for actual processing
             content.match(/<thinking>([\s\S]*?)<\/thinking>/g);
             
@@ -1867,11 +2541,11 @@ When users ask about their systems, use the available MCP tools to fetch real da
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
-            if (role === 'assistant') {
-                // Use marked to render markdown for assistant messages
+            if (role === 'assistant' || role === 'user') {
+                // Use marked to render markdown for both assistant and user messages
                 contentDiv.innerHTML = marked.parse(content);
             } else {
-                // Keep user messages as plain text
+                // Other messages (system, error) as plain text
                 contentDiv.textContent = content;
             }
             
@@ -1882,6 +2556,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         if (role !== 'assistant') {
             this.chatMessages.appendChild(messageDiv);
         }
+        
         
         // Add edit trigger after element is in DOM
         if (role === 'user' && this.currentChatId && content) {
@@ -2060,11 +2735,183 @@ When users ask about their systems, use the available MCP tools to fetch real da
         setTimeout(() => document.addEventListener('click', clickOutside), 0);
     }
     
-    // Finalize assistant group by adding metrics at the bottom
-    finalizeAssistantGroup() {
-        if (!this.currentAssistantGroup || !this.pendingAssistantMetrics) return;
+    // Add a placeholder for metrics that will be filled later
+    addMetricsPlaceholder() {
+        const metricsId = `metrics-${this.metricsIdCounter++}`;
         
-        const { usage, responseTime } = this.pendingAssistantMetrics;
+        const metricsFooter = document.createElement('div');
+        metricsFooter.className = 'assistant-metrics-footer';
+        metricsFooter.id = metricsId;
+        metricsFooter.innerHTML = '<span class="metric-item">⏳ Waiting for response...</span>';
+        
+        // Always append at the end - the spinner will be moved after if needed
+        this.chatMessages.appendChild(metricsFooter);
+        
+        // Move spinner to bottom if it exists
+        this.moveSpinnerToBottom();
+        
+        return metricsId;
+    }
+    
+    // Update a metrics placeholder with actual data
+    updateMetrics(metricsId, usage, responseTime) {
+        const metricsFooter = document.getElementById(metricsId);
+        if (!metricsFooter) return;
+        
+        let metricsHtml = '';
+        
+        // Add response time
+        if (responseTime !== null) {
+            const timeSeconds = (responseTime / 1000).toFixed(1);
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+        }
+        
+        // Add token usage
+        if (usage) {
+            const formatNumber = (num) => num.toLocaleString();
+            
+            // Calculate delta (tokens added in this step)
+            let deltaTokens = 0;
+            
+            if (this.currentChatId) {
+                const history = this.tokenUsageHistory.get(this.currentChatId);
+                if (history && history.requests.length > 1) {
+                    // Get previous request's prompt tokens
+                    const previousRequest = history.requests[history.requests.length - 2];
+                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
+                } else if (history && history.requests.length === 1) {
+                    // First request - all tokens are new
+                    deltaTokens = usage.promptTokens;
+                }
+            }
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+            
+            // Add delta if there was an increase
+            if (deltaTokens > 0) {
+                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
+            }
+            
+            // Add cache information if available (Anthropic)
+            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
+                if (usage.cacheReadInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                }
+                if (usage.cacheCreationInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                }
+            }
+            
+            // Calculate the true total including cache tokens
+            const trueTotal = usage.promptTokens + 
+                              (usage.cacheReadInputTokens || 0) + 
+                              (usage.cacheCreationInputTokens || 0) + 
+                              usage.completionTokens;
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)">📊 ${formatNumber(trueTotal)}</span>
+            `;
+        }
+        
+        metricsFooter.innerHTML = metricsHtml;
+        
+        // Initialize Tippy tooltips for the metric items
+        this.initializeTooltips(metricsFooter);
+    }
+    
+    // Update a metrics placeholder with actual data (unified method for both live and stored)
+    updateMetricsPlaceholder(metricsId, usage, responseTime, previousPromptTokens) {
+        const metricsFooter = document.getElementById(metricsId);
+        if (!metricsFooter) return;
+        
+        let metricsHtml = '';
+        
+        // Add response time
+        if (responseTime !== null) {
+            const timeSeconds = (responseTime / 1000).toFixed(1);
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+        }
+        
+        // Add token usage
+        if (usage) {
+            const formatNumber = (num) => num.toLocaleString();
+            
+            // Calculate delta (tokens added in this step)
+            let deltaTokens = 0;
+            
+            // Use provided previous tokens if available (for stored messages)
+            if (previousPromptTokens !== undefined && previousPromptTokens !== null) {
+                deltaTokens = usage.promptTokens - previousPromptTokens;
+            } else if (this.currentChatId) {
+                // Otherwise try to calculate from history
+                const history = this.tokenUsageHistory.get(this.currentChatId);
+                if (history && history.requests.length > 1) {
+                    // Get previous request's prompt tokens
+                    const previousRequest = history.requests[history.requests.length - 2];
+                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
+                } else if (history && history.requests.length === 1) {
+                    // First request - all tokens are new
+                    deltaTokens = usage.promptTokens;
+                }
+            }
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+            
+            // Add delta if there was an increase
+            if (deltaTokens > 0) {
+                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
+            }
+            
+            // Add cache information if available (Anthropic)
+            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
+                if (usage.cacheReadInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                }
+                if (usage.cacheCreationInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                }
+            }
+            
+            // Calculate the true total including cache tokens
+            const trueTotal = usage.promptTokens + 
+                              (usage.cacheReadInputTokens || 0) + 
+                              (usage.cacheCreationInputTokens || 0) + 
+                              usage.completionTokens;
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)">📊 ${formatNumber(trueTotal)}</span>
+            `;
+        }
+        
+        metricsFooter.innerHTML = metricsHtml;
+        
+        // Initialize Tippy tooltips for the metric items
+        this.initializeTooltips(metricsFooter);
+    }
+    
+    // Add metrics to the previous message element
+    addMetricsToPreviousMessage(usage, responseTime) {
+        const allMessages = this.chatMessages.querySelectorAll('.message, .assistant-group');
+        if (allMessages.length === 0) return;
+        
+        // Get the last message element (excluding loading spinner)
+        let lastMessage = null;
+        for (let i = allMessages.length - 1; i >= 0; i--) {
+            const msg = allMessages[i];
+            if (!msg.classList.contains('loading-spinner')) {
+                lastMessage = msg;
+                break;
+            }
+        }
+        
+        if (!lastMessage) return;
+        
+        // Check if it already has metrics
+        if (lastMessage.querySelector('.assistant-metrics-footer')) return;
         
         const metricsFooter = document.createElement('div');
         metricsFooter.className = 'assistant-metrics-footer';
@@ -2074,25 +2921,128 @@ When users ask about their systems, use the available MCP tools to fetch real da
         // Add response time
         if (responseTime !== null) {
             const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item">⏱️ ${timeSeconds}s</span>`;
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
         }
         
         // Add token usage
         if (usage) {
             const formatNumber = (num) => num.toLocaleString();
+            
+            // Calculate delta (tokens added in this step)
+            let deltaTokens = 0;
+            
+            if (this.currentChatId) {
+                const history = this.tokenUsageHistory.get(this.currentChatId);
+                if (history && history.requests.length > 1) {
+                    // Get previous request's prompt tokens
+                    const previousRequest = history.requests[history.requests.length - 2];
+                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
+                } else if (history && history.requests.length === 1) {
+                    // First request - all tokens are new
+                    deltaTokens = usage.promptTokens;
+                }
+            }
+            
             metricsHtml += `
-                <span class="metric-item">📥 ${formatNumber(usage.promptTokens)}</span>
-                <span class="metric-item">📤 ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item">📊 ${formatNumber(usage.totalTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+            
+            // Add delta if there was an increase
+            if (deltaTokens > 0) {
+                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
+            }
+            
+            // Add cache information if available (Anthropic)
+            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
+                if (usage.cacheReadInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                }
+                if (usage.cacheCreationInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                }
+            }
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)">📊 ${formatNumber(usage.totalTokens)}</span>
+            `;
+        }
+        
+        metricsFooter.innerHTML = metricsHtml;
+        lastMessage.appendChild(metricsFooter);
+        
+        // Initialize Tippy tooltips for the metric items
+        this.initializeTooltips(metricsFooter);
+    }
+    
+    // Add metrics directly to the current assistant group (for stored messages)
+    addMetricsToAssistantGroup(usage, responseTime, previousPromptTokens) {
+        if (!this.currentAssistantGroup) return;
+        
+        const metricsFooter = document.createElement('div');
+        metricsFooter.className = 'assistant-metrics-footer';
+        
+        let metricsHtml = '';
+        
+        // Add response time
+        if (responseTime !== null) {
+            const timeSeconds = (responseTime / 1000).toFixed(1);
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+        }
+        
+        // Add token usage
+        if (usage) {
+            const formatNumber = (num) => num.toLocaleString();
+            
+            // Calculate delta (tokens added in this step)
+            let deltaTokens = 0;
+            
+            // Use provided previous tokens if available (for stored messages)
+            if (previousPromptTokens !== undefined && previousPromptTokens !== null) {
+                deltaTokens = usage.promptTokens - previousPromptTokens;
+            } else if (this.currentChatId) {
+                // Otherwise try to calculate from history
+                const history = this.tokenUsageHistory.get(this.currentChatId);
+                if (history && history.requests.length > 1) {
+                    // Get previous request's prompt tokens
+                    const previousRequest = history.requests[history.requests.length - 2];
+                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
+                } else if (history && history.requests.length === 1) {
+                    // First request - all tokens are new
+                    deltaTokens = usage.promptTokens;
+                }
+            }
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+            
+            // Add delta if there was an increase
+            if (deltaTokens > 0) {
+                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
+            }
+            
+            // Add cache information if available (Anthropic)
+            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
+                if (usage.cacheReadInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                }
+                if (usage.cacheCreationInputTokens > 0) {
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                }
+            }
+            
+            metricsHtml += `
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)">📊 ${formatNumber(usage.totalTokens)}</span>
             `;
         }
         
         metricsFooter.innerHTML = metricsHtml;
         this.currentAssistantGroup.appendChild(metricsFooter);
         
-        // Clear pending metrics
-        this.pendingAssistantMetrics = null;
+        // Initialize Tippy tooltips for the metric items
+        this.initializeTooltips(metricsFooter);
     }
+    
     
     editUserMessage(contentDiv, originalContent) {
         const chat = this.chats.get(this.currentChatId);
@@ -2101,11 +3051,23 @@ When users ask about their systems, use the available MCP tools to fetch real da
         // Prevent multiple edit sessions
         if (contentDiv.classList.contains('editing')) return;
         
-        // Find the message index
+        // Find the message index by searching through all user message divs
         let messageIndex = -1;
-        for (let i = 0; i < chat.messages.length; i++) {
-            if (chat.messages[i].role === 'user' && chat.messages[i].content === originalContent) {
-                messageIndex = i;
+        const allUserMessages = this.chatMessages.querySelectorAll('.message.user .message-content');
+        
+        for (let i = 0; i < allUserMessages.length; i++) {
+            if (allUserMessages[i] === contentDiv) {
+                // Count user messages up to this point
+                let userMessageCount = 0;
+                for (let j = 0; j < chat.messages.length; j++) {
+                    if (chat.messages[j].type === 'user' && !chat.messages[j].isTitleRequest) {
+                        if (userMessageCount === i) {
+                            messageIndex = j;
+                            break;
+                        }
+                        userMessageCount++;
+                    }
+                }
                 break;
             }
         }
@@ -2144,11 +3106,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 return;
             }
             
-            if (newContent === originalText) {
-                // No change, just cancel
-                cancel();
-                return;
-            }
+            // Always proceed even if content is the same - user may want to regenerate response
             
             // Clip history at this point
             chat.messages = chat.messages.slice(0, messageIndex);
@@ -2166,18 +3124,8 @@ When users ask about their systems, use the available MCP tools to fetch real da
         };
         
         // Handle cancel
-        const cancel = () => {
-            contentDiv.contentEditable = false;
-            contentDiv.classList.remove('editing');
-            contentDiv.textContent = originalText;
-            buttonsDiv.remove();
-        };
-        
-        buttonsDiv.querySelector('.btn-primary').onclick = save;
-        buttonsDiv.querySelector('.btn-secondary').onclick = cancel;
-        
-        // Handle keyboard shortcuts
-        contentDiv.addEventListener('keydown', (e) => {
+        // Handle keyboard shortcuts with a named function so we can remove it
+        const keyHandler = (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 save();
@@ -2185,15 +3133,29 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 e.preventDefault();
                 cancel();
             }
-        });
+        };
         
         // Handle click outside
         const clickOutside = (e) => {
             if (!contentDiv.contains(e.target) && !buttonsDiv.contains(e.target)) {
                 cancel();
-                document.removeEventListener('click', clickOutside);
             }
         };
+        
+        const cancel = () => {
+            contentDiv.contentEditable = false;
+            contentDiv.classList.remove('editing');
+            contentDiv.textContent = originalText;
+            buttonsDiv.remove();
+            // Clean up event listeners
+            contentDiv.removeEventListener('keydown', keyHandler);
+            document.removeEventListener('click', clickOutside);
+        };
+        
+        buttonsDiv.querySelector('.btn-primary').onclick = save;
+        buttonsDiv.querySelector('.btn-secondary').onclick = cancel;
+        
+        contentDiv.addEventListener('keydown', keyHandler);
         setTimeout(() => document.addEventListener('click', clickOutside), 0);
     }
     
@@ -2209,6 +3171,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         const hasThinking = thinkingRegex.test(content);
         
         if (hasThinking) {
+            console.log('Processing content with thinking tags:', content);
             // Process thinking content
             let lastIndex = 0;
             let match;
@@ -2279,7 +3242,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         this.moveSpinnerToBottom();
     }
 
-    addToolCall(toolName, args) {
+    addToolCall(toolName, args, includeInContext = true, turn = null, messageIndex) {
         // If we have a current assistant group, append to it
         const targetContainer = this.currentAssistantGroup || this.chatMessages;
         
@@ -2289,6 +3252,23 @@ When users ask about their systems, use the available MCP tools to fetch real da
         const toolDiv = document.createElement('div');
         toolDiv.className = 'tool-block';
         toolDiv.dataset.toolId = toolId;
+        toolDiv.dataset.toolName = toolName;
+        toolDiv.dataset.included = includeInContext;
+        toolDiv.style.position = 'relative';
+        
+        // Store the turn for auto mode
+        const chat = this.chats.get(this.currentChatId);
+        if (turn !== null) {
+            toolDiv.dataset.turn = turn;
+        } else if (chat) {
+            toolDiv.dataset.turn = chat.currentTurn || 0;
+        }
+        
+        // Check if we're in cached mode
+        const isCachedMode = chat && chat.toolInclusionMode === 'cached';
+        const checkboxDisabled = isCachedMode ? 'disabled' : '';
+        const labelTitle = isCachedMode ? 'Tool inclusion is locked in cached mode' : 'Include this tool\'s result in the LLM context';
+        const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
         
         const toolHeader = document.createElement('div');
         toolHeader.className = 'tool-header';
@@ -2297,6 +3277,11 @@ When users ask about their systems, use the available MCP tools to fetch real da
             <span class="tool-label">🔧 ${toolName}</span>
             <span class="tool-info">
                 <span class="tool-status">⏳ Calling...</span>
+                <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
+                    <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
+                    <span class="tool-include-toggle"></span>
+                    <span class="tool-include-text">Include</span>
+                </label>
             </span>
         `;
         
@@ -2307,10 +3292,24 @@ When users ask about their systems, use the available MCP tools to fetch real da
         const requestSection = document.createElement('div');
         requestSection.className = 'tool-request-section';
         requestSection.innerHTML = `
-            <div class="tool-section-header">📤 Request</div>
+            <div class="tool-section-controls">
+                <span class="tool-section-label">📤 REQUEST</span>
+                <button class="tool-section-copy" title="Copy request">📋</button>
+            </div>
             <pre>${JSON.stringify(args, null, 2)}</pre>
         `;
         toolContent.appendChild(requestSection);
+        
+        // Add copy functionality for request
+        const requestCopyBtn = requestSection.querySelector('.tool-section-copy');
+        requestCopyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const text = JSON.stringify(args, null, 2);
+            navigator.clipboard.writeText(text).then(() => {
+                requestCopyBtn.textContent = '✓';
+                setTimeout(() => { requestCopyBtn.textContent = '📋'; }, 1000);
+            });
+        });
         
         // Add separator (will be visible when response is added)
         const separator = document.createElement('div');
@@ -2324,10 +3323,33 @@ When users ask about their systems, use the available MCP tools to fetch real da
         responseSection.style.display = 'none';
         toolContent.appendChild(responseSection);
         
-        toolHeader.addEventListener('click', () => {
+        toolHeader.addEventListener('click', (e) => {
+            // Don't toggle if clicking on checkbox, label, or toggle switch
+            if (e.target.matches('.tool-include-checkbox, .tool-include-label, .tool-include-text, .tool-include-toggle') || 
+                e.target.closest('.tool-include-label')) {
+                e.stopPropagation();
+                return;
+            }
             const isCollapsed = toolContent.classList.contains('collapsed');
             toolContent.classList.toggle('collapsed');
             toolHeader.querySelector('.tool-toggle').textContent = isCollapsed ? '▼' : '▶';
+        });
+        
+        // Handle checkbox change
+        const checkbox = toolHeader.querySelector('.tool-include-checkbox');
+        checkbox.addEventListener('change', () => {
+            // Update the tool's included state
+            toolDiv.dataset.included = checkbox.checked;
+            
+            // If this is part of a chat, track the inclusion state
+            if (this.currentChatId) {
+                const chatToolStates = this.toolInclusionStates.get(this.currentChatId) || new Map();
+                chatToolStates.set(toolId, checkbox.checked);
+                this.toolInclusionStates.set(this.currentChatId, chatToolStates);
+            }
+            
+            // Update global toggle state
+            this.updateGlobalToggleUI();
         });
         
         toolDiv.appendChild(toolHeader);
@@ -2347,7 +3369,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         this.moveSpinnerToBottom();
     }
 
-    addToolResult(toolName, result, responseTime = 0, responseSize = null) {
+    addToolResult(toolName, result, responseTime = 0, responseSize = null, includeInContext = true, messageIndex = null) {
         // Try to find the pending tool call
         const toolId = this.pendingToolCalls?.get(toolName);
         
@@ -2377,20 +3399,55 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 }
                 
                 // Format response time
-                const timeInfo = responseTime > 0 ? `${(responseTime / 1000).toFixed(2)}s` : '';
+                const timeInfo = responseTime > 0 ? `${(responseTime / 1000).toFixed(2)}s` : '0s';
                 
                 // Update status
                 if (statusSpan) {
                     statusSpan.textContent = result.error ? '❌ Error' : '✅ Complete';
                 }
                 
-                // Add metrics
+                // Update metrics while preserving checkbox
                 if (infoSpan) {
+                    // Save checkbox state and reference
+                    const oldCheckbox = infoSpan.querySelector('.tool-include-checkbox');
+                    const wasChecked = oldCheckbox ? oldCheckbox.checked : true;
+                    
+                    // Check if we're in cached mode
+                    const chat = this.chats.get(this.currentChatId);
+                    const isCachedMode = chat && chat.toolInclusionMode === 'cached';
+                    const checkboxDisabled = isCachedMode ? 'disabled' : '';
+                    const labelTitle = isCachedMode ? 'Tool inclusion is locked in cached mode' : 'Include this tool\'s result in the LLM context';
+                    const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
+                    
                     infoSpan.innerHTML = `
                         <span class="tool-status">${result.error ? '❌ Error' : '✅ Complete'}</span>
                         <span class="tool-metric">⏱️ ${timeInfo}</span>
                         <span class="tool-metric">📦 ${sizeInfo}</span>
+                        <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
+                            <input type="checkbox" class="tool-include-checkbox" ${wasChecked || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
+                            <span class="tool-include-toggle"></span>
+                            <span class="tool-include-text">Include</span>
+                        </label>
                     `;
+                    
+                    // Re-attach checkbox event handler if it exists
+                    const newCheckbox = infoSpan.querySelector('.tool-include-checkbox');
+                    if (newCheckbox) {
+                        newCheckbox.addEventListener('change', () => {
+                            // Update the tool's included state
+                            toolDiv.dataset.included = newCheckbox.checked;
+                            
+                            // If this is part of a chat, track the inclusion state
+                            if (this.currentChatId) {
+                                const chatToolStates = this.toolInclusionStates.get(this.currentChatId) || new Map();
+                                chatToolStates.set(toolId, newCheckbox.checked);
+                                this.toolInclusionStates.set(this.currentChatId, chatToolStates);
+                            }
+                            
+                            // Update global toggle state
+                            this.updateGlobalToggleUI();
+                        });
+                    }
                 }
                 
                 // Update response section
@@ -2410,10 +3467,24 @@ When users ask about their systems, use the available MCP tools to fetch real da
                     }
                     
                     responseSection.innerHTML = `
-                        <div class="tool-section-header">📥 Response</div>
+                        <div class="tool-section-controls">
+                            <span class="tool-section-label">📥 RESPONSE</span>
+                            <button class="tool-section-copy" title="Copy response">📋</button>
+                        </div>
                         ${formattedResult}
                     `;
                     responseSection.style.display = 'block';
+                    
+                    // Add copy functionality for response
+                    const responseCopyBtn = responseSection.querySelector('.tool-section-copy');
+                    responseCopyBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const text = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+                        navigator.clipboard.writeText(text).then(() => {
+                            responseCopyBtn.textContent = '✓';
+                            setTimeout(() => { responseCopyBtn.textContent = '📋'; }, 1000);
+                        });
+                    });
                     
                     if (separator) {
                         separator.style.display = 'block';
@@ -2424,18 +3495,18 @@ When users ask about their systems, use the available MCP tools to fetch real da
                 this.pendingToolCalls.delete(toolName);
             } else {
                 // Fallback: create new block if not found
-                this.createStandaloneToolResult(toolName, result, responseTime, responseSize);
+                this.createStandaloneToolResult(toolName, result, responseTime, responseSize, includeInContext);
             }
         } else {
             // No pending call found, create standalone result
-            this.createStandaloneToolResult(toolName, result, responseTime, responseSize);
+            this.createStandaloneToolResult(toolName, result, responseTime, responseSize, includeInContext);
         }
         
         this.scrollToBottom();
         this.moveSpinnerToBottom();
     }
     
-    createStandaloneToolResult(toolName, result, responseTime = 0, responseSize = null) {
+    createStandaloneToolResult(toolName, result, responseTime = 0, responseSize = null, includeInContext = true) {
         const targetContainer = this.currentAssistantGroup || this.chatMessages;
         
         const toolDiv = document.createElement('div');
@@ -2461,6 +3532,19 @@ When users ask about their systems, use the available MCP tools to fetch real da
         // Format response time
         const timeInfo = responseTime > 0 ? `${(responseTime / 1000).toFixed(2)}s` : '';
         
+        // Generate unique ID for this tool result
+        const toolId = `tool-result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        toolDiv.dataset.toolId = toolId;
+        toolDiv.dataset.toolName = toolName;
+        toolDiv.dataset.included = includeInContext ? 'true' : 'false';
+        
+        // Check if we're in cached mode
+        const chat = this.chats.get(this.currentChatId);
+        const isCachedMode = chat && chat.toolInclusionMode === 'cached';
+        const checkboxDisabled = isCachedMode ? 'disabled' : '';
+        const labelTitle = isCachedMode ? 'Tool inclusion is locked in cached mode' : 'Include this tool\'s result in the LLM context';
+        const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
+        
         const toolHeader = document.createElement('div');
         toolHeader.className = 'tool-header';
         toolHeader.innerHTML = `
@@ -2469,6 +3553,11 @@ When users ask about their systems, use the available MCP tools to fetch real da
             <span class="tool-info">
                 <span class="tool-metric">⏱️ ${timeInfo}</span>
                 <span class="tool-metric">📦 ${sizeInfo}</span>
+                <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
+                    <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
+                    <span class="tool-include-toggle"></span>
+                    <span class="tool-include-text">Include</span>
+                </label>
             </span>
         `;
         
@@ -2488,11 +3577,45 @@ When users ask about their systems, use the available MCP tools to fetch real da
         
         toolContent.innerHTML = formattedResult;
         
-        toolHeader.addEventListener('click', () => {
+        toolHeader.addEventListener('click', (e) => {
+            // Don't toggle if clicking on checkbox, label, or toggle switch
+            if (e.target.matches('.tool-include-checkbox, .tool-include-label, .tool-include-text, .tool-include-toggle') || 
+                e.target.closest('.tool-include-label')) {
+                e.stopPropagation();
+                return;
+            }
             const isCollapsed = toolContent.classList.contains('collapsed');
             toolContent.classList.toggle('collapsed');
             toolHeader.querySelector('.tool-toggle').textContent = isCollapsed ? '▼' : '▶';
         });
+        
+        // Handle checkbox change
+        const checkbox = toolHeader.querySelector('.tool-include-checkbox');
+        if (checkbox) {
+            checkbox.addEventListener('change', () => {
+                // Update the tool's included state
+                toolDiv.dataset.included = checkbox.checked;
+                
+                // If this is part of a chat, track the inclusion state
+                if (this.currentChatId) {
+                    const chatToolStates = this.toolInclusionStates.get(this.currentChatId) || new Map();
+                    chatToolStates.set(toolId, checkbox.checked);
+                    this.toolInclusionStates.set(this.currentChatId, chatToolStates);
+                    
+                    // If we're in manual mode, update it when user changes checkboxes
+                    const chat = this.chats.get(this.currentChatId);
+                    if (chat && chat.toolInclusionMode === 'manual') {
+                        // Stay in manual mode when user manually changes checkboxes
+                        this.updateGlobalToggleUI();
+                    } else if (chat) {
+                        // User changed a checkbox, switch to manual mode
+                        chat.toolInclusionMode = 'manual';
+                        this.saveSettings();
+                        this.updateGlobalToggleUI();
+                    }
+                }
+            });
+        }
         
         toolDiv.appendChild(toolHeader);
         toolDiv.appendChild(toolContent);
@@ -2506,6 +3629,44 @@ When users ask about their systems, use the available MCP tools to fetch real da
 
     scrollToBottom() {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+    }
+    
+    // Add turn separator between conversation turns
+    addTurnSeparator(turnNumber) {
+        const separator = document.createElement('div');
+        separator.className = 'turn-separator';
+        
+        const turnLabel = document.createElement('span');
+        turnLabel.className = 'turn-number';
+        turnLabel.textContent = `Turn ${turnNumber}`;
+        
+        separator.appendChild(turnLabel);
+        this.chatMessages.appendChild(separator);
+    }
+    
+    // Add step number to the last message element
+    addStepNumber(turn, step, element = null) {
+        const target = element || this.chatMessages.lastElementChild;
+        if (!target) return;
+        
+        // Don't add step numbers to separators, spinners, or metrics
+        if (target.classList.contains('turn-separator') || 
+            target.classList.contains('loading-spinner') || 
+            target.classList.contains('assistant-metrics-footer')) {
+            return;
+        }
+        
+        // Check if step number already exists
+        if (target.querySelector('.step-number')) {
+            return;
+        }
+        
+        const stepLabel = document.createElement('span');
+        stepLabel.className = 'step-number';
+        stepLabel.textContent = `${turn}.${step}`;
+        stepLabel.title = `Turn ${turn}, Step ${step}`;
+        
+        target.appendChild(stepLabel);
     }
 
     // Helper method to clean content before sending to API
@@ -2558,7 +3719,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         return result;
     }
 
-    showLoadingSpinner() {
+    showLoadingSpinner(text = 'Thinking...') {
         // Remove any existing spinner first
         this.hideLoadingSpinner();
         
@@ -2569,7 +3730,7 @@ When users ask about their systems, use the available MCP tools to fetch real da
         spinnerDiv.innerHTML = `
             <div class="spinner-container">
                 <div class="spinner"></div>
-                <span class="spinner-text">Thinking...</span>
+                <span class="spinner-text">${text}</span>
             </div>
         `;
         this.chatMessages.appendChild(spinnerDiv);
@@ -2682,24 +3843,24 @@ When users ask about their systems, use the available MCP tools to fetch real da
             timestamp: new Date().toISOString(),
             promptTokens: usage.promptTokens,
             completionTokens: usage.completionTokens,
-            totalTokens: usage.totalTokens
+            totalTokens: usage.totalTokens,
+            cacheCreationInputTokens: usage.cacheCreationInputTokens || 0,
+            cacheReadInputTokens: usage.cacheReadInputTokens || 0
         });
         
-        // The prompt tokens of the latest request include the entire conversation
-        // So we use the latest prompt tokens as the true total
-        const latestTotalTokens = usage.promptTokens;
+        // The total tokens in context include all token types
+        // promptTokens + cacheReadInputTokens + cacheCreationInputTokens represent the input
+        // We don't include completionTokens as they're the output
+        const latestTotalTokens = usage.promptTokens + 
+                                  (usage.cacheReadInputTokens || 0) + 
+                                  (usage.cacheCreationInputTokens || 0);
         
         
         // Update context window indicator with the actual conversation size
         this.updateContextWindowIndicator(latestTotalTokens, model);
         
-        // Save context usage in the chat
-        const chat = this.chats.get(chatId);
-        if (chat) {
-            chat.contextUsage = latestTotalTokens;
-            chat.lastModel = model;
-            this.saveSettings();
-        }
+        // Update cumulative token counters
+        this.updateCumulativeTokenDisplay();
         
         // Update any pending conversation total displays
         const pendingTotals = document.querySelectorAll('[id^="conv-total-"]');
@@ -2763,9 +3924,238 @@ When users ask about their systems, use the available MCP tools to fetch real da
             return { totalTokens: 0 };
         }
         
-        // Get the latest request's prompt tokens as the total
+        // Get the latest request's total input tokens (prompt + cache)
         const latestRequest = history.requests[history.requests.length - 1];
-        return { totalTokens: latestRequest.promptTokens };
+        const totalInputTokens = latestRequest.promptTokens + 
+                                 (latestRequest.cacheReadInputTokens || 0) + 
+                                 (latestRequest.cacheCreationInputTokens || 0);
+        return { totalTokens: totalInputTokens };
+    }
+    
+    // Get cumulative token usage for the entire chat
+    getCumulativeTokenUsage(chatId) {
+        const history = this.tokenUsageHistory.get(chatId);
+        if (!history || history.requests.length === 0) {
+            return { 
+                inputTokens: 0, 
+                outputTokens: 0,
+                cacheCreationTokens: 0,
+                cacheReadTokens: 0
+            };
+        }
+        
+        let totalInput = 0;
+        let totalOutput = 0;
+        let totalCacheCreation = 0;
+        let totalCacheRead = 0;
+        
+        // Sum up all token usage
+        history.requests.forEach(request => {
+            totalInput += request.promptTokens || 0;
+            totalOutput += request.completionTokens || 0;
+            totalCacheCreation += request.cacheCreationInputTokens || 0;
+            totalCacheRead += request.cacheReadInputTokens || 0;
+        });
+        
+        return { 
+            inputTokens: totalInput, 
+            outputTokens: totalOutput,
+            cacheCreationTokens: totalCacheCreation,
+            cacheReadTokens: totalCacheRead
+        };
+    }
+    
+    // Update cumulative token display
+    updateCumulativeTokenDisplay() {
+        if (!this.currentChatId) return;
+        
+        const cumulative = this.getCumulativeTokenUsage(this.currentChatId);
+        const formatNumber = (num) => num.toLocaleString();
+        
+        const inputElement = document.getElementById('cumulativeInputTokens');
+        const outputElement = document.getElementById('cumulativeOutputTokens');
+        const cacheReadElement = document.getElementById('cumulativeCacheReadTokens');
+        const cacheCreationElement = document.getElementById('cumulativeCacheCreationTokens');
+        
+        if (inputElement) {
+            inputElement.textContent = `📥 ${formatNumber(cumulative.inputTokens)}`;
+        }
+        
+        if (outputElement) {
+            outputElement.textContent = `📤 ${formatNumber(cumulative.outputTokens)}`;
+        }
+        
+        // Show/hide and update cache token displays
+        if (cacheReadElement) {
+            if (cumulative.cacheReadTokens > 0) {
+                cacheReadElement.style.display = 'inline-block';
+                cacheReadElement.textContent = `💾 ${formatNumber(cumulative.cacheReadTokens)}`;
+            } else {
+                cacheReadElement.style.display = 'none';
+            }
+        }
+        
+        if (cacheCreationElement) {
+            if (cumulative.cacheCreationTokens > 0) {
+                cacheCreationElement.style.display = 'inline-block';
+                cacheCreationElement.textContent = `💿 ${formatNumber(cumulative.cacheCreationTokens)}`;
+            } else {
+                cacheCreationElement.style.display = 'none';
+            }
+        }
+    }
+    
+    // Get previous prompt tokens for delta calculation
+    getPreviousPromptTokens() {
+        if (!this.currentChatId) return 0;
+        
+        const history = this.tokenUsageHistory.get(this.currentChatId);
+        if (!history || history.requests.length === 0) {
+            return 0;
+        }
+        
+        // If we have previous requests, get the last one's prompt tokens
+        if (history.requests.length > 0) {
+            const lastRequest = history.requests[history.requests.length - 1];
+            return lastRequest.promptTokens || 0;
+        }
+        
+        return 0;
+    }
+    
+    // Add a turn separator with turn number
+    addTurnSeparator(turnNumber) {
+        const separator = document.createElement('div');
+        separator.className = 'turn-separator';
+        
+        const turnLabel = document.createElement('span');
+        turnLabel.className = 'turn-number';
+        turnLabel.textContent = `Turn ${turnNumber}`;
+        
+        separator.appendChild(turnLabel);
+        this.chatMessages.appendChild(separator);
+    }
+    
+    // Add step number to the last added element
+    addStepNumber(turn, step, element = null) {
+        const target = element || this.chatMessages.lastElementChild;
+        if (!target) return;
+        
+        const stepLabel = document.createElement('span');
+        stepLabel.className = 'step-number';
+        stepLabel.textContent = `${turn}.${step}`;
+        stepLabel.title = `Turn ${turn}, Step ${step}`;
+        
+        // Position the step number on the left of the element
+        target.appendChild(stepLabel);
+    }
+    
+    // Initialize Tippy tooltips
+    initializeTooltips(container) {
+        // Find all elements with data-tooltip attribute
+        const elements = container.querySelectorAll('[data-tooltip]');
+        
+        elements.forEach(element => {
+            // Get theme based on current theme
+            const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+            
+            tippy(element, {
+                content: element.getAttribute('data-tooltip'),
+                theme: isDarkTheme ? 'light-border' : 'light',
+                animation: 'shift-away',
+                delay: 0, // No delay
+                duration: [200, 150], // Animation duration in/out
+                placement: 'top',
+                arrow: true,
+                inertia: true
+            });
+        });
+    }
+    
+    // Copy conversation metrics to clipboard
+    async copyConversationMetrics() {
+        if (!this.currentChatId) {
+            this.showError('No active chat to copy metrics from');
+            return;
+        }
+        
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat || !chat.messages || chat.messages.length === 0) {
+            this.showError('No messages to copy');
+            return;
+        }
+        
+        // Create a sanitized copy of the messages without payloads
+        const sanitizedMessages = chat.messages.map((message, index) => {
+            const sanitized = {
+                index,
+                type: message.type,
+                role: message.role
+            };
+            
+            // Add metadata fields but not content
+            if (message.usage) {
+                sanitized.usage = message.usage;
+            }
+            
+            if (message.responseTime) {
+                sanitized.responseTime = message.responseTime;
+            }
+            
+            if (message.toolCalls && message.toolCalls.length > 0) {
+                sanitized.toolCalls = message.toolCalls.map(tc => ({
+                    name: tc.name,
+                    toolCallId: tc.toolCallId,
+                    // Don't include args or result
+                }));
+            }
+            
+            if (message.results && Array.isArray(message.results)) {
+                sanitized.results = message.results.map(r => ({
+                    name: r.name,
+                    toolCallId: r.toolCallId,
+                    resultSize: r.result 
+                        ? (typeof r.result === 'string' 
+                            ? r.result.length 
+                            : JSON.stringify(r.result).length)
+                        : 0
+                    // Don't include actual result
+                }));
+            }
+            
+            // Add content size but not content itself
+            if (message.content) {
+                sanitized.contentSize = typeof message.content === 'string' 
+                    ? message.content.length 
+                    : JSON.stringify(message.content).length;
+            }
+            
+            return sanitized;
+        });
+        
+        const output = {
+            title: chat.title,
+            model: chat.model,
+            messageCount: chat.messages.length,
+            messages: sanitizedMessages
+        };
+        
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(output, null, 2));
+            
+            // Show success feedback
+            const btn = this.copyMetricsBtn;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied JSON!';
+            btn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('btn-success');
+            }, 2000);
+        } catch (error) {
+            this.showError('Failed to copy to clipboard: ' + error.message);
+        }
     }
     
     // Temperature control methods
@@ -2811,6 +4201,393 @@ When users ask about their systems, use the available MCP tools to fetch real da
         
         const chat = this.chats.get(this.currentChatId);
         return chat ? (chat.temperature || 0.7) : 0.7;
+    }
+    
+    // Handle generate title button click
+    async handleGenerateTitleClick() {
+        if (!this.currentChatId) {
+            this.showError('Please select or create a chat first');
+            return;
+        }
+        
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return;
+        
+        // Check if there are any messages to generate a title from
+        const userMessages = chat.messages.filter(m => m.type === 'user' && !m.isTitleRequest);
+        const assistantMessages = chat.messages.filter(m => m.type === 'assistant' && !m.isTitleRequest);
+        
+        if (userMessages.length === 0 || assistantMessages.length === 0) {
+            this.showError('Need at least one user message and one assistant response to generate a title');
+            return;
+        }
+        
+        // Disable the button to prevent multiple clicks
+        this.generateTitleBtn.disabled = true;
+        
+        try {
+            // Get MCP connection
+            const mcpConnection = await this.ensureMcpConnection(chat.mcpServerId);
+            
+            // Get proxy provider configuration
+            const proxyProvider = this.llmProviders.get(chat.llmProviderId);
+            if (!proxyProvider) {
+                throw new Error('LLM provider not found');
+            }
+            
+            // Parse the model selection (format: "provider:model")
+            const [providerType, modelName] = chat.model.split(':');
+            if (!providerType || !modelName) {
+                throw new Error('Invalid model selection in chat');
+            }
+            
+            // Create the actual LLM provider instance
+            console.log('Creating provider with proxyUrl:', proxyProvider.proxyUrl);
+            const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+            provider.onLog = proxyProvider.onLog;
+            
+            // Generate the title
+            await this.generateChatTitle(chat, mcpConnection, provider);
+        } catch (error) {
+            this.showError(`Failed to generate title: ${error.message}`);
+        } finally {
+            this.generateTitleBtn.disabled = false;
+        }
+    }
+    
+    // Generate chat title using LLM
+    async generateChatTitle(chat, mcpConnection, provider) {
+        try {
+            // Mark that we're generating a title
+            chat.titleGenerated = true;
+            this.saveSettings();
+            
+            // Create a system message for title generation
+            const titleRequest = "Please provide a short, descriptive title (max 50 characters) for this conversation. Respond with ONLY the title text, no quotes, no explanation.";
+            
+            // Add visual separator
+            const separatorDiv = document.createElement('div');
+            separatorDiv.className = 'message system';
+            separatorDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--info-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
+            separatorDiv.textContent = '📝 Generating chat title...';
+            this.chatMessages.appendChild(separatorDiv);
+            this.scrollToBottom();
+            
+            // Process the title request as a user message
+            this.processRenderEvent({ type: 'user-message', content: `[System Request] ${titleRequest}` });
+            chat.messages.push({ 
+                type: 'user', 
+                role: 'user', 
+                content: titleRequest,
+                isTitleRequest: true,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Add metrics placeholder
+            const metricsId = `metrics-title-${this.metricsIdCounter++}`;
+            this.processRenderEvent({ type: 'metrics-placeholder', id: metricsId });
+            const domMetricsId = this.metricsIdMapping?.[metricsId] || metricsId;
+            
+            // Show loading spinner
+            this.processRenderEvent({ type: 'show-spinner' });
+            
+            // Build messages for title generation
+            const messages = [];
+            
+            // Add system prompt for title generation
+            messages.push({ 
+                role: 'system', 
+                content: 'You are a helpful assistant that generates concise, descriptive titles for conversations. Respond with ONLY the title text, no quotes, no explanation, no markdown.' 
+            });
+            
+            // Add the conversation context (excluding the title request itself)
+            for (const msg of chat.messages) {
+                if (msg.isTitleRequest) continue;
+                
+                if (msg.type === 'user') {
+                    messages.push({ role: 'user', content: msg.content });
+                } else if (msg.type === 'assistant' && msg.content) {
+                    // Clean content and truncate if needed
+                    const cleanedContent = this.cleanContentForAPI(msg.content);
+                    const truncated = cleanedContent.length > 500 ? cleanedContent.substring(0, 500) + '...' : cleanedContent;
+                    messages.push({ role: 'assistant', content: truncated });
+                }
+            }
+            
+            // Add the title request
+            messages.push({ role: 'user', content: titleRequest });
+            
+            // Send request with low temperature for consistent titles
+            const temperature = 0.3;
+            const llmStartTime = Date.now();
+            const response = await provider.sendMessage(messages, [], temperature);
+            const llmResponseTime = Date.now() - llmStartTime;
+            
+            // Update metrics
+            if (response.usage) {
+                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
+            }
+            
+            this.processRenderEvent({ 
+                type: 'update-metrics', 
+                id: metricsId,
+                usage: response.usage, 
+                responseTime: llmResponseTime,
+                previousPromptTokens: this.getPreviousPromptTokens()
+            });
+            
+            // Process the title response
+            if (response.content) {
+                // Display the response
+                this.processRenderEvent({ type: 'assistant-message', content: response.content });
+                
+                // Extract and clean the title
+                const newTitle = response.content.trim()
+                    .replace(/^["']|["']$/g, '') // Remove quotes
+                    .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
+                    .substring(0, 50); // Limit length
+                
+                console.log('Generated title:', newTitle);
+                console.log('Current chat ID:', this.currentChatId);
+                
+                // Update the chat title
+                if (newTitle && newTitle.length > 0) {
+                    chat.title = newTitle;
+                    chat.updatedAt = new Date().toISOString();
+                    this.saveSettings(); // Save the updated title
+                    
+                    chat.messages.push({ 
+                        type: 'assistant', 
+                        role: 'assistant', 
+                        content: response.content,
+                        isTitleRequest: true,
+                        usage: response.usage || null,
+                        responseTime: llmResponseTime || null,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Update UI
+                    this.updateChatSessions();
+                    document.getElementById('chatTitle').textContent = newTitle;
+                    
+                    // Also update the sidebar item directly
+                    const sessionItem = document.querySelector(`[data-chat-id="${this.currentChatId}"] .session-title`);
+                    if (sessionItem) {
+                        sessionItem.textContent = newTitle;
+                    }
+                    
+                    // Add success message
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'message system';
+                    successDiv.style.cssText = 'margin: 10px auto 20px; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
+                    successDiv.textContent = `✅ Chat title updated: "${newTitle}"`;
+                    this.chatMessages.appendChild(successDiv);
+                    this.scrollToBottom();
+                }
+            }
+            
+        } catch (error) {
+            console.error('Failed to generate title:', error);
+            // Don't show error to user, just log it
+        } finally {
+            // Hide spinner
+            this.processRenderEvent({ type: 'hide-spinner' });
+            // Clear assistant group
+            this.currentAssistantGroup = null;
+            // Save any changes
+            this.saveSettings();
+        }
+    }
+    
+    // Tool inclusion toggle methods
+    cycleGlobalToolToggle() {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return;
+        
+        const currentMode = chat.toolInclusionMode || 'auto';
+        let newMode;
+        
+        // Cycle through states: auto -> all-on -> all-off -> manual -> cached -> auto
+        switch (currentMode) {
+            case 'auto':
+                newMode = 'all-on';
+                this.enableAllToolCheckboxes();
+                this.setAllToolStates(true);
+                break;
+            case 'all-on':
+                newMode = 'all-off';
+                this.setAllToolStates(false);
+                break;
+            case 'all-off':
+                newMode = 'manual';
+                // Don't change individual states in manual mode
+                break;
+            case 'manual':
+                newMode = 'cached';
+                // In cached mode, all tools are on and disabled
+                this.setAllToolStates(true);
+                this.disableAllToolCheckboxes();
+                break;
+            case 'cached':
+                newMode = 'auto';
+                // In auto mode, we'll dynamically determine which tools to include
+                this.enableAllToolCheckboxes();
+                this.updateToolCheckboxesForAutoMode();
+                break;
+            default:
+                newMode = 'auto';
+                this.updateToolCheckboxesForAutoMode();
+        }
+        
+        chat.toolInclusionMode = newMode;
+        this.saveSettings();
+        this.updateGlobalToggleUI();
+    }
+    
+    getGlobalToolToggleState() {
+        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
+        if (checkboxes.length === 0) return 'all-on';
+        
+        let checkedCount = 0;
+        checkboxes.forEach(cb => {
+            if (cb.checked) checkedCount++;
+        });
+        
+        if (checkedCount === checkboxes.length) return 'all-on';
+        if (checkedCount === 0) return 'all-off';
+        return 'mixed';
+    }
+    
+    setAllToolStates(checked) {
+        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = checked;
+            // Trigger change event to update data attributes and states
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+    
+    enableAllToolCheckboxes() {
+        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.disabled = false;
+            const label = checkbox.closest('.tool-include-label');
+            if (label) {
+                label.style.opacity = '1';
+                label.title = 'Include this tool\'s result in the LLM context';
+            }
+        });
+    }
+    
+    disableAllToolCheckboxes() {
+        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.disabled = true;
+            const label = checkbox.closest('.tool-include-label');
+            if (label) {
+                label.style.opacity = '0.5';
+                label.title = 'Tool inclusion is locked in cached mode';
+            }
+        });
+    }
+    
+    updateToolCheckboxesForAutoMode() {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat || chat.toolInclusionMode !== 'auto') return;
+        
+        const currentTurn = chat.currentTurn || 0;
+        
+        // Find all tool blocks in the chat
+        const toolBlocks = this.chatMessages.querySelectorAll('.tool-block');
+        
+        toolBlocks.forEach(toolBlock => {
+            // Get the turn from the dataset
+            const toolTurn = parseInt(toolBlock.dataset.turn || '0');
+            
+            // Update checkbox based on whether this tool is from current turn
+            const checkbox = toolBlock.querySelector('.tool-include-checkbox');
+            if (checkbox) {
+                const shouldInclude = toolTurn === currentTurn;
+                checkbox.checked = shouldInclude;
+                checkbox.disabled = true; // Disable in auto mode
+                toolBlock.dataset.included = shouldInclude;
+                
+                // Update visual state
+                const label = toolBlock.querySelector('.tool-include-label');
+                if (label) {
+                    label.style.opacity = '0.6';
+                    label.title = `Auto mode: ${shouldInclude ? 'Included (current turn)' : 'Excluded (previous turn)'}`;
+                }
+            }
+        });
+    }
+    
+    shouldIncludeToolsForMessage(msg, toolMode, currentTurn) {
+        // For non-tool messages, always include
+        if (msg.type !== 'assistant' && msg.type !== 'tool-results') {
+            return true;
+        }
+        
+        // Check the inclusion mode
+        switch (toolMode) {
+            case 'all-on':
+                return true;
+            case 'all-off':
+                return false;
+            case 'manual':
+                // In manual mode, respect individual checkbox states
+                return true; // The filtering happens later based on includeInContext
+            case 'auto':
+                // In auto mode, only include tools from the current turn
+                return msg.turn === currentTurn;
+            default:
+                return true;
+        }
+    }
+    
+    updateGlobalToggleUI() {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return;
+        
+        const mode = chat.toolInclusionMode || 'auto';
+        const button = this.globalToolToggleBtn;
+        const icon = button.querySelector('.tool-toggle-icon');
+        const text = button.querySelector('.tool-toggle-text');
+        
+        // Update button appearance based on mode
+        switch (mode) {
+            case 'auto':
+                button.classList.remove('btn-warning', 'btn-danger', 'btn-secondary');
+                button.classList.add('btn-success');
+                icon.textContent = '🔄';
+                text.textContent = 'Auto (current turn only)';
+                break;
+            case 'all-on':
+                button.classList.remove('btn-warning', 'btn-danger', 'btn-success');
+                button.classList.add('btn-secondary');
+                icon.textContent = '✓';
+                text.textContent = 'All tools included';
+                break;
+            case 'all-off':
+                button.classList.remove('btn-secondary', 'btn-warning', 'btn-success');
+                button.classList.add('btn-danger');
+                icon.textContent = '✗';
+                text.textContent = 'No tools included';
+                break;
+            case 'manual':
+                button.classList.remove('btn-secondary', 'btn-danger', 'btn-success');
+                button.classList.add('btn-warning');
+                const state = this.getGlobalToolToggleState();
+                icon.textContent = '⚙️';
+                text.textContent = state === 'mixed' ? 'Manual (mixed)' : `Manual (${state})`;
+                break;
+            case 'cached':
+                button.classList.remove('btn-warning', 'btn-danger', 'btn-success');
+                button.classList.add('btn-secondary');
+                icon.textContent = '🔒';
+                text.textContent = 'Cached (all locked)';
+                break;
+        }
     }
 }
 

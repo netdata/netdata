@@ -249,14 +249,7 @@ class MCPClient {
             this.log('sent', requestStr, { method, params });
             this.ws.send(requestStr);
             
-            // Set timeout for request
-            setTimeout(() => {
-                if (this.pendingRequests.has(id)) {
-                    this.pendingRequests.delete(id);
-                    this.log('error', `Request ${id} timed out`, { method, id });
-                    reject(new Error(`Request ${id} timed out`));
-                }
-            }, 30000); // 30 second timeout
+            // No client-side timeout - let the backend handle its own timeouts
         });
     }
 
