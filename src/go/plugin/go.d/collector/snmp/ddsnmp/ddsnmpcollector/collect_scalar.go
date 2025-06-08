@@ -78,24 +78,6 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		}
 	}
 
-	var mappings map[int64]string
-
-	if len(cfg.Symbol.Mapping) > 0 {
-		mappings = make(map[int64]string)
-		if isMappingKeysNumeric(cfg.Symbol.Mapping) {
-			for k, v := range cfg.Symbol.Mapping {
-				intKey, _ := strconv.ParseInt(k, 10, 64)
-				mappings[intKey] = v
-			}
-		} else {
-			for k, v := range cfg.Symbol.Mapping {
-				if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
-					mappings[intVal] = k
-				}
-			}
-		}
-	}
-
 	return &Metric{
 		Name:        cfg.Symbol.Name,
 		Value:       value,
@@ -103,7 +85,7 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		Unit:        cfg.Symbol.Unit,
 		Description: cfg.Symbol.Description,
 		Family:      cfg.Symbol.Family,
-		Mappings:    mappings,
+		Mappings:    convSymMappingToNumeric(cfg.Symbol),
 		MetricType:  getMetricType(cfg.Symbol, pdu),
 	}, nil
 }
