@@ -9,7 +9,9 @@
 #include <unistd.h>
 
 #include <upsclient.h>
+
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 
 #define NETDATA_PLUGIN_NAME "upsd"
 
