@@ -93,6 +93,8 @@ class NetdataMCPChat {
         // Default system prompt
         this.defaultSystemPrompt = `You are the Netdata assistant, with access to Netdata monitoring data via your tools.
 
+For complex requests, you should use <thinking> tags to show your reasoning process before responding. This helps users understand your analysis approach.
+
 When you receive a user request, you MUST follow this process:
 
 ## STEP 1: IDENTIFY WHAT IS RELEVANT
@@ -174,6 +176,10 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         // Copy metrics button
         this.copyMetricsBtn = document.getElementById('copyMetricsBtn');
         this.copyMetricsBtn.addEventListener('click', () => this.copyConversationMetrics());
+        
+        // Summarize conversation button
+        this.summarizeBtn = document.getElementById('summarizeBtn');
+        this.summarizeBtn.addEventListener('click', () => this.summarizeConversation());
         
         // Include all tools toggle button - three state: all on, all off, mixed
         this.globalToolToggleBtn = document.getElementById('globalToolToggleBtn');
@@ -304,6 +310,9 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                 }
             }
         });
+        
+        // Initialize tooltips for all elements
+        this.initializeTooltips(document.body);
     }
 
     setupModal(modalId, backdropId, closeId) {
@@ -1333,7 +1342,7 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             currentTurn: 0, // Track conversation turns
-            toolInclusionMode: 'auto' // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
+            toolInclusionMode: 'cached' // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
         };
         
         this.chats.set(chatId, chat);
@@ -1439,6 +1448,12 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             // Rebuild token history from saved messages
             let reconstructedRequests = [];
             for (const msg of chat.messages) {
+                // Skip title and system messages - they don't affect context window
+                if (['title', 'system-title', 'system-summary'].includes(msg.role)) {
+                    continue;
+                }
+                
+                // Include ALL messages with usage data for cumulative totals
                 if (msg.usage && msg.usage.totalTokens) {
                     reconstructedRequests.push({
                         timestamp: msg.timestamp || new Date().toISOString(),
@@ -1587,12 +1602,12 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         }
         
         // Update context window indicator
-        const tokenHistory = this.getTokenUsageForChat(chatId);
+        const contextTokens = this.calculateContextWindowTokens(chatId);
         const model = chat.model || (provider ? provider.model : null);
         
-        // Always calculate token usage from the history
-        if (tokenHistory.totalTokens > 0 && model) {
-            this.updateContextWindowIndicator(tokenHistory.totalTokens, model);
+        // Always calculate token usage properly (respecting summaries)
+        if (contextTokens > 0 && model) {
+            this.updateContextWindowIndicator(contextTokens, model);
         } else {
             // Show empty context window with the correct model
             this.updateContextWindowIndicator(0, model || chat.model || 'unknown');
@@ -1643,13 +1658,36 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
     convertMessageToEvents(msg) {
         const events = [];
         
-        switch(msg.type) {
+        // Handle messages by role (new system) or type (legacy)
+        const messageRole = msg.role || msg.type;
+        
+        switch(messageRole) {
             case 'user':
                 if (msg.isTitleRequest) {
                     events.push({ type: 'user-message', content: `[System Request] ${msg.content}` });
                 } else {
                     events.push({ type: 'user-message', content: msg.content });
                 }
+                break;
+                
+            case 'system-title':
+                events.push({ type: 'system-title-message', content: msg.content });
+                break;
+                
+            case 'system-summary':
+                events.push({ type: 'system-summary-message', content: msg.content });
+                break;
+                
+            case 'title':
+                events.push({ type: 'title-message', content: msg.content });
+                break;
+                
+            case 'summary':
+                events.push({ type: 'summary-message', content: msg.content });
+                break;
+                
+            case 'accounting':
+                events.push({ type: 'accounting-message', data: msg });
                 break;
                 
             case 'assistant':
@@ -1782,6 +1820,26 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                 this.addSystemMessage(event.content);
                 break;
                 
+            case 'system-title-message':
+                this.addMessage('system-title', event.content, event.messageIndex);
+                break;
+                
+            case 'system-summary-message':
+                this.addMessage('system-summary', event.content, event.messageIndex);
+                break;
+                
+            case 'title-message':
+                this.addMessage('title', event.content, event.messageIndex);
+                break;
+                
+            case 'summary-message':
+                this.addMessage('summary', event.content, event.messageIndex);
+                break;
+                
+            case 'accounting-message':
+                this.addAccountingNode(event.data);
+                break;
+                
             case 'error-message':
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message error';
@@ -1806,7 +1864,14 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                         // Remove messages from the error onwards
                         const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
-                            chat.messages = chat.messages.slice(0, errorIndex);
+                            // Create accounting node before discarding messages
+                            const messagesToDiscard = chat.messages.length - errorIndex;
+                            if (messagesToDiscard > 0) {
+                                const accountingNode = this.createAccountingNode('Retry after error', messagesToDiscard);
+                                chat.messages.splice(errorIndex, 0, accountingNode);
+                            }
+                            
+                            chat.messages = chat.messages.slice(0, errorIndex + 1); // Keep accounting node
                             this.saveSettings();
                             
                             // Reload chat to show cleaned history
@@ -2042,38 +2107,75 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         }
     }
 
-    async processMessageWithTools(chat, mcpConnection, provider, userMessage, firstMetricsId = null) {
-        // Build conversation history
+    buildMessagesForAPI(chat, provider, freezeCache = false) {
         const messages = [];
+        let cacheControlIndex = null;
+        let lastCacheControlIndex = null;
         
-        // Add system prompt if first message
-        if (chat.messages.filter(m => m.role === 'user').length === 1) {
-            messages.push({ role: 'system', content: chat.systemPrompt || this.defaultSystemPrompt });
+        // Find the last summary checkpoint
+        let startIndex = 0;
+        let summaryMessage = null;
+        for (let i = chat.messages.length - 1; i >= 0; i--) {
+            if (chat.messages[i].role === 'summary') {
+                summaryMessage = chat.messages[i];
+                startIndex = i + 1;  // Start after summary (we'll add it separately)
+                break;
+            }
         }
         
-        // Determine tool inclusion mode
-        const toolMode = chat.toolInclusionMode || 'auto';
-        const currentTurn = chat.currentTurn || 0;
+        // Find the last cache control index if freezing
+        if (freezeCache) {
+            for (let i = chat.messages.length - 1; i >= startIndex; i--) {
+                const msg = chat.messages[i];
+                if (msg.cacheControlIndex !== undefined) {
+                    lastCacheControlIndex = msg.cacheControlIndex;
+                    break;
+                }
+            }
+        }
         
-        // Add conversation history with our simplified structure
-        for (let i = 0; i < chat.messages.length; i++) {
+        // Add system prompt (always needed at start of conversation)
+        // If we have a summary, include it in the system prompt
+        const userMessagesAfterCheckpoint = chat.messages.slice(startIndex).filter(m => m.role === 'user').length;
+        if (userMessagesAfterCheckpoint === 1 || (startIndex === 0 && chat.messages.filter(m => m.role === 'user').length === 1)) {
+            let systemContent = chat.systemPrompt || this.defaultSystemPrompt;
+            
+            // If there's a summary, prepend it to the system prompt
+            if (summaryMessage) {
+                systemContent = `Previous Conversation Summary:\n${summaryMessage.content}\n\n${systemContent}`;
+            }
+            
+            messages.push({ role: 'system', content: systemContent });
+        }
+        
+        // Build messages from checkpoint onwards
+        let apiMessageIndex = messages.length; // Start after system message if present
+        
+        for (let i = startIndex; i < chat.messages.length; i++) {
             const msg = chat.messages[i];
             
-            // Check if we should include tool calls/results for this message
-            const shouldIncludeTools = this.shouldIncludeToolsForMessage(msg, toolMode, currentTurn);
+            // Skip system roles - they should never be sent to API
+            if (['system-title', 'system-summary', 'title', 'summary', 'accounting'].includes(msg.role)) {
+                continue;
+            }
             
-            if (msg.type === 'user') {
-                // Simple user message
+            // Process based on type/role
+            const messageType = msg.type || msg.role;
+            
+            if (messageType === 'user') {
                 messages.push({ role: 'user', content: msg.content });
-                
-            } else if (msg.type === 'assistant') {
-                // Assistant message with potential tool calls
+                apiMessageIndex++;
+            } else if (messageType === 'assistant') {
+                // Process assistant message (existing logic)
                 const cleanedContent = msg.content ? this.cleanContentForAPI(msg.content) : '';
                 
+                // Check if we should include tool calls
+                const toolMode = chat.toolInclusionMode || 'auto';
+                const shouldIncludeTools = this.shouldIncludeToolsForMessage(msg, toolMode, msg.turn || 0);
+                
                 if (msg.toolCalls && msg.toolCalls.length > 0 && shouldIncludeTools) {
-                    // Assistant with tool calls
+                    // Add message with tool calls (provider-specific format)
                     if (provider.type === 'anthropic') {
-                        // Anthropic format with content blocks
                         messages.push({
                             role: 'assistant',
                             content: [
@@ -2087,7 +2189,6 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                             ]
                         });
                     } else if (provider.type === 'openai') {
-                        // OpenAI format
                         messages.push({
                             role: 'assistant',
                             content: cleanedContent,
@@ -2101,7 +2202,6 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                             }))
                         });
                     } else {
-                        // Google format (will be handled by their convertMessages)
                         messages.push({
                             role: 'assistant',
                             content: cleanedContent,
@@ -2109,40 +2209,54 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                         });
                     }
                 } else if (cleanedContent) {
-                    // Assistant without tool calls
                     messages.push({ role: 'assistant', content: cleanedContent });
                 }
+                apiMessageIndex++;
+            } else if (messageType === 'tool-results') {
+                // Process tool results (existing logic)
+                const toolMode = chat.toolInclusionMode || 'auto';
+                const shouldIncludeTools = this.shouldIncludeToolsForMessage(msg, toolMode, msg.turn || 0);
                 
-            } else if (msg.type === 'tool-results' && shouldIncludeTools) {
-                // Filter tool results based on includeInContext flag
-                const includedResults = msg.results.filter(tr => tr.includeInContext !== false);
-                
-                if (includedResults.length > 0) {
-                    // Tool results
-                    if (provider.type === 'anthropic') {
-                        // Anthropic wants tool results in a user message
-                        messages.push({
-                            role: 'user',
-                            content: includedResults.map(tr => ({
-                                type: 'tool_result',
-                                tool_use_id: tr.toolCallId,
-                                content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
-                            }))
-                        });
-                    } else {
-                        // OpenAI and others want individual tool messages
-                        for (const tr of includedResults) {
-                            messages.push(provider.formatToolResponse(
-                                tr.toolCallId,
-                                tr.result,
-                                tr.name
-                            ));
+                if (shouldIncludeTools) {
+                    const includedResults = msg.results.filter(tr => tr.includeInContext !== false);
+                    
+                    if (includedResults.length > 0) {
+                        if (provider.type === 'anthropic') {
+                            messages.push({
+                                role: 'user',
+                                content: includedResults.map(tr => ({
+                                    type: 'tool_result',
+                                    tool_use_id: tr.toolCallId,
+                                    content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
+                                }))
+                            });
+                            apiMessageIndex++;
+                        } else {
+                            for (const tr of includedResults) {
+                                messages.push(provider.formatToolResponse(tr.toolCallId, tr.result, tr.name));
+                                apiMessageIndex++;
+                            }
                         }
                     }
                 }
             }
-            // Note: We skip old format messages (tool-call, tool-result) as they should not exist in new chats
         }
+        
+        // Determine cache control position
+        if (freezeCache && lastCacheControlIndex !== null) {
+            cacheControlIndex = lastCacheControlIndex;
+        } else {
+            // Normal behavior - cache control goes on the last message
+            cacheControlIndex = messages.length - 1;
+        }
+        
+        return { messages, cacheControlIndex };
+    }
+
+    async processMessageWithTools(chat, mcpConnection, provider, userMessage, firstMetricsId = null) {
+        // Build conversation history using the new function
+        const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider);
+        
         
         // Get available tools
         const tools = Array.from(mcpConnection.tools.values());
@@ -2177,7 +2291,7 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             // Send to LLM with current temperature
             const temperature = this.getCurrentTemperature();
             const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, tools, temperature);
+            const response = await provider.sendMessage(messages, tools, temperature, chat.toolInclusionMode, cacheControlIndex);
             console.log('LLM response:', { 
                 content: response.content?.substring(0, 200), 
                 hasThinking: response.content?.includes('<thinking>'),
@@ -2243,7 +2357,8 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                     })),
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    turn: chat.currentTurn
+                    turn: chat.currentTurn,
+                    cacheControlIndex: cacheControlIndex  // Store where cache control was placed
                 };
                 chat.messages.push(assistantMessage);
                 assistantMessageIndex = chat.messages.length - 1;
@@ -2287,9 +2402,6 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             
             // Execute tool calls and collect results
             if (response.toolCalls && response.toolCalls.length > 0) {
-                // Hide the spinner before tool execution starts
-                this.processRenderEvent({ type: 'hide-spinner' });
-                
                 // Ensure we have an assistant group even if there was no content
                 if (!this.currentAssistantGroup) {
                     this.processRenderEvent({ type: 'assistant-message', content: '' });
@@ -2307,10 +2419,16 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                             includeInContext: toolCall.includeInContext !== false 
                         });
                         
+                        // Show spinner while executing tool
+                        this.processRenderEvent({ type: 'show-spinner', text: `Executing ${toolCall.name}...` });
+                        
                         // Execute tool and track timing
                         const toolStartTime = Date.now();
                         const rawResult = await mcpConnection.callTool(toolCall.name, toolCall.arguments);
                         const toolResponseTime = Date.now() - toolStartTime;
+                        
+                        // Hide spinner after tool execution
+                        this.processRenderEvent({ type: 'hide-spinner' });
                         
                         // Parse the result to handle MCP's response format
                         const result = this.parseToolResult(rawResult);
@@ -2417,7 +2535,6 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
     }
 
     addMessage(role, content, messageIndex) {
-        console.log(`addMessage called with role: ${role}, content preview: ${content?.substring(0, 100)}...`);
         let messageDiv;
         
         if (role === 'assistant') {
@@ -2541,8 +2658,8 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
-            if (role === 'assistant' || role === 'user') {
-                // Use marked to render markdown for both assistant and user messages
+            if (role === 'assistant' || role === 'user' || role === 'summary') {
+                // Use marked to render markdown for assistant, user, and summary messages
                 contentDiv.innerHTML = marked.parse(content);
             } else {
                 // Other messages (system, error) as plain text
@@ -2576,6 +2693,65 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
         this.moveSpinnerToBottom();
+    }
+    
+    addAccountingNode(data) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message accounting';
+        
+        const formatNumber = (num) => num ? num.toLocaleString() : '0';
+        const tokens = data.cumulativeTokens || {};
+        
+        messageDiv.innerHTML = `
+            <div class="accounting-line">
+                <div class="accounting-content">
+                    <span class="accounting-icon">💰</span>
+                    <div class="accounting-tokens">
+                        <span class="accounting-token-item">
+                            <span>📥</span>
+                            <span>${formatNumber(tokens.inputTokens || 0)}</span>
+                        </span>
+                        <span class="accounting-token-item">
+                            <span>📤</span>
+                            <span>${formatNumber(tokens.outputTokens || 0)}</span>
+                        </span>
+                        ${tokens.cacheReadTokens ? `
+                        <span class="accounting-token-item">
+                            <span>💾</span>
+                            <span>${formatNumber(tokens.cacheReadTokens)}</span>
+                        </span>` : ''}
+                        ${tokens.cacheCreationTokens ? `
+                        <span class="accounting-token-item">
+                            <span>💿</span>
+                            <span>${formatNumber(tokens.cacheCreationTokens)}</span>
+                        </span>` : ''}
+                    </div>
+                    <span class="accounting-reason">${data.reason || 'Token checkpoint'}</span>
+                </div>
+            </div>
+        `;
+        
+        this.chatMessages.appendChild(messageDiv);
+        this.scrollToBottom();
+        this.moveSpinnerToBottom();
+    }
+    
+    createAccountingNode(reason, messagesToDiscard = 0) {
+        // Calculate current cumulative tokens before discarding messages
+        const cumulative = this.getCumulativeTokenUsage(this.currentChatId);
+        
+        return {
+            role: 'accounting',
+            timestamp: new Date().toISOString(),
+            cumulativeTokens: {
+                inputTokens: cumulative.inputTokens,
+                outputTokens: cumulative.outputTokens,
+                cacheReadTokens: cumulative.cacheReadTokens,
+                cacheCreationTokens: cumulative.cacheCreationTokens
+            },
+            reason: reason,
+            discardedMessages: messagesToDiscard
+        };
     }
     
     displaySystemPrompt(prompt) {
@@ -3107,6 +3283,14 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             }
             
             // Always proceed even if content is the same - user may want to regenerate response
+            
+            // Create accounting node before discarding messages
+            const messagesToDiscard = chat.messages.length - messageIndex;
+            if (messagesToDiscard > 0) {
+                const accountingNode = this.createAccountingNode('Message edited', messagesToDiscard);
+                chat.messages.splice(messageIndex, 0, accountingNode);
+                messageIndex++; // Adjust index after insertion
+            }
             
             // Clip history at this point
             chat.messages = chat.messages.slice(0, messageIndex);
@@ -3727,17 +3911,38 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         const spinnerDiv = document.createElement('div');
         spinnerDiv.id = 'llm-loading-spinner';
         spinnerDiv.className = 'message assistant loading-spinner';
+        
+        // Store start time
+        const startTime = Date.now();
+        
+        // Create initial HTML
         spinnerDiv.innerHTML = `
             <div class="spinner-container">
                 <div class="spinner"></div>
-                <span class="spinner-text">${text}</span>
+                <span class="spinner-text">${text} <span class="spinner-time">(0s)</span></span>
             </div>
         `;
+        
+        // Update time every 100ms
+        this.spinnerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const timeElement = spinnerDiv.querySelector('.spinner-time');
+            if (timeElement) {
+                timeElement.textContent = `(${elapsed}s)`;
+            }
+        }, 100);
+        
         this.chatMessages.appendChild(spinnerDiv);
         this.scrollToBottom();
     }
 
     hideLoadingSpinner() {
+        // Clear the interval
+        if (this.spinnerInterval) {
+            clearInterval(this.spinnerInterval);
+            this.spinnerInterval = null;
+        }
+        
         const spinner = document.getElementById('llm-loading-spinner');
         if (spinner) {
             spinner.remove();
@@ -3828,6 +4033,55 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
     }
     
     // Token usage tracking methods
+    calculateContextWindowTokens(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return 0;
+        
+        // For system messages (title, summary requests), return current context
+        const lastMessage = chat.messages[chat.messages.length - 1];
+        if (lastMessage && ['system-title', 'system-summary', 'title'].includes(lastMessage.role)) {
+            // Don't change context window for these messages
+            const currentTokens = this.getTokenUsageForChat(chatId);
+            return currentTokens.totalTokens;
+        }
+        
+        // Check if there's a summary in the conversation (not just last message)
+        const summaryIndex = chat.messages.findIndex(m => m.role === 'summary');
+        if (summaryIndex !== -1) {
+            // We have a summary - context should be based on messages after it
+            const summaryMessage = chat.messages[summaryIndex];
+            const messagesAfterSummary = chat.messages.slice(summaryIndex + 1);
+            
+            // Start with the summary's completion tokens
+            let contextTokens = 0;
+            if (summaryMessage.usage && summaryMessage.usage.completionTokens) {
+                contextTokens = summaryMessage.usage.completionTokens;
+            }
+            
+            // Add tokens from messages after the summary
+            const history = this.tokenUsageHistory.get(chatId);
+            if (history && history.requests.length > 0) {
+                // If we have messages after summary, use the latest token count
+                const hasMessagesAfterSummary = messagesAfterSummary.some(m => 
+                    ['user', 'assistant'].includes(m.role) && m.usage
+                );
+                if (hasMessagesAfterSummary) {
+                    const latestRequest = history.requests[history.requests.length - 1];
+                    return latestRequest.promptTokens + 
+                           (latestRequest.cacheReadInputTokens || 0) + 
+                           (latestRequest.cacheCreationInputTokens || 0) +
+                           (latestRequest.completionTokens || 0);
+                }
+            }
+            
+            return contextTokens;
+        }
+        
+        // Otherwise, get the latest token usage
+        const tokenUsage = this.getTokenUsageForChat(chatId);
+        return tokenUsage.totalTokens;
+    }
+    
     updateTokenUsage(chatId, usage, model) {
         if (!this.tokenUsageHistory.has(chatId)) {
             this.tokenUsageHistory.set(chatId, {
@@ -3848,16 +4102,11 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             cacheReadInputTokens: usage.cacheReadInputTokens || 0
         });
         
-        // The total tokens in context include all token types
-        // promptTokens + cacheReadInputTokens + cacheCreationInputTokens represent the input
-        // We don't include completionTokens as they're the output
-        const latestTotalTokens = usage.promptTokens + 
-                                  (usage.cacheReadInputTokens || 0) + 
-                                  (usage.cacheCreationInputTokens || 0);
+        // Calculate context window based on message type
+        const contextTokens = this.calculateContextWindowTokens(chatId);
         
-        
-        // Update context window indicator with the actual conversation size
-        this.updateContextWindowIndicator(latestTotalTokens, model);
+        // Update context window indicator
+        this.updateContextWindowIndicator(contextTokens, model);
         
         // Update cumulative token counters
         this.updateCumulativeTokenDisplay();
@@ -3866,7 +4115,7 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         const pendingTotals = document.querySelectorAll('[id^="conv-total-"]');
         pendingTotals.forEach(el => {
             if (el.textContent === 'Calculating...' || el.textContent.match(/^\d/)) {
-                el.textContent = latestTotalTokens.toLocaleString();
+                el.textContent = contextTokens.toLocaleString();
             }
         });
     }
@@ -3924,18 +4173,24 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             return { totalTokens: 0 };
         }
         
-        // Get the latest request's total input tokens (prompt + cache)
+        // Get the latest request's tokens
         const latestRequest = history.requests[history.requests.length - 1];
-        const totalInputTokens = latestRequest.promptTokens + 
-                                 (latestRequest.cacheReadInputTokens || 0) + 
-                                 (latestRequest.cacheCreationInputTokens || 0);
-        return { totalTokens: totalInputTokens };
+        
+        // Context window includes:
+        // - All input tokens (which already contains the full conversation history)
+        // - The completion tokens (which will be part of the next request's input)
+        const totalContextTokens = latestRequest.promptTokens + 
+                                   (latestRequest.cacheReadInputTokens || 0) + 
+                                   (latestRequest.cacheCreationInputTokens || 0) +
+                                   (latestRequest.completionTokens || 0);
+        
+        return { totalTokens: totalContextTokens };
     }
     
     // Get cumulative token usage for the entire chat
     getCumulativeTokenUsage(chatId) {
-        const history = this.tokenUsageHistory.get(chatId);
-        if (!history || history.requests.length === 0) {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
             return { 
                 inputTokens: 0, 
                 outputTokens: 0,
@@ -3944,18 +4199,52 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             };
         }
         
+        // Start with tokens from accounting nodes
         let totalInput = 0;
         let totalOutput = 0;
         let totalCacheCreation = 0;
         let totalCacheRead = 0;
         
-        // Sum up all token usage
-        history.requests.forEach(request => {
-            totalInput += request.promptTokens || 0;
-            totalOutput += request.completionTokens || 0;
-            totalCacheCreation += request.cacheCreationInputTokens || 0;
-            totalCacheRead += request.cacheReadInputTokens || 0;
-        });
+        // Find the last accounting node
+        let lastAccountingIndex = -1;
+        for (let i = chat.messages.length - 1; i >= 0; i--) {
+            if (chat.messages[i].role === 'accounting') {
+                const tokens = chat.messages[i].cumulativeTokens;
+                totalInput = tokens.inputTokens || 0;
+                totalOutput = tokens.outputTokens || 0;
+                totalCacheCreation = tokens.cacheCreationTokens || 0;
+                totalCacheRead = tokens.cacheReadTokens || 0;
+                lastAccountingIndex = i;
+                break;
+            }
+        }
+        
+        // Add tokens from requests after the last accounting node
+        const history = this.tokenUsageHistory.get(chatId);
+        if (history && history.requests.length > 0) {
+            // Count how many requests happened after the accounting node
+            // This is approximate - we count messages that have token usage
+            let requestsAfterAccounting = 0;
+            if (lastAccountingIndex >= 0) {
+                for (let i = lastAccountingIndex + 1; i < chat.messages.length; i++) {
+                    if (chat.messages[i].usage) {
+                        requestsAfterAccounting++;
+                    }
+                }
+            } else {
+                requestsAfterAccounting = history.requests.length;
+            }
+            
+            // Add the last N requests
+            const startIndex = Math.max(0, history.requests.length - requestsAfterAccounting);
+            for (let i = startIndex; i < history.requests.length; i++) {
+                const request = history.requests[i];
+                totalInput += request.promptTokens || 0;
+                totalOutput += request.completionTokens || 0;
+                totalCacheCreation += request.cacheCreationInputTokens || 0;
+                totalCacheRead += request.cacheReadInputTokens || 0;
+            }
+        }
         
         return { 
             inputTokens: totalInput, 
@@ -4256,6 +4545,135 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
     }
     
     // Generate chat title using LLM
+    async summarizeConversation() {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) {
+            this.showError('No active chat to summarize');
+            return;
+        }
+        
+        // Disable button to prevent multiple requests
+        this.summarizeBtn.disabled = true;
+        this.summarizeBtn.innerHTML = '<span>⏳</span><span>Summarizing...</span>';
+        
+        try {
+            // Get MCP connection and LLM provider
+            const mcpConnection = await this.ensureMcpConnection(chat.mcpServerId);
+            const llmProviderConfig = this.llmProviders.get(chat.llmProviderId);
+            
+            // Parse the model selection (format: "provider:model")
+            const [providerType, modelName] = chat.model.split(':');
+            if (!providerType || !modelName) {
+                throw new Error('Invalid model selection in chat');
+            }
+            
+            const provider = window.createLLMProvider(
+                providerType,
+                llmProviderConfig.proxyUrl,
+                modelName
+            );
+            provider.onLog = llmProviderConfig.onLog;
+            
+            // Create summary request
+            const summaryRequest = `Please provide a comprehensive summary of our conversation so far. Include:
+1. The main topics discussed
+2. Key decisions or conclusions reached
+3. Any important context or background information
+4. Current status or next steps if applicable
+
+This summary will be used as context for continuing our conversation.`;
+            
+            // Process the summary request as a system-summary message
+            this.processRenderEvent({ type: 'system-summary-message', content: summaryRequest });
+            chat.messages.push({ 
+                role: 'system-summary', 
+                content: summaryRequest,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Add metrics placeholder
+            const metricsId = `metrics-summary-${this.metricsIdCounter++}`;
+            this.processRenderEvent({ type: 'metrics-placeholder', id: metricsId });
+            
+            // Show loading spinner
+            this.processRenderEvent({ type: 'show-spinner' });
+            
+            // Build messages for API with frozen cache position
+            const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider, true);
+            
+            // Add the summary request
+            messages.push({ role: 'user', content: summaryRequest });
+            
+            // Send request with low temperature for consistent summaries
+            const temperature = 0.5;
+            const llmStartTime = Date.now();
+            const response = await provider.sendMessage(messages, [], temperature, chat.toolInclusionMode, cacheControlIndex);
+            const llmResponseTime = Date.now() - llmStartTime;
+            
+            // Hide spinner
+            this.processRenderEvent({ type: 'hide-spinner' });
+            
+            // Update metrics
+            if (response.usage) {
+                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
+            }
+            
+            this.processRenderEvent({ 
+                type: 'update-metrics', 
+                id: metricsId,
+                usage: response.usage, 
+                responseTime: llmResponseTime,
+                previousPromptTokens: this.getPreviousPromptTokens()
+            });
+            
+            // Process the summary response
+            if (response.content) {
+                // Display the response as a summary checkpoint
+                this.processRenderEvent({ type: 'summary-message', content: response.content });
+                
+                // Store the summary response with the 'summary' role
+                chat.messages.push({ 
+                    role: 'summary', 
+                    content: response.content,
+                    usage: response.usage || null,
+                    responseTime: llmResponseTime || null,
+                    timestamp: new Date().toISOString(),
+                    cacheControlIndex: cacheControlIndex  // Store the frozen cache position
+                });
+                
+                // Save the chat
+                this.saveSettings();
+                
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.className = 'message system';
+                successDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
+                successDiv.textContent = '✅ Conversation summarized! Context window has been reset.';
+                this.chatMessages.appendChild(successDiv);
+                this.scrollToBottom();
+                
+                // Update context window display (should show near zero)
+                const contextTokens = this.calculateContextWindowTokens(chat.id);
+                this.updateContextWindowIndicator(contextTokens, chat.model || provider.model);
+            }
+            
+        } catch (error) {
+            console.error('Failed to summarize conversation:', error);
+            this.showError(`Failed to summarize: ${error.message}`);
+            
+            // Remove the system-summary message if it failed
+            const lastMsg = chat.messages[chat.messages.length - 1];
+            if (lastMsg && lastMsg.role === 'system-summary') {
+                chat.messages.pop();
+                this.saveSettings();
+            }
+        } finally {
+            // Re-enable button
+            this.summarizeBtn.disabled = false;
+            this.summarizeBtn.innerHTML = '<span>📋</span><span>Summarize Conversation</span>';
+        }
+    }
+    
     async generateChatTitle(chat, mcpConnection, provider) {
         try {
             // Mark that we're generating a title
@@ -4273,13 +4691,11 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             this.chatMessages.appendChild(separatorDiv);
             this.scrollToBottom();
             
-            // Process the title request as a user message
-            this.processRenderEvent({ type: 'user-message', content: `[System Request] ${titleRequest}` });
+            // Process the title request as a system-title message
+            this.processRenderEvent({ type: 'system-title-message', content: titleRequest });
             chat.messages.push({ 
-                type: 'user', 
-                role: 'user', 
+                role: 'system-title', 
                 content: titleRequest,
-                isTitleRequest: true,
                 timestamp: new Date().toISOString()
             });
             
@@ -4300,13 +4716,15 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                 content: 'You are a helpful assistant that generates concise, descriptive titles for conversations. Respond with ONLY the title text, no quotes, no explanation, no markdown.' 
             });
             
-            // Add the conversation context (excluding the title request itself)
+            // Add the conversation context (excluding system messages)
             for (const msg of chat.messages) {
-                if (msg.isTitleRequest) continue;
+                // Skip system roles
+                if (['system-title', 'system-summary', 'title', 'summary'].includes(msg.role)) continue;
                 
-                if (msg.type === 'user') {
+                const msgRole = msg.role || msg.type;
+                if (msgRole === 'user') {
                     messages.push({ role: 'user', content: msg.content });
-                } else if (msg.type === 'assistant' && msg.content) {
+                } else if (msgRole === 'assistant' && msg.content) {
                     // Clean content and truncate if needed
                     const cleanedContent = this.cleanContentForAPI(msg.content);
                     const truncated = cleanedContent.length > 500 ? cleanedContent.substring(0, 500) + '...' : cleanedContent;
@@ -4320,13 +4738,11 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             // Send request with low temperature for consistent titles
             const temperature = 0.3;
             const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, [], temperature);
+            const response = await provider.sendMessage(messages, [], temperature, chat.toolInclusionMode);
             const llmResponseTime = Date.now() - llmStartTime;
             
-            // Update metrics
-            if (response.usage) {
-                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
-            }
+            // Don't update token usage history for title generation
+            // as it shouldn't affect the context window
             
             this.processRenderEvent({ 
                 type: 'update-metrics', 
@@ -4338,14 +4754,14 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             
             // Process the title response
             if (response.content) {
-                // Display the response
-                this.processRenderEvent({ type: 'assistant-message', content: response.content });
+                // Display the response as a title message
+                this.processRenderEvent({ type: 'title-message', content: response.content });
                 
                 // Extract and clean the title
                 const newTitle = response.content.trim()
                     .replace(/^["']|["']$/g, '') // Remove quotes
                     .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
-                    .substring(0, 50); // Limit length
+                    .substring(0, 65); // Allow some tolerance beyond 50 chars
                 
                 console.log('Generated title:', newTitle);
                 console.log('Current chat ID:', this.currentChatId);
@@ -4356,11 +4772,10 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                     chat.updatedAt = new Date().toISOString();
                     this.saveSettings(); // Save the updated title
                     
+                    // Store the title response with the 'title' role
                     chat.messages.push({ 
-                        type: 'assistant', 
-                        role: 'assistant', 
+                        role: 'title', 
                         content: response.content,
-                        isTitleRequest: true,
                         usage: response.usage || null,
                         responseTime: llmResponseTime || null,
                         timestamp: new Date().toISOString()

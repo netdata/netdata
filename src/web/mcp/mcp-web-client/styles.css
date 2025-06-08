@@ -369,6 +369,124 @@ body {
     text-align: center;
 }
 
+/* System-initiated requests (title, summary) */
+.message.system-title,
+.message.system-summary {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    align-self: center;
+    max-width: 90%;
+    border: 2px solid var(--info-color);
+    position: relative;
+    padding-left: 40px;
+}
+
+.message.system-title::before,
+.message.system-summary::before {
+    content: '🤖';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+}
+
+.message.system-title::before {
+    content: '📝';
+}
+
+.message.system-summary::before {
+    content: '📋';
+}
+
+/* System responses (title, summary) */
+.message.title,
+.message.summary {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    align-self: center;
+    max-width: 90%;
+    border-left: 4px solid var(--info-color);
+    font-style: italic;
+}
+
+.message.summary {
+    border-left-color: var(--warning-color);
+    background-color: rgba(255, 193, 7, 0.1);
+    color: var(--text-primary);
+    font-style: normal;
+    position: relative;
+    padding: 20px;
+}
+
+.message.summary::before {
+    content: '📌 Conversation Summary (Checkpoint)';
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--warning-color);
+}
+
+/* Accounting nodes - token checkpoint */
+.message.accounting {
+    background: none;
+    border: none;
+    padding: 8px 0;
+    max-width: 100%;
+    align-self: stretch;
+    position: relative;
+    margin: 16px 0;
+}
+
+.accounting-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    position: relative;
+}
+
+.accounting-line::before,
+.accounting-line::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.accounting-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 12px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.accounting-icon {
+    font-size: 14px;
+}
+
+.accounting-tokens {
+    display: flex;
+    gap: 12px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+}
+
+.accounting-token-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.accounting-reason {
+    font-style: italic;
+    color: var(--text-tertiary);
+    margin-left: 8px;
+}
+
 .message.error {
     background-color: var(--danger-color);
     color: white;
@@ -1460,6 +1578,14 @@ body {
     font-size: 14px;
     color: var(--text-secondary);
     font-style: italic;
+}
+
+.spinner-time {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-left: 4px;
 }
 
 /* Responsive */
