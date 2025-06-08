@@ -83,27 +83,7 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 		c.log.Debugf("collecting metrics: %v", errors.Join(errs...))
 	}
 
-	// Find device vendor and type from any profile that has them.
-	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
-	// but only device-specific profiles contain vendor/type information.
-	// We need to apply vendor/type to ALL metrics across ALL profiles to ensure consistent
-	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
-	for _, ps := range c.profiles {
-		if !ps.initialized {
-			continue
-		}
-		if res, ok := ps.profile.Definition.Metadata["device"]; ok {
-			if dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value; dt != "" && dv != "" {
-				for _, pm := range metrics {
-					for i := range pm.Metrics {
-						m := &pm.Metrics[i]
-						m.Family = processMetricFamily(m.Family, dt, dv)
-					}
-				}
-				break
-			}
-		}
-	}
+	c.updateMetricFamily(metrics)
 
 	return metrics, nil
 }
@@ -139,6 +119,30 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		DeviceMetadata: maps.Clone(ps.deviceMetadata),
 		Metrics:        metrics,
 	}, nil
+}
+
+func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {
+	// Find device vendor and type from any profile that has them.
+	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
+	// but only device-specific profiles contain vendor/type information.
+	// We need to apply vendor/type to ALL metrics across ALL profiles to ensure consistent
+	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
+	for _, ps := range c.profiles {
+		if !ps.initialized {
+			continue
+		}
+		if res, ok := ps.profile.Definition.Metadata["device"]; ok {
+			if dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value; dt != "" && dv != "" {
+				for _, pm := range pms {
+					for i := range pm.Metrics {
+						m := &pm.Metrics[i]
+						m.Family = processMetricFamily(m.Family, dt, dv)
+					}
+				}
+				return
+			}
+		}
+	}
 }
 
 func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
