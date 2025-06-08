@@ -3,9 +3,53 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+struct exchange_proxy {
+    RRDSET *st_exchange_http_proxy_avg_auth_latency;
+    RRDSET *st_exchange_http_proxy_avg_cas_processing_latency;
+    RRDSET *st_exchange_http_proxy_mailbox_proxy_failure;
+    RRDSET *st_exchange_http_proxy_server_location_avg_latency;
+    RRDSET *st_exchange_http_proxy_outstanding_proxy_requests;
+    RRDSET *st_exchange_http_proxy_requests_total;
+
+    RRDDIM *rd_exchange_http_proxy_avg_auth_latency;
+    RRDDIM *rd_exchange_http_proxy_avg_cas_processing_latency;
+    RRDDIM *rd_exchange_http_proxy_mailbox_proxy_failure;
+    RRDDIM *rd_exchange_http_proxy_server_location_avg_latency;
+    RRDDIM *rd_exchange_http_proxy_outstanding_proxy_requests;
+    RRDDIM *rd_exchange_http_proxy_requests_total;
+
+    COUNTER_DATA exchangeProxyAvgAuthLatency;
+    COUNTER_DATA exchangeProxyAvgCasProcessingLatency;
+    COUNTER_DATA exchangeProxyMailboxProxyFailure;
+    COUNTER_DATA exchangeProxyMailboxServerLocator;
+    COUNTER_DATA exchangeProxyOutstandingProxy;
+    COUNTER_DATA exchangeProxyRequestsTotal;
+};
+
+DICTIONARY *exchange_proxy;
+
+static void exchange_proxy_initialize_variables(struct exchange_proxy *ep) {
+    ep->exchangeProxyAvgAuthLatency.key = "Average Authentication Latency";
+    ep->exchangeProxyAvgCasProcessingLatency.key = "Average ClientAccess Server Processing Latency";
+    ep->exchangeProxyMailboxProxyFailure.key = "Mailbox Server Proxy Failure Rate";
+    ep->exchangeProxyMailboxServerLocator.key = "MailboxServerLocator Average Latency (Moving Average)";
+    ep->exchangeProxyOutstandingProxy.key = "Outstanding Proxy Requests";
+    ep->exchangeProxyRequestsTotal.key = "Proxy Requests/Sec";
+}
+
+static void dict_exchange_insert_proxy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    struct exchange_proxy *ep = value;
+
+    exchange_proxy_initialize_variables(struct exchange_proxy *ep);
+}
+
 static void initialize(void)
 {
-    ;
+    exchange_proxy = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_proxy));
+    dictionary_register_insert_callback(exchange_proxy, dict_exchange_insert_proxy_cb, NULL);
 }
 
 static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int update_every) {
@@ -469,6 +513,225 @@ void netdata_exchange_rpc(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObject
         netdata_exchange_rpc_user_count(&exchangeRPCUserCount, update_every);
 }
 
+static void netdata_exchange_proxy_avg_auth_latency(struct exchange_proxy *ep, char *proxy, int update_every) {
+    if (unlikely(!ep->st_exchange_http_proxy_avg_auth_latency)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_avg_auth_latency", proxy);
+
+        ep->st_exchange_http_proxy_avg_auth_latency = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_avg_auth_latency",
+            "Average time spent authenticating CAS requests.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_AVG_AUTH_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ep->rd_exchange_http_proxy_avg_auth_latency =
+            rrddim_add(ep->st_exchange_http_proxy_avg_auth_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        ep->st_exchange_http_proxy_avg_auth_latency,
+        ep->rd_exchange_http_proxy_avg_auth_latency,
+        (collected_number)ep->exchangeProxyAvgAuthLatency.current.Data);
+    rrdset_done(ep->st_exchange_http_proxy_avg_auth_latency);
+}
+
+static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_proxy *ep, char *proxy, int update_every) {
+    if (unlikely(!ep->st_exchange_http_proxy_avg_cas_processing_latency)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_avg_cas_processing_latency_sec", proxy);
+
+        ep->st_exchange_http_proxy_avg_cas_processing_latency = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_avg_cas_processing_latency_sec",
+            "Average latency (sec) of CAS processing time.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_AVG_CAS_PROCESSING_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ep->rd_exchange_http_proxy_avg_cas_processing_latency =
+            rrddim_add(ep->st_exchange_http_proxy_avg_cas_processing_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        ep->st_exchange_http_proxy_avg_cas_processing_latency,
+        ep->rd_exchange_http_proxy_avg_cas_processing_latency,
+        (collected_number)ep->exchangeProxyAvgCasProcessingLatency.current.Data);
+    rrdset_done(ep->st_exchange_http_proxy_avg_cas_processing_latency);
+}
+
+static void netdata_exchange_proxy_mailbox_proxy_failure(struct exchange_proxy *ep, char *proxy, int update_every) {
+    if (unlikely(!ep->st_exchange_http_proxy_mailbox_proxy_failure)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_proxy_failure_rate", proxy);
+
+        ep->st_exchange_http_proxy_mailbox_proxy_failure = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_mailbox_proxy_failure_rate",
+            "Percentage of failures between this CAS and MBX servers.",
+            "percentage",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_MAILBOX_PROXY_FAILURE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ep->rd_exchange_http_proxy_mailbox_proxy_failure =
+            rrddim_add(ep->st_exchange_http_proxy_mailbox_proxy_failure, "failures", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        ep->st_exchange_http_proxy_mailbox_proxy_failure,
+        ep->rd_exchange_http_proxy_mailbox_proxy_failure,
+        (collected_number)ep->exchangeProxyMailboxProxyFailure.current.Data);
+    rrdset_done(ep->st_exchange_http_proxy_mailbox_proxy_failure);
+}
+
+static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy *ep, char *proxy, int update_every) {
+    if (unlikely(!ep->st_exchange_http_proxy_server_location_avg_latency)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_server_locator_avg_latency_sec", proxy);
+
+        ep->st_exchange_http_proxy_server_location_avg_latency = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_mailbox_server_locator_avg_latency_sec",
+            "Average latency of MailboxServerLocator web service calls.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_SERVER_LOCATIOR_AVG_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ep->rd_exchange_http_proxy_server_location_avg_latency =
+            rrddim_add(ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        ep->st_exchange_http_proxy_server_location_avg_latency,
+        ep->rd_exchange_http_proxy_server_location_avg_latency,
+        (collected_number)ep->exchangeProxyMailboxServerLocator.current.Data);
+    rrdset_done(ep->st_exchange_http_proxy_server_location_avg_latency);
+}
+
+static void netdata_exchange_proxy_outstanding_proxy(struct exchange_proxy *ep, char *proxy, int update_every) {
+    if (unlikely(!ep->st_exchange_http_proxy_outstanding_proxy_requests)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_outstanding_proxy_requests", proxy);
+
+        ep->st_exchange_http_proxy_outstanding_proxy_requests = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_outstanding_proxy_requests",
+            "Concurrent outstanding proxy requests.",
+            "requests",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_OUTSTANDING_PROXY_REQUESTS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ep->rd_exchange_http_proxy_outstanding_proxy_requests =
+            rrddim_add(ep->st_exchange_http_proxy_outstanding_proxy_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        ep->st_exchange_http_proxy_outstanding_proxy_requests,
+        ep->rd_exchange_http_proxy_outstanding_proxy_requests,
+        (collected_number)ep->exchangeProxyOutstandingProxy.current.Data);
+    rrdset_done(ep->st_exchange_http_proxy_outstanding_proxy_requests);
+}
+
+static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char *proxy, int update_every) {
+    if (unlikely(!ep->st_exchange_http_proxy_requests_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_requests_total", proxy);
+
+        ep->st_exchange_http_proxy_requests_total = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "proxy",
+            "exchange.http_proxy_requests",
+            "Number of proxy requests processed each second.",
+            "requests",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_PROXY_PROXY_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ep->rd_exchange_http_proxy_requests_total =
+            rrddim_add(ep->st_exchange_http_proxy_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        ep->st_exchange_http_proxy_requests_total,
+        ep->rd_exchange_http_proxy_requests_total,
+        (collected_number)ep->exchangeProxyRequestsTotal.current.Data);
+    rrdset_done(ep->st_exchange_http_proxy_requests_total);
+}
+
+static
+void netdata_exchange_proxy(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct exchange_proxy *ep = dictionary_set(exchange_proxy, windows_shared_buffer, NULL, sizeof(*ep));
+        if (!ep)
+            continue;
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ep->exchangeProxyAvgAuthLatency))
+            netdata_exchange_proxy_avg_auth_latency(ep, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ep->exchangeProxyAvgCasProcessingLatency))
+            netdata_exchange_proxy_avg_cas_processing_latency(ep, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ep->exchangeProxyMailboxProxyFailure))
+            netdata_exchange_proxy_mailbox_proxy_failure(ep, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ep->exchangeProxyMailboxServerLocator))
+            netdata_exchange_proxy_mailbox_server_locator(ep, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ep->exchangeProxyOutstandingProxy))
+            netdata_exchange_proxy_outstanding_proxy(ep, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ep->exchangeProxyRequestsTotal))
+            netdata_exchange_proxy_request_total(ep, windows_shared_buffer, update_every);
+    }
+}
+
 struct netdata_exchange_objects {
     void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int);
     char *object;
@@ -478,6 +741,7 @@ struct netdata_exchange_objects {
     {.fnct = netdata_exchange_auto_discover, .object = "MSExchangeAutodiscover"},
     {.fnct = netdata_exchange_availability_service, .object = "MSExchange Availability Service"},
     {.fnct = netdata_exchange_rpc, .object = "MSExchange RpcClientAccess"},
+    {.fnct = netdata_exchange_proxy, .object = "MSExchange HttpProxy"},
 
     // This is the end of the loop
     {.fnct = NULL, .object = NULL}};

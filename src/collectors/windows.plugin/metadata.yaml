@@ -3238,6 +3238,42 @@ modules:
               chart_type: line
               dimensions:
                 - name: requests
+            - name: exchange.http_proxy_avg_auth_latency
+              description: Average time spent authenticating CAS requests.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.http_proxy_avg_cas_processing_latency_sec
+              description: Average latency (sec) of CAS processing time.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.http_proxy_mailbox_proxy_failure_rate
+              description: Percentage of failures between this CAS and MBX servers.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: exchange.http_proxy_mailbox_server_locator_avg_latency_sec
+              description: Average latency of MailboxServerLocator web service calls.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.http_proxy_outstanding_proxy_requests
+              description: Concurrent outstanding proxy requests.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: exchange.http_proxy_requests
+              description: Number of proxy requests processed each second.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: requests
             - name: exchange.autodiscover_requests
               description: Autodiscover service requests processed
               unit: requests/s
