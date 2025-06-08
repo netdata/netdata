@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix registry save integer overflow and add failure backoff [\#20437](https://github.com/netdata/netdata/pull/20437) ([ktsaou](https://github.com/ktsaou))
 - Mcp3 [\#20435](https://github.com/netdata/netdata/pull/20435) ([ktsaou](https://github.com/ktsaou))
 - Adjust stream connector timeout during agent shutdown [\#20434](https://github.com/netdata/netdata/pull/20434) ([stelfrag](https://github.com/stelfrag))
 - Improve statement finalization and cleanup [\#20433](https://github.com/netdata/netdata/pull/20433) ([stelfrag](https://github.com/stelfrag))
@@ -467,8 +468,6 @@
 - fix for system shutdown [\#19897](https://github.com/netdata/netdata/pull/19897) ([ktsaou](https://github.com/ktsaou))
 - build: update otel deps to v0.122.0 [\#19895](https://github.com/netdata/netdata/pull/19895) ([ilyam8](https://github.com/ilyam8))
 - do not recurse cleanup on shutdown [\#19894](https://github.com/netdata/netdata/pull/19894) ([ktsaou](https://github.com/ktsaou))
-- make sure all rrdcalcs are unlinked the moment they are deleted [\#19893](https://github.com/netdata/netdata/pull/19893) ([ktsaou](https://github.com/ktsaou))
-- Fix typo in README title [\#19891](https://github.com/netdata/netdata/pull/19891) ([felipecrs](https://github.com/felipecrs))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
