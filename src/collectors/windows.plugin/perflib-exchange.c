@@ -26,7 +26,29 @@ struct exchange_proxy {
     COUNTER_DATA exchangeProxyRequestsTotal;
 };
 
-DICTIONARY *exchange_proxy;
+struct exchange_workload {
+    RRDSET *st_exchange_workload_active_tasks;
+    RRDSET *st_exchange_workload_complete_tasks;
+    RRDSET *st_exchange_workload_queued_tasks;
+    RRDSET *st_exchange_workload_yielded_tasks;
+    RRDSET *st_exchange_workload_activity_status;
+
+    RRDDIM *rd_exchange_workload_active_tasks;
+    RRDDIM *rd_exchange_workload_complete_tasks;
+    RRDDIM *rd_exchange_workload_queued_tasks;
+    RRDDIM *rd_exchange_workload_yielded_tasks;
+    RRDDIM *rd_exchange_workload_activity_active_status;
+    RRDDIM *rd_exchange_workload_activity_paused_status;
+
+    COUNTER_DATA exchangeWorkloadActiveTasks;
+    COUNTER_DATA exchangeWorkloadCompleteTasks;
+    COUNTER_DATA exchangeWorkloadQueueTasks;
+    COUNTER_DATA exchangeWorkloadYieldedTasks;
+    COUNTER_DATA exchangeWorkloadActivityStatus;
+};
+
+DICTIONARY *exchange_proxies;
+DICTIONARY *exchange_workloads;
 
 static void exchange_proxy_initialize_variables(struct exchange_proxy *ep) {
     ep->exchangeProxyAvgAuthLatency.key = "Average Authentication Latency";
@@ -42,14 +64,34 @@ static void dict_exchange_insert_proxy_cb(const DICTIONARY_ITEM *item __maybe_un
     const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     struct exchange_proxy *ep = value;
 
-    exchange_proxy_initialize_variables(struct exchange_proxy *ep);
+    exchange_proxy_initialize_variables(ep);
+}
+
+static void exchange_proxy_initialize_variables(struct exchange_workload *ew) {
+    ew->exchangeWorkloadActiveTasks.key = "ActiveTasks";
+    ew->exchangeWorkloadCompleteTasks.key = "CompletedTasks";
+    ew->exchangeWorkloadQueueTasks.key = "QueuedTasks";
+    ew->exchangeWorkloadYieldedTasks.key = "YieldedTasks";
+    ew->exchangeWorkloadActiveTasks.key = "Active";
+}
+
+static void dict_exchange_insert_worload_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    struct exchange_workload *ew = value;
+
+    exchange_proxy_initialize_variables(ew);
 }
 
 static void initialize(void)
 {
-    exchange_proxy = dictionary_create_advanced(
+    exchange_proxies = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_proxy));
     dictionary_register_insert_callback(exchange_proxy, dict_exchange_insert_proxy_cb, NULL);
+
+    exchange_worloads = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_workload));
+    dictionary_register_insert_callback(exchange_worloads, dict_exchange_insert_worload_cb, NULL);
 }
 
 static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int update_every) {
@@ -708,7 +750,7 @@ void netdata_exchange_proxy(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct exchange_proxy *ep = dictionary_set(exchange_proxy, windows_shared_buffer, NULL, sizeof(*ep));
+        struct exchange_proxy *ep = dictionary_set(exchange_proxies, windows_shared_buffer, NULL, sizeof(*ep));
         if (!ep)
             continue;
 
@@ -732,6 +774,203 @@ void netdata_exchange_proxy(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     }
 }
 
+static void netdata_exchange_workload_active_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+    if (unlikely(!ew->st_exchange_workload_active_tasks)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_tasks", workload);
+
+        ew->st_exchange_workload_active_tasks = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "workload",
+            "exchange.workload_active_tasks",
+            "Workload active tasks.",
+            "tasks",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_WORKlOAD_ACTIVE_TASKS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ew->rd_exchange_workload_active_tasks =
+            rrddim_add(ew->st_exchange_workload_active_tasks, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        ew->st_exchange_workload_active_tasks,
+        ew->rd_exchange_workload_active_tasks,
+        (collected_number)ew->exchangeWorkloadActiveTasks.current.Data);
+    rrdset_done(ew->st_exchange_workload_active_tasks);
+}
+
+static void netdata_exchange_workload_completed_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+    if (unlikely(!ew->st_exchange_workload_complete_tasks)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_completed_tasks", workload);
+
+        ew->st_exchange_workload_complete_tasks = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "workload",
+            "exchange.workload_completed_tasks",
+            "Workload completed tasks.",
+            "tasks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_WORKlOAD_COMPLETE_TASKS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ew->rd_exchange_workload_complete_tasks =
+            rrddim_add(ew->st_exchange_workload_complete_tasks, "completed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        ew->st_exchange_workload_complete_tasks,
+        ew->rd_exchange_workload_complete_tasks,
+        (collected_number)ew->exchangeWorkloadCompleteTasks.current.Data);
+    rrdset_done(ew->st_exchange_workload_complete_tasks);
+}
+
+static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+    if (unlikely(!ew->st_exchange_workload_queued_tasks)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_queued_tasks", workload);
+
+        ew->st_exchange_workload_queued_tasks = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "workload",
+            "exchange.workload_queued_tasks",
+            "Workload queued tasks.",
+            "tasks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_WORKlOAD_QUEUE_TASKS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ew->rd_exchange_workload_queued_tasks =
+            rrddim_add(ew->st_exchange_workload_queued_tasks, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        ew->st_exchange_workload_queued_tasks,
+        ew->rd_exchange_workload_queued_tasks,
+        (collected_number)ew->exchangeWorkloadQueueTasks.current.Data);
+    rrdset_done(ew->st_exchange_workload_queued_tasks);
+}
+
+static void netdata_exchange_workload_yielded_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+    if (unlikely(!ew->st_exchange_workload_yielded_tasks)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_yielded_tasks", workload);
+
+        ew->st_exchange_workload_yielded_tasks = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "workload",
+            "exchange.workload_yielded_tasks",
+            "Workload yielded tasks.",
+            "tasks/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_WORKlOAD_YIELDED_TASKS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ew->rd_exchange_workload_yielded_tasks =
+            rrddim_add(ew->st_exchange_workload_yielded_tasks, "yielded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        ew->st_exchange_workload_yielded_tasks,
+        ew->rd_exchange_workload_yielded_tasks,
+        (collected_number)ew->exchangeWorkloadYieldedTasks.current.Data);
+    rrdset_done(ew->st_exchange_workload_yielded_tasks);
+}
+
+static void netdata_exchange_workload_activity_status(struct exchange_workload *ew, char *workload, int update_every) {
+    if (unlikely(!ew->st_exchange_workload_activity_status)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_activity_status", workload);
+
+        ew->st_exchange_workload_activity_status = rrdset_create_localhost(
+            "exchange",
+            id,
+            NULL,
+            "workload",
+            "exchange.workload_activity_status",
+            "Workload activity status.",
+            "status",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibExchange",
+            PRIO_EXCHANGE_WORKlOAD_ACTIVITY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        ew->rd_exchange_workload_activity_active_status =
+            rrddim_add(ew->st_exchange_workload_activity_status, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        ew->rd_exchange_workload_activity_paused_status =
+            rrddim_add(ew->st_exchange_workload_activity_status, "paused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    bool value = (bool)ew->exchangeWorkloadActivityStatus.current.Data;
+    rrddim_set_by_pointer(
+        ew->st_exchange_workload_activity_status,
+        ew->rd_exchange_workload_activity_active_status,
+        (collected_number)value);
+    rrdset_done(ew->st_exchange_workload_activity_status);
+
+    value = !value;
+    rrddim_set_by_pointer(
+        ew->st_exchange_workload_activity_status,
+        ew->rd_exchange_workload_activity_paused_status,
+        (collected_number)value);
+    rrdset_done(ew->st_exchange_workload_activity_status);
+}
+
+static
+void netdata_exchange_workload(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct exchange_workload *ew = dictionary_set(exchange_workloads, windows_shared_buffer, NULL, sizeof(*ep));
+        if (!ew)
+            continue;
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ew->exchangeWorkloadActiveTasks))
+            netdata_exchange_workload_active_tasks(ew, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ew->exchangeWorkloadCompleteTasks))
+            netdata_exchange_workload_completed_tasks(ew, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ew->exchangeWorkloadQueueTasks))
+            netdata_exchange_workload_queued_tasks(ew, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ew->exchangeWorkloadYieldedTasks))
+            netdata_exchange_workload_yielded_tasks(ew, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &ew->exchangeWorkloadActivityStatus))
+            netdata_exchange_workload_activity_status(ew, windows_shared_buffer, update_every);
+    }
+}
+
 struct netdata_exchange_objects {
     void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int);
     char *object;
@@ -742,6 +981,7 @@ struct netdata_exchange_objects {
     {.fnct = netdata_exchange_availability_service, .object = "MSExchange Availability Service"},
     {.fnct = netdata_exchange_rpc, .object = "MSExchange RpcClientAccess"},
     {.fnct = netdata_exchange_proxy, .object = "MSExchange HttpProxy"},
+    {.fnct = netdata_exchange_workload, .object = "MSExchange WorkloadManagement Workloads"},
 
     // This is the end of the loop
     {.fnct = NULL, .object = NULL}};

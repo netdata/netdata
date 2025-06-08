@@ -3238,6 +3238,37 @@ modules:
               chart_type: line
               dimensions:
                 - name: requests
+            - name: exchange.workload_active_tasks
+              description: Workload active tasks.
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.workload_completed_tasks
+              description: Workload completed tasks.
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: completed
+            - name: exchange.workload_queued_tasks
+              description: Workload queued tasks.
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.workload_yielded_tasks
+              description: Workload yielded tasks.
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: yielded
+            - name: exchange.workload_activity_status
+              description: Workload activity status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: paused
             - name: exchange.http_proxy_avg_auth_latency
               description: Average time spent authenticating CAS requests.
               unit: seconds
