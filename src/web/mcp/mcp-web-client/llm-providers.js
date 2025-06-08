@@ -8,7 +8,7 @@ class LLMProvider {
         this.proxyUrl = proxyUrl;
     }
 
-    async sendMessage(messages, tools = [], temperature = 0.7) {
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
         throw new Error('sendMessage must be implemented by subclass');
     }
 
@@ -48,7 +48,7 @@ class OpenAIProvider extends LLMProvider {
         return `${this.proxyUrl}/proxy/openai/v1/chat/completions`;
     }
 
-    async sendMessage(messages, tools = [], temperature = 0.7) {
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
         const openaiTools = tools.map(tool => ({
             type: 'function',
             function: {
@@ -160,9 +160,11 @@ class AnthropicProvider extends LLMProvider {
         return `${this.proxyUrl}/proxy/anthropic/v1/messages`;
     }
 
-    async sendMessage(messages, tools = [], temperature = 0.7) {
-        // Convert messages to Anthropic format with caching
-        const anthropicMessages = this.convertMessagesWithCaching(messages);
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
+        // Convert messages to Anthropic format with caching (only if mode is 'cached')
+        const anthropicMessages = mode === 'cached' 
+            ? this.convertMessagesWithCaching(messages, cachePosition) 
+            : this.convertMessages(messages);
         
         // Convert tools to Anthropic format (no cache control on tools)
         const anthropicTools = tools.map(tool => ({
@@ -242,12 +244,19 @@ class AnthropicProvider extends LLMProvider {
         for (const block of data.content) {
             if (block.type === 'text') {
                 content += block.text;
+                // Debug: Check if thinking tags are in the text
+                if (block.text.includes('<thinking>')) {
+                    console.log('Found <thinking> tags in Anthropic text block:', block.text);
+                }
             } else if (block.type === 'tool_use') {
                 toolCalls.push({
                     id: block.id,
                     name: block.name,
                     arguments: block.input
                 });
+            } else {
+                // Log any unknown block types
+                console.warn('Unknown block type in Anthropic response:', block.type, block);
             }
         }
         
@@ -264,7 +273,7 @@ class AnthropicProvider extends LLMProvider {
         };
     }
 
-    convertMessagesWithCaching(messages) {
+    convertMessagesWithCaching(messages, cachePosition = null) {
         // Convert messages WITHOUT adding cache control yet
         const converted = [];
         let lastRole = null;
@@ -318,22 +327,32 @@ class AnthropicProvider extends LLMProvider {
             }
         }
         
-        // Now find the absolute last content block across all messages
-        let lastContentBlock = null;
-        
-        // Iterate backwards through messages to find the last content block
-        for (let i = converted.length - 1; i >= 0; i--) {
-            const msg = converted[i];
-            if (Array.isArray(msg.content) && msg.content.length > 0) {
-                // Found a message with content, get its last block
-                lastContentBlock = msg.content[msg.content.length - 1];
-                break;
+        // Apply cache control based on cachePosition parameter
+        if (cachePosition !== null && cachePosition >= 0 && cachePosition < converted.length) {
+            // Apply cache control to specific position
+            const targetMsg = converted[cachePosition];
+            if (targetMsg && Array.isArray(targetMsg.content) && targetMsg.content.length > 0) {
+                // Add cache control to last content block of the specified message
+                targetMsg.content[targetMsg.content.length - 1].cache_control = { type: 'ephemeral' };
             }
-        }
-        
-        // Add cache_control to only the very last content block
-        if (lastContentBlock) {
-            lastContentBlock.cache_control = { type: 'ephemeral' };
+        } else {
+            // Default behavior - find the absolute last content block across all messages
+            let lastContentBlock = null;
+            
+            // Iterate backwards through messages to find the last content block
+            for (let i = converted.length - 1; i >= 0; i--) {
+                const msg = converted[i];
+                if (Array.isArray(msg.content) && msg.content.length > 0) {
+                    // Found a message with content, get its last block
+                    lastContentBlock = msg.content[msg.content.length - 1];
+                    break;
+                }
+            }
+            
+            // Add cache_control to only the very last content block
+            if (lastContentBlock) {
+                lastContentBlock.cache_control = { type: 'ephemeral' };
+            }
         }
         
         return converted;
@@ -421,7 +440,7 @@ class GoogleProvider extends LLMProvider {
         return `${this.proxyUrl}/proxy/google/v1beta/models/${this.model}/generateContent`;
     }
 
-    async sendMessage(messages, tools = [], temperature = 0.7) {
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
         // Convert messages to Gemini format
         const contents = this.convertMessages(messages);
         
