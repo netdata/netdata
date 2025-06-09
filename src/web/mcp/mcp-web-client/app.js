@@ -91,35 +91,41 @@ class NetdataMCPChat {
         }
         
         // Default system prompt
-        this.defaultSystemPrompt = `You are the Netdata assistant, with access to Netdata monitoring data via your tools.
+        this.defaultSystemPrompt = `You are the Netdata assistant, with access to Netdata monitoring data via your tools. 
 
-For complex requests, you should use <thinking> tags to show your reasoning process before responding. This helps users understand your analysis approach.
+For ANY request involving data analysis, troubleshooting, or complex queries, you MUST use <thinking> tags to show your complete reasoning process. In your <thinking> section, always include:
 
-When you receive a user request, you MUST follow this process:
+- Your interpretation of the user's request and what they're trying to accomplish
+- Your strategy for approaching the problem (which tools to use and why)
+- Analysis of each piece of data you retrieve
+- Connections you're making between different metrics/nodes/alerts
+- Any assumptions or limitations in your analysis
+- Your reasoning for conclusions or recommendations
 
 ## STEP 1: IDENTIFY WHAT IS RELEVANT
+<thinking>
+The user is asking about [summarize request]. To answer this, I need to:
+1. Identify relevant infrastructure components by...
+2. My search strategy will be...
+3. I expect to find...
+</thinking>
 
-Identify the relevant parts of the infrastructure. Infrastructures can be vast, so start with \`list_metrics\` (full text search) and \`list_nodes\` (hostname matches) giving the terms the user provided.
-
-If the user does not provide any clues on "what", but provides a "when", you can narrow down the scope using:
-
-- \`list_alert_transitions\`: to get the list of alerts over the given time window
-- \`find_anomalous_metrics\`: identify metrics and nodes that had anomalies over the given time window (use cardinality_limit 100+ for best results).
+[Continue with your existing process]
 
 ## STEP 2: FIND DATA TO ANSWER THE QUESTION
+<thinking>
+Based on Step 1 results, I found [summarize findings]. Now I need to:
+1. Query specific metrics because...
+2. The time range should be X because...
+3. I'm looking for patterns that indicate...
+</thinking>
 
-Once the relevant infrastructure components have been identified, run targeted queries on their metrics, alerts, or functions.
-
-Remember: Netdata has tiered storage, high-resolution (per-second), mid-resolution (per-minute), low-resolution (per-hour). Tiers are automatically selected based on availability and resolution (points) requested.
+[Continue with targeted queries]
 
 ## RESPONSE STYLE
+After your <thinking> analysis, provide your response following your existing style guidelines.
 
-- Be concise and direct - avoid verbose preambles
-- Use bullet points and structured formatting for clarity
-- Focus on answering the specific question asked
-- When showing metrics, include relevant context (units, time ranges)
-- If you find issues or anomalies, highlight them clearly
-- Use technical but accessible language`;
+CRITICAL: Never skip the <thinking> section. Even for simple queries, show your reasoning process. This transparency helps users understand your analysis methodology and builds confidence in your conclusions.`;
         
         // Load last used system prompt from localStorage or use default
         this.lastSystemPrompt = localStorage.getItem('lastSystemPrompt') || this.defaultSystemPrompt;
@@ -127,6 +133,11 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         this.initializeUI();
         this.initializeResizable();
         this.loadSettings();
+        this.initializeDefaultLLMProvider();
+        this.initializeDefaultMCPServer();
+        
+        // After all initialization, create default chat if needed
+        setTimeout(() => this.createDefaultChatIfNeeded(), 100);
     }
     
     // Get available models for a provider type
@@ -191,6 +202,30 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         this.generateTitleBtn = document.getElementById('generateTitleBtn');
         this.generateTitleBtn.addEventListener('click', () => this.handleGenerateTitleClick());
         
+        // Model and MCP server dropdowns
+        this.llmModelBtn = document.getElementById('llmModelBtn');
+        this.llmModelDropdown = document.getElementById('llmModelDropdown');
+        this.currentModelText = document.getElementById('currentModelText');
+        this.mcpServerBtn = document.getElementById('mcpServerBtn');
+        this.mcpServerDropdown = document.getElementById('mcpServerDropdown');
+        this.currentMcpText = document.getElementById('currentMcpText');
+        
+        this.llmModelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleDropdown('llmModelDropdown');
+        });
+        
+        this.mcpServerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleDropdown('mcpServerDropdown');
+        });
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            this.llmModelDropdown.style.display = 'none';
+            this.mcpServerDropdown.style.display = 'none';
+        });
+        
         this.chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -235,16 +270,12 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         // Settings modal
         this.settingsModal = document.getElementById('settingsModal');
         this.setupModal('settingsModal', 'settingsBackdrop', 'closeSettingsBtn');
-        this.setupTabs();
         
         // Settings lists
         this.mcpServersList = document.getElementById('mcpServersList');
-        this.llmProvidersList = document.getElementById('llmProvidersList');
         this.addMcpServerBtn = document.getElementById('addMcpServerBtn');
-        this.addLlmProviderBtn = document.getElementById('addLlmProviderBtn');
         
         this.addMcpServerBtn.addEventListener('click', () => this.showModal('addMcpModal'));
-        this.addLlmProviderBtn.addEventListener('click', () => this.showModal('addLlmModal'));
         
         // New chat modal
         this.setupModal('newChatModal', 'newChatBackdrop', 'closeNewChatBtn');
@@ -269,19 +300,6 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         
         this.saveMcpServerBtn.addEventListener('click', () => this.addMcpServer());
         this.cancelAddMcpBtn.addEventListener('click', () => this.hideModal('addMcpModal'));
-        
-        // Add LLM provider modal
-        this.setupModal('addLlmModal', 'addLlmBackdrop', 'closeAddLlmBtn');
-        this.llmProxyUrl = document.getElementById('llmProxyUrl');
-        this.llmProviderName = document.getElementById('llmProviderName');
-        this.llmProvidersStatus = document.getElementById('llmProvidersStatus');
-        this.llmProvidersInfo = document.getElementById('llmProvidersInfo');
-        this.saveLlmProviderBtn = document.getElementById('saveLlmProviderBtn');
-        this.cancelAddLlmBtn = document.getElementById('cancelAddLlmBtn');
-        
-        this.llmProxyUrl.addEventListener('blur', () => this.testProxyConnection());
-        this.saveLlmProviderBtn.addEventListener('click', () => this.addLlmProvider());
-        this.cancelAddLlmBtn.addEventListener('click', () => this.hideModal('addLlmModal'));
         
         // System prompt modal controls
         this.systemPromptTextarea = document.getElementById('systemPromptTextarea');
@@ -324,24 +342,6 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         closeBtn.addEventListener('click', () => this.hideModal(modalId));
     }
 
-    setupTabs() {
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tabName = btn.getAttribute('data-tab');
-                
-                // Update active button
-                tabBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                // Update active content
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
-                document.getElementById(`${tabName}-tab`).classList.add('active');
-            });
-        });
-    }
 
     showModal(modalId) {
         document.getElementById(modalId).classList.add('show');
@@ -349,6 +349,203 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
 
     hideModal(modalId) {
         document.getElementById(modalId).classList.remove('show');
+    }
+    
+    toggleDropdown(dropdownId) {
+        const dropdown = document.getElementById(dropdownId);
+        const isVisible = dropdown.style.display === 'block';
+        
+        // Close all dropdowns
+        this.llmModelDropdown.style.display = 'none';
+        this.mcpServerDropdown.style.display = 'none';
+        
+        // Toggle the requested dropdown
+        if (!isVisible) {
+            dropdown.style.display = 'block';
+            
+            // Populate the dropdown based on which one it is
+            if (dropdownId === 'llmModelDropdown') {
+                this.populateModelDropdown();
+            } else if (dropdownId === 'mcpServerDropdown') {
+                this.populateMcpDropdown();
+            }
+        }
+    }
+    
+    populateModelDropdown() {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return;
+        
+        const provider = this.llmProviders.get(chat.llmProviderId);
+        if (!provider || !provider.availableProviders) return;
+        
+        this.llmModelDropdown.innerHTML = '';
+        
+        // Add models from all available providers
+        Object.entries(provider.availableProviders).forEach(([providerType, config]) => {
+            // Add provider header
+            const header = document.createElement('div');
+            header.className = 'dropdown-header';
+            header.textContent = providerType.charAt(0).toUpperCase() + providerType.slice(1);
+            this.llmModelDropdown.appendChild(header);
+            
+            // Add models
+            config.models.forEach(model => {
+                const modelId = typeof model === 'string' ? model : model.id;
+                const item = document.createElement('button');
+                item.className = 'dropdown-item';
+                item.textContent = modelId;
+                
+                // Mark active model
+                if (chat.model === `${providerType}:${modelId}`) {
+                    item.classList.add('active');
+                }
+                
+                item.onclick = () => {
+                    this.switchModel(`${providerType}:${modelId}`);
+                    this.llmModelDropdown.style.display = 'none';
+                };
+                
+                this.llmModelDropdown.appendChild(item);
+            });
+            
+            // Add divider after each provider (except the last)
+            const divider = document.createElement('div');
+            divider.className = 'dropdown-divider';
+            this.llmModelDropdown.appendChild(divider);
+        });
+        
+        // Remove the last divider
+        const lastChild = this.llmModelDropdown.lastChild;
+        if (lastChild && lastChild.className === 'dropdown-divider') {
+            this.llmModelDropdown.removeChild(lastChild);
+        }
+    }
+    
+    populateMcpDropdown() {
+        this.mcpServerDropdown.innerHTML = '';
+        
+        for (const [id, server] of this.mcpServers) {
+            const item = document.createElement('button');
+            item.className = 'dropdown-item';
+            item.innerHTML = `
+                ${server.connected ? '🟢' : '🔴'} ${server.name}
+                <small style="display: block; color: var(--text-secondary); font-size: 12px;">${server.url}</small>
+            `;
+            
+            const chat = this.chats.get(this.currentChatId);
+            if (chat && chat.mcpServerId === id) {
+                item.classList.add('active');
+            }
+            
+            item.onclick = () => {
+                this.switchMcpServer(id);
+                this.mcpServerDropdown.style.display = 'none';
+            };
+            
+            this.mcpServerDropdown.appendChild(item);
+        }
+    }
+    
+    async switchModel(newModel) {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat || chat.model === newModel) return;
+        
+        // Extract model name for context window lookup
+        const modelName = newModel.includes(':') ? newModel.split(':')[1] : newModel;
+        
+        // Update model limits if we have context window info
+        const provider = this.llmProviders.get(chat.llmProviderId);
+        if (provider && provider.availableProviders) {
+            const [providerType] = newModel.split(':');
+            const providerConfig = provider.availableProviders[providerType];
+            if (providerConfig) {
+                const modelInfo = providerConfig.models.find(m => 
+                    (typeof m === 'string' ? m : m.id) === modelName
+                );
+                if (modelInfo && typeof modelInfo === 'object' && modelInfo.contextWindow) {
+                    this.modelLimits[modelName] = modelInfo.contextWindow;
+                }
+            }
+        }
+        
+        chat.model = newModel;
+        this.saveSettings();
+        
+        // Update UI
+        this.currentModelText.textContent = modelName;
+        
+        // Update context window indicator
+        const { totalTokens } = this.getTokenUsageForChat(this.currentChatId);
+        this.updateContextWindowIndicator(totalTokens, newModel);
+        
+        // Save as default for new chats
+        const lastConfig = localStorage.getItem('lastChatConfig');
+        let config = {};
+        if (lastConfig) {
+            try {
+                config = JSON.parse(lastConfig);
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
+        config.model = newModel;
+        config.llmProviderId = chat.llmProviderId;
+        config.mcpServerId = chat.mcpServerId;
+        localStorage.setItem('lastChatConfig', JSON.stringify(config));
+        
+        this.addLogEntry('SYSTEM', {
+            timestamp: new Date().toISOString(),
+            direction: 'info',
+            message: `Switched model to ${modelName}`
+        });
+    }
+    
+    async switchMcpServer(newServerId) {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat || chat.mcpServerId === newServerId) return;
+        
+        try {
+            // Ensure connection to new MCP server
+            const connection = await this.ensureMcpConnection(newServerId);
+            
+            chat.mcpServerId = newServerId;
+            this.saveSettings();
+            
+            // Update UI
+            const server = this.mcpServers.get(newServerId);
+            this.currentMcpText.textContent = server.name;
+            
+            // Clear tool inclusion states for the new server (will be populated on next use)
+            const chatToolStates = this.toolInclusionStates.get(this.currentChatId);
+            if (chatToolStates) {
+                chatToolStates.clear();
+            }
+            
+            // Save as default for new chats
+            const lastConfig = localStorage.getItem('lastChatConfig');
+            let config = {};
+            if (lastConfig) {
+                try {
+                    config = JSON.parse(lastConfig);
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            }
+            config.mcpServerId = newServerId;
+            config.llmProviderId = chat.llmProviderId;
+            config.model = chat.model;
+            localStorage.setItem('lastChatConfig', JSON.stringify(config));
+            
+            this.addLogEntry('SYSTEM', {
+                timestamp: new Date().toISOString(),
+                direction: 'info',
+                message: `Switched to MCP server: ${server.name}`
+            });
+            
+        } catch (error) {
+            this.showError(`Failed to switch MCP server: ${error.message}`);
+        }
     }
 
     showSystemPromptModal() {
@@ -883,6 +1080,19 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                         onLog: (logEntry) => this.addLogEntry(p.name, logEntry)
                     };
                     this.llmProviders.set(p.id, provider);
+                    
+                    // Populate modelLimits from available providers
+                    if (p.availableProviders) {
+                        Object.entries(p.availableProviders).forEach(([providerType, config]) => {
+                            if (config.models) {
+                                config.models.forEach(model => {
+                                    if (typeof model === 'object' && model.id && model.contextWindow) {
+                                        this.modelLimits[model.id] = model.contextWindow;
+                                    }
+                                });
+                            }
+                        });
+                    }
                 });
                 this.updateLlmProvidersList();
             } catch (e) {
@@ -904,9 +1114,207 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                 const lastChatId = localStorage.getItem('currentChatId');
                 if (lastChatId && this.chats.has(lastChatId)) {
                     this.loadChat(lastChatId);
+                } else {
+                    // No active chat, will create one after initialization
+                    this.shouldCreateDefaultChat = true;
                 }
             } catch (e) {
                 console.error('Failed to load chats:', e);
+            }
+        } else {
+            // No saved chats, will create one after initialization
+            this.shouldCreateDefaultChat = true;
+        }
+    }
+
+    async initializeDefaultLLMProvider() {
+        // Check if we already have LLM providers
+        if (this.llmProviders.size > 0) {
+            return;
+        }
+
+        // Auto-detect the proxy URL from the current origin
+        const proxyUrl = window.location.origin;
+        
+        try {
+            // Fetch available models from the same origin
+            const response = await fetch(`${proxyUrl}/models`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            const providers = data.providers || {};
+            
+            if (Object.keys(providers).length === 0) {
+                console.warn('No LLM providers configured in proxy');
+                return;
+            }
+            
+            // Create the default LLM provider
+            const providerId = 'default_llm_provider';
+            const provider = {
+                id: providerId,
+                name: 'Local LLM Proxy',
+                proxyUrl: proxyUrl,
+                availableProviders: providers,
+                onLog: (logEntry) => this.addLogEntry('Local LLM Proxy', logEntry)
+            };
+            
+            // Populate modelLimits from available providers
+            Object.entries(providers).forEach(([providerType, config]) => {
+                if (config.models) {
+                    config.models.forEach(model => {
+                        if (typeof model === 'object' && model.id && model.contextWindow) {
+                            this.modelLimits[model.id] = model.contextWindow;
+                        }
+                    });
+                }
+            });
+            
+            this.llmProviders.set(providerId, provider);
+            this.saveSettings();
+            this.updateLlmProvidersList();
+            this.updateNewChatSelectors();
+            
+            this.addLogEntry('SYSTEM', {
+                timestamp: new Date().toISOString(),
+                direction: 'info',
+                message: `Auto-configured LLM proxy from ${proxyUrl}`
+            });
+            
+        } catch (error) {
+            console.error('Failed to auto-configure LLM provider:', error);
+            this.addLogEntry('SYSTEM', {
+                timestamp: new Date().toISOString(),
+                direction: 'error',
+                message: `Failed to auto-configure LLM provider: ${error.message}`
+            });
+        }
+    }
+
+    async createDefaultChatIfNeeded() {
+        // Only create if we should and have the necessary components
+        if (!this.shouldCreateDefaultChat) return;
+        
+        // Check if there's already an unsaved chat
+        const hasUnsavedChat = Array.from(this.chats.values()).some(chat => chat.isSaved === false);
+        if (hasUnsavedChat) return;
+        
+        // Make sure we have at least one MCP server and LLM provider
+        if (this.mcpServers.size === 0 || this.llmProviders.size === 0) return;
+        
+        // Get the last used configuration or use defaults
+        let mcpServerId, llmProviderId, model;
+        
+        try {
+            const lastConfig = localStorage.getItem('lastChatConfig');
+            if (lastConfig) {
+                const config = JSON.parse(lastConfig);
+                // Verify these still exist
+                if (this.mcpServers.has(config.mcpServerId) && this.llmProviders.has(config.llmProviderId)) {
+                    mcpServerId = config.mcpServerId;
+                    llmProviderId = config.llmProviderId;
+                    model = config.model;
+                }
+            }
+        } catch (e) {
+            // Ignore errors
+        }
+        
+        // Use defaults if needed
+        if (!mcpServerId) mcpServerId = this.mcpServers.keys().next().value;
+        if (!llmProviderId) llmProviderId = this.llmProviders.keys().next().value;
+        
+        // Get first available model if not specified
+        if (!model) {
+            const provider = this.llmProviders.get(llmProviderId);
+            if (provider && provider.availableProviders) {
+                const firstProvider = Object.keys(provider.availableProviders)[0];
+                const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
+                if (firstModel) {
+                    const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
+                    model = `${firstProvider}:${modelId}`;
+                }
+            }
+        }
+        
+        if (!model) return;
+        
+        // Create an unsaved chat
+        await this.createNewChat({
+            mcpServerId: mcpServerId,
+            llmProviderId: llmProviderId,
+            model: model,
+            title: 'New Chat',
+            isSaved: false
+        });
+    }
+
+    async initializeDefaultMCPServer() {
+        // Check if we already have MCP servers or if the default one exists
+        const defaultUrl = 'ws://localhost:19999/mcp';
+        const defaultName = 'Local Netdata';
+        
+        // Check if this URL already exists
+        for (const [id, server] of this.mcpServers) {
+            if (server.url === defaultUrl) {
+                // Already exists, no need to add
+                return;
+            }
+        }
+        
+        // If we have no MCP servers, add the default one
+        if (this.mcpServers.size === 0) {
+            try {
+                // Try to connect to the default MCP server
+                const testClient = new MCPClient();
+                testClient.onLog = (logEntry) => this.addLogEntry(`MCP-${defaultName}`, logEntry);
+                
+                await testClient.connect(defaultUrl);
+                
+                // Connection successful, save server
+                const serverId = 'default_mcp_server';
+                const server = {
+                    id: serverId,
+                    name: defaultName,
+                    url: defaultUrl,
+                    connected: true,
+                    lastConnected: new Date().toISOString()
+                };
+                
+                this.mcpServers.set(serverId, server);
+                this.mcpConnections.set(serverId, testClient);
+                this.saveSettings();
+                this.updateMcpServersList();
+                this.updateNewChatSelectors();
+                
+                this.addLogEntry('SYSTEM', {
+                    timestamp: new Date().toISOString(),
+                    direction: 'info',
+                    message: `Auto-connected to default MCP server at ${defaultUrl}`
+                });
+                
+            } catch (error) {
+                // Connection failed, but still add the server for manual connection later
+                const serverId = 'default_mcp_server';
+                const server = {
+                    id: serverId,
+                    name: defaultName,
+                    url: defaultUrl,
+                    connected: false
+                };
+                
+                this.mcpServers.set(serverId, server);
+                this.saveSettings();
+                this.updateMcpServersList();
+                this.updateNewChatSelectors();
+                
+                this.addLogEntry('SYSTEM', {
+                    timestamp: new Date().toISOString(),
+                    direction: 'warning',
+                    message: `Added default MCP server at ${defaultUrl} (not connected)`
+                });
             }
         }
     }
@@ -925,8 +1333,8 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         }));
         localStorage.setItem('llmProviders', JSON.stringify(providersToSave));
         
-        // Save chats
-        const chatsToSave = Array.from(this.chats.values());
+        // Save only chats that have been marked as saved
+        const chatsToSave = Array.from(this.chats.values()).filter(chat => chat.isSaved !== false);
         localStorage.setItem('chats', JSON.stringify(chatsToSave));
         
         // Save current chat ID
@@ -1084,85 +1492,14 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         }
     }
 
+    // This function is no longer needed since LLM providers are auto-configured
     async addLlmProvider() {
-        const proxyUrl = this.llmProxyUrl.value.trim();
-        const name = this.llmProviderName.value.trim();
-        
-        if (!proxyUrl || !name) {
-            this.showError('Please fill in all fields');
-            return;
-        }
-        
-        // Make sure we have tested the connection and have available providers
-        if (!this.availableProviders) {
-            await this.testProxyConnection();
-            if (!this.availableProviders) {
-                this.showError('Please test the proxy connection first');
-                return;
-            }
-        }
-        
-        try {
-            const providerId = `llm_${Date.now()}`;
-            
-            // Create a proxy provider object that holds all available providers
-            const provider = {
-                id: providerId,
-                name: name,
-                proxyUrl: proxyUrl,
-                availableProviders: this.availableProviders,
-                onLog: (logEntry) => this.addLogEntry(name, logEntry)
-            };
-            
-            this.llmProviders.set(providerId, provider);
-            this.saveSettings();
-            this.updateLlmProvidersList();
-            this.updateNewChatSelectors();
-            
-            // Clear form
-            this.llmProxyUrl.value = 'http://localhost:8081';
-            this.llmProviderName.value = '';
-            this.llmProvidersStatus.style.display = 'none';
-            this.availableProviders = null;
-            this.hideModal('addLlmModal');
-            
-            this.addLogEntry('SYSTEM', {
-                timestamp: new Date().toISOString(),
-                direction: 'info',
-                message: `LLM proxy "${name}" added successfully`
-            });
-            
-        } catch (error) {
-            this.showError(`Failed to add LLM proxy: ${error.message}`);
-        }
+        // Kept for backward compatibility but does nothing
     }
 
     updateLlmProvidersList() {
-        this.llmProvidersList.innerHTML = '';
-        
-        if (this.llmProviders.size === 0) {
-            this.llmProvidersList.innerHTML = '<div class="text-center text-muted">No LLM proxies configured</div>';
-            return;
-        }
-        
-        for (const [id, provider] of this.llmProviders) {
-            const providerCount = Object.keys(provider.availableProviders || {}).length;
-            const modelCount = Object.values(provider.availableProviders || {})
-                .reduce((sum, p) => sum + (p.models || []).length, 0);
-            
-            const providerDiv = document.createElement('div');
-            providerDiv.className = 'config-item';
-            providerDiv.innerHTML = `
-                <div class="config-item-info">
-                    <div class="config-item-name">🔗 ${provider.name}</div>
-                    <div class="config-item-details">${provider.proxyUrl} - ${providerCount} providers, ${modelCount} models</div>
-                </div>
-                <div class="config-item-actions">
-                    <button class="btn btn-small btn-danger" onclick="app.removeLlmProvider('${id}')">Remove</button>
-                </div>
-            `;
-            this.llmProvidersList.appendChild(providerDiv);
-        }
+        // This function is no longer needed since LLM providers are auto-configured
+        // but we'll keep it for backward compatibility
     }
 
     removeLlmProvider(providerId) {
@@ -1194,6 +1531,14 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
 
     // Chat Management
     showNewChatModal() {
+        // Check if there's an unsaved chat
+        const unsavedChat = Array.from(this.chats.values()).find(chat => chat.isSaved === false);
+        if (unsavedChat) {
+            // Switch to the unsaved chat instead of creating a new one
+            this.loadChat(unsavedChat.id);
+            this.showError('Please use the current chat or save it by sending a message before creating a new one.');
+            return;
+        }
         this.updateNewChatSelectors();
         
         // Restore last selected values from localStorage
@@ -1283,11 +1628,21 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             const optgroup = document.createElement('optgroup');
             optgroup.label = providerType.charAt(0).toUpperCase() + providerType.slice(1);
             
-            config.models.forEach(modelName => {
+            config.models.forEach(model => {
                 const option = document.createElement('option');
+                // Handle both object format (new) and string format (legacy)
+                const modelId = typeof model === 'string' ? model : model.id;
+                const contextWindow = typeof model === 'object' ? model.contextWindow : null;
+                
                 // Store both provider type and model in the value
-                option.value = `${providerType}:${modelName}`;
-                option.textContent = modelName;
+                option.value = `${providerType}:${modelId}`;
+                option.textContent = modelId;
+                
+                // Store context window in data attribute if available
+                if (contextWindow) {
+                    option.setAttribute('data-context-window', contextWindow);
+                }
+                
                 optgroup.appendChild(option);
             });
             
@@ -1295,14 +1650,18 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         });
     }
 
-    async createNewChat() {
-        const mcpServerId = this.newChatMcpServer.value;
-        const llmProviderId = this.newChatLlmProvider.value;
-        const selectedModel = this.newChatModel.value;
-        let title = this.newChatTitle.value.trim();
+    async createNewChat(options = {}) {
+        // Support both modal-based creation and programmatic creation
+        const mcpServerId = options.mcpServerId || this.newChatMcpServer.value;
+        const llmProviderId = options.llmProviderId || this.newChatLlmProvider.value;
+        const selectedModel = options.model || this.newChatModel.value;
+        let title = options.title || this.newChatTitle.value.trim();
+        const isSaved = options.isSaved !== undefined ? options.isSaved : true;
         
         if (!mcpServerId || !llmProviderId) {
-            this.showError('Please select both MCP server and LLM provider');
+            if (!options.mcpServerId) { // Only show error for modal-based creation
+                this.showError('Please select both MCP server and LLM provider');
+            }
             return;
         }
         
@@ -1329,6 +1688,18 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             title = `${server.name} - ${provider.name}`;
         }
         
+        // Extract context window size from selected option if available
+        const selectedOption = this.newChatModel.options[this.newChatModel.selectedIndex];
+        const contextWindow = selectedOption.getAttribute('data-context-window');
+        
+        // Extract model name from format "provider:model-name"
+        const modelName = selectedModel.includes(':') ? selectedModel.split(':')[1] : selectedModel;
+        
+        // Update modelLimits with the context window from proxy if available
+        if (contextWindow) {
+            this.modelLimits[modelName] = parseInt(contextWindow);
+        }
+        
         const chatId = `chat_${Date.now()}`;
         const chat = {
             id: chatId,
@@ -1342,7 +1713,8 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             currentTurn: 0, // Track conversation turns
-            toolInclusionMode: 'cached' // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
+            toolInclusionMode: 'cached', // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
+            isSaved: isSaved // Track whether this chat has been saved to localStorage
         };
         
         this.chats.set(chatId, chat);
@@ -1361,15 +1733,22 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             model: selectedModel
         }));
         
-        this.saveSettings();
+        // Only save settings if this is a saved chat
+        if (isSaved) {
+            this.saveSettings();
+        }
         this.updateChatSessions();
         this.loadChat(chatId);
         
-        // Clear form and close modal
-        this.newChatTitle.value = '';
-        this.newChatModel.value = '';
-        this.newChatModelGroup.style.display = 'none';
-        this.hideModal('newChatModal');
+        // Clear form and close modal (only if using modal)
+        if (!options.mcpServerId) {
+            this.newChatTitle.value = '';
+            this.newChatModel.value = '';
+            this.newChatModelGroup.style.display = 'none';
+            this.hideModal('newChatModal');
+        }
+        
+        return chatId;
     }
 
     updateChatSessions() {
@@ -1380,9 +1759,9 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             return;
         }
         
-        const sortedChats = Array.from(this.chats.values()).sort((a, b) => 
-            new Date(b.updatedAt) - new Date(a.updatedAt)
-        );
+        const sortedChats = Array.from(this.chats.values())
+            .filter(chat => chat.isSaved !== false) // Only show saved chats
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
         
         for (const chat of sortedChats) {
             const sessionDiv = document.createElement('div');
@@ -1483,6 +1862,20 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
             this.chatLlm.textContent = `LLM: ${provider.name} (${modelDisplay})`;
         } else {
             this.chatLlm.textContent = 'LLM: Not found';
+        }
+        
+        // Update dropdown buttons
+        if (chat.model) {
+            const modelName = chat.model.includes(':') ? chat.model.split(':')[1] : chat.model;
+            this.currentModelText.textContent = modelName;
+        } else {
+            this.currentModelText.textContent = 'Select Model';
+        }
+        
+        if (server) {
+            this.currentMcpText.textContent = server.name;
+        } else {
+            this.currentMcpText.textContent = 'Select MCP';
         }
         
         // Enable/disable input based on server and provider availability
@@ -1621,6 +2014,11 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         this.updateCumulativeTokenDisplay();
         
         this.scrollToBottom();
+        
+        // Focus the chat input so user can start typing immediately
+        if (this.chatInput && !this.chatInput.disabled) {
+            this.chatInput.focus();
+        }
     }
 
     displayStoredMessage(msg, messageIndex) {
@@ -1949,6 +2347,10 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
                 this.reconnectMcpBtn.style.display = 'none';
                 this.temperatureControl.style.display = 'flex';
                 
+                // Reset dropdown buttons
+                this.currentModelText.textContent = 'Model';
+                this.currentMcpText.textContent = 'MCP Server';
+                
                 // Show empty context window indicator
                 const indicator = document.getElementById('contextWindowIndicator');
                 if (indicator) {
@@ -2049,6 +2451,13 @@ Remember: Netdata has tiered storage, high-resolution (per-second), mid-resoluti
         // Process user message event
         this.processRenderEvent({ type: 'user-message', content: message });
         chat.messages.push({ type: 'user', role: 'user', content: message, turn: chat.currentTurn });
+        
+        // If this is the first message in an unsaved chat, mark it as saved
+        if (chat.isSaved === false && chat.messages.filter(m => m.type === 'user').length === 1) {
+            chat.isSaved = true;
+            this.saveSettings();
+            this.updateChatSessions();
+        }
         
         // Show loading spinner event
         this.processRenderEvent({ type: 'show-spinner' });
