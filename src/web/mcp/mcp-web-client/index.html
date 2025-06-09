@@ -90,7 +90,27 @@
                 </div>
                 <div class="chat-content" id="chatContent">
                     <div class="chat-messages" id="chatMessages"></div>
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin: 10px auto;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin: 10px auto; flex-wrap: wrap;">
+                        <!-- Model and MCP Server Selection -->
+                        <div class="dropdown" style="position: relative;">
+                            <button id="llmModelBtn" class="btn btn-secondary dropdown-toggle" data-tooltip="Switch LLM model">
+                                <span>🤖</span>
+                                <span id="currentModelText">Model</span>
+                                <span style="margin-left: 5px;">▼</span>
+                            </button>
+                            <div id="llmModelDropdown" class="dropdown-menu" style="display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; max-height: 300px; overflow-y: auto;"></div>
+                        </div>
+                        
+                        <div class="dropdown" style="position: relative;">
+                            <button id="mcpServerBtn" class="btn btn-secondary dropdown-toggle" data-tooltip="Switch MCP server">
+                                <span>🔌</span>
+                                <span id="currentMcpText">MCP Server</span>
+                                <span style="margin-left: 5px;">▼</span>
+                            </button>
+                            <div id="mcpServerDropdown" class="dropdown-menu" style="display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; max-height: 300px; overflow-y: auto;"></div>
+                        </div>
+                        
+                        <!-- Existing buttons -->
                         <button id="copyMetricsBtn" class="btn btn-secondary" data-tooltip="Copy all message metadata including tokens and timing">Copy Conversation Metrics</button>
                         <button id="summarizeBtn" class="btn btn-secondary" data-tooltip="Summarize conversation to reduce context size">
                             <span>📋</span>
@@ -149,27 +169,11 @@
                 <button class="btn-icon modal-close" id="closeSettingsBtn">✕</button>
             </div>
             <div class="modal-body">
-                <div class="settings-tabs">
-                    <button class="tab-btn active" data-tab="mcp-servers">MCP Servers</button>
-                    <button class="tab-btn" data-tab="llm-providers">LLM Providers</button>
-                </div>
-                
-                <!-- MCP Servers Tab -->
-                <div class="tab-content active" id="mcp-servers-tab">
-                    <div class="config-section">
-                        <h3>MCP Servers</h3>
-                        <div class="config-list" id="mcpServersList"></div>
-                        <button id="addMcpServerBtn" class="btn btn-primary">+ Add MCP Server</button>
-                    </div>
-                </div>
-                
-                <!-- LLM Providers Tab -->
-                <div class="tab-content" id="llm-providers-tab">
-                    <div class="config-section">
-                        <h3>LLM Providers</h3>
-                        <div class="config-list" id="llmProvidersList"></div>
-                        <button id="addLlmProviderBtn" class="btn btn-primary">+ Add LLM Provider</button>
-                    </div>
+                <!-- MCP Servers (no tabs needed anymore) -->
+                <div class="config-section">
+                    <h3>MCP Servers</h3>
+                    <div class="config-list" id="mcpServersList"></div>
+                    <button id="addMcpServerBtn" class="btn btn-primary">+ Add MCP Server</button>
                 </div>
             </div>
         </div>

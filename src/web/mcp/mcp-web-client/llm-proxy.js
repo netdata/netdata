@@ -7,11 +7,47 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Display startup banner
+console.log('='.repeat(60));
+console.log('LLM Proxy Server & MCP Web Client');
+console.log('='.repeat(60));
+
 // Configuration file path in user's home directory
 const CONFIG_DIR = path.join(os.homedir(), '.config');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'llm-proxy-config.json');
 
 // Default configuration template
+// Model context window sizes
+const MODEL_CONTEXT_WINDOWS = {
+  // OpenAI
+  'gpt-4o': 128000,
+  'gpt-4o-mini': 128000,
+  'gpt-4-turbo': 128000,
+  'gpt-4-turbo-preview': 128000,
+  'gpt-4': 8192,
+  'gpt-3.5-turbo': 16384,
+  'gpt-3.5-turbo-16k': 16384,
+  
+  // Anthropic
+  'claude-opus-4-20250514': 200000,
+  'claude-sonnet-4-20250514': 200000,
+  'claude-3-7-sonnet-20250219': 200000,
+  'claude-3-5-haiku-20241022': 200000,
+  'claude-3-5-sonnet-20241022': 200000,
+  'claude-3-5-sonnet-20240620': 200000,
+  'claude-3-opus-20240229': 200000,
+  'claude-3-sonnet-20240229': 200000,
+  'claude-3-haiku-20240307': 200000,
+  
+  // Google
+  'gemini-2.0-flash-exp': 1000000,
+  'gemini-2.0-flash-thinking-exp': 1000000,
+  'gemini-1.5-pro': 2000000,
+  'gemini-1.5-flash': 1000000,
+  'gemini-pro': 32760,
+  'gemini-pro-vision': 32760
+};
+
 const DEFAULT_CONFIG = {
   port: 8081,
   allowedOrigins: '*',
@@ -19,38 +55,38 @@ const DEFAULT_CONFIG = {
     openai: {
       apiKey: '',
       models: [
-        'gpt-4o',
-        'gpt-4o-mini',
-        'gpt-4-turbo',
-        'gpt-4-turbo-preview',
-        'gpt-4',
-        'gpt-3.5-turbo',
-        'gpt-3.5-turbo-16k'
+        { id: 'gpt-4o', contextWindow: 128000 },
+        { id: 'gpt-4o-mini', contextWindow: 128000 },
+        { id: 'gpt-4-turbo', contextWindow: 128000 },
+        { id: 'gpt-4-turbo-preview', contextWindow: 128000 },
+        { id: 'gpt-4', contextWindow: 8192 },
+        { id: 'gpt-3.5-turbo', contextWindow: 16384 },
+        { id: 'gpt-3.5-turbo-16k', contextWindow: 16384 }
       ]
     },
     anthropic: {
       apiKey: '',
       models: [
-        'claude-opus-4-20250514',
-        'claude-sonnet-4-20250514',
-        'claude-3-7-sonnet-20250219',
-        'claude-3-5-haiku-20241022',
-        'claude-3-5-sonnet-20241022',
-        'claude-3-5-sonnet-20240620',
-        'claude-3-opus-20240229',
-        'claude-3-sonnet-20240229',
-        'claude-3-haiku-20240307'
+        { id: 'claude-opus-4-20250514', contextWindow: 200000 },
+        { id: 'claude-sonnet-4-20250514', contextWindow: 200000 },
+        { id: 'claude-3-7-sonnet-20250219', contextWindow: 200000 },
+        { id: 'claude-3-5-haiku-20241022', contextWindow: 200000 },
+        { id: 'claude-3-5-sonnet-20241022', contextWindow: 200000 },
+        { id: 'claude-3-5-sonnet-20240620', contextWindow: 200000 },
+        { id: 'claude-3-opus-20240229', contextWindow: 200000 },
+        { id: 'claude-3-sonnet-20240229', contextWindow: 200000 },
+        { id: 'claude-3-haiku-20240307', contextWindow: 200000 }
       ]
     },
     google: {
       apiKey: '',
       models: [
-        'gemini-2.0-flash-exp',
-        'gemini-2.0-flash-thinking-exp',
-        'gemini-1.5-pro',
-        'gemini-1.5-flash',
-        'gemini-pro',
-        'gemini-pro-vision'
+        { id: 'gemini-2.0-flash-exp', contextWindow: 1000000 },
+        { id: 'gemini-2.0-flash-thinking-exp', contextWindow: 1000000 },
+        { id: 'gemini-1.5-pro', contextWindow: 2000000 },
+        { id: 'gemini-1.5-flash', contextWindow: 1000000 },
+        { id: 'gemini-pro', contextWindow: 32760 },
+        { id: 'gemini-pro-vision', contextWindow: 32760 }
       ]
     }
   }
@@ -75,39 +111,76 @@ const LLM_PROVIDERS = {
 
 // Load or create configuration
 function loadConfig() {
+  console.log('\n📁 Configuration:');
+  console.log(`   Config directory: ${CONFIG_DIR}`);
+  console.log(`   Config file: ${CONFIG_FILE}`);
+  
   // Ensure .config directory exists
   if (!fs.existsSync(CONFIG_DIR)) {
+    console.log(`   Creating config directory...`);
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
   }
 
   if (!fs.existsSync(CONFIG_FILE)) {
-    console.log(`Configuration file not found. Creating ${CONFIG_FILE}`);
+    console.log('\n🆕 First time setup detected!');
+    console.log('   Creating default configuration file...');
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(DEFAULT_CONFIG, null, 2));
-    console.log('\nPlease edit the configuration file and add your API keys.');
-    console.log('Then restart the proxy server.');
+    console.log('\n✅ Configuration file created successfully!');
+    console.log('\n📝 Next steps:');
+    console.log(`   1. Edit the configuration file: ${CONFIG_FILE}`);
+    console.log('   2. Add your API keys for the LLM providers you want to use:');
+    console.log('      - OpenAI: Add your API key starting with "sk-"');
+    console.log('      - Anthropic: Add your API key starting with "sk-ant-"');
+    console.log('      - Google: Add your API key for Gemini');
+    console.log('   3. Save the file and restart this server');
+    console.log('\n💡 Tip: You can use any text editor to edit the configuration file');
+    console.log('   Example: nano ' + CONFIG_FILE);
+    console.log('\n');
     process.exit(0);
   }
 
   try {
+    console.log('   Loading configuration...');
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     
     // Check if any API keys are configured
-    const hasApiKeys = Object.values(config.providers).some(provider => provider.apiKey && provider.apiKey.length > 0);
+    const configuredProviders = [];
+    let totalModels = 0;
     
-    if (!hasApiKeys) {
-      console.error('\nError: No API keys configured!');
-      console.error(`Please edit ${CONFIG_FILE} and add at least one API key.`);
-      console.error('\nExample:');
-      console.error('  "openai": {');
-      console.error('    "apiKey": "sk-...",');
-      console.error('    "models": ["gpt-4", "gpt-3.5-turbo"]');
+    Object.entries(config.providers).forEach(([provider, settings]) => {
+      if (settings.apiKey && settings.apiKey.length > 0) {
+        const modelCount = settings.models ? settings.models.length : 0;
+        configuredProviders.push(`${provider} (${modelCount} models)`);
+        totalModels += modelCount;
+      }
+    });
+    
+    if (configuredProviders.length === 0) {
+      console.error('\n❌ Error: No API keys configured!');
+      console.error('\n📝 Please edit the configuration file and add at least one API key:');
+      console.error(`   ${CONFIG_FILE}`);
+      console.error('\nExample configuration:');
+      console.error('```json');
+      console.error('{');
+      console.error('  "providers": {');
+      console.error('    "openai": {');
+      console.error('      "apiKey": "sk-YOUR-API-KEY-HERE",');
+      console.error('      "models": [...]');
+      console.error('    }');
       console.error('  }');
+      console.error('}');
+      console.error('```\n');
       process.exit(1);
     }
+    
+    console.log('   ✅ Configuration loaded successfully!');
+    console.log(`   Configured providers: ${configuredProviders.join(', ')}`);
+    console.log(`   Total models available: ${totalModels}`);
 
     return config;
   } catch (error) {
-    console.error(`Error reading configuration file: ${error.message}`);
+    console.error('\n❌ Error reading configuration file:', error.message);
+    console.error('   Please check that the file is valid JSON format');
     process.exit(1);
   }
 }
@@ -116,6 +189,170 @@ function loadConfig() {
 const config = loadConfig();
 const PROXY_PORT = config.port || 8081;
 const ALLOWED_ORIGINS = config.allowedOrigins || '*';
+
+// MIME types for static file serving
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon'
+};
+
+// Serve static files
+function serveStaticFile(req, res) {
+  let filePath = req.url === '/' ? '/index.html' : req.url;
+  filePath = path.join(__dirname, filePath);
+  
+  // Security: prevent directory traversal
+  if (!filePath.startsWith(__dirname)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('Forbidden');
+    return;
+  }
+  
+  fs.readFile(filePath, (err, content) => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      } else {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Internal Server Error');
+      }
+      return;
+    }
+    
+    const ext = path.extname(filePath);
+    const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+    
+    res.writeHead(200, {
+      'Content-Type': mimeType,
+      'Access-Control-Allow-Origin': ALLOWED_ORIGINS,
+      'Cache-Control': 'no-cache'
+    });
+    res.end(content);
+  });
+}
+
+// Check for command line arguments
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log('\n📚 Usage:');
+  console.log('   node llm-proxy.js [options]');
+  console.log('\n🎯 Options:');
+  console.log('   --help, -h        Show this help message');
+  console.log('   --update-config   Update the configuration file with latest model definitions');
+  console.log('                     while preserving your API keys and custom settings');
+  console.log('\n📖 Description:');
+  console.log('   This server provides:');
+  console.log('   • A proxy for LLM API calls (OpenAI, Anthropic, Google)');
+  console.log('   • A web interface for the MCP (Model Context Protocol) client');
+  console.log('   • Automatic model discovery and context window information');
+  console.log('\n🌐 Endpoints:');
+  console.log('   • Web UI:      http://localhost:' + (config.port || 8081) + '/');
+  console.log('   • Models API:  http://localhost:' + (config.port || 8081) + '/models');
+  console.log('   • Proxy API:   http://localhost:' + (config.port || 8081) + '/proxy/<provider>/<path>');
+  console.log('\n');
+  process.exit(0);
+}
+
+if (process.argv.includes('--update-config')) {
+  console.log('\n🔄 Configuration Update Mode');
+  console.log('   This will update your configuration file with the latest model definitions');
+  console.log('   while preserving your API keys and custom settings.\n');
+  
+  try {
+    // Read existing config to preserve API keys
+    let existingConfig = {};
+    if (fs.existsSync(CONFIG_FILE)) {
+      const configContent = fs.readFileSync(CONFIG_FILE, 'utf8');
+      existingConfig = JSON.parse(configContent);
+    }
+    
+    // Create new config with updated model lists and context windows
+    const updatedConfig = {
+      ...DEFAULT_CONFIG,
+      providers: {}
+    };
+    
+    // Merge providers, preserving API keys and custom models
+    Object.entries(DEFAULT_CONFIG.providers).forEach(([provider, defaultProviderConfig]) => {
+      const existingProvider = existingConfig.providers?.[provider];
+      
+      // Create a map of default models for easy lookup
+      const defaultModelsMap = new Map();
+      defaultProviderConfig.models.forEach(model => {
+        const id = typeof model === 'string' ? model : model.id;
+        defaultModelsMap.set(id, model);
+      });
+      
+      // Create merged models list
+      const mergedModels = [...defaultProviderConfig.models];
+      
+      // Add any custom models from existing config that aren't in defaults
+      if (existingProvider?.models) {
+        existingProvider.models.forEach(existingModel => {
+          const id = typeof existingModel === 'string' ? existingModel : existingModel.id;
+          if (!defaultModelsMap.has(id)) {
+            // This is a custom model, preserve it
+            mergedModels.push(existingModel);
+          }
+        });
+      }
+      
+      updatedConfig.providers[provider] = {
+        ...defaultProviderConfig,
+        // Preserve existing API key if available
+        apiKey: existingProvider?.apiKey || '',
+        // Use merged models list
+        models: mergedModels
+      };
+    });
+    
+    // Also preserve any custom providers not in defaults
+    if (existingConfig.providers) {
+      Object.entries(existingConfig.providers).forEach(([provider, providerConfig]) => {
+        if (!updatedConfig.providers[provider]) {
+          updatedConfig.providers[provider] = providerConfig;
+        }
+      });
+    }
+    
+    // Preserve any custom settings
+    if (existingConfig.port) updatedConfig.port = existingConfig.port;
+    if (existingConfig.allowedOrigins) updatedConfig.allowedOrigins = existingConfig.allowedOrigins;
+    
+    // Write updated config
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedConfig, null, 2));
+    
+    console.log('   ✅ Configuration updated successfully!');
+    console.log('\n📊 Update Summary:');
+    console.log('   • API keys: Preserved');
+    console.log('   • Custom models: Preserved');
+    console.log('   • Latest model definitions: Added');
+    console.log('   • Context window sizes: Updated');
+    
+    // Count total models
+    let totalModels = 0;
+    Object.values(updatedConfig.providers).forEach(provider => {
+      if (provider.models) totalModels += provider.models.length;
+    });
+    console.log(`   • Total models available: ${totalModels}`);
+    
+    console.log('\n✨ Your configuration is now up to date!');
+    console.log('   You can start the server normally to use the new models.\n');
+    
+    process.exit(0);
+  } catch (error) {
+    console.error('\n❌ Error updating configuration:', error.message);
+    console.error('   Please check that your configuration file is valid JSON');
+    process.exit(1);
+  }
+}
 
 // Create proxy server
 const server = http.createServer(async (req, res) => {
@@ -135,14 +372,40 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathParts = parsedUrl.pathname.split('/').filter(p => p);
 
+  // Serve static files for the web client
+  if (!parsedUrl.pathname.startsWith('/proxy/') && !parsedUrl.pathname.startsWith('/models')) {
+    // Log static file requests only for main pages
+    if (req.url === '/' || req.url.endsWith('.html')) {
+      console.log(`[${new Date().toISOString()}] 📄 Web UI request: ${req.url}`);
+    }
+    serveStaticFile(req, res);
+    return;
+  }
+
   // Handle /models endpoint
   if (pathParts.length === 1 && pathParts[0] === 'models') {
+    console.log(`[${new Date().toISOString()}] 🔍 Models API request`);
     const availableProviders = {};
     
     Object.entries(config.providers).forEach(([provider, providerConfig]) => {
       if (providerConfig.apiKey && providerConfig.apiKey.length > 0) {
         availableProviders[provider] = {
-          models: providerConfig.models || []
+          models: (providerConfig.models || []).map(model => {
+            // Handle both string format (backward compatibility) and object format
+            if (typeof model === 'string') {
+              return {
+                id: model,
+                contextWindow: MODEL_CONTEXT_WINDOWS[model] || 4096
+              };
+            } else if (model.id) {
+              // Already in object format with contextWindow
+              return {
+                id: model.id,
+                contextWindow: model.contextWindow || MODEL_CONTEXT_WINDOWS[model.id] || 4096
+              };
+            }
+            return null;
+          }).filter(Boolean)
         };
       }
     });
@@ -263,15 +526,23 @@ const server = http.createServer(async (req, res) => {
     // Choose http or https module
     const protocol = targetUrl.protocol === 'https:' ? https : http;
 
-    // Log the proxied request for debugging
-    console.log(`[${new Date().toISOString()}] Proxying ${req.method} request:`);
-    console.log(`  From: ${req.url}`);
-    console.log(`  To: ${targetUrl.href} (without API key in logs)`);
-    console.log(`  Provider: ${provider}`);
+    // Extract model from request body for better logging
+    let modelInfo = '';
+    try {
+      const bodyData = JSON.parse(body);
+      if (bodyData.model) {
+        modelInfo = ` (model: ${bodyData.model})`;
+      }
+    } catch (e) {
+      // Ignore JSON parse errors
+    }
+    
+    console.log(`[${new Date().toISOString()}] 🔄 Proxy ${req.method} to ${provider}: ${targetUrl.pathname}${modelInfo}`);
     
     // Make the request to the LLM provider
     const proxyReq = protocol.request(options, (proxyRes) => {
-      console.log(`  Response: ${proxyRes.statusCode} ${proxyRes.statusMessage}`);
+      const statusEmoji = proxyRes.statusCode >= 200 && proxyRes.statusCode < 300 ? '✅' : '❌';
+      console.log(`[${new Date().toISOString()}] ${statusEmoji} Response: ${proxyRes.statusCode} from ${provider}`);
       
       // Set CORS headers
       const responseHeaders = {
@@ -300,7 +571,7 @@ const server = http.createServer(async (req, res) => {
     });
 
     proxyReq.on('error', (error) => {
-      console.error('Proxy request error:', error);
+      console.error(`[${new Date().toISOString()}] ❌ Proxy error for ${provider}: ${error.message}`);
       res.writeHead(502, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': ALLOWED_ORIGINS
@@ -319,20 +590,28 @@ const server = http.createServer(async (req, res) => {
 
 // Start the server
 server.listen(PROXY_PORT, () => {
-  console.log(`LLM CORS Proxy Server running on http://localhost:${PROXY_PORT}`);
-  console.log('\nEndpoints:');
-  console.log(`  GET  http://localhost:${PROXY_PORT}/models - List available models`);
-  console.log(`  POST http://localhost:${PROXY_PORT}/proxy/<provider>/<api-path> - Proxy LLM requests`);
-  console.log('\nConfigured providers:');
+  console.log('\n🚀 Server Started Successfully!');
+  console.log('='.repeat(60));
+  console.log('\n🌐 Available Services:');
+  console.log(`   • Web UI:          http://localhost:${PROXY_PORT}/`);
+  console.log(`   • Models API:      http://localhost:${PROXY_PORT}/models`);
+  console.log(`   • Proxy Endpoint:  http://localhost:${PROXY_PORT}/proxy/<provider>/<path>`);
   
-  Object.entries(config.providers).forEach(([provider, providerConfig]) => {
-    if (providerConfig.apiKey && providerConfig.apiKey.length > 0) {
-      console.log(`  - ${provider}: ${providerConfig.models.length} models`);
-    }
-  });
+  console.log('\n🔌 MCP Connection:');
+  console.log('   The web client will automatically try to connect to:');
+  console.log('   • MCP Server: ws://localhost:19999/mcp');
+  console.log('   • If the MCP server is not running, you can start it separately');
   
-  console.log('\nExamples:');
-  console.log(`  OpenAI:    POST http://localhost:${PROXY_PORT}/proxy/openai/v1/chat/completions`);
-  console.log(`  Anthropic: POST http://localhost:${PROXY_PORT}/proxy/anthropic/v1/messages`);
-  console.log(`  Google:    POST http://localhost:${PROXY_PORT}/proxy/google/v1beta/models/gemini-pro/generateContent`);
+  console.log('\n📝 Quick Start:');
+  console.log(`   1. Open your browser to: http://localhost:${PROXY_PORT}/`);
+  console.log('   2. Create a new chat');
+  console.log('   3. Start asking questions about your infrastructure!');
+  
+  console.log('\n💡 Tips:');
+  console.log('   • Press Ctrl+C to stop the server');
+  console.log('   • Logs are displayed here in real-time');
+  console.log('   • Check the Communication Log in the web UI for detailed debugging');
+  
+  console.log('\n' + '='.repeat(60));
+  console.log('Server is ready and waiting for connections...\n');
 });
