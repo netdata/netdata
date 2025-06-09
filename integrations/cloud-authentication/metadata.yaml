@@ -226,7 +226,7 @@
 
       **Important Considerations**
       - Configure supported attributes only: Your SCIM client must be configured to send only the attributes listed above. Requests containing unsupported attributes will fail with a `400 Bad Request` error.
-      - Okta users: If you're using Okta, the Netdata integration already includes the correct attribute configuration, no additional setup required.
+      - Okta users: No additional setup needed. The Netdata integration includes the correct attribute configuration automatically.
 
       ## FAQ
 
