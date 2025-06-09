@@ -69,7 +69,7 @@ dict_exchange_insert_proxy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *
     exchange_proxy_initialize_variables(ep);
 }
 
-static void exchange_proxy_initialize_variables(struct exchange_workload *ew)
+static void exchange_workload_initialize_variables(struct exchange_workload *ew)
 {
     ew->exchangeWorkloadActiveTasks.key = "ActiveTasks";
     ew->exchangeWorkloadCompleteTasks.key = "CompletedTasks";
@@ -84,18 +84,18 @@ dict_exchange_insert_worload_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     struct exchange_workload *ew = value;
 
-    exchange_proxy_initialize_variables(ew);
+    exchange_workload_initialize_variables(ew);
 }
 
 static void initialize(void)
 {
     exchange_proxies = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_proxy));
-    dictionary_register_insert_callback(exchange_proxy, dict_exchange_insert_proxy_cb, NULL);
+    dictionary_register_insert_callback(exchange_proxies, dict_exchange_insert_proxy_cb, NULL);
 
-    exchange_worloads = dictionary_create_advanced(
+    exchange_workloads = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct exchange_workload));
-    dictionary_register_insert_callback(exchange_worloads, dict_exchange_insert_worload_cb, NULL);
+    dictionary_register_insert_callback(exchange_workloads, dict_exchange_insert_worload_cb, NULL);
 }
 
 static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int update_every)
@@ -975,7 +975,7 @@ static void netdata_exchange_workload(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct exchange_workload *ew = dictionary_set(exchange_workloads, windows_shared_buffer, NULL, sizeof(*ep));
+        struct exchange_workload *ew = dictionary_set(exchange_workloads, windows_shared_buffer, NULL, sizeof(*ew));
         if (!ew)
             continue;
 
