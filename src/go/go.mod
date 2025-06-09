@@ -43,7 +43,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/prometheus/common v0.64.0
 	github.com/prometheus/prometheus v2.55.1+incompatible
-	github.com/redis/go-redis/v9 v9.9.0
+	github.com/redis/go-redis/v9 v9.10.0
 	github.com/sijms/go-ora/v2 v2.8.24
 	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.10.0
