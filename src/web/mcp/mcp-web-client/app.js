@@ -349,8 +349,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
         });
         
-        // Initialize tooltips for all elements
-        this.initializeTooltips(document.body);
+        // Tooltips are now CSS-only, no initialization needed
         
         // Setup no models modal
         this.noModelsModal = document.getElementById('noModelsModal');
@@ -730,16 +729,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         html.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
         
-        // Update Tippy theme for existing tooltips
-        const isDarkTheme = newTheme === 'dark';
-        const allTippyInstances = document.querySelectorAll('[data-tooltip]');
-        allTippyInstances.forEach(element => {
-            if (element._tippy) {
-                element._tippy.setProps({
-                    theme: isDarkTheme ? 'light-border' : 'light'
-                });
-            }
-        });
+        // Theme switching for tooltips is now handled by CSS variables
     }
 
     initializeResizable() {
@@ -1160,13 +1150,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const message = chat.messages[messageIndex];
         if (!message) return;
         
-        // Remove all messages after this point
-        chat.messages = chat.messages.slice(0, messageIndex + 1);
-        this.saveSettings();
-        
-        // Reload the chat to show the truncated history
-        this.loadChat(this.currentChatId);
-        
         // Get the MCP connection and provider
         const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
         const proxyProvider = this.llmProviders.get(chat.llmProviderId);
@@ -1192,33 +1175,43 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         try {
             if (message.type === 'user') {
-                // Redo from user message - resend it
+                // Redo from user message - truncate everything AFTER this message
+                // Keep all history up to and including this message
+                chat.messages = chat.messages.slice(0, messageIndex + 1);
+                this.saveSettings();
+                this.loadChat(this.currentChatId);
+                
+                // Resend the user message with full prior context
                 await this.processMessageWithTools(chat, mcpConnection, provider, message.content);
             } else if (message.type === 'assistant') {
-                // Redo from assistant message - find previous user message and resend
-                let lastUserMessage = null;
+                // Redo from assistant message - find the user message that triggered it
+                let triggeringUserMessage = null;
+                let triggeringUserIndex = -1;
+                
+                // Find the most recent user message before this assistant message
                 for (let i = messageIndex - 1; i >= 0; i--) {
                     if (chat.messages[i].type === 'user' && !chat.messages[i].isTitleRequest) {
-                        lastUserMessage = chat.messages[i];
+                        triggeringUserMessage = chat.messages[i];
+                        triggeringUserIndex = i;
                         break;
                     }
                 }
                 
-                if (lastUserMessage) {
-                    // Remove the assistant message we're redoing from
-                    chat.messages = chat.messages.slice(0, messageIndex);
+                if (triggeringUserMessage) {
+                    // Truncate to remove this assistant message and everything after
+                    // Keep everything up to the triggering user message
+                    chat.messages = chat.messages.slice(0, triggeringUserIndex + 1);
                     this.saveSettings();
                     this.loadChat(this.currentChatId);
                     
-                    await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
+                    // Resend the triggering user message with full prior context
+                    await this.processMessageWithTools(chat, mcpConnection, provider, triggeringUserMessage.content);
                 } else {
-                    this.showError('Cannot find previous user message to redo from');
+                    this.showError('Cannot find the user message that triggered this response');
                 }
-            } else if (message.type === 'tool-results') {
-                // Redo from tool results - continue conversation
-                // This essentially just continues the conversation from this point
-                const fakeUserMessage = "[Continue from tool results]";
-                await this.processMessageWithTools(chat, mcpConnection, provider, fakeUserMessage);
+            } else {
+                // For any other message type, show error (shouldn't happen with our button logic)
+                this.showError('Redo is only available for user and assistant messages');
             }
         } catch (error) {
             this.showError(`Redo failed: ${error.message}`);
@@ -1995,6 +1988,15 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const modelName = selectedModel.includes(':') ? selectedModel.split(':')[1] : selectedModel;
         
         const chatId = `chat_${Date.now()}`;
+        
+        // Prepare system prompt with timestamp and timezone
+        let systemPromptWithTimestamp = this.lastSystemPrompt;
+        const currentTimestamp = new Date().toISOString();
+        const timezoneInfo = this.getTimezoneInfo();
+        systemPromptWithTimestamp += `\n\nThe current date and time is ${currentTimestamp}.`;
+        systemPromptWithTimestamp += `\nThe current timezone is ${timezoneInfo.name}, i.e. ${timezoneInfo.offset}.`;
+        systemPromptWithTimestamp += `\nUnless otherwise specified, assume all relative datetime references have a basis on this date, time and timezone.`;
+        
         const chat = {
             id: chatId,
             title: title,
@@ -2003,7 +2005,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             model: selectedModel, // Selected model for this chat
             messages: [],
             temperature: 0.7, // Default temperature
-            systemPrompt: this.lastSystemPrompt, // Use the last system prompt
+            systemPrompt: systemPromptWithTimestamp, // System prompt with timestamp
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             currentTurn: 0, // Track conversation turns
@@ -2741,9 +2743,11 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // If this is the first message in an unsaved chat, mark it as saved
         if (chat.isSaved === false && chat.messages.filter(m => m.type === 'user').length === 1) {
             chat.isSaved = true;
-            this.saveSettings();
             this.updateChatSessions();
         }
+        
+        // ALWAYS save after adding any message
+        this.saveSettings();
         
         // Show loading spinner event
         this.processRenderEvent({ type: 'show-spinner' });
@@ -2762,21 +2766,22 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         } catch (error) {
             // Show error with retry button
             this.showErrorWithRetry(`Error: ${error.message}`, async () => {
-                // Retry the last message
-                const lastUserMessage = chat.messages.filter(m => m.type === 'user').pop();
-                if (lastUserMessage) {
-                    // Remove the error message and the failed attempt's messages
-                    const lastUserIndex = chat.messages.lastIndexOf(lastUserMessage);
-                    chat.messages = chat.messages.slice(0, lastUserIndex + 1);
+                // Find and remove only the error message
+                const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === error.message);
+                if (errorIndex !== -1) {
+                    chat.messages.splice(errorIndex, 1);
                     this.saveSettings();
                     
-                    // Reload chat and retry
+                    // Reload chat to remove the error from display
                     this.loadChat(this.currentChatId);
-                    try {
-                        await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
-                    } catch (retryError) {
-                        this.showError(`Retry failed: ${retryError.message}`);
-                    }
+                }
+                
+                // Retry processing without removing any other messages
+                try {
+                    // Continue the conversation from where it left off
+                    await this.processMessageWithTools(chat, mcpConnection, provider, message);
+                } catch (retryError) {
+                    this.showError(`Retry failed: ${retryError.message}`);
                 }
             });
             chat.messages.push({ type: 'error', content: error.message });
@@ -2800,6 +2805,33 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 this.updateToolCheckboxesForAutoMode();
             }
         }
+    }
+
+    // Get timezone information including name and UTC offset
+    getTimezoneInfo() {
+        const date = new Date();
+        
+        // Get UTC offset in minutes
+        const offsetMinutes = -date.getTimezoneOffset();
+        const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
+        const offsetMins = Math.abs(offsetMinutes) % 60;
+        const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+        const offsetString = `UTC${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMins.toString().padStart(2, '0')}`;
+        
+        // Try to get timezone name
+        let timezoneName;
+        try {
+            // This returns something like "America/New_York"
+            timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch (e) {
+            // Fallback to basic timezone string
+            timezoneName = date.toString().match(/\(([^)]+)\)/)?.[1] || offsetString;
+        }
+        
+        return {
+            name: timezoneName,
+            offset: offsetString
+        };
     }
 
     buildMessagesForAPI(chat, provider, freezeCache = false) {
@@ -3251,8 +3283,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             messageDiv.className = `message ${role}`;
         }
         
-        // Add redo button if we have a message index
-        if (messageIndex !== undefined && role !== 'system') {
+        // Add redo button only for user and assistant messages
+        if (messageIndex !== undefined && (role === 'user' || role === 'assistant')) {
             const redoBtn = document.createElement('button');
             redoBtn.className = 'redo-button';
             redoBtn.textContent = 'Redo';
@@ -3796,8 +3828,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         metricsFooter.innerHTML = metricsHtml;
         
-        // Initialize Tippy tooltips for the metric items
-        this.initializeTooltips(metricsFooter);
+        // Tooltips are CSS-only now
     }
     
     // Update a metrics placeholder with actual data (unified method for both live and stored)
@@ -3868,8 +3899,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         metricsFooter.innerHTML = metricsHtml;
         
-        // Initialize Tippy tooltips for the metric items
-        this.initializeTooltips(metricsFooter);
+        // Tooltips are CSS-only now
     }
     
     // Add metrics to the previous message element
@@ -3949,8 +3979,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         metricsFooter.innerHTML = metricsHtml;
         lastMessage.appendChild(metricsFooter);
         
-        // Initialize Tippy tooltips for the metric items
-        this.initializeTooltips(metricsFooter);
+        // Tooltips are CSS-only now
     }
     
     // Add metrics directly to the current assistant group (for stored messages)
@@ -4018,8 +4047,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         metricsFooter.innerHTML = metricsHtml;
         this.currentAssistantGroup.appendChild(metricsFooter);
         
-        // Initialize Tippy tooltips for the metric items
-        this.initializeTooltips(metricsFooter);
+        // Tooltips are CSS-only now
     }
     
     
@@ -5147,27 +5175,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         target.appendChild(stepLabel);
     }
     
-    // Initialize Tippy tooltips
-    initializeTooltips(container) {
-        // Find all elements with data-tooltip attribute
-        const elements = container.querySelectorAll('[data-tooltip]');
-        
-        elements.forEach(element => {
-            // Get theme based on current theme
-            const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
-            
-            tippy(element, {
-                content: element.getAttribute('data-tooltip'),
-                theme: isDarkTheme ? 'light-border' : 'light',
-                animation: 'shift-away',
-                delay: 0, // No delay
-                duration: [200, 150], // Animation duration in/out
-                placement: 'top',
-                arrow: true,
-                inertia: true
-            });
-        });
-    }
+    // Tooltips are now implemented with pure CSS
+    // No JavaScript initialization required
     
     // Copy conversation metrics to clipboard
     async copyConversationMetrics() {
@@ -5399,6 +5408,9 @@ This summary will be used as context for continuing our conversation.`;
                 timestamp: new Date().toISOString()
             });
             
+            // Save after adding the system-summary message
+            this.saveSettings();
+            
             // Add metrics placeholder
             const metricsId = `metrics-summary-${this.metricsIdCounter++}`;
             this.processRenderEvent({ type: 'metrics-placeholder', id: metricsId });
@@ -5507,6 +5519,9 @@ This summary will be used as context for continuing our conversation.`;
                 timestamp: new Date().toISOString()
             });
             
+            // Save after adding the system-title message
+            this.saveSettings();
+            
             // Add metrics placeholder
             const metricsId = `metrics-title-${this.metricsIdCounter++}`;
             this.processRenderEvent({ type: 'metrics-placeholder', id: metricsId });
@@ -5578,7 +5593,6 @@ This summary will be used as context for continuing our conversation.`;
                 if (newTitle && newTitle.length > 0) {
                     chat.title = newTitle;
                     chat.updatedAt = new Date().toISOString();
-                    this.saveSettings(); // Save the updated title
                     
                     // Store the title response with the 'title' role
                     chat.messages.push({ 
@@ -5588,6 +5602,8 @@ This summary will be used as context for continuing our conversation.`;
                         responseTime: llmResponseTime || null,
                         timestamp: new Date().toISOString()
                     });
+                    
+                    this.saveSettings(); // Save after adding the message
                     
                     // Update UI
                     this.updateChatSessions();
