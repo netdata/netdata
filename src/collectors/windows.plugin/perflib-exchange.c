@@ -567,6 +567,8 @@ static void netdata_exchange_proxy_avg_auth_latency(struct exchange_proxy *ep, c
 
         ep->rd_exchange_http_proxy_avg_auth_latency =
             rrddim_add(ep->st_exchange_http_proxy_avg_auth_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ep->st_exchange_http_proxy_avg_auth_latency->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -598,6 +600,9 @@ static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_pr
 
         ep->rd_exchange_http_proxy_avg_cas_processing_latency = rrddim_add(
             ep->st_exchange_http_proxy_avg_cas_processing_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            ep->st_exchange_http_proxy_avg_cas_processing_latency->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -629,6 +634,9 @@ static void netdata_exchange_proxy_mailbox_proxy_failure(struct exchange_proxy *
 
         ep->rd_exchange_http_proxy_mailbox_proxy_failure = rrddim_add(
             ep->st_exchange_http_proxy_mailbox_proxy_failure, "failures", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            ep->st_exchange_http_proxy_mailbox_proxy_failure->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -660,6 +668,9 @@ static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy 
 
         ep->rd_exchange_http_proxy_server_location_avg_latency = rrddim_add(
             ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            ep->st_exchange_http_proxy_server_location_avg_latency->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -691,6 +702,9 @@ static void netdata_exchange_proxy_outstanding_proxy(struct exchange_proxy *ep, 
 
         ep->rd_exchange_http_proxy_outstanding_proxy_requests = rrddim_add(
             ep->st_exchange_http_proxy_outstanding_proxy_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(
+            ep->st_exchange_http_proxy_outstanding_proxy_requests->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -722,6 +736,8 @@ static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char
 
         ep->rd_exchange_http_proxy_requests_total =
             rrddim_add(ep->st_exchange_http_proxy_requests_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ep->st_exchange_http_proxy_requests_total->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
