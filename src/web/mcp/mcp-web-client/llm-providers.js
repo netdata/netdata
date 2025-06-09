@@ -244,10 +244,6 @@ class AnthropicProvider extends LLMProvider {
         for (const block of data.content) {
             if (block.type === 'text') {
                 content += block.text;
-                // Debug: Check if thinking tags are in the text
-                if (block.text.includes('<thinking>')) {
-                    console.log('Found <thinking> tags in Anthropic text block:', block.text);
-                }
             } else if (block.type === 'tool_use') {
                 toolCalls.push({
                     id: block.id,
