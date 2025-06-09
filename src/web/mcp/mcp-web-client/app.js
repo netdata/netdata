@@ -2365,7 +2365,8 @@ All date/time interpretations must be based on the current date/time context pro
         this.updateGlobalToggleUI();
         
         // Display system prompt as first message
-        this.displaySystemPrompt(chat.systemPrompt || this.defaultSystemPrompt);
+        const systemPromptToDisplay = chat.systemPrompt || this.defaultSystemPrompt;
+        this.displaySystemPrompt(systemPromptToDisplay);
         
         // Track previous prompt tokens for delta calculation
         let previousPromptTokens = 0;
@@ -2538,7 +2539,8 @@ All date/time interpretations must be based on the current date/time context pro
         }
         this.updateCumulativeTokenDisplay();
         
-        this.scrollToBottom();
+        // Force scroll to bottom when loading chat (ignore the isAtBottom check)
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         
         // Focus the chat input so user can start typing immediately
         if (this.chatInput && !this.chatInput.disabled) {
@@ -3911,21 +3913,65 @@ All date/time interpretations must be based on the current date/time context pro
         const promptDiv = document.createElement('div');
         promptDiv.className = 'system-prompt-display';
         
+        // Create collapsible header (similar to thinking blocks)
         const headerDiv = document.createElement('div');
         headerDiv.className = 'system-prompt-header';
-        headerDiv.innerHTML = `<span class="system-prompt-label">System Prompt</span>`;
+        headerDiv.style.cursor = 'pointer';
+        headerDiv.style.userSelect = 'none';
         
+        const toggle = document.createElement('span');
+        toggle.className = 'system-prompt-toggle';
+        toggle.textContent = '▼';
+        toggle.style.fontSize = '12px';
+        toggle.style.fontFamily = 'monospace';
+        toggle.style.transition = 'transform 0.2s';
+        toggle.style.marginRight = '8px';
+        
+        const label = document.createElement('span');
+        label.className = 'system-prompt-label';
+        label.textContent = 'System Prompt';
+        
+        headerDiv.appendChild(toggle);
+        headerDiv.appendChild(label);
+        
+        // Create collapsible content
         const contentDiv = document.createElement('div');
-        contentDiv.className = 'system-prompt-content';
+        contentDiv.className = 'system-prompt-content collapsed';
         contentDiv.textContent = prompt;
+        
+        // Toggle functionality
+        let isCollapsed = true;
+        headerDiv.onclick = () => {
+            isCollapsed = !isCollapsed;
+            if (isCollapsed) {
+                contentDiv.classList.add('collapsed');
+                toggle.style.transform = 'rotate(0deg)';
+                toggle.textContent = '▼';
+            } else {
+                contentDiv.classList.remove('collapsed');
+                toggle.style.transform = 'rotate(90deg)';
+                toggle.textContent = '▶';
+            }
+        };
         
         promptDiv.appendChild(headerDiv);
         promptDiv.appendChild(contentDiv);
         
         this.chatMessages.appendChild(promptDiv);
         
-        // Add edit trigger after element is in DOM
-        this.addEditTrigger(contentDiv, prompt, 'system');
+        // Add edit trigger after element is in DOM (only when expanded)
+        const originalAddEditTrigger = () => this.addEditTrigger(contentDiv, prompt, 'system');
+        
+        // Override the header click to also handle edit trigger
+        const originalClick = headerDiv.onclick;
+        headerDiv.onclick = () => {
+            originalClick();
+            // Add edit trigger when expanding for the first time
+            if (!isCollapsed && !contentDiv.dataset.editTriggerAdded) {
+                setTimeout(originalAddEditTrigger, 300); // Wait for animation
+                contentDiv.dataset.editTriggerAdded = 'true';
+            }
+        };
     }
     
     addEditTrigger(contentDiv, originalContent, type) {

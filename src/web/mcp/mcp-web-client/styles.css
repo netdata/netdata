@@ -600,36 +600,61 @@ body {
     max-width: 80%;
 }
 
-/* System Prompt Display */
+/* System Prompt Display - exactly like thinking blocks */
 .system-prompt-display {
-    background-color: var(--hover-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin: 0 40px 16px;
-    max-width: auto;
-    overflow: visible;
-    position: relative;
+    margin: 16px 40px 4px 40px; /* More top margin to clear header, but same bottom as thinking blocks */
+    background-color: rgba(30, 30, 30, 0.2);
+    border-radius: 6px;
+    overflow: visible; /* Change from hidden to visible to ensure content can expand */
+    border: 1px solid var(--border-subtle);
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    position: relative; /* Ensure proper stacking context */
+    z-index: 10; /* Higher z-index to stay above other elements */
+}
+
+.system-prompt-display:hover {
+    opacity: 1.0;
 }
 
 .system-prompt-header {
+    padding: 3px 4px;
+    cursor: pointer;
+    user-select: none;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    gap: 8px;
+    background-color: rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s;
+}
+
+.system-prompt-header:hover {
+    background-color: rgba(0, 0, 0, 0.2);
 }
 
 .system-prompt-label {
-    font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--text-secondary);
+    opacity: 0.7;
 }
 
 .system-prompt-content {
+    padding: 3px 6px;
     font-size: 14px;
+    line-height: 1.6;
     color: var(--text-secondary);
+    max-height: 400px;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    background-color: rgba(255, 255, 255, 0.6);
     white-space: pre-wrap;
-    line-height: 1.5;
+}
+
+.system-prompt-content.collapsed {
+    max-height: 0;
+    padding: 0 3px;
+    opacity: 0;
 }
 
 /* System prompt editing */
@@ -2235,20 +2260,24 @@ body {
 
 /* Dark mode adjustments for tool blocks */
 [data-theme="dark"] .tool-block,
-[data-theme="dark"] .thinking-block {
+[data-theme="dark"] .thinking-block,
+[data-theme="dark"] .system-prompt-display {
     background-color: rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .tool-header {
+[data-theme="dark"] .tool-header,
+[data-theme="dark"] .system-prompt-header {
     background-color: rgba(0, 0, 0, 0.2);
 }
 
-[data-theme="dark"] .tool-header:hover {
+[data-theme="dark"] .tool-header:hover,
+[data-theme="dark"] .system-prompt-header:hover {
     background-color: rgba(0, 122, 204, 0.1);
 }
 
 [data-theme="dark"] .tool-content,
-[data-theme="dark"] .thinking-content {
+[data-theme="dark"] .thinking-content,
+[data-theme="dark"] .system-prompt-content {
     background-color: rgba(0, 0, 0, 0.25);
 }
 
