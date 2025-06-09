@@ -3177,31 +3177,43 @@ modules:
               unit: commands
               chart_type: line
               dimensions:
-                - name: ping
+                - name: pending
             - name: exchange.activesync_requests
               description: HTTP requests received from ASP.NET.
               unit: requests/s
               chart_type: line
               dimensions:
-                - name: requests
+                - name: received
             - name: exchange.activesync_sync_cmds
               description: Sync commands processed.
               unit: commands/s
               chart_type: line
               dimensions:
-                - name: sync
+                - name: processed
+            - name: exchange.rpc_active_user_count
+              description: Active unique users in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: active
             - name: exchange.rpc_avg_latency
               description: Average latency.
               unit: seconds
               chart_type: line
               dimensions:
                 - name: latency
-            - name: exchange.rpc_requests_total
+            - name: exchange.rpc_connection_count
+              description: Client connections.
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: exchange.rpc_requests
               description: Clients requests currently being processed.
               unit: requests
               chart_type: line
               dimensions:
-                - name: requests
+                - name: processed
             - name: exchange.rpc_active_user
               description: Active unique users in the last 2 minutes.
               unit: users
@@ -3220,7 +3232,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: operations
-            - name: exchange.rpc_user
+            - name: exchange.rpc_user_count
               description: RPC users.
               unit: users
               chart_type: line
@@ -3231,13 +3243,13 @@ modules:
               unit: users
               chart_type: line
               dimensions:
-                - name: users
+                - name: logged-in
             - name: exchange.owa_requests_total
               description: Requests handled by Outlook Web App.
               unit: requests/s
               chart_type: line
               dimensions:
-                - name: requests
+                - name: handled
             - name: exchange.workload_active_tasks
               description: Workload active tasks.
               unit: tasks

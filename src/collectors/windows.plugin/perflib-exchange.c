@@ -119,7 +119,7 @@ static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int u
             RRDSET_TYPE_LINE);
 
         rd_exchange_owa_unique_users =
-            rrddim_add(st_exchange_owa_unique_users, "users", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_exchange_owa_unique_users, "logged-in", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -148,7 +148,7 @@ static void netdata_exchange_owa_request_total(COUNTER_DATA *value, int update_e
             RRDSET_TYPE_LINE);
 
         rd_exchange_owa_request_total =
-            rrddim_add(st_exchange_owa_request_total, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_exchange_owa_request_total, "handled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -189,7 +189,7 @@ static void netdata_exchange_active_ping_cmd(COUNTER_DATA *value, int update_eve
             RRDSET_TYPE_LINE);
 
         rd_exchange_active_ping_cmds =
-            rrddim_add(st_exchange_active_ping_cmds, "ping", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_exchange_active_ping_cmds, "pending", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -218,7 +218,7 @@ static void netdata_exchange_active_requests(COUNTER_DATA *value, int update_eve
             RRDSET_TYPE_LINE);
 
         rd_exchange_received_requests =
-            rrddim_add(st_exchange_received_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_exchange_received_requests, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -246,7 +246,7 @@ static void netdata_exchange_sync_cmds(COUNTER_DATA *value, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_exchange_sync_cmds = rrddim_add(st_exchange_sync_cmds, "sync", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_exchange_sync_cmds = rrddim_add(st_exchange_sync_cmds, "processed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(st_exchange_sync_cmds, rd_exchange_sync_cmds, (collected_number)value->current.Data);
@@ -384,7 +384,7 @@ static void netdata_exchange_rpc_requests(COUNTER_DATA *value, int update_every)
             "rpc_requests_total",
             NULL,
             "rpc",
-            "exchange.rpc_requests_total",
+            "exchange.rpc_requests",
             "Clients requests currently being processed.",
             "requests",
             PLUGIN_WINDOWS_NAME,
@@ -394,7 +394,7 @@ static void netdata_exchange_rpc_requests(COUNTER_DATA *value, int update_every)
             RRDSET_TYPE_LINE);
 
         rd_exchange_rpc_requests =
-            rrddim_add(st_exchange_rpc_requests, "requests", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_exchange_rpc_requests, "processed", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st_exchange_rpc_requests, rd_exchange_rpc_requests, (collected_number)value->current.Data);
@@ -422,7 +422,7 @@ static void netdata_exchange_rpc_active_user_count(COUNTER_DATA *value, int upda
             RRDSET_TYPE_LINE);
 
         rd_exchange_active_user_account =
-            rrddim_add(st_exchange_active_user_account, "users", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_exchange_active_user_account, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -499,7 +499,7 @@ static void netdata_exchange_rpc_user_count(COUNTER_DATA *value, int update_ever
             "rpc_user",
             NULL,
             "rpc",
-            "exchange.rpc_user",
+            "exchange.rpc_user_count",
             "RPC users.",
             "users",
             PLUGIN_WINDOWS_NAME,
@@ -841,7 +841,7 @@ static void netdata_exchange_workload_completed_tasks(struct exchange_workload *
         ew->rd_exchange_workload_complete_tasks =
             rrddim_add(ew->st_exchange_workload_complete_tasks, "completed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "completed", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
