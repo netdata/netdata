@@ -863,6 +863,13 @@ body {
     transition: opacity 0.2s ease;
 }
 
+/* System blocks (Chat Title, Chat Summary) - ensure proper alignment */
+.system-block {
+    margin: 6px 40px; /* Match assistant-group horizontal padding */
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
 .tool-block:hover {
     opacity: 1;
 }
