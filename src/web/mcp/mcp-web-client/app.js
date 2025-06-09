@@ -1215,7 +1215,14 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         });
         
         this.logContent.appendChild(entryDiv);
-        this.logContent.scrollTop = this.logContent.scrollHeight;
+        
+        // Only scroll if user is already near the bottom
+        const threshold = 100; // pixels from bottom to consider "at bottom"
+        const isAtBottom = this.logContent.scrollHeight - this.logContent.scrollTop - this.logContent.clientHeight < threshold;
+        
+        if (isAtBottom) {
+            this.logContent.scrollTop = this.logContent.scrollHeight;
+        }
     }
 
     formatLogMessage(message) {
@@ -2107,9 +2114,35 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         let systemPromptWithTimestamp = this.lastSystemPrompt;
         const currentTimestamp = new Date().toISOString();
         const timezoneInfo = this.getTimezoneInfo();
-        systemPromptWithTimestamp += `\n\nThe current date and time is ${currentTimestamp}.`;
-        systemPromptWithTimestamp += `\nThe current timezone is ${timezoneInfo.name}, i.e. ${timezoneInfo.offset}.`;
-        systemPromptWithTimestamp += `\nUnless otherwise specified, assume all relative datetime references have a basis on this date, time and timezone.`;
+        const currentDate = new Date();
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const currentDayName = dayNames[currentDate.getDay()];
+        
+        systemPromptWithTimestamp += `\n\n## CRITICAL DATE/TIME CONTEXT
+Current date and time: ${currentTimestamp}
+Current day: ${currentDayName}
+Current timezone: ${timezoneInfo.name} (${timezoneInfo.offset})
+Current year: ${currentDate.getFullYear()}
+
+IMPORTANT DATE/TIME INTERPRETATION RULES FOR MONITORING DATA:
+1. When the user mentions dates without a year (e.g., "January 15", "last month"), use ${currentDate.getFullYear()} as the current year
+2. When the user mentions times without a timezone (e.g., "10pm", "14:30"), assume ${timezoneInfo.name} timezone
+3. ALL relative references refer to the PAST (this is a monitoring system analyzing historical data):
+   - "this morning" = earlier today, before noon
+   - "this afternoon" = earlier today, after noon
+   - "tonight" = earlier today, evening hours
+   - "this Thursday" or "on Thursday" = the most recent Thursday (if today is Thursday and it's past the mentioned time, use today; otherwise use last Thursday)
+   - "during the weekend" = the most recent Saturday and Sunday
+   - "Monday" or "on Monday" = the most recent Monday
+4. IMPORTANT: Distinguish between complete time periods and relative offsets:
+   - "yesterday" = the complete 24-hour period before today at 00:00 (e.g., if today is Jan 15, yesterday is Jan 14 00:00 to Jan 14 23:59:59)
+   - "last week" = the complete previous calendar week (Monday 00:00 to Sunday 23:59:59)
+   - "last hour" = the complete previous clock hour (e.g., if it's 14:35, last hour is 13:00 to 13:59:59)
+   - "last month" = the complete previous calendar month (e.g., if it's January, last month is December 1-31)
+   - BUT: "7 days ago", "3 hours ago", "2 weeks ago" = exactly that amount of time before now
+5. Never interpret relative references as future times - users are always asking about historical monitoring data
+
+All date/time interpretations must be based on the current date/time context provided above, NOT on your training data.`;
         
         const chat = {
             id: chatId,
@@ -2338,6 +2371,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         let previousPromptTokens = 0;
         
         let inTitleGeneration = false;
+        let inSummaryGeneration = false;
         
         for (let i = 0; i < chat.messages.length; i++) {
             const msg = chat.messages[i];
@@ -2352,6 +2386,11 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 separatorDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--info-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
                 separatorDiv.innerHTML = '<i class="fas fa-edit"></i> Generating chat title...';
                 this.chatMessages.appendChild(separatorDiv);
+            }
+            
+            // Check if this is the start of summary generation
+            if (msg.role === 'system-summary' && !inSummaryGeneration) {
+                inSummaryGeneration = true;
             }
             
             // Store previous tokens before displaying
@@ -2401,6 +2440,60 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                         actionSection.appendChild(actionContent);
                         
                         systemContent.appendChild(actionSection);
+                        }
+                    }
+                }
+            }
+            
+            // Check if summary generation completed
+            if (inSummaryGeneration && msg.role === 'summary') {
+                inSummaryGeneration = false;
+                // Find the summary block and add the RESPONSE section
+                const summaryBlocks = this.chatMessages.querySelectorAll('.system-block[data-type="summary"]');
+                const summaryBlock = summaryBlocks[summaryBlocks.length - 1]; // Get the last one
+                
+                if (summaryBlock) {
+                    const systemContent = summaryBlock.querySelector('.tool-content');
+                    if (systemContent) {
+                        // Check if RESPONSE section already exists
+                        const existingResponse = Array.from(systemContent.querySelectorAll('.tool-section-label'))
+                            .find(label => label.textContent === 'RESPONSE');
+                        if (!existingResponse) {
+                            // Add separator
+                            const separator = document.createElement('div');
+                            separator.className = 'tool-separator';
+                            systemContent.appendChild(separator);
+                            
+                            // Add response section with the actual summary
+                            const responseSection = document.createElement('div');
+                            responseSection.className = 'tool-response-section';
+                            
+                            const responseControls = document.createElement('div');
+                            responseControls.className = 'tool-section-controls';
+                            
+                            const responseLabel = document.createElement('span');
+                            responseLabel.className = 'tool-section-label';
+                            responseLabel.textContent = 'RESPONSE';
+                            
+                            // Add copy button for the response
+                            const copyBtn = document.createElement('button');
+                            copyBtn.className = 'tool-section-copy';
+                            copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                            copyBtn.onclick = () => {
+                                this.copyToClipboard(msg.content, copyBtn);
+                            };
+                            
+                            responseControls.appendChild(responseLabel);
+                            responseControls.appendChild(copyBtn);
+                            responseSection.appendChild(responseControls);
+                            
+                            // Create a div for the summary content with markdown rendering
+                            const responseContent = document.createElement('div');
+                            responseContent.className = 'message-content';
+                            responseContent.innerHTML = marked.parse(msg.content);
+                            responseSection.appendChild(responseContent);
+                            
+                            systemContent.appendChild(responseSection);
                         }
                     }
                 }
@@ -4889,7 +4982,13 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     scrollToBottom() {
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        // Only scroll if user is already near the bottom
+        const threshold = 100; // pixels from bottom to consider "at bottom"
+        const isAtBottom = this.chatMessages.scrollHeight - this.chatMessages.scrollTop - this.chatMessages.clientHeight < threshold;
+        
+        if (isAtBottom) {
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
     }
     
     // Add turn separator between conversation turns
@@ -5114,25 +5213,48 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const chat = this.chats.get(chatId);
         if (!chat) return 0;
         
-        // Check if the last non-title message is a summary - if so, context is just the summary's output tokens
-        let lastNonTitleIndex = -1;
+        // Find the last summary checkpoint
+        let lastSummaryIndex = -1;
         for (let i = chat.messages.length - 1; i >= 0; i--) {
-            if (chat.messages[i].role !== 'title') {
-                lastNonTitleIndex = i;
+            if (chat.messages[i].role === 'summary') {
+                lastSummaryIndex = i;
                 break;
             }
         }
         
-        if (lastNonTitleIndex >= 0) {
-            const lastNonTitleMessage = chat.messages[lastNonTitleIndex];
-            if (lastNonTitleMessage && lastNonTitleMessage.role === 'summary' && lastNonTitleMessage.usage) {
-                // For summaries as the last real message, the context window is just the completion tokens
-                // since that's what will be included in the next request
-                return lastNonTitleMessage.usage.completionTokens || 0;
+        // If we have a summary, calculate tokens only from after it
+        if (lastSummaryIndex >= 0) {
+            const summaryMsg = chat.messages[lastSummaryIndex];
+            let contextTokens = 0;
+            
+            // Start with the summary's completion tokens (this will be in the system prompt)
+            if (summaryMsg.usage && summaryMsg.usage.completionTokens) {
+                contextTokens = summaryMsg.usage.completionTokens;
             }
+            
+            // Find the latest assistant message AFTER the summary
+            for (let i = chat.messages.length - 1; i > lastSummaryIndex; i--) {
+                const message = chat.messages[i];
+                if (message.role === 'assistant' && message.usage) {
+                    // Skip title responses
+                    if (i > 0 && chat.messages[i-1].role === 'system-title') {
+                        continue;
+                    }
+                    
+                    // For assistant messages after summary, include all tokens from that request
+                    const usage = message.usage;
+                    return (usage.promptTokens || 0) + 
+                           (usage.cacheReadInputTokens || 0) + 
+                           (usage.cacheCreationInputTokens || 0) + 
+                           (usage.completionTokens || 0);
+                }
+            }
+            
+            // If no assistant message after summary, return just the summary tokens
+            return contextTokens;
         }
         
-        // Find the latest assistant message (excluding title/summary)
+        // No summary found - find the latest assistant message
         for (let i = chat.messages.length - 1; i >= 0; i--) {
             const message = chat.messages[i];
             if (message.role === 'assistant' && message.usage) {
@@ -5746,7 +5868,7 @@ This summary will be used as context for continuing our conversation, so preserv
                         separator.className = 'tool-separator';
                         systemContent.appendChild(separator);
                         
-                        // Add action section
+                        // Add action section with the actual summary response
                         const actionSection = document.createElement('div');
                         actionSection.className = 'tool-response-section';
                         
@@ -5755,13 +5877,24 @@ This summary will be used as context for continuing our conversation, so preserv
                         
                         const actionLabel = document.createElement('span');
                         actionLabel.className = 'tool-section-label';
-                        actionLabel.textContent = 'ACTION';
+                        actionLabel.textContent = 'RESPONSE';
+                        
+                        // Add copy button for the response
+                        const copyBtn = document.createElement('button');
+                        copyBtn.className = 'tool-section-copy';
+                        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                        copyBtn.onclick = () => {
+                            this.copyToClipboard(response.content, copyBtn);
+                        };
                         
                         actionControls.appendChild(actionLabel);
+                        actionControls.appendChild(copyBtn);
                         actionSection.appendChild(actionControls);
                         
-                        const actionContent = document.createElement('pre');
-                        actionContent.textContent = 'Conversation summarized. Context window has been reset.';
+                        // Create a div for the summary content with markdown rendering
+                        const actionContent = document.createElement('div');
+                        actionContent.className = 'message-content';
+                        actionContent.innerHTML = marked.parse(response.content);
                         actionSection.appendChild(actionContent);
                         
                         systemContent.appendChild(actionSection);
@@ -5775,6 +5908,10 @@ This summary will be used as context for continuing our conversation, so preserv
             
         } catch (error) {
             console.error('Failed to summarize conversation:', error);
+            
+            // Hide spinner on error
+            this.processRenderEvent({ type: 'hide-spinner' });
+            
             this.showError(`Failed to summarize: ${error.message}`);
             
             // Remove the system-summary message if it failed
@@ -5785,7 +5922,7 @@ This summary will be used as context for continuing our conversation, so preserv
         } finally {
             // Re-enable button
             this.summarizeBtn.disabled = false;
-            this.summarizeBtn.innerHTML = '<span><i class="fas fa-compress-alt"></i></span><span>Summarize Conversation</span>';
+            this.summarizeBtn.innerHTML = '<span><i class="fas fa-compress-alt"></i></span><span>Summarize</span>';
         }
     }
     
