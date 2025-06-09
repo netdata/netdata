@@ -1278,6 +1278,10 @@ body {
     background: var(--modal-backdrop);
 }
 
+.modal-backdrop.no-close {
+    cursor: default;
+}
+
 .modal-content {
     position: relative;
     background: var(--surface-color);

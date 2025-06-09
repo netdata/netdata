@@ -132,6 +132,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         this.initializeUI();
         this.initializeResizable();
+        
+        // Clear current chat ID to always start fresh
+        localStorage.removeItem('currentChatId');
+        
         this.loadSettings();
         this.initializeDefaultLLMProvider();
         this.initializeDefaultMCPServer();
@@ -163,7 +167,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     initializeUI() {
         // Chat sidebar
         this.newChatBtn = document.getElementById('newChatBtn');
-        this.newChatBtn.addEventListener('click', () => this.showNewChatModal());
+        this.newChatBtn.addEventListener('click', () => this.createNewChatDirectly());
         this.chatSessions = document.getElementById('chatSessions');
         
         // Sidebar footer controls
@@ -277,19 +281,19 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         this.addMcpServerBtn.addEventListener('click', () => this.showModal('addMcpModal'));
         
-        // New chat modal
-        this.setupModal('newChatModal', 'newChatBackdrop', 'closeNewChatBtn');
-        this.newChatMcpServer = document.getElementById('newChatMcpServer');
-        this.newChatLlmProvider = document.getElementById('newChatLlmProvider');
-        this.newChatModelGroup = document.getElementById('newChatModelGroup');
-        this.newChatModel = document.getElementById('newChatModel');
-        this.newChatTitle = document.getElementById('newChatTitle');
-        this.createChatBtn = document.getElementById('createChatBtn');
-        this.cancelNewChatBtn = document.getElementById('cancelNewChatBtn');
-        
-        this.newChatLlmProvider.addEventListener('change', () => this.updateNewChatModels());
-        this.createChatBtn.addEventListener('click', () => this.createNewChat());
-        this.cancelNewChatBtn.addEventListener('click', () => this.hideModal('newChatModal'));
+        // New chat modal - no longer used, kept for potential future use
+        // this.setupModal('newChatModal', 'newChatBackdrop', 'closeNewChatBtn');
+        // this.newChatMcpServer = document.getElementById('newChatMcpServer');
+        // this.newChatLlmProvider = document.getElementById('newChatLlmProvider');
+        // this.newChatModelGroup = document.getElementById('newChatModelGroup');
+        // this.newChatModel = document.getElementById('newChatModel');
+        // this.newChatTitle = document.getElementById('newChatTitle');
+        // this.createChatBtn = document.getElementById('createChatBtn');
+        // this.cancelNewChatBtn = document.getElementById('cancelNewChatBtn');
+        // 
+        // this.newChatLlmProvider.addEventListener('change', () => this.updateNewChatModels());
+        // this.createChatBtn.addEventListener('click', () => this.createNewChat());
+        // this.cancelNewChatBtn.addEventListener('click', () => this.hideModal('newChatModal'));
         
         // Add MCP server modal
         this.setupModal('addMcpModal', 'addMcpBackdrop', 'closeAddMcpBtn');
@@ -331,6 +335,18 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         // Initialize tooltips for all elements
         this.initializeTooltips(document.body);
+        
+        // Setup no models modal
+        this.noModelsModal = document.getElementById('noModelsModal');
+        this.noModelsBackdrop = document.getElementById('noModelsBackdrop');
+        this.noModelsProxyUrl = document.getElementById('noModelsProxyUrl');
+        this.retryModelsBtn = document.getElementById('retryModelsBtn');
+        
+        // Retry button handler
+        this.retryModelsBtn.addEventListener('click', async () => {
+            this.hideModal('noModelsModal');
+            await this.initializeDefaultLLMProvider();
+        });
     }
 
     setupModal(modalId, backdropId, closeId) {
@@ -349,6 +365,94 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
 
     hideModal(modalId) {
         document.getElementById(modalId).classList.remove('show');
+    }
+    
+    showNoModelsModal(proxyUrl) {
+        // Update the proxy URL in the modal
+        this.noModelsProxyUrl.textContent = proxyUrl;
+        
+        // Show the modal
+        this.showModal('noModelsModal');
+        
+        // Disable the backdrop click since we don't want users to close it
+        this.noModelsBackdrop.onclick = null;
+    }
+    
+    validateChatModels() {
+        // Get default model for fallback
+        let defaultModel = null;
+        try {
+            const lastConfig = localStorage.getItem('lastChatConfig');
+            if (lastConfig) {
+                const config = JSON.parse(lastConfig);
+                defaultModel = config.model;
+            }
+        } catch (e) {
+            // Ignore
+        }
+        
+        // Validate each chat's model
+        for (const [chatId, chat] of this.chats) {
+            if (chat.model && chat.llmProviderId) {
+                const provider = this.llmProviders.get(chat.llmProviderId);
+                if (provider && provider.availableProviders) {
+                    // Check if the model exists
+                    let modelExists = false;
+                    const [providerType, modelName] = chat.model.includes(':') ? 
+                        chat.model.split(':') : ['', chat.model];
+                    
+                    if (providerType && provider.availableProviders[providerType]) {
+                        const models = provider.availableProviders[providerType].models || [];
+                        modelExists = models.some(m => {
+                            const mId = typeof m === 'string' ? m : m.id;
+                            return mId === modelName;
+                        });
+                    }
+                    
+                    if (!modelExists) {
+                        console.warn(`Chat ${chatId} has invalid model ${chat.model}, resetting to default`);
+                        
+                        // Use default or first available
+                        let fallbackModel = defaultModel;
+                        if (!fallbackModel || !this.isModelValid(fallbackModel, provider)) {
+                            const firstProvider = Object.keys(provider.availableProviders)[0];
+                            const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
+                            if (firstModel) {
+                                const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
+                                fallbackModel = `${firstProvider}:${modelId}`;
+                            }
+                        }
+                        
+                        if (fallbackModel) {
+                            chat.model = fallbackModel;
+                            
+                            // Update UI if this is the current chat
+                            if (chatId === this.currentChatId) {
+                                this.updateModelDisplay(chat);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Save any changes
+        this.saveSettings();
+    }
+    
+    isModelValid(model, provider) {
+        if (!model || !provider || !provider.availableProviders) return false;
+        
+        const [providerType, modelName] = model.includes(':') ? 
+            model.split(':') : ['', model];
+        
+        if (!providerType || !provider.availableProviders[providerType]) return false;
+        
+        const models = provider.availableProviders[providerType].models || [];
+        return models.some(m => {
+            const mId = typeof m === 'string' ? m : m.id;
+            return mId === modelName;
+        });
     }
     
     toggleDropdown(dropdownId) {
@@ -800,6 +904,17 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         }
     }
     
+    showToast(message, className = 'error-toast') {
+        // Show toast notification only (no chat message)
+        const toast = document.createElement('div');
+        toast.className = className;
+        toast.textContent = message;
+        document.getElementById('errorToastContainer').appendChild(toast);
+        
+        // Remove after animation
+        setTimeout(() => toast.remove(), 3000);
+    }
+    
     showErrorWithRetry(message, retryCallback) {
         // Show error toast
         const toast = document.createElement('div');
@@ -1106,18 +1221,63 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             try {
                 const chats = JSON.parse(savedChats);
                 chats.forEach(chat => {
+                    // Validate that the chat's model still exists
+                    if (chat.model && chat.llmProviderId) {
+                        const provider = this.llmProviders.get(chat.llmProviderId);
+                        if (provider && provider.availableProviders) {
+                            // Check if the model exists in the provider's available models
+                            let modelExists = false;
+                            const [providerType, modelName] = chat.model.includes(':') ? 
+                                chat.model.split(':') : ['', chat.model];
+                            
+                            if (providerType && provider.availableProviders[providerType]) {
+                                const models = provider.availableProviders[providerType].models || [];
+                                modelExists = models.some(m => {
+                                    const mId = typeof m === 'string' ? m : m.id;
+                                    return mId === modelName;
+                                });
+                            }
+                            
+                            if (!modelExists) {
+                                console.warn(`Chat ${chat.id} has invalid model ${chat.model}, resetting to default`);
+                                
+                                // Try to get default model from lastChatConfig
+                                let defaultModel = null;
+                                try {
+                                    const lastConfig = localStorage.getItem('lastChatConfig');
+                                    if (lastConfig) {
+                                        const config = JSON.parse(lastConfig);
+                                        if (config.model && config.llmProviderId === chat.llmProviderId) {
+                                            defaultModel = config.model;
+                                        }
+                                    }
+                                } catch (e) {
+                                    // Ignore
+                                }
+                                
+                                // If no default, use first available model
+                                if (!defaultModel) {
+                                    const firstProvider = Object.keys(provider.availableProviders)[0];
+                                    const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
+                                    if (firstModel) {
+                                        const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
+                                        defaultModel = `${firstProvider}:${modelId}`;
+                                    }
+                                }
+                                
+                                if (defaultModel) {
+                                    chat.model = defaultModel;
+                                }
+                            }
+                        }
+                    }
+                    
                     this.chats.set(chat.id, chat);
                 });
                 this.updateChatSessions();
                 
-                // Load last active chat
-                const lastChatId = localStorage.getItem('currentChatId');
-                if (lastChatId && this.chats.has(lastChatId)) {
-                    this.loadChat(lastChatId);
-                } else {
-                    // No active chat, will create one after initialization
-                    this.shouldCreateDefaultChat = true;
-                }
+                // Always create a new chat on startup instead of loading the last one
+                this.shouldCreateDefaultChat = true;
             } catch (e) {
                 console.error('Failed to load chats:', e);
             }
@@ -1148,6 +1308,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             
             if (Object.keys(providers).length === 0) {
                 console.warn('No LLM providers configured in proxy');
+                this.showNoModelsModal(proxyUrl);
                 return;
             }
             
@@ -1177,6 +1338,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             this.updateLlmProvidersList();
             this.updateNewChatSelectors();
             
+            // Validate all existing chats have valid models
+            this.validateChatModels();
+            
             this.addLogEntry('SYSTEM', {
                 timestamp: new Date().toISOString(),
                 direction: 'info',
@@ -1190,6 +1354,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 direction: 'error',
                 message: `Failed to auto-configure LLM provider: ${error.message}`
             });
+            this.showNoModelsModal(proxyUrl);
         }
     }
 
@@ -1530,42 +1695,76 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     // Chat Management
-    showNewChatModal() {
+    async createNewChatDirectly() {
         // Check if there's an unsaved chat
         const unsavedChat = Array.from(this.chats.values()).find(chat => chat.isSaved === false);
         if (unsavedChat) {
             // Switch to the unsaved chat instead of creating a new one
             this.loadChat(unsavedChat.id);
-            this.showError('Please use the current chat or save it by sending a message before creating a new one.');
+            this.showToast('Please use the current chat or save it by sending a message before creating a new one.');
             return;
         }
-        this.updateNewChatSelectors();
         
-        // Restore last selected values from localStorage
-        const lastChatConfig = localStorage.getItem('lastChatConfig');
-        if (lastChatConfig) {
-            try {
-                const config = JSON.parse(lastChatConfig);
-                if (config.mcpServerId && this.mcpServers.has(config.mcpServerId)) {
-                    this.newChatMcpServer.value = config.mcpServerId;
+        // Make sure we have at least one MCP server and LLM provider
+        if (this.mcpServers.size === 0 || this.llmProviders.size === 0) {
+            this.showError('Please configure at least one MCP server and LLM provider');
+            return;
+        }
+        
+        // Get the last used configuration or use defaults
+        let mcpServerId, llmProviderId, model;
+        
+        try {
+            const lastConfig = localStorage.getItem('lastChatConfig');
+            if (lastConfig) {
+                const config = JSON.parse(lastConfig);
+                // Verify these still exist
+                if (this.mcpServers.has(config.mcpServerId) && this.llmProviders.has(config.llmProviderId)) {
+                    mcpServerId = config.mcpServerId;
+                    llmProviderId = config.llmProviderId;
+                    model = config.model;
                 }
-                if (config.llmProviderId && this.llmProviders.has(config.llmProviderId)) {
-                    this.newChatLlmProvider.value = config.llmProviderId;
-                    // Trigger model update
-                    this.updateNewChatModels();
-                    // After models are loaded, restore the selected model
-                    setTimeout(() => {
-                        if (config.model) {
-                            this.newChatModel.value = config.model;
-                        }
-                    }, 100);
+            }
+        } catch (e) {
+            // Ignore errors
+        }
+        
+        // Use defaults if needed
+        if (!mcpServerId) mcpServerId = this.mcpServers.keys().next().value;
+        if (!llmProviderId) llmProviderId = this.llmProviders.keys().next().value;
+        
+        // Get first available model if not specified
+        if (!model) {
+            const provider = this.llmProviders.get(llmProviderId);
+            if (provider && provider.availableProviders) {
+                const firstProvider = Object.keys(provider.availableProviders)[0];
+                const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
+                if (firstModel) {
+                    const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
+                    model = `${firstProvider}:${modelId}`;
                 }
-            } catch (e) {
-                console.error('Failed to restore last chat config:', e);
             }
         }
         
-        this.showModal('newChatModal');
+        if (!model) {
+            this.showError('No models available');
+            return;
+        }
+        
+        // Create an unsaved chat
+        await this.createNewChat({
+            mcpServerId: mcpServerId,
+            llmProviderId: llmProviderId,
+            model: model,
+            title: 'New Chat',
+            isSaved: false
+        });
+    }
+    
+    // Legacy method kept for compatibility
+    showNewChatModal() {
+        // Redirect to direct creation
+        this.createNewChatDirectly();
     }
 
     updateNewChatSelectors() {
@@ -1651,17 +1850,15 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     async createNewChat(options = {}) {
-        // Support both modal-based creation and programmatic creation
-        const mcpServerId = options.mcpServerId || this.newChatMcpServer.value;
-        const llmProviderId = options.llmProviderId || this.newChatLlmProvider.value;
-        const selectedModel = options.model || this.newChatModel.value;
-        let title = options.title || this.newChatTitle.value.trim();
+        // Now only supports programmatic creation since we removed the modal
+        const mcpServerId = options.mcpServerId;
+        const llmProviderId = options.llmProviderId;
+        const selectedModel = options.model;
+        let title = options.title || '';
         const isSaved = options.isSaved !== undefined ? options.isSaved : true;
         
         if (!mcpServerId || !llmProviderId) {
-            if (!options.mcpServerId) { // Only show error for modal-based creation
-                this.showError('Please select both MCP server and LLM provider');
-            }
+            this.showError('Cannot create chat: Missing MCP server or LLM provider');
             return;
         }
         
@@ -1688,17 +1885,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             title = `${server.name} - ${provider.name}`;
         }
         
-        // Extract context window size from selected option if available
-        const selectedOption = this.newChatModel.options[this.newChatModel.selectedIndex];
-        const contextWindow = selectedOption.getAttribute('data-context-window');
-        
         // Extract model name from format "provider:model-name"
         const modelName = selectedModel.includes(':') ? selectedModel.split(':')[1] : selectedModel;
-        
-        // Update modelLimits with the context window from proxy if available
-        if (contextWindow) {
-            this.modelLimits[modelName] = parseInt(contextWindow);
-        }
         
         const chatId = `chat_${Date.now()}`;
         const chat = {
@@ -1739,14 +1927,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         }
         this.updateChatSessions();
         this.loadChat(chatId);
-        
-        // Clear form and close modal (only if using modal)
-        if (!options.mcpServerId) {
-            this.newChatTitle.value = '';
-            this.newChatModel.value = '';
-            this.newChatModelGroup.style.display = 'none';
-            this.hideModal('newChatModal');
-        }
         
         return chatId;
     }
