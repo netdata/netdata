@@ -1699,9 +1699,14 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Check if there's an unsaved chat
         const unsavedChat = Array.from(this.chats.values()).find(chat => chat.isSaved === false);
         if (unsavedChat) {
-            // Switch to the unsaved chat instead of creating a new one
-            this.loadChat(unsavedChat.id);
-            this.showToast('Please use the current chat or save it by sending a message before creating a new one.');
+            // Check if we're already in the unsaved chat
+            if (this.currentChatId === unsavedChat.id) {
+                // Already in the unsaved chat, just show toast
+                this.showToast('Please use the current chat or save it by sending a message before creating a new one.');
+            } else {
+                // Switch to the unsaved chat instead of creating a new one
+                this.loadChat(unsavedChat.id);
+            }
             return;
         }
         
