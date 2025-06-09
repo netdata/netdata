@@ -131,7 +131,11 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         this.lastSystemPrompt = localStorage.getItem('lastSystemPrompt') || this.defaultSystemPrompt;
         
         this.initializeUI();
-        this.initializeResizable();
+        
+        // Delay resizable initialization to ensure DOM is ready
+        setTimeout(() => {
+            this.initializeResizable();
+        }, 0);
         
         // Clear current chat ID to always start fresh
         localStorage.removeItem('currentChatId');
@@ -245,13 +249,25 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Log panel
         this.logPanel = document.getElementById('logPanel');
         this.toggleLogBtn = document.getElementById('toggleLogBtn');
+        this.expandLogBtn = document.getElementById('expandLogBtn');
         this.clearLogBtn = document.getElementById('clearLogBtn');
         this.downloadLogBtn = document.getElementById('downloadLogBtn');
         this.logContent = document.getElementById('logContent');
         
         this.toggleLogBtn.addEventListener('click', () => this.toggleLog());
+        this.expandLogBtn.addEventListener('click', () => this.toggleLog());
         this.clearLogBtn.addEventListener('click', () => this.clearLog());
         this.downloadLogBtn.addEventListener('click', () => this.downloadLog());
+        
+        // Sidebar management
+        this.chatSidebar = document.getElementById('chatSidebar');
+        this.toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+        
+        // Set up sidebar toggle button
+        this.toggleSidebarBtn.addEventListener('click', () => this.toggleChatSidebar());
+        
+        // Load sidebar states from localStorage
+        this.loadSidebarStates();
         
         // Temperature control
         this.temperatureControl = document.getElementById('temperatureControl');
@@ -731,12 +747,51 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const chatSidebar = document.getElementById('chatSidebar');
         const chatSidebarResize = document.getElementById('chatSidebarResize');
         
-        this.setupResize(chatSidebarResize, 'horizontal', (delta) => {
-            const currentWidth = chatSidebar.offsetWidth;
-            const newWidth = Math.max(200, Math.min(400, currentWidth + delta));
-            chatSidebar.style.width = newWidth + 'px';
+        // Make sure the resize handle exists
+        if (!chatSidebarResize) {
+            console.error('Chat sidebar resize handle not found');
+        } else {
+            this.setupResize(chatSidebarResize, 'horizontal', (delta) => {
+                const isCollapsed = chatSidebar.classList.contains('collapsed');
+                const currentWidth = chatSidebar.offsetWidth;
+                const newWidth = currentWidth + delta;
+                
+                // If collapsed and dragging to expand (delta > 0)
+            if (isCollapsed && newWidth > 100) {
+                // Expand the sidebar
+                chatSidebar.classList.remove('collapsed');
+                const icon = this.toggleSidebarBtn.querySelector('i');
+                icon.className = 'fas fa-chevron-left';
+                localStorage.setItem('chatSidebarCollapsed', 'false');
+                
+                // Set the new width
+                const finalExpandWidth = Math.max(200, Math.min(400, newWidth));
+                chatSidebar.style.setProperty('width', finalExpandWidth + 'px', 'important');
+                chatSidebar.style.setProperty('min-width', finalExpandWidth + 'px', 'important');
+                chatSidebar.style.setProperty('max-width', finalExpandWidth + 'px', 'important');
+            }
+            // If expanded and dragging to collapse (width getting too small)
+            else if (!isCollapsed && newWidth < 100) {
+                // Collapse the sidebar
+                chatSidebar.classList.add('collapsed');
+                const icon = this.toggleSidebarBtn.querySelector('i');
+                icon.className = 'fas fa-chevron-left';
+                localStorage.setItem('chatSidebarCollapsed', 'true');
+                chatSidebar.style.width = '';
+            }
+            // Normal resize when expanded
+            else if (!isCollapsed) {
+                const finalWidth = Math.max(200, Math.min(400, newWidth));
+                
+                // Override all width-related CSS properties
+                chatSidebar.style.setProperty('width', finalWidth + 'px', 'important');
+                chatSidebar.style.setProperty('min-width', finalWidth + 'px', 'important');
+                chatSidebar.style.setProperty('max-width', finalWidth + 'px', 'important');
+            }
+            
             this.savePaneSizes();
         });
+        }
 
         // Log panel resize
         const logPanel = document.getElementById('logPanel');
@@ -747,7 +802,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             if (logPanel.classList.contains('collapsed')) {
                 // Expand it first
                 logPanel.classList.remove('collapsed');
-                this.toggleLogBtn.textContent = '◀';
+                this.toggleLogBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+                this.expandLogBtn.style.display = 'none';
                 localStorage.setItem('logCollapsed', 'false');
                 // Set initial width when expanding
                 logPanel.style.width = '300px';
@@ -757,7 +813,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // For right panel, dragging left (negative delta) should increase width
             const newWidth = Math.max(200, Math.min(650, currentWidth + (-delta)));
             logPanel.style.width = newWidth + 'px';
-            console.log('Log panel resize:', { currentWidth, delta, newWidth, offsetWidth: logPanel.offsetWidth });
             this.savePaneSizes();
         }, logPanel);
 
@@ -846,7 +901,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             try {
                 const sizes = JSON.parse(savedSizes);
                 
-                if (sizes.chatSidebar) {
+                if (sizes.chatSidebar && !this.chatSidebar.classList.contains('collapsed')) {
                     document.getElementById('chatSidebar').style.width = sizes.chatSidebar + 'px';
                 }
                 
@@ -871,10 +926,55 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     toggleLog() {
-        this.logPanel.classList.toggle('collapsed');
-        this.toggleLogBtn.textContent = this.logPanel.classList.contains('collapsed') ? '▶' : '◀';
-        localStorage.setItem('logCollapsed', this.logPanel.classList.contains('collapsed'));
+        const isCollapsed = this.logPanel.classList.toggle('collapsed');
+        this.toggleLogBtn.innerHTML = isCollapsed ? '<i class="fas fa-chevron-left"></i>' : '<i class="fas fa-chevron-right"></i>';
+        this.expandLogBtn.style.display = isCollapsed ? 'block' : 'none';
+        localStorage.setItem('logCollapsed', isCollapsed);
         this.savePaneSizes();
+    }
+    
+    toggleChatSidebar() {
+        const isCollapsed = this.chatSidebar.classList.toggle('collapsed');
+        
+        // Update button icon - always keep as chevron-left, CSS handles rotation when collapsed
+        const icon = this.toggleSidebarBtn.querySelector('i');
+        icon.className = 'fas fa-chevron-left';
+        
+        if (isCollapsed) {
+            // Store current width before collapsing
+            const currentWidth = this.chatSidebar.offsetWidth;
+            if (currentWidth > 40) {
+                localStorage.setItem('chatSidebarWidth', currentWidth);
+            }
+            // Override any inline width when collapsed
+            this.chatSidebar.style.width = '';
+        } else {
+            // Restore previous width
+            const savedWidth = localStorage.getItem('chatSidebarWidth') || '280';
+            this.chatSidebar.style.width = savedWidth + 'px';
+        }
+        
+        localStorage.setItem('chatSidebarCollapsed', isCollapsed);
+        this.savePaneSizes();
+    }
+    
+    loadSidebarStates() {
+        // Load chat sidebar state
+        const chatSidebarCollapsed = localStorage.getItem('chatSidebarCollapsed') === 'true';
+        if (chatSidebarCollapsed) {
+            this.chatSidebar.classList.add('collapsed');
+            // Note: CSS rotates the icon 180deg when collapsed, so keep it as chevron-left
+            const icon = this.toggleSidebarBtn.querySelector('i');
+            icon.className = 'fas fa-chevron-left';
+        }
+        
+        // Load log panel state
+        const logCollapsed = localStorage.getItem('logCollapsed') === 'true';
+        if (logCollapsed) {
+            this.logPanel.classList.add('collapsed');
+            this.toggleLogBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+            this.expandLogBtn.style.display = 'block';
+        }
     }
 
     showError(message) {
@@ -898,7 +998,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (this.currentChatId) {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message error';
-            messageDiv.textContent = `❌ ${message}`;
+            messageDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${message}`;
             this.chatMessages.appendChild(messageDiv);
             this.scrollToBottom();
         }
@@ -937,9 +1037,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message error';
             messageDiv.innerHTML = `
-                <div>❌ ${message}</div>
+                <div><i class="fas fa-times-circle"></i> ${message}</div>
                 <button class="btn btn-warning btn-small" style="margin-top: 8px;">
-                    🔄 Retry
+                    <i class="fas fa-redo"></i> Retry
                 </button>
             `;
             
@@ -996,7 +1096,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     <span class="log-source">[${entry.source}]</span>
                     <span class="log-direction ${directionClass}">${directionSymbol}</span>
                 </div>
-                <button class="btn-copy-log" title="Copy to clipboard" data-entry-id="${entryId}">📋</button>
+                <button class="btn-copy-log" title="Copy to clipboard" data-entry-id="${entryId}"><i class="fas fa-clipboard"></i></button>
             </div>
             ${metadataHtml}
             <div class="log-message" id="${entryId}">${this.formatLogMessage(entry.message)}</div>
@@ -1029,7 +1129,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             
             // Show success feedback
             const originalText = button.textContent;
-            button.textContent = '✓';
+            button.innerHTML = '<i class="fas fa-check"></i>';
             button.style.color = 'var(--success-color)';
             
             setTimeout(() => {
@@ -1161,7 +1261,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const logCollapsed = localStorage.getItem('logCollapsed') === 'true';
         if (logCollapsed) {
             this.logPanel.classList.add('collapsed');
-            this.toggleLogBtn.textContent = '▶';
+            this.toggleLogBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+            this.expandLogBtn.style.display = 'block';
         }
         
         // Load pane sizes
@@ -1638,7 +1739,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
             
             // Display available providers and models
-            let html = '<div style="color: var(--color-success);">✓ Connected successfully</div>';
+            let html = '<div style="color: var(--color-success);"><i class="fas fa-check"></i> Connected successfully</div>';
             html += '<div style="margin-top: 8px; font-size: 0.9em;">';
             
             Object.entries(providers).forEach(([provider, config]) => {
@@ -1687,7 +1788,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
 
     getProviderIcon(type) {
         switch(type) {
-            case 'openai': return '🤖';
+            case 'openai': return '<i class="fas fa-robot"></i>';
             case 'anthropic': return '🧠';
             case 'google': return '🔮';
             default: return '💬';
@@ -1987,7 +2088,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     </div>
                 </div>
                 <button class="btn-delete-chat" onclick="event.stopPropagation(); app.deleteChat('${chat.id}')" title="Delete chat">
-                    🗑️
+                    <i class="fas fa-trash-alt"></i>
                 </button>
             `;
             
@@ -2133,7 +2234,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 const separatorDiv = document.createElement('div');
                 separatorDiv.className = 'message system';
                 separatorDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--info-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                separatorDiv.textContent = '📝 Generating chat title...';
+                separatorDiv.innerHTML = '<i class="fas fa-edit"></i> Generating chat title...';
                 this.chatMessages.appendChild(separatorDiv);
             }
             
@@ -2155,7 +2256,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 const successDiv = document.createElement('div');
                 successDiv.className = 'message system';
                 successDiv.style.cssText = 'margin: 10px auto 20px; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                successDiv.textContent = `✅ Chat title updated: "${chat.title}"`;
+                successDiv.innerHTML = `<i class="fas fa-check-circle"></i> Chat title updated: "${chat.title}"`;
                 this.chatMessages.appendChild(successDiv);
             }
             
@@ -2427,9 +2528,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message error';
                 messageDiv.innerHTML = `
-                    <div>❌ ${event.content}</div>
+                    <div><i class="fas fa-times-circle"></i> ${event.content}</div>
                     <button class="btn btn-warning btn-small" style="margin-top: 8px;">
-                        🔄 Retry
+                        <i class="fas fa-redo"></i> Retry
                     </button>
                 `;
                 
@@ -3231,7 +3332,12 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     
                     const thinkingContent = document.createElement('div');
                     thinkingContent.className = 'thinking-content collapsed';
-                    thinkingContent.textContent = part.content;
+                    
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.className = 'message-content';
+                    contentWrapper.innerHTML = marked.parse(part.content);
+                    
+                    thinkingContent.appendChild(contentWrapper);
                     
                     thinkingHeader.addEventListener('click', () => {
                         const isCollapsed = thinkingContent.classList.contains('collapsed');
@@ -3247,13 +3353,125 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     messageDiv.appendChild(thinkingDiv);
                 }
             });
+        } else if (role === 'system-title' || role === 'system-summary') {
+            // Handle system messages like tool blocks
+            console.log('Creating system message block for role:', role, 'content:', content);
+            
+            // Check if we need to create a new system block or add to existing one
+            let systemBlock = this.chatMessages.querySelector('.system-block:last-child');
+            const isTitle = role === 'system-title';
+            const blockType = isTitle ? 'title' : 'summary';
+            
+            if (!systemBlock || systemBlock.dataset.type !== blockType) {
+                // Create new system block
+                systemBlock = document.createElement('div');
+                systemBlock.className = 'tool-block system-block';
+                systemBlock.dataset.type = blockType;
+                
+                const systemHeader = document.createElement('div');
+                systemHeader.className = 'tool-header';
+                systemHeader.style.cursor = 'pointer';
+                
+                const systemToggle = document.createElement('span');
+                systemToggle.className = 'tool-toggle';
+                systemToggle.textContent = '▶';
+                
+                const systemLabel = document.createElement('span');
+                systemLabel.className = 'tool-label';
+                systemLabel.textContent = isTitle ? 'Chat Title' : 'Chat Summary';
+                
+                systemHeader.appendChild(systemToggle);
+                systemHeader.appendChild(systemLabel);
+                
+                const systemContent = document.createElement('div');
+                systemContent.className = 'tool-content collapsed';
+                
+                // Add click handler to toggle
+                systemHeader.addEventListener('click', () => {
+                    const isCollapsed = systemContent.classList.contains('collapsed');
+                    systemContent.classList.toggle('collapsed');
+                    systemToggle.textContent = isCollapsed ? '▶' : '▼';
+                });
+                
+                systemBlock.appendChild(systemHeader);
+                systemBlock.appendChild(systemContent);
+                this.chatMessages.appendChild(systemBlock);
+            }
+            
+            // Add request section
+            const systemContent = systemBlock.querySelector('.tool-content');
+            
+            const requestSection = document.createElement('div');
+            requestSection.className = 'tool-request-section';
+            
+            const requestControls = document.createElement('div');
+            requestControls.className = 'tool-section-controls';
+            
+            const requestLabel = document.createElement('span');
+            requestLabel.className = 'tool-section-label';
+            requestLabel.textContent = 'REQUEST';
+            
+            requestControls.appendChild(requestLabel);
+            requestSection.appendChild(requestControls);
+            
+            const requestContent = document.createElement('pre');
+            requestContent.textContent = content;
+            requestSection.appendChild(requestContent);
+            
+            systemContent.appendChild(requestSection);
+            
+            // Store reference for when response comes
+            systemBlock.pendingResponse = true;
+            
+            return; // Don't append messageDiv to chat
+        } else if (role === 'title' || role === 'summary') {
+            // Handle system responses - add to existing system block
+            console.log('Adding system response for role:', role, 'content:', content);
+            
+            const isTitle = role === 'title';
+            const blockType = isTitle ? 'title' : 'summary';
+            let systemBlock = this.chatMessages.querySelector(`.system-block[data-type="${blockType}"]`);
+            
+            if (systemBlock && systemBlock.pendingResponse) {
+                const systemContent = systemBlock.querySelector('.tool-content');
+                
+                // Add separator
+                const separator = document.createElement('div');
+                separator.className = 'tool-separator';
+                systemContent.appendChild(separator);
+                
+                // Add response section
+                const responseSection = document.createElement('div');
+                responseSection.className = 'tool-response-section';
+                
+                const responseControls = document.createElement('div');
+                responseControls.className = 'tool-section-controls';
+                
+                const responseLabel = document.createElement('span');
+                responseLabel.className = 'tool-section-label';
+                responseLabel.textContent = 'RESPONSE';
+                
+                responseControls.appendChild(responseLabel);
+                responseSection.appendChild(responseControls);
+                
+                const responseContent = document.createElement('pre');
+                responseContent.textContent = content;
+                responseSection.appendChild(responseContent);
+                
+                systemContent.appendChild(responseSection);
+                
+                // Clear pending response flag
+                delete systemBlock.pendingResponse;
+                
+                return; // Don't append messageDiv to chat
+            }
         } else {
             // Regular message without thinking tags
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
-            if (role === 'assistant' || role === 'user' || role === 'summary') {
-                // Use marked to render markdown for assistant, user, and summary messages
+            if (role === 'assistant' || role === 'user') {
+                // Use marked to render markdown for assistant and user messages
                 contentDiv.innerHTML = marked.parse(content);
             } else {
                 // Other messages (system, error) as plain text
@@ -3299,24 +3517,24 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         messageDiv.innerHTML = `
             <div class="accounting-line">
                 <div class="accounting-content">
-                    <span class="accounting-icon">💰</span>
+                    <span class="accounting-icon"><i class="fas fa-coins"></i></span>
                     <div class="accounting-tokens">
                         <span class="accounting-token-item">
-                            <span>📥</span>
+                            <i class="fas fa-download"></i>
                             <span>${formatNumber(tokens.inputTokens || 0)}</span>
                         </span>
                         <span class="accounting-token-item">
-                            <span>📤</span>
+                            <i class="fas fa-upload"></i>
                             <span>${formatNumber(tokens.outputTokens || 0)}</span>
                         </span>
                         ${tokens.cacheReadTokens ? `
                         <span class="accounting-token-item">
-                            <span>💾</span>
+                            <i class="fas fa-memory"></i>
                             <span>${formatNumber(tokens.cacheReadTokens)}</span>
                         </span>` : ''}
                         ${tokens.cacheCreationTokens ? `
                         <span class="accounting-token-item">
-                            <span>💿</span>
+                            <i class="fas fa-save"></i>
                             <span>${formatNumber(tokens.cacheCreationTokens)}</span>
                         </span>` : ''}
                     </div>
@@ -3381,19 +3599,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const editBalloon = document.createElement('div');
         editBalloon.className = 'edit-balloon';
         editBalloon.innerHTML = 'Edit';
-        editBalloon.style.display = 'none';
+        // CSS handles initial state and transitions
         wrapper.appendChild(editBalloon);
         
-        // Show balloon on hover
-        contentDiv.addEventListener('mouseenter', () => {
-            if (!contentDiv.classList.contains('editing')) {
-                editBalloon.style.display = 'block';
-            }
-        });
-        
-        wrapper.addEventListener('mouseleave', () => {
-            editBalloon.style.display = 'none';
-        });
+        // CSS handles hover visibility via transitions, no JavaScript needed
         
         // Handle click on balloon
         editBalloon.onclick = () => {
@@ -3424,8 +3633,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'edit-actions-floating';
         buttonsDiv.innerHTML = `
-            <button class="btn btn-small btn-primary" title="Save & Restart Chat (Enter)">✓</button>
-            <button class="btn btn-small btn-secondary" title="Cancel (Escape)">✗</button>
+            <button class="btn btn-small btn-primary" title="Save & Restart Chat (Enter)"><i class="fas fa-check"></i></button>
+            <button class="btn btn-small btn-secondary" title="Cancel (Escape)"><i class="fas fa-times"></i></button>
         `;
         contentDiv.parentElement.appendChild(buttonsDiv);
         
@@ -3512,7 +3721,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const metricsFooter = document.createElement('div');
         metricsFooter.className = 'assistant-metrics-footer';
         metricsFooter.id = metricsId;
-        metricsFooter.innerHTML = '<span class="metric-item">⏳ Waiting for response...</span>';
+        metricsFooter.innerHTML = '<span class="metric-item"><i class="fas fa-hourglass-half"></i> Waiting for response...</span>';
         
         // Always append at the end - the spinner will be moved after if needed
         this.chatMessages.appendChild(metricsFooter);
@@ -3533,7 +3742,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Add response time
         if (responseTime !== null) {
             const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
         }
         
         // Add token usage
@@ -3556,7 +3765,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
             
             // Add delta if there was an increase
             if (deltaTokens > 0) {
@@ -3566,10 +3775,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Add cache information if available (Anthropic)
             if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
                 if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
                 }
                 if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
                 }
             }
             
@@ -3580,8 +3789,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                               usage.completionTokens;
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)">📊 ${formatNumber(trueTotal)}</span>
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(trueTotal)}</span>
             `;
         }
         
@@ -3601,7 +3810,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Add response time
         if (responseTime !== null) {
             const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
         }
         
         // Add token usage
@@ -3628,7 +3837,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
             
             // Add delta if there was an increase
             if (deltaTokens > 0) {
@@ -3638,10 +3847,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Add cache information if available (Anthropic)
             if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
                 if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
                 }
                 if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
                 }
             }
             
@@ -3652,8 +3861,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                               usage.completionTokens;
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)">📊 ${formatNumber(trueTotal)}</span>
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(trueTotal)}</span>
             `;
         }
         
@@ -3691,7 +3900,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Add response time
         if (responseTime !== null) {
             const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
         }
         
         // Add token usage
@@ -3714,7 +3923,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
             
             // Add delta if there was an increase
             if (deltaTokens > 0) {
@@ -3724,16 +3933,16 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Add cache information if available (Anthropic)
             if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
                 if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
                 }
                 if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
                 }
             }
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)">📊 ${formatNumber(usage.totalTokens)}</span>
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)"><i class="fas fa-chart-bar"></i> ${formatNumber(usage.totalTokens)}</span>
             `;
         }
         
@@ -3756,7 +3965,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Add response time
         if (responseTime !== null) {
             const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond">⏱️ ${timeSeconds}s</span>`;
+            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
         }
         
         // Add token usage
@@ -3783,7 +3992,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model">📥 ${formatNumber(usage.promptTokens)}</span>`;
+                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
             
             // Add delta if there was an increase
             if (deltaTokens > 0) {
@@ -3793,16 +4002,16 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Add cache information if available (Anthropic)
             if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
                 if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)">💾 ${formatNumber(usage.cacheReadInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
                 }
                 if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)">💿 ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
+                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
                 }
             }
             
             metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant">📤 ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)">📊 ${formatNumber(usage.totalTokens)}</span>
+                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
+                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)"><i class="fas fa-chart-bar"></i> ${formatNumber(usage.totalTokens)}</span>
             `;
         }
         
@@ -3859,8 +4068,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'edit-actions-floating';
         buttonsDiv.innerHTML = `
-            <button class="btn btn-small btn-primary" title="Save & Resend (Enter)">✓</button>
-            <button class="btn btn-small btn-secondary" title="Cancel (Escape)">✗</button>
+            <button class="btn btn-small btn-primary" title="Save & Resend (Enter)"><i class="fas fa-check"></i></button>
+            <button class="btn btn-small btn-secondary" title="Cancel (Escape)"><i class="fas fa-times"></i></button>
         `;
         contentDiv.parentElement.appendChild(buttonsDiv);
         
@@ -3980,7 +4189,12 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 
                 const thinkingContent = document.createElement('div');
                 thinkingContent.className = 'thinking-content collapsed';
-                thinkingContent.textContent = match[1].trim();
+                
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = 'message-content';
+                contentWrapper.innerHTML = marked.parse(match[1].trim());
+                
+                thinkingContent.appendChild(contentWrapper);
                 
                 thinkingHeader.addEventListener('click', () => {
                     const isCollapsed = thinkingContent.classList.contains('collapsed');
@@ -4052,9 +4266,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         toolHeader.className = 'tool-header';
         toolHeader.innerHTML = `
             <span class="tool-toggle">▶</span>
-            <span class="tool-label">🔧 ${toolName}</span>
+            <span class="tool-label"><i class="fas fa-wrench"></i> ${toolName}</span>
             <span class="tool-info">
-                <span class="tool-status">⏳ Calling...</span>
+                <span class="tool-status"><i class="fas fa-hourglass-half"></i> Calling...</span>
                 <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
                     <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
                     <span class="tool-include-toggle"></span>
@@ -4072,7 +4286,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         requestSection.innerHTML = `
             <div class="tool-section-controls">
                 <span class="tool-section-label">📤 REQUEST</span>
-                <button class="tool-section-copy" title="Copy request">📋</button>
+                <button class="tool-section-copy" title="Copy request"><i class="fas fa-clipboard"></i></button>
             </div>
             <pre>${JSON.stringify(args, null, 2)}</pre>
         `;
@@ -4084,8 +4298,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             e.stopPropagation();
             const text = JSON.stringify(args, null, 2);
             navigator.clipboard.writeText(text).then(() => {
-                requestCopyBtn.textContent = '✓';
-                setTimeout(() => { requestCopyBtn.textContent = '📋'; }, 1000);
+                requestCopyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => { requestCopyBtn.innerHTML = '<i class="fas fa-clipboard"></i>'; }, 1000);
             });
         });
         
@@ -4181,7 +4395,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 
                 // Update status
                 if (statusSpan) {
-                    statusSpan.textContent = result.error ? '❌ Error' : '✅ Complete';
+                    statusSpan.innerHTML = result.error ? '<i class="fas fa-times-circle"></i> Error' : '<i class="fas fa-check-circle"></i> Complete';
                 }
                 
                 // Update metrics while preserving checkbox
@@ -4198,9 +4412,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
                     
                     infoSpan.innerHTML = `
-                        <span class="tool-status">${result.error ? '❌ Error' : '✅ Complete'}</span>
-                        <span class="tool-metric">⏱️ ${timeInfo}</span>
-                        <span class="tool-metric">📦 ${sizeInfo}</span>
+                        <span class="tool-status">${result.error ? '<i class="fas fa-times-circle"></i> Error' : '<i class="fas fa-check-circle"></i> Complete'}</span>
+                        <span class="tool-metric"><i class="fas fa-clock"></i> ${timeInfo}</span>
+                        <span class="tool-metric"><i class="fas fa-box"></i> ${sizeInfo}</span>
                         <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
                             <input type="checkbox" class="tool-include-checkbox" ${wasChecked || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
                             <span class="tool-include-toggle"></span>
@@ -4247,7 +4461,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     responseSection.innerHTML = `
                         <div class="tool-section-controls">
                             <span class="tool-section-label">📥 RESPONSE</span>
-                            <button class="tool-section-copy" title="Copy response">📋</button>
+                            <button class="tool-section-copy" title="Copy response"><i class="fas fa-clipboard"></i></button>
                         </div>
                         ${formattedResult}
                     `;
@@ -4259,8 +4473,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                         e.stopPropagation();
                         const text = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
                         navigator.clipboard.writeText(text).then(() => {
-                            responseCopyBtn.textContent = '✓';
-                            setTimeout(() => { responseCopyBtn.textContent = '📋'; }, 1000);
+                            responseCopyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                            setTimeout(() => { responseCopyBtn.innerHTML = '<i class="fas fa-clipboard"></i>'; }, 1000);
                         });
                     });
                     
@@ -4327,10 +4541,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         toolHeader.className = 'tool-header';
         toolHeader.innerHTML = `
             <span class="tool-toggle">▶</span>
-            <span class="tool-label">📊 Tool result: ${toolName}</span>
+            <span class="tool-label"><i class="fas fa-chart-bar"></i> Tool result: ${toolName}</span>
             <span class="tool-info">
-                <span class="tool-metric">⏱️ ${timeInfo}</span>
-                <span class="tool-metric">📦 ${sizeInfo}</span>
+                <span class="tool-metric"><i class="fas fa-clock"></i> ${timeInfo}</span>
+                <span class="tool-metric"><i class="fas fa-box"></i> ${sizeInfo}</span>
                 <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
                     <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
                     <span class="tool-include-toggle"></span>
@@ -4861,18 +5075,18 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const cacheCreationElement = document.getElementById('cumulativeCacheCreationTokens');
         
         if (inputElement) {
-            inputElement.textContent = `📥 ${formatNumber(cumulative.inputTokens)}`;
+            inputElement.innerHTML = `<i class="fas fa-download"></i> ${formatNumber(cumulative.inputTokens)}`;
         }
         
         if (outputElement) {
-            outputElement.textContent = `📤 ${formatNumber(cumulative.outputTokens)}`;
+            outputElement.innerHTML = `<i class="fas fa-upload"></i> ${formatNumber(cumulative.outputTokens)}`;
         }
         
         // Show/hide and update cache token displays
         if (cacheReadElement) {
             if (cumulative.cacheReadTokens > 0) {
                 cacheReadElement.style.display = 'inline-block';
-                cacheReadElement.textContent = `💾 ${formatNumber(cumulative.cacheReadTokens)}`;
+                cacheReadElement.innerHTML = `<i class="fas fa-memory"></i> ${formatNumber(cumulative.cacheReadTokens)}`;
             } else {
                 cacheReadElement.style.display = 'none';
             }
@@ -4881,7 +5095,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (cacheCreationElement) {
             if (cumulative.cacheCreationTokens > 0) {
                 cacheCreationElement.style.display = 'inline-block';
-                cacheCreationElement.textContent = `💿 ${formatNumber(cumulative.cacheCreationTokens)}`;
+                cacheCreationElement.innerHTML = `<i class="fas fa-save"></i> ${formatNumber(cumulative.cacheCreationTokens)}`;
             } else {
                 cacheCreationElement.style.display = 'none';
             }
@@ -5029,7 +5243,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Show success feedback
             const btn = this.copyMetricsBtn;
             const originalText = btn.textContent;
-            btn.textContent = '✓ Copied JSON!';
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied JSON!';
             btn.classList.add('btn-success');
             
             setTimeout(() => {
@@ -5148,7 +5362,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         // Disable button to prevent multiple requests
         this.summarizeBtn.disabled = true;
-        this.summarizeBtn.innerHTML = '<span>⏳</span><span>Summarizing...</span>';
+        this.summarizeBtn.innerHTML = '<span><i class="fas fa-hourglass-half"></i></span><span>Summarizing...</span>';
         
         try {
             // Get MCP connection and LLM provider
@@ -5242,7 +5456,7 @@ This summary will be used as context for continuing our conversation.`;
                 const successDiv = document.createElement('div');
                 successDiv.className = 'message system';
                 successDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                successDiv.textContent = '✅ Conversation summarized! Context window has been reset.';
+                successDiv.innerHTML = '<i class="fas fa-check-circle"></i> Conversation summarized! Context window has been reset.';
                 this.chatMessages.appendChild(successDiv);
                 this.scrollToBottom();
                 
@@ -5264,7 +5478,7 @@ This summary will be used as context for continuing our conversation.`;
         } finally {
             // Re-enable button
             this.summarizeBtn.disabled = false;
-            this.summarizeBtn.innerHTML = '<span>📋</span><span>Summarize Conversation</span>';
+            this.summarizeBtn.innerHTML = '<span><i class="fas fa-compress-alt"></i></span><span>Summarize Conversation</span>';
         }
     }
     
@@ -5281,7 +5495,7 @@ This summary will be used as context for continuing our conversation.`;
             const separatorDiv = document.createElement('div');
             separatorDiv.className = 'message system';
             separatorDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--info-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-            separatorDiv.textContent = '📝 Generating chat title...';
+            separatorDiv.innerHTML = '<i class="fas fa-pen"></i> Generating chat title...';
             this.chatMessages.appendChild(separatorDiv);
             this.scrollToBottom();
             
@@ -5389,7 +5603,7 @@ This summary will be used as context for continuing our conversation.`;
                     const successDiv = document.createElement('div');
                     successDiv.className = 'message system';
                     successDiv.style.cssText = 'margin: 10px auto 20px; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                    successDiv.textContent = `✅ Chat title updated: "${newTitle}"`;
+                    successDiv.innerHTML = `<i class="fas fa-check-circle"></i> Chat title updated: "${newTitle}"`;
                     this.chatMessages.appendChild(successDiv);
                     this.scrollToBottom();
                 }
@@ -5568,7 +5782,7 @@ This summary will be used as context for continuing our conversation.`;
             case 'auto':
                 button.classList.remove('btn-warning', 'btn-danger', 'btn-secondary');
                 button.classList.add('btn-success');
-                icon.textContent = '🔄';
+                icon.innerHTML = '<i class="fas fa-sync-alt"></i>';
                 text.textContent = 'Auto (current turn only)';
                 break;
             case 'all-on':
@@ -5587,13 +5801,13 @@ This summary will be used as context for continuing our conversation.`;
                 button.classList.remove('btn-secondary', 'btn-danger', 'btn-success');
                 button.classList.add('btn-warning');
                 const state = this.getGlobalToolToggleState();
-                icon.textContent = '⚙️';
+                icon.innerHTML = '<i class="fas fa-cog"></i>';
                 text.textContent = state === 'mixed' ? 'Manual (mixed)' : `Manual (${state})`;
                 break;
             case 'cached':
                 button.classList.remove('btn-warning', 'btn-danger', 'btn-success');
                 button.classList.add('btn-secondary');
-                icon.textContent = '🔒';
+                icon.innerHTML = '<i class="fas fa-lock"></i>';
                 text.textContent = 'Cached (all locked)';
                 break;
         }
