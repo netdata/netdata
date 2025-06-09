@@ -179,7 +179,8 @@
         </div>
     </div>
 
-    <!-- New Chat Modal -->
+    <!-- New Chat Modal - No longer used, kept for potential future use -->
+    <!-- 
     <div class="modal" id="newChatModal">
         <div class="modal-backdrop" id="newChatBackdrop"></div>
         <div class="modal-content modal-small">
@@ -218,6 +219,7 @@
             </div>
         </div>
     </div>
+    -->
 
     <!-- Add MCP Server Modal -->
     <div class="modal" id="addMcpModal">
@@ -296,6 +298,42 @@
             <div class="modal-footer">
                 <button id="cancelSystemPromptBtn" class="btn btn-secondary">Cancel</button>
                 <button id="saveSystemPromptBtn" class="btn btn-primary">Save & Restart Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Models Available Modal -->
+    <div class="modal" id="noModelsModal">
+        <div class="modal-backdrop no-close" id="noModelsBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>🤖 No LLM Models Available</h2>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div style="font-size: 48px; margin: 20px 0;">🔌</div>
+                <p style="font-size: 16px; margin-bottom: 10px;">
+                    <strong>The LLM proxy server is not accessible.</strong>
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    This application needs to connect to an LLM proxy server to access AI models.
+                </p>
+                <div style="background: var(--hover-color); padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600;">To fix this:</p>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        <li>Ensure the LLM proxy is running at: <code id="noModelsProxyUrl" style="font-family: monospace; background: var(--background-color); padding: 2px 4px; border-radius: 3px;">http://localhost:8081</code></li>
+                        <li>Check that you have API keys configured in the proxy</li>
+                        <li>Verify there are no network or firewall issues</li>
+                    </ol>
+                </div>
+                <p style="font-size: 14px; color: var(--text-secondary);">
+                    Once the proxy is running with configured API keys, click Retry to continue.
+                </p>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button id="retryModelsBtn" class="btn btn-primary">
+                    <span>🔄</span>
+                    <span>Retry</span>
+                </button>
             </div>
         </div>
     </div>
