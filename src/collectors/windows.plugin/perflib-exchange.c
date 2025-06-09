@@ -795,6 +795,8 @@ static void netdata_exchange_workload_active_tasks(struct exchange_workload *ew,
 
         ew->rd_exchange_workload_active_tasks =
             rrddim_add(ew->st_exchange_workload_active_tasks, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ew->st_exchange_workload_active_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -825,6 +827,8 @@ static void netdata_exchange_workload_completed_tasks(struct exchange_workload *
 
         ew->rd_exchange_workload_complete_tasks =
             rrddim_add(ew->st_exchange_workload_complete_tasks, "completed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ew->st_exchange_workload_complete_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -855,6 +859,8 @@ static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew,
 
         ew->rd_exchange_workload_queued_tasks =
             rrddim_add(ew->st_exchange_workload_queued_tasks, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ew->st_exchange_workload_queued_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -885,6 +891,8 @@ static void netdata_exchange_workload_yielded_tasks(struct exchange_workload *ew
 
         ew->rd_exchange_workload_yielded_tasks =
             rrddim_add(ew->st_exchange_workload_yielded_tasks, "yielded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(ew->st_exchange_workload_yielded_tasks->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
@@ -918,6 +926,8 @@ static void netdata_exchange_workload_activity_status(struct exchange_workload *
 
         ew->rd_exchange_workload_activity_paused_status =
             rrddim_add(ew->st_exchange_workload_activity_status, "paused", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(ew->st_exchange_workload_activity_status->rrdlabels, "workload", workload, RRDLABEL_SRC_AUTO);
     }
 
     bool value = (bool)ew->exchangeWorkloadActivityStatus.current.Data;
