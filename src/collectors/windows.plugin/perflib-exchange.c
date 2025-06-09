@@ -50,7 +50,8 @@ struct exchange_workload {
 DICTIONARY *exchange_proxies;
 DICTIONARY *exchange_workloads;
 
-static void exchange_proxy_initialize_variables(struct exchange_proxy *ep) {
+static void exchange_proxy_initialize_variables(struct exchange_proxy *ep)
+{
     ep->exchangeProxyAvgAuthLatency.key = "Average Authentication Latency";
     ep->exchangeProxyAvgCasProcessingLatency.key = "Average ClientAccess Server Processing Latency";
     ep->exchangeProxyMailboxProxyFailure.key = "Mailbox Server Proxy Failure Rate";
@@ -59,7 +60,8 @@ static void exchange_proxy_initialize_variables(struct exchange_proxy *ep) {
     ep->exchangeProxyRequestsTotal.key = "Proxy Requests/Sec";
 }
 
-static void dict_exchange_insert_proxy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static void
+dict_exchange_insert_proxy_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     struct exchange_proxy *ep = value;
@@ -67,7 +69,8 @@ static void dict_exchange_insert_proxy_cb(const DICTIONARY_ITEM *item __maybe_un
     exchange_proxy_initialize_variables(ep);
 }
 
-static void exchange_proxy_initialize_variables(struct exchange_workload *ew) {
+static void exchange_proxy_initialize_variables(struct exchange_workload *ew)
+{
     ew->exchangeWorkloadActiveTasks.key = "ActiveTasks";
     ew->exchangeWorkloadCompleteTasks.key = "CompletedTasks";
     ew->exchangeWorkloadQueueTasks.key = "QueuedTasks";
@@ -75,7 +78,8 @@ static void exchange_proxy_initialize_variables(struct exchange_workload *ew) {
     ew->exchangeWorkloadActiveTasks.key = "Active";
 }
 
-static void dict_exchange_insert_worload_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static void
+dict_exchange_insert_worload_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     const char *resource = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     struct exchange_workload *ew = value;
@@ -94,7 +98,8 @@ static void initialize(void)
     dictionary_register_insert_callback(exchange_worloads, dict_exchange_insert_worload_cb, NULL);
 }
 
-static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_owa_unique_users = NULL;
     static RRDDIM *rd_exchange_owa_unique_users = NULL;
 
@@ -118,13 +123,12 @@ static void netdata_exchange_owa_current_unique_users(COUNTER_DATA *value, int u
     }
 
     rrddim_set_by_pointer(
-        st_exchange_owa_unique_users,
-        rd_exchange_owa_unique_users,
-        (collected_number)value->current.Data);
+        st_exchange_owa_unique_users, rd_exchange_owa_unique_users, (collected_number)value->current.Data);
     rrdset_done(st_exchange_owa_unique_users);
 }
 
-static void netdata_exchange_owa_request_total(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_owa_request_total(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_owa_request_total = NULL;
     static RRDDIM *rd_exchange_owa_request_total = NULL;
 
@@ -148,16 +152,14 @@ static void netdata_exchange_owa_request_total(COUNTER_DATA *value, int update_e
     }
 
     rrddim_set_by_pointer(
-        st_exchange_owa_request_total,
-        rd_exchange_owa_request_total,
-        (collected_number)value->current.Data);
+        st_exchange_owa_request_total, rd_exchange_owa_request_total, (collected_number)value->current.Data);
     rrdset_done(st_exchange_owa_request_total);
 }
 
-static
-void netdata_exchange_owa(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
-    static COUNTER_DATA exchangeOWACurrentUniqueUser = {.key = "Current Unique Users" };
-    static COUNTER_DATA exchangeOWARequestsTotal = {.key = "Requests/sec" };
+static void netdata_exchange_owa(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA exchangeOWACurrentUniqueUser = {.key = "Current Unique Users"};
+    static COUNTER_DATA exchangeOWARequestsTotal = {.key = "Requests/sec"};
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeOWACurrentUniqueUser))
         netdata_exchange_owa_current_unique_users(&exchangeOWACurrentUniqueUser, update_every);
@@ -166,7 +168,8 @@ void netdata_exchange_owa(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObject
         netdata_exchange_owa_request_total(&exchangeOWARequestsTotal, update_every);
 }
 
-static void netdata_exchange_active_ping_cmd(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_active_ping_cmd(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_active_ping_cmds = NULL;
     static RRDDIM *rd_exchange_active_ping_cmds = NULL;
 
@@ -190,13 +193,12 @@ static void netdata_exchange_active_ping_cmd(COUNTER_DATA *value, int update_eve
     }
 
     rrddim_set_by_pointer(
-        st_exchange_active_ping_cmds,
-        rd_exchange_active_ping_cmds,
-        (collected_number)value->current.Data);
+        st_exchange_active_ping_cmds, rd_exchange_active_ping_cmds, (collected_number)value->current.Data);
     rrdset_done(st_exchange_active_ping_cmds);
 }
 
-static void netdata_exchange_active_requests(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_active_requests(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_received_requests = NULL;
     static RRDDIM *rd_exchange_received_requests = NULL;
 
@@ -220,13 +222,12 @@ static void netdata_exchange_active_requests(COUNTER_DATA *value, int update_eve
     }
 
     rrddim_set_by_pointer(
-        st_exchange_received_requests,
-        rd_exchange_received_requests,
-        (collected_number)value->current.Data);
+        st_exchange_received_requests, rd_exchange_received_requests, (collected_number)value->current.Data);
     rrdset_done(st_exchange_received_requests);
 }
 
-static void netdata_exchange_sync_cmds(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_sync_cmds(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_sync_cmds = NULL;
     static RRDDIM *rd_exchange_sync_cmds = NULL;
 
@@ -245,23 +246,18 @@ static void netdata_exchange_sync_cmds(COUNTER_DATA *value, int update_every) {
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_exchange_sync_cmds =
-            rrddim_add(st_exchange_sync_cmds, "sync", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_exchange_sync_cmds = rrddim_add(st_exchange_sync_cmds, "sync", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(
-        st_exchange_sync_cmds,
-        rd_exchange_sync_cmds,
-        (collected_number)value->current.Data);
+    rrddim_set_by_pointer(st_exchange_sync_cmds, rd_exchange_sync_cmds, (collected_number)value->current.Data);
     rrdset_done(st_exchange_sync_cmds);
 }
 
-static
-void netdata_exchange_active_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
-    static COUNTER_DATA exchangePingCommands = {.key = "Ping Commands Pending" };
-    static COUNTER_DATA exchangeSyncCommands = {.key = "Sync Commands/sec" };
-    static COUNTER_DATA exchangeActiveRequests = {.key = "Requests/sec" };
-
+static void netdata_exchange_active_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA exchangePingCommands = {.key = "Ping Commands Pending"};
+    static COUNTER_DATA exchangeSyncCommands = {.key = "Sync Commands/sec"};
+    static COUNTER_DATA exchangeActiveRequests = {.key = "Requests/sec"};
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangePingCommands))
         netdata_exchange_active_ping_cmd(&exchangePingCommands, update_every);
@@ -273,9 +269,9 @@ void netdata_exchange_active_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
         netdata_exchange_active_requests(&exchangeActiveRequests, update_every);
 }
 
-static
-void netdata_exchange_auto_discover(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
-    static COUNTER_DATA exchangeAutoDiscoverRequestsTotal = {.key = "Requests/sec" };
+static void netdata_exchange_auto_discover(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA exchangeAutoDiscoverRequestsTotal = {.key = "Requests/sec"};
 
     static RRDSET *st_exchange_auto_discover_request_total = NULL;
     static RRDDIM *rd_exchange_auto_discover_request_total = NULL;
@@ -310,9 +306,10 @@ void netdata_exchange_auto_discover(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
     rrdset_done(st_exchange_auto_discover_request_total);
 }
 
-static
-void netdata_exchange_availability_service(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
-    static COUNTER_DATA exchangeAvailServiceRequests = {.key = "Availability Requests (sec)" };
+static void
+netdata_exchange_availability_service(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA exchangeAvailServiceRequests = {.key = "Availability Requests (sec)"};
 
     static RRDSET *st_exchange_avail_service_requests = NULL;
     static RRDDIM *rd_exchange_avail_service_requests = NULL;
@@ -347,7 +344,8 @@ void netdata_exchange_availability_service(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
     rrdset_done(st_exchange_avail_service_requests);
 }
 
-static void netdata_exchange_rpc_avg_latency(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_rpc_avg_latency(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_rpc_avg_latency = NULL;
     static RRDDIM *rd_exchange_rpc_avg_latency = NULL;
 
@@ -371,13 +369,12 @@ static void netdata_exchange_rpc_avg_latency(COUNTER_DATA *value, int update_eve
     }
 
     rrddim_set_by_pointer(
-        st_exchange_rpc_avg_latency,
-        rd_exchange_rpc_avg_latency,
-        (collected_number)value->current.Data);
+        st_exchange_rpc_avg_latency, rd_exchange_rpc_avg_latency, (collected_number)value->current.Data);
     rrdset_done(st_exchange_rpc_avg_latency);
 }
 
-static void netdata_exchange_rpc_requests(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_rpc_requests(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_rpc_requests = NULL;
     static RRDDIM *rd_exchange_rpc_requests = NULL;
 
@@ -400,14 +397,12 @@ static void netdata_exchange_rpc_requests(COUNTER_DATA *value, int update_every)
             rrddim_add(st_exchange_rpc_requests, "requests", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(
-        st_exchange_rpc_requests,
-        rd_exchange_rpc_requests,
-        (collected_number)value->current.Data);
+    rrddim_set_by_pointer(st_exchange_rpc_requests, rd_exchange_rpc_requests, (collected_number)value->current.Data);
     rrdset_done(st_exchange_rpc_requests);
 }
 
-static void netdata_exchange_rpc_active_user_count(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_rpc_active_user_count(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_active_user_account = NULL;
     static RRDDIM *rd_exchange_active_user_account = NULL;
 
@@ -431,13 +426,12 @@ static void netdata_exchange_rpc_active_user_count(COUNTER_DATA *value, int upda
     }
 
     rrddim_set_by_pointer(
-        st_exchange_active_user_account,
-        rd_exchange_active_user_account,
-        (collected_number)value->current.Data);
+        st_exchange_active_user_account, rd_exchange_active_user_account, (collected_number)value->current.Data);
     rrdset_done(st_exchange_active_user_account);
 }
 
-static void netdata_exchange_rpc_connection_count(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_rpc_connection_count(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_rpc_connection_count = NULL;
     static RRDDIM *rd_exchange_rpc_connection_count = NULL;
 
@@ -461,13 +455,12 @@ static void netdata_exchange_rpc_connection_count(COUNTER_DATA *value, int updat
     }
 
     rrddim_set_by_pointer(
-        st_exchange_rpc_connection_count,
-        rd_exchange_rpc_connection_count,
-        (collected_number)value->current.Data);
+        st_exchange_rpc_connection_count, rd_exchange_rpc_connection_count, (collected_number)value->current.Data);
     rrdset_done(st_exchange_rpc_connection_count);
 }
 
-static void netdata_exchange_rpc_op_per_sec(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_rpc_op_per_sec(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_rpc_opc_per_sec = NULL;
     static RRDDIM *rd_exchange_rpc_opc_per_sec = NULL;
 
@@ -491,13 +484,12 @@ static void netdata_exchange_rpc_op_per_sec(COUNTER_DATA *value, int update_ever
     }
 
     rrddim_set_by_pointer(
-        st_exchange_rpc_opc_per_sec,
-        rd_exchange_rpc_opc_per_sec,
-        (collected_number)value->current.Data);
+        st_exchange_rpc_opc_per_sec, rd_exchange_rpc_opc_per_sec, (collected_number)value->current.Data);
     rrdset_done(st_exchange_rpc_opc_per_sec);
 }
 
-static void netdata_exchange_rpc_user_count(COUNTER_DATA *value, int update_every) {
+static void netdata_exchange_rpc_user_count(COUNTER_DATA *value, int update_every)
+{
     static RRDSET *st_exchange_rpc_user_count = NULL;
     static RRDDIM *rd_exchange_rpc_user_count = NULL;
 
@@ -521,20 +513,18 @@ static void netdata_exchange_rpc_user_count(COUNTER_DATA *value, int update_ever
     }
 
     rrddim_set_by_pointer(
-        st_exchange_rpc_user_count,
-        rd_exchange_rpc_user_count,
-        (collected_number)value->current.Data);
+        st_exchange_rpc_user_count, rd_exchange_rpc_user_count, (collected_number)value->current.Data);
     rrdset_done(st_exchange_rpc_user_count);
 }
 
-static
-void netdata_exchange_rpc(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
-    static COUNTER_DATA exchangeRPCAveragedLatency = {.key = "RPC Averaged Latency" };
-    static COUNTER_DATA exchangeRPCRequest = {.key = "RPC Requests" };
-    static COUNTER_DATA exchangeRPCActiveUserCount = {.key = "Active User Count" };
-    static COUNTER_DATA exchangeRPCConnectionCount = {.key = "Connection Count" };
-    static COUNTER_DATA exchangeRPCOperationPerSec = {.key = "RPC Operations/sec" };
-    static COUNTER_DATA exchangeRPCUserCount = {.key = "User Count" };
+static void netdata_exchange_rpc(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA exchangeRPCAveragedLatency = {.key = "RPC Averaged Latency"};
+    static COUNTER_DATA exchangeRPCRequest = {.key = "RPC Requests"};
+    static COUNTER_DATA exchangeRPCActiveUserCount = {.key = "Active User Count"};
+    static COUNTER_DATA exchangeRPCConnectionCount = {.key = "Connection Count"};
+    static COUNTER_DATA exchangeRPCOperationPerSec = {.key = "RPC Operations/sec"};
+    static COUNTER_DATA exchangeRPCUserCount = {.key = "User Count"};
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &exchangeRPCAveragedLatency))
         netdata_exchange_rpc_avg_latency(&exchangeRPCAveragedLatency, update_every);
@@ -555,7 +545,8 @@ void netdata_exchange_rpc(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObject
         netdata_exchange_rpc_user_count(&exchangeRPCUserCount, update_every);
 }
 
-static void netdata_exchange_proxy_avg_auth_latency(struct exchange_proxy *ep, char *proxy, int update_every) {
+static void netdata_exchange_proxy_avg_auth_latency(struct exchange_proxy *ep, char *proxy, int update_every)
+{
     if (unlikely(!ep->st_exchange_http_proxy_avg_auth_latency)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_avg_auth_latency", proxy);
@@ -585,7 +576,8 @@ static void netdata_exchange_proxy_avg_auth_latency(struct exchange_proxy *ep, c
     rrdset_done(ep->st_exchange_http_proxy_avg_auth_latency);
 }
 
-static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_proxy *ep, char *proxy, int update_every) {
+static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_proxy *ep, char *proxy, int update_every)
+{
     if (unlikely(!ep->st_exchange_http_proxy_avg_cas_processing_latency)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_avg_cas_processing_latency_sec", proxy);
@@ -604,8 +596,8 @@ static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_pr
             update_every,
             RRDSET_TYPE_LINE);
 
-        ep->rd_exchange_http_proxy_avg_cas_processing_latency =
-            rrddim_add(ep->st_exchange_http_proxy_avg_cas_processing_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        ep->rd_exchange_http_proxy_avg_cas_processing_latency = rrddim_add(
+            ep->st_exchange_http_proxy_avg_cas_processing_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -615,7 +607,8 @@ static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_pr
     rrdset_done(ep->st_exchange_http_proxy_avg_cas_processing_latency);
 }
 
-static void netdata_exchange_proxy_mailbox_proxy_failure(struct exchange_proxy *ep, char *proxy, int update_every) {
+static void netdata_exchange_proxy_mailbox_proxy_failure(struct exchange_proxy *ep, char *proxy, int update_every)
+{
     if (unlikely(!ep->st_exchange_http_proxy_mailbox_proxy_failure)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_proxy_failure_rate", proxy);
@@ -634,8 +627,8 @@ static void netdata_exchange_proxy_mailbox_proxy_failure(struct exchange_proxy *
             update_every,
             RRDSET_TYPE_LINE);
 
-        ep->rd_exchange_http_proxy_mailbox_proxy_failure =
-            rrddim_add(ep->st_exchange_http_proxy_mailbox_proxy_failure, "failures", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        ep->rd_exchange_http_proxy_mailbox_proxy_failure = rrddim_add(
+            ep->st_exchange_http_proxy_mailbox_proxy_failure, "failures", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -645,7 +638,8 @@ static void netdata_exchange_proxy_mailbox_proxy_failure(struct exchange_proxy *
     rrdset_done(ep->st_exchange_http_proxy_mailbox_proxy_failure);
 }
 
-static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy *ep, char *proxy, int update_every) {
+static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy *ep, char *proxy, int update_every)
+{
     if (unlikely(!ep->st_exchange_http_proxy_server_location_avg_latency)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_mailbox_server_locator_avg_latency_sec", proxy);
@@ -664,8 +658,8 @@ static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy 
             update_every,
             RRDSET_TYPE_LINE);
 
-        ep->rd_exchange_http_proxy_server_location_avg_latency =
-            rrddim_add(ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        ep->rd_exchange_http_proxy_server_location_avg_latency = rrddim_add(
+            ep->st_exchange_http_proxy_server_location_avg_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -675,7 +669,8 @@ static void netdata_exchange_proxy_mailbox_server_locator(struct exchange_proxy 
     rrdset_done(ep->st_exchange_http_proxy_server_location_avg_latency);
 }
 
-static void netdata_exchange_proxy_outstanding_proxy(struct exchange_proxy *ep, char *proxy, int update_every) {
+static void netdata_exchange_proxy_outstanding_proxy(struct exchange_proxy *ep, char *proxy, int update_every)
+{
     if (unlikely(!ep->st_exchange_http_proxy_outstanding_proxy_requests)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_outstanding_proxy_requests", proxy);
@@ -694,8 +689,8 @@ static void netdata_exchange_proxy_outstanding_proxy(struct exchange_proxy *ep, 
             update_every,
             RRDSET_TYPE_LINE);
 
-        ep->rd_exchange_http_proxy_outstanding_proxy_requests =
-            rrddim_add(ep->st_exchange_http_proxy_outstanding_proxy_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        ep->rd_exchange_http_proxy_outstanding_proxy_requests = rrddim_add(
+            ep->st_exchange_http_proxy_outstanding_proxy_requests, "requests", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -705,7 +700,8 @@ static void netdata_exchange_proxy_outstanding_proxy(struct exchange_proxy *ep, 
     rrdset_done(ep->st_exchange_http_proxy_outstanding_proxy_requests);
 }
 
-static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char *proxy, int update_every) {
+static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char *proxy, int update_every)
+{
     if (unlikely(!ep->st_exchange_http_proxy_requests_total)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_proxy_%s_requests_total", proxy);
@@ -735,8 +731,7 @@ static void netdata_exchange_proxy_request_total(struct exchange_proxy *ep, char
     rrdset_done(ep->st_exchange_http_proxy_requests_total);
 }
 
-static
-void netdata_exchange_proxy(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_exchange_proxy(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -774,7 +769,8 @@ void netdata_exchange_proxy(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     }
 }
 
-static void netdata_exchange_workload_active_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+static void netdata_exchange_workload_active_tasks(struct exchange_workload *ew, char *workload, int update_every)
+{
     if (unlikely(!ew->st_exchange_workload_active_tasks)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_tasks", workload);
@@ -806,7 +802,8 @@ static void netdata_exchange_workload_active_tasks(struct exchange_workload *ew,
     rrdset_done(ew->st_exchange_workload_active_tasks);
 }
 
-static void netdata_exchange_workload_completed_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+static void netdata_exchange_workload_completed_tasks(struct exchange_workload *ew, char *workload, int update_every)
+{
     if (unlikely(!ew->st_exchange_workload_complete_tasks)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_completed_tasks", workload);
@@ -838,7 +835,8 @@ static void netdata_exchange_workload_completed_tasks(struct exchange_workload *
     rrdset_done(ew->st_exchange_workload_complete_tasks);
 }
 
-static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew, char *workload, int update_every)
+{
     if (unlikely(!ew->st_exchange_workload_queued_tasks)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_queued_tasks", workload);
@@ -870,7 +868,8 @@ static void netdata_exchange_workload_queued_tasks(struct exchange_workload *ew,
     rrdset_done(ew->st_exchange_workload_queued_tasks);
 }
 
-static void netdata_exchange_workload_yielded_tasks(struct exchange_workload *ew, char *workload, int update_every) {
+static void netdata_exchange_workload_yielded_tasks(struct exchange_workload *ew, char *workload, int update_every)
+{
     if (unlikely(!ew->st_exchange_workload_yielded_tasks)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_yielded_tasks", workload);
@@ -902,7 +901,8 @@ static void netdata_exchange_workload_yielded_tasks(struct exchange_workload *ew
     rrdset_done(ew->st_exchange_workload_yielded_tasks);
 }
 
-static void netdata_exchange_workload_activity_status(struct exchange_workload *ew, char *workload, int update_every) {
+static void netdata_exchange_workload_activity_status(struct exchange_workload *ew, char *workload, int update_every)
+{
     if (unlikely(!ew->st_exchange_workload_activity_status)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_workload_%s_activity_status", workload);
@@ -945,8 +945,7 @@ static void netdata_exchange_workload_activity_status(struct exchange_workload *
     rrdset_done(ew->st_exchange_workload_activity_status);
 }
 
-static
-void netdata_exchange_workload(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_exchange_workload(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -1005,7 +1004,7 @@ int do_PerflibExchange(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    for (int i = 0; exchange_obj[i].fnct ; i++) {
+    for (int i = 0; exchange_obj[i].fnct; i++) {
         DWORD id = RegistryFindIDByName(exchange_obj[i].object);
         if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
             continue;
