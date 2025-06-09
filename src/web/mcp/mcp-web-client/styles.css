@@ -347,6 +347,7 @@ body {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden; /* Prevent horizontal scrollbar */
     padding: 5px 5px 5px 50px; /* Add left padding for turn/step numbers */
     display: flex;
     flex-direction: column;
@@ -2153,91 +2154,282 @@ body {
     text-shadow: 0 0 2px var(--surface-color);
 }
 
-/* Tippy.js tooltip customization */
+/* CSS-only tooltip implementation */
 :root {
-    --tooltip-bg: #fff;
-    --tooltip-color: #333;
-    --tooltip-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    --tooltip-border: #ddd;
+    --tooltip-bg: #333;
+    --tooltip-color: #fff;
+    --tooltip-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    --tooltip-border: transparent;
+    --tooltip-arrow-size: 5px;
 }
 
 :root[data-theme="dark"] {
-    --tooltip-bg: #2a2a2a;
-    --tooltip-color: #d4d4d4;
-    --tooltip-shadow: none;
-    --tooltip-border: #444;
+    --tooltip-bg: #4a4a4a;
+    --tooltip-color: #f0f0f0;
+    --tooltip-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    --tooltip-border: #5a5a5a;
 }
 
-.tippy-box {
-    font-size: 12px !important;
+/* Elements with tooltips */
+[data-tooltip] {
+    position: relative;
+    cursor: help;
 }
 
-/* Override Tippy's light theme with our dynamic colors */
-.tippy-box[data-theme~="light"] {
-    background-color: var(--tooltip-bg) !important;
-    color: var(--tooltip-color) !important;
-    box-shadow: var(--tooltip-shadow) !important;
+/* Prevent tooltips from causing horizontal scrollbars in chat messages */
+.chat-messages [data-tooltip] {
+    overflow: visible !important;
 }
 
-/* Fix arrow visibility using CSS variables for all directions */
-.tippy-box[data-theme~="light"] .tippy-arrow::before {
-    border-color: transparent !important;
+/* Ensure metric containers don't clip tooltips */
+.message-metrics,
+.assistant-metrics-footer {
+    overflow: visible !important;
+    position: relative;
 }
 
-.tippy-box[data-theme~="light"][data-placement^="top"] .tippy-arrow::before {
-    border-top-color: var(--tooltip-bg) !important;
+.metric-item {
+    position: relative;
+    display: inline-block; /* Ensure proper positioning context */
 }
 
-.tippy-box[data-theme~="light"][data-placement^="top"] .tippy-arrow::after {
-    border-top-color: var(--tooltip-border) !important;
+/* Tooltip pseudo-elements */
+[data-tooltip]::before,
+[data-tooltip]::after {
+    position: absolute;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 200ms ease-out, visibility 200ms ease-out, transform 200ms ease-out;
 }
 
-.tippy-box[data-theme~="light"][data-placement^="bottom"] .tippy-arrow::before {
-    border-bottom-color: var(--tooltip-bg) !important;
+/* Tooltip text */
+[data-tooltip]::before {
+    content: attr(data-tooltip);
+    background-color: var(--tooltip-bg);
+    color: var(--tooltip-color);
+    font-size: 12px;
+    padding: 6px 16px; /* Increased horizontal padding for minimum visual width */
+    border-radius: 4px;
+    width: max-content; /* Size based on content */
+    max-width: 300px;
+    box-shadow: var(--tooltip-shadow);
+    border: 1px solid var(--tooltip-border);
+    font-weight: normal;
+    text-align: center;
+    line-height: 1.4;
+    z-index: 999999; /* Very high z-index to appear above all panels */
 }
 
-.tippy-box[data-theme~="light"][data-placement^="bottom"] .tippy-arrow::after {
-    border-bottom-color: var(--tooltip-border) !important;
+/* Tooltip arrow */
+[data-tooltip]::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border: var(--tooltip-arrow-size) solid transparent;
+    z-index: 999998; /* Just below tooltip text */
 }
 
-.tippy-box[data-theme~="light"][data-placement^="left"] .tippy-arrow::before {
-    border-left-color: var(--tooltip-bg) !important;
+/* Default placement (top) */
+[data-tooltip]::before {
+    bottom: calc(100% + var(--tooltip-arrow-size) + 2px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
 }
 
-.tippy-box[data-theme~="light"][data-placement^="left"] .tippy-arrow::after {
-    border-left-color: var(--tooltip-border) !important;
+[data-tooltip]::after {
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-top-color: var(--tooltip-bg);
 }
 
-.tippy-box[data-theme~="light"][data-placement^="right"] .tippy-arrow::before {
-    border-right-color: var(--tooltip-bg) !important;
+/* Show tooltip on hover */
+[data-tooltip]:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
 }
 
-.tippy-box[data-theme~="light"][data-placement^="right"] .tippy-arrow::after {
-    border-right-color: var(--tooltip-border) !important;
+[data-tooltip]:hover::after {
+    opacity: 1;
+    visibility: visible;
 }
 
-/* For the svg arrow variant (if used) */
-.tippy-box[data-theme~="light"] .tippy-svg-arrow {
-    fill: var(--tooltip-bg) !important;
+/* Default tooltip text behavior - single line if it fits */
+[data-tooltip]::before {
+    white-space: nowrap; /* Keep on one line by default */
+    min-width: 80px; /* Ensure minimum width */
 }
 
-/* Add subtle border to light theme tooltips for visibility */
-.tippy-box[data-theme~="light"] {
-    border: 1px solid var(--tooltip-border) !important;
+/* Wrap text when tooltip reaches max-width */
+@supports (width: max-content) {
+    [data-tooltip]::before {
+        white-space: pre-wrap; /* Allow wrapping when needed */
+        word-wrap: break-word;
+    }
 }
 
-/* Remove shadow from arrow to prevent gap */
-.tippy-box[data-theme~="light"] .tippy-arrow {
-    filter: none !important;
-    box-shadow: none !important;
+/* For short tooltips that should stay on one line */
+[data-tooltip][data-tooltip-nowrap]::before {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Also handle light-border theme */
-.tippy-box[data-theme~="light-border"] {
-    background-color: var(--tooltip-bg) !important;
-    color: var(--tooltip-color) !important;
-    border-color: var(--tooltip-border) !important;
-    box-shadow: var(--tooltip-shadow) !important;
+/* Smart positioning for elements near edges */
+
+/* For metric items - center tooltips but constrain to viewport */
+.assistant-metrics-footer .metric-item[data-tooltip]::before {
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    max-width: 250px; /* Reduce max width to prevent overflow */
+}
+
+.assistant-metrics-footer .metric-item[data-tooltip]:hover::before {
+    transform: translateX(-50%) translateY(0);
+}
+
+.assistant-metrics-footer .metric-item[data-tooltip]::after {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* For the last few metric items on the right, shift tooltip left to prevent overflow */
+.assistant-metrics-footer .metric-item:nth-last-child(-n+3)[data-tooltip]::before {
+    left: auto;
+    right: -10px;
+    transform: translateX(0) translateY(4px);
+}
+
+.assistant-metrics-footer .metric-item:nth-last-child(-n+3)[data-tooltip]:hover::before {
+    transform: translateX(0) translateY(0);
+}
+
+.assistant-metrics-footer .metric-item:nth-last-child(-n+3)[data-tooltip]::after {
+    left: auto;
+    right: 10px;
+    transform: translateX(0);
+}
+
+/* For elements at the top of the screen, show tooltip below */
+.chat-header [data-tooltip]::before,
+.chat-controls [data-tooltip]::before {
+    bottom: auto;
+    top: calc(100% + var(--tooltip-arrow-size) + 2px);
+    transform: translateX(-50%) translateY(-4px);
+}
+
+.chat-header [data-tooltip]:hover::before,
+.chat-controls [data-tooltip]:hover::before {
+    transform: translateX(-50%) translateY(0);
+}
+
+.chat-header [data-tooltip]::after,
+.chat-controls [data-tooltip]::after {
+    bottom: auto;
+    top: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--tooltip-bg);
+}
+
+/* For elements in the right edge that also need horizontal adjustment */
+.chat-controls .token-counters [data-tooltip]::before,
+.chat-controls .context-window-indicator [data-tooltip]::before,
+.chat-controls .temperature-control [data-tooltip]::before {
+    bottom: auto;
+    top: calc(100% + var(--tooltip-arrow-size) + 2px);
+    left: auto;
+    right: 0;
+    transform: translateX(0) translateY(-4px);
+}
+
+.chat-controls .token-counters [data-tooltip]:hover::before,
+.chat-controls .context-window-indicator [data-tooltip]:hover::before,
+.chat-controls .temperature-control [data-tooltip]:hover::before {
+    transform: translateX(0) translateY(0);
+}
+
+.chat-controls .token-counters [data-tooltip]::after,
+.chat-controls .context-window-indicator [data-tooltip]::after,
+.chat-controls .temperature-control [data-tooltip]::after {
+    bottom: auto;
+    top: 100%;
+    left: auto;
+    right: 15px;
+    transform: translateX(0);
+    border-top-color: transparent;
+    border-bottom-color: var(--tooltip-bg);
+}
+
+/* For sidebar buttons at bottom left */
+.sidebar-footer [data-tooltip]::before {
+    left: 0;
+    transform: translateX(0) translateY(4px);
+}
+
+.sidebar-footer [data-tooltip]:hover::before {
+    transform: translateX(0) translateY(0);
+}
+
+.sidebar-footer [data-tooltip]::after {
+    left: 15px;
+    transform: translateX(0);
+}
+
+/* For message action buttons (appear on right side) */
+.message-actions [data-tooltip]::before {
+    left: auto;
+    right: 0;
+    transform: translateX(0) translateY(4px);
+}
+
+.message-actions [data-tooltip]:hover::before {
+    transform: translateX(0) translateY(0);
+}
+
+.message-actions [data-tooltip]::after {
+    left: auto;
+    right: 15px;
+    transform: translateX(0);
+}
+
+/* For input actions at the bottom - position tooltips above */
+.input-actions [data-tooltip]::before,
+.input-actions [data-tooltip]::after {
+    bottom: calc(100% + var(--tooltip-arrow-size) + 2px);
+    top: auto;
+}
+
+.input-actions [data-tooltip]::after {
+    bottom: 100%;
+    border-bottom-color: transparent;
+    border-top-color: var(--tooltip-bg);
+}
+
+/* Positioning adjustments for elements near edges */
+@media (hover: hover) {
+    /* Only apply hover tooltips on devices that support hover */
+    [data-tooltip]:hover::before {
+        animation: tooltipFadeIn 200ms ease-out forwards;
+    }
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Disable tooltips on touch devices during interaction */
+@media (hover: none) {
+    [data-tooltip]::before,
+    [data-tooltip]::after {
+        display: none;
+    }
 }
 
 /* Token breakdown tooltip */
