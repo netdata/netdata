@@ -15,6 +15,7 @@ class NetdataMCPChat {
         this.toolInclusionStates = new Map(); // Track which tools are included/excluded per chat
         this.shouldStopProcessing = false; // Flag to stop processing between requests
         this.isProcessing = false; // Track if we're currently processing messages
+        this.pendingSaveTimeout = null; // Debounce saves for performance
         
         // Single source of truth for all model information
         this.models = {
@@ -148,6 +149,90 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         setTimeout(() => this.createDefaultChatIfNeeded(), 100);
     }
     
+    /**
+     * Safe message operations that automatically persist changes
+     * These methods ensure messages are never lost by auto-saving after each operation
+     * 
+     * IMPORTANT: Always use these methods instead of direct array manipulation
+     * - addMessage() instead of messages.push()
+     * - insertMessage() instead of messages.splice(index, 0, item)
+     * - removeMessage() instead of messages.splice(index, count)
+     * - removeLastMessage() instead of messages.pop()
+     * 
+     * CRITICAL ORDERING RULE: Always save messages BEFORE displaying them!
+     * 1. Call addMessage() to save the message
+     * 2. Call processRenderEvent() to display it
+     * This ensures users never see messages that aren't persisted
+     * 
+     * ATOMIC OPERATIONS: Use batchMode for multi-step operations
+     * this.batchMode = true;
+     * try {
+     *     // Multiple operations
+     * } finally {
+     *     this.batchMode = false;
+     *     this.saveSettings();
+     * }
+     */
+    addMessage(chatId, message) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        chat.messages.push(message);
+        chat.updatedAt = new Date().toISOString();
+        this.autoSave();
+    }
+    
+    insertMessage(chatId, index, message) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        chat.messages.splice(index, 0, message);
+        chat.updatedAt = new Date().toISOString();
+        this.autoSave();
+    }
+    
+    removeMessage(chatId, index, count = 1) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        chat.messages.splice(index, count);
+        chat.updatedAt = new Date().toISOString();
+        this.autoSave();
+    }
+    
+    removeLastMessage(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat || chat.messages.length === 0) return;
+        
+        chat.messages.pop();
+        chat.updatedAt = new Date().toISOString();
+        this.autoSave();
+    }
+    
+    /**
+     * Auto-save with debouncing for performance
+     * Batches multiple rapid saves into a single operation
+     */
+    autoSave() {
+        // Clear any pending save
+        if (this.pendingSaveTimeout) {
+            clearTimeout(this.pendingSaveTimeout);
+        }
+        
+        // For critical operations, save immediately
+        // This ensures data is persisted before UI updates
+        if (!this.batchMode) {
+            this.saveSettings();
+            return;
+        }
+        
+        // In batch mode, schedule a save after a short delay
+        this.pendingSaveTimeout = setTimeout(() => {
+            this.saveSettings();
+            this.pendingSaveTimeout = null;
+        }, 100); // 100ms debounce
+    }
+    
     // Get available models for a provider type
     getModelsForProviderType(providerType) {
         // Use the single source of truth for models
@@ -232,6 +317,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         document.addEventListener('click', () => {
             this.llmModelDropdown.style.display = 'none';
             this.mcpServerDropdown.style.display = 'none';
+            if (this.temperatureDropdown) {
+                this.temperatureDropdown.style.display = 'none';
+            }
         });
         
         this.chatInput.addEventListener('keydown', (e) => {
@@ -269,16 +357,28 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Load sidebar states from localStorage
         this.loadSidebarStates();
         
-        // Temperature control
-        this.temperatureControl = document.getElementById('temperatureControl');
+        // Temperature control dropdown
+        this.temperatureBtn = document.getElementById('temperatureBtn');
+        this.temperatureDropdown = document.getElementById('temperatureDropdown');
         this.temperatureSlider = document.getElementById('temperatureSlider');
-        this.temperatureValue = document.getElementById('temperatureValue');
+        this.currentTempText = document.getElementById('currentTempText');
+        this.tempValueLabel = document.getElementById('tempValueLabel');
+        this.temperatureControl = this.temperatureBtn; // For compatibility
+        this.temperatureValue = this.currentTempText; // For compatibility
         
         // Initialize temperature display
         this.updateTemperatureDisplay(0.7);
         
+        // Temperature button click
+        this.temperatureBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleDropdown('temperatureDropdown');
+        });
+        
+        // Temperature slider events
         this.temperatureSlider.addEventListener('input', (e) => {
-            this.updateTemperatureDisplay(parseFloat(e.target.value));
+            const temp = parseFloat(e.target.value);
+            this.updateTemperatureDisplay(temp);
         });
         
         this.temperatureSlider.addEventListener('change', (e) => {
@@ -477,6 +577,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Close all dropdowns
         this.llmModelDropdown.style.display = 'none';
         this.mcpServerDropdown.style.display = 'none';
+        if (this.temperatureDropdown) {
+            this.temperatureDropdown.style.display = 'none';
+        }
         
         // Toggle the requested dropdown
         if (!isVisible) {
@@ -547,9 +650,19 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         for (const [id, server] of this.mcpServers) {
             const item = document.createElement('button');
             item.className = 'dropdown-item';
+            
+            // Check actual connection status from mcpConnections
+            const mcpConnection = this.mcpConnections.get(id);
+            const isConnected = mcpConnection && mcpConnection.isReady();
+            
             item.innerHTML = `
-                ${server.connected ? '🟢' : '🔴'} ${server.name}
-                <small style="display: block; color: var(--text-secondary); font-size: 12px;">${server.url}</small>
+                <div style="display: flex; align-items: flex-start; gap: 8px;">
+                    <span style="flex-shrink: 0;">${isConnected ? '🟢' : '🔴'}</span>
+                    <div style="flex: 1; min-width: 0;">
+                        <div>${server.name}</div>
+                        <small style="display: block; color: var(--text-tertiary); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${server.url}</small>
+                    </div>
+                </div>
             `;
             
             const chat = this.chats.get(this.currentChatId);
@@ -1005,7 +1118,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         setTimeout(() => toast.remove(), 3000);
     }
     
-    showErrorWithRetry(message, retryCallback) {
+    showErrorWithRetry(message, retryCallback, buttonLabel = 'Retry') {
         // Show error toast
         const toast = document.createElement('div');
         toast.className = 'error-toast';
@@ -1026,10 +1139,11 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (this.currentChatId) {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message error';
+            const buttonIcon = buttonLabel === 'Continue' ? 'fa-play' : 'fa-redo';
             messageDiv.innerHTML = `
                 <div><i class="fas fa-times-circle"></i> ${message}</div>
                 <button class="btn btn-warning btn-small" style="margin-top: 8px;">
-                    <i class="fas fa-redo"></i> Retry
+                    <i class="fas ${buttonIcon}"></i> ${buttonLabel}
                 </button>
             `;
             
@@ -2143,13 +2257,13 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         // Update UI
         this.chatTitle.textContent = chat.title;
-        this.chatMcp.textContent = server ? `MCP: ${server.name}` : 'MCP: Not found';
+        this.chatMcp.textContent = server ? server.name : 'MCP: Not found';
         if (provider) {
             // Parse the model format "provider:model"
             const modelDisplay = chat.model ? chat.model.split(':')[1] || chat.model : 'No model selected';
-            this.chatLlm.textContent = `LLM: ${provider.name} (${modelDisplay})`;
+            this.chatLlm.textContent = modelDisplay;
         } else {
-            this.chatLlm.textContent = 'LLM: Not found';
+            this.chatLlm.textContent = 'Model: Not found';
         }
         
         // Update dropdown buttons
@@ -2254,12 +2368,42 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Check if title generation completed
             if (inTitleGeneration && msg.isTitleRequest && msg.type === 'assistant') {
                 inTitleGeneration = false;
-                // Add the success message
-                const successDiv = document.createElement('div');
-                successDiv.className = 'message system';
-                successDiv.style.cssText = 'margin: 10px auto 20px; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                successDiv.innerHTML = `<i class="fas fa-check-circle"></i> Chat title updated: "${chat.title}"`;
-                this.chatMessages.appendChild(successDiv);
+                // Add ACTION section to the existing Chat Title block
+                const titleBlock = this.chatMessages.querySelector('.system-block[data-type="title"]');
+                if (titleBlock) {
+                    const systemContent = titleBlock.querySelector('.tool-content');
+                    if (systemContent) {
+                        // Check if ACTION section already exists
+                        const existingAction = Array.from(systemContent.querySelectorAll('.tool-section-label'))
+                            .find(label => label.textContent === 'ACTION');
+                        if (!existingAction) {
+                        // Add separator
+                        const separator = document.createElement('div');
+                        separator.className = 'tool-separator';
+                        systemContent.appendChild(separator);
+                        
+                        // Add action section
+                        const actionSection = document.createElement('div');
+                        actionSection.className = 'tool-response-section';
+                        
+                        const actionControls = document.createElement('div');
+                        actionControls.className = 'tool-section-controls';
+                        
+                        const actionLabel = document.createElement('span');
+                        actionLabel.className = 'tool-section-label';
+                        actionLabel.textContent = 'ACTION';
+                        
+                        actionControls.appendChild(actionLabel);
+                        actionSection.appendChild(actionControls);
+                        
+                        const actionContent = document.createElement('pre');
+                        actionContent.textContent = `Chat title updated: "${chat.title}"`;
+                        actionSection.appendChild(actionContent);
+                        
+                        systemContent.appendChild(actionSection);
+                        }
+                    }
+                }
             }
             
             // Reset assistant group after each message to ensure proper separation
@@ -2460,7 +2604,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     this.lastDisplayedTurn = chat.currentTurn;
                 }
                 
-                this.addMessage('user', event.content, event.messageIndex);
+                this.renderMessage('user', event.content, event.messageIndex);
                 if (turn > 0) {
                     this.addStepNumber(turn, this.currentStepInTurn++);
                 }
@@ -2476,7 +2620,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 break;
                 
             case 'assistant-message':
-                this.addMessage('assistant', event.content, event.messageIndex);
+                this.renderMessage('assistant', event.content, event.messageIndex);
                 const chat2 = this.chats.get(this.currentChatId);
                 const turn2 = event.turn !== undefined ? event.turn : (chat2 ? chat2.currentTurn : 0);
                 if (turn2 > 0 && this.currentAssistantGroup) {
@@ -2487,7 +2631,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             case 'tool-call':
                 // Ensure we have a group
                 if (!this.currentAssistantGroup) {
-                    this.addMessage('assistant', '');
+                    this.renderMessage('assistant', '');
                 }
                 this.addToolCall(event.name, event.arguments, event.includeInContext !== false, event.turn, event.messageIndex);
                 break;
@@ -2507,19 +2651,19 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 break;
                 
             case 'system-title-message':
-                this.addMessage('system-title', event.content, event.messageIndex);
+                this.renderMessage('system-title', event.content, event.messageIndex);
                 break;
                 
             case 'system-summary-message':
-                this.addMessage('system-summary', event.content, event.messageIndex);
+                this.renderMessage('system-summary', event.content, event.messageIndex);
                 break;
                 
             case 'title-message':
-                this.addMessage('title', event.content, event.messageIndex);
+                this.renderMessage('title', event.content, event.messageIndex);
                 break;
                 
             case 'summary-message':
-                this.addMessage('summary', event.content, event.messageIndex);
+                this.renderMessage('summary', event.content, event.messageIndex);
                 break;
                 
             case 'accounting-message':
@@ -2547,21 +2691,38 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     
                     const lastUserMessage = chat.messages.filter(m => m.type === 'user' && !m.isTitleRequest).pop();
                     if (lastUserMessage) {
-                        // Remove messages from the error onwards
+                        // ATOMIC OPERATION: Remove messages from the error onwards
                         const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
-                            // Create accounting node before discarding messages
-                            const messagesToDiscard = chat.messages.length - errorIndex;
-                            if (messagesToDiscard > 0) {
-                                const accountingNode = this.createAccountingNode('Retry after error', messagesToDiscard);
-                                chat.messages.splice(errorIndex, 0, accountingNode);
+                            this.batchMode = true;
+                            try {
+                                // Check if we're actually discarding any conversation messages (not just the error)
+                                const messagesToDiscard = chat.messages.length - errorIndex - 1; // -1 to exclude the error itself
+                                
+                                // Only create accounting node if we're discarding actual conversation messages
+                                if (messagesToDiscard > 0) {
+                                    const accountingNode = this.createAccountingNode('Retry after error', messagesToDiscard);
+                                    this.insertMessage(chat.id, errorIndex, accountingNode);
+                                    // Remove all messages after the accounting node
+                                    const messagesToRemove = chat.messages.length - errorIndex - 1;
+                                    if (messagesToRemove > 0) {
+                                        this.removeMessage(chat.id, errorIndex + 1, messagesToRemove);
+                                    }
+                                } else {
+                                    // Just remove the error message, no accounting needed
+                                    this.removeMessage(chat.id, errorIndex, 1);
+                                }
+                            } finally {
+                                // Exit batch mode and save atomically
+                                this.batchMode = false;
+                                this.saveSettings();
                             }
-                            
-                            chat.messages = chat.messages.slice(0, errorIndex + 1); // Keep accounting node
-                            this.saveSettings();
                             
                             // Reload chat to show cleaned history
                             this.loadChat(this.currentChatId);
+                            
+                            // Hide any existing spinner before retry
+                            this.hideLoadingSpinner();
                             
                             // Retry processing
                             try {
@@ -2581,6 +2742,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                                     provider.onLog = proxyProvider.onLog;
                                     
                                     await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
+                                    
+                                    // Save the chat after successful retry
+                                    chat.updatedAt = new Date().toISOString();
+                                    this.saveSettings();
                                 } else {
                                     this.showError('Cannot retry: MCP server or LLM provider not available');
                                 }
@@ -2736,9 +2901,11 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Increment turn counter for new user message
         chat.currentTurn = (chat.currentTurn || 0) + 1;
         
-        // Process user message event
+        // CRITICAL: Save message BEFORE displaying it to prevent data loss
+        this.addMessage(chat.id, { type: 'user', role: 'user', content: message, turn: chat.currentTurn });
+        
+        // Now display it - if save failed, user won't see a message that wasn't saved
         this.processRenderEvent({ type: 'user-message', content: message });
-        chat.messages.push({ type: 'user', role: 'user', content: message, turn: chat.currentTurn });
         
         // If this is the first message in an unsaved chat, mark it as saved
         if (chat.isSaved === false && chat.messages.filter(m => m.type === 'user').length === 1) {
@@ -2764,27 +2931,51 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 await this.generateChatTitle(chat, mcpConnection, provider);
             }
         } catch (error) {
-            // Show error with retry button
-            this.showErrorWithRetry(`Error: ${error.message}`, async () => {
-                // Find and remove only the error message
-                const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === error.message);
-                if (errorIndex !== -1) {
-                    chat.messages.splice(errorIndex, 1);
-                    this.saveSettings();
+            // Check if the user stopped processing
+            if (this.shouldStopProcessing) {
+                // User clicked Stop - show a friendly message with Continue option
+                const continueMessage = '⏸️ Processing paused. You can continue the conversation by sending a new message or clicking Continue.';
+                this.showErrorWithRetry(continueMessage, async () => {
+                    // Find and remove the pause message
+                    const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === continueMessage);
+                    if (errorIndex !== -1) {
+                        this.removeMessage(chat.id, errorIndex, 1);
+                        
+                        // Reload chat to remove the error from display
+                        this.loadChat(this.currentChatId);
+                    }
                     
-                    // Reload chat to remove the error from display
-                    this.loadChat(this.currentChatId);
-                }
-                
-                // Retry processing without removing any other messages
-                try {
-                    // Continue the conversation from where it left off
-                    await this.processMessageWithTools(chat, mcpConnection, provider, message);
-                } catch (retryError) {
-                    this.showError(`Retry failed: ${retryError.message}`);
-                }
-            });
-            chat.messages.push({ type: 'error', content: error.message });
+                    // Continue with a simple continuation prompt
+                    this.chatInput.value = 'Please continue';
+                    await this.sendMessage();
+                }, 'Continue');
+                this.addMessage(chat.id, { type: 'error', content: continueMessage });
+            } else {
+                // Regular error handling
+                this.showErrorWithRetry(`Error: ${error.message}`, async () => {
+                    // Find and remove only the error message
+                    const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === error.message);
+                    if (errorIndex !== -1) {
+                        this.removeMessage(chat.id, errorIndex, 1);
+                        
+                        // Reload chat to remove the error from display
+                        this.loadChat(this.currentChatId);
+                    }
+                    
+                    // Retry processing without removing any other messages
+                    try {
+                        // Continue the conversation from where it left off
+                        await this.processMessageWithTools(chat, mcpConnection, provider, message);
+                        
+                        // Save the chat after successful retry
+                        chat.updatedAt = new Date().toISOString();
+                        this.saveSettings();
+                    } catch (retryError) {
+                        this.showError(`Retry failed: ${retryError.message}`);
+                    }
+                });
+                this.addMessage(chat.id, { type: 'error', content: error.message });
+            }
         } finally {
             // Remove loading spinner event
             this.processRenderEvent({ type: 'hide-spinner' });
@@ -2867,9 +3058,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (userMessagesAfterCheckpoint === 1 || (startIndex === 0 && chat.messages.filter(m => m.role === 'user').length === 1)) {
             let systemContent = chat.systemPrompt || this.defaultSystemPrompt;
             
-            // If there's a summary, prepend it to the system prompt
+            // If there's a summary, append it to the system prompt
             if (summaryMessage) {
-                systemContent = `Previous Conversation Summary:\n${summaryMessage.content}\n\n${systemContent}`;
+                systemContent = `${systemContent}\n\nPrevious Conversation Summary:\n${summaryMessage.content}`;
             }
             
             messages.push({ role: 'system', content: systemContent });
@@ -2984,6 +3175,17 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Build conversation history using the new function
         const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider);
         
+        // Safety check: Ensure we have at least one message
+        if (messages.length === 0) {
+            console.error('No messages to send to API - this should not happen');
+            console.error('Chat messages:', chat.messages);
+            console.error('Chat ID:', chat.id);
+            console.error('User message parameter:', userMessage);
+            
+            // This can happen if the chat only contains system messages that are filtered out
+            // This is an edge case that shouldn't happen in normal usage
+            throw new Error('No valid conversation messages found. Please start a new conversation.');
+        }
         
         // Get available tools
         const tools = Array.from(mcpConnection.tools.values());
@@ -3000,7 +3202,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             
             // Check if we should stop processing
             if (this.shouldStopProcessing) {
-                this.showSystemMessage('⏹️ Stopped by user');
+                // Don't show a system message here - we'll handle it in the catch block
                 break;
             }
             
@@ -3019,11 +3221,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             const temperature = this.getCurrentTemperature();
             const llmStartTime = Date.now();
             const response = await provider.sendMessage(messages, tools, temperature, chat.toolInclusionMode, cacheControlIndex);
-            console.log('LLM response:', { 
-                content: response.content?.substring(0, 200), 
-                hasThinking: response.content?.includes('<thinking>'),
-                toolCalls: response.toolCalls?.length 
-            });
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Track token usage
@@ -3067,13 +3264,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             
             // Store assistant message with tool calls if any
             if (response.content || response.toolCalls) {
-                // Display the message
-                if (response.content) {
-                    // Process assistant message event
-                    this.processRenderEvent({ type: 'assistant-message', content: response.content });
-                }
-                
-                // Store in our improved internal format
+                // CRITICAL: Save assistant message BEFORE displaying
                 const assistantMessage = {
                     type: 'assistant',
                     role: 'assistant',
@@ -3087,7 +3278,12 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     turn: chat.currentTurn,
                     cacheControlIndex: cacheControlIndex  // Store where cache control was placed
                 };
-                chat.messages.push(assistantMessage);
+                this.addMessage(chat.id, assistantMessage);
+                
+                // Now display the message - after it's safely saved
+                if (response.content) {
+                    this.processRenderEvent({ type: 'assistant-message', content: response.content });
+                }
                 assistantMessageIndex = chat.messages.length - 1;
                 
                 // Build the message for the API
@@ -3218,7 +3414,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     }
                     
                     // Store all tool results together
-                    chat.messages.push({
+                    // NOTE: Tool results are displayed during execution for user feedback,
+                    // but the consolidated results are saved here to ensure consistency
+                    this.addMessage(chat.id, {
                         type: 'tool-results',
                         results: toolResults,
                         turn: chat.currentTurn
@@ -3261,7 +3459,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         }
     }
 
-    addMessage(role, content, messageIndex) {
+    renderMessage(role, content, messageIndex) {
         let messageDiv;
         
         if (role === 'assistant') {
@@ -3304,7 +3502,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         // Process content
         if (hasThinking && role === 'assistant') {
-            console.log('Found thinking tags in assistant message:', content);
             // Reset regex for actual processing
             content.match(/<thinking>([\s\S]*?)<\/thinking>/g);
             
@@ -3387,7 +3584,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             });
         } else if (role === 'system-title' || role === 'system-summary') {
             // Handle system messages like tool blocks
-            console.log('Creating system message block for role:', role, 'content:', content);
             
             // Check if we need to create a new system block or add to existing one
             let systemBlock = this.chatMessages.querySelector('.system-block:last-child');
@@ -3458,7 +3654,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             return; // Don't append messageDiv to chat
         } else if (role === 'title' || role === 'summary') {
             // Handle system responses - add to existing system block
-            console.log('Adding system response for role:', role, 'content:', content);
             
             const isTitle = role === 'title';
             const blockType = isTitle ? 'title' : 'summary';
@@ -3581,17 +3776,38 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
     
     createAccountingNode(reason, messagesToDiscard = 0) {
-        // Calculate current cumulative tokens before discarding messages
-        const cumulative = this.getCumulativeTokenUsage(this.currentChatId);
+        // Calculate tokens ONLY from messages that will be discarded
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return null;
+        
+        // Find messages that will be discarded (from the end)
+        const startIndex = Math.max(0, chat.messages.length - messagesToDiscard);
+        const discardedMessages = chat.messages.slice(startIndex);
+        
+        // Calculate tokens only from these discarded messages
+        let discardedInput = 0;
+        let discardedOutput = 0;
+        let discardedCacheCreation = 0;
+        let discardedCacheRead = 0;
+        
+        for (const message of discardedMessages) {
+            if (message.usage) {
+                // Add tokens from this message
+                discardedInput += message.usage.promptTokens || 0;
+                discardedOutput += message.usage.completionTokens || 0;
+                discardedCacheCreation += message.usage.cacheCreationInputTokens || 0;
+                discardedCacheRead += message.usage.cacheReadInputTokens || 0;
+            }
+        }
         
         return {
             role: 'accounting',
             timestamp: new Date().toISOString(),
             cumulativeTokens: {
-                inputTokens: cumulative.inputTokens,
-                outputTokens: cumulative.outputTokens,
-                cacheReadTokens: cumulative.cacheReadTokens,
-                cacheCreationTokens: cumulative.cacheCreationTokens
+                inputTokens: discardedInput,
+                outputTokens: discardedOutput,
+                cacheReadTokens: discardedCacheRead,
+                cacheCreationTokens: discardedCacheCreation
             },
             reason: reason,
             discardedMessages: messagesToDiscard
@@ -3720,6 +3936,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             contentDiv.classList.remove('editing');
             contentDiv.textContent = originalPrompt;
             buttonsDiv.remove();
+            // Restore the edit trigger
+            this.addEditTrigger(contentDiv, originalPrompt, 'system');
         };
         
         buttonsDiv.querySelector('.btn-primary').onclick = save;
@@ -3781,49 +3999,53 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (usage) {
             const formatNumber = (num) => num.toLocaleString();
             
-            // Calculate delta (tokens added in this step)
-            let deltaTokens = 0;
+            // Calculate the current total
+            const currentTotal = usage.promptTokens + 
+                               (usage.cacheReadInputTokens || 0) + 
+                               (usage.cacheCreationInputTokens || 0) + 
+                               usage.completionTokens;
             
+            // Calculate delta vs previous total
+            let deltaTokens = 0;
             if (this.currentChatId) {
                 const history = this.tokenUsageHistory.get(this.currentChatId);
                 if (history && history.requests.length > 1) {
-                    // Get previous request's prompt tokens
+                    // Get previous request's total
                     const previousRequest = history.requests[history.requests.length - 2];
-                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
+                    const previousTotal = previousRequest.promptTokens + 
+                                        (previousRequest.cacheReadInputTokens || 0) + 
+                                        (previousRequest.cacheCreationInputTokens || 0) + 
+                                        previousRequest.completionTokens;
+                    deltaTokens = currentTotal - previousTotal;
                 } else if (history && history.requests.length === 1) {
                     // First request - all tokens are new
-                    deltaTokens = usage.promptTokens;
+                    deltaTokens = currentTotal;
                 }
             }
             
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
+            // Regular tokens (normal price)
+            metricsHtml += `<span class="metric-item" data-tooltip="Regular input tokens at standard price"><i class="fas fa-file-alt"></i> ${formatNumber(usage.promptTokens)}</span>`;
             
-            // Add delta if there was an increase
-            if (deltaTokens > 0) {
-                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
+            // Cached tokens (90% discount) - always show
+            const cachedTokens = usage.cacheReadInputTokens || 0;
+            metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Cached tokens (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(cachedTokens)}</span>`;
+            
+            // Updated tokens (25% surcharge) - always show
+            const updatedTokens = usage.cacheCreationInputTokens || 0;
+            metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Updated cache tokens (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(updatedTokens)}</span>`;
+            
+            // Output tokens
+            metricsHtml += `<span class="metric-item" data-tooltip="Output tokens generated by the model"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>`;
+            
+            // Total
+            metricsHtml += `<span class="metric-item" data-tooltip="Total tokens (regular + cached + updated + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(currentTotal)}</span>`;
+            
+            // Delta
+            if (deltaTokens !== 0) {
+                const deltaColor = deltaTokens > 0 ? 'var(--warning-color)' : 'var(--success-color)';
+                const deltaSign = deltaTokens > 0 ? '+' : '';
+                metricsHtml += `<span class="metric-item" style="color: ${deltaColor}" data-tooltip="Change from previous request total">${deltaSign}${formatNumber(deltaTokens)}</span>`;
             }
-            
-            // Add cache information if available (Anthropic)
-            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
-                if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
-                }
-                if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
-                }
-            }
-            
-            // Calculate the true total including cache tokens
-            const trueTotal = usage.promptTokens + 
-                              (usage.cacheReadInputTokens || 0) + 
-                              (usage.cacheCreationInputTokens || 0) + 
-                              usage.completionTokens;
-            
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(trueTotal)}</span>
-            `;
         }
         
         metricsFooter.innerHTML = metricsHtml;
@@ -3848,53 +4070,63 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (usage) {
             const formatNumber = (num) => num.toLocaleString();
             
-            // Calculate delta (tokens added in this step)
+            // Calculate the current total
+            const currentTotal = usage.promptTokens + 
+                               (usage.cacheReadInputTokens || 0) + 
+                               (usage.cacheCreationInputTokens || 0) + 
+                               usage.completionTokens;
+            
+            // Calculate delta vs previous total
             let deltaTokens = 0;
+            let previousTotal = 0;
             
             // Use provided previous tokens if available (for stored messages)
             if (previousPromptTokens !== undefined && previousPromptTokens !== null) {
-                deltaTokens = usage.promptTokens - previousPromptTokens;
+                // This is a bit tricky - we only have previous prompt tokens, not the full previous total
+                // For now, we'll calculate delta based on current total vs previous prompt tokens
+                // This is an approximation but better than nothing
+                previousTotal = previousPromptTokens;
+                deltaTokens = currentTotal - previousTotal;
             } else if (this.currentChatId) {
                 // Otherwise try to calculate from history
                 const history = this.tokenUsageHistory.get(this.currentChatId);
                 if (history && history.requests.length > 1) {
-                    // Get previous request's prompt tokens
+                    // Get previous request's total
                     const previousRequest = history.requests[history.requests.length - 2];
-                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
+                    previousTotal = previousRequest.promptTokens + 
+                                  (previousRequest.cacheReadInputTokens || 0) + 
+                                  (previousRequest.cacheCreationInputTokens || 0) + 
+                                  previousRequest.completionTokens;
+                    deltaTokens = currentTotal - previousTotal;
                 } else if (history && history.requests.length === 1) {
                     // First request - all tokens are new
-                    deltaTokens = usage.promptTokens;
+                    deltaTokens = currentTotal;
                 }
             }
             
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
+            // Regular tokens (normal price)
+            metricsHtml += `<span class="metric-item" data-tooltip="Regular input tokens at standard price"><i class="fas fa-file-alt"></i> ${formatNumber(usage.promptTokens)}</span>`;
             
-            // Add delta if there was an increase
-            if (deltaTokens > 0) {
-                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
+            // Cached tokens (90% discount) - always show
+            const cachedTokens = usage.cacheReadInputTokens || 0;
+            metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Cached tokens (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(cachedTokens)}</span>`;
+            
+            // Updated tokens (25% surcharge) - always show
+            const updatedTokens = usage.cacheCreationInputTokens || 0;
+            metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Updated cache tokens (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(updatedTokens)}</span>`;
+            
+            // Output tokens
+            metricsHtml += `<span class="metric-item" data-tooltip="Output tokens generated by the model"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>`;
+            
+            // Total
+            metricsHtml += `<span class="metric-item" data-tooltip="Total tokens (regular + cached + updated + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(currentTotal)}</span>`;
+            
+            // Delta
+            if (deltaTokens !== 0) {
+                const deltaColor = deltaTokens > 0 ? 'var(--warning-color)' : 'var(--success-color)';
+                const deltaSign = deltaTokens > 0 ? '+' : '';
+                metricsHtml += `<span class="metric-item" style="color: ${deltaColor}" data-tooltip="Change from previous request total">${deltaSign}${formatNumber(deltaTokens)}</span>`;
             }
-            
-            // Add cache information if available (Anthropic)
-            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
-                if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
-                }
-                if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
-                }
-            }
-            
-            // Calculate the true total including cache tokens
-            const trueTotal = usage.promptTokens + 
-                              (usage.cacheReadInputTokens || 0) + 
-                              (usage.cacheCreationInputTokens || 0) + 
-                              usage.completionTokens;
-            
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens (input + cache + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(trueTotal)}</span>
-            `;
         }
         
         metricsFooter.innerHTML = metricsHtml;
@@ -4115,20 +4347,27 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             
             // Always proceed even if content is the same - user may want to regenerate response
             
-            // Create accounting node before discarding messages
-            const messagesToDiscard = chat.messages.length - messageIndex;
-            if (messagesToDiscard > 0) {
-                const accountingNode = this.createAccountingNode('Message edited', messagesToDiscard);
-                chat.messages.splice(messageIndex, 0, accountingNode);
-                messageIndex++; // Adjust index after insertion
+            // ATOMIC OPERATION: Batch mode to prevent partial saves
+            this.batchMode = true;
+            try {
+                // Create accounting node before discarding messages
+                const messagesToDiscard = chat.messages.length - messageIndex;
+                if (messagesToDiscard > 0) {
+                    const accountingNode = this.createAccountingNode('Message edited', messagesToDiscard);
+                    this.insertMessage(chat.id, messageIndex, accountingNode);
+                    messageIndex++; // Adjust index after insertion
+                }
+                
+                // Clip history at this point - remove all messages after messageIndex
+                const toRemove = chat.messages.length - messageIndex;
+                if (toRemove > 0) {
+                    this.removeMessage(chat.id, messageIndex, toRemove);
+                }
+            } finally {
+                // Exit batch mode and save immediately
+                this.batchMode = false;
+                this.saveSettings();
             }
-            
-            // Clip history at this point
-            chat.messages = chat.messages.slice(0, messageIndex);
-            chat.updatedAt = new Date().toISOString();
-            
-            // Save the clipped state
-            this.saveSettings();
             
             // Reload the chat to show clipped history
             this.loadChat(this.currentChatId);
@@ -4165,6 +4404,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             // Clean up event listeners
             contentDiv.removeEventListener('keydown', keyHandler);
             document.removeEventListener('click', clickOutside);
+            // Restore the edit trigger
+            this.addEditTrigger(contentDiv, originalText, 'user');
         };
         
         buttonsDiv.querySelector('.btn-primary').onclick = save;
@@ -4178,7 +4419,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     addContentToAssistantGroup(content) {
         if (!this.currentAssistantGroup) {
             // Create a new group if we don't have one
-            this.addMessage('assistant', '');
+            this.renderMessage('assistant', '');
         }
         
         // Check if content has thinking tags
@@ -4873,49 +5114,44 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const chat = this.chats.get(chatId);
         if (!chat) return 0;
         
-        // For system messages (title, summary requests), return current context
-        const lastMessage = chat.messages[chat.messages.length - 1];
-        if (lastMessage && ['system-title', 'system-summary', 'title'].includes(lastMessage.role)) {
-            // Don't change context window for these messages
-            const currentTokens = this.getTokenUsageForChat(chatId);
-            return currentTokens.totalTokens;
+        // Check if the last non-title message is a summary - if so, context is just the summary's output tokens
+        let lastNonTitleIndex = -1;
+        for (let i = chat.messages.length - 1; i >= 0; i--) {
+            if (chat.messages[i].role !== 'title') {
+                lastNonTitleIndex = i;
+                break;
+            }
         }
         
-        // Check if there's a summary in the conversation (not just last message)
-        const summaryIndex = chat.messages.findIndex(m => m.role === 'summary');
-        if (summaryIndex !== -1) {
-            // We have a summary - context should be based on messages after it
-            const summaryMessage = chat.messages[summaryIndex];
-            const messagesAfterSummary = chat.messages.slice(summaryIndex + 1);
-            
-            // Start with the summary's completion tokens
-            let contextTokens = 0;
-            if (summaryMessage.usage && summaryMessage.usage.completionTokens) {
-                contextTokens = summaryMessage.usage.completionTokens;
+        if (lastNonTitleIndex >= 0) {
+            const lastNonTitleMessage = chat.messages[lastNonTitleIndex];
+            if (lastNonTitleMessage && lastNonTitleMessage.role === 'summary' && lastNonTitleMessage.usage) {
+                // For summaries as the last real message, the context window is just the completion tokens
+                // since that's what will be included in the next request
+                return lastNonTitleMessage.usage.completionTokens || 0;
             }
-            
-            // Add tokens from messages after the summary
-            const history = this.tokenUsageHistory.get(chatId);
-            if (history && history.requests.length > 0) {
-                // If we have messages after summary, use the latest token count
-                const hasMessagesAfterSummary = messagesAfterSummary.some(m => 
-                    ['user', 'assistant'].includes(m.role) && m.usage
-                );
-                if (hasMessagesAfterSummary) {
-                    const latestRequest = history.requests[history.requests.length - 1];
-                    return latestRequest.promptTokens + 
-                           (latestRequest.cacheReadInputTokens || 0) + 
-                           (latestRequest.cacheCreationInputTokens || 0) +
-                           (latestRequest.completionTokens || 0);
+        }
+        
+        // Find the latest assistant message (excluding title/summary)
+        for (let i = chat.messages.length - 1; i >= 0; i--) {
+            const message = chat.messages[i];
+            if (message.role === 'assistant' && message.usage) {
+                // Skip title and summary responses
+                if (i > 0 && ['system-title', 'system-summary'].includes(chat.messages[i-1].role)) {
+                    continue;
                 }
+                
+                // Calculate total tokens for this message
+                const usage = message.usage;
+                return (usage.promptTokens || 0) + 
+                       (usage.cacheReadInputTokens || 0) + 
+                       (usage.cacheCreationInputTokens || 0) + 
+                       (usage.completionTokens || 0);
             }
-            
-            return contextTokens;
         }
         
-        // Otherwise, get the latest token usage
-        const tokenUsage = this.getTokenUsageForChat(chatId);
-        return tokenUsage.totalTokens;
+        // No assistant message found
+        return 0;
     }
     
     updateTokenUsage(chatId, usage, model) {
@@ -4977,13 +5213,13 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Show indicator
         indicator.style.display = 'flex';
         
-        // Update stats - show as "X tokens / Y tokens" or "Xk tokens / Yk tokens"
+        // Update stats - show as "X / Y" or "Xk / Yk"
         if (totalTokens >= 1000 || limit >= 1000) {
             const totalDisplay = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(1)}k` : totalTokens.toString();
             const limitDisplay = limit >= 1000 ? `${(limit / 1000).toFixed(0)}k` : limit.toString();
-            stats.textContent = `${totalDisplay} tokens / ${limitDisplay} tokens`;
+            stats.textContent = `${totalDisplay} / ${limitDisplay}`;
         } else {
-            stats.textContent = `${totalTokens} tokens / ${limit} tokens`;
+            stats.textContent = `${totalTokens} / ${limit}`;
         }
         
         // Update bar
@@ -5035,50 +5271,27 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             };
         }
         
-        // Start with tokens from accounting nodes
+        // Start from zero and count all tokens
         let totalInput = 0;
         let totalOutput = 0;
         let totalCacheCreation = 0;
         let totalCacheRead = 0;
         
-        // Find the last accounting node
-        let lastAccountingIndex = -1;
-        for (let i = chat.messages.length - 1; i >= 0; i--) {
-            if (chat.messages[i].role === 'accounting') {
-                const tokens = chat.messages[i].cumulativeTokens;
-                totalInput = tokens.inputTokens || 0;
-                totalOutput = tokens.outputTokens || 0;
-                totalCacheCreation = tokens.cacheCreationTokens || 0;
-                totalCacheRead = tokens.cacheReadTokens || 0;
-                lastAccountingIndex = i;
-                break;
-            }
-        }
-        
-        // Add tokens from requests after the last accounting node
-        const history = this.tokenUsageHistory.get(chatId);
-        if (history && history.requests.length > 0) {
-            // Count how many requests happened after the accounting node
-            // This is approximate - we count messages that have token usage
-            let requestsAfterAccounting = 0;
-            if (lastAccountingIndex >= 0) {
-                for (let i = lastAccountingIndex + 1; i < chat.messages.length; i++) {
-                    if (chat.messages[i].usage) {
-                        requestsAfterAccounting++;
-                    }
-                }
-            } else {
-                requestsAfterAccounting = history.requests.length;
-            }
-            
-            // Add the last N requests
-            const startIndex = Math.max(0, history.requests.length - requestsAfterAccounting);
-            for (let i = startIndex; i < history.requests.length; i++) {
-                const request = history.requests[i];
-                totalInput += request.promptTokens || 0;
-                totalOutput += request.completionTokens || 0;
-                totalCacheCreation += request.cacheCreationInputTokens || 0;
-                totalCacheRead += request.cacheReadInputTokens || 0;
+        // Add tokens from ALL messages (including accounting nodes)
+        for (const message of chat.messages) {
+            if (message.role === 'accounting' && message.cumulativeTokens) {
+                // Accounting nodes store tokens from discarded messages
+                const tokens = message.cumulativeTokens;
+                totalInput += tokens.inputTokens || 0;
+                totalOutput += tokens.outputTokens || 0;
+                totalCacheCreation += tokens.cacheCreationTokens || 0;
+                totalCacheRead += tokens.cacheReadTokens || 0;
+            } else if (message.usage) {
+                // Regular messages with usage data
+                totalInput += message.usage.promptTokens || 0;
+                totalOutput += message.usage.completionTokens || 0;
+                totalCacheCreation += message.usage.cacheCreationInputTokens || 0;
+                totalCacheRead += message.usage.cacheReadInputTokens || 0;
             }
         }
         
@@ -5102,31 +5315,33 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const cacheReadElement = document.getElementById('cumulativeCacheReadTokens');
         const cacheCreationElement = document.getElementById('cumulativeCacheCreationTokens');
         
+        // Format numbers with k suffix for thousands
+        const formatTokens = (num) => {
+            if (num >= 1000) {
+                const thousands = num / 1000;
+                const formatted = thousands >= 1000 ? 
+                    thousands.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ",") : 
+                    thousands.toFixed(1);
+                return `${formatted}<span style="color: var(--text-tertiary); font-size: 10px;">k</span>`;
+            }
+            return num.toString();
+        };
+        
         if (inputElement) {
-            inputElement.innerHTML = `<i class="fas fa-download"></i> ${formatNumber(cumulative.inputTokens)}`;
+            inputElement.innerHTML = formatTokens(cumulative.inputTokens);
         }
         
         if (outputElement) {
-            outputElement.innerHTML = `<i class="fas fa-upload"></i> ${formatNumber(cumulative.outputTokens)}`;
+            outputElement.innerHTML = formatTokens(cumulative.outputTokens);
         }
         
-        // Show/hide and update cache token displays
+        // Always show cache token displays, even if zero
         if (cacheReadElement) {
-            if (cumulative.cacheReadTokens > 0) {
-                cacheReadElement.style.display = 'inline-block';
-                cacheReadElement.innerHTML = `<i class="fas fa-memory"></i> ${formatNumber(cumulative.cacheReadTokens)}`;
-            } else {
-                cacheReadElement.style.display = 'none';
-            }
+            cacheReadElement.innerHTML = formatTokens(cumulative.cacheReadTokens);
         }
         
         if (cacheCreationElement) {
-            if (cumulative.cacheCreationTokens > 0) {
-                cacheCreationElement.style.display = 'inline-block';
-                cacheCreationElement.innerHTML = `<i class="fas fa-save"></i> ${formatNumber(cumulative.cacheCreationTokens)}`;
-            } else {
-                cacheCreationElement.style.display = 'none';
-            }
+            cacheCreationElement.innerHTML = formatTokens(cumulative.cacheCreationTokens);
         }
     }
     
@@ -5266,7 +5481,18 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     
     // Temperature control methods
     updateTemperatureDisplay(temperature) {
-        this.temperatureValue.textContent = temperature.toFixed(1);
+        const formattedValue = temperature.toFixed(1);
+        
+        // Update all temperature displays
+        if (this.currentTempText) {
+            this.currentTempText.textContent = formattedValue;
+        }
+        if (this.tempValueLabel) {
+            this.tempValueLabel.textContent = formattedValue;
+        }
+        if (this.temperatureValue) {
+            this.temperatureValue.textContent = formattedValue;
+        }
         
         // Set title attribute as hint for compact view
         let hint = '';
@@ -5286,6 +5512,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             hint = 'Experimental';
         }
         
+        if (this.temperatureBtn) {
+            this.temperatureBtn.setAttribute('data-tooltip', `Temperature ${formattedValue}: ${hint}`);
+        }
         if (this.temperatureControl) {
             this.temperatureControl.title = `Temperature: ${hint}`;
         }
@@ -5369,6 +5598,14 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             return;
         }
         
+        // Check if there are any user messages to summarize
+        const userMessages = chat.messages.filter(m => m.role === 'user' && !['system-title', 'system-summary'].includes(m.role));
+        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
+        if (userMessages.length === 0 || assistantMessages.length === 0) {
+            this.showError('Need at least one complete conversation exchange to summarize');
+            return;
+        }
+        
         // Disable button to prevent multiple requests
         this.summarizeBtn.disabled = true;
         this.summarizeBtn.innerHTML = '<span><i class="fas fa-hourglass-half"></i></span><span>Summarizing...</span>';
@@ -5392,24 +5629,60 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             provider.onLog = llmProviderConfig.onLog;
             
             // Create summary request
-            const summaryRequest = `Please provide a comprehensive summary of our conversation so far. Include:
-1. The main topics discussed
-2. Key decisions or conclusions reached
-3. Any important context or background information
-4. Current status or next steps if applicable
+            const summaryRequest = `Please provide a comprehensive summary of our conversation so far.
 
-This summary will be used as context for continuing our conversation.`;
+CRITICAL REQUIREMENTS:
+- You MUST quote ALL user messages verbatim in a dedicated section
+- Preserve exact dates, times, numbers, and any specific details mentioned
+- Do not paraphrase or summarize the user messages - quote them exactly
+- Document ALL findings, discoveries, and analysis in detail
+
+Include the following sections:
+
+1. USER MESSAGES (VERBATIM)
+Quote every user message in chronological order, exactly as written.
+
+2. DETAILED FINDINGS
+Document everything discovered so far, including:
+- All data collected from tools (metrics, logs, system states)
+- Patterns or anomalies identified
+- Root causes discovered
+- Correlations found
+- Timeline of events
+- Specific values, thresholds, or measurements observed
+- Any errors, warnings, or issues encountered
+- Configuration details or system behaviors noted
+
+3. ANALYSIS AND CONCLUSIONS
+- Detailed analysis of the findings
+- Hypotheses formed and tested
+- Conclusions reached with supporting evidence
+- Relationships between different findings
+
+4. MAIN TOPICS DISCUSSED
+Summarize the key topics and areas covered.
+
+5. KEY DECISIONS AND RECOMMENDATIONS
+List any decisions made, recommendations provided, or actions taken.
+
+6. IMPORTANT CONTEXT
+Include any critical background information, dates, hints, or specific details the user provided.
+
+7. CURRENT STATUS AND NEXT STEPS
+Describe where the investigation/conversation stands now and any pending items or next steps.
+
+This summary will be used as context for continuing our conversation, so preserving all findings and exact user input is essential.`;
             
-            // Process the summary request as a system-summary message
-            this.processRenderEvent({ type: 'system-summary-message', content: summaryRequest });
-            chat.messages.push({ 
-                role: 'system-summary', 
+            // CRITICAL: Save summary request BEFORE displaying
+            this.addMessage(chat.id, { 
+                role: 'system-summary',
                 content: summaryRequest,
                 timestamp: new Date().toISOString()
             });
             
-            // Save after adding the system-summary message
-            this.saveSettings();
+            // Now display it
+            this.processRenderEvent({ type: 'system-summary-message', content: summaryRequest });
+            // No need to save - addMessage handles it
             
             // Add metrics placeholder
             const metricsId = `metrics-summary-${this.metricsIdCounter++}`;
@@ -5448,11 +5721,8 @@ This summary will be used as context for continuing our conversation.`;
             
             // Process the summary response
             if (response.content) {
-                // Display the response as a summary checkpoint
-                this.processRenderEvent({ type: 'summary-message', content: response.content });
-                
-                // Store the summary response with the 'summary' role
-                chat.messages.push({ 
+                // CRITICAL: Save summary response BEFORE displaying
+                this.addMessage(chat.id, { 
                     role: 'summary', 
                     content: response.content,
                     usage: response.usage || null,
@@ -5461,16 +5731,42 @@ This summary will be used as context for continuing our conversation.`;
                     cacheControlIndex: cacheControlIndex  // Store the frozen cache position
                 });
                 
-                // Save the chat
-                this.saveSettings();
+                // Now display the response as a summary checkpoint
+                this.processRenderEvent({ type: 'summary-message', content: response.content });
                 
-                // Show success message
-                const successDiv = document.createElement('div');
-                successDiv.className = 'message system';
-                successDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                successDiv.innerHTML = '<i class="fas fa-check-circle"></i> Conversation summarized! Context window has been reset.';
-                this.chatMessages.appendChild(successDiv);
-                this.scrollToBottom();
+                // No need for extra save - addMessage handles it
+                
+                // Add ACTION section to the existing Chat Summary block
+                const summaryBlock = this.chatMessages.querySelector('.system-block[data-type="summary"]');
+                if (summaryBlock) {
+                    const systemContent = summaryBlock.querySelector('.tool-content');
+                    if (systemContent) {
+                        // Add separator
+                        const separator = document.createElement('div');
+                        separator.className = 'tool-separator';
+                        systemContent.appendChild(separator);
+                        
+                        // Add action section
+                        const actionSection = document.createElement('div');
+                        actionSection.className = 'tool-response-section';
+                        
+                        const actionControls = document.createElement('div');
+                        actionControls.className = 'tool-section-controls';
+                        
+                        const actionLabel = document.createElement('span');
+                        actionLabel.className = 'tool-section-label';
+                        actionLabel.textContent = 'ACTION';
+                        
+                        actionControls.appendChild(actionLabel);
+                        actionSection.appendChild(actionControls);
+                        
+                        const actionContent = document.createElement('pre');
+                        actionContent.textContent = 'Conversation summarized. Context window has been reset.';
+                        actionSection.appendChild(actionContent);
+                        
+                        systemContent.appendChild(actionSection);
+                    }
+                }
                 
                 // Update context window display (should show near zero)
                 const contextTokens = this.calculateContextWindowTokens(chat.id);
@@ -5484,8 +5780,7 @@ This summary will be used as context for continuing our conversation.`;
             // Remove the system-summary message if it failed
             const lastMsg = chat.messages[chat.messages.length - 1];
             if (lastMsg && lastMsg.role === 'system-summary') {
-                chat.messages.pop();
-                this.saveSettings();
+                this.removeLastMessage(chat.id);
             }
         } finally {
             // Re-enable button
@@ -5503,24 +5798,18 @@ This summary will be used as context for continuing our conversation.`;
             // Create a system message for title generation
             const titleRequest = "Please provide a short, descriptive title (max 50 characters) for this conversation. Respond with ONLY the title text, no quotes, no explanation.";
             
-            // Add visual separator
-            const separatorDiv = document.createElement('div');
-            separatorDiv.className = 'message system';
-            separatorDiv.style.cssText = 'margin: 20px auto; padding: 8px 16px; background: var(--info-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-            separatorDiv.innerHTML = '<i class="fas fa-pen"></i> Generating chat title...';
-            this.chatMessages.appendChild(separatorDiv);
-            this.scrollToBottom();
+            // No visual separator needed - the collapsible node shows the status
             
-            // Process the title request as a system-title message
-            this.processRenderEvent({ type: 'system-title-message', content: titleRequest });
-            chat.messages.push({ 
+            // CRITICAL: Save title request BEFORE displaying
+            this.addMessage(chat.id, { 
                 role: 'system-title', 
                 content: titleRequest,
                 timestamp: new Date().toISOString()
             });
             
-            // Save after adding the system-title message
-            this.saveSettings();
+            // Now display it
+            this.processRenderEvent({ type: 'system-title-message', content: titleRequest });
+            // No need to save - addMessage handles it
             
             // Add metrics placeholder
             const metricsId = `metrics-title-${this.metricsIdCounter++}`;
@@ -5595,15 +5884,14 @@ This summary will be used as context for continuing our conversation.`;
                     chat.updatedAt = new Date().toISOString();
                     
                     // Store the title response with the 'title' role
-                    chat.messages.push({ 
+                    this.addMessage(chat.id, { 
                         role: 'title', 
                         content: response.content,
                         usage: response.usage || null,
                         responseTime: llmResponseTime || null,
                         timestamp: new Date().toISOString()
                     });
-                    
-                    this.saveSettings(); // Save after adding the message
+                    // No need to save - addMessage handles it
                     
                     // Update UI
                     this.updateChatSessions();
@@ -5615,13 +5903,37 @@ This summary will be used as context for continuing our conversation.`;
                         sessionItem.textContent = newTitle;
                     }
                     
-                    // Add success message
-                    const successDiv = document.createElement('div');
-                    successDiv.className = 'message system';
-                    successDiv.style.cssText = 'margin: 10px auto 20px; padding: 8px 16px; background: var(--success-color); color: white; text-align: center; border-radius: 4px; max-width: 80%;';
-                    successDiv.innerHTML = `<i class="fas fa-check-circle"></i> Chat title updated: "${newTitle}"`;
-                    this.chatMessages.appendChild(successDiv);
-                    this.scrollToBottom();
+                    // Add ACTION section to the existing Chat Title block
+                    const titleBlock = this.chatMessages.querySelector('.system-block[data-type="title"]');
+                    if (titleBlock) {
+                        const systemContent = titleBlock.querySelector('.tool-content');
+                        if (systemContent) {
+                            // Add separator
+                            const separator = document.createElement('div');
+                            separator.className = 'tool-separator';
+                            systemContent.appendChild(separator);
+                            
+                            // Add action section
+                            const actionSection = document.createElement('div');
+                            actionSection.className = 'tool-response-section';
+                            
+                            const actionControls = document.createElement('div');
+                            actionControls.className = 'tool-section-controls';
+                            
+                            const actionLabel = document.createElement('span');
+                            actionLabel.className = 'tool-section-label';
+                            actionLabel.textContent = 'ACTION';
+                            
+                            actionControls.appendChild(actionLabel);
+                            actionSection.appendChild(actionControls);
+                            
+                            const actionContent = document.createElement('pre');
+                            actionContent.textContent = `Chat title updated: "${newTitle}"`;
+                            actionSection.appendChild(actionContent);
+                            
+                            systemContent.appendChild(actionSection);
+                        }
+                    }
                 }
             }
             

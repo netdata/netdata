@@ -21,9 +21,9 @@
     --modal-backdrop: rgba(0, 0, 0, 0.5);
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.08);
-    --chat-user-bg: rgba(0, 171, 68, 0.08);
-    --chat-user-text: var(--text-primary);
-    --chat-user-border: rgba(0, 171, 68, 0.3);
+    --chat-user-bg: #00ab44;  /* Solid Netdata green */
+    --chat-user-text: white;
+    --chat-user-border: #00ab44;
     --chat-assistant-bg: transparent;
     --chat-assistant-text: var(--text-primary);
     --code-bg: #f5f5f5;
@@ -51,9 +51,9 @@
     --modal-backdrop: rgba(0, 0, 0, 0.8);
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.6);
-    --chat-user-bg: rgba(0, 217, 82, 0.1);
-    --chat-user-text: var(--text-primary);
-    --chat-user-border: rgba(0, 217, 82, 0.3);
+    --chat-user-bg: #00d952;  /* Solid bright green for dark theme */
+    --chat-user-text: #1e1e1e;  /* Dark text on bright background */
+    --chat-user-border: #00d952;
     --chat-assistant-bg: transparent;
     --chat-assistant-text: var(--text-primary);
     --code-bg: #1e1e1e;
@@ -263,7 +263,7 @@ body {
 }
 
 :root[data-theme="dark"] .chat-session-item.active .session-meta {
-    color: rgba(0, 0, 0, 0.7);
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .session-title {
@@ -368,14 +368,16 @@ body {
 
 .message.user {
     background-color: var(--chat-user-bg);
-    color: var(--text-secondary);
+    color: var(--chat-user-text);
     align-self: flex-end;
     position: relative;
     margin-right: 20px;
-    border: 1px solid var(--chat-user-border);
-    border-left-width: 2px;
+    margin-bottom: 12px;
+    border: none;
     font-size: 16px;
     padding: 12px 20px;
+    border-radius: 16px 32px 0 32px;  /* top-left: 16px, top-right: 32px, bottom-right: 0, bottom-left: 32px */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Edit balloon */
@@ -667,20 +669,22 @@ body {
 /* Redo button styling */
 .redo-button {
     position: absolute;
-    left: -40px;
+    left: -45px;
     top: 35px;
     background: var(--primary-color);
     color: white;
     border: none;
-    border-radius: 4px;
-    padding: 2px 4px;
-    font-size: 9px;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     opacity: 0;
     transition: all 0.2s ease;
     z-index: 100;
     white-space: nowrap;
     transform: translateX(-5px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .message:hover .redo-button,
@@ -738,7 +742,7 @@ body {
 
 .message-content pre {
     background-color: var(--code-bg);
-    border: 1px solid var(--border-subtle);
+    border: none;
     border-radius: 4px;
     padding: 12px 16px;
     overflow-x: auto;
@@ -754,12 +758,13 @@ body {
     border-radius: 3px;
     font-family: 'IBM Plex Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
     font-size: 0.9em;
-    border: 1px solid var(--border-subtle);
+    border: none;
 }
 
 .message-content pre code {
     background-color: transparent;
     padding: 0;
+    border: none;
 }
 
 .message-content blockquote {
@@ -1360,83 +1365,226 @@ body {
 
 /* Buttons */
 .btn {
-    padding: 6px 12px;
-    border: 1px solid var(--border-subtle);
+    padding: 3px 6px;
+    border: none;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
-    background: transparent;
+    background: var(--surface-color);
     color: var(--text-secondary);
     font-family: 'IBM Plex Sans', sans-serif;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 3px;
     white-space: nowrap;
+    min-height: 26px;
+    opacity: 0.6;
 }
 
 .btn:hover {
-    background: var(--surface-color);
-    border-color: var(--border-color);
+    background: var(--surface-hover);
     color: var(--text-primary);
+    opacity: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .btn:active {
-    transform: translateY(1px);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .btn:disabled {
-    opacity: 0.4;
+    opacity: 0.3;
     cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.btn:focus:not(:focus-visible) {
+    outline: none;
 }
 
 .btn-primary {
     background: var(--primary-color);
     color: white;
-    border-color: var(--primary-color);
+    border: none;
+    opacity: 0.8;
 }
 
 .btn-primary:hover {
     background: var(--primary-hover);
-    border-color: var(--primary-hover);
-}
-
-:root[data-theme="dark"] .btn-primary {
-    color: #1e1e1e;
-}
-
-.btn-secondary {
-    background: transparent;
-    color: var(--text-tertiary);
-    border-color: transparent;
-    opacity: 0.8;
-}
-
-.btn-secondary:hover {
-    background: var(--surface-color);
-    color: var(--text-secondary);
-    border-color: var(--border-subtle);
+    color: white;
     opacity: 1;
 }
 
-:root[data-theme="dark"] .btn-secondary {
+:root[data-theme="dark"] .btn-primary {
+    background: rgba(0, 217, 82, 0.2);  /* Darker green background */
+    color: var(--text-primary);  /* Light text for readability */
+}
+
+:root[data-theme="dark"] .btn-primary:hover {
+    background: rgba(0, 217, 82, 0.3);
+    color: var(--text-primary);
+}
+
+.btn-secondary {
+    background: var(--surface-color);
     color: var(--text-secondary);
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+}
+
+.btn-secondary:active {
+    background: var(--surface-color);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme specific adjustments */
+:root[data-theme="dark"] .btn {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .btn-secondary:active {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .btn-danger {
     background: var(--danger-color);
     color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #ff5757;
+    color: white;
+}
+
+:root[data-theme="dark"] .btn-danger {
+    color: white;
+}
+
+:root[data-theme="dark"] .btn-danger:hover {
+    color: white;
 }
 
 .btn-success {
-    background: var(--success-color);
-    color: white;
+    background: var(--success-color) !important;
+    color: white !important;
+    border: none !important;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background: var(--primary-hover) !important;
+    color: white !important;
+}
+
+.btn-success:active {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="dark"] .btn-success {
+    color: #1e1e1e !important;
+}
+
+:root[data-theme="dark"] .btn-success:hover {
+    color: #1e1e1e !important;
 }
 
 .btn-warning {
     background: var(--warning-color);
     color: #1a1a1a;
+    border: none;
+}
+
+.btn-warning:hover {
+    background: #ffab00;
+    color: #1a1a1a;
+}
+
+:root[data-theme="dark"] .btn-warning {
+    color: #1a1a1a;
+}
+
+:root[data-theme="dark"] .btn-warning:hover {
+    color: #1a1a1a;
+}
+
+/* Error message retry buttons - make them fully visible */
+.message.error .btn {
+    opacity: 1;
+    background: var(--warning-color);
+    color: #1a1a1a;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.message.error .btn:hover {
+    background: #ffab00;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme="dark"] .message.error .btn {
+    color: #1a1a1a;
+}
+
+:root[data-theme="dark"] .message.error .btn:hover {
+    color: #1a1a1a;
+}
+
+/* Cache control button specific styling */
+.tool-toggle-global.all-off {
+    opacity: 0.7;
+}
+
+.tool-toggle-global.all-off:hover {
+    opacity: 1;
+}
+
+/* Fix dark theme text color for tool toggle states */
+:root[data-theme="dark"] .tool-toggle-global.btn-danger,
+:root[data-theme="dark"] .tool-toggle-global.btn-warning,
+:root[data-theme="dark"] .tool-toggle-global.btn-secondary {
+    color: var(--text-primary) !important;
+}
+
+:root[data-theme="dark"] .tool-toggle-global.btn-danger:hover,
+:root[data-theme="dark"] .tool-toggle-global.btn-warning:hover,
+:root[data-theme="dark"] .tool-toggle-global.btn-secondary:hover {
+    color: var(--text-primary) !important;
+}
+
+/* Keep dark text for success state (green background) */
+:root[data-theme="dark"] .tool-toggle-global.btn-success {
+    color: #1e1e1e !important;
+}
+
+:root[data-theme="dark"] .tool-toggle-global.btn-success:hover {
+    color: #1e1e1e !important;
 }
 
 /* Tool toggle global button styling */
@@ -1448,7 +1596,7 @@ body {
 
 .tool-toggle-icon {
     font-weight: bold;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .btn-small {
@@ -1457,20 +1605,65 @@ body {
 }
 
 .btn-send {
-    background: var(--primary-color);
-    color: white;
+    background: var(--primary-color) !important;
+    color: white !important;
     padding: 12px 24px;
     font-weight: 600;
-    border-color: var(--primary-color);
+    border: 2px solid var(--primary-color) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    opacity: 1 !important;  /* Full opacity, not 0.9 */
+    font-size: 14px;  /* Slightly larger than base btn */
 }
 
 .btn-send:hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
+    background: var(--primary-hover) !important;
+    border-color: var(--primary-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    opacity: 1 !important;
 }
 
+.btn-send:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-send:disabled {
+    opacity: 0.4 !important;
+    transform: none;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+/* Light theme - keep white text on green background */
+:root[data-theme="light"] .btn-send {
+    color: white !important;
+}
+
+/* Dark theme - use contrasting text color */
 :root[data-theme="dark"] .btn-send {
-    color: #1e1e1e;
+    background: #00d952 !important;
+    border-color: #00d952 !important;
+    color: #0a0a0a !important;  /* Very dark text for contrast on bright green */
+    font-weight: 700;  /* Slightly bolder in dark mode */
+}
+
+:root[data-theme="dark"] .btn-send:hover {
+    background: #00ff5e !important;
+    border-color: #00ff5e !important;
+    color: #0a0a0a !important;
+}
+
+/* Focus state for accessibility */
+.btn-send:focus {
+    outline: 3px solid var(--primary-dim);
+    outline-offset: 2px;
+}
+
+.btn-send:focus:not(:focus-visible) {
+    outline: none;
 }
 
 .btn-icon {
@@ -2052,87 +2245,77 @@ body {
     background-color: rgba(0, 0, 0, 0.25);
 }
 
-/* Context Window Indicator */
-.context-window-indicator {
+/* Metrics Dashboard - Professional Context Window & Token Counters */
+.metrics-dashboard {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+    min-width: 0; /* Allow shrinking */
+}
+
+/* Context Window Section */
+.context-window-section {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 200px;
     flex: 1;
-}
-
-.context-window-indicator.compact {
-    padding: 0;
-    background: transparent;
-    border: none;
-    margin: 0;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-}
-
-.context-label {
-    font-size: 9px;
-    font-weight: 500;
-    color: var(--text-tertiary);
-    text-align: center;
-    opacity: 0.7;
+    max-width: 400px; /* Responsive max width */
 }
 
 .context-window-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    justify-content: flex-start;
 }
 
-.context-window-title {
-    font-size: 14px;
+.context-window-label {
+    font-size: 9px;
     font-weight: 500;
-    color: var(--text-primary);
+    color: var(--text-tertiary);
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
 }
 
-.context-window-indicator.compact .context-window-bar {
-    flex: 0 0 auto;
-    width: 180px;
-    height: 24px;
+.context-window-bar-container {
+    display: flex;
+    align-items: center;
+}
+
+.context-window-bar {
+    flex: 1;
+    height: 32px; /* Bigger to match token numbers */
     background: var(--surface-color);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
     overflow: hidden;
     position: relative;
     display: flex;
     align-items: center;
-    margin: 0;
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
+    box-shadow: 
+        inset 0 1px 3px rgba(0, 0, 0, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    min-width: 160px;
 }
 
-.context-window-indicator.compact:hover .context-window-bar {
-    opacity: 1;
-}
-
-.context-window-indicator.compact .context-window-stats {
-    font-size: 11px;
-    color: var(--text-primary);
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
-    white-space: nowrap;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 10;
-    font-weight: normal;
-    text-shadow: 
-        0 0 3px var(--surface-color),
-        0 0 6px var(--surface-color);
+.context-window-section:hover .context-window-bar {
+    border-color: var(--primary-color);
+    box-shadow: 
+        inset 0 1px 3px rgba(0, 0, 0, 0.1),
+        0 2px 8px rgba(0, 171, 68, 0.15);
+    transform: translateY(-1px);
 }
 
 .context-window-fill {
     height: 100%;
-    background: var(--primary-color);
-    transition: width 0.3s ease, background-color 0.3s ease;
+    background: #d0d0d0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    opacity: 0.8;
+    border-radius: 4px;
 }
 
 .context-window-fill.warning {
@@ -2143,15 +2326,122 @@ body {
     background: var(--danger-color);
 }
 
-.context-window-percentage {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 11px;
-    font-weight: bold;
+/* Dark theme specific fill color - darker than background */
+:root[data-theme="dark"] .context-window-fill {
+    background: #404040;
+}
+
+:root[data-theme="dark"] .context-window-fill.warning {
+    background: var(--warning-color);
+}
+
+:root[data-theme="dark"] .context-window-fill.danger {
+    background: var(--danger-color);
+}
+
+.context-window-stats {
+    font-size: 14px;
     color: var(--text-primary);
-    text-shadow: 0 0 2px var(--surface-color);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+    font-weight: 600;
+    white-space: nowrap;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    letter-spacing: 0.5px;
+}
+
+/* Token Counters Section */
+.token-counters-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex-shrink: 0;
+}
+
+.token-counters-headers {
+    display: flex;
+    gap: 0;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--text-tertiary);
+    opacity: 0.6;
+    line-height: 1;
+    padding: 1px 0;
+}
+
+.token-header-primary {
+    width: 58px;
+    text-align: right;
+    padding-right: 8px;
+}
+
+.token-header-item {
+    width: 81px;
+    text-align: center;
+    border-left: 1px solid var(--border-subtle);
+    padding: 0 2px;
+}
+
+.token-counters-values {
+    display: flex;
+    gap: 0;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+    line-height: 1.4;
+}
+
+.token-value-primary {
+    width: 58px;
+    text-align: right;
+    padding-right: 8px;
+    color: var(--text-tertiary);
+    font-size: 10px;
+}
+
+.token-value-item {
+    width: 81px;
+    text-align: center;
+    color: var(--text-primary);
+    border-left: 1px solid var(--border-subtle);
+    padding: 4px 2px;
+}
+
+/* Responsive behavior */
+@media (max-width: 1200px) {
+    .metrics-dashboard {
+        gap: 16px;
+    }
+    
+    .context-window-section {
+        max-width: 300px;
+    }
+    
+    .context-window-bar {
+        min-width: 140px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .metrics-dashboard {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+    
+    .context-window-section {
+        max-width: none;
+    }
+    
+    .token-counters-section {
+        align-self: center;
+    }
 }
 
 /* CSS-only tooltip implementation */
@@ -2567,6 +2857,47 @@ body {
     text-align: left;
 }
 
+/* Temperature Slider Styles */
+#temperatureSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    outline: none;
+}
+
+#temperatureSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+#temperatureSlider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+#temperatureSlider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.1s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+#temperatureSlider::-moz-range-thumb:hover {
+    transform: scale(1.1);
+}
+
 /* Dropdown Styles */
 .dropdown {
     position: relative;
@@ -2575,6 +2906,19 @@ body {
 
 .dropdown-toggle {
     cursor: pointer;
+    min-width: 100px;
+    justify-content: space-between;
+    opacity: 0.7;
+}
+
+.dropdown-toggle:hover {
+    opacity: 1;
+}
+
+/* Ensure dropdown buttons follow the same styling rules */
+.dropdown .btn-secondary {
+    min-width: 120px;
+    justify-content: space-between;
 }
 
 .dropdown-menu {
@@ -2584,8 +2928,8 @@ body {
     border-radius: 4px;
     box-shadow: var(--shadow-lg);
     z-index: 1000;
-    min-width: 200px;
-    max-width: 300px;
+    min-width: 400px;
+    max-width: 500px;
 }
 
 .dropdown-item {
