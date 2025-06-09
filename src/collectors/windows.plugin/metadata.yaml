@@ -3172,6 +3172,54 @@ modules:
           description: "These metrics refer to Windows Exchange."
           labels: []
           metrics:
+            - name: exchange.transport_queues_active_mail_box_delivery
+              description: Active Mailbox Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_external_active_remote_delivery
+              description: External Active Remote Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_external_largest_delivery
+              description: External Largest Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: largest
+            - name: exchange.transport_queues_internal_active_remote_delivery
+              description: Internal Active Remote Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_internal_largest_delivery
+              description: Internal Largest Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: largest
+            - name: exchange.transport_queues_retry_mailbox_delivery
+              description: Retry Mailbox Delivery Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: retry
+            - name: exchange.transport_queues_unreachable
+              description: Unreachable Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: unreachable
+            - name: exchange.transport_queues_poison
+              description: Poison Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: unreachable
             - name: exchange.activesync_ping_cmds_pending
               description: Ping commands pending in queue.
               unit: commands
