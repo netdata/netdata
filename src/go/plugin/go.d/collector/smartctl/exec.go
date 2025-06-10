@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
