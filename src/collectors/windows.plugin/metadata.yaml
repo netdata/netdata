@@ -1949,7 +1949,7 @@ modules:
             - name: mssql_instance
               description: The instance name.
             - name: resource
-              description: "The MSSQL instance name."
+              description: "The Resource are all the system objects that are included with SQL Server."
           metrics:
             - name: mssql.instance_resource_deadlocks
               description: Active lock requests that resulted in deadlock per resource
