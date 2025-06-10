@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20453](https://github.com/netdata/netdata/pull/20453) ([netdatabot](https://github.com/netdatabot))
+- docs: improve SCIM documentation [\#20451](https://github.com/netdata/netdata/pull/20451) ([juacker](https://github.com/juacker))
+- build\(deps\): bump github.com/gosnmp/gosnmp from 1.40.0 to 1.41.0 in /src/go [\#20449](https://github.com/netdata/netdata/pull/20449) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.3 to 1.17.4 in /src/go [\#20447](https://github.com/netdata/netdata/pull/20447) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/lmittmann/tint from 1.1.1 to 1.1.2 in /src/go [\#20446](https://github.com/netdata/netdata/pull/20446) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.9.0 to 9.10.0 in /src/go [\#20445](https://github.com/netdata/netdata/pull/20445) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump golang.org/x/net from 0.40.0 to 0.41.0 in /src/go [\#20444](https://github.com/netdata/netdata/pull/20444) ([dependabot[bot]](https://github.com/apps/dependabot))
 - chore\(go.d/ddsnmp\): add basic SNMP table walking functionality [\#20441](https://github.com/netdata/netdata/pull/20441) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d/ddsnmp\): use dev type and vendor from meta for family [\#20439](https://github.com/netdata/netdata/pull/20439) ([ilyam8](https://github.com/ilyam8))
 - Fix registry save integer overflow and add failure backoff [\#20437](https://github.com/netdata/netdata/pull/20437) ([ktsaou](https://github.com/ktsaou))
@@ -444,7 +451,6 @@
 - initial implementation of libbacktrace [\#19910](https://github.com/netdata/netdata/pull/19910) ([ktsaou](https://github.com/ktsaou))
 - fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
 - improvement\(health/dyncfg\): add widget to load available contexts [\#19904](https://github.com/netdata/netdata/pull/19904) ([ilyam8](https://github.com/ilyam8))
-- new exit cause: shutdown timeout [\#19903](https://github.com/netdata/netdata/pull/19903) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
@@ -463,11 +469,6 @@
 - Remove auto-retry on changelog generation. [\#19908](https://github.com/netdata/netdata/pull/19908) ([Ferroin](https://github.com/Ferroin))
 - Bump repoconfig version used in kickstart script to 5-1. [\#19906](https://github.com/netdata/netdata/pull/19906) ([Ferroin](https://github.com/Ferroin))
 - Revert "Fix compile without dbengine" [\#19905](https://github.com/netdata/netdata/pull/19905) ([stelfrag](https://github.com/stelfrag))
-- Fix compile without dbengine [\#19902](https://github.com/netdata/netdata/pull/19902) ([stelfrag](https://github.com/stelfrag))
-- do not use errno when hashing status events [\#19900](https://github.com/netdata/netdata/pull/19900) ([ktsaou](https://github.com/ktsaou))
-- more compilation flags for stack traces [\#19899](https://github.com/netdata/netdata/pull/19899) ([ktsaou](https://github.com/ktsaou))
-- more strict checks on log-fw [\#19898](https://github.com/netdata/netdata/pull/19898) ([ktsaou](https://github.com/ktsaou))
-- fix for system shutdown [\#19897](https://github.com/netdata/netdata/pull/19897) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
