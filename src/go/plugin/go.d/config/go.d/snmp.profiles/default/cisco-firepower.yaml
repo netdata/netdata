@@ -44,12 +44,12 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.21 # cfprSmMonitorMemFree
         name: memory.free
         description: Memory free
-        family: Memory
+        family: Memory/Usage
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.23 # cfprSmMonitorMemUsed
         name: memory.used
         description: Memory used
-        family: Memory
+        family: Memory/Usage
         unit: "By"
     metric_tags:
       - index: 1 # cfprSmMonitorInstanceId
