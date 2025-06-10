@@ -165,9 +165,17 @@ static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     return LIBUV_WORKERS_RELAXED;
 }
 
+// This needs to be called from event loop thread only (callback)
 static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx)
 {
     internal_fatal(rrdeng_main.tid != gettid_cached(), "check_and_schedule_db_rotation() can only be run from the event loop thread");
+
+    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED)) {
+        if (ctx->datafiles.pending_index == false) {
+            ctx->datafiles.pending_index = true;
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        }
+    }
 
     if (ctx->datafiles.pending_rotate) {
         nd_log_daemon(NDLP_DEBUG, "DBENGINE: tier %d is already pending rotation", ctx->config.tier);
@@ -670,8 +678,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
     spinlock_unlock(&datafile->writers.spinlock);
 
     if(datafile->fileno != ctx_last_fileno_get(ctx) && still_running)
-        // we just finished a flushing on a datafile that is not the active one
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -716,8 +723,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
         if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx, true) == 0)
-            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
-                           NULL);
+            __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
         netdata_mutex_unlock(&mutex);
 
@@ -934,9 +940,6 @@ done:
 
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     __atomic_store_n(&ctx->atomic.now_deleting_files, false, __ATOMIC_RELAXED);
-
-    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED))
-       rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     check_and_schedule_db_rotation(ctx);
 }
@@ -2308,6 +2311,7 @@ void *dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_JOURNAL_INDEX: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
+                    // We no longer have an indexing command pending
                     ctx->datafiles.pending_index = false;
                     if (NOT_INDEXING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
                         __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
