@@ -1326,7 +1326,7 @@ static void netdata_exchange_queues(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
         // Remove 'queue' from instance name
         char *ptr = strchr(windows_shared_buffer, ' ');
         if (ptr)
-            ptr = '\0';
+            *ptr = '\0';
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0 || strcasecmp(windows_shared_buffer, "total") == 0)
             continue;
