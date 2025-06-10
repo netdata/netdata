@@ -887,6 +887,427 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"table metrics with same-table tags": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "IF-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "interface",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.2.2.1.2",
+											Name: "ifDescr",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
+					[]gosnmp.SnmpPDU{
+						// Row 1 - index 1
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("eth0"),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.1",
+							Type:  gosnmp.Counter32,
+							Value: uint(1000),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.16.1",
+							Type:  gosnmp.Counter32,
+							Value: uint(2000),
+						},
+						// Row 2 - index 2
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.2.2",
+							Type:  gosnmp.OctetString,
+							Value: []byte("eth1"),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.2",
+							Type:  gosnmp.Counter32,
+							Value: uint(3000),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.16.2",
+							Type:  gosnmp.Counter32,
+							Value: uint(4000),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "ifInOctets",
+							Value:      1000,
+							Tags:       map[string]string{"interface": "eth0"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+						{
+							Name:       "ifOutOctets",
+							Value:      2000,
+							Tags:       map[string]string{"interface": "eth0"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+						{
+							Name:       "ifInOctets",
+							Value:      3000,
+							Tags:       map[string]string{"interface": "eth1"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+						{
+							Name:       "ifOutOctets",
+							Value:      4000,
+							Tags:       map[string]string{"interface": "eth1"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"table metrics with tag mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "IF-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "if_type",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.2.2.1.3",
+											Name: "ifType",
+										},
+										Mapping: map[string]string{
+											"1": "other",
+											"2": "regular1822",
+											"6": "ethernetCsmacd",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
+					[]gosnmp.SnmpPDU{
+						// Row 1
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.3.1",
+							Type:  gosnmp.Integer,
+							Value: 6, // ethernetCsmacd
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.1",
+							Type:  gosnmp.Counter32,
+							Value: uint(1000),
+						},
+						// Row 2
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.3.2",
+							Type:  gosnmp.Integer,
+							Value: 1, // other
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.2",
+							Type:  gosnmp.Counter32,
+							Value: uint(2000),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "ifInOctets",
+							Value:      1000,
+							Tags:       map[string]string{"if_type": "ethernetCsmacd"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+						{
+							Name:       "ifInOctets",
+							Value:      2000,
+							Tags:       map[string]string{"if_type": "other"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"table metrics with pattern matching tags": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:                  "1.3.6.1.4.1.1000.1.1.2",
+											Name:                 "myDescription",
+											ExtractValueCompiled: mustCompileRegex(`Interface (\w+)`),
+										},
+										Tag: "port",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.1",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("Interface Gi0/1"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "myMetric",
+							Value:      100,
+							Tags:       map[string]string{"port": "Gi0"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"table metrics with static tags": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								StaticTags: []string{"table_type:performance", "source:snmp"},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "interface",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.1000.1.1.2",
+											Name: "ifName",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.1",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("eth0"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:  "myMetric",
+							Value: 100,
+							Tags: map[string]string{
+								"table_type": "performance",
+								"source":     "snmp",
+								"interface":  "eth0",
+							},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"table metrics with missing tag values": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "IF-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "interface",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.2.2.1.2",
+											Name: "ifDescr",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
+					[]gosnmp.SnmpPDU{
+						// Row 1 - has both metric and tag
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("eth0"),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.1",
+							Type:  gosnmp.Counter32,
+							Value: uint(1000),
+						},
+						// Row 2 - missing tag value
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.2",
+							Type:  gosnmp.Counter32,
+							Value: uint(2000),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "ifInOctets",
+							Value:      1000,
+							Tags:       map[string]string{"interface": "eth0"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+						{
+							Name:       "ifInOctets",
+							Value:      2000,
+							Tags:       map[string]string{}, // No interface tag because it's missing
+							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
 	}
 
 	for name, tc := range tests {
@@ -898,6 +1319,7 @@ func TestCollector_Collect(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			collector := New(mockHandler, tc.profiles, logger.New())
+			collector.doTableMetrics = true
 
 			result, err := collector.Collect()
 

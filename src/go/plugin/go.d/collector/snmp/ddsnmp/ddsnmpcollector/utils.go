@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -137,10 +138,8 @@ func convPduToString(pdu gosnmp.SnmpPDU) (string, error) {
 			return "", fmt.Errorf("OctetString has unexpected type %T", pdu.Value)
 		}
 
-		// Convert to string and check if it can be represented as a raw string literal
-		s := string(bs)
-		if strconv.CanBackquote(s) {
-			return s, nil
+		if utf8.Valid(bs) {
+			return strings.ToValidUTF8(string(bs), "�"), nil
 		}
 		return hex.EncodeToString(bs), nil
 	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32, gosnmp.Uinteger32, gosnmp.TimeTicks:
