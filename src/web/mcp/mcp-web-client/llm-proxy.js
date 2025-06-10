@@ -41,9 +41,13 @@ const MODEL_CONTEXT_WINDOWS = {
   
   // Google
   'gemini-2.0-flash-exp': 1000000,
-  'gemini-2.0-flash-thinking-exp': 1000000,
+  'gemini-2.0-flash-thinking-exp-1219': 1000000,
+  'gemini-2.0-flash-thinking-exp-01-21': 1000000,
   'gemini-1.5-pro': 2000000,
+  'gemini-1.5-pro-002': 2000000,
   'gemini-1.5-flash': 1000000,
+  'gemini-1.5-flash-002': 1000000,
+  'gemini-1.5-flash-8b': 1000000,
   'gemini-pro': 32760,
   'gemini-pro-vision': 32760
 };
@@ -89,9 +93,13 @@ const MODEL_PRICING = {
   
   // Google Gemini
   'gemini-2.0-flash-exp': { input: 0.00, output: 0.00 }, // Free experimental
-  'gemini-2.0-flash-thinking-exp': { input: 0.00, output: 0.00 }, // Free experimental
+  'gemini-2.0-flash-thinking-exp-1219': { input: 0.00, output: 0.00 }, // Free experimental  
+  'gemini-2.0-flash-thinking-exp-01-21': { input: 0.00, output: 0.00 }, // Free experimental
   'gemini-1.5-pro': { input: 1.25, output: 5.00 },
+  'gemini-1.5-pro-002': { input: 1.25, output: 5.00 },
   'gemini-1.5-flash': { input: 0.075, output: 0.30 },
+  'gemini-1.5-flash-002': { input: 0.075, output: 0.30 },
+  'gemini-1.5-flash-8b': { input: 0.05, output: 0.20 }, // 8B model is cheaper
   'gemini-pro': { input: 0.50, output: 1.50 },
   'gemini-pro-vision': { input: 0.50, output: 1.50 }
 };
@@ -130,9 +138,13 @@ const DEFAULT_CONFIG = {
       apiKey: '',
       models: [
         { id: 'gemini-2.0-flash-exp', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
-        { id: 'gemini-2.0-flash-thinking-exp', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
+        { id: 'gemini-2.0-flash-thinking-exp-1219', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
+        { id: 'gemini-2.0-flash-thinking-exp-01-21', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
         { id: 'gemini-1.5-pro', contextWindow: 2000000, pricing: { input: 1.25, output: 5.00 } },
+        { id: 'gemini-1.5-pro-002', contextWindow: 2000000, pricing: { input: 1.25, output: 5.00 } },
         { id: 'gemini-1.5-flash', contextWindow: 1000000, pricing: { input: 0.075, output: 0.30 } },
+        { id: 'gemini-1.5-flash-002', contextWindow: 1000000, pricing: { input: 0.075, output: 0.30 } },
+        { id: 'gemini-1.5-flash-8b', contextWindow: 1000000, pricing: { input: 0.05, output: 0.20 } },
         { id: 'gemini-pro', contextWindow: 32760, pricing: { input: 0.50, output: 1.50 } },
         { id: 'gemini-pro-vision', contextWindow: 32760, pricing: { input: 0.50, output: 1.50 } }
       ]
