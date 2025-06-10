@@ -1944,12 +1944,12 @@ modules:
               dimensions:
                 - name: blocked
         - name: MSSQL Resource Locks
-          description: "TODO"
+          description: "SQL Server locks on individual resource types. Locks are held on SQL Server resources, such as rows read or modified during a transaction, to prevent concurrent use of resources by different transactions: https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17."
           labels:
             - name: mssql_instance
               description: The instance name.
             - name: resource
-              description: "TODO: ???"
+              description: "The MSSQL instance name."
           metrics:
             - name: mssql.instance_resource_deadlocks
               description: Active lock requests that resulted in deadlock per resource
@@ -1971,7 +1971,7 @@ modules:
             - name: wait_type
               description: A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes.
             - name: wait_category
-              description: "TODO: ???"
+              description: "Wait categories are groupings of specific wait types that indicate the reason a SQL Server worker is waiting."
           metrics:
             - name: mssql.instance_total_wait_time
               description: Wait time for each wait type and category
