@@ -51,6 +51,17 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 }
 
 func (c *Collector) collectSingleTable(cfg ddprofiledefinition.MetricsConfig) ([]Metric, error) {
+	for _, tagCfg := range cfg.MetricTags {
+		if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
+			c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
+			return nil, nil
+		}
+		if len(tagCfg.IndexTransform) > 0 {
+			c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
+			return nil, nil
+		}
+	}
+
 	pdus, err := c.snmpWalk(cfg.Table.OID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk table: %w", err)
