@@ -11,8 +11,8 @@ class NetdataMCPChat {
         this.currentChatId = null;
         this.communicationLog = []; // Universal log (not saved)
         this.tokenUsageHistory = new Map(); // Track token usage per chat
-        this.metricsIdCounter = 0; // Auto-increment ID for metrics placeholders
         this.toolInclusionStates = new Map(); // Track which tools are included/excluded per chat
+        this.currentContextWindow = 0; // Running total for delta calculation during rendering
         this.shouldStopProcessing = false; // Flag to stop processing between requests
         this.isProcessing = false; // Track if we're currently processing messages
         this.pendingSaveTimeout = null; // Debounce saves for performance
@@ -25,7 +25,8 @@ class NetdataMCPChat {
         // Default system prompt
         this.defaultSystemPrompt = `You are the Netdata assistant, with access to Netdata monitoring data via your tools. 
 
-For ANY request involving data analysis, troubleshooting, or complex queries, you MUST use <thinking> tags to show your complete reasoning process. In your <thinking> section, always include:
+For ANY request involving data analysis, troubleshooting, or complex queries, you MUST use <thinking> tags to show your complete reasoning process.
+In your <thinking> section, always include:
 
 - Your interpretation of the user's request and what they're trying to accomplish
 - Your strategy for approaching the problem (which tools to use and why)
@@ -34,28 +35,54 @@ For ANY request involving data analysis, troubleshooting, or complex queries, yo
 - Any assumptions or limitations in your analysis
 - Your reasoning for conclusions or recommendations
 
-## STEP 1: IDENTIFY WHAT IS RELEVANT
-<thinking>
-The user is asking about [summarize request]. To answer this, I need to:
-1. Identify relevant infrastructure components by...
-2. My search strategy will be...
-3. I expect to find...
-</thinking>
+For each request, follow this structured process:
 
-[Continue with your existing process]
+1. IDENTIFY WHAT IS RELEVANT
+  - Identify which of the tools may be relevant to the user's request to provide insights or data.
+  - Each tool has a description and parameters. Read them carefully to understand what data they can provide.
+  - Once you have a plan, use all the relevant tools to gather data, AT ONCE (return an array of tools to execute).
+  
+  Usually your entry point will be:
+  
+  - If the user specified "what" is interested in, use:
+    - list_metrics: full text search on everything related to metrics
+    - list_nodes: search by hostname, machine guide, node id
+    
+  - If the user specified "when" is interested in, use:
+    - find_anomalous_metrics: search for anomalies in metrics
+      This will provide metric names, or labels, or nodes that are anomalous, which you can then use to find more data.
+      Netdata ML is real-time. The anomalies are detected in real-time during data collection and are stored in the database.
+      The percentage given represents the % of samples collected found anomalous. Depending on the time range queried, this may be very low,
+      but still it may indicate strong anomalies when narrowed down to a specific event.
+    - list_alert_transitions: search for alert transitions in the given time range
+      You may need to expand the time range to the past, to find already raised alerts during the time range.
+  
+2. FIND DATA TO ANSWER THE QUESTION
+  - Once you have identified which part of the infrastructure is relevant, use more tools to gather data.
+  - Pay attention to the parameters of each tool, as they may require specific inputs.
+  - For live information (processes, containers, sockets, etc) use Netdata functions.
+  - For logs queries, use Netdata functions.
 
-## STEP 2: FIND DATA TO ANSWER THE QUESTION
-<thinking>
-Based on Step 1 results, I found [summarize findings]. Now I need to:
-1. Query specific metrics because...
-2. The time range should be X because...
-3. I'm looking for patterns that indicate...
-</thinking>
+## FORMATTING GUIDELINES
+**CRITICAL**: Always use proper markdown formatting in your responses:
 
-[Continue with targeted queries]
+- Use **bold** and *italic* for emphasis
+- Use proper markdown lists with dashes or numbers for structured information
+- For tree structures, node hierarchies, or ASCII diagrams, ALWAYS wrap them in code blocks with triple backticks
+- Use inline code formatting for technical terms, commands, and values
+- Use > blockquotes for important notes or warnings
+- Use tables when presenting structured data
+- Use headings (##, ###) to organize your response
+
+**Example of proper tree formatting:**
+Use triple backticks to wrap tree structures:
+📡 Streaming Path:
+└── parent (root)
+    ├── child1
+    └── child2
 
 ## RESPONSE STYLE
-After your <thinking> analysis, provide your response following your existing style guidelines.
+After your <thinking> analysis, provide your response following your existing style guidelines and the formatting guidelines above.
 
 CRITICAL: Never skip the <thinking> section. Even for simple queries, show your reasoning process. This transparency helps users understand your analysis methodology and builds confidence in your conclusions.`;
         
@@ -110,7 +137,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
      *     // Multiple operations
      * } finally {
      *     this.batchMode = false;
-     *     this.saveSettings();
+     *     this.autoSave(this.currentChatId);
      * }
      */
     addMessage(chatId, message) {
@@ -131,7 +158,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Update cumulative token pricing
         this.updateChatTokenPricing(chat);
         
-        this.autoSave();
+        this.autoSave(chatId);
     }
     
     insertMessage(chatId, index, message) {
@@ -140,7 +167,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         chat.messages.splice(index, 0, message);
         chat.updatedAt = new Date().toISOString();
-        this.autoSave();
+        this.autoSave(chatId);
     }
     
     removeMessage(chatId, index, count = 1) {
@@ -149,39 +176,88 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         chat.messages.splice(index, count);
         chat.updatedAt = new Date().toISOString();
-        this.autoSave();
+        this.autoSave(chatId);
     }
     
     removeLastMessage(chatId) {
         const chat = this.chats.get(chatId);
-        if (!chat || chat.messages.length === 0) return;
+        if (!chat || !this.hasUserContent(chat)) return;
         
         chat.messages.pop();
         chat.updatedAt = new Date().toISOString();
-        this.autoSave();
+        this.autoSave(chatId);
+    }
+    
+    /**
+     * Check if a chat has any real user content (excluding system messages)
+     */
+    hasUserContent(chat) {
+        if (!chat || !chat.messages) return false;
+        return chat.messages.some(m => 
+            m.role !== 'system' && 
+            m.role !== 'system-title' && 
+            m.role !== 'system-summary' &&
+            m.role !== 'title' &&
+            m.role !== 'summary' &&
+            m.role !== 'accounting'
+        );
+    }
+    
+    /**
+     * Check if this is the first real user message in the chat
+     */
+    isFirstUserMessage(chat) {
+        if (!chat || !chat.messages) return false;
+        const userMessages = chat.messages.filter(m => 
+            m.type === 'user' && 
+            !m.isTitleRequest
+        );
+        return userMessages.length === 1;
+    }
+    
+    /**
+     * Count real user messages (excluding title requests)
+     */
+    countUserMessages(chat) {
+        if (!chat || !chat.messages) return 0;
+        return chat.messages.filter(m => 
+            m.type === 'user' && 
+            !m.isTitleRequest
+        ).length;
+    }
+    
+    /**
+     * Count real assistant messages (excluding title responses)
+     */
+    countAssistantMessages(chat) {
+        if (!chat || !chat.messages) return 0;
+        return chat.messages.filter(m => 
+            m.type === 'assistant' && 
+            !m.isTitleRequest
+        ).length;
     }
     
     /**
      * Auto-save with debouncing for performance
-     * Batches multiple rapid saves into a single operation
+     * Saves only the specific chat that was modified
      */
-    autoSave() {
-        // Clear any pending save
-        if (this.pendingSaveTimeout) {
-            clearTimeout(this.pendingSaveTimeout);
+    autoSave(chatId) {
+        if (!chatId) return;
+        
+        // For per-chat saves, we can be more aggressive since we're only saving one chat
+        // Clear any pending save for this specific chat
+        if (this.pendingSaveTimeouts) {
+            if (this.pendingSaveTimeouts[chatId]) {
+                clearTimeout(this.pendingSaveTimeouts[chatId]);
+            }
+        } else {
+            this.pendingSaveTimeouts = {};
         }
         
-        // For critical operations, save immediately
-        // This ensures data is persisted before UI updates
-        if (!this.batchMode) {
-            this.saveSettings();
-            return;
-        }
-        
-        // In batch mode, schedule a save after a short delay
-        this.pendingSaveTimeout = setTimeout(() => {
-            this.saveSettings();
-            this.pendingSaveTimeout = null;
+        // Save this specific chat after a short delay
+        this.pendingSaveTimeouts[chatId] = setTimeout(() => {
+            this.saveChatToStorage(chatId);
+            delete this.pendingSaveTimeouts[chatId];
         }, 100); // 100ms debounce
     }
     
@@ -400,7 +476,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         this.updateChatTokenPricing(chat);
         
         // Save the migrated data
-        this.saveSettings();
+        this.saveChatToStorage(chat.id);
     }
 
     initializeUI() {
@@ -593,7 +669,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 try {
                     const url = new URL(this.mcpServerUrl.value);
                     this.mcpServerName.value = url.hostname || 'MCP Server';
-                } catch (e) {
+                } catch {
                     // Invalid URL, ignore
                 }
             }
@@ -615,7 +691,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     setupModal(modalId, backdropId, closeId) {
-        const modal = document.getElementById(modalId);
         const backdrop = document.getElementById(backdropId);
         const closeBtn = document.getElementById(closeId);
         
@@ -652,7 +727,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 const config = JSON.parse(lastConfig);
                 defaultModel = config.model;
             }
-        } catch (e) {
+        } catch {
             // Ignore
         }
         
@@ -675,8 +750,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     }
                     
                     if (!modelExists) {
-                        console.warn(`Chat ${chatId} has invalid model ${chat.model}, resetting to default`);
-                        
                         // Use default or first available
                         let fallbackModel = defaultModel;
                         if (!fallbackModel || !this.isModelValid(fallbackModel, provider)) {
@@ -688,8 +761,13 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                             }
                         }
                         
+                        console.warn(`Chat ${chatId} has invalid model ${chat.model}, resetting to ${fallbackModel || 'none (no valid model found)'}`);
+                        
                         if (fallbackModel) {
                             chat.model = fallbackModel;
+                            
+                            // Save the updated chat
+                            this.saveChatToStorage(chatId);
                             
                             // Update UI if this is the current chat
                             if (chatId === this.currentChatId) {
@@ -700,9 +778,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                 }
             }
         }
-        
-        // Save any changes
-        this.saveSettings();
     }
     
     isModelValid(model, provider) {
@@ -892,7 +967,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         }
         
         chat.model = newModel;
-        this.saveSettings();
+        this.autoSave(chat.id);
         
         // Update UI
         this.currentModelText.textContent = modelName;
@@ -910,7 +985,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (lastConfig) {
             try {
                 config = JSON.parse(lastConfig);
-            } catch (e) {
+            } catch {
                 // Ignore parse errors
             }
         }
@@ -932,10 +1007,10 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         try {
             // Ensure connection to new MCP server
-            const connection = await this.ensureMcpConnection(newServerId);
+            await this.ensureMcpConnection(newServerId);
             
             chat.mcpServerId = newServerId;
-            this.saveSettings();
+            this.autoSave(chat.id);
             
             // Update UI
             const server = this.mcpServers.get(newServerId);
@@ -953,7 +1028,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             if (lastConfig) {
                 try {
                     config = JSON.parse(lastConfig);
-                } catch (e) {
+                } catch {
                     // Ignore parse errors
                 }
             }
@@ -1484,16 +1559,16 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
         provider.onLog = proxyProvider.onLog;
         
-        // Show loading spinner
-        this.processRenderEvent({ type: 'show-spinner' });
-        
         try {
             if (message.type === 'user') {
                 // Redo from user message - truncate everything AFTER this message
                 // Keep all history up to and including this message
                 chat.messages = chat.messages.slice(0, messageIndex + 1);
-                this.saveSettings();
+                this.autoSave(chat.id);
                 this.loadChat(this.currentChatId);
+                
+                // Show loading spinner AFTER loadChat to prevent it from being cleared
+                this.processRenderEvent({ type: 'show-spinner' });
                 
                 // Resend the user message with full prior context
                 await this.processMessageWithTools(chat, mcpConnection, provider, message.content);
@@ -1515,8 +1590,11 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     // Truncate to remove this assistant message and everything after
                     // Keep everything up to the triggering user message
                     chat.messages = chat.messages.slice(0, triggeringUserIndex + 1);
-                    this.saveSettings();
+                    this.autoSave(chat.id);
                     this.loadChat(this.currentChatId);
+                    
+                    // Show loading spinner AFTER loadChat to prevent it from being cleared
+                    this.processRenderEvent({ type: 'show-spinner' });
                     
                     // Resend the triggering user message with full prior context
                     await this.processMessageWithTools(chat, mcpConnection, provider, triggeringUserMessage.content);
@@ -1591,75 +1669,98 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         // LLM providers will be fetched from proxy on demand
         
-        // Load chats
-        const savedChats = localStorage.getItem('chats');
-        if (savedChats) {
-            try {
-                const chats = JSON.parse(savedChats);
-                chats.forEach(chat => {
-                    // Validate that the chat's model still exists
-                    if (chat.model && chat.llmProviderId) {
-                        const provider = this.llmProviders.get(chat.llmProviderId);
-                        if (provider && provider.availableProviders) {
-                            // Check if the model exists in the provider's available models
-                            let modelExists = false;
-                            const [providerType, modelName] = chat.model.includes(':') ? 
-                                chat.model.split(':') : ['', chat.model];
-                            
-                            if (providerType && provider.availableProviders[providerType]) {
-                                const models = provider.availableProviders[providerType].models || [];
-                                modelExists = models.some(m => {
-                                    const mId = typeof m === 'string' ? m : m.id;
-                                    return mId === modelName;
-                                });
+        // Load chats - first try split storage, then fall back to legacy
+        this.loadChatsFromStorage();
+        
+        // Always create a new chat on startup instead of loading the last one
+        this.shouldCreateDefaultChat = true;
+    }
+
+    loadChatsFromStorage() {
+        // Load from split storage (mcp_chat_* keys)
+        const chatKeyPrefix = 'mcp_chat_';
+        
+        // Scan localStorage for individual chat keys
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(chatKeyPrefix)) {
+                try {
+                    const chatData = JSON.parse(localStorage.getItem(key));
+                    if (chatData && chatData.id) {
+                        this.validateAndAddChat(chatData);
+                    }
+                } catch (e) {
+                    console.error(`Failed to load chat from key ${key}:`, e);
+                }
+            }
+        }
+        
+        this.updateChatSessions();
+    }
+    
+    
+    validateAndAddChat(chat) {
+        // Validate that the chat's model still exists
+        if (chat.model && chat.llmProviderId) {
+            const provider = this.llmProviders.get(chat.llmProviderId);
+            if (provider && provider.availableProviders) {
+                // Check if the model exists in the provider's available models
+                let modelExists = false;
+                const [providerType, modelName] = chat.model.includes(':') ? 
+                    chat.model.split(':') : ['', chat.model];
+                
+                if (providerType && provider.availableProviders[providerType]) {
+                    const models = provider.availableProviders[providerType].models || [];
+                    modelExists = models.some(m => {
+                        const mId = typeof m === 'string' ? m : m.id;
+                        return mId === modelName;
+                    });
+                }
+                
+                if (!modelExists) {
+                    // Try to get default model from lastChatConfig
+                    let defaultModel = null;
+                    try {
+                        const lastConfig = localStorage.getItem('lastChatConfig');
+                        if (lastConfig) {
+                            const config = JSON.parse(lastConfig);
+                            if (config.model && config.llmProviderId === chat.llmProviderId) {
+                                defaultModel = config.model;
                             }
-                            
-                            if (!modelExists) {
-                                console.warn(`Chat ${chat.id} has invalid model ${chat.model}, resetting to default`);
-                                
-                                // Try to get default model from lastChatConfig
-                                let defaultModel = null;
-                                try {
-                                    const lastConfig = localStorage.getItem('lastChatConfig');
-                                    if (lastConfig) {
-                                        const config = JSON.parse(lastConfig);
-                                        if (config.model && config.llmProviderId === chat.llmProviderId) {
-                                            defaultModel = config.model;
-                                        }
-                                    }
-                                } catch (e) {
-                                    // Ignore
-                                }
-                                
-                                // If no default, use first available model
-                                if (!defaultModel) {
-                                    const firstProvider = Object.keys(provider.availableProviders)[0];
-                                    const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
-                                    if (firstModel) {
-                                        const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
-                                        defaultModel = `${firstProvider}:${modelId}`;
-                                    }
-                                }
-                                
-                                if (defaultModel) {
-                                    chat.model = defaultModel;
-                                }
-                            }
+                        }
+                    } catch {
+                        // Ignore
+                    }
+                    
+                    // If no default, use first available model
+                    if (!defaultModel) {
+                        const firstProvider = Object.keys(provider.availableProviders)[0];
+                        const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
+                        if (firstModel) {
+                            const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
+                            defaultModel = `${firstProvider}:${modelId}`;
                         }
                     }
                     
-                    this.chats.set(chat.id, chat);
-                });
-                this.updateChatSessions();
-                
-                // Always create a new chat on startup instead of loading the last one
-                this.shouldCreateDefaultChat = true;
-            } catch (e) {
-                console.error('Failed to load chats:', e);
+                    console.warn(`Chat ${chat.id} has invalid model ${chat.model}, resetting to ${defaultModel || 'none (no valid model found)'}`);
+                    
+                    if (defaultModel) {
+                        chat.model = defaultModel;
+                    }
+                }
             }
-        } else {
-            // No saved chats, will create one after initialization
-            this.shouldCreateDefaultChat = true;
+        }
+        
+        this.chats.set(chat.id, chat);
+    }
+    
+    saveAllChatsToSplitStorage() {
+        // Save all chats to individual keys
+        for (const [chatId, chat] of this.chats) {
+            if (chat.isSaved !== false) {
+                const key = `mcp_chat_${chatId}`;
+                localStorage.setItem(key, JSON.stringify(chat));
+            }
         }
     }
 
@@ -1693,7 +1794,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             
             // Update availableProviders for all existing providers with the same proxyUrl
             let updated = false;
-            for (const [id, provider] of this.llmProviders) {
+            for (const [, provider] of this.llmProviders) {
                 if (provider.proxyUrl === proxyUrl) {
                     provider.availableProviders = providers;
                     updated = true;
@@ -1823,7 +1924,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const defaultName = 'Local Netdata';
         
         // Check if this URL already exists
-        for (const [id, server] of this.mcpServers) {
+        for (const [, server] of this.mcpServers) {
             if (server.url === defaultUrl) {
                 // Already exists, no need to add
                 return;
@@ -1861,7 +1962,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
                     message: `Auto-connected to default MCP server at ${defaultUrl}`
                 });
                 
-            } catch (error) {
+            } catch {
                 // Connection failed, but still add the server for manual connection later
                 const serverId = 'default_mcp_server';
                 const server = {
@@ -1892,13 +1993,27 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         
         // Don't save LLM providers - always fetch fresh from proxy
         
-        // Save only chats that have been marked as saved
-        const chatsToSave = Array.from(this.chats.values()).filter(chat => chat.isSaved !== false);
-        localStorage.setItem('chats', JSON.stringify(chatsToSave));
+        // Note: Chats are now saved individually via saveChatToStorage()
+        // when they are modified, not all at once
         
         // Save current chat ID
         if (this.currentChatId) {
             localStorage.setItem('currentChatId', this.currentChatId);
+        }
+    }
+    
+    saveChatToStorage(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat || chat.isSaved === false) return;
+        
+        const key = `mcp_chat_${chatId}`;
+        try {
+            localStorage.setItem(key, JSON.stringify(chat));
+        } catch (e) {
+            console.error(`Failed to save chat ${chatId}:`, e);
+            if (e.name === 'QuotaExceededError') {
+                this.showError('Storage quota exceeded. Consider deleting old chats.');
+            }
         }
     }
 
@@ -2195,9 +2310,8 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         }
         
         // Ensure MCP connection
-        let mcpConnection;
         try {
-            mcpConnection = await this.ensureMcpConnection(mcpServerId);
+            await this.ensureMcpConnection(mcpServerId);
             // Update server list to show connected status
             this.updateMcpServersList();
         } catch (error) {
@@ -2211,9 +2325,6 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             const provider = this.llmProviders.get(llmProviderId);
             title = `${server.name} - ${provider.name}`;
         }
-        
-        // Extract model name from format "provider:model-name"
-        const modelName = selectedModel.includes(':') ? selectedModel.split(':')[1] : selectedModel;
         
         const chatId = `chat_${Date.now()}`;
         
@@ -2257,14 +2368,21 @@ All date/time interpretations must be based on the current date/time context pro
             mcpServerId: mcpServerId,
             llmProviderId: llmProviderId,
             model: selectedModel, // Selected model for this chat
-            messages: [],
+            messages: [
+                {
+                    role: 'system',
+                    content: systemPromptWithTimestamp,
+                    timestamp: new Date().toISOString()
+                }
+            ],
             temperature: 0.7, // Default temperature
             systemPrompt: systemPromptWithTimestamp, // System prompt with timestamp
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             currentTurn: 0, // Track conversation turns
             toolInclusionMode: 'cached', // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
-            isSaved: isSaved // Track whether this chat has been saved to localStorage
+            isSaved: isSaved, // Track whether this chat has been saved to localStorage
+            titleGenerated: false // Track whether title has been generated
         };
         
         this.chats.set(chatId, chat);
@@ -2308,9 +2426,6 @@ All date/time interpretations must be based on the current date/time context pro
         for (const chat of sortedChats) {
             const sessionDiv = document.createElement('div');
             sessionDiv.className = `chat-session-item ${chat.id === this.currentChatId ? 'active' : ''}`;
-            
-            const server = this.mcpServers.get(chat.mcpServerId);
-            const provider = this.llmProviders.get(chat.llmProviderId);
             
             // Get model display name
             let modelDisplay = 'No model';
@@ -2439,7 +2554,7 @@ All date/time interpretations must be based on the current date/time context pro
         if (server && provider && this.mcpConnections.has(chat.mcpServerId)) {
             this.chatInput.disabled = false;
             this.sendMessageBtn.disabled = false;
-            this.chatInput.placeholder = "Ask about your Netdata metrics...";
+            this.chatInput.placeholder = 'Ask about your Netdata metrics...';
             // Hide reconnect button if shown
             const reconnectBtn = document.getElementById('reconnectMcpBtn');
             if (reconnectBtn) {
@@ -2459,15 +2574,15 @@ All date/time interpretations must be based on the current date/time context pro
             this.sendMessageBtn.disabled = true;
             this.temperatureControl.style.display = 'flex';
             if (!server) {
-                this.chatInput.placeholder = "MCP server not found";
+                this.chatInput.placeholder = 'MCP server not found';
             } else if (!provider) {
-                this.chatInput.placeholder = "LLM provider not found";
+                this.chatInput.placeholder = 'LLM provider not found';
             } else if (!this.mcpConnections.has(chat.mcpServerId)) {
-                this.chatInput.placeholder = "MCP server disconnected - click Reconnect";
+                this.chatInput.placeholder = 'MCP server disconnected - click Reconnect';
                 // Show reconnect button
                 this.showReconnectButton(chat.mcpServerId);
             } else {
-                this.chatInput.placeholder = "MCP server or LLM provider not available";
+                this.chatInput.placeholder = 'MCP server or LLM provider not available';
             }
             // Still show context window even when disabled
             const indicator = document.getElementById('contextWindowIndicator');
@@ -2479,9 +2594,9 @@ All date/time interpretations must be based on the current date/time context pro
         // Load messages
         this.chatMessages.innerHTML = '';
         this.currentAssistantGroup = null; // Reset any current group
-        this.metricsIdMapping = {}; // Reset metrics ID mapping
         this.currentStepInTurn = 1; // Initialize step counter
         this.lastDisplayedTurn = 0; // Track last displayed turn for separators
+        this.currentContextWindow = 0; // Reset context window counter for delta calculation
         
         // Update global toggle UI based on chat's tool inclusion mode
         this.updateGlobalToggleUI();
@@ -2613,7 +2728,9 @@ All date/time interpretations must be based on the current date/time context pro
                             // Create a div for the summary content with markdown rendering
                             const responseContent = document.createElement('div');
                             responseContent.className = 'message-content';
-                            responseContent.innerHTML = marked.parse(msg.content);
+                            responseContent.innerHTML = marked.parse(msg.content, {
+                                breaks: true, gfm: true, sanitize: false
+                            });
                             responseSection.appendChild(responseContent);
                             
                             systemContent.appendChild(responseSection);
@@ -2662,7 +2779,9 @@ All date/time interpretations must be based on the current date/time context pro
         this.updateAllTokenDisplays();
         
         // Force scroll to bottom when loading chat (ignore the isAtBottom check)
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        requestAnimationFrame(() => {
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        });
         
         // Focus the chat input so user can start typing immediately
         if (this.chatInput && !this.chatInput.disabled) {
@@ -2718,19 +2837,19 @@ All date/time interpretations must be based on the current date/time context pro
                 break;
                 
             case 'system-title':
-                events.push({ type: 'system-title-message', content: msg.content });
+                events.push({ type: 'system-title-message', content: msg.content, usage: msg.usage, responseTime: msg.responseTime, model: msg.model, price: msg.price });
                 break;
                 
             case 'system-summary':
-                events.push({ type: 'system-summary-message', content: msg.content });
+                events.push({ type: 'system-summary-message', content: msg.content, usage: msg.usage, responseTime: msg.responseTime, model: msg.model, price: msg.price });
                 break;
                 
             case 'title':
-                events.push({ type: 'title-message', content: msg.content });
+                events.push({ type: 'title-message', content: msg.content, usage: msg.usage, responseTime: msg.responseTime, model: msg.model, price: msg.price });
                 break;
                 
             case 'summary':
-                events.push({ type: 'summary-message', content: msg.content });
+                events.push({ type: 'summary-message', content: msg.content, usage: msg.usage, responseTime: msg.responseTime, model: msg.model, price: msg.price });
                 break;
                 
             case 'accounting':
@@ -2738,16 +2857,22 @@ All date/time interpretations must be based on the current date/time context pro
                 break;
                 
             case 'assistant':
-                // Add metrics placeholder event (like we do in live chats)
-                const metricsId = `metrics-stored-${this.metricsIdCounter++}`;
-                events.push({ type: 'metrics-placeholder', id: metricsId });
+                // Add assistant metrics event FIRST
+                if (msg.usage || msg.responseTime) {
+                    events.push({ 
+                        type: 'assistant-metrics', 
+                        usage: msg.usage, 
+                        responseTime: msg.responseTime,
+                        model: msg.model
+                    });
+                }
                 
-                // Add assistant message event
+                // Then add assistant message event
                 if (msg.content) {
                     events.push({ type: 'assistant-message', content: msg.content });
                 }
                 
-                // Add tool calls
+                // Then add tool calls
                 if (msg.toolCalls && msg.toolCalls.length > 0) {
                     for (const toolCall of msg.toolCalls) {
                         events.push({ 
@@ -2759,27 +2884,15 @@ All date/time interpretations must be based on the current date/time context pro
                         });
                     }
                 }
-                
-                // Update metrics event
-                if (msg.usage || msg.responseTime) {
-                    events.push({ 
-                        type: 'update-metrics', 
-                        id: metricsId,
-                        usage: msg.usage, 
-                        responseTime: msg.responseTime,
-                        previousPromptTokens: this.previousPromptTokensForDisplay,
-                        model: msg.model,
-                        price: msg.price
-                    });
-                }
                 break;
                 
             case 'tool-results':
                 // Add tool results with their inclusion state
-                for (const result of msg.results) {
+                const toolResults = msg.toolResults || [];
+                for (const result of toolResults) {
                     events.push({ 
                         type: 'tool-result', 
-                        name: result.name, 
+                        name: result.name || result.toolName, 
                         result: result.result,
                         includeInContext: result.includeInContext
                     });
@@ -2829,13 +2942,9 @@ All date/time interpretations must be based on the current date/time context pro
                 }
                 break;
                 
-            case 'metrics-placeholder':
-                const placeholder = this.addMetricsPlaceholder();
-                // Store mapping of event ID to actual DOM ID
-                if (event.id) {
-                    this.metricsIdMapping = this.metricsIdMapping || {};
-                    this.metricsIdMapping[event.id] = placeholder;
-                }
+            case 'assistant-metrics':
+                // Simply append metrics to the chat
+                this.appendMetricsToChat(event.usage, event.responseTime, event.model);
                 break;
                 
             case 'assistant-message':
@@ -2859,11 +2968,6 @@ All date/time interpretations must be based on the current date/time context pro
                 this.addToolResult(event.name, event.result, event.responseTime || 0, event.responseSize || null, event.includeInContext, event.messageIndex);
                 break;
                 
-            case 'update-metrics':
-                // Find the placeholder by mapped ID
-                const domId = this.metricsIdMapping?.[event.id] || event.id;
-                this.updateMetricsPlaceholder(domId, event.usage, event.responseTime, event.previousPromptTokens, event.model, event.price);
-                break;
                 
             case 'system-message':
                 this.addSystemMessage(event.content);
@@ -2879,10 +2983,18 @@ All date/time interpretations must be based on the current date/time context pro
                 
             case 'title-message':
                 this.renderMessage('title', event.content, event.messageIndex);
+                // For title/summary, append metrics AFTER rendering the message
+                if (event.usage) {
+                    this.appendMetricsToChat(event.usage, event.responseTime, event.model, 'title');
+                }
                 break;
                 
             case 'summary-message':
                 this.renderMessage('summary', event.content, event.messageIndex);
+                // For title/summary, append metrics AFTER rendering the message
+                if (event.usage) {
+                    this.appendMetricsToChat(event.usage, event.responseTime, event.model, 'summary');
+                }
                 break;
                 
             case 'accounting-message':
@@ -2920,12 +3032,17 @@ All date/time interpretations must be based on the current date/time context pro
                                 
                                 // Only create accounting node if we're discarding actual conversation messages
                                 if (messagesToDiscard > 0) {
-                                    const accountingNode = this.createAccountingNode('Retry after error', messagesToDiscard);
-                                    this.insertMessage(chat.id, errorIndex, accountingNode);
-                                    // Remove all messages after the accounting node
-                                    const messagesToRemove = chat.messages.length - errorIndex - 1;
+                                    const accountingNodes = this.createAccountingNodes('Retry after error', messagesToDiscard);
+                                    // Insert all accounting nodes (one per model)
+                                    let insertIndex = errorIndex;
+                                    for (const accountingNode of accountingNodes) {
+                                        this.insertMessage(chat.id, insertIndex, accountingNode);
+                                        insertIndex++;
+                                    }
+                                    // Remove all messages after the accounting nodes
+                                    const messagesToRemove = chat.messages.length - insertIndex;
                                     if (messagesToRemove > 0) {
-                                        this.removeMessage(chat.id, errorIndex + 1, messagesToRemove);
+                                        this.removeMessage(chat.id, insertIndex, messagesToRemove);
                                     }
                                 } else {
                                     // Just remove the error message, no accounting needed
@@ -2934,7 +3051,7 @@ All date/time interpretations must be based on the current date/time context pro
                             } finally {
                                 // Exit batch mode and save atomically
                                 this.batchMode = false;
-                                this.saveSettings();
+                                this.autoSave(this.currentChatId);
                             }
                             
                             // Reload chat to show cleaned history
@@ -2964,7 +3081,7 @@ All date/time interpretations must be based on the current date/time context pro
                                     
                                     // Save the chat after successful retry
                                     chat.updatedAt = new Date().toISOString();
-                                    this.saveSettings();
+                                    this.autoSave(chat.id);
                                 } else {
                                     this.showError('Cannot retry: MCP server or LLM provider not available');
                                 }
@@ -3004,7 +3121,11 @@ All date/time interpretations must be based on the current date/time context pro
         
         if (confirm(`Delete chat "${chat.title}"?`)) {
             this.chats.delete(chatId);
-            this.saveSettings();
+            
+            // Remove from split storage
+            const key = `mcp_chat_${chatId}`;
+            localStorage.removeItem(key);
+            
             this.updateChatSessions();
             
             // If this was the current chat, clear the display
@@ -3128,14 +3249,19 @@ All date/time interpretations must be based on the current date/time context pro
         // Now display it - if save failed, user won't see a message that wasn't saved
         this.processRenderEvent({ type: 'user-message', content: message });
         
+        // Force scroll to bottom after DOM update
+        requestAnimationFrame(() => {
+            this.scrollToBottom(true);
+        });
+        
         // If this is the first message in an unsaved chat, mark it as saved
-        if (chat.isSaved === false && chat.messages.filter(m => m.type === 'user').length === 1) {
+        if (chat.isSaved === false && this.isFirstUserMessage(chat)) {
             chat.isSaved = true;
             this.updateChatSessions();
         }
         
-        // ALWAYS save after adding any message
-        this.saveSettings();
+        // Save this specific chat after adding message
+        this.autoSave(this.currentChatId);
         
         // Show loading spinner event
         this.processRenderEvent({ type: 'show-spinner' });
@@ -3144,12 +3270,19 @@ All date/time interpretations must be based on the current date/time context pro
             await this.processMessageWithTools(chat, mcpConnection, provider, message);
             
             // Check if we should generate a title (first user message and got a response)
-            const userMessages = chat.messages.filter(m => m.type === 'user' && !m.isTitleRequest);
-            const assistantMessages = chat.messages.filter(m => m.type === 'assistant' && !m.isTitleRequest);
-            
-            if (userMessages.length === 1 && assistantMessages.length > 0 && !chat.titleGenerated) {
+            if (this.isFirstUserMessage(chat) && this.countAssistantMessages(chat) > 0 && !chat.titleGenerated) {
                 // Generate title automatically
-                await this.generateChatTitle(chat, mcpConnection, provider);
+                await this.generateChatTitle(chat, mcpConnection, provider, true);
+            }
+            
+            // Check if we should generate a summary (conditions to be defined later)
+            if (this.shouldGenerateSummary(chat)) {
+                try {
+                    await this.generateChatSummary(chat, mcpConnection, provider, true);
+                } catch (error) {
+                    // Log but don't interrupt the flow for automatic summaries
+                    console.error('Automatic summary generation failed:', error);
+                }
             }
         } catch (error) {
             // Check if the user stopped processing
@@ -3190,7 +3323,7 @@ All date/time interpretations must be based on the current date/time context pro
                         
                         // Save the chat after successful retry
                         chat.updatedAt = new Date().toISOString();
-                        this.saveSettings();
+                        this.autoSave(chat.id);
                     } catch (retryError) {
                         this.showError(`Retry failed: ${retryError.message}`);
                     }
@@ -3205,7 +3338,7 @@ All date/time interpretations must be based on the current date/time context pro
             this.currentAssistantGroup = null;
             
             chat.updatedAt = new Date().toISOString();
-            this.saveSettings();
+            this.autoSave(chat.id);
             this.chatInput.disabled = false;
             this.isProcessing = false;
             this.shouldStopProcessing = false;
@@ -3246,10 +3379,89 @@ All date/time interpretations must be based on the current date/time context pro
         };
     }
 
-    buildMessagesForAPI(chat, provider, freezeCache = false) {
+    /**
+     * Build messages for LLM context, stripping tool-related content
+     * This creates a clean conversation flow without tool calls/results
+     * Used for title generation and summarization to reduce costs
+     * @param {Array} messages - Raw chat messages
+     * @param {boolean} includeSystemPrompt - Whether to include the system prompt
+     * @returns {Array} Clean messages array with only conversational content
+     */
+    buildConversationalMessages(messages, includeSystemPrompt = true) {
+        const cleanMessages = [];
+        
+        // Add system prompt if requested and it exists
+        if (includeSystemPrompt && messages.length > 0 && messages[0].role === 'system') {
+            cleanMessages.push({ 
+                role: 'system', 
+                content: messages[0].content 
+            });
+        }
+        
+        let lastRole = null;
+        
+        // Process messages, skipping tool-related content
+        for (let i = (includeSystemPrompt && messages[0]?.role === 'system' ? 1 : 0); i < messages.length; i++) {
+            const msg = messages[i];
+            
+            // Skip system roles and tool results
+            if (['system-title', 'system-summary', 'title', 'summary', 'accounting', 'tool-results', 'error'].includes(msg.role)) {
+                continue;
+            }
+            
+            const msgRole = msg.role || msg.type;
+            
+            if (msgRole === 'user') {
+                // Check if we have consecutive user messages (which can happen after filtering)
+                if (lastRole === 'user' && cleanMessages.length > 1) {
+                    // Insert a placeholder assistant message to maintain alternation
+                    cleanMessages.push({
+                        role: 'assistant',
+                        content: '[Tool interaction removed for summary]'
+                    });
+                }
+                cleanMessages.push({ 
+                    role: 'user', 
+                    content: msg.content 
+                });
+                lastRole = 'user';
+            } else if (msgRole === 'assistant') {
+                // Only include assistant messages that DON'T have tool calls
+                // Skip ALL messages with tool calls, even if they have content
+                if (!msg.toolCalls || msg.toolCalls.length === 0) {
+                    // This is a pure conversational response
+                    if (msg.content) {
+                        const cleanedContent = this.cleanContentForAPI(msg.content);
+                        if (cleanedContent && cleanedContent.trim().length > 0) {
+                            cleanMessages.push({ 
+                                role: 'assistant', 
+                                content: cleanedContent 
+                            });
+                            lastRole = 'assistant';
+                        }
+                    }
+                } else {
+                    // Assistant message with tool calls - mark that we had an assistant response
+                    lastRole = 'assistant';
+                }
+            }
+        }
+        
+        return cleanMessages;
+    }
+
+    buildMessagesForAPI(chat, freezeCache = false) {
         const messages = [];
         let cacheControlIndex = null;
         let lastCacheControlIndex = null;
+        
+        // Basic input validation
+        if (!chat.messages || chat.messages.length === 0) {
+            const error = 'Chat has no messages';
+            console.error('[buildMessagesForAPI] ' + error);
+            this.showError(error);
+            throw new Error(error);
+        }
         
         // Find the last summary checkpoint
         let startIndex = 0;
@@ -3273,18 +3485,15 @@ All date/time interpretations must be based on the current date/time context pro
             }
         }
         
-        // Add system prompt (always needed at start of conversation)
-        // If we have a summary, include it in the system prompt
-        const userMessagesAfterCheckpoint = chat.messages.slice(startIndex).filter(m => m.role === 'user').length;
-        if (userMessagesAfterCheckpoint === 1 || (startIndex === 0 && chat.messages.filter(m => m.role === 'user').length === 1)) {
-            let systemContent = chat.systemPrompt || this.defaultSystemPrompt;
-            
-            // If there's a summary, append it to the system prompt
-            if (summaryMessage) {
-                systemContent = `${systemContent}\n\nPrevious Conversation Summary:\n${summaryMessage.content}`;
-            }
-            
-            messages.push({ role: 'system', content: systemContent });
+        // Always include the system prompt if it exists (it should be the first message)
+        if (chat.messages.length > 0 && chat.messages[0].role === 'system') {
+            messages.push(chat.messages[0]);
+        }
+        
+        // If we have a summary, include it in the messages
+        // The provider will decide how to handle it (modify system prompt, add as user message, etc.)
+        if (summaryMessage) {
+            messages.push(summaryMessage);
         }
         
         // Build messages from checkpoint onwards
@@ -3293,91 +3502,34 @@ All date/time interpretations must be based on the current date/time context pro
         for (let i = startIndex; i < chat.messages.length; i++) {
             const msg = chat.messages[i];
             
-            // Skip system roles - they should never be sent to API
-            if (['system-title', 'system-summary', 'title', 'summary', 'accounting'].includes(msg.role)) {
+            // Skip system roles and error messages - they should never be sent to API
+            if (['system-title', 'system-summary', 'title', 'summary', 'accounting', 'error'].includes(msg.role)) {
                 continue;
             }
             
             // Process based on type/role
             const messageType = msg.type || msg.role;
             
-            if (messageType === 'user') {
-                messages.push({ role: 'user', content: msg.content });
+            if (messageType === 'system') {
+                // Skip system message if it's the first message (we already added it)
+                if (i === 0) continue;
+                // Otherwise include it
+                messages.push(msg);
+                apiMessageIndex++;
+            } else if (messageType === 'user') {
+                // Pass through the original user message to preserve all its properties
+                messages.push(msg);
                 apiMessageIndex++;
             } else if (messageType === 'assistant') {
-                // Process assistant message (existing logic)
-                const cleanedContent = msg.content ? this.cleanContentForAPI(msg.content) : '';
-                
-                // Check if we should include tool calls
-                const toolMode = chat.toolInclusionMode || 'auto';
-                const shouldIncludeTools = this.shouldIncludeToolsForMessage(msg, toolMode, msg.turn || 0);
-                
-                if (msg.toolCalls && msg.toolCalls.length > 0 && shouldIncludeTools) {
-                    // Add message with tool calls (provider-specific format)
-                    if (provider.type === 'anthropic') {
-                        messages.push({
-                            role: 'assistant',
-                            content: [
-                                ...(cleanedContent ? [{ type: 'text', text: cleanedContent }] : []),
-                                ...msg.toolCalls.map(tc => ({
-                                    type: 'tool_use',
-                                    id: tc.id,
-                                    name: tc.name,
-                                    input: tc.arguments
-                                }))
-                            ]
-                        });
-                    } else if (provider.type === 'openai') {
-                        messages.push({
-                            role: 'assistant',
-                            content: cleanedContent,
-                            tool_calls: msg.toolCalls.map(tc => ({
-                                id: tc.id,
-                                type: 'function',
-                                function: {
-                                    name: tc.name,
-                                    arguments: JSON.stringify(tc.arguments)
-                                }
-                            }))
-                        });
-                    } else {
-                        messages.push({
-                            role: 'assistant',
-                            content: cleanedContent,
-                            toolCalls: msg.toolCalls
-                        });
-                    }
-                } else if (cleanedContent) {
-                    messages.push({ role: 'assistant', content: cleanedContent });
-                }
+                // Pass through the original assistant message to preserve all its properties
+                // The provider will handle content cleaning and formatting
+                messages.push(msg);
                 apiMessageIndex++;
             } else if (messageType === 'tool-results') {
-                // Process tool results (existing logic)
-                const toolMode = chat.toolInclusionMode || 'auto';
-                const shouldIncludeTools = this.shouldIncludeToolsForMessage(msg, toolMode, msg.turn || 0);
-                
-                if (shouldIncludeTools) {
-                    const includedResults = msg.results.filter(tr => tr.includeInContext !== false);
-                    
-                    if (includedResults.length > 0) {
-                        if (provider.type === 'anthropic') {
-                            messages.push({
-                                role: 'user',
-                                content: includedResults.map(tr => ({
-                                    type: 'tool_result',
-                                    tool_use_id: tr.toolCallId,
-                                    content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
-                                }))
-                            });
-                            apiMessageIndex++;
-                        } else {
-                            for (const tr of includedResults) {
-                                messages.push(provider.formatToolResponse(tr.toolCallId, tr.result, tr.name));
-                                apiMessageIndex++;
-                            }
-                        }
-                    }
-                }
+                // Pass through the original tool-results message
+                // The provider will handle formatting and filtering
+                messages.push(msg);
+                apiMessageIndex++;
             }
         }
         
@@ -3389,12 +3541,18 @@ All date/time interpretations must be based on the current date/time context pro
             cacheControlIndex = messages.length - 1;
         }
         
-        return { messages, cacheControlIndex };
+        // Return messages with tool inclusion context
+        return { 
+            messages, 
+            cacheControlIndex,
+            toolInclusionMode: chat.toolInclusionMode || 'auto',
+            currentTurn: chat.currentTurn || 0
+        };
     }
 
-    async processMessageWithTools(chat, mcpConnection, provider, userMessage, firstMetricsId = null) {
+    async processMessageWithTools(chat, mcpConnection, provider, userMessage) {
         // Build conversation history using the new function
-        const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider);
+        const { messages, cacheControlIndex, toolInclusionMode, currentTurn } = this.buildMessagesForAPI(chat);
         
         // Safety check: Ensure we have at least one message
         if (messages.length === 0) {
@@ -3419,7 +3577,7 @@ All date/time interpretations must be based on the current date/time context pro
         this.currentAssistantGroup = null;
         
         while (true) {
-            attempts++
+            attempts++;
             
             // Check if we should stop processing
             if (this.shouldStopProcessing) {
@@ -3427,16 +3585,6 @@ All date/time interpretations must be based on the current date/time context pro
                 break;
             }
             
-            let metricsId;
-            if (attempts === 1 && firstMetricsId) {
-                // First iteration - use the metrics placeholder already added after user message
-                metricsId = firstMetricsId;
-            } else {
-                // Subsequent iterations - add new metrics placeholder
-                const eventId = `metrics-live-${this.metricsIdCounter++}`;
-                this.processRenderEvent({ type: 'metrics-placeholder', id: eventId });
-                metricsId = this.metricsIdMapping?.[eventId] || eventId;
-            }
             
             // Send to LLM with current temperature
             const temperature = this.getCurrentTemperature();
@@ -3449,21 +3597,18 @@ All date/time interpretations must be based on the current date/time context pro
                 this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
             }
             
-            // Update the metrics placeholder with actual data
-            this.processRenderEvent({ 
-                type: 'update-metrics', 
-                id: metricsId,
-                usage: response.usage, 
-                responseTime: llmResponseTime,
-                previousPromptTokens: this.getPreviousPromptTokens(),
-                model: chat.model || provider.model,
-                price: response.usage ? this.calculateMessagePrice(chat.model || provider.model, response.usage) : null
-            });
-            
             // If no tool calls, display response and finish
             if (!response.toolCalls || response.toolCalls.length === 0) {
+                // Emit metrics event first (just like loaded chats)
+                this.processRenderEvent({ 
+                    type: 'assistant-metrics', 
+                    usage: response.usage, 
+                    responseTime: llmResponseTime, 
+                    model: chat.model || provider.model
+                });
+                
                 if (response.content) {
-                    // Process assistant message event
+                    // Then emit assistant message event
                     this.processRenderEvent({ type: 'assistant-message', content: response.content });
                     const assistantMsg = { 
                         type: 'assistant', 
@@ -3534,6 +3679,14 @@ All date/time interpretations must be based on the current date/time context pro
                 }
                 
                 // Now display the message - after it's safely saved
+                // Emit metrics event first (just like loaded chats)
+                this.processRenderEvent({ 
+                    type: 'assistant-metrics', 
+                    usage: response.usage, 
+                    responseTime: llmResponseTime, 
+                    model: chat.model || provider.model
+                });
+                
                 if (response.content) {
                     this.processRenderEvent({ type: 'assistant-message', content: response.content });
                 }
@@ -3542,37 +3695,20 @@ All date/time interpretations must be based on the current date/time context pro
                 // Build the message for the API
                 const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
                 
-                if (provider.type === 'anthropic' && response.toolCalls && response.toolCalls.length > 0) {
-                    // Anthropic format with content blocks
-                    messages.push({
-                        role: 'assistant',
-                        content: [
-                            ...(cleanedContent ? [{ type: 'text', text: cleanedContent }] : []),
-                            ...response.toolCalls.map(tc => ({
-                                type: 'tool_use',
-                                id: tc.id,
-                                name: tc.name,
-                                input: tc.arguments
-                            }))
-                        ]
-                    });
-                } else if (response.toolCalls && response.toolCalls.length > 0) {
-                    // Other providers (OpenAI, Google)
-                    messages.push({
-                        role: 'assistant',
-                        content: cleanedContent,
-                        tool_calls: response.toolCalls.map(tc => ({
-                            id: tc.id,
-                            type: 'function',
-                            function: {
-                                name: tc.name,
-                                arguments: JSON.stringify(tc.arguments)
-                            }
-                        }))
-                    });
-                } else if (cleanedContent) {
-                    // Just text, no tool calls
-                    messages.push({ role: 'assistant', content: cleanedContent });
+                // Create standard assistant message
+                const assistantMsg = {
+                    role: 'assistant',
+                    content: cleanedContent
+                };
+                
+                // Add tool calls if present (providers will convert to their format)
+                if (response.toolCalls && response.toolCalls.length > 0) {
+                    assistantMsg.toolCalls = response.toolCalls;
+                }
+                
+                // Only add message if it has content or tool calls
+                if (cleanedContent || (response.toolCalls && response.toolCalls.length > 0)) {
+                    messages.push(assistantMsg);
                 }
             }
             
@@ -3671,7 +3807,7 @@ All date/time interpretations must be based on the current date/time context pro
                     // but the consolidated results are saved here to ensure consistency
                     this.addMessage(chat.id, {
                         type: 'tool-results',
-                        results: toolResults,
+                        toolResults: toolResults,
                         turn: chat.currentTurn
                     });
                     
@@ -3679,27 +3815,16 @@ All date/time interpretations must be based on the current date/time context pro
                     const includedResults = toolResults.filter(tr => tr.includeInContext !== false);
                     
                     if (includedResults.length > 0) {
-                        // Add to conversation based on provider
-                        if (provider.type === 'anthropic') {
-                            // Anthropic wants tool results in a user message
-                            messages.push({
-                                role: 'user',
-                                content: includedResults.map(tr => ({
-                                    type: 'tool_result',
-                                    tool_use_id: tr.toolCallId,
-                                    content: typeof tr.result === 'string' ? tr.result : JSON.stringify(tr.result)
-                                }))
-                            });
-                        } else {
-                            // OpenAI and others want individual tool messages
-                            for (const tr of includedResults) {
-                                messages.push(provider.formatToolResponse(
-                                    tr.toolCallId,
-                                    tr.result,
-                                    tr.name
-                                ));
-                            }
-                        }
+                        // Add standard tool-results message
+                        // Providers will convert to their specific format
+                        messages.push({
+                            role: 'tool-results',
+                            toolResults: includedResults.map(tr => ({
+                                toolCallId: tr.toolCallId,
+                                toolName: tr.name,
+                                result: tr.result
+                            }))
+                        });
                     }
                     
                     // Reset assistant group after tool results so next metrics appears separately
@@ -3799,7 +3924,9 @@ All date/time interpretations must be based on the current date/time context pro
                     const textDiv = document.createElement('div');
                     textDiv.className = 'message-content';
                     // Use marked to render markdown
-                    textDiv.innerHTML = marked.parse(part.content);
+                    textDiv.innerHTML = marked.parse(part.content, {
+                        breaks: true, gfm: true, sanitize: false
+                    });
                     messageDiv.appendChild(textDiv);
                 } else if (part.type === 'thinking') {
                     const thinkingDiv = document.createElement('div');
@@ -3817,7 +3944,9 @@ All date/time interpretations must be based on the current date/time context pro
                     
                     const contentWrapper = document.createElement('div');
                     contentWrapper.className = 'message-content';
-                    contentWrapper.innerHTML = marked.parse(part.content);
+                    contentWrapper.innerHTML = marked.parse(part.content, {
+                        breaks: true, gfm: true, sanitize: false
+                    });
                     
                     thinkingContent.appendChild(contentWrapper);
                     
@@ -3864,6 +3993,36 @@ All date/time interpretations must be based on the current date/time context pro
                 systemHeader.appendChild(systemToggle);
                 systemHeader.appendChild(systemLabel);
                 
+                // Add delete button for summary blocks
+                if (!isTitle) {
+                    const toolInfo = document.createElement('span');
+                    toolInfo.className = 'tool-info';
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-danger btn-small';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                    deleteBtn.title = 'Delete summary and replace with accounting';
+                    deleteBtn.style.marginLeft = '10px';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation(); // Prevent header toggle
+                        const chat = this.chats.get(this.currentChatId);
+                        if (chat) {
+                            // Find the most recent summary message
+                            for (let i = chat.messages.length - 1; i >= 0; i--) {
+                                if (chat.messages[i]?.role === 'summary') {
+                                    if (confirm('Delete this summary and replace with accounting record?')) {
+                                        this.deleteSummaryMessages(i);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    };
+                    
+                    toolInfo.appendChild(deleteBtn);
+                    systemHeader.appendChild(toolInfo);
+                }
+                
                 const systemContent = document.createElement('div');
                 systemContent.className = 'tool-content collapsed';
                 
@@ -3901,18 +4060,20 @@ All date/time interpretations must be based on the current date/time context pro
             
             systemContent.appendChild(requestSection);
             
-            // Store reference for when response comes
-            systemBlock.pendingResponse = true;
-            
             return; // Don't append messageDiv to chat
         } else if (role === 'title' || role === 'summary') {
             // Handle system responses - add to existing system block
             
             const isTitle = role === 'title';
             const blockType = isTitle ? 'title' : 'summary';
-            let systemBlock = this.chatMessages.querySelector(`.system-block[data-type="${blockType}"]`);
             
-            if (systemBlock && systemBlock.pendingResponse) {
+            // Find the LAST system block of this type (most recent)
+            const systemBlocks = this.chatMessages.querySelectorAll(`.system-block[data-type="${blockType}"]`);
+            const systemBlock = systemBlocks[systemBlocks.length - 1];
+            
+            
+            if (systemBlock && !systemBlock.querySelector('.tool-response-section')) {
+                // Only add response if there isn't one already
                 const systemContent = systemBlock.querySelector('.tool-content');
                 
                 // Add separator
@@ -3931,19 +4092,38 @@ All date/time interpretations must be based on the current date/time context pro
                 responseLabel.className = 'tool-section-label';
                 responseLabel.textContent = 'RESPONSE';
                 
+                // Add copy button for the response
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'tool-section-copy';
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                copyBtn.onclick = () => {
+                    this.copyToClipboard(content, copyBtn);
+                };
+                
                 responseControls.appendChild(responseLabel);
+                responseControls.appendChild(copyBtn);
                 responseSection.appendChild(responseControls);
                 
-                const responseContent = document.createElement('pre');
-                responseContent.textContent = content;
-                responseSection.appendChild(responseContent);
+                // For summary, use markdown rendering
+                if (role === 'summary') {
+                    const responseContent = document.createElement('div');
+                    responseContent.className = 'message-content';
+                    responseContent.innerHTML = marked.parse(content, {
+                        breaks: true, gfm: true, sanitize: false
+                    });
+                    responseSection.appendChild(responseContent);
+                } else {
+                    // For title, use plain text
+                    const responseContent = document.createElement('pre');
+                    responseContent.textContent = content;
+                    responseSection.appendChild(responseContent);
+                }
                 
                 systemContent.appendChild(responseSection);
                 
-                // Clear pending response flag
-                delete systemBlock.pendingResponse;
-                
                 return; // Don't append messageDiv to chat
+            } else {
+                console.warn(`No ${blockType} block found for response:`, content);
             }
         } else {
             // Regular message without thinking tags
@@ -3952,7 +4132,12 @@ All date/time interpretations must be based on the current date/time context pro
             
             if (role === 'assistant' || role === 'user') {
                 // Use marked to render markdown for assistant and user messages
-                contentDiv.innerHTML = marked.parse(content);
+                // Configure marked to preserve line breaks and handle whitespace properly
+                contentDiv.innerHTML = marked.parse(content, {
+                    breaks: true,        // Convert line breaks to <br>
+                    gfm: true,          // GitHub Flavored Markdown
+                    sanitize: false     // Allow HTML (needed for thinking tags)
+                });
             } else {
                 // Other messages (system, error) as plain text
                 contentDiv.textContent = content;
@@ -3966,7 +4151,6 @@ All date/time interpretations must be based on the current date/time context pro
             this.chatMessages.appendChild(messageDiv);
         }
         
-        
         // Add edit trigger after element is in DOM
         if (role === 'user' && this.currentChatId && content) {
             const contentDiv = messageDiv.querySelector('.message-content');
@@ -3974,8 +4158,17 @@ All date/time interpretations must be based on the current date/time context pro
                 this.addEditTrigger(contentDiv, content, 'user');
             }
         }
-        this.scrollToBottom();
-        this.moveSpinnerToBottom();
+        
+        // Scroll to bottom after DOM update
+        // For user messages, force scroll since user just sent it
+        requestAnimationFrame(() => {
+            if (role === 'user') {
+                this.scrollToBottom(true);  // Force scroll for user messages
+            } else {
+                this.scrollToBottom();  // Normal scroll behavior for other messages
+            }
+            this.moveSpinnerToBottom();
+        });
     }
 
     addSystemMessage(content) {
@@ -3994,29 +4187,54 @@ All date/time interpretations must be based on the current date/time context pro
         const formatNumber = (num) => num ? num.toLocaleString() : '0';
         const tokens = data.cumulativeTokens || {};
         
+        // Calculate price - always show it, even if zero
+        let price = 0;
+        if (data.model) {
+            const usage = {
+                promptTokens: tokens.inputTokens || 0,
+                completionTokens: tokens.outputTokens || 0,
+                cacheReadInputTokens: tokens.cacheReadTokens || 0,
+                cacheCreationInputTokens: tokens.cacheCreationTokens || 0
+            };
+            price = this.calculateMessagePrice(data.model, usage) || 0;
+        }
+        
+        const priceHtml = `
+            <span class="accounting-token-item" data-tooltip="Cost">
+                <i class="fas fa-dollar-sign"></i>
+                <span>${price.toFixed(4)}</span>
+            </span>`;
+        
+        // Add model display
+        const modelHtml = data.model ? `
+            <span class="accounting-token-item" data-tooltip="Model used">
+                <i class="fas fa-robot"></i>
+                <span>${data.model.includes(':') ? data.model.split(':')[1] : data.model}</span>
+            </span>` : '';
+        
         messageDiv.innerHTML = `
             <div class="accounting-line">
                 <div class="accounting-content">
                     <span class="accounting-icon"><i class="fas fa-coins"></i></span>
                     <div class="accounting-tokens">
-                        <span class="accounting-token-item">
+                        ${modelHtml}
+                        <span class="accounting-token-item" data-tooltip="Input tokens">
                             <i class="fas fa-download"></i>
                             <span>${formatNumber(tokens.inputTokens || 0)}</span>
                         </span>
-                        <span class="accounting-token-item">
+                        <span class="accounting-token-item" data-tooltip="Cached tokens (90% discount)">
+                            <i class="fas fa-memory"></i>
+                            <span>${formatNumber(tokens.cacheReadTokens || 0)}</span>
+                        </span>
+                        <span class="accounting-token-item" data-tooltip="Cache creation tokens (25% surcharge)">
+                            <i class="fas fa-save"></i>
+                            <span>${formatNumber(tokens.cacheCreationTokens || 0)}</span>
+                        </span>
+                        <span class="accounting-token-item" data-tooltip="Output tokens">
                             <i class="fas fa-upload"></i>
                             <span>${formatNumber(tokens.outputTokens || 0)}</span>
                         </span>
-                        ${tokens.cacheReadTokens ? `
-                        <span class="accounting-token-item">
-                            <i class="fas fa-memory"></i>
-                            <span>${formatNumber(tokens.cacheReadTokens)}</span>
-                        </span>` : ''}
-                        ${tokens.cacheCreationTokens ? `
-                        <span class="accounting-token-item">
-                            <i class="fas fa-save"></i>
-                            <span>${formatNumber(tokens.cacheCreationTokens)}</span>
-                        </span>` : ''}
+                        ${priceHtml}
                     </div>
                     <span class="accounting-reason">${data.reason || 'Token checkpoint'}</span>
                 </div>
@@ -4028,43 +4246,54 @@ All date/time interpretations must be based on the current date/time context pro
         this.moveSpinnerToBottom();
     }
     
-    createAccountingNode(reason, messagesToDiscard = 0) {
+    createAccountingNodes(reason, messagesToDiscard = 0) {
         // Calculate tokens ONLY from messages that will be discarded
         const chat = this.chats.get(this.currentChatId);
-        if (!chat) return null;
+        if (!chat) return [];
         
         // Find messages that will be discarded (from the end)
         const startIndex = Math.max(0, chat.messages.length - messagesToDiscard);
         const discardedMessages = chat.messages.slice(startIndex);
         
-        // Calculate tokens only from these discarded messages
-        let discardedInput = 0;
-        let discardedOutput = 0;
-        let discardedCacheCreation = 0;
-        let discardedCacheRead = 0;
+        // Group discarded tokens by model
+        const tokensByModel = new Map();
         
         for (const message of discardedMessages) {
-            if (message.usage) {
-                // Add tokens from this message
-                discardedInput += message.usage.promptTokens || 0;
-                discardedOutput += message.usage.completionTokens || 0;
-                discardedCacheCreation += message.usage.cacheCreationInputTokens || 0;
-                discardedCacheRead += message.usage.cacheReadInputTokens || 0;
+            if (message.usage && message.model) {
+                const model = message.model;
+                if (!tokensByModel.has(model)) {
+                    tokensByModel.set(model, {
+                        inputTokens: 0,
+                        outputTokens: 0,
+                        cacheReadTokens: 0,
+                        cacheCreationTokens: 0,
+                        messageCount: 0
+                    });
+                }
+                
+                const tokens = tokensByModel.get(model);
+                tokens.inputTokens += message.usage.promptTokens || 0;
+                tokens.outputTokens += message.usage.completionTokens || 0;
+                tokens.cacheCreationTokens += message.usage.cacheCreationInputTokens || 0;
+                tokens.cacheReadTokens += message.usage.cacheReadInputTokens || 0;
+                tokens.messageCount++;
             }
         }
         
-        return {
-            role: 'accounting',
-            timestamp: new Date().toISOString(),
-            cumulativeTokens: {
-                inputTokens: discardedInput,
-                outputTokens: discardedOutput,
-                cacheReadTokens: discardedCacheRead,
-                cacheCreationTokens: discardedCacheCreation
-            },
-            reason: reason,
-            discardedMessages: messagesToDiscard
-        };
+        // Create separate accounting nodes for each model
+        const accountingNodes = [];
+        for (const [model, tokens] of tokensByModel) {
+            accountingNodes.push({
+                role: 'accounting',
+                timestamp: new Date().toISOString(),
+                model: model,
+                cumulativeTokens: tokens,
+                reason: reason,
+                discardedMessages: tokens.messageCount
+            });
+        }
+        
+        return accountingNodes;
     }
     
     displaySystemPrompt(prompt) {
@@ -4261,340 +4490,86 @@ All date/time interpretations must be based on the current date/time context pro
         setTimeout(() => document.addEventListener('click', clickOutside), 0);
     }
     
-    // Add a placeholder for metrics that will be filled later
-    addMetricsPlaceholder() {
-        const metricsId = `metrics-${this.metricsIdCounter++}`;
-        
+    
+    
+    // Simple function to append metrics to the chat DOM
+    // This is the ONLY function that should be used for adding metrics headers
+    appendMetricsToChat(usage, responseTime, model, messageType = 'assistant') {
         const metricsFooter = document.createElement('div');
         metricsFooter.className = 'assistant-metrics-footer';
-        metricsFooter.id = metricsId;
-        metricsFooter.innerHTML = '<span class="metric-item"><i class="fas fa-hourglass-half"></i> Waiting for response...</span>';
         
-        // Always append at the end - the spinner will be moved after if needed
+        const formatNumber = (num) => num.toLocaleString();
+        let metricsHtml = '';
+        
+        // 1. MODEL
+        if (model) {
+            const modelDisplay = model.includes(':') ? model.split(':')[1] : model;
+            metricsHtml += `<span class="metric-item" data-tooltip="Model used"><i class="fas fa-robot"></i> ${modelDisplay}</span>`;
+        }
+        
+        // 2. TIME
+        if (responseTime !== null) {
+            const timeSeconds = (responseTime / 1000).toFixed(1);
+            metricsHtml += `<span class="metric-item" data-tooltip="Response time"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
+        }
+        
+        // Add token usage if available
+        if (usage) {
+            // 3. INPUT
+            metricsHtml += `<span class="metric-item" data-tooltip="Input tokens"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens || 0)}</span>`;
+            
+            // 4. CACHE R (always show, even if 0)
+            metricsHtml += `<span class="metric-item" data-tooltip="Cached tokens read (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens || 0)}</span>`;
+            
+            // 5. CACHE W (always show, even if 0)
+            metricsHtml += `<span class="metric-item" data-tooltip="Cache tokens written (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens || 0)}</span>`;
+            
+            // 6. OUTPUT
+            metricsHtml += `<span class="metric-item" data-tooltip="Output tokens"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens || 0)}</span>`;
+            
+            // 7. TOTAL
+            const totalTokens = (usage.promptTokens || 0) + 
+                               (usage.cacheReadInputTokens || 0) + 
+                               (usage.cacheCreationInputTokens || 0) + 
+                               (usage.completionTokens || 0);
+            metricsHtml += `<span class="metric-item" data-tooltip="Total tokens"><i class="fas fa-chart-bar"></i> ${formatNumber(totalTokens)}</span>`;
+            
+            // 8. DELTA - calculate based on message type
+            let deltaTokens = 0;
+            
+            if (messageType === 'title') {
+                // Titles don't affect context window
+                deltaTokens = 0;
+                // Don't update currentContextWindow
+            } else if (messageType === 'summary') {
+                // Summaries reset context to just their output tokens
+                deltaTokens = (usage.completionTokens || 0) - this.currentContextWindow;
+                // Reset context window to just the summary's output
+                this.currentContextWindow = usage.completionTokens || 0;
+            } else {
+                // Regular assistant messages
+                deltaTokens = totalTokens - this.currentContextWindow;
+                // Update the running total
+                this.currentContextWindow = totalTokens;
+            }
+            
+            // Always show delta, even if zero
+            const deltaSign = deltaTokens > 0 ? '+' : '';
+            metricsHtml += `<span class="metric-item" data-tooltip="Change from previous">Δ ${deltaSign}${formatNumber(deltaTokens)}</span>`;
+            
+            // 9. PRICE
+            if (model) {
+                const price = this.calculateMessagePrice(model, usage) || 0;
+                metricsHtml += `<span class="metric-item" data-tooltip="Cost"><i class="fas fa-dollar-sign"></i> ${price.toFixed(4)}</span>`;
+            }
+        }
+        
+        metricsFooter.innerHTML = metricsHtml;
+        
+        // Simply append to the chat messages container
         this.chatMessages.appendChild(metricsFooter);
-        
-        // Move spinner to bottom if it exists
-        this.moveSpinnerToBottom();
-        
-        return metricsId;
     }
     
-    // Update a metrics placeholder with actual data
-    updateMetrics(metricsId, usage, responseTime, model = null, price = null) {
-        const metricsFooter = document.getElementById(metricsId);
-        if (!metricsFooter) return;
-        
-        let metricsHtml = '';
-        
-        // Add model info if available
-        if (model) {
-            const modelName = model.includes(':') ? model.split(':')[1] : model;
-            metricsHtml += `<span class="metric-item" data-tooltip="Model used for this response"><i class="fas fa-robot"></i> ${modelName}</span>`;
-        }
-        
-        // Add response time
-        if (responseTime !== null) {
-            const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
-        }
-        
-        // Add token usage
-        if (usage) {
-            const formatNumber = (num) => num.toLocaleString();
-            
-            // Calculate the current total
-            const currentTotal = usage.promptTokens + 
-                               (usage.cacheReadInputTokens || 0) + 
-                               (usage.cacheCreationInputTokens || 0) + 
-                               usage.completionTokens;
-            
-            // Calculate delta vs previous total
-            let deltaTokens = 0;
-            if (this.currentChatId) {
-                const history = this.tokenUsageHistory.get(this.currentChatId);
-                if (history && history.requests.length > 1) {
-                    // Get previous request's total
-                    const previousRequest = history.requests[history.requests.length - 2];
-                    const previousTotal = previousRequest.promptTokens + 
-                                        (previousRequest.cacheReadInputTokens || 0) + 
-                                        (previousRequest.cacheCreationInputTokens || 0) + 
-                                        previousRequest.completionTokens;
-                    deltaTokens = currentTotal - previousTotal;
-                } else if (history && history.requests.length === 1) {
-                    // First request - all tokens are new
-                    deltaTokens = currentTotal;
-                }
-            }
-            
-            // Regular tokens (normal price)
-            metricsHtml += `<span class="metric-item" data-tooltip="Regular input tokens at standard price"><i class="fas fa-file-alt"></i> ${formatNumber(usage.promptTokens)}</span>`;
-            
-            // Cached tokens (90% discount) - always show
-            const cachedTokens = usage.cacheReadInputTokens || 0;
-            metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Cached tokens (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(cachedTokens)}</span>`;
-            
-            // Updated tokens (25% surcharge) - always show
-            const updatedTokens = usage.cacheCreationInputTokens || 0;
-            metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Updated cache tokens (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(updatedTokens)}</span>`;
-            
-            // Output tokens
-            metricsHtml += `<span class="metric-item" data-tooltip="Output tokens generated by the model"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>`;
-            
-            // Total
-            metricsHtml += `<span class="metric-item" data-tooltip="Total tokens (regular + cached + updated + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(currentTotal)}</span>`;
-            
-            // Delta
-            if (deltaTokens !== 0) {
-                const deltaColor = deltaTokens > 0 ? 'var(--warning-color)' : 'var(--success-color)';
-                const deltaSign = deltaTokens > 0 ? '+' : '';
-                metricsHtml += `<span class="metric-item" style="color: ${deltaColor}" data-tooltip="Change from previous request total">${deltaSign}${formatNumber(deltaTokens)}</span>`;
-            }
-        }
-        
-        metricsFooter.innerHTML = metricsHtml;
-        
-        // Tooltips are CSS-only now
-    }
-    
-    // Update a metrics placeholder with actual data (unified method for both live and stored)
-    updateMetricsPlaceholder(metricsId, usage, responseTime, previousPromptTokens, model = null, price = null) {
-        const metricsFooter = document.getElementById(metricsId);
-        if (!metricsFooter) return;
-        
-        let metricsHtml = '';
-        
-        // Add model info if available
-        if (model) {
-            const modelName = model.includes(':') ? model.split(':')[1] : model;
-            metricsHtml += `<span class="metric-item" data-tooltip="Model used for this response"><i class="fas fa-robot"></i> ${modelName}</span>`;
-        }
-        
-        // Add response time
-        if (responseTime !== null) {
-            const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
-        }
-        
-        // Add token usage
-        if (usage) {
-            const formatNumber = (num) => num.toLocaleString();
-            
-            // Calculate the current total
-            const currentTotal = usage.promptTokens + 
-                               (usage.cacheReadInputTokens || 0) + 
-                               (usage.cacheCreationInputTokens || 0) + 
-                               usage.completionTokens;
-            
-            // Calculate delta vs previous total
-            let deltaTokens = 0;
-            let previousTotal = 0;
-            
-            // Use provided previous tokens if available (for stored messages)
-            if (previousPromptTokens !== undefined && previousPromptTokens !== null) {
-                // This is a bit tricky - we only have previous prompt tokens, not the full previous total
-                // For now, we'll calculate delta based on current total vs previous prompt tokens
-                // This is an approximation but better than nothing
-                previousTotal = previousPromptTokens;
-                deltaTokens = currentTotal - previousTotal;
-            } else if (this.currentChatId) {
-                // Otherwise try to calculate from history
-                const history = this.tokenUsageHistory.get(this.currentChatId);
-                if (history && history.requests.length > 1) {
-                    // Get previous request's total
-                    const previousRequest = history.requests[history.requests.length - 2];
-                    previousTotal = previousRequest.promptTokens + 
-                                  (previousRequest.cacheReadInputTokens || 0) + 
-                                  (previousRequest.cacheCreationInputTokens || 0) + 
-                                  previousRequest.completionTokens;
-                    deltaTokens = currentTotal - previousTotal;
-                } else if (history && history.requests.length === 1) {
-                    // First request - all tokens are new
-                    deltaTokens = currentTotal;
-                }
-            }
-            
-            // Regular tokens (normal price)
-            metricsHtml += `<span class="metric-item" data-tooltip="Regular input tokens at standard price"><i class="fas fa-file-alt"></i> ${formatNumber(usage.promptTokens)}</span>`;
-            
-            // Cached tokens (90% discount) - always show
-            const cachedTokens = usage.cacheReadInputTokens || 0;
-            metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Cached tokens (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(cachedTokens)}</span>`;
-            
-            // Updated tokens (25% surcharge) - always show
-            const updatedTokens = usage.cacheCreationInputTokens || 0;
-            metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Updated cache tokens (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(updatedTokens)}</span>`;
-            
-            // Output tokens
-            metricsHtml += `<span class="metric-item" data-tooltip="Output tokens generated by the model"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>`;
-            
-            // Total
-            metricsHtml += `<span class="metric-item" data-tooltip="Total tokens (regular + cached + updated + output)"><i class="fas fa-chart-bar"></i> ${formatNumber(currentTotal)}</span>`;
-            
-            // Delta
-            if (deltaTokens !== 0) {
-                const deltaColor = deltaTokens > 0 ? 'var(--warning-color)' : 'var(--success-color)';
-                const deltaSign = deltaTokens > 0 ? '+' : '';
-                metricsHtml += `<span class="metric-item" style="color: ${deltaColor}" data-tooltip="Change from previous request total">${deltaSign}${formatNumber(deltaTokens)}</span>`;
-            }
-        }
-        
-        // Add price if available
-        if (price !== null && price !== undefined) {
-            metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Cost for this message"><i class="fas fa-dollar-sign"></i> $${price.toFixed(4)}</span>`;
-        }
-        
-        metricsFooter.innerHTML = metricsHtml;
-        
-        // Tooltips are CSS-only now
-    }
-    
-    // Add metrics to the previous message element
-    addMetricsToPreviousMessage(usage, responseTime) {
-        const allMessages = this.chatMessages.querySelectorAll('.message, .assistant-group');
-        if (allMessages.length === 0) return;
-        
-        // Get the last message element (excluding loading spinner)
-        let lastMessage = null;
-        for (let i = allMessages.length - 1; i >= 0; i--) {
-            const msg = allMessages[i];
-            if (!msg.classList.contains('loading-spinner')) {
-                lastMessage = msg;
-                break;
-            }
-        }
-        
-        if (!lastMessage) return;
-        
-        // Check if it already has metrics
-        if (lastMessage.querySelector('.assistant-metrics-footer')) return;
-        
-        const metricsFooter = document.createElement('div');
-        metricsFooter.className = 'assistant-metrics-footer';
-        
-        let metricsHtml = '';
-        
-        // Add response time
-        if (responseTime !== null) {
-            const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
-        }
-        
-        // Add token usage
-        if (usage) {
-            const formatNumber = (num) => num.toLocaleString();
-            
-            // Calculate delta (tokens added in this step)
-            let deltaTokens = 0;
-            
-            if (this.currentChatId) {
-                const history = this.tokenUsageHistory.get(this.currentChatId);
-                if (history && history.requests.length > 1) {
-                    // Get previous request's prompt tokens
-                    const previousRequest = history.requests[history.requests.length - 2];
-                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
-                } else if (history && history.requests.length === 1) {
-                    // First request - all tokens are new
-                    deltaTokens = usage.promptTokens;
-                }
-            }
-            
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
-            
-            // Add delta if there was an increase
-            if (deltaTokens > 0) {
-                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
-            }
-            
-            // Add cache information if available (Anthropic)
-            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
-                if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
-                }
-                if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
-                }
-            }
-            
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)"><i class="fas fa-chart-bar"></i> ${formatNumber(usage.totalTokens)}</span>
-            `;
-        }
-        
-        metricsFooter.innerHTML = metricsHtml;
-        lastMessage.appendChild(metricsFooter);
-        
-        // Tooltips are CSS-only now
-    }
-    
-    // Add metrics directly to the current assistant group (for stored messages)
-    addMetricsToAssistantGroup(usage, responseTime, previousPromptTokens) {
-        if (!this.currentAssistantGroup) return;
-        
-        const metricsFooter = document.createElement('div');
-        metricsFooter.className = 'assistant-metrics-footer';
-        
-        let metricsHtml = '';
-        
-        // Add response time
-        if (responseTime !== null) {
-            const timeSeconds = (responseTime / 1000).toFixed(1);
-            metricsHtml += `<span class="metric-item" data-tooltip="Time taken for the assistant to respond"><i class="fas fa-clock"></i> ${timeSeconds}s</span>`;
-        }
-        
-        // Add token usage
-        if (usage) {
-            const formatNumber = (num) => num.toLocaleString();
-            
-            // Calculate delta (tokens added in this step)
-            let deltaTokens = 0;
-            
-            // Use provided previous tokens if available (for stored messages)
-            if (previousPromptTokens !== undefined && previousPromptTokens !== null) {
-                deltaTokens = usage.promptTokens - previousPromptTokens;
-            } else if (this.currentChatId) {
-                // Otherwise try to calculate from history
-                const history = this.tokenUsageHistory.get(this.currentChatId);
-                if (history && history.requests.length > 1) {
-                    // Get previous request's prompt tokens
-                    const previousRequest = history.requests[history.requests.length - 2];
-                    deltaTokens = usage.promptTokens - previousRequest.promptTokens;
-                } else if (history && history.requests.length === 1) {
-                    // First request - all tokens are new
-                    deltaTokens = usage.promptTokens;
-                }
-            }
-            
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Total tokens in the context window sent to the model"><i class="fas fa-download"></i> ${formatNumber(usage.promptTokens)}</span>`;
-            
-            // Add delta if there was an increase
-            if (deltaTokens > 0) {
-                metricsHtml += `<span class="metric-item" style="color: var(--warning-color)" data-tooltip="New tokens added since previous request">+${formatNumber(deltaTokens)}</span>`;
-            }
-            
-            // Add cache information if available (Anthropic)
-            if (usage.cacheReadInputTokens > 0 || usage.cacheCreationInputTokens > 0) {
-                if (usage.cacheReadInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Tokens read from cache (90% discount)"><i class="fas fa-memory"></i> ${formatNumber(usage.cacheReadInputTokens)}</span>`;
-                }
-                if (usage.cacheCreationInputTokens > 0) {
-                    metricsHtml += `<span class="metric-item" style="color: var(--info-color)" data-tooltip="Tokens written to cache (25% surcharge)"><i class="fas fa-save"></i> ${formatNumber(usage.cacheCreationInputTokens)}</span>`;
-                }
-            }
-            
-            metricsHtml += `
-                <span class="metric-item" data-tooltip="Tokens generated by the assistant"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens)}</span>
-                <span class="metric-item" data-tooltip="Total tokens used (prompt + completion)"><i class="fas fa-chart-bar"></i> ${formatNumber(usage.totalTokens)}</span>
-            `;
-        }
-        
-        metricsFooter.innerHTML = metricsHtml;
-        this.currentAssistantGroup.appendChild(metricsFooter);
-        
-        // Tooltips are CSS-only now
-    }
     
     
     editUserMessage(contentDiv, originalContent) {
@@ -4667,9 +4642,12 @@ All date/time interpretations must be based on the current date/time context pro
                 // Create accounting node before discarding messages
                 const messagesToDiscard = chat.messages.length - messageIndex;
                 if (messagesToDiscard > 0) {
-                    const accountingNode = this.createAccountingNode('Message edited', messagesToDiscard);
-                    this.insertMessage(chat.id, messageIndex, accountingNode);
-                    messageIndex++; // Adjust index after insertion
+                    const accountingNodes = this.createAccountingNodes('Message edited', messagesToDiscard);
+                    // Insert all accounting nodes (one per model)
+                    for (const accountingNode of accountingNodes) {
+                        this.insertMessage(chat.id, messageIndex, accountingNode);
+                        messageIndex++; // Adjust index after each insertion
+                    }
                 }
                 
                 // Clip history at this point - remove all messages after messageIndex
@@ -4680,7 +4658,7 @@ All date/time interpretations must be based on the current date/time context pro
             } finally {
                 // Exit batch mode and save immediately
                 this.batchMode = false;
-                this.saveSettings();
+                this.autoSave(this.currentChatId);
             }
             
             // Reload the chat to show clipped history
@@ -5185,7 +5163,7 @@ All date/time interpretations must be based on the current date/time context pro
                     } else if (chat) {
                         // User changed a checkbox, switch to manual mode
                         chat.toolInclusionMode = 'manual';
-                        this.saveSettings();
+                        this.autoSave(chat.id);
                         this.updateGlobalToggleUI();
                     }
                 }
@@ -5202,12 +5180,12 @@ All date/time interpretations must be based on the current date/time context pro
         }
     }
 
-    scrollToBottom() {
-        // Only scroll if user is already near the bottom
+    scrollToBottom(force = false) {
+        // Only scroll if user is already near the bottom, unless forced
         const threshold = 100; // pixels from bottom to consider "at bottom"
         const isAtBottom = this.chatMessages.scrollHeight - this.chatMessages.scrollTop - this.chatMessages.clientHeight < threshold;
         
-        if (isAtBottom) {
+        if (isAtBottom || force) {
             this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         }
     }
@@ -5330,7 +5308,10 @@ All date/time interpretations must be based on the current date/time context pro
         }, 100);
         
         this.chatMessages.appendChild(spinnerDiv);
-        this.scrollToBottom();
+        // Force scroll to bottom when showing spinner
+        requestAnimationFrame(() => {
+            this.scrollToBottom(true);
+        });
     }
 
     hideLoadingSpinner() {
@@ -5353,7 +5334,10 @@ All date/time interpretations must be based on the current date/time context pro
             // Remove and re-append to ensure it's at the bottom
             spinner.parentNode.removeChild(spinner);
             this.chatMessages.appendChild(spinner);
-            this.scrollToBottom();
+            // Force scroll when moving spinner to bottom
+            requestAnimationFrame(() => {
+                this.scrollToBottom(true);
+            });
         }
     }
 
@@ -5682,7 +5666,7 @@ All date/time interpretations must be based on the current date/time context pro
             if (num >= 1000) {
                 const thousands = num / 1000;
                 const formatted = thousands >= 1000 ? 
-                    thousands.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ",") : 
+                    thousands.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : 
                     thousands.toFixed(1);
                 return `${formatted}<span style="color: var(--text-tertiary); font-size: 10px;">k</span>`;
             }
@@ -5926,7 +5910,7 @@ All date/time interpretations must be based on the current date/time context pro
         }
         
         const chat = this.chats.get(this.currentChatId);
-        if (!chat || !chat.messages || chat.messages.length === 0) {
+        if (!chat || !this.hasUserContent(chat)) {
             this.showError('No messages to copy');
             return;
         }
@@ -6052,7 +6036,7 @@ All date/time interpretations must be based on the current date/time context pro
         if (chat) {
             chat.temperature = temperature;
             chat.updatedAt = new Date().toISOString();
-            this.saveSettings();
+            this.autoSave(chat.id);
         }
     }
     
@@ -6115,7 +6099,171 @@ All date/time interpretations must be based on the current date/time context pro
         }
     }
     
-    // Generate chat title using LLM
+    // Unified summary generation method
+    async generateChatSummary(chat, mcpConnection, provider, isAutomatic = false) {
+        try {
+            // User request that clearly explains the purpose
+            const summaryRequest = 'Please create a comprehensive summary of our discussion that I can save and later provide back to you so we can continue from where we left off. Include all the context, findings, and details needed to resume our conversation.';
+            
+            // System prompt that frames the task as creating a reusable context
+            const summarySystemPrompt = `You are a helpful assistant that creates conversation summaries designed to be provided back to an AI assistant to continue discussions.
+
+When asked to summarize, you are creating a "conversation checkpoint" that captures the complete state of the discussion so far. This summary will be given to you (or another AI assistant) in a future conversation to provide full context.
+
+CRITICAL: You are summarizing the conversation that happened BEFORE the summary request. The conversation consists of:
+1. User messages (questions, requests, information provided)
+2. Assistant responses (analysis, findings, answers, data retrieved)
+3. Any tool usage or data collection that occurred
+
+Create a summary with these sections:
+
+## CONVERSATION SUMMARY (CHECKPOINT)
+
+### USER'S ORIGINAL REQUESTS
+Quote each user message exactly as written (excluding the summary request itself).
+
+### ASSISTANT'S FINDINGS AND RESPONSES
+Summarize what the assistant discovered, analyzed, and explained, including:
+- Complete responses provided
+- Data retrieved using tools
+- Analysis performed
+- Conclusions reached
+- Any specific numbers, configurations, or technical details mentioned
+
+### CURRENT UNDERSTANDING
+- What has been established about the user's environment/situation
+- Key facts and data points discovered
+- Current state of any investigations or analysis
+
+### CONTEXT FOR CONTINUATION
+- Where the conversation left off
+- Any pending questions or next steps
+- Relevant details that would be needed to continue the discussion
+
+Remember: This summary will be the ONLY context available when resuming the conversation, so include all important details, findings, and the current state of discussion.`;
+            
+            // CRITICAL: Save summary request BEFORE displaying
+            this.addMessage(chat.id, { 
+                role: 'system-summary',
+                content: summaryRequest,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Now display it
+            this.processRenderEvent({ type: 'system-summary-message', content: summaryRequest });
+            
+            // Show loading spinner
+            this.processRenderEvent({ type: 'show-spinner' });
+            
+            // Build conversational messages (no tools) for summary generation
+            // Don't include the original system prompt - we'll use a custom one
+            const conversationalMessages = this.buildConversationalMessages(chat.messages, false);
+            
+            // Create messages array with custom summary system prompt
+            const messages = [{
+                role: 'system',
+                content: summarySystemPrompt
+            }];
+            
+            // Add all conversational messages
+            messages.push(...conversationalMessages);
+            
+            // IMPORTANT: Ensure the conversation ends properly for the API
+            // If the last message is from the user (orphaned due to MAX_TOKENS or other error),
+            // we need to handle it specially
+            if (messages.length > 1 && messages[messages.length - 1].role === 'user') {
+                // Add a placeholder assistant message to complete the conversation
+                messages.push({
+                    role: 'assistant',
+                    content: '[Response truncated due to token limit]'
+                });
+            }
+            
+            console.log('Messages before adding summary request:', messages.length, messages.map(m => ({ role: m.role, contentLength: m.content?.length || 0 })));
+            
+            // IMPORTANT: The summary request should be added AFTER building messages
+            // but BEFORE the system-summary message is added to chat history
+            // This way it's not included in the conversation being summarized
+            
+            // Add the simple summary request as a user message
+            messages.push({ role: 'user', content: summaryRequest });
+            
+            // For summaries, we can use a simple cache control on the last conversational message
+            const cacheControlIndex = messages.length - 2; // Before the summary request
+            
+            console.log('Total messages being sent:', messages.length);
+            
+            // Send request with low temperature for consistent summaries
+            const temperature = 0.5;
+            const llmStartTime = Date.now();
+            const response = await provider.sendMessage(messages, [], temperature, chat.toolInclusionMode, cacheControlIndex);
+            const llmResponseTime = Date.now() - llmStartTime;
+            
+            // Hide spinner
+            this.processRenderEvent({ type: 'hide-spinner' });
+            
+            // Update metrics
+            if (response.usage) {
+                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
+            }
+            
+            // Process the summary response
+            if (response.content) {
+                // CRITICAL: Save summary response BEFORE displaying
+                this.addMessage(chat.id, { 
+                    role: 'summary', 
+                    content: response.content,
+                    usage: response.usage || null,
+                    responseTime: llmResponseTime || null,
+                    model: chat.model || provider.model,
+                    timestamp: new Date().toISOString(),
+                    cacheControlIndex: cacheControlIndex  // Store the frozen cache position
+                });
+                
+                // Display the response as a summary message WITH metrics
+                this.processRenderEvent({ 
+                    type: 'summary-message', 
+                    content: response.content,
+                    usage: response.usage,
+                    responseTime: llmResponseTime,
+                    model: chat.model || provider.model
+                });
+                
+                // Update context window display
+                const contextTokens = this.calculateContextWindowTokens(chat.id);
+                this.updateContextWindowIndicator(contextTokens, chat.model || provider.model);
+                
+                // Update all token displays including cost
+                this.updateAllTokenDisplays();
+                
+                // Mark that summary was generated
+                chat.summaryGenerated = true;
+                if (!isAutomatic) {
+                    this.saveChatToStorage(chat.id);
+                }
+            }
+            
+        } catch (error) {
+            console.error('Failed to summarize conversation:', error);
+            
+            // Hide spinner on error
+            this.processRenderEvent({ type: 'hide-spinner' });
+            
+            if (!isAutomatic) {
+                this.showError(`Failed to summarize: ${error.message}`);
+            }
+            
+            // Remove the system-summary message if it failed
+            const lastMsg = chat.messages[chat.messages.length - 1];
+            if (lastMsg && lastMsg.role === 'system-summary') {
+                this.removeLastMessage(chat.id);
+            }
+            
+            throw error; // Re-throw for caller to handle
+        }
+    }
+    
+    // Manual summary button handler
     async summarizeConversation() {
         const chat = this.chats.get(this.currentChatId);
         if (!chat) {
@@ -6153,166 +6301,8 @@ All date/time interpretations must be based on the current date/time context pro
             );
             provider.onLog = llmProviderConfig.onLog;
             
-            // Create summary request
-            const summaryRequest = `Please provide a comprehensive summary of our conversation so far.
-
-CRITICAL REQUIREMENTS:
-- You MUST quote ALL user messages verbatim in a dedicated section
-- Preserve exact dates, times, numbers, and any specific details mentioned
-- Do not paraphrase or summarize the user messages - quote them exactly
-- Document ALL findings, discoveries, and analysis in detail
-
-Include the following sections:
-
-1. USER MESSAGES (VERBATIM)
-Quote every user message in chronological order, exactly as written.
-
-2. DETAILED FINDINGS
-Document everything discovered so far, including:
-- All data collected from tools (metrics, logs, system states)
-- Patterns or anomalies identified
-- Root causes discovered
-- Correlations found
-- Timeline of events
-- Specific values, thresholds, or measurements observed
-- Any errors, warnings, or issues encountered
-- Configuration details or system behaviors noted
-
-3. ANALYSIS AND CONCLUSIONS
-- Detailed analysis of the findings
-- Hypotheses formed and tested
-- Conclusions reached with supporting evidence
-- Relationships between different findings
-
-4. MAIN TOPICS DISCUSSED
-Summarize the key topics and areas covered.
-
-5. KEY DECISIONS AND RECOMMENDATIONS
-List any decisions made, recommendations provided, or actions taken.
-
-6. IMPORTANT CONTEXT
-Include any critical background information, dates, hints, or specific details the user provided.
-
-7. CURRENT STATUS AND NEXT STEPS
-Describe where the investigation/conversation stands now and any pending items or next steps.
-
-This summary will be used as context for continuing our conversation, so preserving all findings and exact user input is essential.`;
-            
-            // CRITICAL: Save summary request BEFORE displaying
-            this.addMessage(chat.id, { 
-                role: 'system-summary',
-                content: summaryRequest,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Now display it
-            this.processRenderEvent({ type: 'system-summary-message', content: summaryRequest });
-            // No need to save - addMessage handles it
-            
-            // Add metrics placeholder
-            const metricsId = `metrics-summary-${this.metricsIdCounter++}`;
-            this.processRenderEvent({ type: 'metrics-placeholder', id: metricsId });
-            
-            // Show loading spinner
-            this.processRenderEvent({ type: 'show-spinner' });
-            
-            // Build messages for API with frozen cache position
-            const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider, true);
-            
-            // Add the summary request
-            messages.push({ role: 'user', content: summaryRequest });
-            
-            // Send request with low temperature for consistent summaries
-            const temperature = 0.5;
-            const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, [], temperature, chat.toolInclusionMode, cacheControlIndex);
-            const llmResponseTime = Date.now() - llmStartTime;
-            
-            // Hide spinner
-            this.processRenderEvent({ type: 'hide-spinner' });
-            
-            // Update metrics
-            if (response.usage) {
-                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
-            }
-            
-            this.processRenderEvent({ 
-                type: 'update-metrics', 
-                id: metricsId,
-                usage: response.usage, 
-                responseTime: llmResponseTime,
-                previousPromptTokens: this.getPreviousPromptTokens(),
-                model: chat.model || provider.model,
-                price: response.usage ? this.calculateMessagePrice(chat.model || provider.model, response.usage) : null
-            });
-            
-            // Process the summary response
-            if (response.content) {
-                // CRITICAL: Save summary response BEFORE displaying
-                this.addMessage(chat.id, { 
-                    role: 'summary', 
-                    content: response.content,
-                    usage: response.usage || null,
-                    responseTime: llmResponseTime || null,
-                    timestamp: new Date().toISOString(),
-                    cacheControlIndex: cacheControlIndex  // Store the frozen cache position
-                });
-                
-                // Now display the response as a summary checkpoint
-                this.processRenderEvent({ type: 'summary-message', content: response.content });
-                
-                // No need for extra save - addMessage handles it
-                
-                // Add ACTION section to the existing Chat Summary block
-                const summaryBlock = this.chatMessages.querySelector('.system-block[data-type="summary"]');
-                if (summaryBlock) {
-                    const systemContent = summaryBlock.querySelector('.tool-content');
-                    if (systemContent) {
-                        // Add separator
-                        const separator = document.createElement('div');
-                        separator.className = 'tool-separator';
-                        systemContent.appendChild(separator);
-                        
-                        // Add action section with the actual summary response
-                        const actionSection = document.createElement('div');
-                        actionSection.className = 'tool-response-section';
-                        
-                        const actionControls = document.createElement('div');
-                        actionControls.className = 'tool-section-controls';
-                        
-                        const actionLabel = document.createElement('span');
-                        actionLabel.className = 'tool-section-label';
-                        actionLabel.textContent = 'RESPONSE';
-                        
-                        // Add copy button for the response
-                        const copyBtn = document.createElement('button');
-                        copyBtn.className = 'tool-section-copy';
-                        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
-                        copyBtn.onclick = () => {
-                            this.copyToClipboard(response.content, copyBtn);
-                        };
-                        
-                        actionControls.appendChild(actionLabel);
-                        actionControls.appendChild(copyBtn);
-                        actionSection.appendChild(actionControls);
-                        
-                        // Create a div for the summary content with markdown rendering
-                        const actionContent = document.createElement('div');
-                        actionContent.className = 'message-content';
-                        actionContent.innerHTML = marked.parse(response.content);
-                        actionSection.appendChild(actionContent);
-                        
-                        systemContent.appendChild(actionSection);
-                    }
-                }
-                
-                // Update context window display (should show near zero)
-                const contextTokens = this.calculateContextWindowTokens(chat.id);
-                this.updateContextWindowIndicator(contextTokens, chat.model || provider.model);
-                
-                // Update all token displays including cost
-                this.updateAllTokenDisplays();
-            }
+            // Use the unified method
+            await this.generateChatSummary(chat, mcpConnection, provider, false);
             
         } catch (error) {
             console.error('Failed to summarize conversation:', error);
@@ -6334,16 +6324,138 @@ This summary will be used as context for continuing our conversation, so preserv
         }
     }
     
-    async generateChatTitle(chat, mcpConnection, provider) {
+    // Delete summary messages and replace with accounting record
+    deleteSummaryMessages(messageIndex) {
+        const chat = this.chats.get(this.currentChatId);
+        if (!chat) return;
+        
+        // Find the system-summary message at or near the given index
+        let systemSummaryIndex = -1;
+        let summaryIndex = -1;
+        
+        // Look for system-summary message around the given index
+        for (let i = Math.max(0, messageIndex - 1); i < Math.min(chat.messages.length, messageIndex + 2); i++) {
+            if (chat.messages[i]?.role === 'system-summary') {
+                systemSummaryIndex = i;
+                break;
+            }
+        }
+        
+        if (systemSummaryIndex === -1) {
+            console.error('Could not find system-summary message near index', messageIndex);
+            return;
+        }
+        
+        // Look for the corresponding summary response after the system-summary
+        for (let i = systemSummaryIndex + 1; i < chat.messages.length; i++) {
+            if (chat.messages[i]?.role === 'summary') {
+                summaryIndex = i;
+                break;
+            }
+        }
+        
+        // Extract tokens from the summary message's usage data
+        let summaryTokens = {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 0
+        };
+        let summaryModel = null;
+        
+        if (summaryIndex !== -1) {
+            const summaryMsg = chat.messages[summaryIndex];
+            if (summaryMsg.usage) {
+                summaryTokens.inputTokens = summaryMsg.usage.promptTokens || 0;
+                summaryTokens.outputTokens = summaryMsg.usage.completionTokens || 0;
+                summaryTokens.cacheReadTokens = summaryMsg.usage.cacheReadInputTokens || 0;
+                summaryTokens.cacheCreationTokens = summaryMsg.usage.cacheCreationInputTokens || 0;
+            }
+            // Get the model used for the summary
+            summaryModel = summaryMsg.model || chat.model;
+        }
+        
+        // Count messages to be deleted
+        let messagesToDelete = 1; // At least the system-summary
+        if (summaryIndex !== -1) {
+            messagesToDelete = 2; // Both system-summary and summary
+        }
+        
+        // Create accounting node with the tokens that were spent on the summary
+        const accountingNode = {
+            role: 'accounting',
+            timestamp: new Date().toISOString(),
+            cumulativeTokens: summaryTokens,
+            reason: 'Summary deleted',
+            discardedMessages: messagesToDelete,
+            model: summaryModel
+        };
+        
+        // Delete messages and insert accounting node
+        if (summaryIndex !== -1) {
+            // Delete both messages, starting from the later index
+            this.removeMessage(chat.id, summaryIndex, 1);
+            this.removeMessage(chat.id, systemSummaryIndex, 1);
+        } else {
+            // Delete only system-summary
+            this.removeMessage(chat.id, systemSummaryIndex, 1);
+        }
+        
+        // Insert accounting node at the position of the deleted system-summary
+        this.insertMessage(chat.id, systemSummaryIndex, accountingNode);
+        
+        // Mark that summary is no longer generated
+        chat.summaryGenerated = false;
+        this.saveChatToStorage(chat.id);
+        
+        // Reload the chat to update the display
+        this.loadChat(this.currentChatId);
+    }
+    
+    // Check if automatic summary should be generated
+    shouldGenerateSummary(chat) {
+        // Placeholder implementation - customize conditions as needed
+        // Examples of conditions you might want:
+        // - After X messages
+        // - After Y tokens used
+        // - After Z time elapsed
+        // - When context window is X% full
+        // - Every N user messages
+        
+        // For now, return false - no automatic summaries
+        return false;
+        
+        // Example implementation (uncomment and customize):
+        /*
+        // Don't summarize if already has a summary
+        if (chat.summaryGenerated) return false;
+        
+        // Check message count (e.g., after 20 exchanges)
+        const userMessages = chat.messages.filter(m => m.role === 'user' && !['system-title', 'system-summary'].includes(m.role));
+        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
+        if (userMessages.length < 10 || assistantMessages.length < 10) return false;
+        
+        // Check context window usage (e.g., when 80% full)
+        const contextTokens = this.calculateContextWindowTokens(chat.id);
+        const modelLimit = this.getModelContextLimit(chat.model);
+        if (contextTokens < modelLimit * 0.8) return false;
+        
+        // Check time elapsed (e.g., after 30 minutes)
+        const firstMessage = chat.messages.find(m => m.timestamp);
+        if (firstMessage) {
+            const elapsed = Date.now() - new Date(firstMessage.timestamp).getTime();
+            if (elapsed < 30 * 60 * 1000) return false;
+        }
+        
+        return true;
+        */
+    }
+    
+    // Unified title generation method
+    async generateChatTitle(chat, mcpConnection, provider, isAutomatic = false) {
         try {
-            // Mark that we're generating a title
-            chat.titleGenerated = true;
-            this.saveSettings();
-            
             // Create a system message for title generation
-            const titleRequest = "Please provide a short, descriptive title (max 50 characters) for this conversation. Respond with ONLY the title text, no quotes, no explanation.";
-            
-            // No visual separator needed - the collapsible node shows the status
+            const titleRequest = 'Please provide a short, descriptive title (max 50 characters) for this conversation. Respond with ONLY the title text, no quotes, no explanation.';
             
             // CRITICAL: Save title request BEFORE displaying
             this.addMessage(chat.id, { 
@@ -6354,37 +6466,26 @@ This summary will be used as context for continuing our conversation, so preserv
             
             // Now display it
             this.processRenderEvent({ type: 'system-title-message', content: titleRequest });
-            // No need to save - addMessage handles it
-            
-            // Add metrics placeholder
-            const metricsId = `metrics-title-${this.metricsIdCounter++}`;
-            this.processRenderEvent({ type: 'metrics-placeholder', id: metricsId });
-            const domMetricsId = this.metricsIdMapping?.[metricsId] || metricsId;
             
             // Show loading spinner
             this.processRenderEvent({ type: 'show-spinner' });
             
-            // Build messages for title generation
-            const messages = [];
+            // Build conversational messages (no tools) for title generation
+            const cleanMessages = this.buildConversationalMessages(chat.messages, false);
             
-            // Add system prompt for title generation
-            messages.push({ 
+            // Create messages array with custom system prompt for title generation
+            const messages = [{
                 role: 'system', 
                 content: 'You are a helpful assistant that generates concise, descriptive titles for conversations. Respond with ONLY the title text, no quotes, no explanation, no markdown.' 
-            });
+            }];
             
-            // Add the conversation context (excluding system messages)
-            for (const msg of chat.messages) {
-                // Skip system roles
-                if (['system-title', 'system-summary', 'title', 'summary'].includes(msg.role)) continue;
-                
-                const msgRole = msg.role || msg.type;
-                if (msgRole === 'user') {
-                    messages.push({ role: 'user', content: msg.content });
-                } else if (msgRole === 'assistant' && msg.content) {
-                    // Clean content and truncate if needed
-                    const cleanedContent = this.cleanContentForAPI(msg.content);
-                    const truncated = cleanedContent.length > 500 ? cleanedContent.substring(0, 500) + '...' : cleanedContent;
+            // Add clean conversational messages, truncating assistant responses
+            for (const msg of cleanMessages) {
+                if (msg.role === 'user') {
+                    messages.push(msg);
+                } else if (msg.role === 'assistant' && msg.content) {
+                    // Truncate long assistant messages for title context
+                    const truncated = msg.content.length > 500 ? msg.content.substring(0, 500) + '...' : msg.content;
                     messages.push({ role: 'assistant', content: truncated });
                 }
             }
@@ -6401,20 +6502,26 @@ This summary will be used as context for continuing our conversation, so preserv
             // Don't update token usage history for title generation
             // as it shouldn't affect the context window
             
-            this.processRenderEvent({ 
-                type: 'update-metrics', 
-                id: metricsId,
-                usage: response.usage, 
-                responseTime: llmResponseTime,
-                previousPromptTokens: this.getPreviousPromptTokens(),
-                model: chat.model || provider.model,
-                price: response.usage ? this.calculateMessagePrice(chat.model || provider.model, response.usage) : null
-            });
-            
             // Process the title response
             if (response.content) {
-                // Display the response as a title message
-                this.processRenderEvent({ type: 'title-message', content: response.content });
+                // Store the title response with the 'title' role
+                this.addMessage(chat.id, { 
+                    role: 'title', 
+                    content: response.content,
+                    usage: response.usage || null,
+                    responseTime: llmResponseTime || null,
+                    model: chat.model || provider.model,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Display the response as a title message WITH metrics
+                this.processRenderEvent({ 
+                    type: 'title-message', 
+                    content: response.content,
+                    usage: response.usage,
+                    responseTime: llmResponseTime,
+                    model: chat.model || provider.model
+                });
                 
                 // Extract and clean the title
                 const newTitle = response.content.trim()
@@ -6422,78 +6529,49 @@ This summary will be used as context for continuing our conversation, so preserv
                     .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
                     .substring(0, 65); // Allow some tolerance beyond 50 chars
                 
-                console.log('Generated title:', newTitle);
-                console.log('Current chat ID:', this.currentChatId);
-                
                 // Update the chat title
                 if (newTitle && newTitle.length > 0) {
                     chat.title = newTitle;
                     chat.updatedAt = new Date().toISOString();
                     
-                    // Store the title response with the 'title' role
-                    this.addMessage(chat.id, { 
-                        role: 'title', 
-                        content: response.content,
-                        usage: response.usage || null,
-                        responseTime: llmResponseTime || null,
-                        timestamp: new Date().toISOString()
-                    });
-                    // No need to save - addMessage handles it
+                    // Mark that title was generated
+                    chat.titleGenerated = true;
                     
                     // Update UI
                     this.updateChatSessions();
-                    document.getElementById('chatTitle').textContent = newTitle;
-                    
-                    // Also update the sidebar item directly
-                    const sessionItem = document.querySelector(`[data-chat-id="${this.currentChatId}"] .session-title`);
-                    if (sessionItem) {
-                        sessionItem.textContent = newTitle;
+                    if (chat.id === this.currentChatId) {
+                        document.getElementById('chatTitle').textContent = newTitle;
                     }
                     
-                    // Add ACTION section to the existing Chat Title block
-                    const titleBlock = this.chatMessages.querySelector('.system-block[data-type="title"]');
-                    if (titleBlock) {
-                        const systemContent = titleBlock.querySelector('.tool-content');
-                        if (systemContent) {
-                            // Add separator
-                            const separator = document.createElement('div');
-                            separator.className = 'tool-separator';
-                            systemContent.appendChild(separator);
-                            
-                            // Add action section
-                            const actionSection = document.createElement('div');
-                            actionSection.className = 'tool-response-section';
-                            
-                            const actionControls = document.createElement('div');
-                            actionControls.className = 'tool-section-controls';
-                            
-                            const actionLabel = document.createElement('span');
-                            actionLabel.className = 'tool-section-label';
-                            actionLabel.textContent = 'ACTION';
-                            
-                            actionControls.appendChild(actionLabel);
-                            actionSection.appendChild(actionControls);
-                            
-                            const actionContent = document.createElement('pre');
-                            actionContent.textContent = `Chat title updated: "${newTitle}"`;
-                            actionSection.appendChild(actionContent);
-                            
-                            systemContent.appendChild(actionSection);
-                        }
+                    // Save changes (unless automatic)
+                    if (!isAutomatic) {
+                        this.saveChatToStorage(chat.id);
                     }
                 }
             }
             
         } catch (error) {
             console.error('Failed to generate title:', error);
-            // Don't show error to user, just log it
+            
+            // Hide spinner on error
+            this.processRenderEvent({ type: 'hide-spinner' });
+            
+            if (!isAutomatic) {
+                // Don't show error to user for manual requests, just log it
+            }
+            
+            // Remove the system-title message if it failed
+            const lastMsg = chat.messages[chat.messages.length - 1];
+            if (lastMsg && lastMsg.role === 'system-title') {
+                this.removeLastMessage(chat.id);
+            }
+            
+            throw error; // Re-throw for caller to handle
         } finally {
             // Hide spinner
             this.processRenderEvent({ type: 'hide-spinner' });
             // Clear assistant group
             this.currentAssistantGroup = null;
-            // Save any changes
-            this.saveSettings();
         }
     }
     
@@ -6538,7 +6616,7 @@ This summary will be used as context for continuing our conversation, so preserv
         }
         
         chat.toolInclusionMode = newMode;
-        this.saveSettings();
+        this.autoSave(chat.id);
         this.updateGlobalToggleUI();
     }
     
@@ -6696,26 +6774,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Expose migration function for testing
     window.migrateCurrentChat = () => {
         if (!window.app.currentChatId) {
-            console.log("No chat is currently loaded");
+            console.log('No chat is currently loaded');
             return;
         }
         const chat = window.app.chats.get(window.app.currentChatId);
         if (!chat) {
-            console.log("Chat not found");
+            console.log('Chat not found');
             return;
         }
-        console.log("Migrating chat:", chat.title);
-        console.log("Before migration:", {
+        console.log('Migrating chat:', chat.title);
+        console.log('Before migration:', {
             totalTokensPrice: chat.totalTokensPrice,
             perModelTokensPrice: chat.perModelTokensPrice
         });
         window.app.migrateTokenPricing(chat);
-        console.log("After migration:", {
+        console.log('After migration:', {
             totalTokensPrice: chat.totalTokensPrice,
             perModelTokensPrice: chat.perModelTokensPrice
         });
         // Update displays
         window.app.updateAllTokenDisplays();
-        console.log("Migration complete!");
+        console.log('Migration complete!');
     };
 });
