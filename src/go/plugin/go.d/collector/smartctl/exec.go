@@ -5,9 +5,12 @@
 package smartctl
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"time"
 
@@ -66,6 +69,13 @@ func (e *smartctlCliExec) execute(args ...string) (*gjson.Result, error) {
 	}
 	if len(bs) == 0 {
 		return nil, fmt.Errorf("'%s' returned no output", cmd)
+	}
+
+	if logger.Level.Enabled(slog.LevelDebug) {
+		var buf bytes.Buffer
+		if err := json.Compact(&buf, bs); err == nil {
+			e.Debugf("exec: %v, resp: %s", args, buf.String())
+		}
 	}
 
 	if !gjson.ValidBytes(bs) {
