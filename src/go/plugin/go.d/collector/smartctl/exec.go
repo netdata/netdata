@@ -74,8 +74,9 @@ func (e *smartctlCliExec) execute(args ...string) (*gjson.Result, error) {
 
 	if logger.Level.Enabled(slog.LevelDebug) {
 		var buf bytes.Buffer
-		json.Compact(&buf, bs)
-		e.Debugf("exec: %v, resp: %s", args, buf.String())
+		if err := json.Compact(&buf, bs); err == nil {
+			e.Debugf("exec: %v, resp: %s", args, buf.String())
+		}
 	}
 
 	if !gjson.ValidBytes(bs) {
