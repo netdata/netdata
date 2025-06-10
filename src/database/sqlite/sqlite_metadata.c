@@ -2672,7 +2672,7 @@ static void *metadata_event_loop(void *arg)
     buffer_free(work_buffer);
     release_cmd_pool(&config->cmd_pool);
     worker_unregister();
-
+    service_exits();
     completion_mark_complete(&config->start_stop_complete);
 
     return NULL;
