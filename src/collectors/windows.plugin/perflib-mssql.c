@@ -984,6 +984,7 @@ static void netdata_read_config_options(struct netdata_mssql_conn *dbconn)
 
 void mssql_fill_initial_instances(struct mssql_instance *mi)
 {
+    // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17
     char *keys[] = {
         "AllocUnit",
         "Application",
