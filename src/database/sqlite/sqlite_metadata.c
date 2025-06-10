@@ -2372,7 +2372,7 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
         if (is_worker)
             worker_is_idle();
 
-        metadata_scan_host(host, work_buffer, true);
+        metadata_scan_host(host, work_buffer, is_worker);
 
         if (!is_worker)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
