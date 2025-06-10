@@ -1720,7 +1720,7 @@ modules:
           - title: Configure SQL Server for Monitoring
             description: |
               1. **Create Monitoring User**
-              
+
                  Create an SQL Server user with the necessary permissions to collect monitoring data:
 
                  ```tsql
@@ -1731,9 +1731,9 @@ modules:
                  GRANT VIEW SERVER STATE TO netdata_user;
                  GO
                  ```
-              
+
               2. **Enable Query Store**
-              
+
                  Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
 
                  ```tsql
@@ -1937,50 +1937,32 @@ modules:
               chart_type: line
               dimensions:
                 - name: benefit
-            - name: mssql.instance_resource_deadlocks
-              description: Active lock requests that resulted in deadlock per resource
-              unit: deadlock
-              chart_type: line
-              dimensions:
-                - name: alloc_unit
-                - name: application
-                - name: database
-                - name: extent
-                - name: file
-                - name: hobt
-                - name: key
-                - name: metadata
-                - name: oib
-                - name: object
-                - name: page
-                - name: rid
-                - name: row_group
-                - name: xact
-            - name: mssql.instance_resource_lock_wait
-              description: Active lock requests that required the caller to wait
-              unit: lock
-              chart_type: line
-              dimensions:
-                - name: alloc_unit
-                - name: application
-                - name: database
-                - name: extent
-                - name: file
-                - name: hobt
-                - name: key
-                - name: metadata
-                - name: oib
-                - name: object
-                - name: page
-                - name: rid
-                - name: row_group
-                - name: xact
             - name: mssql.instance_blocked_processes
               description: Blocked processes
               unit: processes
               chart_type: line
               dimensions:
                 - name: blocked
+        - name: MSSQL Resource Locks
+          description: "TODO"
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: resource
+              description: "TODO: ???"
+          metrics:
+            - name: mssql.instance_resource_deadlocks
+              description: Active lock requests that resulted in deadlock per resource
+              unit: deadlock/s
+              chart_type: line
+              dimensions:
+                - name: locks
+            - name: mssql.instance_resource_lock_waits
+              description: Lock requests that required the caller to wait per resource
+              unit: lock/s
+              chart_type: line
+              dimensions:
+                - name: locks
         - name: MSSQL Waits
           description: "These metrics refer to the Microsoft SQL Server instances defined on the host and their associated wait events."
           labels:
@@ -1988,35 +1970,35 @@ modules:
               description: The instance name.
             - name: wait_type
               description: A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes.
-            - name: wait_type
-              description: Waits, which are occurrences where a worker thread is not actively processing a query but is instead waiting for a resource or event.
+            - name: wait_category
+              description: "TODO: ???"
           metrics:
-            - name: mssql.instance_total_wait
-              description: Number of waits on this wait type.
+            - name: mssql.instance_total_wait_time
+              description: Wait time for each wait type and category
               unit: ms
               chart_type: line
               dimensions:
-                - name: period
-            - name: mssql.instance_resource_wait
-              description: Time waiting for another resource.
+                - name: duration
+            - name: mssql.instance_resource_wait_time
+              description: Wait time for threads waiting on specific resource types for each wait type and category
               unit: ms
               chart_type: line
               dimensions:
-                - name: period
-            - name: mssql.instance_signal_wait
-              description: Difference between the time that the waiting thread was signaled and when it started running.
+                - name: duration
+            - name: mssql.instance_signal_wait_time
+              description: Delay between thread wakeup signal and actual execution start for each wait type and category
               unit: ms
               chart_type: line
               dimensions:
-                - name: period
-            - name: mssql.instance_max_wait
-              description: Maximum wait time on this wait type.
+                - name: duration
+            - name: mssql.instance_max_wait_time
+              description: Maximum wait time for each wait type and category
               unit: ms
               chart_type: line
               dimensions:
-                - name: period
-            - name: mssql.instance_waiting_count
-              description: Number of waits on this wait type.
+                - name: duration
+            - name: mssql.instance_waits
+              description: Number of waits for each wait type and category
               unit: waits/s
               chart_type: line
               dimensions:
@@ -3086,4 +3068,3 @@ modules:
                 - name: pause_pending
                 - name: paused
                 - name: unknown
-

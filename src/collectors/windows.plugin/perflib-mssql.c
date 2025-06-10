@@ -1614,9 +1614,9 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, struct mssql_lock_i
             id,
             NULL,
             "locks",
-            "mssql.instance_resource_lock_wait",
-            "Lock requests that required the caller to wait per resource.",
-            "locks",
+            "mssql.instance_resource_lock_waits",
+            "Lock requests that required the caller to wait per resource",
+            "locks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_LOCKS_WAIT,
@@ -1625,7 +1625,7 @@ void dict_mssql_locks_wait_charts(struct mssql_instance *mi, struct mssql_lock_i
 
         rrdlabels_add(mli->st_lockWait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mli->st_lockWait->rrdlabels, "resource", resource, RRDLABEL_SRC_AUTO);
-        mli->rd_lockWait = rrddim_add(mli->st_lockWait, "lock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_lockWait = rrddim_add(mli->st_lockWait, "locks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(mli->st_lockWait, mli->rd_lockWait, (collected_number)mli->lockWait.current.Data);
@@ -1645,8 +1645,8 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, struct mssql_lock_i
             NULL,
             "locks",
             "mssql.instance_resource_deadlocks",
-            "Active lock requests that resulted in deadlock per resource.",
-            "deadlocks",
+            "Active lock requests that resulted in deadlock per resource",
+            "deadlocks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_LOCKS_DEADLOCK_PER_RESOURCE,
@@ -1655,7 +1655,7 @@ void dict_mssql_dead_locks_charts(struct mssql_instance *mi, struct mssql_lock_i
 
         rrdlabels_add(mli->st_deadLocks->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mli->st_deadLocks->rrdlabels, "resource", resource, RRDLABEL_SRC_AUTO);
-        mli->rd_deadLocks = rrddim_add(mli->st_deadLocks, "deadlock", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_deadLocks = rrddim_add(mli->st_deadLocks, "deadlocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(mli->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
@@ -1717,8 +1717,8 @@ void mssql_total_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *m
             id,
             NULL,
             "locks",
-            "mssql.instance_total_wait",
-            "Total wait time for this wait type in milliseconds.",
+            "mssql.instance_total_wait_time",
+            "Wait time for each wait type and category",
             "ms",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
@@ -1729,7 +1729,7 @@ void mssql_total_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *m
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_total_wait->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
-        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mdw->rd_total_wait = rrddim_add(mdw->st_total_wait, "duration", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1750,8 +1750,8 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, struct mssql_db_waits
             id,
             NULL,
             "locks",
-            "mssql.instance_resource_wait",
-            "Time waiting for another resource.",
+            "mssql.instance_resource_wait_time",
+            "Wait time for threads waiting on specific resource types for each wait type and category",
             "ms",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
@@ -1763,7 +1763,7 @@ void mssql_resource_wait_charts(struct mssql_instance *mi, struct mssql_db_waits
         rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_resource_wait_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_resource_wait_msec =
-            rrddim_add(mdw->st_resource_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(mdw->st_resource_wait_msec, "duration", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1786,8 +1786,8 @@ void mssql_signal_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *
             id,
             NULL,
             "locks",
-            "mssql.instance_signal_wait",
-            "Difference between the time that the waiting thread was signaled and when it started running.",
+            "mssql.instance_signal_wait_time",
+            "Delay between thread wakeup signal and actual execution start for each wait type and category",
             "ms",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
@@ -1799,7 +1799,7 @@ void mssql_signal_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *
         rrdlabels_add(mdw->st_signal_wait_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_signal_wait_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_signal_wait_msec =
-            rrddim_add(mdw->st_signal_wait_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(mdw->st_signal_wait_msec, "duration", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1822,8 +1822,8 @@ void mssql_max_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *mdw
             id,
             NULL,
             "locks",
-            "mssql.instance_max_wait",
-            "Maximum wait time on specifc wait type.",
+            "mssql.instance_max_wait_time",
+            "Maximum wait time for each wait type and category",
             "ms",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
@@ -1835,7 +1835,7 @@ void mssql_max_wait_charts(struct mssql_instance *mi, struct mssql_db_waits *mdw
         rrdlabels_add(mdw->st_max_wait_time_msec->rrdlabels, "wait_type", mdw->wait_type, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdw->st_max_wait_time_msec->rrdlabels, "wait_category", mdw->wait_category, RRDLABEL_SRC_AUTO);
         mdw->rd_max_wait_time_msec =
-            rrddim_add(mdw->st_max_wait_time_msec, "period", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(mdw->st_max_wait_time_msec, "duration", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1858,8 +1858,8 @@ void mssql_waiting_count_charts(struct mssql_instance *mi, struct mssql_db_waits
             id,
             NULL,
             "locks",
-            "mssql.instance_waiting_count",
-            "Number of waits on this wait type.",
+            "mssql.instance_waits",
+            "Number of waits for each wait type and category",
             "waits/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
