@@ -26,6 +26,10 @@ func (c *Collector) collectProfiles(mx map[string]int64) error {
 
 	for _, pm := range profMetrics {
 		for _, m := range pm.Metrics {
+			if m.IsTable {
+				continue
+			}
+
 			seen[m.Name] = true
 			if !c.seenScalarMetrics[m.Name] {
 				c.seenScalarMetrics[m.Name] = true

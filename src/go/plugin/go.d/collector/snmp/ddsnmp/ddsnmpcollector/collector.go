@@ -31,14 +31,16 @@ type Metric struct {
 	MetricType  ddprofiledefinition.ProfileMetricType
 	Tags        map[string]string
 	Mappings    map[int64]string
+	IsTable     bool
 	Value       int64
 }
 
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
 	coll := &Collector{
-		log:        log.With(slog.String("ddsnmp", "collector")),
-		snmpClient: snmpClient,
-		profiles:   make(map[string]*profileState),
+		log:         log.With(slog.String("ddsnmp", "collector")),
+		snmpClient:  snmpClient,
+		profiles:    make(map[string]*profileState),
+		missingOIDs: make(map[string]bool),
 	}
 
 	for _, prof := range profiles {
@@ -51,9 +53,12 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 
 type (
 	Collector struct {
-		log        *logger.Logger
-		snmpClient gosnmp.Handler
-		profiles   map[string]*profileState
+		log         *logger.Logger
+		snmpClient  gosnmp.Handler
+		profiles    map[string]*profileState
+		missingOIDs map[string]bool
+
+		doTableMetrics bool
 	}
 	profileState struct {
 		profile        *ddsnmp.Profile
@@ -68,12 +73,11 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 	var errs []error
 
 	for _, prof := range c.profiles {
-		ms, err := c.collectProfile(prof)
-		if err != nil {
+		if ms, err := c.collectProfile(prof); err != nil {
 			errs = append(errs, err)
-			continue
+		} else if ms != nil {
+			metrics = append(metrics, ms)
 		}
-		metrics = append(metrics, ms)
 	}
 
 	if len(metrics) == 0 && len(errs) > 0 {
@@ -105,9 +109,20 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		ps.initialized = true
 	}
 
-	metrics, err := c.collectScalarMetrics(ps.profile)
+	var metrics []Metric
+
+	scalarMetrics, err := c.collectScalarMetrics(ps.profile)
 	if err != nil {
 		return nil, err
+	}
+	metrics = append(metrics, scalarMetrics...)
+
+	if c.doTableMetrics {
+		tableMetrics, err := c.collectTableMetrics(ps.profile)
+		if err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, tableMetrics...)
 	}
 
 	for _, m := range metrics {
@@ -131,17 +146,21 @@ func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {
 		if !ps.initialized {
 			continue
 		}
-		if res, ok := ps.profile.Definition.Metadata["device"]; ok {
-			if dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value; dt != "" && dv != "" {
-				for _, pm := range pms {
-					for i := range pm.Metrics {
-						m := &pm.Metrics[i]
-						m.Family = processMetricFamily(m.Family, dt, dv)
-					}
-				}
-				return
+		res, ok := ps.profile.Definition.Metadata["device"]
+		if !ok {
+			continue
+		}
+		dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value
+		if dt == "" || dv == "" {
+			continue
+		}
+		for _, pm := range pms {
+			for i := range pm.Metrics {
+				m := &pm.Metrics[i]
+				m.Family = processMetricFamily(m.Family, dt, dv)
 			}
 		}
+		return
 	}
 }
 
@@ -155,9 +174,11 @@ func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 		}
 
 		for _, pdu := range result.Variables {
-			if isPduWithData(pdu) {
-				pdus[trimOID(pdu.Name)] = pdu
+			if !isPduWithData(pdu) {
+				c.missingOIDs[trimOID(pdu.Name)] = true
+				continue
 			}
+			pdus[trimOID(pdu.Name)] = pdu
 		}
 	}
 

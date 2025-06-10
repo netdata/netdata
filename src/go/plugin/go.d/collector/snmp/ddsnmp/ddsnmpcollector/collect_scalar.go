@@ -17,15 +17,29 @@ import (
 
 func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
 	var oids []string
+	var missingOIDs []string
 
 	for _, m := range prof.Definition.Metrics {
-		if m.IsScalar() {
-			oids = append(oids, m.Symbol.OID)
+		if !m.IsScalar() {
+			continue
 		}
+		if c.missingOIDs[trimOID(m.Symbol.OID)] {
+			missingOIDs = append(missingOIDs, m.Symbol.OID)
+			continue
+		}
+		oids = append(oids, m.Symbol.OID)
+	}
+
+	if len(missingOIDs) > 0 {
+		c.log.Debugf("scalar metrics missing OIDs: %v", missingOIDs)
 	}
 
 	slices.Sort(oids)
 	oids = slices.Compact(oids)
+
+	if len(oids) == 0 {
+		return nil, nil
+	}
 
 	pdus, err := c.snmpGet(oids)
 	if err != nil {
