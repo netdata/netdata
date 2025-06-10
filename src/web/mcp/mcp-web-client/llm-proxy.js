@@ -48,6 +48,54 @@ const MODEL_CONTEXT_WINDOWS = {
   'gemini-pro-vision': 32760
 };
 
+// Model pricing per million tokens (MTok)
+// For Anthropic models: input, cacheWrite, cacheRead, output
+// For OpenAI models: input, cacheRead, output
+// For others: input, output
+const MODEL_PRICING = {
+  // OpenAI
+  'gpt-4o': { input: 2.00, cacheRead: 0.50, output: 8.00 },
+  'gpt-4o-mini': { input: 0.40, cacheRead: 0.10, output: 1.60 },
+  'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'gpt-4-turbo-preview': { input: 10.00, output: 30.00 },
+  'gpt-4': { input: 30.00, output: 60.00 },
+  'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
+  'gpt-3.5-turbo-16k': { input: 3.00, output: 4.00 },
+  
+  // Anthropic - Claude Opus 4
+  'claude-opus-4-20250514': { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 },
+  
+  // Anthropic - Claude Sonnet 4
+  'claude-sonnet-4-20250514': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
+  
+  // Anthropic - Claude Sonnet 3.7
+  'claude-3-7-sonnet-20250219': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
+  
+  // Anthropic - Claude Haiku 3.5
+  'claude-3-5-haiku-20241022': { input: 0.80, cacheWrite: 1.00, cacheRead: 0.08, output: 4.00 },
+  
+  // Anthropic - Claude Sonnet 3.5
+  'claude-3-5-sonnet-20241022': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
+  'claude-3-5-sonnet-20240620': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
+  
+  // Anthropic - Claude Opus 3
+  'claude-3-opus-20240229': { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 },
+  
+  // Anthropic - Claude Sonnet 3
+  'claude-3-sonnet-20240229': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
+  
+  // Anthropic - Claude Haiku 3
+  'claude-3-haiku-20240307': { input: 0.25, cacheWrite: 0.30, cacheRead: 0.03, output: 1.25 },
+  
+  // Google Gemini
+  'gemini-2.0-flash-exp': { input: 0.00, output: 0.00 }, // Free experimental
+  'gemini-2.0-flash-thinking-exp': { input: 0.00, output: 0.00 }, // Free experimental
+  'gemini-1.5-pro': { input: 1.25, output: 5.00 },
+  'gemini-1.5-flash': { input: 0.075, output: 0.30 },
+  'gemini-pro': { input: 0.50, output: 1.50 },
+  'gemini-pro-vision': { input: 0.50, output: 1.50 }
+};
+
 const DEFAULT_CONFIG = {
   port: 8081,
   allowedOrigins: '*',
@@ -55,38 +103,38 @@ const DEFAULT_CONFIG = {
     openai: {
       apiKey: '',
       models: [
-        { id: 'gpt-4o', contextWindow: 128000 },
-        { id: 'gpt-4o-mini', contextWindow: 128000 },
-        { id: 'gpt-4-turbo', contextWindow: 128000 },
-        { id: 'gpt-4-turbo-preview', contextWindow: 128000 },
-        { id: 'gpt-4', contextWindow: 8192 },
-        { id: 'gpt-3.5-turbo', contextWindow: 16384 },
-        { id: 'gpt-3.5-turbo-16k', contextWindow: 16384 }
+        { id: 'gpt-4o', contextWindow: 128000, pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } },
+        { id: 'gpt-4o-mini', contextWindow: 128000, pricing: { input: 0.40, cacheRead: 0.10, output: 1.60 } },
+        { id: 'gpt-4-turbo', contextWindow: 128000, pricing: { input: 10.00, output: 30.00 } },
+        { id: 'gpt-4-turbo-preview', contextWindow: 128000, pricing: { input: 10.00, output: 30.00 } },
+        { id: 'gpt-4', contextWindow: 8192, pricing: { input: 30.00, output: 60.00 } },
+        { id: 'gpt-3.5-turbo', contextWindow: 16384, pricing: { input: 0.50, output: 1.50 } },
+        { id: 'gpt-3.5-turbo-16k', contextWindow: 16384, pricing: { input: 3.00, output: 4.00 } }
       ]
     },
     anthropic: {
       apiKey: '',
       models: [
-        { id: 'claude-opus-4-20250514', contextWindow: 200000 },
-        { id: 'claude-sonnet-4-20250514', contextWindow: 200000 },
-        { id: 'claude-3-7-sonnet-20250219', contextWindow: 200000 },
-        { id: 'claude-3-5-haiku-20241022', contextWindow: 200000 },
-        { id: 'claude-3-5-sonnet-20241022', contextWindow: 200000 },
-        { id: 'claude-3-5-sonnet-20240620', contextWindow: 200000 },
-        { id: 'claude-3-opus-20240229', contextWindow: 200000 },
-        { id: 'claude-3-sonnet-20240229', contextWindow: 200000 },
-        { id: 'claude-3-haiku-20240307', contextWindow: 200000 }
+        { id: 'claude-opus-4-20250514', contextWindow: 200000, pricing: { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 } },
+        { id: 'claude-sonnet-4-20250514', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
+        { id: 'claude-3-7-sonnet-20250219', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
+        { id: 'claude-3-5-haiku-20241022', contextWindow: 200000, pricing: { input: 0.80, cacheWrite: 1.00, cacheRead: 0.08, output: 4.00 } },
+        { id: 'claude-3-5-sonnet-20241022', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
+        { id: 'claude-3-5-sonnet-20240620', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
+        { id: 'claude-3-opus-20240229', contextWindow: 200000, pricing: { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 } },
+        { id: 'claude-3-sonnet-20240229', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
+        { id: 'claude-3-haiku-20240307', contextWindow: 200000, pricing: { input: 0.25, cacheWrite: 0.30, cacheRead: 0.03, output: 1.25 } }
       ]
     },
     google: {
       apiKey: '',
       models: [
-        { id: 'gemini-2.0-flash-exp', contextWindow: 1000000 },
-        { id: 'gemini-2.0-flash-thinking-exp', contextWindow: 1000000 },
-        { id: 'gemini-1.5-pro', contextWindow: 2000000 },
-        { id: 'gemini-1.5-flash', contextWindow: 1000000 },
-        { id: 'gemini-pro', contextWindow: 32760 },
-        { id: 'gemini-pro-vision', contextWindow: 32760 }
+        { id: 'gemini-2.0-flash-exp', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
+        { id: 'gemini-2.0-flash-thinking-exp', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
+        { id: 'gemini-1.5-pro', contextWindow: 2000000, pricing: { input: 1.25, output: 5.00 } },
+        { id: 'gemini-1.5-flash', contextWindow: 1000000, pricing: { input: 0.075, output: 0.30 } },
+        { id: 'gemini-pro', contextWindow: 32760, pricing: { input: 0.50, output: 1.50 } },
+        { id: 'gemini-pro-vision', contextWindow: 32760, pricing: { input: 0.50, output: 1.50 } }
       ]
     }
   }
@@ -132,7 +180,12 @@ function loadConfig() {
     console.log('      - OpenAI: Add your API key starting with "sk-"');
     console.log('      - Anthropic: Add your API key starting with "sk-ant-"');
     console.log('      - Google: Add your API key for Gemini');
-    console.log('   3. Save the file and restart this server');
+    console.log('   3. Customize pricing if needed (prices are per million tokens):');
+    console.log('      - input: Regular input token cost');
+    console.log('      - cacheRead: Cached input token cost (discounted)');
+    console.log('      - cacheWrite: Cache creation cost (Anthropic only, 25% surcharge)');
+    console.log('      - output: Output token cost');
+    console.log('   4. Save the file and restart this server');
     console.log('\n💡 Tip: You can use any text editor to edit the configuration file');
     console.log('   Example: nano ' + CONFIG_FILE);
     console.log('\n');
@@ -335,6 +388,7 @@ if (process.argv.includes('--update-config')) {
     console.log('   • Custom models: Preserved');
     console.log('   • Latest model definitions: Added');
     console.log('   • Context window sizes: Updated');
+    console.log('   • Pricing information: Added/Updated');
     
     // Count total models
     let totalModels = 0;
@@ -392,19 +446,18 @@ const server = http.createServer(async (req, res) => {
         availableProviders[provider] = {
           models: (providerConfig.models || []).map(model => {
             // Handle both string format (backward compatibility) and object format
-            if (typeof model === 'string') {
-              return {
-                id: model,
-                contextWindow: MODEL_CONTEXT_WINDOWS[model] || 4096
-              };
-            } else if (model.id) {
-              // Already in object format with contextWindow
-              return {
-                id: model.id,
-                contextWindow: model.contextWindow || MODEL_CONTEXT_WINDOWS[model.id] || 4096
-              };
-            }
-            return null;
+            const modelId = typeof model === 'string' ? model : model.id;
+            if (!modelId) return null;
+            
+            return {
+              id: modelId,
+              contextWindow: (typeof model === 'object' && model.contextWindow) 
+                ? model.contextWindow 
+                : MODEL_CONTEXT_WINDOWS[modelId] || 4096,
+              pricing: (typeof model === 'object' && model.pricing) 
+                ? model.pricing 
+                : MODEL_PRICING[modelId] || null
+            };
           }).filter(Boolean)
         };
       }

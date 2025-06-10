@@ -70,13 +70,14 @@
                                 </div>
                                 
                                 <!-- Cumulative Token Counters -->
-                                <div class="token-counters-section" id="tokenCounters" data-tooltip="Total tokens used across all messages in this chat">
+                                <div class="token-counters-section" id="tokenCounters">
                                     <div class="token-counters-headers">
                                         <span class="token-header-primary">TOKENS</span>
-                                        <span class="token-header-item"><i class="fas fa-file-alt"></i> REGULAR</span>
-                                        <span class="token-header-item"><i class="fas fa-memory"></i> CACHED</span>
-                                        <span class="token-header-item"><i class="fas fa-save"></i> UPDATED</span>
+                                        <span class="token-header-item"><i class="fas fa-file-alt"></i> INPUT</span>
+                                        <span class="token-header-item"><i class="fas fa-memory"></i> CACHE R</span>
+                                        <span class="token-header-item"><i class="fas fa-save"></i> CACHE W</span>
                                         <span class="token-header-item"><i class="fas fa-upload"></i> OUTPUT</span>
+                                        <span class="token-header-item"><i class="fas fa-dollar-sign"></i> COST</span>
                                     </div>
                                     <div class="token-counters-values">
                                         <span class="token-value-primary">PRIMARY</span>
@@ -84,6 +85,7 @@
                                         <span id="cumulativeCacheReadTokens" class="token-value-item">0</span>
                                         <span id="cumulativeCacheCreationTokens" class="token-value-item">0</span>
                                         <span id="cumulativeOutputTokens" class="token-value-item">0</span>
+                                        <span id="cumulativeCost" class="token-value-item" style="color: #4CAF50;">$0.00</span>
                                     </div>
                                 </div>
                             </div>

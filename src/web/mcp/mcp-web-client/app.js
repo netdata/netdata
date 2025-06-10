@@ -16,80 +16,11 @@ class NetdataMCPChat {
         this.shouldStopProcessing = false; // Flag to stop processing between requests
         this.isProcessing = false; // Track if we're currently processing messages
         this.pendingSaveTimeout = null; // Debounce saves for performance
+        this.modelPricing = {}; // Initialize model pricing storage
+        this.modelLimits = {}; // Initialize model context limits storage
         
-        // Single source of truth for all model information
-        this.models = {
-            openai: [
-                // Currently available reasoning models
-                { value: 'o1-preview', text: 'o1 Preview (Reasoning)', category: 'reasoning', contextLimit: 128000 },
-                { value: 'o1-mini', text: 'o1 Mini (Reasoning)', category: 'reasoning', contextLimit: 128000 },
-                // GPT-4o series (Multimodal)
-                { value: 'gpt-4o', text: 'GPT-4o (Latest)', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4o-2024-11-20', text: 'GPT-4o (2024-11-20)', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4o-2024-08-06', text: 'GPT-4o (2024-08-06)', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4o-2024-05-13', text: 'GPT-4o (2024-05-13)', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4o-mini', text: 'GPT-4o Mini', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4o-mini-2024-07-18', text: 'GPT-4o Mini (2024-07-18)', category: 'gpt-4', contextLimit: 128000 },
-                // GPT-4 Turbo
-                { value: 'gpt-4-turbo', text: 'GPT-4 Turbo', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4-turbo-2024-04-09', text: 'GPT-4 Turbo (2024-04-09)', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4-turbo-preview', text: 'GPT-4 Turbo Preview', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4-0125-preview', text: 'GPT-4 (0125 Preview)', category: 'gpt-4', contextLimit: 128000 },
-                { value: 'gpt-4-1106-preview', text: 'GPT-4 (1106 Preview)', category: 'gpt-4', contextLimit: 128000 },
-                // Standard GPT-4
-                { value: 'gpt-4', text: 'GPT-4', category: 'gpt-4', contextLimit: 8192 },
-                { value: 'gpt-4-0613', text: 'GPT-4 (0613)', category: 'gpt-4', contextLimit: 8192 },
-                // GPT-3.5
-                { value: 'gpt-3.5-turbo', text: 'GPT-3.5 Turbo', category: 'gpt-3.5', contextLimit: 16385 },
-                { value: 'gpt-3.5-turbo-0125', text: 'GPT-3.5 Turbo (0125)', category: 'gpt-3.5', contextLimit: 16385 },
-                { value: 'gpt-3.5-turbo-1106', text: 'GPT-3.5 Turbo (1106)', category: 'gpt-3.5', contextLimit: 16385 }
-            ],
-            anthropic: [
-                // Claude 4 series (Latest - May 2025)
-                { value: 'claude-opus-4-20250514', text: 'Claude Opus 4', category: 'claude-4', contextLimit: 200000 },
-                { value: 'claude-sonnet-4-20250514', text: 'Claude Sonnet 4', category: 'claude-4', contextLimit: 200000 },
-                // Claude 3.7
-                { value: 'claude-3-7-sonnet-20250219', text: 'Claude 3.7 Sonnet', category: 'claude-3.7', contextLimit: 200000 },
-                { value: 'claude-3-7-sonnet-latest', text: 'Claude 3.7 Sonnet (Latest alias)', category: 'claude-3.7', contextLimit: 200000 },
-                // Claude 3.5 series
-                { value: 'claude-3-5-sonnet-20241022', text: 'Claude 3.5 Sonnet v2', category: 'claude-3.5', contextLimit: 200000 },
-                { value: 'claude-3-5-sonnet-latest', text: 'Claude 3.5 Sonnet (Latest alias)', category: 'claude-3.5', contextLimit: 200000 },
-                { value: 'claude-3-5-sonnet-20240620', text: 'Claude 3.5 Sonnet v1', category: 'claude-3.5', contextLimit: 200000 },
-                { value: 'claude-3-5-haiku-20241022', text: 'Claude 3.5 Haiku', category: 'claude-3.5', contextLimit: 200000 },
-                { value: 'claude-3-5-haiku-latest', text: 'Claude 3.5 Haiku (Latest alias)', category: 'claude-3.5', contextLimit: 200000 },
-                // Claude 3 series
-                { value: 'claude-3-opus-20240229', text: 'Claude 3 Opus', category: 'claude-3', contextLimit: 200000 },
-                { value: 'claude-3-opus-latest', text: 'Claude 3 Opus (Latest alias)', category: 'claude-3', contextLimit: 200000 },
-                { value: 'claude-3-sonnet-20240229', text: 'Claude 3 Sonnet', category: 'claude-3', contextLimit: 200000 },
-                { value: 'claude-3-haiku-20240307', text: 'Claude 3 Haiku', category: 'claude-3', contextLimit: 200000 }
-            ],
-            google: [
-                // Gemini 1.5 series (Currently available)
-                { value: 'gemini-1.5-pro', text: 'Gemini 1.5 Pro', category: 'current', contextLimit: 2000000 },
-                { value: 'gemini-1.5-pro-latest', text: 'Gemini 1.5 Pro Latest', category: 'current', contextLimit: 2000000 },
-                { value: 'gemini-1.5-pro-002', text: 'Gemini 1.5 Pro 002', category: 'current', contextLimit: 2000000 },
-                { value: 'gemini-1.5-pro-001', text: 'Gemini 1.5 Pro 001', category: 'current', contextLimit: 2000000 },
-                { value: 'gemini-1.5-flash', text: 'Gemini 1.5 Flash', category: 'current', contextLimit: 1000000 },
-                { value: 'gemini-1.5-flash-latest', text: 'Gemini 1.5 Flash Latest', category: 'current', contextLimit: 1000000 },
-                { value: 'gemini-1.5-flash-002', text: 'Gemini 1.5 Flash 002', category: 'current', contextLimit: 1000000 },
-                { value: 'gemini-1.5-flash-001', text: 'Gemini 1.5 Flash 001', category: 'current', contextLimit: 1000000 },
-                { value: 'gemini-1.5-flash-8b', text: 'Gemini 1.5 Flash 8B', category: 'current', contextLimit: 1000000 },
-                { value: 'gemini-1.5-flash-8b-latest', text: 'Gemini 1.5 Flash 8B Latest', category: 'current', contextLimit: 1000000 },
-                // Gemini 1.0 (Legacy)
-                { value: 'gemini-1.0-pro', text: 'Gemini 1.0 Pro', category: 'legacy', contextLimit: 32768 },
-                { value: 'gemini-1.0-pro-latest', text: 'Gemini 1.0 Pro Latest', category: 'legacy', contextLimit: 32768 },
-                { value: 'gemini-1.0-pro-001', text: 'Gemini 1.0 Pro 001', category: 'legacy', contextLimit: 32768 },
-                { value: 'gemini-pro', text: 'Gemini Pro (Legacy)', category: 'legacy', contextLimit: 32768 }
-            ]
-        };
-        
-        // Build modelLimits from the models data for backwards compatibility
-        this.modelLimits = {};
-        for (const provider in this.models) {
-            for (const model of this.models[provider]) {
-                this.modelLimits[model.value] = model.contextLimit;
-            }
-        }
+        // Models will be loaded dynamically from the proxy server
+        // No hardcoded model list needed
         
         // Default system prompt
         this.defaultSystemPrompt = `You are the Netdata assistant, with access to Netdata monitoring data via your tools. 
@@ -145,8 +76,17 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         this.initializeDefaultLLMProvider();
         this.initializeDefaultMCPServer();
         
+        // Track if user has interacted with chat selection
+        this.userHasSelectedChat = false;
+        
         // After all initialization, create default chat if needed
-        setTimeout(() => this.createDefaultChatIfNeeded(), 100);
+        // Use a longer timeout to give user time to select a chat
+        this.defaultChatTimeout = setTimeout(() => {
+            // Only create default chat if user hasn't selected one
+            if (!this.userHasSelectedChat && !this.currentChatId) {
+                this.createDefaultChatIfNeeded();
+            }
+        }, 500); // Increased from 100ms to 500ms
     }
     
     /**
@@ -177,8 +117,20 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const chat = this.chats.get(chatId);
         if (!chat) return;
         
+        // Calculate and add price to message if it has token usage
+        if (message.usage && message.model) {
+            const price = this.calculateMessagePrice(message.model, message.usage);
+            if (price !== null) {
+                message.price = price;
+            }
+        }
+        
         chat.messages.push(message);
         chat.updatedAt = new Date().toISOString();
+        
+        // Update cumulative token pricing
+        this.updateChatTokenPricing(chat);
+        
         this.autoSave();
     }
     
@@ -233,24 +185,222 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         }, 100); // 100ms debounce
     }
     
-    // Get available models for a provider type
+    // Get available models for a provider type from the current LLM provider
     getModelsForProviderType(providerType) {
-        // Use the single source of truth for models
-        return this.models[providerType] || [];
+        // Get models from the first available LLM provider (usually there's only one)
+        const provider = Array.from(this.llmProviders.values())[0];
+        if (!provider || !provider.availableProviders || !provider.availableProviders[providerType]) {
+            return [];
+        }
+        
+        // Convert models to the expected format
+        const models = provider.availableProviders[providerType].models || [];
+        return models.map(model => {
+            if (typeof model === 'string') {
+                return {
+                    value: model,
+                    text: model,
+                    contextLimit: this.modelLimits[model] || 4096
+                };
+            } else if (typeof model === 'object' && model.id) {
+                return {
+                    value: model.id,
+                    text: model.id,
+                    contextLimit: model.contextWindow || this.modelLimits[model.id] || 4096
+                };
+            }
+            return null;
+        }).filter(Boolean);
     }
     
-    // Get model info by model ID
+    // Get model info by model ID from dynamic provider data
     getModelInfo(modelId) {
         if (!modelId) return null;
         
-        // Search through all providers
-        for (const [provider, models] of Object.entries(this.models)) {
-            const model = models.find(m => m.value === modelId);
-            if (model) {
-                return model;
+        // Search through all LLM providers' available models
+        for (const provider of this.llmProviders.values()) {
+            if (!provider.availableProviders) continue;
+            
+            for (const [providerType, config] of Object.entries(provider.availableProviders)) {
+                if (!config.models) continue;
+                
+                for (const model of config.models) {
+                    const id = typeof model === 'string' ? model : model.id;
+                    if (id === modelId) {
+                        return {
+                            value: id,
+                            text: id,
+                            contextLimit: (typeof model === 'object' && model.contextWindow) 
+                                ? model.contextWindow 
+                                : this.modelLimits[id] || 4096
+                        };
+                    }
+                }
             }
         }
         return null;
+    }
+
+    // Calculate price for a single message based on its model and usage
+    calculateMessagePrice(model, usage) {
+        if (!usage || !model) return null;
+        
+        // Extract model name from format "provider:model-name"
+        let modelName = model;
+        if (modelName.includes(':')) {
+            modelName = modelName.split(':')[1];
+        }
+        
+        const pricing = this.modelPricing[modelName];
+        if (!pricing) return null;
+        
+        let totalCost = 0;
+        
+        const promptTokens = usage.promptTokens || 0;
+        const completionTokens = usage.completionTokens || 0;
+        const cacheReadTokens = usage.cacheReadInputTokens || 0;
+        const cacheCreationTokens = usage.cacheCreationInputTokens || 0;
+        
+        // For Anthropic models with cache pricing
+        if (pricing.cacheWrite !== undefined && pricing.cacheRead !== undefined) {
+            totalCost += (promptTokens / 1_000_000) * pricing.input;
+            totalCost += (cacheReadTokens / 1_000_000) * pricing.cacheRead;
+            totalCost += (cacheCreationTokens / 1_000_000) * pricing.cacheWrite;
+            totalCost += (completionTokens / 1_000_000) * pricing.output;
+        }
+        // For OpenAI models with cache pricing
+        else if (pricing.cacheRead !== undefined) {
+            const cachedInputTokens = cacheReadTokens + cacheCreationTokens;
+            totalCost += (promptTokens / 1_000_000) * pricing.input;
+            totalCost += (cachedInputTokens / 1_000_000) * pricing.cacheRead;
+            totalCost += (completionTokens / 1_000_000) * pricing.output;
+        }
+        // For models without cache pricing
+        else {
+            const allInputTokens = promptTokens + cacheReadTokens + cacheCreationTokens;
+            totalCost += (allInputTokens / 1_000_000) * pricing.input;
+            totalCost += (completionTokens / 1_000_000) * pricing.output;
+        }
+        
+        return totalCost;
+    }
+
+    // Update the chat's cumulative token pricing
+    updateChatTokenPricing(chat) {
+        // Initialize if not present
+        if (!chat.totalTokensPrice) {
+            chat.totalTokensPrice = {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheCreation: 0,
+                totalCost: 0
+            };
+        }
+        
+        if (!chat.perModelTokensPrice) {
+            chat.perModelTokensPrice = {};
+        }
+        
+        // Reset totals
+        chat.totalTokensPrice = {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheCreation: 0,
+            totalCost: 0
+        };
+        chat.perModelTokensPrice = {};
+        
+        // Calculate from all messages
+        for (const message of chat.messages) {
+            if (message.usage) {
+                const model = message.model || chat.model; // Fallback to chat model for old messages
+                if (!model) continue;
+                
+                // Update total tokens
+                chat.totalTokensPrice.input += message.usage.promptTokens || 0;
+                chat.totalTokensPrice.output += message.usage.completionTokens || 0;
+                chat.totalTokensPrice.cacheRead += message.usage.cacheReadInputTokens || 0;
+                chat.totalTokensPrice.cacheCreation += message.usage.cacheCreationInputTokens || 0;
+                
+                // Update per-model tokens
+                if (!chat.perModelTokensPrice[model]) {
+                    chat.perModelTokensPrice[model] = {
+                        input: 0,
+                        output: 0,
+                        cacheRead: 0,
+                        cacheCreation: 0,
+                        totalCost: 0
+                    };
+                }
+                
+                chat.perModelTokensPrice[model].input += message.usage.promptTokens || 0;
+                chat.perModelTokensPrice[model].output += message.usage.completionTokens || 0;
+                chat.perModelTokensPrice[model].cacheRead += message.usage.cacheReadInputTokens || 0;
+                chat.perModelTokensPrice[model].cacheCreation += message.usage.cacheCreationInputTokens || 0;
+                
+                // Add price if available
+                if (message.price !== undefined) {
+                    chat.totalTokensPrice.totalCost += message.price;
+                    chat.perModelTokensPrice[model].totalCost += message.price;
+                }
+            }
+            
+            // Handle accounting nodes
+            if (message.role === 'accounting' && message.cumulativeTokens) {
+                // Add the preserved tokens from accounting node
+                chat.totalTokensPrice.input += message.cumulativeTokens.inputTokens || 0;
+                chat.totalTokensPrice.output += message.cumulativeTokens.outputTokens || 0;
+                chat.totalTokensPrice.cacheRead += message.cumulativeTokens.cacheReadTokens || 0;
+                chat.totalTokensPrice.cacheCreation += message.cumulativeTokens.cacheCreationTokens || 0;
+                
+                // Note: We can't attribute accounting node tokens to specific models
+                // They represent aggregated tokens from deleted messages
+            }
+        }
+    }
+
+    // Migrate old chat data to include token pricing
+    migrateTokenPricing(chat) {
+        // Initialize structures if not present
+        if (!chat.totalTokensPrice) {
+            chat.totalTokensPrice = {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheCreation: 0,
+                totalCost: 0
+            };
+        }
+        
+        if (!chat.perModelTokensPrice) {
+            chat.perModelTokensPrice = {};
+        }
+        
+        // Process all messages to calculate prices
+        for (const message of chat.messages) {
+            if (message.usage && !message.price) {
+                // Add model if missing (use chat's model as fallback)
+                if (!message.model) {
+                    message.model = chat.model;
+                }
+                
+                // Calculate price
+                if (message.model) {
+                    const price = this.calculateMessagePrice(message.model, message.usage);
+                    if (price !== null) {
+                        message.price = price;
+                    }
+                }
+            }
+        }
+        
+        // Recalculate cumulative pricing
+        this.updateChatTokenPricing(chat);
+        
+        // Save the migrated data
+        this.saveSettings();
     }
 
     initializeUI() {
@@ -602,6 +752,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         if (!provider || !provider.availableProviders) return;
         
         this.llmModelDropdown.innerHTML = '';
+        this.llmModelDropdown.style.width = '600px'; // Make dropdown wider for pricing table with 4 columns
         
         // Add models from all available providers
         Object.entries(provider.availableProviders).forEach(([providerType, config]) => {
@@ -611,12 +762,51 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             header.textContent = providerType.charAt(0).toUpperCase() + providerType.slice(1);
             this.llmModelDropdown.appendChild(header);
             
+            // Add table header for pricing
+            const tableHeader = document.createElement('div');
+            tableHeader.style.cssText = 'display: flex; padding: 5px 10px; font-size: 11px; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color);';
+            tableHeader.innerHTML = `
+                <div style="flex: 1;">Model</div>
+                <div style="width: 70px; text-align: right;">Input</div>
+                <div style="width: 70px; text-align: right;">Cache R</div>
+                <div style="width: 70px; text-align: right;">Cache W</div>
+                <div style="width: 70px; text-align: right;">Output</div>
+            `;
+            this.llmModelDropdown.appendChild(tableHeader);
+            
             // Add models
             config.models.forEach(model => {
                 const modelId = typeof model === 'string' ? model : model.id;
+                // Get pricing from the model object itself or from this.modelPricing
+                const pricing = (typeof model === 'object' && model.pricing) ? model.pricing : this.modelPricing[modelId];
+                
                 const item = document.createElement('button');
                 item.className = 'dropdown-item';
-                item.textContent = modelId;
+                item.style.cssText = 'display: flex; align-items: center; padding: 8px 10px; width: 100%; text-align: left;';
+                
+                // Build pricing display
+                let pricingHTML = `<div style="flex: 1; font-weight: 500;">${modelId}</div>`;
+                
+                if (pricing) {
+                    const formatPrice = (price) => price !== undefined && price !== null ? `$${price.toFixed(2)}` : 'N/A';
+                    
+                    // Input price
+                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.input)}</div>`;
+                    
+                    // Cache read price
+                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.cacheRead)}</div>`;
+                    
+                    // Cache write price (Anthropic only)
+                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.cacheWrite)}</div>`;
+                    
+                    // Output price
+                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.output)}</div>`;
+                } else {
+                    // No pricing info
+                    pricingHTML += `<div style="width: 280px; text-align: right; font-size: 12px; color: var(--text-tertiary); font-style: italic;">No pricing data</div>`;
+                }
+                
+                item.innerHTML = pricingHTML;
                 
                 // Mark active model
                 if (chat.model === `${providerType}:${modelId}`) {
@@ -710,6 +900,9 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         // Update context window indicator
         const { totalTokens } = this.getTokenUsageForChat(this.currentChatId);
         this.updateContextWindowIndicator(totalTokens, newModel);
+        
+        // Update all token displays including cost
+        this.updateAllTokenDisplays();
         
         // Save as default for new chats
         const lastConfig = localStorage.getItem('lastChatConfig');
@@ -1396,39 +1589,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             }
         }
         
-        // Load LLM providers (proxy configurations)
-        const savedLlmProviders = localStorage.getItem('llmProviders');
-        if (savedLlmProviders) {
-            try {
-                const providers = JSON.parse(savedLlmProviders);
-                providers.forEach(p => {
-                    const provider = {
-                        id: p.id,
-                        name: p.name,
-                        proxyUrl: p.proxyUrl,
-                        availableProviders: p.availableProviders,
-                        onLog: (logEntry) => this.addLogEntry(p.name, logEntry)
-                    };
-                    this.llmProviders.set(p.id, provider);
-                    
-                    // Populate modelLimits from available providers
-                    if (p.availableProviders) {
-                        Object.entries(p.availableProviders).forEach(([providerType, config]) => {
-                            if (config.models) {
-                                config.models.forEach(model => {
-                                    if (typeof model === 'object' && model.id && model.contextWindow) {
-                                        this.modelLimits[model.id] = model.contextWindow;
-                                    }
-                                });
-                            }
-                        });
-                    }
-                });
-                this.updateLlmProvidersList();
-            } catch (e) {
-                console.error('Failed to load LLM providers:', e);
-            }
-        }
+        // LLM providers will be fetched from proxy on demand
         
         // Load chats
         const savedChats = localStorage.getItem('chats');
@@ -1503,13 +1664,14 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     async initializeDefaultLLMProvider() {
+        // Always fetch models even if we have providers (to get fresh model list)
         // Check if we already have LLM providers
-        if (this.llmProviders.size > 0) {
-            return;
-        }
+        const hasProviders = this.llmProviders.size > 0;
 
         // Auto-detect the proxy URL from the current origin
         const proxyUrl = window.location.origin;
+        
+        console.log('Fetching models from:', `${proxyUrl}/models`);
         
         try {
             // Fetch available models from the same origin
@@ -1521,40 +1683,64 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
             const data = await response.json();
             const providers = data.providers || {};
             
+            console.log('Received providers data from proxy:', providers);
+            
             if (Object.keys(providers).length === 0) {
                 console.warn('No LLM providers configured in proxy');
                 this.showNoModelsModal(proxyUrl);
                 return;
             }
             
-            // Create the default LLM provider
-            const providerId = 'default_llm_provider';
-            const provider = {
-                id: providerId,
-                name: 'Local LLM Proxy',
-                proxyUrl: proxyUrl,
-                availableProviders: providers,
-                onLog: (logEntry) => this.addLogEntry('Local LLM Proxy', logEntry)
-            };
+            // Update availableProviders for all existing providers with the same proxyUrl
+            let updated = false;
+            for (const [id, provider] of this.llmProviders) {
+                if (provider.proxyUrl === proxyUrl) {
+                    provider.availableProviders = providers;
+                    updated = true;
+                }
+            }
             
-            // Populate modelLimits from available providers
+            // If no existing provider, create a new one
+            if (!updated) {
+                const providerId = 'default_llm_provider';
+                const provider = {
+                    id: providerId,
+                    name: 'Local LLM Proxy',
+                    proxyUrl: proxyUrl,
+                    availableProviders: providers,
+                    onLog: (logEntry) => this.addLogEntry('Local LLM Proxy', logEntry)
+                };
+                this.llmProviders.set(providerId, provider);
+            }
+            
+            // Always populate modelLimits and pricing from fresh data
+            this.modelPricing = {};
             Object.entries(providers).forEach(([providerType, config]) => {
                 if (config.models) {
                     config.models.forEach(model => {
-                        if (typeof model === 'object' && model.id && model.contextWindow) {
-                            this.modelLimits[model.id] = model.contextWindow;
+                        if (typeof model === 'object' && model.id) {
+                            if (model.contextWindow) {
+                                this.modelLimits[model.id] = model.contextWindow;
+                            }
+                            if (model.pricing) {
+                                this.modelPricing[model.id] = model.pricing;
+                            }
                         }
                     });
                 }
             });
             
-            this.llmProviders.set(providerId, provider);
             this.saveSettings();
             this.updateLlmProvidersList();
             this.updateNewChatSelectors();
             
             // Validate all existing chats have valid models
             this.validateChatModels();
+            
+            // Update token displays for the current chat now that pricing is loaded
+            if (this.currentChatId) {
+                this.updateAllTokenDisplays();
+            }
             
             this.addLogEntry('SYSTEM', {
                 timestamp: new Date().toISOString(),
@@ -1704,14 +1890,7 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
         const serversToSave = Array.from(this.mcpServers.values());
         localStorage.setItem('mcpServers', JSON.stringify(serversToSave));
         
-        // Save LLM providers (proxy configurations only, no API keys)
-        const providersToSave = Array.from(this.llmProviders.entries()).map(([id, provider]) => ({
-            id: id,
-            name: provider.name,
-            proxyUrl: provider.proxyUrl,
-            availableProviders: provider.availableProviders
-        }));
-        localStorage.setItem('llmProviders', JSON.stringify(providersToSave));
+        // Don't save LLM providers - always fetch fresh from proxy
         
         // Save only chats that have been marked as saved
         const chatsToSave = Array.from(this.chats.values()).filter(chat => chat.isSaved !== false);
@@ -1988,85 +2167,13 @@ CRITICAL: Never skip the <thinking> section. Even for simple queries, show your 
     }
 
     updateNewChatSelectors() {
-        // Update MCP server selector
-        this.newChatMcpServer.innerHTML = '<option value="">Select MCP Server</option>';
-        for (const [id, server] of this.mcpServers) {
-            const option = document.createElement('option');
-            option.value = id;
-            option.textContent = server.name;
-            this.newChatMcpServer.appendChild(option);
-        }
-        
-        // Update LLM provider selector
-        this.newChatLlmProvider.innerHTML = '<option value="">Select LLM Provider</option>';
-        for (const [id, provider] of this.llmProviders) {
-            const option = document.createElement('option');
-            option.value = id;
-            option.textContent = provider.name;
-            this.newChatLlmProvider.appendChild(option);
-        }
-        
-        // Reset model selector
-        this.newChatModelGroup.style.display = 'none';
-        this.newChatModel.innerHTML = '<option value="">Select Model</option>';
-        
-        // If only one MCP server, auto-select it
-        if (this.mcpServers.size === 1) {
-            const [id] = this.mcpServers.keys();
-            this.newChatMcpServer.value = id;
-        }
-        
-        // If only one LLM provider, auto-select it and load models
-        if (this.llmProviders.size === 1) {
-            const [id] = this.llmProviders.keys();
-            this.newChatLlmProvider.value = id;
-            // Trigger model update
-            this.updateNewChatModels();
-        }
+        // This function is no longer needed since we create chats directly
+        // The New Chat Modal has been removed
     }
     
     updateNewChatModels() {
-        const providerId = this.newChatLlmProvider.value;
-        if (!providerId) {
-            this.newChatModelGroup.style.display = 'none';
-            return;
-        }
-        
-        const provider = this.llmProviders.get(providerId);
-        if (!provider || !provider.availableProviders) {
-            this.newChatModelGroup.style.display = 'none';
-            return;
-        }
-        
-        // Show model selector
-        this.newChatModelGroup.style.display = 'block';
-        this.newChatModel.innerHTML = '<option value="">Select Model</option>';
-        
-        // Add models from all available providers
-        Object.entries(provider.availableProviders).forEach(([providerType, config]) => {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = providerType.charAt(0).toUpperCase() + providerType.slice(1);
-            
-            config.models.forEach(model => {
-                const option = document.createElement('option');
-                // Handle both object format (new) and string format (legacy)
-                const modelId = typeof model === 'string' ? model : model.id;
-                const contextWindow = typeof model === 'object' ? model.contextWindow : null;
-                
-                // Store both provider type and model in the value
-                option.value = `${providerType}:${modelId}`;
-                option.textContent = modelId;
-                
-                // Store context window in data attribute if available
-                if (contextWindow) {
-                    option.setAttribute('data-context-window', contextWindow);
-                }
-                
-                optgroup.appendChild(option);
-            });
-            
-            this.newChatModel.appendChild(optgroup);
-        });
+        // This function is no longer needed since we create chats directly
+        // The New Chat Modal has been removed
     }
 
     async createNewChat(options = {}) {
@@ -2249,8 +2356,22 @@ All date/time interpretations must be based on the current date/time context pro
         const chat = this.chats.get(chatId);
         if (!chat) return;
         
+        // Mark that user has selected a chat
+        this.userHasSelectedChat = true;
+        
+        // Cancel any pending default chat creation
+        if (this.defaultChatTimeout) {
+            clearTimeout(this.defaultChatTimeout);
+            this.defaultChatTimeout = null;
+        }
+        
         this.currentChatId = chatId;
         this.updateChatSessions();
+        
+        // Migrate old chat data if needed
+        if (!chat.totalTokensPrice || !chat.perModelTokensPrice) {
+            this.migrateTokenPricing(chat);
+        }
         
         // Initialize token usage history for this chat if it doesn't exist
         if (!this.tokenUsageHistory.has(chatId)) {
@@ -2271,6 +2392,7 @@ All date/time interpretations must be based on the current date/time context pro
                 if (msg.usage && msg.usage.totalTokens) {
                     reconstructedRequests.push({
                         timestamp: msg.timestamp || new Date().toISOString(),
+                        model: msg.model || chat.model, // Use message model if available, fallback to chat model
                         promptTokens: msg.usage.promptTokens || 0,
                         completionTokens: msg.usage.completionTokens || 0,
                         totalTokens: msg.usage.totalTokens,
@@ -2537,7 +2659,7 @@ All date/time interpretations must be based on the current date/time context pro
         if (tokenCounters) {
             tokenCounters.style.display = 'flex';
         }
-        this.updateCumulativeTokenDisplay();
+        this.updateAllTokenDisplays();
         
         // Force scroll to bottom when loading chat (ignore the isAtBottom check)
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
@@ -2645,7 +2767,9 @@ All date/time interpretations must be based on the current date/time context pro
                         id: metricsId,
                         usage: msg.usage, 
                         responseTime: msg.responseTime,
-                        previousPromptTokens: this.previousPromptTokensForDisplay
+                        previousPromptTokens: this.previousPromptTokensForDisplay,
+                        model: msg.model,
+                        price: msg.price
                     });
                 }
                 break;
@@ -2738,7 +2862,7 @@ All date/time interpretations must be based on the current date/time context pro
             case 'update-metrics':
                 // Find the placeholder by mapped ID
                 const domId = this.metricsIdMapping?.[event.id] || event.id;
-                this.updateMetricsPlaceholder(domId, event.usage, event.responseTime, event.previousPromptTokens);
+                this.updateMetricsPlaceholder(domId, event.usage, event.responseTime, event.previousPromptTokens, event.model, event.price);
                 break;
                 
             case 'system-message':
@@ -2905,6 +3029,8 @@ All date/time interpretations must be based on the current date/time context pro
                     indicator.style.display = 'flex';
                     this.updateContextWindowIndicator(0, 'unknown');
                 }
+                // Update all token displays (will show zeros)
+                this.updateAllTokenDisplays();
                 // Hide token counters when no chat is selected
                 const tokenCounters = document.getElementById('tokenCounters');
                 if (tokenCounters) {
@@ -3329,7 +3455,9 @@ All date/time interpretations must be based on the current date/time context pro
                 id: metricsId,
                 usage: response.usage, 
                 responseTime: llmResponseTime,
-                previousPromptTokens: this.getPreviousPromptTokens()
+                previousPromptTokens: this.getPreviousPromptTokens(),
+                model: chat.model || provider.model,
+                price: response.usage ? this.calculateMessagePrice(chat.model || provider.model, response.usage) : null
             });
             
             // If no tool calls, display response and finish
@@ -3337,14 +3465,30 @@ All date/time interpretations must be based on the current date/time context pro
                 if (response.content) {
                     // Process assistant message event
                     this.processRenderEvent({ type: 'assistant-message', content: response.content });
-                    chat.messages.push({ 
+                    const assistantMsg = { 
                         type: 'assistant', 
                         role: 'assistant', 
                         content: response.content,
                         usage: response.usage || null,
                         responseTime: llmResponseTime || null,
+                        model: chat.model || provider.model,
                         turn: chat.currentTurn
-                    });
+                    };
+                    // Use addMessage to calculate price and update cumulative totals
+                    this.addMessage(chat.id, assistantMsg);
+                    
+                    // Track token usage with model information
+                    if (response.usage) {
+                        const modelUsed = chat.model || provider.model;
+                        this.addCumulativeTokens(
+                            chat.id,
+                            modelUsed,
+                            response.usage.promptTokens || 0,
+                            response.usage.completionTokens || 0,
+                            response.usage.cacheReadInputTokens || 0,
+                            response.usage.cacheCreationInputTokens || 0
+                        );
+                    }
                     // Clean content before sending back to API
                     const cleanedContent = this.cleanContentForAPI(response.content);
                     if (cleanedContent && cleanedContent.trim()) {
@@ -3370,10 +3514,24 @@ All date/time interpretations must be based on the current date/time context pro
                     })),
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
+                    model: chat.model || provider.model,
                     turn: chat.currentTurn,
                     cacheControlIndex: cacheControlIndex  // Store where cache control was placed
                 };
                 this.addMessage(chat.id, assistantMessage);
+                
+                // Track token usage with model information
+                if (response.usage) {
+                    const modelUsed = chat.model || provider.model;
+                    this.addCumulativeTokens(
+                        chat.id,
+                        modelUsed,
+                        response.usage.promptTokens || 0,
+                        response.usage.completionTokens || 0,
+                        response.usage.cacheReadInputTokens || 0,
+                        response.usage.cacheCreationInputTokens || 0
+                    );
+                }
                 
                 // Now display the message - after it's safely saved
                 if (response.content) {
@@ -4122,11 +4280,17 @@ All date/time interpretations must be based on the current date/time context pro
     }
     
     // Update a metrics placeholder with actual data
-    updateMetrics(metricsId, usage, responseTime) {
+    updateMetrics(metricsId, usage, responseTime, model = null, price = null) {
         const metricsFooter = document.getElementById(metricsId);
         if (!metricsFooter) return;
         
         let metricsHtml = '';
+        
+        // Add model info if available
+        if (model) {
+            const modelName = model.includes(':') ? model.split(':')[1] : model;
+            metricsHtml += `<span class="metric-item" data-tooltip="Model used for this response"><i class="fas fa-robot"></i> ${modelName}</span>`;
+        }
         
         // Add response time
         if (responseTime !== null) {
@@ -4193,11 +4357,17 @@ All date/time interpretations must be based on the current date/time context pro
     }
     
     // Update a metrics placeholder with actual data (unified method for both live and stored)
-    updateMetricsPlaceholder(metricsId, usage, responseTime, previousPromptTokens) {
+    updateMetricsPlaceholder(metricsId, usage, responseTime, previousPromptTokens, model = null, price = null) {
         const metricsFooter = document.getElementById(metricsId);
         if (!metricsFooter) return;
         
         let metricsHtml = '';
+        
+        // Add model info if available
+        if (model) {
+            const modelName = model.includes(':') ? model.split(':')[1] : model;
+            metricsHtml += `<span class="metric-item" data-tooltip="Model used for this response"><i class="fas fa-robot"></i> ${modelName}</span>`;
+        }
         
         // Add response time
         if (responseTime !== null) {
@@ -4266,6 +4436,11 @@ All date/time interpretations must be based on the current date/time context pro
                 const deltaSign = deltaTokens > 0 ? '+' : '';
                 metricsHtml += `<span class="metric-item" style="color: ${deltaColor}" data-tooltip="Change from previous request total">${deltaSign}${formatNumber(deltaTokens)}</span>`;
             }
+        }
+        
+        // Add price if available
+        if (price !== null && price !== undefined) {
+            metricsHtml += `<span class="metric-item" style="color: var(--success-color)" data-tooltip="Cost for this message"><i class="fas fa-dollar-sign"></i> $${price.toFixed(4)}</span>`;
         }
         
         metricsFooter.innerHTML = metricsHtml;
@@ -5332,9 +5507,10 @@ All date/time interpretations must be based on the current date/time context pro
         
         const history = this.tokenUsageHistory.get(chatId);
         
-        // Add this request to history
+        // Add this request to history with the model
         history.requests.push({
             timestamp: new Date().toISOString(),
+            model: model,
             promptTokens: usage.promptTokens,
             completionTokens: usage.completionTokens,
             totalTokens: usage.totalTokens,
@@ -5348,8 +5524,8 @@ All date/time interpretations must be based on the current date/time context pro
         // Update context window indicator
         this.updateContextWindowIndicator(contextTokens, model);
         
-        // Update cumulative token counters
-        this.updateCumulativeTokenDisplay();
+        // Update all token displays (context window, cumulative tokens, and cost)
+        this.updateAllTokenDisplays();
         
         // Update any pending conversation total displays
         const pendingTotals = document.querySelectorAll('[id^="conv-total-"]');
@@ -5427,10 +5603,17 @@ All date/time interpretations must be based on the current date/time context pro
         return { totalTokens: totalContextTokens };
     }
     
-    // Get cumulative token usage for the entire chat
+    // Add cumulative tokens with model-based pricing lookup
+    addCumulativeTokens(chatId, model, promptTokens, completionTokens, cacheReadTokens = 0, cacheCreationTokens = 0) {
+        // This function is now deprecated - token tracking happens in addMessage()
+        // Keeping it for backward compatibility but it just updates displays
+        this.updateAllTokenDisplays();
+    }
+    
+    // Get cumulative token usage for the entire chat - now just reads from stored data
     getCumulativeTokenUsage(chatId) {
         const chat = this.chats.get(chatId);
-        if (!chat) {
+        if (!chat || !chat.totalTokensPrice) {
             return { 
                 inputTokens: 0, 
                 outputTokens: 0,
@@ -5439,36 +5622,47 @@ All date/time interpretations must be based on the current date/time context pro
             };
         }
         
-        // Start from zero and count all tokens
-        let totalInput = 0;
-        let totalOutput = 0;
-        let totalCacheCreation = 0;
-        let totalCacheRead = 0;
-        
-        // Add tokens from ALL messages (including accounting nodes)
-        for (const message of chat.messages) {
-            if (message.role === 'accounting' && message.cumulativeTokens) {
-                // Accounting nodes store tokens from discarded messages
-                const tokens = message.cumulativeTokens;
-                totalInput += tokens.inputTokens || 0;
-                totalOutput += tokens.outputTokens || 0;
-                totalCacheCreation += tokens.cacheCreationTokens || 0;
-                totalCacheRead += tokens.cacheReadTokens || 0;
-            } else if (message.usage) {
-                // Regular messages with usage data
-                totalInput += message.usage.promptTokens || 0;
-                totalOutput += message.usage.completionTokens || 0;
-                totalCacheCreation += message.usage.cacheCreationInputTokens || 0;
-                totalCacheRead += message.usage.cacheReadInputTokens || 0;
+        // Use stored token counts
+        return { 
+            inputTokens: chat.totalTokensPrice.input || 0, 
+            outputTokens: chat.totalTokensPrice.output || 0,
+            cacheCreationTokens: chat.totalTokensPrice.cacheCreation || 0,
+            cacheReadTokens: chat.totalTokensPrice.cacheRead || 0
+        };
+    }
+    
+    // Centralized method to update all token-related displays
+    updateAllTokenDisplays(chatId = null) {
+        const targetChatId = chatId || this.currentChatId;
+        if (!targetChatId) {
+            // Clear displays when no chat is selected
+            const costElement = document.getElementById('cumulativeCost');
+            if (costElement) {
+                costElement.textContent = '$0.00';
             }
+            return;
         }
         
-        return { 
-            inputTokens: totalInput, 
-            outputTokens: totalOutput,
-            cacheCreationTokens: totalCacheCreation,
-            cacheReadTokens: totalCacheRead
-        };
+        // Store current chat ID temporarily if using a different one
+        const originalChatId = this.currentChatId;
+        if (chatId && chatId !== this.currentChatId) {
+            this.currentChatId = chatId;
+        }
+        
+        // Update context window
+        const chat = this.chats.get(this.currentChatId);
+        if (chat) {
+            const contextTokens = this.calculateContextWindowTokens(this.currentChatId);
+            this.updateContextWindowIndicator(contextTokens, chat.model || 'unknown');
+        }
+        
+        // Update cumulative tokens
+        this.updateCumulativeTokenDisplay();
+        
+        // Restore original chat ID if we changed it
+        if (chatId && chatId !== originalChatId) {
+            this.currentChatId = originalChatId;
+        }
     }
     
     // Update cumulative token display
@@ -5510,6 +5704,169 @@ All date/time interpretations must be based on the current date/time context pro
         
         if (cacheCreationElement) {
             cacheCreationElement.innerHTML = formatTokens(cumulative.cacheCreationTokens);
+        }
+        
+        // Calculate and display total cost
+        const cost = this.calculateTokenCost(this.currentChatId);
+        const costElement = document.getElementById('cumulativeCost');
+        if (costElement) {
+            if (cost !== null && cost >= 0) {
+                costElement.textContent = `$${cost.toFixed(4)}`;
+                costElement.style.display = '';
+            } else {
+                // Show $0.0000 for empty chats
+                costElement.textContent = '$0.0000';
+                costElement.style.display = '';
+            }
+        }
+        
+        // Update tooltips with individual costs
+        this.updateTokenCostTooltips(this.currentChatId);
+    }
+    
+    // Calculate token cost for a chat - now just reads from stored data
+    calculateTokenCost(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return 0; // Return 0 for no chat
+        
+        // Use stored total cost
+        if (chat.totalTokensPrice && chat.totalTokensPrice.totalCost !== undefined) {
+            return chat.totalTokensPrice.totalCost;
+        }
+        
+        return 0;
+    }
+    
+    // Update token cost tooltips
+    updateTokenCostTooltips(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat || !chat.perModelTokensPrice) return;
+        
+        // Remove old data-tooltip attribute
+        const tokenCountersSection = document.getElementById('tokenCounters');
+        if (tokenCountersSection) {
+            tokenCountersSection.removeAttribute('data-tooltip');
+            
+            // Add hover handlers if not already added
+            if (!tokenCountersSection.hasHoverHandlers) {
+                tokenCountersSection.hasHoverHandlers = true;
+                
+                // Mouse enter - show the breakdown
+                tokenCountersSection.addEventListener('mouseenter', (e) => {
+                    // Use current chat ID dynamically
+                    this.showTokenBreakdownHover(e, this.currentChatId);
+                });
+                
+                // Mouse leave - hide the breakdown
+                tokenCountersSection.addEventListener('mouseleave', () => {
+                    this.hideTokenBreakdownHover();
+                });
+            }
+        }
+    }
+    
+    showTokenBreakdownHover(event, chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat || !chat.perModelTokensPrice) return;
+        
+        // Remove any existing hover element
+        this.hideTokenBreakdownHover();
+        
+        // Create the hover element
+        const hoverDiv = document.createElement('div');
+        hoverDiv.id = 'tokenBreakdownHover';
+        hoverDiv.className = 'token-breakdown-hover';
+        hoverDiv.style.cssText = `
+            position: absolute;
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            z-index: 10000;
+            font-size: 12px;
+            min-width: 600px;
+        `;
+        
+        // Build the content
+        let html = [];
+        html.push('<div style="font-weight: 600; margin-bottom: 12px; font-size: 13px;">TOKEN USAGE AND COST BREAKDOWN</div>');
+        html.push('<div style="display: flex; padding: 6px 0; font-weight: 600; border-bottom: 2px solid var(--border-color); font-size: 11px; color: var(--text-secondary);">');
+        html.push('<div style="flex: 1;">Model</div>');
+        html.push('<div style="width: 70px; text-align: right;">Input</div>');
+        html.push('<div style="width: 70px; text-align: right;">Cache R</div>');
+        html.push('<div style="width: 70px; text-align: right;">Cache W</div>');
+        html.push('<div style="width: 70px; text-align: right;">Output</div>');
+        html.push('<div style="width: 80px; text-align: right;">Cost</div>');
+        html.push('</div>');
+        
+        // Add each model's data
+        let hasData = false;
+        for (const [model, data] of Object.entries(chat.perModelTokensPrice)) {
+            const modelName = model.includes(':') ? model.split(':')[1] : model;
+            
+            // Skip models with no usage
+            if (data.input === 0 && data.output === 0 && data.cacheRead === 0 && data.cacheCreation === 0) {
+                continue;
+            }
+            
+            hasData = true;
+            html.push('<div style="display: flex; padding: 6px 0; border-bottom: 1px solid var(--hover-color);">');
+            html.push(`<div style="flex: 1; font-family: monospace;">${modelName}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${data.input.toLocaleString()}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${data.cacheRead.toLocaleString()}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${data.cacheCreation.toLocaleString()}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${data.output.toLocaleString()}</div>`);
+            html.push(`<div style="width: 80px; text-align: right; font-family: monospace; color: #4CAF50;">$${data.totalCost.toFixed(4)}</div>`);
+            html.push('</div>');
+        }
+        
+        // Add totals
+        if (chat.totalTokensPrice && hasData) {
+            html.push('<div style="display: flex; padding: 8px 0 4px 0; border-top: 2px solid var(--border-color); font-weight: 600;">');
+            html.push(`<div style="flex: 1;">TOTAL</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${chat.totalTokensPrice.input.toLocaleString()}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${chat.totalTokensPrice.cacheRead.toLocaleString()}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${chat.totalTokensPrice.cacheCreation.toLocaleString()}</div>`);
+            html.push(`<div style="width: 70px; text-align: right; font-family: monospace;">${chat.totalTokensPrice.output.toLocaleString()}</div>`);
+            html.push(`<div style="width: 80px; text-align: right; font-family: monospace; color: #4CAF50;">$${chat.totalTokensPrice.totalCost.toFixed(4)}</div>`);
+            html.push('</div>');
+        }
+        
+        if (!hasData) {
+            html.push('<div style="padding: 20px; text-align: center; color: var(--text-tertiary);">No token usage data available</div>');
+        }
+        
+        hoverDiv.innerHTML = html.join('');
+        document.body.appendChild(hoverDiv);
+        
+        // Position the hover element
+        const rect = event.target.getBoundingClientRect();
+        const hoverRect = hoverDiv.getBoundingClientRect();
+        
+        // Position below the token counters, aligned to the right edge
+        let top = rect.bottom + 8;
+        let left = rect.right - hoverRect.width;
+        
+        // Ensure it doesn't go off the left edge
+        if (left < 8) {
+            left = 8;
+        }
+        
+        // Ensure it doesn't go off the bottom
+        if (top + hoverRect.height > window.innerHeight - 8) {
+            // Position above instead
+            top = rect.top - hoverRect.height - 8;
+        }
+        
+        hoverDiv.style.top = `${top}px`;
+        hoverDiv.style.left = `${left}px`;
+    }
+    
+    hideTokenBreakdownHover() {
+        const hoverDiv = document.getElementById('tokenBreakdownHover');
+        if (hoverDiv) {
+            hoverDiv.remove();
         }
     }
     
@@ -5884,7 +6241,9 @@ This summary will be used as context for continuing our conversation, so preserv
                 id: metricsId,
                 usage: response.usage, 
                 responseTime: llmResponseTime,
-                previousPromptTokens: this.getPreviousPromptTokens()
+                previousPromptTokens: this.getPreviousPromptTokens(),
+                model: chat.model || provider.model,
+                price: response.usage ? this.calculateMessagePrice(chat.model || provider.model, response.usage) : null
             });
             
             // Process the summary response
@@ -5950,6 +6309,9 @@ This summary will be used as context for continuing our conversation, so preserv
                 // Update context window display (should show near zero)
                 const contextTokens = this.calculateContextWindowTokens(chat.id);
                 this.updateContextWindowIndicator(contextTokens, chat.model || provider.model);
+                
+                // Update all token displays including cost
+                this.updateAllTokenDisplays();
             }
             
         } catch (error) {
@@ -6044,7 +6406,9 @@ This summary will be used as context for continuing our conversation, so preserv
                 id: metricsId,
                 usage: response.usage, 
                 responseTime: llmResponseTime,
-                previousPromptTokens: this.getPreviousPromptTokens()
+                previousPromptTokens: this.getPreviousPromptTokens(),
+                model: chat.model || provider.model,
+                price: response.usage ? this.calculateMessagePrice(chat.model || provider.model, response.usage) : null
             });
             
             // Process the title response
@@ -6328,4 +6692,30 @@ This summary will be used as context for continuing our conversation, so preserv
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new NetdataMCPChat();
+    
+    // Expose migration function for testing
+    window.migrateCurrentChat = () => {
+        if (!window.app.currentChatId) {
+            console.log("No chat is currently loaded");
+            return;
+        }
+        const chat = window.app.chats.get(window.app.currentChatId);
+        if (!chat) {
+            console.log("Chat not found");
+            return;
+        }
+        console.log("Migrating chat:", chat.title);
+        console.log("Before migration:", {
+            totalTokensPrice: chat.totalTokensPrice,
+            perModelTokensPrice: chat.perModelTokensPrice
+        });
+        window.app.migrateTokenPricing(chat);
+        console.log("After migration:", {
+            totalTokensPrice: chat.totalTokensPrice,
+            perModelTokensPrice: chat.perModelTokensPrice
+        });
+        // Update displays
+        window.app.updateAllTokenDisplays();
+        console.log("Migration complete!");
+    };
 });
