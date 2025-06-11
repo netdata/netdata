@@ -3177,3 +3177,9 @@ modules:
               chart_type: line
               dimensions:
                 - name: restarts
+            - name: asp.worker_process_restarts
+              description: Number of times a worker process has restarted on the machine.
+              unit: restarts
+              chart_type: line
+              dimensions:
+                - name: restarts
