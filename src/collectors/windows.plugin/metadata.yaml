@@ -3189,7 +3189,6 @@ modules:
                 - name: unknown
   - meta:
       plugin_name: windows.plugin
-<<<<<<< HEAD
       module_name: PerflibExchange
       monitored_instance:
         name: MS Exchange
@@ -3197,15 +3196,6 @@ modules:
         categories:
           - data-collection.windows-systems
         icon_filename: "exchange.svg"
-=======
-      module_name: PerflibASP
-      monitored_instance:
-        name: ASP.NET
-        link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
-        categories:
-          - data-collection.windows-systems
-        icon_filename: "windows.svg"
->>>>>>> e6a271a46 (asp: Add first global chart; Initialize the metadata)
       related_resources:
         integrations:
           list: []
@@ -3213,27 +3203,16 @@ modules:
         description: ""
       keywords:
         - windows
-<<<<<<< HEAD
         - microsoft
         - exchange
         - mail
-=======
-        - ASP
-        - webservice
->>>>>>> e6a271a46 (asp: Add first global chart; Initialize the metadata)
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
-<<<<<<< HEAD
           This collector monitors Microsoft Exchange.
         method_description: |
           It queries different Exchange objects from Perflib in order to gather the metrics.
-=======
-          This collector monitors ASP.NET applications.
-        method_description: |
-          It queries for the 'ASP.NET' and 'ASP.NET Applications' objects from Perflib in order to gather the metrics.
->>>>>>> e6a271a46 (asp: Add first global chart; Initialize the metadata)
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -3262,11 +3241,7 @@ modules:
             title: "Config option"
             enabled: false
           list:
-<<<<<<< HEAD
             - name: PerflibExchange
-=======
-            - name: PerflibASP
->>>>>>> e6a271a46 (asp: Add first global chart; Initialize the metadata)
               description: An option to enable or disable the data collection.
               default_value: yes
               required: false
@@ -3478,6 +3453,7 @@ modules:
               dimensions:
                 - name: serviced
 <<<<<<< HEAD
+<<<<<<< HEAD
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNUMA
@@ -3586,3 +3562,6 @@ modules:
               dimensions:
                 - name: restarts
 >>>>>>> 9570ab69a (asp: Add worker process restart)
+=======
+
+>>>>>>> fdc3b79be (asp: Add ASPNET Anonymous chart; Create a common standard)
