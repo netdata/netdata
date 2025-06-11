@@ -38,7 +38,8 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics,
+the size of all the data files, and the wait stats in the database you must:
 
 - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
 - Configure a database connection (see Setup → Configuration → Examples).
@@ -91,9 +92,47 @@ Metrics:
 | mssql.instance_memmgr_connection_memory_bytes | memory | bytes |
 | mssql.instance_memmgr_pending_memory_grants | pending | processes |
 | mssql.instance_memmgr_external_benefit_of_memory | benefit | bytes |
-| mssql.instance_resource_deadlocks | alloc_unit, application, database, extent, file, hobt, key, metadata, oib, object, page, rid, row_group, xact | deadlocks/s |
-| mssql.instance_resource_lock_wait | alloc_unit, application, database, extent, file, hobt, key, metadata, oib, object, page, rid, row_group, xact | locks/s |
 | mssql.instance_blocked_processes | blocked | processes |
+
+### Per MSSQL Resource Locks
+
+Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| mssql_instance | The SQL Server instance name (e.g., 'MSSQLSERVER' for default instance or named instance like 'INSTANCE01'). |
+| resource | The specific resource type being locked (e.g., 'Database', 'Table', 'Page', 'Row', 'Key', 'Extent', 'RID', 'Application', 'Metadata', 'Allocation_Unit'). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mssql.instance_resource_deadlocks | locks | deadlock/s |
+| mssql.instance_resource_lock_waits | locks | lock/s |
+
+### Per MSSQL Waits
+
+These metrics refer to the Microsoft SQL Server instances defined on the host and their associated wait events.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| mssql_instance | The instance name. |
+| wait_type | A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes. |
+| wait_category | Wait categories are groupings of specific wait types that indicate the reason a SQL Server worker is waiting. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mssql.instance_total_wait_time | duration | ms |
+| mssql.instance_resource_wait_time | duration | ms |
+| mssql.instance_signal_wait_time | duration | ms |
+| mssql.instance_max_wait_time | duration | ms |
+| mssql.instance_waits | waits | waits/s |
 
 ### Per Database
 
