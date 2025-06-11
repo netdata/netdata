@@ -3167,19 +3167,31 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: Windows Service
+        - name: ASP.NET Global Data
           description: "These metrics refer to ASP.NET global metrics."
           labels: []
           metrics:
-            - name: asp.application_restarts
+            - name: aspnet.application_restarts
               description: Number of times the application has been restarted.
               unit: restarts
               chart_type: line
               dimensions:
                 - name: restarts
-            - name: asp.worker_process_restarts
+            - name: aspnet.worker_process_restarts
               description: Number of times a worker process has restarted on the machine.
               unit: restarts
               chart_type: line
               dimensions:
                 - name: restarts
+        - name: ASP.NET Applications
+          description: "ASP.NET application performance counters"
+          labels:
+            - name: aspnet_app
+              description: The application name.
+          metrics:
+            - name: aspnet.anonymous_request
+              description: Number of requests utilizing anonymous authentication.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
