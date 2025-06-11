@@ -315,9 +315,8 @@ metrics:
         mapping:
           0: unavailable
           1: available
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.10
-          name: cucsComputeRackUnitCheckPoint
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.10
+        name: cucsComputeRackUnitCheckPoint
         description: "Checkpoint state of the rack unit"
         family: Rack Units/Checkpoint/Status
         unit: "{status}"
