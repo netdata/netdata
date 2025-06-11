@@ -239,6 +239,38 @@ static void netdata_apps_anonymous_request(struct asp_app *aa, char *app, int up
     rrdset_done(aa->st_asp_anonymous_request);
 }
 
+static void netdata_apps_compilations_total(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_asp_compilations_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_compilation_totals", app);
+
+        aa->st_asp_compilations_total = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.compilation_totals",
+                "Number of source files dynamically compiled.",
+                "compilations",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_APP_COMPILATION_TOTALS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_asp_compilations_total =
+                rrddim_add(aa->st_asp_compilations_total, "compilation", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_asp_compilations_total->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_asp_compilations_total,
+            aa->rd_asp_compilations_total,
+            (collected_number) aa->aspCompilationsTotal.current.Data);
+    rrdset_done(aa->st_asp_compilations_total);
+}
+
 static void netdata_asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -258,6 +290,9 @@ static void netdata_asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspAnonymousRequest))
             netdata_apps_anonymous_request(aa, windows_shared_buffer, update_every);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspCompilationsTotal))
+            netdata_apps_compilations_total(aa, windows_shared_buffer, update_every);
     }
 }
 
