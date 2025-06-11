@@ -404,6 +404,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     Pvoid_t datafiles_JudyL = NULL;
     Pvoid_t journafile_JudyL = NULL;
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
+    bool validate_files = true;
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
 
@@ -411,7 +412,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (2 == ret) {
             datafile = datafile_alloc_and_init(ctx, tier, fileno);
             datafiles[matched_files++] = datafile;
-            (void) JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
+            Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
+            if (!Pvalue || Pvalue == PJERR)
+                validate_files = false;
             continue;
         }
 
@@ -453,38 +456,49 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 
     // Remove journal files that do not have a matching data file
     // by scanning the judy array of the journal files
-    bool first_then_next = true;
-    Word_t idx = 0;
-    Pvoid_t *PValue;
-    size_t deleted_journals = 0;
-    while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
-        char path[RRDENG_PATH_MAX];
-        if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
+    if (validate_files) {
+        bool first_then_next = true;
+        Word_t idx = 0;
+        Pvoid_t *PValue;
+        size_t deleted_journals = 0;
+        while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
+            char path[RRDENG_PATH_MAX];
+            if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
+                (void)snprintfz(
+                    path,
+                    sizeof(path),
+                    "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+                    datafile_ctx(datafile)->config.dbfiles_path,
+                    1,
+                    (unsigned)idx);
 
-            (void) snprintfz(path, sizeof(path), "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                            datafile_ctx(datafile)->config.dbfiles_path, 1, (unsigned) idx);
+                UNLINK_FILE(ctx, path, ret);
+                if (ret == 0) {
+                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
+                    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+                    deleted_journals++;
+                }
 
-            UNLINK_FILE(ctx, path, ret);
-            if (ret == 0) {
-                netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
-                __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
-                deleted_journals++;
-            }
+                (void)snprintfz(
+                    path,
+                    sizeof(path),
+                    "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
+                    datafile_ctx(datafile)->config.dbfiles_path,
+                    1,
+                    (unsigned)idx);
 
-            (void) snprintfz(path, sizeof(path), "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
-                            datafile_ctx(datafile)->config.dbfiles_path, 1,  (unsigned) idx);
-
-            UNLINK_FILE(ctx, path, ret);
-            if (ret == 0) {
-                netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
-                __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
-                deleted_journals++;
+                UNLINK_FILE(ctx, path, ret);
+                if (ret == 0) {
+                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
+                    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+                    deleted_journals++;
+                }
             }
         }
-    }
 
-    if (deleted_journals)
-        netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
+        if (deleted_journals)
+            netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
+    }
 
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
