@@ -661,6 +661,12 @@ declare -A pkg_cmake=(
   ['default']="cmake"
 )
 
+# patch is required for vendoring Abseil
+declare -A pkg_patch=(
+  ['default']="patch"
+  ['gentoo']="dev-util/patch"
+)
+
 declare -A pkg_json_c_dev=(
   ['alpine']="json-c-dev"
   ['arch']="json-c"
@@ -1259,6 +1265,7 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
+    require_cmd patch || suitable_package patch
   fi
 
   # -------------------------------------------------------------------------

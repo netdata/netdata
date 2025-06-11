@@ -27,22 +27,32 @@ function(netdata_bundle_protobuf)
                 set(ABSL_PROPAGATE_CXX_STD On)
                 set(ABSL_ENABLE_INSTALL Off)
                 set(BUILD_SHARED_LIBS Off)
-                set(absl_repo https://github.com/abseil/abseil-cpp)
+                set(ABSL_BUILD_TESTING Off)
+                set(absl_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/absl-src")
 
                 message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
+                find_program(PATCH patch REQUIRED)
                 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
-                        FetchContent_Declare(absl
-                                GIT_REPOSITORY ${absl_repo}
-                                GIT_TAG ${ABSL_TAG}
-                                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-                                EXCLUDE_FROM_ALL
-                        )
+                    FetchContent_Declare(absl
+                            GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+                            GIT_TAG ${ABSL_TAG}
+                            SOURCE_DIR ${absl_SOURCE_DIR}
+                            PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
+                                        ${absl_SOURCE_DIR}
+                                        ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                            CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                            EXCLUDE_FROM_ALL
+                    )
                 else()
-                        FetchContent_Declare(absl
-                                GIT_REPOSITORY ${absl_repo}
-                                GIT_TAG ${ABSL_TAG}
-                                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
-                        )
+                    FetchContent_Declare(absl
+                            GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+                            GIT_TAG ${ABSL_TAG}
+                            SOURCE_DIR ${absl_SOURCE_DIR}
+                            PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
+                                        ${absl_SOURCE_DIR}
+                                        ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                            CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
+                    )
                 endif()
                 FetchContent_MakeAvailable_NoInstall(absl)
                 message(STATUS "Finished preparing bundled Abseil")
