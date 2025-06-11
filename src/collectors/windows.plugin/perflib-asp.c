@@ -157,7 +157,7 @@ static void netdata_asp_application_restarts(COUNTER_DATA *value, int update_eve
                 "restarts",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibASP",
-                PRIO_ASP_APPLICATION_RESTART
+                PRIO_ASP_APPLICATION_RESTART,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -166,6 +166,33 @@ static void netdata_asp_application_restarts(COUNTER_DATA *value, int update_eve
 
     rrddim_set_by_pointer(st_asp_application_restarts, rd_asp_application_restarts, (collected_number)value->current.Data);
     rrdset_done(st_asp_application_restarts);
+}
+
+static void netdata_ask_worker_process_restarts(COUNTER_DATA *value, int update_every)
+{
+    static RRDSET *st_asp_worker_process_restarts = NULL;
+    static RRDDIM *rd_asp_worker_process_restarts = NULL;
+
+    if (unlikely(!st_asp_worker_process_restarts)) {
+        st_asp_worker_process_restarts = rrdset_create_localhost(
+                "asp",
+                "worker_process_restarts",
+                NULL,
+                "asp",
+                "asp.worker_process_restarts",
+                "Number of times a worker process has restarted on the machine.",
+                "restarts",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_WORKER_PROCESS_RESTART,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rd_asp_worker_process_restarts = rrddim_add(st_asp_worker_process_restarts, "restarts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_asp_worker_process_restarts, rd_asp_worker_process_restarts, (collected_number)value->current.Data);
+    rrdset_done(st_asp_worker_process_restarts);
 }
 
 static void netdata_asp_global_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {

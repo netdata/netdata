@@ -3576,4 +3576,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: restarts
+<<<<<<< HEAD
 >>>>>>> d40509fa7 (asp: Add first global chart; Initialize the metadata)
+=======
+            - name: asp.worker_process_restarts
+              description: Number of times a worker process has restarted on the machine.
+              unit: restarts
+              chart_type: line
+              dimensions:
+                - name: restarts
+>>>>>>> 9570ab69a (asp: Add worker process restart)
