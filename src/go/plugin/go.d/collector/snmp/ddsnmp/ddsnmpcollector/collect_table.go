@@ -25,15 +25,20 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 		if cfg.IsScalar() || cfg.Table.OID == "" || doneOids[cfg.Table.OID] {
 			continue
 		}
-		for _, tagCfg := range cfg.MetricTags {
-			if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
-				c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
-				continue
+		if func() bool {
+			for _, tagCfg := range cfg.MetricTags {
+				if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
+					c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
+					return true
+				}
+				if len(tagCfg.IndexTransform) > 0 {
+					c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
+					return true
+				}
 			}
-			if len(tagCfg.IndexTransform) > 0 {
-				c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
-				continue
-			}
+			return false
+		}() {
+			continue
 		}
 		if c.missingOIDs[trimOID(cfg.Table.OID)] {
 			missingOIDs = append(missingOIDs, cfg.Table.OID)
