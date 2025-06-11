@@ -9,6 +9,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -17,23 +18,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-type ProfileMetrics struct {
-	Source         string
-	DeviceMetadata map[string]string
-	Metrics        []Metric
-}
-
-type Metric struct {
-	Name        string
-	Description string
-	Family      string
-	Unit        string
-	MetricType  ddprofiledefinition.ProfileMetricType
-	Tags        map[string]string
-	Mappings    map[int64]string
-	IsTable     bool
-	Value       int64
-}
+type (
+	ProfileMetrics struct {
+		Source         string
+		DeviceMetadata map[string]string
+		Tags           map[string]string
+		Metrics        []Metric
+	}
+	Metric struct {
+		Name        string
+		Description string
+		Family      string
+		Unit        string
+		MetricType  ddprofiledefinition.ProfileMetricType
+		StaticTags  map[string]string
+		Tags        map[string]string
+		Mappings    map[int64]string
+		IsTable     bool
+		Value       int64
+	}
+)
 
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
 	coll := &Collector{
@@ -41,6 +45,7 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
+		tableCache:  newTableCache(5*time.Minute, 0.2), // 5 min TTL with 20% jitter
 	}
 
 	for _, prof := range profiles {
@@ -57,6 +62,7 @@ type (
 		snmpClient  gosnmp.Handler
 		profiles    map[string]*profileState
 		missingOIDs map[string]bool
+		tableCache  *tableCache
 
 		doTableMetrics bool
 	}
@@ -71,6 +77,10 @@ type (
 func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 	var metrics []*ProfileMetrics
 	var errs []error
+
+	if expired := c.tableCache.clearExpired(); len(expired) > 0 {
+		c.log.Debugf("Cleared %d expired table cache entries", len(expired))
+	}
 
 	for _, prof := range c.profiles {
 		if ms, err := c.collectProfile(prof); err != nil {
@@ -88,6 +98,7 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 	}
 
 	c.updateMetricFamily(metrics)
+	cleanTags(metrics)
 
 	return metrics, nil
 }
@@ -125,13 +136,10 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		metrics = append(metrics, tableMetrics...)
 	}
 
-	for _, m := range metrics {
-		maps.Copy(m.Tags, ps.globalTags)
-	}
-
 	return &ProfileMetrics{
 		Source:         ps.profile.SourceFile,
 		DeviceMetadata: maps.Clone(ps.deviceMetadata),
+		Tags:           maps.Clone(ps.globalTags),
 		Metrics:        metrics,
 	}, nil
 }

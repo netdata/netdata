@@ -315,7 +315,7 @@ func newUserInputChart(cfg ChartConfig) (*module.Chart, error) {
 	return chart, nil
 }
 
-func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
+func (c *Collector) addProfileScalarMetricChart(pm *ddsnmpcollector.ProfileMetrics, m ddsnmpcollector.Metric) {
 	if m.Name == "" {
 		return
 	}
@@ -343,7 +343,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
 		"vendor":  c.sysInfo.Organization,
 		"sysName": c.sysInfo.Name,
 	}
-	maps.Copy(tags, m.Tags)
+	maps.Copy(tags, pm.Tags)
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
 	}
@@ -362,15 +362,6 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
 
 	if err := c.Charts().Add(chart); err != nil {
 		c.Warning(err)
-	}
-}
-
-func (c *Collector) removeProfileScalarMetricChart(metricName string) {
-	r := strings.NewReplacer(".", "_", " ", "_")
-	id := fmt.Sprintf("snmp_device_prof_%s", r.Replace(metricName))
-	if chart := c.Charts().Get(id); chart != nil {
-		chart.MarkRemove()
-		chart.MarkNotCreated()
 	}
 }
 

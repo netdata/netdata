@@ -76,7 +76,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 						},
 						// sysName will be skipped because it can't be converted to int64
@@ -140,11 +139,11 @@ func TestCollector_Collect(t *testing.T) {
 			expectedResult: []*ProfileMetrics{
 				{
 					DeviceMetadata: nil,
+					Tags:           map[string]string{"device_vendor": "Cisco IOS"},
 					Metrics: []Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
-							Tags:       map[string]string{"device_vendor": "Cisco IOS"},
 							MetricType: "gauge",
 						},
 					},
@@ -220,7 +219,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 						},
 					},
@@ -266,7 +264,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "memoryKilobytes",
 							Value:      1024000, // 1024 * 1000
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 						},
 					},
@@ -395,7 +392,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 						},
 					},
@@ -441,7 +437,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "temperature",
 							Value:      25,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 						},
 					},
@@ -508,11 +503,11 @@ func TestCollector_Collect(t *testing.T) {
 			expectedResult: []*ProfileMetrics{
 				{
 					DeviceMetadata: nil,
+					Tags:           map[string]string{"device_type": "router"},
 					Metrics: []Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
-							Tags:       map[string]string{"device_type": "router"},
 							MetricType: "gauge",
 						},
 					},
@@ -582,7 +577,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "clusterHealth",
 							Value:      1,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 							Mappings: map[int64]string{
 								0: "OK",
@@ -639,7 +633,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "ifOperStatus",
 							Value:      2,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 							Mappings: map[int64]string{
 								1: "up",
@@ -697,7 +690,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "fanStatus",
 							Value:      2,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 							Mappings: map[int64]string{
 								1: "normal",
@@ -752,7 +744,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "ifAdminStatus",
 							Value:      0, // mapped from 2 -> 0
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 							Mappings: map[int64]string{
 								1: "1",
@@ -878,7 +869,6 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
-							Tags:       map[string]string{},
 							MetricType: "gauge",
 							Mappings:   nil, // No mappings
 						},
@@ -1215,10 +1205,12 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:  "myMetric",
 							Value: 100,
-							Tags: map[string]string{
+							StaticTags: map[string]string{
 								"table_type": "performance",
 								"source":     "snmp",
-								"interface":  "eth0",
+							},
+							Tags: map[string]string{
+								"interface": "eth0",
 							},
 							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
 							IsTable:    true,
@@ -1299,7 +1291,7 @@ func TestCollector_Collect(t *testing.T) {
 						{
 							Name:       "ifInOctets",
 							Value:      2000,
-							Tags:       map[string]string{}, // No interface tag because it's missing
+							Tags:       nil, // No interface tag because it's missing
 							MetricType: ddprofiledefinition.ProfileMetricTypeRate,
 							IsTable:    true,
 						},
@@ -1320,6 +1312,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			collector := New(mockHandler, tc.profiles, logger.New())
 			collector.doTableMetrics = true
+			collector.tableCache.setTTL(0, 0)
 
 			result, err := collector.Collect()
 

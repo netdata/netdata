@@ -25,6 +25,21 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 		if cfg.IsScalar() || cfg.Table.OID == "" || doneOids[cfg.Table.OID] {
 			continue
 		}
+		if func() bool {
+			for _, tagCfg := range cfg.MetricTags {
+				if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
+					c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
+					return true
+				}
+				if len(tagCfg.IndexTransform) > 0 {
+					c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
+					return true
+				}
+			}
+			return false
+		}() {
+			continue
+		}
 		if c.missingOIDs[trimOID(cfg.Table.OID)] {
 			missingOIDs = append(missingOIDs, cfg.Table.OID)
 			continue
@@ -51,15 +66,25 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 }
 
 func (c *Collector) collectSingleTable(cfg ddprofiledefinition.MetricsConfig) ([]Metric, error) {
+	columnOIDs := make(map[string]ddprofiledefinition.SymbolConfig)
+	for _, sym := range cfg.Symbols {
+		columnOIDs[trimOID(sym.OID)] = sym
+	}
+
+	tagColumnOIDs := make(map[string]ddprofiledefinition.MetricTagConfig)
 	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
-			c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
-			return nil, nil
+		if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
+			tagColumnOIDs[trimOID(tagCfg.Symbol.OID)] = tagCfg
 		}
-		if len(tagCfg.IndexTransform) > 0 {
-			c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
-			return nil, nil
+	}
+
+	if cachedOIDs, cachedTags, ok := c.tableCache.getCachedData(cfg.Table.OID); ok {
+		metrics, err := c.collectTableWithCache(cfg, cachedOIDs, cachedTags, columnOIDs)
+		if err == nil {
+			c.log.Debugf("Successfully collected table %s using cache", cfg.Table.Name)
+			return metrics, nil
 		}
+		c.log.Debugf("Cached collection failed for table %s, falling back to walk: %v", cfg.Table.Name, err)
 	}
 
 	pdus, err := c.snmpWalk(cfg.Table.OID)
@@ -71,28 +96,18 @@ func (c *Collector) collectSingleTable(cfg ddprofiledefinition.MetricsConfig) ([
 		return nil, nil
 	}
 
-	symColumnOIDs := make(map[string]ddprofiledefinition.SymbolConfig)
-	for _, sym := range cfg.Symbols {
-		symColumnOIDs[trimOID(sym.OID)] = sym
-	}
-
-	tagColumnOIDs := make(map[string]ddprofiledefinition.MetricTagConfig)
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-			tagColumnOIDs[trimOID(tagCfg.Symbol.OID)] = tagCfg
-		}
-	}
-
-	allColumnOIDs := make([]string, 0, len(symColumnOIDs)+len(tagColumnOIDs))
-	for oid := range symColumnOIDs {
+	allColumnOIDs := make([]string, 0, len(columnOIDs)+len(tagColumnOIDs))
+	for oid := range columnOIDs {
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
 	for oid := range tagColumnOIDs {
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
 
-	// Group PDUs by row index (index -> column OID -> PDU)
-	rows := make(map[string]map[string]gosnmp.SnmpPDU, len(pdus)/len(allColumnOIDs))
+	// Group PDUs by row index and build cache structure
+	rows := make(map[string]map[string]gosnmp.SnmpPDU)
+	oidCache := make(map[string]map[string]string) // For caching: index -> column OID -> full OID
+	tagCache := make(map[string]map[string]string) // For caching: index -> tag name -> value
 
 	for oid, pdu := range pdus {
 		for _, columnOID := range allColumnOIDs {
@@ -101,87 +116,165 @@ func (c *Collector) collectSingleTable(cfg ddprofiledefinition.MetricsConfig) ([
 
 				if rows[index] == nil {
 					rows[index] = make(map[string]gosnmp.SnmpPDU)
+					oidCache[index] = make(map[string]string)
+					tagCache[index] = make(map[string]string)
 				}
 				rows[index][columnOID] = pdu
+				oidCache[index][columnOID] = oid
 				break
 			}
 		}
 	}
 
-	var metrics []Metric
-	for index, rowPDUs := range rows {
-		rowMetrics, err := c.processTableRow(rowPDUs, symColumnOIDs, tagColumnOIDs, cfg.StaticTags)
-		if err != nil {
-			c.log.Debugf("Error processing row %s: %v", index, err)
-			continue
+	rowStaticTags := make(map[string]string)
+	for _, tag := range cfg.StaticTags {
+		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
+			rowStaticTags[n] = v
 		}
-		metrics = append(metrics, rowMetrics...)
 	}
+
+	var metrics []Metric
+
+	for index, rowPDUs := range rows {
+		rowTags := make(map[string]string)
+
+		for columnOID, tagCfg := range tagColumnOIDs {
+			pdu, ok := rowPDUs[columnOID]
+			if !ok {
+				continue
+			}
+
+			tags, err := processTableMetricTagValue(tagCfg, pdu)
+			if err != nil {
+				c.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
+				continue
+			}
+
+			for k, v := range tags {
+				rowTags[k] = v
+				tagCache[index][k] = v
+			}
+		}
+
+		for columnOID, sym := range columnOIDs {
+			pdu, ok := rowPDUs[columnOID]
+			if !ok {
+				continue
+			}
+
+			value, err := processSymbolValue(sym, pdu)
+			if err != nil {
+				c.log.Debugf("Error processing value for %s: %v", sym.Name, err)
+				continue
+			}
+
+			metric := Metric{
+				Name:        sym.Name,
+				Value:       value,
+				StaticTags:  ternary(len(rowStaticTags) > 0, rowStaticTags, nil),
+				Tags:        maps.Clone(ternary(len(rowTags) > 0, rowTags, nil)),
+				Unit:        sym.Unit,
+				Description: sym.Description,
+				MetricType:  getMetricType(sym, pdu),
+				Family:      sym.Family,
+				Mappings:    convSymMappingToNumeric(sym),
+				IsTable:     true,
+			}
+
+			metrics = append(metrics, metric)
+		}
+	}
+
+	c.tableCache.cacheData(cfg.Table.OID, oidCache, tagCache)
+	c.log.Debugf("Cached table %s structure with %d rows", cfg.Table.Name, len(oidCache))
 
 	return metrics, nil
 }
 
-func (c *Collector) processTableRow(
-	rowPDUs map[string]gosnmp.SnmpPDU,
+func (c *Collector) collectTableWithCache(
+	cfg ddprofiledefinition.MetricsConfig,
+	cachedOIDs map[string]map[string]string,
+	cachedTags map[string]map[string]string,
 	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
-	tagColumnOIDs map[string]ddprofiledefinition.MetricTagConfig,
-	staticTags []string,
 ) ([]Metric, error) {
+	var oidsToGet []string
+	oidToLocation := make(map[string]struct{ index, column string }) // full OID -> location
+
+	for index, columns := range cachedOIDs {
+		for columnOID, fullOID := range columns {
+			// Only GET metric columns, tags are cached
+			if _, isMetric := columnOIDs[columnOID]; isMetric {
+				oidsToGet = append(oidsToGet, fullOID)
+				oidToLocation[trimOID(fullOID)] = struct{ index, column string }{index, columnOID}
+			}
+		}
+	}
+
+	if len(oidsToGet) == 0 {
+		return nil, nil
+	}
+
+	pdus, err := c.snmpGet(oidsToGet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cached OIDs: %w", err)
+	}
+
+	if len(pdus) < len(oidsToGet)/2 { // If we got less than half, probably table structure changed
+		return nil, fmt.Errorf("table structure may have changed, got %d/%d PDUs", len(pdus), len(oidsToGet))
+	}
+
+	rowStaticTags := make(map[string]string)
+
+	for _, tag := range cfg.StaticTags {
+		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
+			rowStaticTags[n] = v
+		}
+	}
+
 	var metrics []Metric
 
-	// Process tags first to ensure all metrics in the row get the same tags
-	rowTags := make(map[string]string)
+	for index, columns := range cachedOIDs {
+		rowTags := make(map[string]string)
 
-	for _, tag := range staticTags {
-		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
-			rowTags[n] = v
-		}
-	}
-
-	for columnOID, tagCfg := range tagColumnOIDs {
-		pdu, ok := rowPDUs[columnOID]
-		if !ok {
-			continue
+		if tags, ok := cachedTags[index]; ok {
+			for k, v := range tags {
+				rowTags[k] = v
+			}
 		}
 
-		tags, err := processTableMetricTagValue(tagCfg, pdu)
-		if err != nil {
-			c.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
-			continue
+		for columnOID, fullOID := range columns {
+			sym, isMetric := columnOIDs[columnOID]
+			if !isMetric {
+				continue
+			}
+
+			pdu, ok := pdus[trimOID(fullOID)]
+			if !ok {
+				c.log.Debugf("Missing PDU for cached OID %s", fullOID)
+				continue
+			}
+
+			value, err := processSymbolValue(sym, pdu)
+			if err != nil {
+				c.log.Debugf("Error processing value for %s: %v", sym.Name, err)
+				continue
+			}
+
+			metric := Metric{
+				Name:        sym.Name,
+				Value:       value,
+				StaticTags:  ternary(len(rowStaticTags) > 0, rowStaticTags, nil),
+				Tags:        ternary(len(rowTags) > 0, rowTags, nil),
+				Unit:        sym.Unit,
+				Description: sym.Description,
+				MetricType:  getMetricType(sym, pdu),
+				Family:      sym.Family,
+				Mappings:    convSymMappingToNumeric(sym),
+				IsTable:     true,
+			}
+
+			metrics = append(metrics, metric)
 		}
-
-		for k, v := range tags {
-			rowTags[k] = v
-		}
-	}
-
-	for columnOID, sym := range columnOIDs {
-		pdu, ok := rowPDUs[columnOID]
-		if !ok {
-			continue
-		}
-
-		value, err := processSymbolValue(sym, pdu)
-		if err != nil {
-			c.log.Debugf("Error processing value for %s: %v", sym.Name, err)
-			continue
-		}
-
-		metric := Metric{
-			Name:        sym.Name,
-			Value:       value,
-			Tags:        make(map[string]string),
-			Unit:        sym.Unit,
-			Description: sym.Description,
-			MetricType:  getMetricType(sym, pdu),
-			Family:      sym.Family,
-			Mappings:    convSymMappingToNumeric(sym),
-			IsTable:     true,
-		}
-
-		maps.Copy(metric.Tags, rowTags)
-
-		metrics = append(metrics, metric)
 	}
 
 	return metrics, nil
