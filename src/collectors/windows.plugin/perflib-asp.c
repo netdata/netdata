@@ -141,18 +141,53 @@ static void initialize(void)
     dictionary_register_insert_callback(asp_apps, dict_asp_insert_app_cb, NULL);
 }
 
-static void asp_global_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+static void netdata_asp_application_restarts(COUNTER_DATA *value, int update_every)
+{
+    static RRDSET *st_asp_application_restarts = NULL;
+    static RRDDIM *rd_asp_application_restarts = NULL;
+
+    if (unlikely(!st_asp_application_restarts)) {
+        st_asp_application_restarts = rrdset_create_localhost(
+                "asp",
+                "application_restarts",
+                NULL,
+                "asp",
+                "asp.application_restarts",
+                "Number of times the application has been restarted.",
+                "restarts",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_APPLICATION_RESTART
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rd_asp_application_restarts = rrddim_add(st_asp_application_restarts, "restarts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_asp_application_restarts, rd_asp_application_restarts, (collected_number)value->current.Data);
+    rrdset_done(st_asp_application_restarts);
 }
 
-static void asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+static void netdata_asp_global_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    static COUNTER_DATA appApplicationRestarts = {.key = "Application Restarts"};
+    static COUNTER_DATA appWorkerProcessRestarts = {.key = "Worker Process Restarts"};
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &appApplicationRestarts))
+        netdata_asp_application_restarts(&appApplicationRestarts, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &appWorkerProcessRestarts))
+        netdata_ask_worker_process_restarts(&appWorkerProcessRestarts, update_every);
+}
+
+static void netdata_asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
 }
 
 struct netdata_exchange_objects {
     void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int);
     char *object;
 } asp_obj[] = {
-        {.fnct = asp_global_objects, .object = "ASP.NET"},
-        {.fnct = asp_apps_objects, .object = "ASP.NET Applications"},
+        {.fnct = netdata_asp_global_objects, .object = "ASP.NET"},
+        {.fnct = netdata_asp_apps_objects, .object = "ASP.NET Applications"},
 
         // This is the end of the loop
         {.fnct = NULL, .object = NULL}};
