@@ -207,6 +207,22 @@ static void netdata_asp_global_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
 }
 
 static void netdata_asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
+        struct asp_app *aa = dictionary_set(asp_apps, windows_shared_buffer, NULL, sizeof(*aa));
+        if (!aa)
+            continue;
+    }
 }
 
 struct netdata_exchange_objects {
