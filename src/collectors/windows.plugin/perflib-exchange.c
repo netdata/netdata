@@ -104,7 +104,7 @@ static void exchange_workload_initialize_variables(struct exchange_workload *ew)
     ew->exchangeWorkloadCompleteTasks.key = "CompletedTasks";
     ew->exchangeWorkloadQueueTasks.key = "QueuedTasks";
     ew->exchangeWorkloadYieldedTasks.key = "YieldedTasks";
-    ew->exchangeWorkloadActiveTasks.key = "Active";
+    ew->exchangeWorkloadActivityStatus.key = "Active";
 }
 
 static void
