@@ -148,11 +148,11 @@ static void netdata_asp_application_restarts(COUNTER_DATA *value, int update_eve
 
     if (unlikely(!st_asp_application_restarts)) {
         st_asp_application_restarts = rrdset_create_localhost(
-                "asp",
+                "aspnet",
                 "application_restarts",
                 NULL,
-                "asp",
-                "asp.application_restarts",
+                "aspnet",
+                "aspnet.application_restarts",
                 "Number of times the application has been restarted.",
                 "restarts",
                 PLUGIN_WINDOWS_NAME,
@@ -175,11 +175,11 @@ static void netdata_ask_worker_process_restarts(COUNTER_DATA *value, int update_
 
     if (unlikely(!st_asp_worker_process_restarts)) {
         st_asp_worker_process_restarts = rrdset_create_localhost(
-                "asp",
+                "aspnet",
                 "worker_process_restarts",
                 NULL,
-                "asp",
-                "asp.worker_process_restarts",
+                "aspnet",
+                "aspnet.worker_process_restarts",
                 "Number of times a worker process has restarted on the machine.",
                 "restarts",
                 PLUGIN_WINDOWS_NAME,
@@ -206,6 +206,39 @@ static void netdata_asp_global_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         netdata_ask_worker_process_restarts(&appWorkerProcessRestarts, update_every);
 }
 
+static void netdata_apps_anonymous_request(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_asp_anonymous_request)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_anonymous_request", app);
+
+        aa->st_asp_anonymous_request = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.anonymous_request",
+                "Number of requests utilizing anonymous authentication.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_APP_ANONYMOUS_REQUEST,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_asp_anonymous_request =
+                rrddim_add(aa->st_asp_anonymous_request, "request", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_asp_anonymous_request->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_asp_anonymous_request,
+            aa->rd_asp_anonymous_request,
+            (collected_number)aa->aspAnonymousRequest.current.Data);
+    rrdset_done(aa->st_asp_anonymous_request);
+}
+
 static void netdata_asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -222,6 +255,9 @@ static void netdata_asp_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
         struct asp_app *aa = dictionary_set(asp_apps, windows_shared_buffer, NULL, sizeof(*aa));
         if (!aa)
             continue;
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspAnonymousRequest))
+            netdata_apps_anonymous_request(aa, windows_shared_buffer, update_every);
     }
 }
 
