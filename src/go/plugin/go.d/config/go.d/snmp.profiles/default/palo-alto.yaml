@@ -21,9 +21,6 @@ extends:
   - _generic-udp.yaml
   - _generic-ip.yaml
 
-device:
-  vendor: "paloaltonetworks"
-
 # All Palo Alto Networks sysObjectID start with `1.3.6.1.4.1.25461.2.3` (panMibs)
 sysobjectid: 1.3.6.1.4.1.25461.2.3.*
 
@@ -71,6 +68,10 @@ metadata:
             panSysSwVersion # Full software version. The first two components of the full version are the major
             # and minor versions. The third component indicates the maintenance release number
             # and the fourth, the build number.
+      type:
+        value: Firewall
+      vendor:
+        value: Palo Alto Networks
 
 metrics:
   #
@@ -82,56 +83,56 @@ metrics:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.1.0
       name: panSessionUtilization
       description: Session table utilization percentage
-      family: Palo Alto/Sessions/Utilization
+      family: Sessions/Utilization
       unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.2.0
       name: panSessionMax
       description: Total number of sessions supported
-      family: Palo Alto/Sessions/Total
+      family: Sessions/Total
       unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.3.0
       name: panSessionActive
       description: Total number of active sessions
-      family: Palo Alto/Sessions/Active
+      family: Sessions/Active
       unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.4.0
       name: panSessionActiveTcp
       description: Total number of active TCP sessions
-      family: Palo Alto/Sessions/TCP
+      family: Sessions/TCP
       unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.5.0
       name: panSessionActiveUdp
       description: Total number of active UDP sessions
-      family: Palo Alto/Sessions/UDP
+      family: Sessions/UDP
       unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.6.0
       name: panSessionActiveICMP
       description: Total number of active ICMP sessions
-      family: Palo Alto/Sessions/ICMP
+      family: Sessions/ICMP
       unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.7.0
       name: panSessionActiveSslProxy
       description: Total number of active SSL proxy sessions
-      family: Palo Alto/Sessions/SSL Proxy
+      family: Sessions/SSL Proxy
       unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.8.0
       name: panSessionSslProxyUtilization
       description: SSL proxy session utilization percentage
-      family: Palo Alto/Sessions/SSL Proxy
+      family: Sessions/SSL Proxy
       unit: "%"
 
   #
@@ -142,35 +143,35 @@ metrics:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.1.0
       name: panGPGWUtilizationPct
       description: GlobalProtect Gateway utilization percentage
-      family: Palo Alto/GPG/Utilization
+      family: GPG/Utilization
       unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.2.0
       name: panGPGWUtilizationMaxTunnels
       description: Max tunnels allowed
-      family: Palo Alto/GPG/Tunnels/Max
+      family: GPG/Tunnels/Max
       unit: "{tunnel}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.3.0
       name: panGPGWUtilizationActiveTunnels
       description: Number of active tunnels
-      family: Palo Alto/GPG/Tunnels/Active
+      family: GPG/Tunnels/Active
       unit: "{tunnel}"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.1.2.0
       name: panEntityTotalPowerUsed
       description: Total power used on the system in watts
-      family: Palo Alto/GPG/Power
+      family: GPG/Power
       unit: "W"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.1.1.0
       name: panEntityTotalPowerAvail
       description: Total power available on the system in watts
-      family: Palo Alto/GPG/Power
+      family: GPG/Power
       unit: "W"
   - MIB: PAN-ENTITY-EXT-MIB
     table:
@@ -180,12 +181,12 @@ metrics:
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1
         name: panEntryFRUModulePowerUsed
         description: Power used by the FRU Module in watts
-        family: Palo Alto/FRU/Power
+        family: FRU/Power
         unit: "W"
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.2
         name: panEntryFRUModuleNumPorts
         description: Number of ports on the FRU Module
-        family: Palo Alto/FRU/Ports
+        family: FRU/Ports
         unit: "{port}"
     metric_tags:
       - MIB: ENTITY-MIB
@@ -203,7 +204,7 @@ metrics:
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.3.1.1.1
         name: panEntryFanTrayPowerUsed
         description: Power used by the Fan Tray in watts
-        family: Palo Alto/System/Fan Trays/Power
+        family: System/Fan Trays/Power
         unit: "W"
     metric_tags:
       - MIB: ENTITY-MIB

@@ -17,3 +17,5 @@ metadata:
     fields:
       type:
         value: "SD-WAN"
+      vendor:
+        value: "Palo Alto Networks"
