@@ -6,7 +6,7 @@
 struct asp_app {
     RRDSET *st_aspnet_anonymous_request;
     RRDSET *st_aspnet_compilations_total;
-    RRDSET *st_aspnet_errors_during_processing;
+    RRDSET *st_aspnet_errors_during_preprocessing;
     RRDSET *st_aspnet_errors_during_compilation;
     RRDSET *st_aspnet_errors_during_execution;
     RRDSET *st_aspnet_errors_unhandled_execution_sec;
@@ -36,7 +36,7 @@ struct asp_app {
 
     RRDDIM *rd_aspnet_anonymous_request;
     RRDDIM *rd_aspnet_compilations_total;
-    RRDDIM *rd_aspnet_errors_during_processing;
+    RRDDIM *rd_aspnet_errors_during_preprocessing;
     RRDDIM *rd_aspnet_errors_during_compilation;
     RRDDIM *rd_aspnet_errors_during_execution;
     RRDDIM *rd_aspnet_errors_unhandled_execution_sec;
@@ -65,7 +65,7 @@ struct asp_app {
 
     COUNTER_DATA aspnetAnonymousRequestPerSec;
     COUNTER_DATA aspnetCompilationsTotal;
-    COUNTER_DATA aspnetErrorsDuringProcessing;
+    COUNTER_DATA aspnetErrorsDuringPreProcessing;
     COUNTER_DATA aspnetErrorsDuringCompilation;
     COUNTER_DATA aspnetErrorsDuringExecution;
     COUNTER_DATA aspnetErrorsUnhandledExecutionSec;
@@ -98,7 +98,7 @@ DICTIONARY *asp_apps;
 static void asp_app_initialize_variables(struct asp_app *ap) {
     ap->aspnetAnonymousRequestPerSec.key = "Anonymous Requests/Sec";
     ap->aspnetCompilationsTotal.key = "Compilations Total";
-    ap->aspnetErrorsDuringProcessing.key = "Errors During Preprocessing";
+    ap->aspnetErrorsDuringPreProcessing.key = "Errors During Preprocessing";
     ap->aspnetErrorsDuringCompilation.key = "Errors During Compilation";
     ap->aspnetErrorsDuringExecution.key = "Errors During Execution";
     ap->aspnetErrorsUnhandledExecutionSec.key = "Errors Unhandled During Execution/Sec";
@@ -271,6 +271,151 @@ static void netdata_apps_compilations_total(struct asp_app *aa, char *app, int u
     rrdset_done(aa->st_aspnet_compilations_total);
 }
 
+static void netdata_apps_errors_during_preprocessing(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_errors_during_preprocessing)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_errors_during_preprocessing", app);
+
+        aa->st_aspnet_errors_during_preprocessing = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.errors_during_preprocessing",
+                "Errors During Preprocessing.",
+                "errors",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_ERRORS_DURING_PREPROCESSING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_errors_during_preprocessing =
+                rrddim_add(aa->st_aspnet_errors_during_preprocessing, "preprocessing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_errors_during_preprocessing->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_errors_during_preprocessing,
+            aa->rd_aspnet_errors_during_preprocessing,
+            (collected_number) aa->aspnetErrorsDuringPreProcessing.current.Data);
+    rrdset_done(aa->st_aspnet_errors_during_preprocessing);
+}
+
+static void netdata_apps_errors_during_compilation(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_errors_during_compilation)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_errors_during_compilation", app);
+
+        aa->st_aspnet_errors_during_compilation = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.errors_during_compilation",
+                "Errors During Compilation.",
+                "errors",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_ERRORS_DURING_COMPILATION,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_errors_during_compilation =
+                rrddim_add(aa->st_aspnet_errors_during_compilation, "compilation", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_errors_during_compilation->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_errors_during_compilation,
+            aa->rd_aspnet_errors_during_compilation,
+            (collected_number) aa->aspnetErrorsDuringCompilation.current.Data);
+    rrdset_done(aa->st_aspnet_errors_during_compilation);
+}
+
+static void netdata_apps_errors_during_execution(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_errors_during_execution)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_errors_during_execution", app);
+
+        aa->st_aspnet_errors_during_execution = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.errors_during_execution",
+                "Errors During Execution.",
+                "errors",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_ERRORS_DURING_EXECUTION,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_errors_during_execution =
+                rrddim_add(aa->st_aspnet_errors_during_execution, "execution", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_errors_during_execution->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_errors_during_execution,
+            aa->rd_aspnet_errors_during_execution,
+            (collected_number) aa->aspnetErrorsDuringExecution.current.Data);
+    rrdset_done(aa->st_aspnet_errors_during_execution);
+}
+
+static void netdata_apps_errors_during_unhandled_execution(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_errors_unhandled_execution_sec)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_errors_during_unhandled_execution", app);
+
+        aa->st_aspnet_errors_unhandled_execution_sec = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.errors_during_unhandled_execution",
+                "Errors Unhandled During Execution.",
+                "errors",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_ERRORS_UNHANDLED_EXECUTION_PER_SEC,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_errors_unhandled_execution_sec =
+                rrddim_add(aa->st_aspnet_errors_unhandled_execution_sec, "unhandled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_errors_unhandled_execution_sec->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_errors_unhandled_execution_sec,
+            aa->rd_aspnet_errors_unhandled_execution_sec,
+            (collected_number) aa->aspnetErrorsUnhandledExecutionSec.current.Data);
+    rrdset_done(aa->st_aspnet_errors_unhandled_execution_sec);
+}
+
+static inline void netdata_aspnet_apps_runtime_errors(PERF_DATA_BLOCK *pDataBlock,
+                                                      PERF_OBJECT_TYPE *pObjectType,
+                                                      struct asp_app *aa,
+                                                      int update_every) {
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetErrorsDuringPreProcessing))
+        netdata_apps_errors_during_preprocessing(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetErrorsDuringCompilation))
+        netdata_apps_errors_during_compilation(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetErrorsDuringExecution))
+        netdata_apps_errors_during_execution(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetErrorsUnhandledExecutionSec))
+        netdata_apps_errors_during_unhandled_execution(aa, windows_shared_buffer, update_every);
+}
+
 static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -293,6 +438,8 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetCompilationsTotal))
             netdata_apps_compilations_total(aa, windows_shared_buffer, update_every);
+
+        netdata_aspnet_apps_runtime_errors(pDataBlock, pObjectType, app, update_every);
     }
 }
 
