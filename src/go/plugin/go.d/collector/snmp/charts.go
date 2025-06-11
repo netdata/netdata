@@ -365,15 +365,6 @@ func (c *Collector) addProfileScalarMetricChart(pm *ddsnmpcollector.ProfileMetri
 	}
 }
 
-func (c *Collector) removeProfileScalarMetricChart(metricName string) {
-	r := strings.NewReplacer(".", "_", " ", "_")
-	id := fmt.Sprintf("snmp_device_prof_%s", r.Replace(metricName))
-	if chart := c.Charts().Get(id); chart != nil {
-		chart.MarkRemove()
-		chart.MarkNotCreated()
-	}
-}
-
 func dimAlgoFromDdSnmpType(m ddsnmpcollector.Metric) module.DimAlgo {
 	if m.MetricType == ddprofiledefinition.ProfileMetricTypeGauge {
 		return module.Absolute
