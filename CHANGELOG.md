@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- improvement\(go.d/ddsnmp\): add table metrics, tags from the same table [\#20463](https://github.com/netdata/netdata/pull/20463) ([ilyam8](https://github.com/ilyam8))
+- build: update otel-collector deps [\#20461](https://github.com/netdata/netdata/pull/20461) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/smartctl\): debug log exec output [\#20460](https://github.com/netdata/netdata/pull/20460) ([ilyam8](https://github.com/ilyam8))
+- improve database indexing and rotation handling in event loop [\#20459](https://github.com/netdata/netdata/pull/20459) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.24 to 2.9.0 in /src/go [\#20457](https://github.com/netdata/netdata/pull/20457) ([dependabot[bot]](https://github.com/apps/dependabot))
+- improvement\(go.d/ddsnmp\): dedup metrics when merging profiles [\#20456](https://github.com/netdata/netdata/pull/20456) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20453](https://github.com/netdata/netdata/pull/20453) ([netdatabot](https://github.com/netdatabot))
 - docs: improve SCIM documentation [\#20451](https://github.com/netdata/netdata/pull/20451) ([juacker](https://github.com/juacker))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.40.0 to 1.41.0 in /src/go [\#20449](https://github.com/netdata/netdata/pull/20449) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -13,6 +19,7 @@
 - build\(deps\): bump github.com/lmittmann/tint from 1.1.1 to 1.1.2 in /src/go [\#20446](https://github.com/netdata/netdata/pull/20446) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.9.0 to 9.10.0 in /src/go [\#20445](https://github.com/netdata/netdata/pull/20445) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump golang.org/x/net from 0.40.0 to 0.41.0 in /src/go [\#20444](https://github.com/netdata/netdata/pull/20444) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Weblog collector: Exclude 429 from 4xx [\#20443](https://github.com/netdata/netdata/pull/20443) ([Slind14](https://github.com/Slind14))
 - chore\(go.d/ddsnmp\): add basic SNMP table walking functionality [\#20441](https://github.com/netdata/netdata/pull/20441) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d/ddsnmp\): use dev type and vendor from meta for family [\#20439](https://github.com/netdata/netdata/pull/20439) ([ilyam8](https://github.com/ilyam8))
 - Fix registry save integer overflow and add failure backoff [\#20437](https://github.com/netdata/netdata/pull/20437) ([ktsaou](https://github.com/ktsaou))
@@ -447,10 +454,6 @@
 - Make sure ACLK sync thread completes initialization [\#19916](https://github.com/netdata/netdata/pull/19916) ([stelfrag](https://github.com/stelfrag))
 - do not enqueue command if aclk is not initialized [\#19914](https://github.com/netdata/netdata/pull/19914) ([ktsaou](https://github.com/ktsaou))
 - detect null datafile while finding datafiles in range [\#19913](https://github.com/netdata/netdata/pull/19913) ([ktsaou](https://github.com/ktsaou))
-- post the first status when there is no last status [\#19912](https://github.com/netdata/netdata/pull/19912) ([ktsaou](https://github.com/ktsaou))
-- initial implementation of libbacktrace [\#19910](https://github.com/netdata/netdata/pull/19910) ([ktsaou](https://github.com/ktsaou))
-- fix reliability calculation [\#19909](https://github.com/netdata/netdata/pull/19909) ([ktsaou](https://github.com/ktsaou))
-- improvement\(health/dyncfg\): add widget to load available contexts [\#19904](https://github.com/netdata/netdata/pull/19904) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
@@ -463,12 +466,6 @@
 ## [v2.3.0](https://github.com/netdata/netdata/tree/v2.3.0) (2025-03-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.2.6...v2.3.0)
-
-**Merged pull requests:**
-
-- Remove auto-retry on changelog generation. [\#19908](https://github.com/netdata/netdata/pull/19908) ([Ferroin](https://github.com/Ferroin))
-- Bump repoconfig version used in kickstart script to 5-1. [\#19906](https://github.com/netdata/netdata/pull/19906) ([Ferroin](https://github.com/Ferroin))
-- Revert "Fix compile without dbengine" [\#19905](https://github.com/netdata/netdata/pull/19905) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.2.6](https://github.com/netdata/netdata/tree/v2.2.6) (2025-02-20)
 
