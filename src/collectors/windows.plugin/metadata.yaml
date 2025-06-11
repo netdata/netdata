@@ -3195,3 +3195,9 @@ modules:
               chart_type: line
               dimensions:
                 - name: requests
+            - name: aspnet.compilation_totals
+              description: Number of source files dynamically compiled.
+              unit: compilations
+              chart_type: line
+              dimensions:
+                - name: compilations
