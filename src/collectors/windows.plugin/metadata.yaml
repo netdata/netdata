@@ -3201,3 +3201,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: compilations
+            - name: aspnet.errors_during_preprocessing
+              description: Errors During Preprocessing.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: preprocessing
+            - name: aspnet.errors_during_compilation
+              description: Errors During Compilation.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: compilation
+            - name: aspnet.errors_during_execution
+              description: Errors During Execution.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: execution
+            - name: aspnet.errors_during_unhandled_execution
+              description: Errors Unhandled During Execution.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: unhandled
