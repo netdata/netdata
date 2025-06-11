@@ -250,3 +250,14 @@ func isMappingKeysNumeric(mapping map[string]string) bool {
 	}
 	return true
 }
+func cleanTags(metrics []*ProfileMetrics) {
+	for _, pm := range metrics {
+		for _, m := range pm.Metrics {
+			for k, v := range m.Tags {
+				m.Tags[k] = tagReplacer.Replace(v)
+			}
+		}
+	}
+}
+
+var tagReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ")

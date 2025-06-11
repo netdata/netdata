@@ -84,18 +84,18 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		return nil, fmt.Errorf("error processing value for OID %s (%s): %w", cfg.Symbol.Name, cfg.Symbol.OID, err)
 	}
 
-	tags := make(map[string]string)
+	staticTags := make(map[string]string)
 
 	for _, tag := range cfg.StaticTags {
 		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
-			tags[n] = v
+			staticTags[n] = v
 		}
 	}
 
 	return &Metric{
 		Name:        cfg.Symbol.Name,
 		Value:       value,
-		Tags:        tags,
+		StaticTags:  ternary(len(staticTags) > 0, staticTags, nil),
 		Unit:        cfg.Symbol.Unit,
 		Description: cfg.Symbol.Description,
 		Family:      cfg.Symbol.Family,

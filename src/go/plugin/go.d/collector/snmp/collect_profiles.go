@@ -22,18 +22,15 @@ func (c *Collector) collectProfiles(mx map[string]int64) error {
 		return err
 	}
 
-	seen := make(map[string]bool)
-
 	for _, pm := range profMetrics {
 		for _, m := range pm.Metrics {
 			if m.IsTable {
 				continue
 			}
 
-			seen[m.Name] = true
 			if !c.seenScalarMetrics[m.Name] {
 				c.seenScalarMetrics[m.Name] = true
-				c.addProfileScalarMetricChart(m)
+				c.addProfileScalarMetricChart(pm, m)
 			}
 
 			if len(m.Mappings) > 0 {
@@ -45,13 +42,6 @@ func (c *Collector) collectProfiles(mx map[string]int64) error {
 				id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
 				mx[id] = m.Value
 			}
-		}
-	}
-
-	for name := range c.seenScalarMetrics {
-		if !seen[name] {
-			delete(c.seenScalarMetrics, name)
-			c.removeProfileScalarMetricChart(name)
 		}
 	}
 
