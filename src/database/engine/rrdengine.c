@@ -182,7 +182,7 @@ static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx
         return;
     }
 
-    if(ctx_is_available_for_queries(ctx) && rrdeng_ctx_tier_cap_exceeded(ctx)) {
+    if(rrdeng_ctx_tier_cap_exceeded(ctx)) {
         ctx->datafiles.pending_rotate = true;
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     }
@@ -689,7 +689,7 @@ static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_da
     bool ret = false;
     spinlock_lock(&datafile->writers.spinlock);
 
-    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx))
+    if(datafile->pos > rrdeng_target_data_file_size(ctx))
         ret = true;
 
     spinlock_unlock(&datafile->writers.spinlock);
@@ -1327,12 +1327,12 @@ void datafile_delete(
     if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
-    if (!ctx_is_available_for_queries(ctx)) {
-        // agent is shutting down, we cannot continue
-        if(worker)
-            worker_is_idle();
-        return;
-    }
+//    if (!ctx_is_available_for_queries(ctx)) {
+//        // agent is shutting down, we cannot continue
+//        if(worker)
+//            worker_is_idle();
+//        return;
+//    }
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
     netdata_log_info("DBENGINE: deleting data file \"%s/"
@@ -2086,11 +2086,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         dbengine_initialize_structures();
 
         int retries = 0;
-//        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
         rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
-
-//        if (!rrdeng_main.thread)
-//            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
 
         fatal_assert(0 != rrdeng_main.thread);
 
@@ -2187,6 +2183,7 @@ void *dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_EVICT_MAIN,                               "evict init");
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
     worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_DIRTY,                          "ctx flush dirty");
+    worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,                      "ctx flush all");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
 
@@ -2347,13 +2344,19 @@ void *dbengine_event_loop(void* arg) {
                     break;
                 }
 
+                case RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY: {
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    work_dispatch(ctx, NULL, NULL, opcode,
+                                  flush_all_hot_and_dirty_pages_of_section_tp_worker,
+                                  after_flush_all_hot_and_dirty_pages_of_section);
+                    break;
+                }
+
                 case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
                     struct rrdengine_instance *ctx = cmd.ctx;
+                    nd_log_daemon(NDLP_INFO, "DBENGINE: Tier %d is shutting down — query processing disabled", ctx->config.tier);
                     __atomic_store_n(&ctx->quiesce.enabled, true, __ATOMIC_RELEASE);
-                    work_dispatch(ctx, NULL, NULL, opcode,
-                                      flush_all_hot_and_dirty_pages_of_section_tp_worker,
-                                      after_flush_all_hot_and_dirty_pages_of_section);
                     break;
                 }
 
