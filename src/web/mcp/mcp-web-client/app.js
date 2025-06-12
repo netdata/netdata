@@ -2,7 +2,8 @@
  * Main application logic for the Netdata MCP LLM Client
  */
 
-import { MessageOptimizer } from './message-optimizer.js';
+import {MessageOptimizer} from './message-optimizer.js';
+import * as ChatConfig from './chat-config.js';
 
 class NetdataMCPChat {
     constructor() {
@@ -18,6 +19,7 @@ class NetdataMCPChat {
         this.isProcessing = false; // Track if we're currently processing messages
         this.modelPricing = {}; // Initialize model pricing storage
         this.modelLimits = {}; // Initialize model context limits storage
+        this.copiedModel = null; // Track copied model for paste functionality
         
         // Per-chat DOM management
         this.chatContainers = new Map(); // Map of chatId -> DOM container
@@ -389,8 +391,10 @@ helps users understand your analysis methodology and builds confidence in your c
         
         // Extract model name from format "provider:model-name"
         let modelName = model;
-        if (modelName.includes(':')) {
-            modelName = modelName.split(':')[1];
+        if (typeof model === 'string') {
+            modelName = ChatConfig.getModelDisplayName(model);
+        } else if (model?.id) {
+            modelName = model.id;
         }
         
         const pricing = this.modelPricing[modelName];
@@ -462,7 +466,7 @@ helps users understand your analysis methodology and builds confidence in your c
         // Calculate from all messages
         for (const message of chat.messages) {
             if (message.usage) {
-                const model = message.model || chat.model; // Fallback to chat model for old messages
+                const model = message.model || ChatConfig.getChatModelString(chat); // Fallback to chat model for old messages
                 if (!model) {continue;}
                 
                 // Update total tokens
@@ -530,7 +534,7 @@ helps users understand your analysis methodology and builds confidence in your c
             if (message.usage && !message.price) {
                 // Add model if missing (use chat's model as fallback)
                 if (!message.model) {
-                    message.model = chat.model;
+                    message.model = ChatConfig.getChatModelString(chat);
                 }
                 
                 // Calculate price
@@ -607,9 +611,6 @@ helps users understand your analysis methodology and builds confidence in your c
                     if (elements.mcpServerDropdown && elements.mcpServerDropdown.style) {
                         elements.mcpServerDropdown.style.display = 'none';
                     }
-                    if (elements.temperatureDropdown && elements.temperatureDropdown.style) {
-                        elements.temperatureDropdown.style.display = 'none';
-                    }
                 }
             });
         });
@@ -638,10 +639,6 @@ helps users understand your analysis methodology and builds confidence in your c
         this.loadSidebarStates();
         
         // Temperature control - will be set when switching chats
-        this.temperatureBtn = null;
-        this.currentTempText = null;
-        // Removed unused variables - tempValueLabel is accessed via elements._elements
-        this.temperatureControl = null; // For compatibility
         
         // Settings modal
         this.settingsModal = document.getElementById('settingsModal');
@@ -756,29 +753,22 @@ helps users understand your analysis methodology and builds confidence in your c
     }
     
     validateChatModels() {
-        // Get default model for fallback
-        let defaultModel = null;
-        try {
-            const lastConfig = localStorage.getItem('lastChatConfig');
-            if (lastConfig) {
-                const config = JSON.parse(lastConfig);
-                defaultModel = config.model;
-            }
-        } catch {
-            // Ignore
-        }
-        
         // Validate each chat's model
         for (const [chatId, chat] of this.chats) {
-            if (chat.model && chat.llmProviderId) {
+            // Skip if chat doesn't have proper config
+            if (!chat.config || !chat.config.model) {
+                continue;
+            }
+            
+            if (chat.llmProviderId) {
                 const provider = this.llmProviders.get(chat.llmProviderId);
                 if (provider && provider.availableProviders) {
                     // Check if the model exists
                     let modelExists = false;
-                    const [providerType, modelName] = chat.model.includes(':') ? 
-                        chat.model.split(':') : ['', chat.model];
+                    const providerType = chat.config.model.provider;
+                    const modelName = chat.config.model.id;
                     
-                    if (providerType && provider.availableProviders[providerType]) {
+                    if (providerType && modelName && provider.availableProviders[providerType]) {
                         const models = provider.availableProviders[providerType].models || [];
                         modelExists = models.some(m => {
                             const mId = typeof m === 'string' ? m : m.id;
@@ -787,30 +777,14 @@ helps users understand your analysis methodology and builds confidence in your c
                     }
                     
                     if (!modelExists) {
-                        // Use default or first available
-                        let fallbackModel = defaultModel;
-                        if (!fallbackModel || !this.isModelValid(fallbackModel, provider)) {
-                            const firstProvider = Object.keys(provider.availableProviders)[0];
-                            const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
-                            if (firstModel) {
-                                const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
-                                fallbackModel = `${firstProvider}:${modelId}`;
-                            }
-                        }
+                        const oldModelString = ChatConfig.modelConfigToString(chat.config.model);
+                        console.error(`Chat ${chatId} has invalid model ${oldModelString}. Model not found in available providers.`);
                         
-                        console.warn(`Chat ${chatId} has invalid model ${chat.model}, resetting to ${fallbackModel || 'none (no valid model found)'}`);
+                        // Mark the chat as having an invalid model
+                        chat.hasInvalidModel = true;
                         
-                        if (fallbackModel) {
-                            chat.model = fallbackModel;
-                            
-                            // Save the updated chat
-                            this.saveChatToStorage(chatId);
-                            
-                            // Update UI if this is the current chat
-                            if (this.getActiveChatId() === chatId) {
-                                this.updateModelDisplay(chat);
-                            }
-                        }
+                        // DO NOT automatically reset or save!
+                        // The user must manually select a valid model
                     }
                 }
             }
@@ -829,8 +803,8 @@ helps users understand your analysis methodology and builds confidence in your c
         const provider = this.llmProviders.get(chat.llmProviderId);
         
         // Update LLM model display
-        if (provider && chat.model) {
-            const modelDisplay = chat.model.includes(':') ? chat.model.split(':')[1] : chat.model;
+        if (provider && chat.config?.model?.id) {
+            const modelDisplay = chat.config.model.id;
             if (elements.llmMeta) {
                 elements.llmMeta.textContent = modelDisplay;
             }
@@ -850,10 +824,20 @@ helps users understand your analysis methodology and builds confidence in your c
     isModelValid(model, provider) {
         if (!model || !provider || !provider.availableProviders) {return false;}
         
-        const [providerType, modelName] = model.includes(':') ? 
-            model.split(':') : ['', model];
+        // Handle both string format and config object
+        let providerType, modelName;
+        if (typeof model === 'string') {
+            const modelConfig = ChatConfig.modelConfigFromString(model);
+            providerType = modelConfig?.provider;
+            modelName = modelConfig?.id;
+        } else if (model.provider && model.id) {
+            providerType = model.provider;
+            modelName = model.id;
+        } else {
+            return false;
+        }
         
-        if (!providerType || !provider.availableProviders[providerType]) {return false;}
+        if (!providerType || !modelName || !provider.availableProviders[providerType]) {return false;}
         
         const models = provider.availableProviders[providerType].models || [];
         return models.some(m => {
@@ -862,13 +846,13 @@ helps users understand your analysis methodology and builds confidence in your c
         });
     }
     
-    populateModelDropdown(chatId, dropdown = null) {
+    populateModelDropdown(chatId, dropdown = null, buttonElement = null) {
         if (!chatId) {
             console.error('[populateModelDropdown] Called without chatId');
             return;
         }
         const targetChatId = chatId;
-        const targetDropdown = dropdown || this.llmModelDropdown;
+        let targetDropdown = dropdown || this.llmModelDropdown;
         
         const chat = this.chats.get(targetChatId);
         if (!chat) {return;}
@@ -876,91 +860,1184 @@ helps users understand your analysis methodology and builds confidence in your c
         const provider = this.llmProviders.get(chat.llmProviderId);
         if (!provider || !provider.availableProviders) {return;}
         
-        targetDropdown.innerHTML = '';
-        targetDropdown.style.width = '600px'; // Make dropdown wider for pricing table with 4 columns
+        // Create a modal overlay instead of using the dropdown
+        const overlay = document.createElement('div');
+        overlay.className = 'model-selector-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+        `;
         
-        // Add models from all available providers
-        Object.entries(provider.availableProviders).forEach(([providerType, config]) => {
-            // Add provider header
-            const header = document.createElement('div');
-            header.className = 'dropdown-header';
-            header.textContent = providerType.charAt(0).toUpperCase() + providerType.slice(1);
-            targetDropdown.appendChild(header);
+        // Get button position for dropdown-like positioning
+        const buttonRect = buttonElement ? buttonElement.getBoundingClientRect() : null;
+        
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            width: 900px !important;
+            min-width: 900px !important;
+            max-width: 900px !important;
+            max-height: 64vh;
+            position: fixed;
+            background: var(--background-color);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        `;
+        
+        // Position the modal like a dropdown
+        if (buttonRect) {
+            // Position below the button
+            const spaceBelow = window.innerHeight - buttonRect.bottom;
+            const spaceAbove = buttonRect.top;
             
-            // Add table header for pricing
-            const tableHeader = document.createElement('div');
-            tableHeader.style.cssText = 'display: flex; padding: 5px 10px; font-size: 11px; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color);';
-            tableHeader.innerHTML = `
-                <div style="flex: 1;">Model</div>
-                <div style="width: 70px; text-align: right;">Input</div>
-                <div style="width: 70px; text-align: right;">Cache R</div>
-                <div style="width: 70px; text-align: right;">Cache W</div>
-                <div style="width: 70px; text-align: right;">Output</div>
-            `;
-            targetDropdown.appendChild(tableHeader);
+            if (spaceBelow >= 400 || spaceBelow > spaceAbove) {
+                // Show below button
+                modalContent.style.top = `${buttonRect.bottom + 5}px`;
+                modalContent.style.bottom = 'auto';
+            } else {
+                // Show above button
+                modalContent.style.bottom = `${window.innerHeight - buttonRect.top + 5}px`;
+                modalContent.style.top = 'auto';
+            }
             
-            // Add models
-            config.models.forEach(model => {
-                const modelId = typeof model === 'string' ? model : model.id;
-                // Get pricing from the model object itself or from this.modelPricing
-                const pricing = typeof model === 'object' && model.pricing ? model.pricing : this.modelPricing[modelId];
-                
-                const item = document.createElement('button');
-                item.className = 'dropdown-item';
-                item.style.cssText = 'display: flex; align-items: center; padding: 8px 10px; width: 100%; text-align: left;';
-                
-                // Build pricing display
-                let pricingHTML = `<div style="flex: 1; font-weight: 500;">${modelId}</div>`;
-                
-                if (pricing) {
-                    const formatPrice = (price) => price !== undefined && price !== null ? `$${price.toFixed(2)}` : 'N/A';
-                    
-                    // Input price
-                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.input)}</div>`;
-                    
-                    // Cache read price
-                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.cacheRead)}</div>`;
-                    
-                    // Cache write price (Anthropic only)
-                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.cacheWrite)}</div>`;
-                    
-                    // Output price
-                    pricingHTML += `<div style="width: 70px; text-align: right; font-size: 12px; color: var(--text-secondary);">${formatPrice(pricing.output)}</div>`;
-                } else {
-                    // No pricing info
-                    pricingHTML += `<div style="width: 280px; text-align: right; font-size: 12px; color: var(--text-tertiary); font-style: italic;">No pricing data</div>`;
-                }
-                
-                item.innerHTML = pricingHTML;
-                
-                // Mark active model
-                if (chat.model === `${providerType}:${modelId}`) {
-                    item.classList.add('active');
-                }
-                
-                item.onclick = () => {
-                    this.switchModel(`${providerType}:${modelId}`, targetChatId).catch(error => {
-                        console.error('Failed to switch model:', error);
-                        this.showError('Failed to switch model', targetChatId);
-                    });
-                    targetDropdown.style.display = 'none';
-                };
-                
-                targetDropdown.appendChild(item);
-            });
+            // Center horizontally relative to button
+            const modalWidth = 900;
+            const buttonCenter = buttonRect.left + (buttonRect.width / 2);
+            let left = buttonCenter - (modalWidth / 2);
             
-            // Add divider after each provider (except the last)
-            const divider = document.createElement('div');
-            divider.className = 'dropdown-divider';
-            targetDropdown.appendChild(divider);
+            // Keep within viewport bounds
+            if (left < 10) left = 10;
+            if (left + modalWidth > window.innerWidth - 10) {
+                left = window.innerWidth - modalWidth - 10;
+            }
+            
+            modalContent.style.left = `${left}px`;
+        } else {
+            // Fallback to center if no button provided
+            modalContent.style.top = '50%';
+            modalContent.style.left = '50%';
+            modalContent.style.transform = 'translate(-50%, -50%)';
+        }
+        
+        // Close when clicking overlay
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+                // Update displays
+                this.updateChatHeader(chatId);
+                this.updateChatSessions();
+            }
         });
         
-        // Remove the last divider
-        const lastChild = targetDropdown.lastChild;
-        if (lastChild && lastChild.className === 'dropdown-divider') {
-            targetDropdown.removeChild(lastChild);
+        // Prevent clicks inside modal from closing
+        modalContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        overlay.appendChild(modalContent);
+        document.body.appendChild(overlay);
+        
+        // Use modalContent as our target for populating
+        targetDropdown = modalContent;
+        
+        // Get current config
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        
+        // Create header section (fixed)
+        const headerSection = document.createElement('div');
+        headerSection.style.cssText = `
+            flex-shrink: 0;
+            position: relative;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--surface-color);
+        `;
+        
+        // Add title
+        const headerTitle = document.createElement('h3');
+        headerTitle.style.cssText = `
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        `;
+        headerTitle.textContent = 'Model & Optimization Settings';
+        headerSection.appendChild(headerTitle);
+        
+        // Add close button at the top
+        const closeButton = document.createElement('button');
+        closeButton.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            z-index: 1;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background 0.2s;
+        `;
+        closeButton.innerHTML = '×';
+        closeButton.addEventListener('mouseenter', () => {
+            closeButton.style.background = 'var(--hover-color)';
+        });
+        closeButton.addEventListener('mouseleave', () => {
+            closeButton.style.background = 'none';
+        });
+        closeButton.addEventListener('click', () => {
+            overlay.remove();
+            // Update displays
+            this.updateChatHeader(chatId);
+            this.updateChatSessions();
+        });
+        headerSection.appendChild(closeButton);
+        targetDropdown.appendChild(headerSection);
+        
+        // Create scrollable content container
+        const contentContainer = document.createElement('div');
+        contentContainer.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            min-height: 200px;
+            max-height: calc(64vh - 120px); /* Account for header and footer */
+            scrollbar-width: thin;
+            scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+        `;
+        
+        // Add cost optimization settings section to content container
+        this.addCostOptimizationSection(contentContainer, chatId, config);
+        targetDropdown.appendChild(contentContainer);
+        
+        // Add footer section with cost estimation
+        // Footer section removed - no cost estimation needed
+    }
+
+    addCostOptimizationSection(dropdown, chatId, config) {
+        const section = document.createElement('div');
+        section.style.cssText = `
+            padding: 8px 12px;
+            background: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+        `;
+        
+        section.innerHTML = `
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-primary);">
+                Cost Optimizations
+            </div>
+        `;
+        
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error('addCostOptimizationSection: Chat not found for ID:', chatId);
+            return;
+        }
+        
+        // Get all available models - removed as unused
+        // const allModels = this.getAllAvailableModels();
+        
+        // Chat Model Selection with Max Tokens
+        const chatModelDiv = document.createElement('div');
+        chatModelDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;';
+        
+        const currentMaxTokens = chat.config.model.params.maxTokens;
+        chatModelDiv.innerHTML = `
+            <span>Chat with</span>
+            <div class="model-select-wrapper" style="position: relative; display: inline-block;">
+                <button class="model-select-btn" id="chatModel_${chatId}" 
+                        style="padding: 2px 8px; border: 1px solid var(--border-color); 
+                               border-radius: 4px; background: var(--background-color); 
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;">
+                    <span class="model-name">${ChatConfig.getChatModelString(chat) || 'Select model'}</span>
+                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                </button>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
+                <label style="font-size: 12px; color: var(--text-secondary);">Max tokens:</label>
+                <select id="maxTokens_${chatId}" 
+                        style="padding: 2px 6px; border: 1px solid var(--border-color); 
+                               border-radius: 4px; background: var(--background-color); 
+                               color: var(--text-primary); font-size: 12px;">
+                    <option value="1024" ${currentMaxTokens === 1024 ? 'selected' : ''}>1k</option>
+                    <option value="2048" ${currentMaxTokens === 2048 ? 'selected' : ''}>2k</option>
+                    <option value="4096" ${currentMaxTokens === 4096 ? 'selected' : ''}>4k</option>
+                    <option value="8192" ${currentMaxTokens === 8192 ? 'selected' : ''}>8k</option>
+                    <option value="16384" ${currentMaxTokens === 16384 ? 'selected' : ''}>16k</option>
+                    <option value="32768" ${currentMaxTokens === 32768 ? 'selected' : ''}>32k</option>
+                    <option value="65536" ${currentMaxTokens === 65536 ? 'selected' : ''}>64k</option>
+                    <option value="131072" ${currentMaxTokens === 131072 ? 'selected' : ''}>128k</option>
+                </select>
+            </div>
+        `;
+        section.appendChild(chatModelDiv);
+        
+        // Tool Summarization Option
+        const toolSumDiv = document.createElement('div');
+        const isEnabled = config.optimisation.toolSummarisation.enabled;
+        toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!isEnabled ? 'opacity: 0.5;' : ''}`;
+        
+        const currentThreshold = config.optimisation.toolSummarisation.thresholdKiB || 20; // Default 20KB
+        const toolSumModel = ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model) || ChatConfig.getChatModelString(chat);
+        
+        toolSumDiv.innerHTML = `
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="toolSummarization_${chatId}" ${isEnabled ? 'checked' : ''}
+                       style="margin-right: 6px;">
+                <span>Summarize tool responses of at least</span>
+            </label>
+            <select id="toolThreshold_${chatId}" 
+                    style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
+                           border-radius: 4px; background: var(--background-color); color: var(--text-primary);
+                           cursor: pointer;"
+                    ${!isEnabled ? 'disabled' : ''}>
+                <option value="0">0 (all)</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20" ${currentThreshold === 20 ? 'selected' : ''}>20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+                <option value="60">60</option>
+                <option value="70">70</option>
+                <option value="80">80</option>
+                <option value="90">90</option>
+                <option value="100">100</option>
+            </select>
+            <span>KiB size, with</span>
+            <div class="model-select-wrapper" style="position: relative; display: inline-block;">
+                <button class="model-select-btn" id="toolSumModel_${chatId}" 
+                        style="padding: 2px 8px; border: 1px solid var(--border-color); 
+                               border-radius: 4px; background: var(--background-color); 
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;"
+                        ${!isEnabled ? 'disabled' : ''}>
+                    <span class="model-name">${toolSumModel || 'Select model'}</span>
+                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                </button>
+            </div>
+        `;
+        
+        section.appendChild(toolSumDiv);
+        
+        // Auto-summarization Option (second)
+        const autoSumDiv = document.createElement('div');
+        const autoSumEnabled = config.optimisation.autoSummarisation.enabled;
+        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!autoSumEnabled ? 'opacity: 0.5;' : ''}`;
+        
+        const currentPercent = config.optimisation.autoSummarisation.triggerPercent || 50;
+        const autoSumModel = ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model) || ChatConfig.getChatModelString(chat);
+        
+        autoSumDiv.innerHTML = `
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="autoSummarization_${chatId}" ${autoSumEnabled ? 'checked' : ''}
+                       style="margin-right: 6px;">
+                <span>Summarize conversation when context window above</span>
+            </label>
+            <select id="autoSumThreshold_${chatId}" 
+                    style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
+                           border-radius: 4px; background: var(--background-color); color: var(--text-primary);
+                           cursor: pointer;"
+                    ${!autoSumEnabled ? 'disabled' : ''}>
+                <option value="30">30%</option>
+                <option value="40">40%</option>
+                <option value="50" ${currentPercent === 50 ? 'selected' : ''}>50%</option>
+                <option value="60">60%</option>
+                <option value="70">70%</option>
+                <option value="80">80%</option>
+                <option value="90">90%</option>
+            </select>
+            <span>with</span>
+            <div class="model-select-wrapper" style="position: relative; display: inline-block;">
+                <button class="model-select-btn" id="autoSumModel_${chatId}" 
+                        style="padding: 2px 8px; border: 1px solid var(--border-color); 
+                               border-radius: 4px; background: var(--background-color); 
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;"
+                        ${!autoSumEnabled ? 'disabled' : ''}>
+                    <span class="model-name">${autoSumModel || 'Select model'}</span>
+                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                </button>
+            </div>
+        `;
+        
+        section.appendChild(autoSumDiv);
+        
+        // Title Generation Option
+        const titleGenDiv = document.createElement('div');
+        const titleGenEnabled = config.optimisation.titleGeneration?.enabled !== false; // Default to true
+        titleGenDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!titleGenEnabled ? 'opacity: 0.5;' : ''}`;
+        
+        const titleGenModel = ChatConfig.modelConfigToString(config.optimisation.titleGeneration?.model) || ChatConfig.getChatModelString(chat);
+        
+        titleGenDiv.innerHTML = `
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="titleGeneration_${chatId}" ${titleGenEnabled ? 'checked' : ''}
+                       style="margin-right: 6px;">
+                <span>Generate chat titles with</span>
+            </label>
+            <div class="model-select-wrapper" style="position: relative; display: inline-block;">
+                <button class="model-select-btn" id="titleGenModel_${chatId}" 
+                        style="padding: 2px 8px; border: 1px solid var(--border-color); 
+                               border-radius: 4px; background: var(--background-color); 
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;"
+                        ${!titleGenEnabled ? 'disabled' : ''}>
+                    <span class="model-name">${titleGenModel || 'Select model'}</span>
+                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                </button>
+            </div>
+        `;
+        
+        section.appendChild(titleGenDiv);
+        
+        // Tool Memory Option
+        const toolMemoryDiv = document.createElement('div');
+        const toolMemoryEnabled = config.optimisation.toolMemory.enabled;
+        toolMemoryDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!toolMemoryEnabled ? 'opacity: 0.5;' : ''}`;
+        
+        const forgetAfter = config.optimisation.toolMemory.forgetAfterConclusions || 1;
+        
+        toolMemoryDiv.innerHTML = `
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="toolMemory_${chatId}" ${toolMemoryEnabled ? 'checked' : ''}
+                       style="margin-right: 6px;">
+                <span>Stop sending tool responses after the assistant concludes</span>
+            </label>
+            <select id="toolMemoryThreshold_${chatId}" 
+                    style="width: 50px; padding: 2px 4px; border: 1px solid var(--border-color); 
+                           border-radius: 4px; background: var(--background-color); color: var(--text-primary);
+                           cursor: pointer;"
+                    ${!toolMemoryEnabled ? 'disabled' : ''}>
+                <option value="0" ${forgetAfter === 0 ? 'selected' : ''}>0</option>
+                <option value="1" ${forgetAfter === 1 ? 'selected' : ''}>1</option>
+                <option value="2" ${forgetAfter === 2 ? 'selected' : ''}>2</option>
+                <option value="3" ${forgetAfter === 3 ? 'selected' : ''}>3</option>
+            </select>
+            <span>times</span>
+        `;
+        
+        section.appendChild(toolMemoryDiv);
+        
+        // Cache Control Option (ghosted when not Anthropic)
+        const isAnthropicModel = chat.model && chat.model.includes('claude');
+        const cacheControlDiv = document.createElement('div');
+        const cacheControlEnabled = config.optimisation.cacheControl.enabled;
+        cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!isAnthropicModel ? 'opacity: 0.5;' : ''}`;
+        
+        cacheControlDiv.innerHTML = `
+            <label style="display: flex; align-items: center; cursor: ${isAnthropicModel ? 'pointer' : 'default'};">
+                <input type="checkbox" id="cacheControl_${chatId}" ${cacheControlEnabled ? 'checked' : ''}
+                       style="margin-right: 6px;"
+                       ${!isAnthropicModel ? 'disabled' : ''}>
+                <span>Enable Anthropic's cache control</span>
+            </label>
+        `;
+        
+        section.appendChild(cacheControlDiv);
+        
+        // Temperature and TopP Controls
+        const paramsDiv = document.createElement('div');
+        paramsDiv.style.cssText = 'margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);';
+        
+        const currentTemp = chat.config.model.params.temperature;
+        const currentTopP = chat.config.model.params.topP;
+        
+        paramsDiv.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Temperature Control -->
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-primary); min-width: 100px;">
+                        Temperature
+                    </label>
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 11px; color: var(--text-tertiary); min-width: 50px;">Focused</span>
+                        <input type="range" id="temperature_${chatId}" min="0" max="2" step="0.1" value="${currentTemp}" 
+                               style="flex: 1; height: 4px; accent-color: var(--primary-color);">
+                        <span style="font-size: 11px; color: var(--text-tertiary); min-width: 50px; text-align: right;">Creative</span>
+                        <span id="tempValue_${chatId}" style="font-size: 12px; font-weight: 600; color: var(--primary-color); min-width: 30px; text-align: right;">${currentTemp.toFixed(1)}</span>
+                    </div>
+                </div>
+                
+                <!-- TopP Control -->
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-primary); min-width: 100px;">
+                        Top P
+                    </label>
+                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 11px; color: var(--text-tertiary); min-width: 50px;">Precise</span>
+                        <input type="range" id="topP_${chatId}" min="0" max="1" step="0.05" value="${currentTopP}" 
+                               style="flex: 1; height: 4px; accent-color: var(--primary-color);">
+                        <span style="font-size: 11px; color: var(--text-tertiary); min-width: 50px; text-align: right;">Diverse</span>
+                        <span id="topPValue_${chatId}" style="font-size: 12px; font-weight: 600; color: var(--primary-color); min-width: 30px; text-align: right;">${currentTopP.toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        section.appendChild(paramsDiv);
+        
+        // Temperature and TopP event listeners
+        const tempSlider = paramsDiv.querySelector(`#temperature_${chatId}`);
+        const tempValueLabel = paramsDiv.querySelector(`#tempValue_${chatId}`);
+        const topPSlider = paramsDiv.querySelector(`#topP_${chatId}`);
+        const topPValueLabel = paramsDiv.querySelector(`#topPValue_${chatId}`);
+        
+        tempSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            tempValueLabel.textContent = value.toFixed(1);
+        });
+        
+        tempSlider.addEventListener('change', (e) => {
+            chat.config.model.params.temperature = parseFloat(e.target.value);
+            this.autoSave(chatId);
+        });
+        
+        topPSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            topPValueLabel.textContent = value.toFixed(2);
+        });
+        
+        topPSlider.addEventListener('change', (e) => {
+            chat.config.model.params.topP = parseFloat(e.target.value);
+            this.autoSave(chatId);
+        });
+        
+        section.appendChild(document.createElement('div')); // spacer
+        
+        // Initialize model selection buttons
+        this.initializeModelSelectionButtons(section, chatId, chat, config);
+        
+        // Add event listeners
+        const toolSumCheckbox = section.querySelector(`#toolSummarization_${chatId}`);
+        const thresholdSelect = section.querySelector(`#toolThreshold_${chatId}`);
+        const toolModelBtn = section.querySelector(`#toolSumModel_${chatId}`);
+        
+        toolSumCheckbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const enabled = toolSumCheckbox.checked;
+            thresholdSelect.disabled = !enabled;
+            toolModelBtn.disabled = !enabled;
+            toolSumDiv.style.opacity = enabled ? '1' : '0.5';
+            this.updateOptimizationSetting(chatId, 'toolSummarization', enabled);
+        });
+        
+        thresholdSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const kbValue = parseInt(e.target.value, 10) || 20;
+            const byteValue = kbValue * 1024;
+            this.updateToolThreshold(chatId, byteValue);
+        });
+        
+        // Auto-summarization controls
+        const autoSumCheckbox = section.querySelector(`#autoSummarization_${chatId}`);
+        const autoSumSelect = section.querySelector(`#autoSumThreshold_${chatId}`);
+        const autoModelBtn = section.querySelector(`#autoSumModel_${chatId}`);
+        
+        autoSumCheckbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const enabled = autoSumCheckbox.checked;
+            autoSumSelect.disabled = !enabled;
+            autoModelBtn.disabled = !enabled;
+            autoSumDiv.style.opacity = enabled ? '1' : '0.5';
+            this.updateOptimizationSetting(chatId, 'autoSummarization', enabled);
+        });
+        
+        autoSumSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const percent = parseInt(e.target.value, 10) || 50;
+            this.updateAutoSumThreshold(chatId, percent);
+        });
+        
+        // Title Generation controls
+        const titleGenCheckbox = section.querySelector(`#titleGeneration_${chatId}`);
+        const titleModelBtn = section.querySelector(`#titleGenModel_${chatId}`);
+        
+        titleGenCheckbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const enabled = titleGenCheckbox.checked;
+            titleModelBtn.disabled = !enabled;
+            titleGenDiv.style.opacity = enabled ? '1' : '0.5';
+            this.updateOptimizationSetting(chatId, 'titleGeneration', enabled);
+        });
+        
+        // Tool Memory controls
+        const toolMemoryCheckbox = section.querySelector(`#toolMemory_${chatId}`);
+        const toolMemorySelect = section.querySelector(`#toolMemoryThreshold_${chatId}`);
+        
+        toolMemoryCheckbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const enabled = toolMemoryCheckbox.checked;
+            toolMemorySelect.disabled = !enabled;
+            toolMemoryDiv.style.opacity = enabled ? '1' : '0.5';
+            this.updateOptimizationSetting(chatId, 'toolMemory', enabled);
+        });
+        
+        toolMemorySelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const conclusions = parseInt(e.target.value, 10) || 1;
+            this.updateToolMemoryThreshold(chatId, conclusions);
+        });
+        
+        // Other checkboxes (smart filtering, cache control)
+        section.querySelectorAll('input[type="checkbox"]:not(#toolSummarization_' + chatId + '):not(#autoSummarization_' + chatId + ')').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                this.updateOptimizationSetting(chatId, checkbox.id.split('_')[0], checkbox.checked);
+            });
+        });
+        
+        section.querySelectorAll('label').forEach(label => {
+            label.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+        
+        dropdown.appendChild(section);
+    }
+
+    formatContextWindow(limit) {
+        if (!limit) return '--';
+        if (limit >= 1000000) return `${(limit / 1000000).toFixed(1)}M`;
+        if (limit >= 1000) return `${(limit / 1000).toFixed(0)}k`;
+        return limit.toString();
+    }
+    
+    getAllAvailableModels() {
+        const models = [];
+        
+        // Iterate through all LLM providers
+        this.llmProviders.forEach((provider) => {
+            // Check if provider has availableProviders (the actual structure from the proxy)
+            if (provider.availableProviders) {
+                Object.entries(provider.availableProviders).forEach(([providerType, providerConfig]) => {
+                    if (providerConfig.models && Array.isArray(providerConfig.models)) {
+                        providerConfig.models.forEach(model => {
+                            const modelId = typeof model === 'string' ? model : model.id;
+                            const contextWindow = typeof model === 'object' ? model.contextWindow : null;
+                            const pricing = typeof model === 'object' ? model.pricing : null;
+                            
+                            if (modelId) {
+                                models.push({
+                                    id: modelId,
+                                    providerId: providerType,
+                                    contextWindow: contextWindow || 128000, // Default context
+                                    pricing: pricing || null
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        
+        // Sort by provider and then by model name
+        models.sort((a, b) => {
+            if (a.providerId !== b.providerId) {
+                return a.providerId.localeCompare(b.providerId);
+            }
+            return a.id.localeCompare(b.id);
+        });
+        
+        return models;
+    }
+    
+    initializeModelSelectionButtons(section, chatId, chat, _settings) {
+        // Helper to create model dropdown with pricing table
+        const createModelDropdown = (buttonId, currentModel, onSelect) => {
+            const button = section.querySelector(`#${buttonId}`);
+            if (!button) return;
+            
+            // Add context menu for copy/paste
+            button.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Create context menu
+                const menu = document.createElement('div');
+                menu.className = 'model-context-menu';
+                menu.style.cssText = `
+                    position: fixed;
+                    left: ${e.clientX}px;
+                    top: ${e.clientY}px;
+                    background: var(--background-color);
+                    border: 1px solid var(--border-color);
+                    border-radius: 4px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    padding: 4px 0;
+                    z-index: 10000;
+                `;
+                
+                const modelName = button.querySelector('.model-name').textContent;
+                const hasModel = modelName && modelName !== 'Select model';
+                
+                if (hasModel) {
+                    const copyItem = document.createElement('div');
+                    copyItem.style.cssText = `
+                        padding: 6px 12px;
+                        cursor: pointer;
+                        font-size: 13px;
+                    `;
+                    copyItem.textContent = `Copy "${modelName}"`;
+                    copyItem.addEventListener('mouseenter', () => {
+                        copyItem.style.background = 'var(--hover-color)';
+                    });
+                    copyItem.addEventListener('mouseleave', () => {
+                        copyItem.style.background = '';
+                    });
+                    copyItem.addEventListener('click', () => {
+                        this.copiedModel = modelName;
+                        document.body.removeChild(menu);
+                        this.showToast(`Copied model: ${modelName}`, 'success-toast');
+                    });
+                    menu.appendChild(copyItem);
+                }
+                
+                if (this.copiedModel && this.copiedModel !== modelName) {
+                    const pasteItem = document.createElement('div');
+                    pasteItem.style.cssText = `
+                        padding: 6px 12px;
+                        cursor: pointer;
+                        font-size: 13px;
+                    `;
+                    pasteItem.textContent = `Paste "${this.copiedModel}"`;
+                    pasteItem.addEventListener('mouseenter', () => {
+                        pasteItem.style.background = 'var(--hover-color)';
+                    });
+                    pasteItem.addEventListener('mouseleave', () => {
+                        pasteItem.style.background = '';
+                    });
+                    pasteItem.addEventListener('click', () => {
+                        button.querySelector('.model-name').textContent = this.copiedModel;
+                        onSelect(this.copiedModel);
+                        document.body.removeChild(menu);
+                        this.showToast(`Pasted model: ${this.copiedModel}`, 'success-toast');
+                    });
+                    menu.appendChild(pasteItem);
+                }
+                
+                if (menu.children.length === 0) {
+                    const emptyItem = document.createElement('div');
+                    emptyItem.style.cssText = `
+                        padding: 6px 12px;
+                        color: var(--text-secondary);
+                        font-size: 13px;
+                    `;
+                    emptyItem.textContent = 'No model to copy/paste';
+                    menu.appendChild(emptyItem);
+                }
+                
+                document.body.appendChild(menu);
+                
+                // Remove menu on click outside
+                const removeMenu = (evt) => {
+                    if (!menu.contains(evt.target)) {
+                        document.body.removeChild(menu);
+                        document.removeEventListener('click', removeMenu);
+                    }
+                };
+                setTimeout(() => {
+                    document.addEventListener('click', removeMenu);
+                }, 0);
+            });
+            
+            // Regular click to open model selection
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Check if this button already has a dropdown open (toggle behavior)
+                if (button.getAttribute('data-dropdown-open') === 'true') {
+                    const existingDropdown = document.body.querySelector('.model-selection-dropdown');
+                    if (existingDropdown) {
+                        existingDropdown.remove();
+                        button.removeAttribute('data-dropdown-open');
+                    }
+                    return;
+                }
+                
+                // Close any other open dropdowns
+                document.querySelectorAll('.model-selection-dropdown').forEach(d => d.remove());
+                document.querySelectorAll('[data-dropdown-open]').forEach(b => b.removeAttribute('data-dropdown-open'));
+                
+                // Create model selection dropdown with pricing table
+                const dropdown = document.createElement('div');
+                dropdown.className = 'model-selection-dropdown';
+                
+                // Mark button as having an open dropdown
+                button.setAttribute('data-dropdown-open', 'true');
+                
+                // Calculate button position relative to viewport
+                const buttonRect = button.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const viewportWidth = window.innerWidth;
+                const dropdownHeight = 400; // Max height of dropdown
+                const dropdownMinWidth = 600;
+                
+                // Determine if dropdown should appear above or below the button
+                const spaceBelow = viewportHeight - buttonRect.bottom;
+                const shouldShowAbove = spaceBelow < dropdownHeight && buttonRect.top > dropdownHeight;
+                
+                // Calculate left position - ensure dropdown doesn't go off-screen
+                let leftPosition = buttonRect.left;
+                if (leftPosition + dropdownMinWidth > viewportWidth) {
+                    leftPosition = Math.max(10, viewportWidth - dropdownMinWidth - 10);
+                }
+                
+                dropdown.style.cssText = `
+                    position: fixed;
+                    ${shouldShowAbove ? 'bottom' : 'top'}: ${shouldShowAbove ? (viewportHeight - buttonRect.top + 4) : (buttonRect.bottom + 4)}px;
+                    left: ${leftPosition}px;
+                    background: var(--background-color);
+                    border: 1px solid var(--border-color);
+                    border-radius: 4px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 10000;
+                    max-height: 400px;
+                    overflow-y: auto;
+                    min-width: 600px;
+                `;
+                
+                // Create pricing table
+                const models = this.getAllAvailableModels();
+                
+                // Sort models by provider, then by input price desc, then by name desc
+                models.sort((a, b) => {
+                    // First sort by provider
+                    if (a.providerId !== b.providerId) {
+                        return a.providerId.localeCompare(b.providerId);
+                    }
+                    
+                    // Within same provider, sort by input price descending
+                    const aInputPrice = a.pricing?.input || 0;
+                    const bInputPrice = b.pricing?.input || 0;
+                    
+                    if (aInputPrice !== bInputPrice) {
+                        return bInputPrice - aInputPrice; // Descending order (expensive first)
+                    }
+                    
+                    // If prices are equal, sort by name descending (newer models typically have later names)
+                    return b.id.localeCompare(a.id);
+                });
+                
+                // Check if there are any models
+                if (!models || models.length === 0) {
+                    dropdown.innerHTML = `
+                        <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                            No models available. Please check your LLM provider configuration.
+                        </div>
+                    `;
+                    document.body.appendChild(dropdown);
+                    
+                    // Function to update dropdown position on scroll/resize
+                    const updateDropdownPosition = () => {
+                        const newButtonRect = button.getBoundingClientRect();
+                        const newViewportHeight = window.innerHeight;
+                        const newViewportWidth = window.innerWidth;
+                        const newSpaceBelow = newViewportHeight - newButtonRect.bottom;
+                        const newShouldShowAbove = newSpaceBelow < dropdownHeight && newButtonRect.top > dropdownHeight;
+                        
+                        if (newShouldShowAbove) {
+                            dropdown.style.top = 'auto';
+                            dropdown.style.bottom = `${newViewportHeight - newButtonRect.top + 4}px`;
+                        } else {
+                            dropdown.style.bottom = 'auto';
+                            dropdown.style.top = `${newButtonRect.bottom + 4}px`;
+                        }
+                        
+                        // Update horizontal position
+                        let newLeftPosition = newButtonRect.left;
+                        if (newLeftPosition + dropdownMinWidth > newViewportWidth) {
+                            newLeftPosition = Math.max(10, newViewportWidth - dropdownMinWidth - 10);
+                        }
+                        dropdown.style.left = `${newLeftPosition}px`;
+                    };
+                    
+                    // Close dropdown on outside click
+                    const closeDropdown = (evt) => {
+                        if (!dropdown.contains(evt.target) && !button.contains(evt.target)) {
+                            if (dropdown.parentElement) {
+                                dropdown.parentElement.removeChild(dropdown);
+                            }
+                            document.removeEventListener('click', closeDropdown, true);
+                            document.removeEventListener('mousedown', closeDropdown, true);
+                            window.removeEventListener('scroll', updateDropdownPosition, true);
+                            window.removeEventListener('resize', updateDropdownPosition);
+                        }
+                    };
+                    
+                    // Use capture phase to ensure we catch clicks before they're stopped by modal
+                    setTimeout(() => {
+                        document.addEventListener('click', closeDropdown, true);
+                        document.addEventListener('mousedown', closeDropdown, true);
+                        window.addEventListener('scroll', updateDropdownPosition, true);
+                        window.addEventListener('resize', updateDropdownPosition);
+                    }, 0);
+                    return;
+                }
+                const table = document.createElement('table');
+                table.style.cssText = `
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 12px;
+                `;
+                
+                // Table header
+                const thead = document.createElement('thead');
+                thead.innerHTML = `
+                    <tr style="background: var(--surface-color); position: sticky; top: 0; z-index: 1;">
+                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Model</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 1px solid var(--border-color);">Context</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 1px solid var(--border-color);">Input $/MTok</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 1px solid var(--border-color);">Output $/MTok</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 1px solid var(--border-color);">CacheR $/MTok</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 1px solid var(--border-color);">CacheW $/MTok</th>
+                    </tr>
+                `;
+                table.appendChild(thead);
+                
+                const tbody = document.createElement('tbody');
+                let currentProvider = null;
+                
+                models.forEach(model => {
+                    // Add provider header row when provider changes
+                    if (model.providerId !== currentProvider) {
+                        currentProvider = model.providerId;
+                        const providerRow = document.createElement('tr');
+                        providerRow.style.cssText = `
+                            background: var(--surface-color);
+                            font-weight: 600;
+                            color: var(--text-secondary);
+                            cursor: default;
+                        `;
+                        providerRow.innerHTML = `
+                            <td colspan="6" style="padding: 8px; text-transform: uppercase; font-size: 11px;">
+                                ${currentProvider}
+                            </td>
+                        `;
+                        tbody.appendChild(providerRow);
+                    }
+                    
+                    const tr = document.createElement('tr');
+                    tr.style.cssText = `
+                        cursor: pointer;
+                        transition: background 0.1s;
+                        border-bottom: 1px solid var(--border-subtle, var(--border-color));
+                    `;
+                    tr.addEventListener('mouseenter', () => {
+                        tr.style.background = 'var(--hover-color)';
+                    });
+                    tr.addEventListener('mouseleave', () => {
+                        tr.style.background = '';
+                    });
+                    
+                    // Capture the full model string in the closure
+                    const fullModelId = `${model.providerId}:${model.id}`;
+                    
+                    // Add click handler directly here
+                    tr.addEventListener('click', () => {
+                        const modelName = ChatConfig.getModelDisplayName(fullModelId);
+                        button.querySelector('.model-name').textContent = modelName;
+                        onSelect(fullModelId);
+                        document.body.removeChild(dropdown);
+                        button.removeAttribute('data-dropdown-open');
+                    });
+                    
+                    const pricing = model.pricing || {};
+                    const inputPrice = pricing.input || 0;
+                    const outputPrice = pricing.output || 0;
+                    const cacheReadPrice = pricing.cacheRead !== undefined ? pricing.cacheRead : '-';
+                    const cacheWritePrice = pricing.cacheWrite !== undefined ? pricing.cacheWrite : '-';
+                    
+                    tr.innerHTML = `
+                        <td style="padding: 8px; font-weight: 500;">${model.id}</td>
+                        <td style="padding: 8px; text-align: right; color: var(--text-secondary);">${this.formatContextWindow(model.contextWindow)}</td>
+                        <td style="padding: 8px; text-align: right;">$${inputPrice.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: right;">$${outputPrice.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: right;">${cacheReadPrice === '-' ? '-' : '$' + cacheReadPrice.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: right;">${cacheWritePrice === '-' ? '-' : '$' + cacheWritePrice.toFixed(2)}</td>
+                    `;
+                    
+                    tbody.appendChild(tr);
+                });
+                
+                // Define functions before they're used
+                // Function to update dropdown position on scroll/resize
+                const updateDropdownPosition = () => {
+                    const newButtonRect = button.getBoundingClientRect();
+                    const newViewportHeight = window.innerHeight;
+                    const newViewportWidth = window.innerWidth;
+                    const newSpaceBelow = newViewportHeight - newButtonRect.bottom;
+                    const newShouldShowAbove = newSpaceBelow < dropdownHeight && newButtonRect.top > dropdownHeight;
+                    
+                    if (newShouldShowAbove) {
+                        dropdown.style.top = 'auto';
+                        dropdown.style.bottom = `${newViewportHeight - newButtonRect.top + 4}px`;
+                    } else {
+                        dropdown.style.bottom = 'auto';
+                        dropdown.style.top = `${newButtonRect.bottom + 4}px`;
+                    }
+                    
+                    // Update horizontal position
+                    let newLeftPosition = newButtonRect.left;
+                    if (newLeftPosition + dropdownMinWidth > newViewportWidth) {
+                        newLeftPosition = Math.max(10, newViewportWidth - dropdownMinWidth - 10);
+                    }
+                    dropdown.style.left = `${newLeftPosition}px`;
+                };
+                
+                // Close dropdown on outside click
+                const closeDropdown = (evt) => {
+                    // Check if click is outside dropdown and button
+                    if (!dropdown.contains(evt.target) && !button.contains(evt.target)) {
+                        if (dropdown.parentElement) {
+                            dropdown.parentElement.removeChild(dropdown);
+                        }
+                        button.removeAttribute('data-dropdown-open');
+                        document.removeEventListener('click', closeDropdown, true);
+                        document.removeEventListener('mousedown', closeDropdown, true);
+                        window.removeEventListener('scroll', updateDropdownPosition, true);
+                        window.removeEventListener('resize', updateDropdownPosition);
+                    }
+                };
+                
+                // Click listeners are now added directly when creating rows
+                
+                // Add event listeners
+                // Use capture phase to ensure we catch clicks before they're stopped by modal
+                setTimeout(() => {
+                    document.addEventListener('click', closeDropdown, true);
+                    document.addEventListener('mousedown', closeDropdown, true);
+                    window.addEventListener('scroll', updateDropdownPosition, true);
+                    window.addEventListener('resize', updateDropdownPosition);
+                }, 0);
+                
+                // Now append elements after functions are defined
+                table.appendChild(tbody);
+                dropdown.appendChild(table);
+                
+                // Append dropdown to body for proper z-index layering
+                document.body.appendChild(dropdown);
+            });
+        };
+        
+        // Initialize all model selection buttons
+        createModelDropdown(`chatModel_${chatId}`, ChatConfig.getChatModelString(chat), (model) => {
+            this.updateChatModel(chatId, model);
+        });
+        
+        createModelDropdown(`toolSumModel_${chatId}`, ChatConfig.modelConfigToString(chat.config.optimisation.toolSummarisation.model) || ChatConfig.getChatModelString(chat), (model) => {
+            this.updateToolSummarizationModel(chatId, model);
+        });
+        
+        createModelDropdown(`autoSumModel_${chatId}`, ChatConfig.modelConfigToString(chat.config.optimisation.autoSummarisation.model) || ChatConfig.getChatModelString(chat), (model) => {
+            this.updateAutoSummarizationModel(chatId, model);
+        });
+        
+        createModelDropdown(`titleGenModel_${chatId}`, ChatConfig.modelConfigToString(chat.config.optimisation.titleGeneration?.model) || ChatConfig.getChatModelString(chat), (model) => {
+            this.updateTitleGenerationModel(chatId, model);
+        });
+    }
+
+    updateOptimizationSetting(chatId, settingType, enabled) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+
+        // Get current config or create defaults
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        
+        // Update the specific setting
+        switch (settingType) {
+            case 'toolSummarization':
+                config.optimisation.toolSummarisation.enabled = enabled;
+                break;
+            case 'toolMemory':
+                config.optimisation.toolMemory.enabled = enabled;
+                break;
+            case 'cacheControl':
+                config.optimisation.cacheControl.enabled = enabled;
+                break;
+            case 'autoSummarization':
+                config.optimisation.autoSummarisation.enabled = enabled;
+                break;
+            case 'titleGeneration':
+                config.optimisation.titleGeneration.enabled = enabled;
+                break;
+            default:
+                console.warn(`Unknown setting type: ${settingType}`);
+                break;
+        }
+
+        // Update chat config
+        chat.config = config;
+
+        // Recreate MessageOptimizer with new settings
+        const optimizerSettings = {
+            ...config,
+            llmProviderFactory: config.optimisation.toolSummarisation.enabled ? window.createLLMProvider : undefined
+        };
+        
+        try {
+            chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+        } catch (error) {
+            console.error('[updateOptimizationSetting] Failed to create MessageOptimizer:', error);
+        }
+
+        // Save config
+        ChatConfig.saveChatConfig(chatId, config);
+        
+        // Auto-save chat
+        this.autoSave(chatId);
+    }
+
+    
+    updateChatModel(chatId, model) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        // Store the old model before updating
+        const oldModelString = ChatConfig.modelConfigToString(chat.config?.model);
+        
+        // Update config
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        const modelConfig = ChatConfig.modelConfigFromString(model);
+        if (modelConfig) {
+            // Preserve existing params
+            modelConfig.params = config.model?.params || modelConfig.params;
+            config.model = modelConfig;
+        }
+        
+        // Update models in optimization features if they were using the old model
+        if (oldModelString && config.optimisation.toolSummarisation.model && 
+            ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model) === oldModelString) {
+            config.optimisation.toolSummarisation.model = { ...config.model };
+        }
+        if (oldModelString && config.optimisation.autoSummarisation.model && 
+            ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model) === oldModelString) {
+            config.optimisation.autoSummarisation.model = { ...config.model };
+        }
+        if (oldModelString && config.optimisation.titleGeneration.model && 
+            ChatConfig.modelConfigToString(config.optimisation.titleGeneration.model) === oldModelString) {
+            config.optimisation.titleGeneration.model = { ...config.model };
+        }
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+        
+        // Update displays
+        this.updateChatHeader(chatId);
+        this.updateChatSessions();
+    }
+    
+    updateToolSummarizationModel(chatId, model) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        config.optimisation.toolSummarisation.model = ChatConfig.modelConfigFromString(model);
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+    }
+    
+    updateAutoSummarizationModel(chatId, model) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        config.optimisation.autoSummarisation.model = ChatConfig.modelConfigFromString(model);
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+    }
+    
+    updateTitleGenerationModel(chatId, model) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        config.optimisation.titleGeneration.model = ChatConfig.modelConfigFromString(model);
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+    }
+    
+    updateToolThreshold(chatId, threshold) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        config.optimisation.toolSummarisation.thresholdKiB = Math.floor(threshold / 1024);
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+    }
+    
+    updateAutoSumThreshold(chatId, percent) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        config.optimisation.autoSummarisation.triggerPercent = percent;
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+    }
+    
+    updateToolMemoryThreshold(chatId, conclusions) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        config.optimisation.toolMemory.forgetAfterConclusions = conclusions;
+        
+        chat.config = config;
+        this.recreateMessageOptimizer(chat, config);
+        ChatConfig.saveChatConfig(chatId, config);
+        this.autoSave(chatId);
+    }
+    
+    recreateMessageOptimizer(chat, config) {
+        // Add factory for tool summarization if enabled
+        const optimizerSettings = {
+            ...config,
+            llmProviderFactory: config.optimisation.toolSummarisation.enabled ? window.createLLMProvider : undefined
+        };
+        
+        try {
+            chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+        } catch (error) {
+            console.error('[recreateMessageOptimizer] Failed to create MessageOptimizer:', error);
         }
     }
+
     
     populateMCPDropdown(chatId, dropdown = null) {
         if (!chatId) {
@@ -1007,64 +2084,6 @@ helps users understand your analysis methodology and builds confidence in your c
         }
     }
     
-    async switchModel(newModel, chatId) {
-        const chat = this.chats.get(chatId);
-        if (!chat || chat.model === newModel) {return;}
-        
-        // Extract model name for context window lookup
-        const modelName = newModel.includes(':') ? newModel.split(':')[1] : newModel;
-        
-        // Update model limits if we have context window info
-        const provider = this.llmProviders.get(chat.llmProviderId);
-        if (provider && provider.availableProviders) {
-            const [providerType] = newModel.split(':');
-            const providerConfig = provider.availableProviders[providerType];
-            if (providerConfig) {
-                const modelInfo = providerConfig.models.find(m => 
-                    (typeof m === 'string' ? m : m.id) === modelName
-                );
-                if (modelInfo && typeof modelInfo === 'object' && modelInfo.contextWindow) {
-                    this.modelLimits[modelName] = modelInfo.contextWindow;
-                }
-            }
-        }
-        
-        chat.model = newModel;
-        this.autoSave(chat.id);
-        
-        // Update UI
-        this.currentModelText.textContent = modelName;
-        
-        // Update context window indicator
-        const { totalTokens } = this.getTokenUsageForChat(chatId);
-        this.updateContextWindowIndicator(totalTokens, newModel, chatId);
-        
-        // Update all token displays including cost
-        this.updateAllTokenDisplays(chatId);
-        
-        // Save as default for new chats
-        const lastConfig = localStorage.getItem('lastChatConfig');
-        let config = {};
-        if (lastConfig) {
-            try {
-                config = JSON.parse(lastConfig);
-            } catch {
-                // Ignore parse errors
-            }
-        }
-        config.model = newModel;
-        config.llmProviderId = chat.llmProviderId;
-        config.mcpServerId = chat.mcpServerId;
-        config.optimizerSettings = chat.optimizerSettings; // Save optimizer settings too
-        localStorage.setItem('lastChatConfig', JSON.stringify(config));
-        
-        this.addLogEntry('SYSTEM', {
-            timestamp: new Date().toISOString(),
-            direction: 'info',
-            message: `Switched model to ${modelName}`
-        });
-    }
-    
     async switchMcpServer(newServerId, chatId) {
         const chat = this.chats.get(chatId);
         if (!chat || chat.mcpServerId === newServerId) {return;}
@@ -1086,21 +2105,12 @@ helps users understand your analysis methodology and builds confidence in your c
                 chatToolStates.clear();
             }
             
-            // Save as default for new chats
-            const lastConfig = localStorage.getItem('lastChatConfig');
-            let config = {};
-            if (lastConfig) {
-                try {
-                    config = JSON.parse(lastConfig);
-                } catch {
-                    // Ignore parse errors
-                }
+            // Save the updated config as default for new chats
+            if (chat.config) {
+                const updatedConfig = { ...chat.config };
+                updatedConfig.mcpServer = newServerId;
+                ChatConfig.saveLastConfig(updatedConfig);
             }
-            config.mcpServerId = newServerId;
-            config.llmProviderId = chat.llmProviderId;
-            config.model = chat.model;
-            config.optimizerSettings = chat.optimizerSettings; // Save optimizer settings too
-            localStorage.setItem('lastChatConfig', JSON.stringify(config));
             
             this.addLogEntry('SYSTEM', {
                 timestamp: new Date().toISOString(),
@@ -1143,7 +2153,7 @@ helps users understand your analysis methodology and builds confidence in your c
         // Clear token usage history for this chat
         this.tokenUsageHistory.set(chatId, {
             requests: [],
-            model: chat.model
+            model: ChatConfig.getChatModelString(chat)
         });
         
         // Save settings
@@ -1168,7 +2178,6 @@ helps users understand your analysis methodology and builds confidence in your c
         
         // Theme switching for tooltips is now handled by CSS variables
     }
-
     initializeResizable() {
         // Chat sidebar resize
         const chatSidebar = document.getElementById('chatSidebar');
@@ -1625,15 +2634,16 @@ helps users understand your analysis methodology and builds confidence in your c
         const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
         const proxyProvider = this.llmProviders.get(chat.llmProviderId);
         
-        if (!mcpConnection || !proxyProvider || !chat.model) {
+        if (!mcpConnection || !proxyProvider || !chat.config || !chat.config.model) {
             this.showError('Cannot redo: MCP server or LLM provider not available', chatId);
             return;
         }
         
-        // Parse model format
-        const [providerType, modelName] = chat.model.split(':');
+        // Get model config
+        const providerType = chat.config.model.provider;
+        const modelName = chat.config.model.id;
         if (!providerType || !modelName) {
-            this.showError('Invalid model format in chat', chatId);
+            this.showError('Invalid model configuration in chat', chatId);
             return;
         }
         
@@ -1653,8 +2663,14 @@ helps users understand your analysis methodology and builds confidence in your c
                 // Show loading spinner AFTER loadChat to prevent it from being cleared
                 this.processRenderEvent({ type: 'show-spinner' }, chatId);
                 
+                // Get fresh chat object after loadChat
+                const freshChat = this.chats.get(chatId);
+                if (!freshChat) {
+                    throw new Error('Chat not found after reload');
+                }
+                
                 // Resend the user message with full prior context
-                await this.processMessageWithTools(chat, mcpConnection, provider, message.content);
+                await this.processMessageWithTools(freshChat, mcpConnection, provider, message.content);
             } else if (message.type === 'assistant') {
                 // Redo from assistant message - find the user message that triggered it
                 let triggeringUserMessage = null;
@@ -1680,8 +2696,14 @@ helps users understand your analysis methodology and builds confidence in your c
                     // Show loading spinner AFTER loadChat to prevent it from being cleared
                     this.processRenderEvent({ type: 'show-spinner' }, chatId);
                     
+                    // Get fresh chat object after loadChat
+                    const freshChat = this.chats.get(chatId);
+                    if (!freshChat) {
+                        throw new Error('Chat not found after reload');
+                    }
+                    
                     // Resend the triggering user message with full prior context
-                    await this.processMessageWithTools(chat, mcpConnection, provider, triggeringUserMessage.content);
+                    await this.processMessageWithTools(freshChat, mcpConnection, provider, triggeringUserMessage.content);
                 } else {
                     this.showError('Cannot find the user message that triggered this response', chatId);
                 }
@@ -1788,16 +2810,43 @@ helps users understand your analysis methodology and builds confidence in your c
     
     
     validateAndAddChat(chat) {
+        // IMMEDIATE MIGRATION - Delete ALL old properties
+        delete chat.model;
+        delete chat.temperature;
+        delete chat.optimizerSettings;
+        delete chat.primaryModel;
+        delete chat.secondaryModel;
+        delete chat.toolSummarization;
+        delete chat.autoSummarization;
+        delete chat.toolMemory;
+        delete chat.cacheControl;
+        
+        // Migrate old chat format to new config format if needed
+        if (!chat.config) {
+            // No config - create default
+            chat.config = ChatConfig.createDefaultConfig();
+            // If we had an mcpServerId, preserve it
+            if (chat.mcpServerId) {
+                chat.config.mcpServer = chat.mcpServerId;
+            }
+        }
+        
+        // Ensure config is valid
+        if (!ChatConfig.validateConfig(chat.config)) {
+            console.error(`Chat ${chat.id} has invalid config, creating default`);
+            chat.config = ChatConfig.createDefaultConfig();
+        }
+        
         // Validate that the chat's model still exists
-        if (chat.model && chat.llmProviderId) {
+        if (chat.config && chat.config.model && chat.llmProviderId) {
             const provider = this.llmProviders.get(chat.llmProviderId);
             if (provider && provider.availableProviders) {
                 // Check if the model exists in the provider's available models
                 let modelExists = false;
-                const [providerType, modelName] = chat.model.includes(':') ? 
-                    chat.model.split(':') : ['', chat.model];
+                const providerType = chat.config.model.provider;
+                const modelName = chat.config.model.id;
                 
-                if (providerType && provider.availableProviders[providerType]) {
+                if (providerType && modelName && provider.availableProviders[providerType]) {
                     const models = provider.availableProviders[providerType].models || [];
                     modelExists = models.some(m => {
                         const mId = typeof m === 'string' ? m : m.id;
@@ -1806,35 +2855,14 @@ helps users understand your analysis methodology and builds confidence in your c
                 }
                 
                 if (!modelExists) {
-                    // Try to get default model from lastChatConfig
-                    let defaultModel = null;
-                    try {
-                        const lastConfig = localStorage.getItem('lastChatConfig');
-                        if (lastConfig) {
-                            const config = JSON.parse(lastConfig);
-                            if (config.model && config.llmProviderId === chat.llmProviderId) {
-                                defaultModel = config.model;
-                            }
-                        }
-                    } catch {
-                        // Ignore
-                    }
+                    const oldModelString = ChatConfig.modelConfigToString(chat.config.model);
+                    console.error(`Chat ${chat.id} has invalid model ${oldModelString}. Model not found in available providers.`);
                     
-                    // If no default, use first available model
-                    if (!defaultModel) {
-                        const firstProvider = Object.keys(provider.availableProviders)[0];
-                        const firstModel = provider.availableProviders[firstProvider]?.models?.[0];
-                        if (firstModel) {
-                            const modelId = typeof firstModel === 'string' ? firstModel : firstModel.id;
-                            defaultModel = `${firstProvider}:${modelId}`;
-                        }
-                    }
+                    // Mark the chat as having an invalid model
+                    chat.hasInvalidModel = true;
                     
-                    console.warn(`Chat ${chat.id} has invalid model ${chat.model}, resetting to ${defaultModel || 'none (no valid model found)'}`);
-                    
-                    if (defaultModel) {
-                        chat.model = defaultModel;
-                    }
+                    // DO NOT automatically reset or save!
+                    // The user must manually select a valid model
                 }
             }
         }
@@ -1858,40 +2886,22 @@ helps users understand your analysis methodology and builds confidence in your c
         }
         
         // Reconstruct MessageOptimizer instance for loaded chats
-        if (!chat.messageOptimizer) {
-            // Use saved optimizer settings or create defaults
-            if (!chat.optimizerSettings) {
-                chat.optimizerSettings = {
-                    primaryModel: chat.model,
-                    secondaryModel: null,
-                    toolSummarization: {
-                        enabled: false,
-                        threshold: 50000,
-                        useSecondaryModel: true
-                    },
-                    toolMemory: {
-                        enabled: false,
-                        forgetAfterConclusions: 1
-                    },
-                    cacheControl: {
-                        enabled: false,
-                        strategy: 'smart'
-                    },
-                    autoSummarization: {
-                        enabled: false,
-                        triggerPercent: 50,
-                        useSecondaryModel: true
-                    }
-                };
+        if (!chat.messageOptimizer || !(chat.messageOptimizer instanceof MessageOptimizer)) {
+            // Config should already be migrated by this point
+            if (!chat.config) {
+                throw new Error(`Chat ${chat.id} has no config after migration`);
             }
-            // Add llmProviderFactory if tool summarization is enabled
-            if (chat.optimizerSettings.toolSummarization.enabled) {
-                chat.optimizerSettings.llmProviderFactory = window.createLLMProvider;
-            }
+            
+            // Get optimizer settings from config
+            const optimizerSettings = ChatConfig.getOptimizerSettings(chat.config, window.createLLMProvider);
+            
             // Create MessageOptimizer instance
-            chat.messageOptimizer = new MessageOptimizer(chat.optimizerSettings);
+            chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
         }
         
+        // Add to memory - DO NOT SAVE!
+        // The chat is now in the correct format in memory
+        // It will only be saved when the user actually modifies it
         this.chats.set(chat.id, chat);
     }
     
@@ -1993,19 +3003,21 @@ helps users understand your analysis methodology and builds confidence in your c
         // Make sure we have at least one MCP server and LLM provider
         if (this.mcpServers.size === 0 || this.llmProviders.size === 0) {return;}
         
-        // Get the last used configuration or use defaults
-        let mcpServerId, llmProviderId, model, optimizerSettings;
+        // Get the last used configuration
+        const config = ChatConfig.getLastConfig();
+        let mcpServerId = config.mcpServer;
+        let llmProviderId, model;
         
+        // Extract legacy settings if they exist
         try {
             const lastConfig = localStorage.getItem('lastChatConfig');
             if (lastConfig) {
-                const config = JSON.parse(lastConfig);
+                const legacyConfig = JSON.parse(lastConfig);
                 // Verify these still exist
-                if (this.mcpServers.has(config.mcpServerId) && this.llmProviders.has(config.llmProviderId)) {
-                    mcpServerId = config.mcpServerId;
-                    llmProviderId = config.llmProviderId;
-                    model = config.model;
-                    optimizerSettings = config.optimizerSettings; // Load saved optimizer settings
+                if (this.mcpServers.has(legacyConfig.mcpServerId) && this.llmProviders.has(legacyConfig.llmProviderId)) {
+                    mcpServerId = legacyConfig.mcpServerId;
+                    llmProviderId = legacyConfig.llmProviderId;
+                    model = legacyConfig.model;
                 }
             }
         } catch {
@@ -2032,14 +3044,20 @@ helps users understand your analysis methodology and builds confidence in your c
         if (!model) {return;}
         
         // Create an unsaved chat
-        return this.createNewChat({
+        const createOptions = {
             mcpServerId,
             llmProviderId,
-            model,
             title: 'New Chat',
             isSaved: false,
-            optimizerSettings  // Pass saved optimizer settings
-        });
+            config  // Pass the config
+        };
+        
+        // Only pass model if config doesn't already have a valid one
+        if (!config || !config.model || !config.model.provider || !config.model.id) {
+            createOptions.model = model;
+        }
+        
+        return this.createNewChat(createOptions);
     }
 
     async initializeDefaultMCPServer() {
@@ -2275,7 +3293,7 @@ helps users understand your analysis methodology and builds confidence in your c
         }
         
         // Get the last used configuration or use defaults
-        let mcpServerId, llmProviderId, model, optimizerSettings;
+        let mcpServerId, llmProviderId, model;
         
         try {
             const lastConfig = localStorage.getItem('lastChatConfig');
@@ -2286,7 +3304,7 @@ helps users understand your analysis methodology and builds confidence in your c
                     mcpServerId = config.mcpServerId;
                     llmProviderId = config.llmProviderId;
                     model = config.model;
-                    optimizerSettings = config.optimizerSettings; // Load saved optimizer settings
+                    // optimizerSettings removed - now using new config structure
                 }
             }
         } catch {
@@ -2322,7 +3340,7 @@ helps users understand your analysis methodology and builds confidence in your c
             model,
             title: 'New Chat',
             isSaved: false,
-            optimizerSettings  // Pass saved optimizer settings
+            config: ChatConfig.getLastConfig()  // Pass the full config
         });
         
         // Load the chat immediately when created via button click
@@ -2359,7 +3377,21 @@ helps users understand your analysis methodology and builds confidence in your c
                         <h3 class="chat-title">${chat.title}</h3>
                         <div class="chat-meta">
                             <span class="chat-mcp"></span>
-                            <span class="chat-llm"></span>
+                            <span class="chat-llm" style="display: inline-flex; align-items: center; gap: 8px;">
+                                <span class="model-name"></span>
+                                <select class="max-tokens-dropdown" style="padding: 2px 4px; border: 1px solid var(--border-color); 
+                                        border-radius: 4px; background: var(--background-color); color: var(--text-primary);
+                                        cursor: pointer; font-size: 12px;">
+                                    <option value="1024">1k</option>
+                                    <option value="2048">2k</option>
+                                    <option value="4096" selected>4k</option>
+                                    <option value="8192">8k</option>
+                                    <option value="16384">16k</option>
+                                    <option value="32768">32k</option>
+                                    <option value="65536">64k</option>
+                                    <option value="131072">128k</option>
+                                </select>
+                            </span>
                         </div>
                     </div>
                     <div class="chat-controls">
@@ -2403,28 +3435,10 @@ helps users understand your analysis methodology and builds confidence in your c
             <div class="chat-content">
                 <div class="chat-messages"></div>
                 <div class="chat-controls-bar" style="display: flex; align-items: center; justify-content: center; gap: 4px; margin: 5px auto; flex-wrap: wrap; padding: 0 10px; max-width: 900px;">
-                    <!-- Temperature Control -->
-                    <div class="dropdown" style="position: relative;">
-                        <button class="temperature-btn btn btn-secondary dropdown-toggle" data-tooltip="Adjust response randomness" style="min-width: 80px;">
-                            <span><i class="fas fa-thermometer-half"></i></span>
-                            <span class="current-temp-text">${chat.temperature || 0.7}</span>
-                            <span style="margin-left: 5px;"><i class="fas fa-chevron-down"></i></span>
-                        </button>
-                        <div class="temperature-dropdown dropdown-menu" style="display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; width: 200px;">
-                            <div style="padding: 12px;">
-                                <label style="font-size: 12px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 8px;">Temperature: <span class="temp-value-label">${chat.temperature || 0.7}</span></label>
-                                <input type="range" class="temperature-slider" min="0" max="2" step="0.1" value="${chat.temperature || 0.7}" style="width: 100%; margin-bottom: 8px;">
-                                <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary);">
-                                    <span>0 (Focused)</span>
-                                    <span>2 (Creative)</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                     
                     <!-- Model and MCP Server Selection -->
                     <div class="dropdown" style="position: relative;">
-                        <button class="llm-model-btn btn btn-secondary dropdown-toggle" data-tooltip="Switch LLM model">
+                        <button class="llm-model-btn btn btn-secondary dropdown-toggle">
                             <span><i class="fas fa-robot"></i></span>
                             <span class="current-model-text">Model</span>
                             <span style="margin-left: 5px;"><i class="fas fa-chevron-down"></i></span>
@@ -2449,10 +3463,6 @@ helps users understand your analysis methodology and builds confidence in your c
                     <button class="summarize-btn btn btn-secondary" data-tooltip="Summarize conversation to reduce context size">
                         <span><i class="fas fa-compress-alt"></i></span>
                         <span>Summarize</span>
-                    </button>
-                    <button class="global-tool-toggle-btn btn btn-secondary tool-toggle-global" data-tooltip="Control inclusion of all tools in LLM context">
-                        <span class="tool-toggle-icon"><i class="fas fa-check"></i></span>
-                        <span class="tool-toggle-text">All tools included</span>
                     </button>
                     <button class="generate-title-btn btn btn-secondary" data-tooltip="Generate or update chat title using AI">
                         <span><i class="fas fa-edit"></i></span>
@@ -2480,6 +3490,7 @@ helps users understand your analysis methodology and builds confidence in your c
             title: container.querySelector('.chat-title'),
             mcpMeta: container.querySelector('.chat-mcp'),
             llmMeta: container.querySelector('.chat-llm'),
+            maxTokensDropdown: container.querySelector('.max-tokens-dropdown'),
             messages: container.querySelector('.chat-messages'),
             input: container.querySelector('.chat-input'),
             sendBtn: container.querySelector('.send-message-btn'),
@@ -2497,11 +3508,6 @@ helps users understand your analysis methodology and builds confidence in your c
             cumulativeCost: container.querySelector('.cumulative-cost'),
             
             // Control buttons
-            temperatureBtn: container.querySelector('.temperature-btn'),
-            temperatureDropdown: container.querySelector('.temperature-dropdown'),
-            temperatureSlider: container.querySelector('.temperature-slider'),
-            tempValueLabel: container.querySelector('.temp-value-label'),
-            currentTempText: container.querySelector('.current-temp-text'),
             
             llmModelBtn: container.querySelector('.llm-model-btn'),
             llmModelDropdown: container.querySelector('.llm-model-dropdown'),
@@ -2513,7 +3519,6 @@ helps users understand your analysis methodology and builds confidence in your c
             
             copyMetricsBtn: container.querySelector('.copy-metrics-btn'),
             summarizeBtn: container.querySelector('.summarize-btn'),
-            globalToolToggleBtn: container.querySelector('.global-tool-toggle-btn'),
             generateTitleBtn: container.querySelector('.generate-title-btn'),
             
             // Resize handle
@@ -2568,28 +3573,12 @@ helps users understand your analysis methodology and builds confidence in your c
             }
         });
         
-        // Temperature controls
-        elements.temperatureBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleChatDropdown(elements.temperatureDropdown);
-        });
-        
-        elements.temperatureSlider.addEventListener('input', (e) => {
-            const temp = parseFloat(e.target.value);
-            elements.currentTempText.textContent = temp.toFixed(1);
-            elements.tempValueLabel.textContent = temp.toFixed(1);
-        });
-        
-        elements.temperatureSlider.addEventListener('change', (e) => {
-            chat.temperature = parseFloat(e.target.value);
-            this.autoSave(chatId);
-        });
-        
         // Model selector
         elements.llmModelBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.populateModelDropdown(chatId, elements.llmModelDropdown);
-            this.toggleChatDropdown(elements.llmModelDropdown);
+            // Close any existing model selector overlays
+            document.querySelectorAll('.model-selector-overlay').forEach(el => el.remove());
+            this.populateModelDropdown(chatId, elements.llmModelDropdown, elements.llmModelBtn);
         });
         
         // MCP server selector
@@ -2614,10 +3603,6 @@ helps users understand your analysis methodology and builds confidence in your c
             });
         });
         
-        elements.globalToolToggleBtn.addEventListener('click', () => {
-            this.cycleGlobalToolToggle(chatId);
-        });
-        
         elements.generateTitleBtn.addEventListener('click', () => {
             this.handleGenerateTitleClick(chatId).catch(error => {
                 console.error('Failed to generate title:', error);
@@ -2635,6 +3620,21 @@ helps users understand your analysis methodology and builds confidence in your c
             }
         });
         
+        // Max tokens dropdown
+        if (elements.maxTokensDropdown) {
+            // Set initial value from config
+            const currentMaxTokens = chat.config.model.params.maxTokens || 4096;
+            elements.maxTokensDropdown.value = currentMaxTokens;
+            
+            // Add change handler
+            elements.maxTokensDropdown.addEventListener('change', (e) => {
+                const newMaxTokens = parseInt(e.target.value, 10);
+                chat.config.model.params.maxTokens = newMaxTokens;
+                this.autoSave(chatId);
+                console.log(`Updated max tokens for chat ${chatId} to ${newMaxTokens}`);
+            });
+        }
+        
         // Resize handle for input - delay to ensure DOM is ready
         if (elements.inputResizeHandle) {
             requestAnimationFrame(() => {
@@ -2651,9 +3651,6 @@ helps users understand your analysis methodology and builds confidence in your c
         this.chatContainers.forEach(container => {
             const elements = container._elements;
             if (elements) {
-                if (elements.temperatureDropdown !== dropdownEl) {
-                    elements.temperatureDropdown.style.display = 'none';
-                }
                 if (elements.llmModelDropdown !== dropdownEl) {
                     elements.llmModelDropdown.style.display = 'none';
                 }
@@ -2719,11 +3716,6 @@ helps users understand your analysis methodology and builds confidence in your c
                 this.currentMcpText = container._elements.currentMcpText;
                 
                 // Temperature controls
-                this.temperatureBtn = container._elements.temperatureBtn;
-                this.currentTempText = container._elements.currentTempText;
-                this.tempValueLabel = container._elements.tempValueLabel;
-                this.temperatureControl = this.temperatureBtn; // For compatibility
-                this.temperatureValue = this.currentTempText; // For compatibility
                 
                 // Focus input if ready
                 if (this.isChatReady(chat)) {
@@ -2751,10 +3743,46 @@ helps users understand your analysis methodology and builds confidence in your c
         elements.mcpMeta.textContent = server ? server.name : 'MCP: Not found';
         
         // Update LLM model
-        if (provider && chat.model) {
-            const modelDisplay = chat.model.includes(':') ? chat.model.split(':')[1] : chat.model;
-            elements.llmMeta.textContent = modelDisplay;
+        const chatModelString = ChatConfig.getChatModelString(chat);
+        if (provider && chatModelString) {
+            const config = chat.config || ChatConfig.loadChatConfig(chatId);
+            
+            // Collect all unique models being used
+            const modelsInUse = new Map();
+            modelsInUse.set('Chat', chatModelString);
+            
+            if (config.optimisation.toolSummarisation.enabled && config.optimisation.toolSummarisation.model) {
+                modelsInUse.set('Tools', ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model));
+            }
+            
+            if (config.optimisation.autoSummarisation.enabled && config.optimisation.autoSummarisation.model) {
+                modelsInUse.set('Summaries', ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model));
+            }
+            
+            if (config.optimisation.titleGeneration?.enabled !== false && config.optimisation.titleGeneration?.model) {
+                modelsInUse.set('Titles', ChatConfig.modelConfigToString(config.optimisation.titleGeneration.model));
+            }
+            
+            // Create display string with unique models
+            const uniqueModels = [...new Set(modelsInUse.values())];
+            const modelDisplay = uniqueModels.join(' / ');
+            
+            // Create tooltip content
+            const tooltipLines = [];
+            modelsInUse.forEach((model, purpose) => {
+                tooltipLines.push(`${purpose.padEnd(10)} | ${model}`);
+            });
+            
+            // Update model display in the header
+            const modelNameSpan = elements.llmMeta.querySelector('.model-name');
+            if (modelNameSpan) {
+                modelNameSpan.textContent = modelDisplay;
+                elements.llmMeta.setAttribute('data-tooltip', tooltipLines.join('\n'));
+            }
+            
+            // Also update dropdown button
             elements.currentModelText.textContent = modelDisplay;
+            elements.currentModelText.setAttribute('data-tooltip', tooltipLines.join('\n'));
         } else {
             elements.llmMeta.textContent = 'Model: Not found';
             elements.currentModelText.textContent = 'Select Model';
@@ -2762,6 +3790,12 @@ helps users understand your analysis methodology and builds confidence in your c
         
         // Update MCP dropdown text
         elements.currentMcpText.textContent = server ? server.name : 'Select MCP';
+        
+        // Update max tokens dropdown value
+        if (elements.maxTokensDropdown && chat.config && chat.config.model && chat.config.model.params) {
+            const currentMaxTokens = chat.config.model.params.maxTokens || 4096;
+            elements.maxTokensDropdown.value = currentMaxTokens;
+        }
     }
     
     isChatReady(chat) {
@@ -2820,9 +3854,11 @@ helps users understand your analysis methodology and builds confidence in your c
             return;
         }
         
-        if (!selectedModel) {
-            this.showError('Please select a model', null);
-            return;
+        // For backward compatibility, if selectedModel is provided as a string, use it
+        // Otherwise, the model should be in the config
+        if (!selectedModel && (!options.config || !options.config.model || !options.config.model.provider || !options.config.model.id)) {
+            console.warn('[createNewChat] No model provided and no valid model in config');
+            return null;
         }
         
         // Ensure MCP connection
@@ -2878,12 +3914,29 @@ IMPORTANT DATE/TIME INTERPRETATION RULES FOR MONITORING DATA:
 
 All date/time interpretations must be based on the current date/time context provided above, NOT on your training data.`;
         
+        // Create configuration from options
+        let chatConfig;
+        try {
+            chatConfig = ChatConfig.createConfigFromOptions({
+                config: options.config,
+                model: selectedModel,
+                mcpServerId
+            });
+        } catch (error) {
+            console.error('[createNewChat] Failed to create valid configuration:', error);
+            return null;
+        }
+        
+        // Get optimizer settings
+        const optimizerSettings = ChatConfig.getOptimizerSettings(chatConfig, window.createLLMProvider);
+        
+        // Create the chat object
         const chat = {
             id: chatId,
             title,
             mcpServerId,
             llmProviderId,
-            model: selectedModel, // Selected model for this chat
+            model: selectedModel || ChatConfig.modelConfigToString(chatConfig.model), // Selected model for this chat (legacy format)
             messages: [
                 {
                     role: 'system',
@@ -2896,7 +3949,6 @@ All date/time interpretations must be based on the current date/time context pro
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             currentTurn: 0, // Track conversation turns
-            toolInclusionMode: 'cached', // 'auto', 'all-on', 'all-off', 'manual', or 'cached'
             isSaved, // Track whether this chat has been saved to localStorage
             titleGenerated: false, // Track whether title has been generated
             // Per-chat rendering state
@@ -2910,48 +3962,15 @@ All date/time interpretations must be based on the current date/time context pro
             pendingToolCalls: new Map()
         };
         
-        // Get optimizer settings from options or create defaults
-        let chatOptimizerSettings;
-        if (options.optimizerSettings) {
-            // Use provided settings (from localStorage)
-            chatOptimizerSettings = {
-                ...options.optimizerSettings,
-                primaryModel: selectedModel  // Always use the current model as primary
-            };
-        } else {
-            // Create default settings - all disabled
-            chatOptimizerSettings = {
-                primaryModel: selectedModel,
-                secondaryModel: null,  // No secondary model by default
-                toolSummarization: {
-                    enabled: false,
-                    threshold: 50000,
-                    useSecondaryModel: true
-                },
-                toolMemory: {
-                    enabled: false,
-                    forgetAfterConclusions: 1
-                },
-                cacheControl: {
-                    enabled: false,  // Disabled by default
-                    strategy: 'smart'
-                },
-                autoSummarization: {
-                    enabled: false,
-                    triggerPercent: 50,
-                    useSecondaryModel: true
-                }
-            };
-        }
-        
-        // Add llmProviderFactory if tool summarization is enabled
-        if (chatOptimizerSettings.toolSummarization.enabled) {
-            chatOptimizerSettings.llmProviderFactory = window.createLLMProvider;
-        }
+        // Debug: Check what we're passing
+        console.log('[createNewChat] chatConfig:', chatConfig);
+        console.log('[createNewChat] chatConfig.model:', chatConfig.model);
+        console.log('[createNewChat] optimizerSettings:', optimizerSettings);
+        console.log('[createNewChat] optimizerSettings.model:', optimizerSettings.model);
         
         // Create isolated MessageOptimizer instance for this chat
-        chat.messageOptimizer = new MessageOptimizer(chatOptimizerSettings);
-        chat.optimizerSettings = chatOptimizerSettings;
+        chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+        chat.config = chatConfig;
         
         this.chats.set(chatId, chat);
         
@@ -2961,7 +3980,10 @@ All date/time interpretations must be based on the current date/time context pro
             model: selectedModel
         });
         
-        // Save the selections for next time
+        // Save the config for next time
+        ChatConfig.saveLastConfig(chatConfig);
+        
+        // Also save legacy format for now
         localStorage.setItem('lastChatConfig', JSON.stringify({
             mcpServerId,
             llmProviderId,
@@ -3048,8 +4070,8 @@ All date/time interpretations must be based on the current date/time context pro
         sessionDiv.dataset.chatId = chat.id;
         
             // Determine status
-            let statusIcon = '';
-            let statusClass = '';
+            let statusIcon;
+            let statusClass;
             if (chat.wasWaitingOnLoad) {
                 // Chat was saved while waiting for a response - broken state
                 statusIcon = '<i class="fas fa-chain-broken"></i>';
@@ -3084,13 +4106,18 @@ All date/time interpretations must be based on the current date/time context pro
             
             // Get model display name
             let modelDisplay = 'No model';
-            if (chat.model) {
-                // Extract model name from format "provider:model-name"
-                const parts = chat.model.split(':');
-                modelDisplay = parts.length > 1 ? parts[1] : chat.model;
-                // Shorten long model names
-                if (modelDisplay.length > 25) {
-                    modelDisplay = modelDisplay.substring(0, 22) + '...';
+            if (chat.hasInvalidModel) {
+                modelDisplay = '⚠️ Invalid model';
+            } else {
+                const config = chat.config || ChatConfig.loadChatConfig(chat.id);
+                if (config && config.model) {
+                    const primaryModel = ChatConfig.modelConfigToString(config.model);
+                    
+                    modelDisplay = ChatConfig.getModelDisplayName(primaryModel);
+                    // Shorten long model names
+                    if (modelDisplay.length > 25) {
+                        modelDisplay = modelDisplay.substring(0, 22) + '...';
+                    }
                 }
             }
             
@@ -3108,11 +4135,8 @@ All date/time interpretations must be based on the current date/time context pro
             // Calculate context usage and tokens
             const tokenHistory = this.getTokenUsageForChat(chat.id);
             let contextPercent = 0;
-            if (tokenHistory.totalTokens > 0 && chat.model) {
-                let modelName = chat.model;
-                if (modelName && modelName.includes(':')) {
-                    modelName = modelName.split(':')[1];
-                }
+            if (tokenHistory.totalTokens > 0 && chat.config?.model?.id) {
+                const modelName = chat.config.model.id;
                 const limit = this.modelLimits[modelName] || 4096;
                 contextPercent = Math.min(100, Math.round((tokenHistory.totalTokens / limit) * 100));
             }
@@ -3124,7 +4148,7 @@ All date/time interpretations must be based on the current date/time context pro
             const totalPrice = this.calculateTokenCost(chat.id) || 0;
             
             // Format tokens
-            let tokenDisplay = '0';
+            let tokenDisplay;
             if (totalTokens >= 1000000) {
                 tokenDisplay = `${(totalTokens / 1000000).toFixed(1)}M`;
             } else if (totalTokens >= 1000) {
@@ -3136,13 +4160,13 @@ All date/time interpretations must be based on the current date/time context pro
             // Format date and time
             const updatedDate = new Date(chat.updatedAt);
             const dateStr = updatedDate.toLocaleDateString();
-            const timeStr = updatedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const timeStr = updatedDate.toLocaleTimeString();
             
             // Add indicator for unsaved chats
             const titlePrefix = chat.isSaved === false ? '• ' : '';
             
             sessionDiv.innerHTML = `
-                <div class="session-content" onclick="app.loadChat('${chat.id}')">
+                <div class="session-content">
                     <div class="session-row session-title-row">
                         <span class="session-title" data-tooltip="${chat.title}">${titlePrefix}${chat.title}</span>
                     </div>
@@ -3165,13 +4189,25 @@ All date/time interpretations must be based on the current date/time context pro
                         <div class="session-actions">
                             ${hasDraft ? '<span class="status-icon status-draft" data-tooltip="Draft message"><i class="fas fa-edit"></i></span>' : ''}
                             <span class="status-icon ${statusClass}" data-tooltip="Chat status">${statusIcon}</span>
-                            <button class="btn-delete-chat" data-chat-id="${chat.id}" data-tooltip="Delete chat" onclick="event.stopPropagation(); app.deleteChat('${chat.id}')">
+                            <button class="btn-delete-chat" data-chat-id="${chat.id}" data-tooltip="Delete chat">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
                         </div>
                     </div>
                 </div>
             `;
+            
+            // Add event listeners
+            const sessionContent = sessionDiv.querySelector('.session-content');
+            sessionContent.addEventListener('click', () => {
+                this.loadChat(chat.id);
+            });
+            
+            const deleteBtn = sessionDiv.querySelector('.btn-delete-chat');
+            deleteBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.deleteChat(chat.id);
+            });
             
             return sessionDiv;
     }
@@ -3269,7 +4305,7 @@ All date/time interpretations must be based on the current date/time context pro
         if (!this.tokenUsageHistory.has(chatId)) {
             this.tokenUsageHistory.set(chatId, {
                 requests: [],
-                model: chat.model
+                model: ChatConfig.getChatModelString(chat)
             });
             
             // Rebuild token history from saved messages
@@ -3322,11 +4358,6 @@ All date/time interpretations must be based on the current date/time context pro
                     elements.input.placeholder = 'Ask about your Netdata metrics...';
                     elements.reconnectBtn.style.display = 'none';
                     
-                    // Update temperature display
-                    const temp = chat.temperature || 0.7;
-                    elements.temperatureSlider.value = temp;
-                    elements.currentTempText.textContent = temp;
-                    elements.tempValueLabel.textContent = temp;
                 } else {
                     // Connection exists but not ready yet
                     elements.input.disabled = true;
@@ -3549,11 +4580,10 @@ All date/time interpretations must be based on the current date/time context pro
         }
         
         // Update global toggle UI based on chat's tool inclusion mode
-        this.updateChatToolToggleUI(chatId);
         
         // Update context window indicator
         const contextTokens = this.calculateContextWindowTokens(chatId);
-        const model = chat.model || (provider ? provider.model : null);
+        const model = ChatConfig.getChatModelString(chat) || (provider ? provider.model : null);
         
         // Always update the context window and cumulative tokens
         this.updateContextWindowIndicator(contextTokens, model, chatId);
@@ -3909,11 +4939,12 @@ All date/time interpretations must be based on the current date/time context pro
                                 const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
                                 const proxyProvider = this.llmProviders.get(chat.llmProviderId);
                                 
-                                if (mcpConnection && proxyProvider && chat.model) {
-                                    // Parse model format: "provider:model-name"
-                                    const [providerType, modelName] = chat.model.split(':');
+                                if (mcpConnection && proxyProvider && chat.config?.model) {
+                                    // Get model config
+                                    const providerType = chat.config.model.provider;
+                                    const modelName = chat.config.model.id;
                                     if (!providerType || !modelName) {
-                                        this.showError('Invalid model format in chat', chatId);
+                                        this.showError('Invalid model configuration in chat', chatId);
                                         return;
                                     }
                                     
@@ -3934,13 +4965,15 @@ All date/time interpretations must be based on the current date/time context pro
                                 const retryErrorMessage = `Retry failed: ${retryError.message}`;
                                 this.showErrorWithRetry(retryErrorMessage, async () => {
                                     // Remove the retry error message
-                                    const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === retryErrorMessage);
-                                    if (errorIndex !== -1) {
-                                        this.removeMessage(chat.id, errorIndex, 1);
+                                    const retryErrorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === retryErrorMessage);
+                                    if (retryErrorIndex !== -1) {
+                                        this.removeMessage(chat.id, retryErrorIndex, 1);
                                         this.loadChat(chatId, true);
                                     }
-                                    // Try again
-                                    await retryBtn.onclick();
+                                    // Try again - trigger a click event on the original retry button
+                                    if (retryBtn) {
+                                        retryBtn.click();
+                                    }
                                 }, 'Retry', chatId);
                                 this.addMessage(chat.id, { type: 'error', content: retryErrorMessage });
                             }
@@ -4021,8 +5054,8 @@ All date/time interpretations must be based on the current date/time context pro
                     let mostRecentChat = null;
                     let mostRecentTime = null;
                     
-                    for (const [id, chat] of this.chats) {
-                        const updatedTime = new Date(chat.updatedAt);
+                    for (const [id, chatEntry] of this.chats) {
+                        const updatedTime = new Date(chatEntry.updatedAt);
                         if (!mostRecentTime || updatedTime > mostRecentTime) {
                             mostRecentTime = updatedTime;
                             mostRecentChat = id;
@@ -4033,13 +5066,22 @@ All date/time interpretations must be based on the current date/time context pro
                         this.loadChat(mostRecentChat);
                     }
                 }
-                this.sendMessageBtn.disabled = true;
-                this.reconnectMcpBtn.style.display = 'none';
-                this.temperatureControl.style.display = 'flex';
+                // These elements might not exist since we're between chats
+                if (this.sendMessageBtn) {
+                    this.sendMessageBtn.disabled = true;
+                }
+                if (this.reconnectMcpBtn) {
+                    this.reconnectMcpBtn.style.display = 'none';
+                }
+                // Temperature control removed - now in modal
                 
-                // Reset dropdown buttons
-                this.currentModelText.textContent = 'Model';
-                this.currentMcpText.textContent = 'MCP Server';
+                // Reset dropdown buttons if they exist
+                if (this.currentModelText) {
+                    this.currentModelText.textContent = 'Model';
+                }
+                if (this.currentMcpText) {
+                    this.currentMcpText.textContent = 'MCP Server';
+                }
                 
                 // Show empty context window indicator
                 const indicator = document.getElementById('contextWindowIndicator');
@@ -4102,10 +5144,11 @@ All date/time interpretations must be based on the current date/time context pro
             return;
         }
         
-        // Parse the model selection (format: "provider:model")
-        const [providerType, modelName] = chat.model.split(':');
+        // Get model config
+        const providerType = chat.config?.model?.provider;
+        const modelName = chat.config?.model?.id;
         if (!providerType || !modelName) {
-            this.showError('Invalid model selection', chat.id);
+            this.showError('sendMessage(): Invalid model configuration', chat.id);
             return;
         }
         
@@ -4163,8 +5206,31 @@ All date/time interpretations must be based on the current date/time context pro
             
             // Check if we should generate a title (first user message and got a response)
             if (this.isFirstUserMessage(chat) && this.countAssistantMessages(chat) > 0 && !chat.titleGenerated) {
-                // Generate title automatically
-                await this.generateChatTitle(chat, mcpConnection, provider, true);
+                // Only proceed if title generation is enabled
+                if (chat.config?.optimisation?.titleGeneration?.enabled) {
+                    let titleProvider;
+                    
+                    // If a specific title model is configured, use that
+                    if (chat.config.optimisation.titleGeneration.model) {
+                        const titleModel = chat.config.optimisation.titleGeneration.model;
+                        const llmProxy = this.llmProviders.get(chat.llmProviderId);
+                        if (llmProxy) {
+                            titleProvider = createLLMProvider(
+                                titleModel.provider,
+                                llmProxy.proxyUrl,
+                                titleModel.id
+                            );
+                            titleProvider.onLog = llmProxy.onLog;
+                        }
+                    } else {
+                        // Use the chat's primary model if no specific title model configured
+                        titleProvider = provider;
+                    }
+                    
+                    // Generate title automatically (force=false)
+                    await this.generateChatTitle(chat, mcpConnection, titleProvider, true, false);
+                }
+                // If title generation is disabled, do nothing
             }
             
             // Check if we should generate a summary (conditions to be defined later)
@@ -4201,9 +5267,9 @@ All date/time interpretations must be based on the current date/time context pro
                 const errorMessage = `Error: ${error.message}`;
                 this.showErrorWithRetry(errorMessage, async () => {
                     // Find and remove only the error message
-                    const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === errorMessage);
-                    if (errorIndex !== -1) {
-                        this.removeMessage(chat.id, errorIndex, 1);
+                    const errorMessageIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === errorMessage);
+                    if (errorMessageIndex !== -1) {
+                        this.removeMessage(chat.id, errorMessageIndex, 1);
                         
                         // Reload chat to remove the error from display (force render to refresh UI)
                         this.loadChat(chat.id, true);
@@ -4222,9 +5288,9 @@ All date/time interpretations must be based on the current date/time context pro
                         const retryErrorMessage = `Retry failed: ${retryError.message}`;
                         this.showErrorWithRetry(retryErrorMessage, async () => {
                             // Remove the retry error message
-                            const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === retryErrorMessage);
-                            if (errorIndex !== -1) {
-                                this.removeMessage(chat.id, errorIndex, 1);
+                            const retryErrIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === retryErrorMessage);
+                            if (retryErrIndex !== -1) {
+                                this.removeMessage(chat.id, retryErrIndex, 1);
                                 this.loadChat(chat.id, true);
                             }
                             // Try again - resend the original message
@@ -4249,11 +5315,6 @@ All date/time interpretations must be based on the current date/time context pro
             this.shouldStopProcessing = false;
             this.updateSendButton();
             this.chatInput.focus();
-            
-            // Update tool checkboxes if in auto mode
-            if (chat.toolInclusionMode === 'auto') {
-                this.updateToolCheckboxesForAutoMode(chat.id);
-            }
         }
     }
 
@@ -4423,12 +5484,12 @@ All date/time interpretations must be based on the current date/time context pro
             const temperature = this.getCurrentTemperature(chat.id);
             const llmStartTime = Date.now();
             // eslint-disable-next-line no-await-in-loop
-            const response = await provider.sendMessage(messages, tools, temperature, chat.toolInclusionMode, cacheControlIndex);
+            const response = await provider.sendMessage(messages, tools, temperature, cacheControlIndex);
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Track token usage
             if (response.usage) {
-                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
+                this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || provider.model);
             }
             
             // If no tool calls, display response and finish
@@ -4438,7 +5499,7 @@ All date/time interpretations must be based on the current date/time context pro
                     type: 'assistant-metrics', 
                     usage: response.usage, 
                     responseTime: llmResponseTime, 
-                    model: chat.model || provider.model
+                    model: ChatConfig.getChatModelString(chat) || provider.model
                 }, chat.id);
                 
                 if (response.content) {
@@ -4450,7 +5511,7 @@ All date/time interpretations must be based on the current date/time context pro
                         content: response.content,
                         usage: response.usage || null,
                         responseTime: llmResponseTime || null,
-                        model: chat.model || provider.model,
+                        model: provider.model || ChatConfig.getChatModelString(chat),
                         turn: chat.currentTurn
                     };
                     // Use addMessage to calculate price and update cumulative totals
@@ -4458,7 +5519,7 @@ All date/time interpretations must be based on the current date/time context pro
                     
                     // Track token usage with model information
                     if (response.usage) {
-                        const modelUsed = chat.model || provider.model;
+                        const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
                         this.addCumulativeTokens(
                             chat.id,
                             modelUsed,
@@ -4493,7 +5554,7 @@ All date/time interpretations must be based on the current date/time context pro
                     })),
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: chat.model || provider.model,
+                    model: provider.model || ChatConfig.getChatModelString(chat),
                     turn: chat.currentTurn,
                     cacheControlIndex // Store where cache control was placed
                 };
@@ -4501,7 +5562,7 @@ All date/time interpretations must be based on the current date/time context pro
                 
                 // Track token usage with model information
                 if (response.usage) {
-                    const modelUsed = chat.model || provider.model;
+                    const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
                     this.addCumulativeTokens(
                         chat.id,
                         modelUsed,
@@ -4518,7 +5579,7 @@ All date/time interpretations must be based on the current date/time context pro
                     type: 'assistant-metrics', 
                     usage: response.usage, 
                     responseTime: llmResponseTime, 
-                    model: chat.model || provider.model
+                    model: ChatConfig.getChatModelString(chat) || provider.model
                 }, chat.id);
                 
                 if (response.content) {
@@ -4633,24 +5694,11 @@ All date/time interpretations must be based on the current date/time context pro
                 // Update tool results with inclusion state from checkboxes
                 if (toolResults.length > 0) {
                     // Check current checkbox states
-                    // In cached mode, all tools are always included
-                    if (chat && chat.toolInclusionMode === 'cached') {
-                            toolResults.forEach(tr => {
-                                tr.includeInContext = true;
-                            });
-                        } else {
-                            toolResults.forEach(tr => {
-                                // Find the tool div by tool name
-                                const toolDivs = document.querySelectorAll(`.tool-block[data-tool-name="${tr.name}"]`);
-                                for (const toolDiv of toolDivs) {
-                                    const checkbox = toolDiv.querySelector('.tool-include-checkbox');
-                                    if (checkbox) {
-                                        tr.includeInContext = checkbox.checked;
-                                        break;
-                                    }
-                                }
-                            });
-                        }
+                    toolResults.forEach(tr => {
+                        // Tool inclusion checkboxes have been removed
+                        // Always include tool results in context
+                        tr.includeInContext = true;
+                    });
                     }
                     
                     // Store all tool results together
@@ -4680,7 +5728,7 @@ All date/time interpretations must be based on the current date/time context pro
                         messages.push(toolResultsMessage);
                         
                         // Check if we need to perform tool summarization
-                        if (chat.messageOptimizer && chat.optimizerSettings.toolSummarization.enabled) {
+                        if (chat.messageOptimizer && chat.config?.optimisation?.toolSummarisation?.enabled) {
                             try {
                                 // Get tool schemas for context
                                 const toolSchemas = new Map();
@@ -4694,6 +5742,7 @@ All date/time interpretations must be based on the current date/time context pro
                                 };
                                 
                                 // Perform async summarization
+                                // eslint-disable-next-line no-await-in-loop
                                 const summarizedMessages = await chat.messageOptimizer.performToolSummarization(
                                     messages,
                                     {
@@ -5161,7 +6210,7 @@ All date/time interpretations must be based on the current date/time context pro
         const modelHtml = data.model ? `
             <span class="accounting-token-item" data-tooltip="Model used">
                 <i class="fas fa-robot"></i>
-                <span>${data.model.includes(':') ? data.model.split(':')[1] : data.model}</span>
+                <span>${ChatConfig.getModelDisplayName(data.model)}</span>
             </span>` : '';
         
         messageDiv.innerHTML = `
@@ -5433,7 +6482,7 @@ All date/time interpretations must be based on the current date/time context pro
             // Clear token usage history for this chat
             this.tokenUsageHistory.set(chatId, {
                 requests: [],
-                model: chat.model
+                model: ChatConfig.getChatModelString(chat)
             });
             
             // Save settings
@@ -5493,7 +6542,7 @@ All date/time interpretations must be based on the current date/time context pro
         
         // 1. MODEL
         if (model) {
-            const modelDisplay = model.includes(':') ? model.split(':')[1] : model;
+            const modelDisplay = ChatConfig.getModelDisplayName(model);
             metricsHtml += `<span class="metric-item" data-tooltip="Model used"><i class="fas fa-robot"></i> ${modelDisplay}</span>`;
         }
         
@@ -5738,12 +6787,6 @@ All date/time interpretations must be based on the current date/time context pro
             toolDiv.dataset.turn = chat.currentTurn || 0;
         }
         
-        // Check if we're in cached mode
-        const isCachedMode = chat && chat.toolInclusionMode === 'cached';
-        const checkboxDisabled = isCachedMode ? 'disabled' : '';
-        const labelTitle = isCachedMode ? 'Tool inclusion is locked in cached mode' : 'Include this tool\'s result in the LLM context';
-        const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
-        
         const toolHeader = document.createElement('div');
         toolHeader.className = 'tool-header';
         toolHeader.innerHTML = `
@@ -5751,11 +6794,6 @@ All date/time interpretations must be based on the current date/time context pro
             <span class="tool-label"><i class="fas fa-wrench"></i> ${toolName}</span>
             <span class="tool-info">
                 <span class="tool-status"><i class="fas fa-hourglass-half"></i> Calling...</span>
-                <label class="tool-include-label" data-tooltip="${labelTitle}" ${labelOpacity}>
-                    <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
-                    <span class="tool-include-toggle"></span>
-                    <span class="tool-include-text">Include</span>
-                </label>
             </span>
         `;
         
@@ -5797,36 +6835,16 @@ All date/time interpretations must be based on the current date/time context pro
         responseSection.style.display = 'none';
         toolContent.appendChild(responseSection);
         
-        toolHeader.addEventListener('click', (e) => {
+        toolHeader.addEventListener('click', (_e) => {
             // Don't toggle if clicking on checkbox, label, or toggle switch
-            /** @type {Element} */
-            const target = e.target;
-            if (target.matches('.tool-include-checkbox, .tool-include-label, .tool-include-text, .tool-include-toggle') || 
-                target.closest('.tool-include-label')) {
-                e.stopPropagation();
-                return;
-            }
+            // No need to check for tool inclusion elements - they've been removed
             const isCollapsed = toolContent.classList.contains('collapsed');
             toolContent.classList.toggle('collapsed');
             toolHeader.querySelector('.tool-toggle').textContent = isCollapsed ? '▼' : '▶';
         });
         
-        // Handle checkbox change
-        const checkbox = toolHeader.querySelector('.tool-include-checkbox');
-        checkbox.addEventListener('change', () => {
-            // Update the tool's included state
-            toolDiv.dataset.included = checkbox.checked;
-            
-            // If this is part of a chat, track the inclusion state
-            if (chatId) {
-                const chatToolStates = this.toolInclusionStates.get(chatId) || new Map();
-                chatToolStates.set(toolId, checkbox.checked);
-                this.toolInclusionStates.set(chatId, chatToolStates);
-            }
-            
-            // Update global toggle state
-            this.updateChatToolToggleUI(chatId);
-        });
+        // Tool inclusion checkboxes have been removed
+        // No checkbox event handlers needed
         
         toolDiv.appendChild(toolHeader);
         toolDiv.appendChild(toolContent);
@@ -5911,45 +6929,13 @@ All date/time interpretations must be based on the current date/time context pro
             // Update metrics while preserving checkbox
             if (infoSpan) {
                 // Save checkbox state and reference
-                const oldCheckbox = infoSpan.querySelector('.tool-include-checkbox');
-                const wasChecked = oldCheckbox ? oldCheckbox.checked : true;
-                
-                // Check if we're in cached mode
-                const chat = this.chats.get(chatId);
-                const isCachedMode = chat && chat.toolInclusionMode === 'cached';
-                const checkboxDisabled = isCachedMode ? 'disabled' : '';
-                const labelTitle = isCachedMode ? 'Tool inclusion is locked in cached mode' : 'Include this tool\'s result in the LLM context';
-                const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
-                
                 infoSpan.innerHTML = `
                     <span class="tool-status">${result.error ? '<i class="fas fa-times-circle"></i> Error' : '<i class="fas fa-check-circle"></i> Complete'}</span>
                     <span class="tool-metric"><i class="fas fa-clock"></i> ${timeInfo}</span>
                     <span class="tool-metric"><i class="fas fa-box"></i> ${sizeInfo}</span>
-                    <label class="tool-include-label" data-tooltip="${labelTitle}" ${labelOpacity}>
-                        <input type="checkbox" class="tool-include-checkbox" ${wasChecked || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
-                        <span class="tool-include-toggle"></span>
-                        <span class="tool-include-text">Include</span>
-                    </label>
                 `;
                 
-                // Re-attach checkbox event handler if it exists
-                const newCheckbox = infoSpan.querySelector('.tool-include-checkbox');
-                if (newCheckbox) {
-                    newCheckbox.addEventListener('change', () => {
-                        // Update the tool's included state
-                        toolDiv.dataset.included = newCheckbox.checked;
-                        
-                        // If this is part of a chat, track the inclusion state
-                        if (chatId) {
-                            const chatToolStates = this.toolInclusionStates.get(chatId) || new Map();
-                            chatToolStates.set(toolCallId, newCheckbox.checked);
-                            this.toolInclusionStates.set(chatId, chatToolStates);
-                        }
-                        
-                        // Update global toggle state
-                        this.updateChatToolToggleUI(chatId);
-                    });
-                }
+                // Tool inclusion checkboxes have been removed
             }
             
             // Update response section
@@ -6003,135 +6989,6 @@ All date/time interpretations must be based on the current date/time context pro
         this.moveSpinnerToBottom(chatId);
     }
     
-    createStandaloneToolResult(toolName, result, chatId, responseTime = 0, responseSize = null, includeInContext = true) {
-        // Get chat-specific messages container
-        const container = this.getChatContainer(chatId);
-        const messagesContainer = container && container._elements && container._elements.messages;
-        const targetContainer = this.getCurrentAssistantGroup(chatId) || messagesContainer;
-        
-        const toolDiv = document.createElement('div');
-        toolDiv.className = 'tool-block tool-result-block';
-        
-        // Use provided size or calculate it
-        const resultSize = responseSize !== null ? responseSize : 
-            typeof result === 'string' 
-                ? result.length 
-                : JSON.stringify(result).length
-        ;
-        
-        // Format size info
-        let sizeInfo;
-        if (resultSize < 1024) {
-            sizeInfo = `${resultSize} bytes`;
-        } else if (resultSize < 1024 * 1024) {
-            sizeInfo = `${(resultSize / 1024).toFixed(1)} KB`;
-        } else {
-            sizeInfo = `${(resultSize / (1024 * 1024)).toFixed(1)} MB`;
-        }
-        
-        // Format response time
-        const timeInfo = responseTime > 0 ? `${(responseTime / 1000).toFixed(2)}s` : '';
-        
-        // Generate unique ID for this tool result
-        const toolId = `tool-result-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-        toolDiv.dataset.toolId = toolId;
-        toolDiv.dataset.toolName = toolName;
-        toolDiv.dataset.included = includeInContext ? 'true' : 'false';
-        
-        // Check if we're in cached mode
-        const chat = this.chats.get(chatId);
-        const isCachedMode = chat && chat.toolInclusionMode === 'cached';
-        const checkboxDisabled = isCachedMode ? 'disabled' : '';
-        const labelTitle = isCachedMode ? 'Tool inclusion is locked in cached mode' : 'Include this tool\'s result in the LLM context';
-        const labelOpacity = isCachedMode ? 'style="opacity: 0.5;"' : '';
-        
-        const toolHeader = document.createElement('div');
-        toolHeader.className = 'tool-header';
-        toolHeader.innerHTML = `
-            <span class="tool-toggle">▶</span>
-            <span class="tool-label"><i class="fas fa-chart-bar"></i> Tool result: ${toolName}</span>
-            <span class="tool-info">
-                <span class="tool-metric"><i class="fas fa-clock"></i> ${timeInfo}</span>
-                <span class="tool-metric"><i class="fas fa-box"></i> ${sizeInfo}</span>
-                <label class="tool-include-label" data-tooltip="${labelTitle}" ${labelOpacity}>
-                    <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
-                    <span class="tool-include-toggle"></span>
-                    <span class="tool-include-text">Include</span>
-                </label>
-            </span>
-        `;
-        
-        const toolContent = document.createElement('div');
-        toolContent.className = 'tool-content collapsed';
-        
-        let formattedResult;
-        if (typeof result === 'object') {
-            if (result.error) {
-                formattedResult = `<span style="color: var(--danger-color);">${result.error}</span>`;
-            } else {
-                formattedResult = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-            }
-        } else {
-            formattedResult = result;
-        }
-        
-        toolContent.innerHTML = formattedResult;
-        
-        toolHeader.addEventListener('click', (e) => {
-            // Don't toggle if clicking on checkbox, label, or toggle switch
-            /** @type {Element} */
-            const target = e.target;
-            if (target.matches('.tool-include-checkbox, .tool-include-label, .tool-include-text, .tool-include-toggle') || 
-                target.closest('.tool-include-label')) {
-                e.stopPropagation();
-                return;
-            }
-            const isCollapsed = toolContent.classList.contains('collapsed');
-            toolContent.classList.toggle('collapsed');
-            toolHeader.querySelector('.tool-toggle').textContent = isCollapsed ? '▼' : '▶';
-        });
-        
-        // Handle checkbox change
-        const checkbox = toolHeader.querySelector('.tool-include-checkbox');
-        if (checkbox) {
-            checkbox.addEventListener('change', () => {
-                // Update the tool's included state
-                toolDiv.dataset.included = checkbox.checked;
-                
-                // If this is part of a chat, track the inclusion state
-                if (chatId) {
-                    const chatToolStates = this.toolInclusionStates.get(chatId) || new Map();
-                    chatToolStates.set(toolId, checkbox.checked);
-                    this.toolInclusionStates.set(chatId, chatToolStates);
-                    
-                    // If we're in manual mode, update it when user changes checkboxes
-                    const currentChat = this.chats.get(chatId);
-                    if (currentChat && currentChat.toolInclusionMode === 'manual') {
-                        // Stay in manual mode when user manually changes checkboxes
-                        this.updateChatToolToggleUI(chatId);
-                    } else if (currentChat) {
-                        // User changed a checkbox, switch to manual mode
-                        currentChat.toolInclusionMode = 'manual';
-                        this.autoSave(currentChat.id);
-                        this.updateChatToolToggleUI(chatId);
-                    }
-                }
-            });
-        }
-        
-        toolDiv.appendChild(toolHeader);
-        toolDiv.appendChild(toolContent);
-        targetContainer.appendChild(toolDiv);
-        
-        // Only append to chat if we're not in a group
-        if (!this.getCurrentAssistantGroup(chatId)) {
-            const chatContainer = this.getChatContainer(chatId);
-            if (chatContainer && chatContainer._elements && chatContainer._elements.messages) {
-                chatContainer._elements.messages.appendChild(targetContainer);
-            }
-        }
-    }
-
     scrollToBottom(chatId, force = false) {
         if (!chatId) {
             console.error('scrollToBottom called without chatId');
@@ -6600,10 +7457,7 @@ All date/time interpretations must be based on the current date/time context pro
         if (!elements.contextFill || !elements.contextStats) {return;}
         
         // Extract model name from format "provider:model-name" if needed
-        let modelName = model;
-        if (model && model.includes(':')) {
-            modelName = model.split(':')[1];
-        }
+        const modelName = ChatConfig.getModelDisplayName(model);
         
         // Get model info
         const limit = this.modelLimits[modelName] || 4096;
@@ -6724,7 +7578,7 @@ All date/time interpretations must be based on the current date/time context pro
         const chat = this.chats.get(chatId);
         if (chat) {
             const contextTokens = this.calculateContextWindowTokens(chatId);
-            this.updateContextWindowIndicator(contextTokens, chat.model || 'unknown', chatId);
+            this.updateContextWindowIndicator(contextTokens, ChatConfig.getChatModelString(chat) || 'unknown', chatId);
         }
         
         // Update cumulative tokens
@@ -6901,7 +7755,7 @@ All date/time interpretations must be based on the current date/time context pro
         // Add each model's data
         let hasData = false;
         for (const [model, data] of Object.entries(chat.perModelTokensPrice)) {
-            const modelName = model.includes(':') ? model.split(':')[1] : model;
+            const modelName = ChatConfig.getModelDisplayName(model);
             
             // Skip models with no usage
             if (data.input === 0 && data.output === 0 && data.cacheRead === 0 && data.cacheCreation === 0) {
@@ -7031,7 +7885,7 @@ All date/time interpretations must be based on the current date/time context pro
         
         const output = {
             title: chat.title,
-            model: chat.model,
+            model: ChatConfig.getChatModelString(chat),
             messageCount: chat.messages.length,
             messages: sanitizedMessages
         };
@@ -7055,10 +7909,16 @@ All date/time interpretations must be based on the current date/time context pro
     }
     
     getCurrentTemperature(chatId) {
-        if (!chatId) {return 0.7;}
+        if (!chatId) {
+            throw new Error('chatId is required for getCurrentTemperature');
+        }
         
         const chat = this.chats.get(chatId);
-        return chat ? chat.temperature || 0.7 : 0.7;
+        if (!chat) {
+            throw new Error(`Chat ${chatId} not found`);
+        }
+        
+        return chat.config.model.params.temperature;
     }
     
     // Handle generate title button click
@@ -7093,10 +7953,24 @@ All date/time interpretations must be based on the current date/time context pro
                 throw new Error('LLM provider not found');
             }
             
-            // Parse the model selection (format: "provider:model")
-            const [providerType, modelName] = chat.model.split(':');
-            if (!providerType || !modelName) {
-                throw new Error('Invalid model selection in chat');
+            // Determine which model to use for title generation
+            let providerType, modelName;
+            
+            // If title generation is enabled and has a model configured, use that
+            if (chat.config?.optimisation?.titleGeneration?.enabled && 
+                chat.config.optimisation.titleGeneration.model) {
+                const titleModel = chat.config.optimisation.titleGeneration.model;
+                providerType = titleModel.provider;
+                modelName = titleModel.id;
+                console.log('Using title generation model:', `${providerType}:${modelName}`);
+            } else {
+                // Fall back to chat's primary model
+                providerType = chat.config?.model?.provider;
+                modelName = chat.config?.model?.id;
+                if (!providerType || !modelName) {
+                    throw new Error('Invalid model configuration in chat');
+                }
+                console.log('Using chat primary model:', `${providerType}:${modelName}`);
             }
             
             // Create the actual LLM provider instance
@@ -7104,8 +7978,8 @@ All date/time interpretations must be based on the current date/time context pro
             const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
             provider.onLog = proxyProvider.onLog;
             
-            // Generate the title
-            await this.generateChatTitle(chat, mcpConnection, provider);
+            // Generate the title (force=true for manual generation)
+            await this.generateChatTitle(chat, mcpConnection, provider, false, true);
         } catch (error) {
             this.showError(`Failed to generate title: ${error.message}`, chatId);
         } finally {
@@ -7210,7 +8084,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
             // Send request with low temperature for consistent summaries
             const temperature = 0.5;
             const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, [], temperature, chat.toolInclusionMode, cacheControlIndex);
+            const response = await provider.sendMessage(messages, [], temperature, cacheControlIndex);
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Hide spinner
@@ -7218,7 +8092,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
             
             // Update metrics
             if (response.usage) {
-                this.updateTokenUsage(chat.id, response.usage, chat.model || provider.model);
+                this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || provider.model);
             }
             
             // Process the summary response
@@ -7229,7 +8103,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
                     content: response.content,
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: chat.model || provider.model,
+                    model: provider.model || ChatConfig.getChatModelString(chat),
                     timestamp: new Date().toISOString(),
                     cacheControlIndex // Store the frozen cache position
                 });
@@ -7240,12 +8114,12 @@ Remember: This summary will be the ONLY context available when resuming the conv
                     content: response.content,
                     usage: response.usage,
                     responseTime: llmResponseTime,
-                    model: chat.model || provider.model
+                    model: ChatConfig.getChatModelString(chat) || provider.model
                 }, chat.id);
                 
                 // Update context window display
                 const contextTokens = this.calculateContextWindowTokens(chat.id);
-                this.updateContextWindowIndicator(contextTokens, chat.model || provider.model, chat.id);
+                this.updateContextWindowIndicator(contextTokens, ChatConfig.getChatModelString(chat) || provider.model, chat.id);
                 
                 // Update all token displays including cost
                 this.updateAllTokenDisplays(chat.id);
@@ -7307,10 +8181,11 @@ Remember: This summary will be the ONLY context available when resuming the conv
             const mcpConnection = await this.ensureMcpConnection(chat.mcpServerId);
             const llmProviderConfig = this.llmProviders.get(chat.llmProviderId);
             
-            // Parse the model selection (format: "provider:model")
-            const [providerType, modelName] = chat.model.split(':');
+            // Get model from config
+            const providerType = chat.config?.model?.provider;
+            const modelName = chat.config?.model?.id;
             if (!providerType || !modelName) {
-                throw new Error('Invalid model selection in chat');
+                throw new Error('Invalid model configuration in chat');
             }
             
             const provider = window.createLLMProvider(
@@ -7391,7 +8266,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
                 summaryTokens.cacheCreationTokens = summaryMsg.usage.cacheCreationInputTokens || 0;
             }
             // Get the model used for the summary
-            summaryModel = summaryMsg.model || chat.model;
+            summaryModel = summaryMsg.model || ChatConfig.getChatModelString(chat);
         }
         
         // Count messages to be deleted
@@ -7456,7 +8331,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
         
         // Check context window usage (e.g., when 80% full)
         const contextTokens = this.calculateContextWindowTokens(chat.id);
-        const modelLimit = this.getModelContextLimit(chat.model);
+        const modelLimit = this.getModelContextLimit(ChatConfig.getChatModelString(chat));
         if (contextTokens < modelLimit * 0.8) return false;
         
         // Check time elapsed (e.g., after 30 minutes)
@@ -7471,7 +8346,13 @@ Remember: This summary will be the ONLY context available when resuming the conv
     }
     
     // Unified title generation method
-    async generateChatTitle(chat, mcpConnection, provider, isAutomatic = false) {
+    async generateChatTitle(chat, mcpConnection, provider, isAutomatic = false, force = false) {
+        // Check if title generation is enabled (unless forced)
+        if (!force && !chat.config?.optimisation?.titleGeneration?.enabled) {
+            console.log('Title generation is disabled in config, skipping');
+            return;
+        }
+        
         try {
             // Create a system message for title generation
             const titleRequest = 'Please provide a short, descriptive title (max 50 characters) for this conversation. Respond with ONLY the title text, no quotes, no explanation.';
@@ -7516,7 +8397,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
             // Send request with low temperature for consistent titles
             const temperature = 0.3;
             const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, [], temperature, chat.toolInclusionMode);
+            const response = await provider.sendMessage(messages, [], temperature);
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Don't update token usage history for title generation
@@ -7530,7 +8411,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
                     content: response.content,
                     usage: response.usage || null,
                     responseTime: llmResponseTime || null,
-                    model: chat.model || provider.model,
+                    model: provider.model || ChatConfig.getChatModelString(chat),
                     timestamp: new Date().toISOString()
                 });
                 
@@ -7540,7 +8421,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
                     content: response.content,
                     usage: response.usage,
                     responseTime: llmResponseTime,
-                    model: chat.model || provider.model
+                    model: ChatConfig.getChatModelString(chat) || provider.model
                 }, chat.id);
                 
                 // Extract and clean the title
@@ -7597,192 +8478,6 @@ Remember: This summary will be the ONLY context available when resuming the conv
             this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
             // Clear assistant group
             this.clearCurrentAssistantGroup(chat.id);
-        }
-    }
-    
-    // Tool inclusion toggle methods
-    cycleGlobalToolToggle(chatId) {
-        if (!chatId) {return;}
-        
-        const chat = this.chats.get(chatId);
-        if (!chat) {return;}
-        
-        const currentMode = chat.toolInclusionMode || 'auto';
-        let newMode;
-        
-        // Cycle through states: auto -> all-on -> all-off -> manual -> cached -> auto
-        switch (currentMode) {
-            case 'auto':
-                newMode = 'all-on';
-                this.enableAllToolCheckboxes();
-                this.setAllToolStates(true);
-                break;
-            case 'all-on':
-                newMode = 'all-off';
-                this.setAllToolStates(false);
-                break;
-            case 'all-off':
-                newMode = 'manual';
-                // Don't change individual states in manual mode
-                break;
-            case 'manual':
-                newMode = 'cached';
-                // In cached mode, all tools are on and disabled
-                this.setAllToolStates(true);
-                this.disableAllToolCheckboxes();
-                break;
-            case 'cached':
-                newMode = 'auto';
-                // In auto mode, we'll dynamically determine which tools to include
-                this.enableAllToolCheckboxes();
-                this.updateToolCheckboxesForAutoMode();
-                break;
-            default:
-                newMode = 'auto';
-                this.updateToolCheckboxesForAutoMode();
-        }
-        
-        chat.toolInclusionMode = newMode;
-        this.autoSave(chat.id);
-        this.updateChatToolToggleUI(chatId);
-    }
-    
-    getGlobalToolToggleState() {
-        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
-        if (checkboxes.length === 0) {return 'all-on';}
-        
-        let checkedCount = 0;
-        checkboxes.forEach(cb => {
-            if (cb.checked) {checkedCount++;}
-        });
-        
-        if (checkedCount === checkboxes.length) {return 'all-on';}
-        if (checkedCount === 0) {return 'all-off';}
-        return 'mixed';
-    }
-    
-    setAllToolStates(checked) {
-        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = checked;
-            // Trigger change event to update data attributes and states
-            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-    }
-    
-    enableAllToolCheckboxes() {
-        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
-        checkboxes.forEach(/** @type {Element} */ checkbox => {
-            checkbox.disabled = false;
-            const label = checkbox.closest('.tool-include-label');
-            if (label) {
-                label.style.opacity = '1';
-                label.title = 'Include this tool\'s result in the LLM context';
-            }
-        });
-    }
-    
-    disableAllToolCheckboxes() {
-        const checkboxes = document.querySelectorAll('.tool-block .tool-include-checkbox');
-        checkboxes.forEach(/** @type {Element} */ checkbox => {
-            checkbox.disabled = true;
-            const label = checkbox.closest('.tool-include-label');
-            if (label) {
-                label.style.opacity = '0.5';
-                label.title = 'Tool inclusion is locked in cached mode';
-            }
-        });
-    }
-    
-    updateToolCheckboxesForAutoMode(chatId) {
-        const chat = this.chats.get(chatId);
-        if (!chat || chat.toolInclusionMode !== 'auto') {return;}
-        
-        const currentTurn = chat.currentTurn || 0;
-        
-        // Find all tool blocks in the chat
-        const container = this.getChatContainer(chatId);
-        const messagesContainer = container && container._elements && container._elements.messages;
-        const toolBlocks = messagesContainer ? messagesContainer.querySelectorAll('.tool-block') : [];
-        
-        toolBlocks.forEach(toolBlock => {
-            // Get the turn from the dataset
-            const toolTurn = parseInt(toolBlock.dataset.turn || '0', 10);
-            
-            // Update checkbox based on whether this tool is from current turn
-            const checkbox = toolBlock.querySelector('.tool-include-checkbox');
-            if (checkbox) {
-                const shouldInclude = toolTurn === currentTurn;
-                checkbox.checked = shouldInclude;
-                checkbox.disabled = true; // Disable in auto mode
-                toolBlock.dataset.included = shouldInclude;
-                
-                // Update visual state
-                const label = toolBlock.querySelector('.tool-include-label');
-                if (label) {
-                    label.style.opacity = '0.6';
-                    label.title = `Auto mode: ${shouldInclude ? 'Included (current turn)' : 'Excluded (previous turn)'}`;
-                }
-            }
-        });
-    }
-    
-    updateChatToolToggleUI(chatId) {
-        if (!chatId) {
-            console.error('[updateChatToolToggleUI] Called without chatId');
-            return;
-        }
-        const targetChatId = chatId;
-        const chat = this.chats.get(targetChatId);
-        if (!chat) {return;}
-        
-        const container = this.chatContainers.get(targetChatId);
-        if (!container) {return;}
-        
-        const button = container._elements.globalToolToggleBtn;
-        if (!button) {return;}
-        
-        const mode = chat.toolInclusionMode || 'auto';
-        const icon = button.querySelector('.tool-toggle-icon');
-        const text = button.querySelector('.tool-toggle-text');
-        
-        // Update button appearance based on mode
-        switch (mode) {
-            case 'auto':
-                button.classList.remove('btn-warning', 'btn-danger', 'btn-secondary');
-                button.classList.add('btn-success');
-                icon.innerHTML = '<i class="fas fa-sync-alt"></i>';
-                text.textContent = 'Auto (current turn only)';
-                break;
-            case 'all-on':
-                button.classList.remove('btn-warning', 'btn-danger', 'btn-success');
-                button.classList.add('btn-secondary');
-                icon.textContent = '✓';
-                text.textContent = 'All tools included';
-                break;
-            case 'all-off':
-                button.classList.remove('btn-secondary', 'btn-warning', 'btn-success');
-                button.classList.add('btn-danger');
-                icon.textContent = '✗';
-                text.textContent = 'No tools included';
-                break;
-            case 'manual':
-                button.classList.remove('btn-secondary', 'btn-danger', 'btn-success');
-                button.classList.add('btn-warning');
-                const state = this.getGlobalToolToggleState();
-                icon.innerHTML = '<i class="fas fa-cog"></i>';
-                text.textContent = state === 'mixed' ? 'Manual (mixed)' : `Manual (${state})`;
-                break;
-            case 'cached':
-                button.classList.remove('btn-warning', 'btn-danger', 'btn-success');
-                button.classList.add('btn-secondary');
-                icon.innerHTML = '<i class="fas fa-lock"></i>';
-                text.textContent = 'Cached (all locked)';
-                break;
-                
-            default:
-                console.warn('Unknown tool inclusion mode:', mode);
-                break;
         }
     }
     
@@ -7859,3 +8554,4 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Migration complete!');
     };
 });
+

@@ -27,6 +27,8 @@
     --chat-assistant-bg: transparent;
     --chat-assistant-text: var(--text-primary);
     --code-bg: #f5f5f5;
+    --scrollbar-thumb: #c1c1c1;
+    --scrollbar-track: #f3f3f3;
 }
 
 :root[data-theme="dark"] {
@@ -57,6 +59,8 @@
     --chat-assistant-bg: transparent;
     --chat-assistant-text: var(--text-primary);
     --code-bg: #1e1e1e;
+    --scrollbar-thumb: #464647;
+    --scrollbar-track: #252526;
 }
 
 * {
@@ -92,6 +96,15 @@ body {
 
 .error-toast {
     background-color: var(--danger-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    animation: slideDown 0.3s ease-out, fadeOut 0.3s ease-out 2.7s forwards;
+}
+
+.success-toast {
+    background-color: var(--success-color);
     color: white;
     padding: 4px 8px;
     border-radius: 4px;
@@ -2008,6 +2021,11 @@ body {
 
 .btn-send:focus:not(:focus-visible) {
     outline: none;
+}
+
+/* Model selection dropdown */
+.model-selection-dropdown {
+    max-width: calc(100vw - 40px);
 }
 
 .btn-icon {
