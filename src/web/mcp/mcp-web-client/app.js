@@ -2,6 +2,8 @@
  * Main application logic for the Netdata MCP LLM Client
  */
 
+import { MessageOptimizer } from './message-optimizer.js';
+
 class NetdataMCPChat {
     constructor() {
         this.mcpServers = new Map(); // Multiple MCP servers
@@ -22,6 +24,7 @@ class NetdataMCPChat {
 
         // Models will be loaded dynamically from the proxy server
         // No hardcoded model list needed
+        
         
         // Default system prompt
         this.defaultSystemPrompt =
@@ -1052,6 +1055,7 @@ helps users understand your analysis methodology and builds confidence in your c
         config.model = newModel;
         config.llmProviderId = chat.llmProviderId;
         config.mcpServerId = chat.mcpServerId;
+        config.optimizerSettings = chat.optimizerSettings; // Save optimizer settings too
         localStorage.setItem('lastChatConfig', JSON.stringify(config));
         
         this.addLogEntry('SYSTEM', {
@@ -1095,6 +1099,7 @@ helps users understand your analysis methodology and builds confidence in your c
             config.mcpServerId = newServerId;
             config.llmProviderId = chat.llmProviderId;
             config.model = chat.model;
+            config.optimizerSettings = chat.optimizerSettings; // Save optimizer settings too
             localStorage.setItem('lastChatConfig', JSON.stringify(config));
             
             this.addLogEntry('SYSTEM', {
@@ -1852,6 +1857,37 @@ helps users understand your analysis methodology and builds confidence in your c
             chat.waitingForMCP = false;
         }
         
+        // Reconstruct MessageOptimizer instance for loaded chats
+        if (!chat.messageOptimizer) {
+            // Use saved optimizer settings or create defaults
+            if (!chat.optimizerSettings) {
+                chat.optimizerSettings = {
+                    primaryModel: chat.model,
+                    secondaryModel: null,
+                    toolSummarization: {
+                        enabled: false,
+                        threshold: 50000,
+                        useSecondaryModel: true
+                    },
+                    toolMemory: {
+                        enabled: false,
+                        forgetAfterConclusions: 1
+                    },
+                    cacheControl: {
+                        enabled: false,
+                        strategy: 'smart'
+                    },
+                    autoSummarization: {
+                        enabled: false,
+                        triggerPercent: 50,
+                        useSecondaryModel: true
+                    }
+                };
+            }
+            // Create MessageOptimizer instance
+            chat.messageOptimizer = new MessageOptimizer(chat.optimizerSettings);
+        }
+        
         this.chats.set(chat.id, chat);
     }
     
@@ -1954,7 +1990,7 @@ helps users understand your analysis methodology and builds confidence in your c
         if (this.mcpServers.size === 0 || this.llmProviders.size === 0) {return;}
         
         // Get the last used configuration or use defaults
-        let mcpServerId, llmProviderId, model;
+        let mcpServerId, llmProviderId, model, optimizerSettings;
         
         try {
             const lastConfig = localStorage.getItem('lastChatConfig');
@@ -1965,6 +2001,7 @@ helps users understand your analysis methodology and builds confidence in your c
                     mcpServerId = config.mcpServerId;
                     llmProviderId = config.llmProviderId;
                     model = config.model;
+                    optimizerSettings = config.optimizerSettings; // Load saved optimizer settings
                 }
             }
         } catch {
@@ -1996,7 +2033,8 @@ helps users understand your analysis methodology and builds confidence in your c
             llmProviderId,
             model,
             title: 'New Chat',
-            isSaved: false
+            isSaved: false,
+            optimizerSettings  // Pass saved optimizer settings
         });
     }
 
@@ -2233,7 +2271,7 @@ helps users understand your analysis methodology and builds confidence in your c
         }
         
         // Get the last used configuration or use defaults
-        let mcpServerId, llmProviderId, model;
+        let mcpServerId, llmProviderId, model, optimizerSettings;
         
         try {
             const lastConfig = localStorage.getItem('lastChatConfig');
@@ -2244,6 +2282,7 @@ helps users understand your analysis methodology and builds confidence in your c
                     mcpServerId = config.mcpServerId;
                     llmProviderId = config.llmProviderId;
                     model = config.model;
+                    optimizerSettings = config.optimizerSettings; // Load saved optimizer settings
                 }
             }
         } catch {
@@ -2278,7 +2317,8 @@ helps users understand your analysis methodology and builds confidence in your c
             llmProviderId,
             model,
             title: 'New Chat',
-            isSaved: false
+            isSaved: false,
+            optimizerSettings  // Pass saved optimizer settings
         });
         
         // Load the chat immediately when created via button click
@@ -2865,6 +2905,44 @@ All date/time interpretations must be based on the current date/time context pro
             // Per-chat pending tool calls map
             pendingToolCalls: new Map()
         };
+        
+        // Get optimizer settings from options or create defaults
+        let chatOptimizerSettings;
+        if (options.optimizerSettings) {
+            // Use provided settings (from localStorage)
+            chatOptimizerSettings = {
+                ...options.optimizerSettings,
+                primaryModel: selectedModel  // Always use the current model as primary
+            };
+        } else {
+            // Create default settings - all disabled
+            chatOptimizerSettings = {
+                primaryModel: selectedModel,
+                secondaryModel: null,  // No secondary model by default
+                toolSummarization: {
+                    enabled: false,
+                    threshold: 50000,
+                    useSecondaryModel: true
+                },
+                toolMemory: {
+                    enabled: false,
+                    forgetAfterConclusions: 1
+                },
+                cacheControl: {
+                    enabled: false,  // Disabled by default
+                    strategy: 'smart'
+                },
+                autoSummarization: {
+                    enabled: false,
+                    triggerPercent: 50,
+                    useSecondaryModel: true
+                }
+            };
+        }
+        
+        // Create isolated MessageOptimizer instance for this chat
+        chat.messageOptimizer = new MessageOptimizer(chatOptimizerSettings);
+        chat.optimizerSettings = chatOptimizerSettings;
         
         this.chats.set(chatId, chat);
         
@@ -4253,99 +4331,26 @@ All date/time interpretations must be based on the current date/time context pro
     }
 
     buildMessagesForAPI(chat, freezeCache = false) {
-        const messages = [];
-        let cacheControlIndex = null;
-        let lastCacheControlIndex = null;
-        
-        // Basic input validation
-        if (!chat.messages || chat.messages.length === 0) {
-            const error = 'Chat has no messages';
-            console.error('[buildMessagesForAPI] ' + error);
-            this.showError(error, chat.id);
-            throw new Error(error);
+        // STRICT: Use the chat's MessageOptimizer instance
+        if (!chat.messageOptimizer) {
+            throw new Error('[buildMessagesForAPI] Chat missing messageOptimizer instance');
         }
         
-        // Find the last summary checkpoint
-        let startIndex = 0;
-        let summaryMessage = null;
-        for (let i = chat.messages.length - 1; i >= 0; i--) {
-            if (chat.messages[i].role === 'summary') {
-                summaryMessage = chat.messages[i];
-                startIndex = i + 1; // Start after summary (we'll add it separately)
-                break;
-            }
-        }
-        
-        // Find the last cache control index if freezing
-        if (freezeCache) {
-            for (let i = chat.messages.length - 1; i >= startIndex; i--) {
-                const msg = chat.messages[i];
-                if (msg.cacheControlIndex !== undefined) {
-                    lastCacheControlIndex = msg.cacheControlIndex;
-                    break;
-                }
-            }
-        }
-        
-        // Always include the system prompt if it exists (it should be the first message)
-        if (chat.messages.length > 0 && chat.messages[0].role === 'system') {
-            messages.push(chat.messages[0]);
-        }
-        
-        // If we have a summary, include it in the messages
-        // The provider will decide how to handle it (modify system prompt, add as user message, etc.)
-        if (summaryMessage) {
-            messages.push(summaryMessage);
-        }
-        
-        // Build messages from checkpoint onwards
-        // let apiMessageIndex = messages.length; // Start after system message if present
-        
-        for (let i = startIndex; i < chat.messages.length; i++) {
-            const msg = chat.messages[i];
+        try {
+            // Delegate to the chat's MessageOptimizer
+            const result = chat.messageOptimizer.buildMessagesForAPI(chat, freezeCache);
             
-            // Skip system roles and error messages - they should never be sent to API
-            if (['system-title', 'system-summary', 'title', 'summary', 'accounting', 'error'].includes(msg.role)) {
-                continue;
+            // Log optimization stats if available
+            if (result.stats) {
+                // console.log(`[buildMessagesForAPI] Optimization stats for chat ${chat.id}:`, result.stats);
             }
             
-            // Process based on type/role
-            const messageType = msg.type || msg.role;
-            
-            if (messageType === 'system') {
-                // Skip system message if it's the first message (we already added it)
-                if (i === 0) {continue;}
-                // Otherwise include it
-                messages.push(msg);
-            } else if (messageType === 'user') {
-                // Pass through the original user message to preserve all its properties
-                messages.push(msg);
-            } else if (messageType === 'assistant') {
-                // Pass through the original assistant message to preserve all its properties
-                // The provider will handle content cleaning and formatting
-                messages.push(msg);
-            } else if (messageType === 'tool-results') {
-                // Pass through the original tool-results message
-                // The provider will handle formatting and filtering
-                messages.push(msg);
-            }
+            return result;
+        } catch (error) {
+            console.error('[buildMessagesForAPI] MessageOptimizer failed:', error);
+            this.showError(`Message optimization failed: ${error.message}`, chat.id);
+            throw error;
         }
-        
-        // Determine cache control position
-        if (freezeCache && lastCacheControlIndex !== null) {
-            cacheControlIndex = lastCacheControlIndex;
-        } else {
-            // Normal behavior - cache control goes on the last message
-            cacheControlIndex = messages.length - 1;
-        }
-        
-        // Return messages with tool inclusion context
-        return { 
-            messages, 
-            cacheControlIndex,
-            toolInclusionMode: chat.toolInclusionMode || 'auto',
-            currentTurn: chat.currentTurn || 0
-        };
     }
 
     async processMessageWithTools(chat, mcpConnection, provider, userMessage) {
