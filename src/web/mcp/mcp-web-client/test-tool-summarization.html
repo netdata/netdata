@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tool Summarization Test</title>
+    <script type="module">
+        import { MessageOptimizer } from './message-optimizer.js';
+        import { ToolSummarizer } from './tool-summarizer.js';
+        
+        // Mock LLM provider
+        const mockProvider = {
+            async sendMessage(messages, tools, temperature, mode) {
+                console.log('Mock LLM called with:', { messages, temperature, mode });
+                
+                // Return a mock summary
+                return {
+                    content: 'Summary: The tool returned a large dataset containing multiple entries with various attributes.',
+                    usage: {
+                        promptTokens: 500,
+                        completionTokens: 50,
+                        totalTokens: 550
+                    }
+                };
+            }
+        };
+        
+        // Mock provider factory
+        function mockProviderFactory(provider, url, model) {
+            console.log('Creating provider:', { provider, url, model });
+            return mockProvider;
+        }
+        
+        async function testToolSummarization() {
+            console.log('=== Testing Tool Summarization ===\n');
+            
+            // Create large tool result (>50KB)
+            const largeData = {
+                entries: Array(1000).fill(null).map((_, i) => ({
+                    id: i,
+                    name: `Entry ${i}`,
+                    description: 'This is a very long description that contains lots of text to make the response large enough to trigger summarization.',
+                    metadata: {
+                        created: new Date().toISOString(),
+                        tags: ['tag1', 'tag2', 'tag3'],
+                        properties: {
+                            value: Math.random() * 1000,
+                            status: 'active',
+                            type: 'data'
+                        }
+                    }
+                }))
+            };
+            
+            // Create optimizer with tool summarization enabled
+            const optimizerSettings = {
+                primaryModel: 'anthropic/claude-3-sonnet',
+                secondaryModel: 'anthropic/claude-3-haiku',
+                toolSummarization: {
+                    enabled: true,
+                    threshold: 50000, // 50KB
+                    useSecondaryModel: true
+                },
+                toolMemory: {
+                    enabled: false,
+                    forgetAfterConclusions: 1
+                },
+                cacheControl: {
+                    enabled: false,
+                    strategy: 'smart'
+                },
+                autoSummarization: {
+                    enabled: false,
+                    triggerPercent: 50,
+                    useSecondaryModel: true
+                },
+                llmProviderFactory: mockProviderFactory
+            };
+            
+            const optimizer = new MessageOptimizer(optimizerSettings);
+            console.log('✅ Created MessageOptimizer with tool summarization enabled\n');
+            
+            // Create a chat with tool results
+            const chat = {
+                id: 'test-chat',
+                messages: [
+                    { role: 'system', content: 'You are a helpful assistant.' },
+                    { role: 'user', content: 'List all the data entries' },
+                    { 
+                        role: 'assistant', 
+                        content: 'I\'ll list all the data entries for you.',
+                        toolCalls: [{ id: 'call_123', name: 'list_data', arguments: {} }]
+                    },
+                    {
+                        role: 'tool-results',
+                        toolResults: [{
+                            toolCallId: 'call_123',
+                            toolName: 'list_data',
+                            result: largeData
+                        }]
+                    }
+                ]
+            };
+            
+            // Build messages for API
+            const result = optimizer.buildMessagesForAPI(chat);
+            console.log('✅ Built messages for API');
+            console.log('Original messages:', result.messages.length);
+            console.log('Stats:', result.stats);
+            
+            // Check if tool results were marked for summarization
+            const lastMessage = result.messages[result.messages.length - 1];
+            if (lastMessage._hasPendingSummarization) {
+                console.log('✅ Tool results marked for summarization\n');
+                
+                // Perform summarization
+                const context = {
+                    toolSchemas: new Map([
+                        ['list_data', { 
+                            name: 'list_data',
+                            description: 'Lists all data entries in the system'
+                        }]
+                    ]),
+                    providerInfo: { url: 'http://localhost:8080' }
+                };
+                
+                console.log('Performing tool summarization...');
+                const summarizedMessages = await optimizer.performToolSummarization(
+                    result.messages,
+                    context
+                );
+                
+                console.log('\n✅ Tool summarization completed');
+                
+                // Check the summarized result
+                const summarizedLastMessage = summarizedMessages[summarizedMessages.length - 1];
+                const summarizedResult = summarizedLastMessage.toolResults[0].result;
+                
+                if (summarizedResult._type === 'summarized') {
+                    console.log('\n📊 Summarization Results:');
+                    console.log('- Original size:', summarizedResult.originalSize, 'bytes');
+                    console.log('- Summarized size:', summarizedResult.summarizedSize, 'bytes');
+                    console.log('- Compression ratio:', (summarizedResult.compressionRatio * 100).toFixed(1) + '%');
+                    console.log('- Model used:', summarizedResult.model);
+                    console.log('- Summary:', summarizedResult.summary);
+                    
+                    console.log('\n✅ Tool summarization test PASSED!');
+                } else {
+                    console.error('❌ Tool result was not summarized');
+                }
+            } else {
+                console.error('❌ Tool results were not marked for summarization');
+                console.log('Tool result size:', JSON.stringify(largeData).length, 'bytes');
+            }
+        }
+        
+        // Run test
+        testToolSummarization().catch(console.error);
+    </script>
+</head>
+<body>
+    <h1>Tool Summarization Test</h1>
+    <p>Check the browser console for test results.</p>
+</body>
+</html>

@@ -1884,6 +1884,10 @@ helps users understand your analysis methodology and builds confidence in your c
                     }
                 };
             }
+            // Add llmProviderFactory if tool summarization is enabled
+            if (chat.optimizerSettings.toolSummarization.enabled) {
+                chat.optimizerSettings.llmProviderFactory = window.createLLMProvider;
+            }
             // Create MessageOptimizer instance
             chat.messageOptimizer = new MessageOptimizer(chat.optimizerSettings);
         }
@@ -2940,6 +2944,11 @@ All date/time interpretations must be based on the current date/time context pro
             };
         }
         
+        // Add llmProviderFactory if tool summarization is enabled
+        if (chatOptimizerSettings.toolSummarization.enabled) {
+            chatOptimizerSettings.llmProviderFactory = window.createLLMProvider;
+        }
+        
         // Create isolated MessageOptimizer instance for this chat
         chat.messageOptimizer = new MessageOptimizer(chatOptimizerSettings);
         chat.optimizerSettings = chatOptimizerSettings;
@@ -3669,13 +3678,17 @@ All date/time interpretations must be based on the current date/time context pro
                 // Then add tool calls
                 if (msg.toolCalls && msg.toolCalls.length > 0) {
                     for (const toolCall of msg.toolCalls) {
+                        if (!toolCall.id) {
+                            console.error('[convertMessageToEvents] Tool call missing required id:', toolCall);
+                            continue; // Skip invalid tool calls
+                        }
                         // Use destructuring to avoid direct 'arguments' reference
                         const { arguments: toolArgs } = toolCall || {};
                         events.push({ 
                             type: 'tool-call', 
                             name: toolCall.name, 
                             arguments: toolArgs,
-                            id: toolCall.id,  // Preserve tool call ID for matching
+                            id: toolCall.id,  // Required tool call ID for matching
                             includeInContext: toolCall.includeInContext !== false,
                             turn: msg.turn
                         });
@@ -3687,11 +3700,15 @@ All date/time interpretations must be based on the current date/time context pro
                 // Add tool results with their inclusion state
                 const toolResults = msg.toolResults || [];
                 for (const result of toolResults) {
+                    if (!result.toolCallId) {
+                        console.error('[convertMessageToEvents] Tool result missing required toolCallId:', result);
+                        continue; // Skip invalid tool results
+                    }
                     events.push({ 
                         type: 'tool-result', 
                         name: result.name || result.toolName, 
                         result: result.result,
-                        toolCallId: result.toolCallId,  // Preserve tool call ID for matching
+                        toolCallId: result.toolCallId,  // Required tool call ID for matching
                         includeInContext: result.includeInContext
                     });
                 }
@@ -3699,12 +3716,20 @@ All date/time interpretations must be based on the current date/time context pro
                 events.push({ type: 'reset-assistant-group' });
                 break;
                 
-            // Handle old format for backward compatibility
+            // Handle old format - MUST have id
             case 'tool-call':
-                events.push({ type: 'tool-call', name: msg.toolName, arguments: msg.args });
+                if (!msg.id) {
+                    console.error('[convertMessageToEvents] tool-call message missing required id:', msg);
+                    break;
+                }
+                events.push({ type: 'tool-call', name: msg.toolName, arguments: msg.args, id: msg.id });
                 break;
             case 'tool-result':
-                events.push({ type: 'tool-result', name: msg.toolName, result: msg.result });
+                if (!msg.toolCallId) {
+                    console.error('[convertMessageToEvents] tool-result message missing required toolCallId:', msg);
+                    break;
+                }
+                events.push({ type: 'tool-result', name: msg.toolName, result: msg.result, toolCallId: msg.toolCallId });
                 break;
                 
             case 'system':
@@ -4531,6 +4556,10 @@ All date/time interpretations must be based on the current date/time context pro
                 const toolResults = [];
                 
                 for (const toolCall of response.toolCalls) {
+                    if (!toolCall.id) {
+                        console.error('[processMessageWithTools] Tool call missing required id:', toolCall);
+                        continue; // Skip invalid tool calls
+                    }
                     try {
                         // Use destructuring to avoid direct 'arguments' reference
                         const { arguments: toolArgs } = toolCall || {};
@@ -4539,7 +4568,7 @@ All date/time interpretations must be based on the current date/time context pro
                             type: 'tool-call', 
                             name: toolCall.name, 
                             arguments: toolArgs,
-                            id: toolCall.id,  // Pass tool ID for proper matching
+                            id: toolCall.id,  // Required tool ID for proper matching
                             includeInContext: toolCall.includeInContext !== false 
                         }, chat.id);
                         
@@ -4589,7 +4618,7 @@ All date/time interpretations must be based on the current date/time context pro
                         
                     } catch (error) {
                         const errorMsg = `Tool error (${toolCall.name}): ${error.message}`;
-                        this.processRenderEvent({ type: 'tool-result', name: toolCall.name, result: { error: errorMsg }, responseTime: 0, responseSize: errorMsg.length, messageIndex: assistantMessageIndex }, chat.id);
+                        this.processRenderEvent({ type: 'tool-result', name: toolCall.name, result: { error: errorMsg }, responseTime: 0, responseSize: errorMsg.length, messageIndex: assistantMessageIndex, toolCallId: toolCall.id }, chat.id);
                         
                         // Collect error result
                         toolResults.push({
@@ -4639,14 +4668,59 @@ All date/time interpretations must be based on the current date/time context pro
                     if (includedResults.length > 0) {
                         // Add standard tool-results message
                         // Providers will convert to their specific format
-                        messages.push({
+                        const toolResultsMessage = {
                             role: 'tool-results',
                             toolResults: includedResults.map(tr => ({
                                 toolCallId: tr.toolCallId,
                                 toolName: tr.name,
                                 result: tr.result
                             }))
-                        });
+                        };
+                        
+                        messages.push(toolResultsMessage);
+                        
+                        // Check if we need to perform tool summarization
+                        if (chat.messageOptimizer && chat.optimizerSettings.toolSummarization.enabled) {
+                            try {
+                                // Get tool schemas for context
+                                const toolSchemas = new Map();
+                                for (const tool of tools) {
+                                    toolSchemas.set(tool.name, tool);
+                                }
+                                
+                                // Get provider info
+                                const providerInfo = {
+                                    url: provider.proxyUrl
+                                };
+                                
+                                // Perform async summarization
+                                const summarizedMessages = await chat.messageOptimizer.performToolSummarization(
+                                    messages,
+                                    {
+                                        toolSchemas,
+                                        providerInfo
+                                    }
+                                );
+                                
+                                // Replace messages array with summarized version
+                                messages.length = 0;
+                                messages.push(...summarizedMessages);
+                                
+                                // Log summarization stats
+                                const lastToolMessage = messages[messages.length - 1];
+                                if (lastToolMessage && lastToolMessage.toolResults) {
+                                    const summarizedCount = lastToolMessage.toolResults.filter(
+                                        tr => tr.result && tr.result._type === 'summarized'
+                                    ).length;
+                                    if (summarizedCount > 0) {
+                                        console.log(`[Tool Summarization] Summarized ${summarizedCount} large tool responses`);
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('[Tool Summarization] Failed:', error);
+                                // Continue with original messages on error
+                            }
+                        }
                     }
                     
                     // Reset assistant group after tool results so next metrics appears separately
