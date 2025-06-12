@@ -535,14 +535,21 @@ const server = http.createServer(async (req, res) => {
   // Copy query parameters from original request (except Google's key)
   Object.keys(parsedUrl.query).forEach(key => {
     if (!(provider.toLowerCase() === 'google' && key === 'key')) {
-      targetUrl.searchParams.append(key, parsedUrl.query[key]);
+      const value = parsedUrl.query[key];
+      // Handle both string and string[] cases
+      if (Array.isArray(value)) {
+        // If multiple values, append each one
+        value.forEach(v => targetUrl.searchParams.append(key, v));
+      } else {
+        targetUrl.searchParams.append(key, value);
+      }
     }
   });
 
   // Prepare headers
   const headers = {
     'Content-Type': req.headers['content-type'] || 'application/json',
-    'Accept': req.headers['accept'] || 'application/json',
+    'Accept': req.headers.accept || 'application/json',
     'User-Agent': 'MCP-LLM-Proxy/1.0'
   };
 
@@ -585,7 +592,7 @@ const server = http.createServer(async (req, res) => {
       port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
       path: targetUrl.pathname + targetUrl.search,
       method: req.method,
-      headers: headers
+      headers
     };
 
     // Choose http or https module
@@ -598,7 +605,7 @@ const server = http.createServer(async (req, res) => {
       if (bodyData.model) {
         modelInfo = ` (model: ${bodyData.model})`;
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore JSON parse errors
     }
     

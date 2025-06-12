@@ -69,7 +69,7 @@ body {
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--background-color);
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.4;
     height: 100vh;
     overflow: hidden;
     font-size: 14px;
@@ -266,6 +266,16 @@ body {
     color: rgba(255, 255, 255, 0.7);
 }
 
+/* Unsaved chat styling */
+.chat-session-item.unsaved {
+    opacity: 0.8;
+    font-style: italic;
+}
+
+.chat-session-item.unsaved .session-title {
+    color: var(--warning-color);
+}
+
 .session-title {
     font-weight: 500;
     font-size: 13px;
@@ -285,6 +295,39 @@ body {
     justify-content: space-between;
 }
 
+/* Chat session activity indicators */
+.chat-session-item[data-state="processing"] {
+    position: relative;
+}
+
+.chat-session-item[data-state="processing"]::after {
+    content: '';
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #4CAF50;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: translateY(-50%) scale(1.2);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+}
+
 /* Main Chat Area */
 .chat-main {
     flex: 1;
@@ -293,6 +336,53 @@ body {
     background: var(--background-color);
     min-width: 300px;
     position: relative;
+}
+
+/* Chat Containers */
+.chat-containers {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.chat-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    flex-direction: column;
+}
+
+.chat-container.active {
+    display: flex;
+}
+
+/* Welcome Screen */
+.welcome-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: var(--background-color);
+}
+
+.welcome-content {
+    text-align: center;
+    padding: 2rem;
+}
+
+.welcome-content h2 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    font-size: 2rem;
+}
+
+.welcome-content p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
 }
 
 .chat-content {
@@ -454,11 +544,27 @@ body {
 }
 
 .message.system {
-    background-color: var(--info-color);
-    color: white;
-    align-self: center;
-    max-width: 90%;
-    text-align: center;
+    background: none;
+    color: var(--text-tertiary);
+    align-self: flex-start;
+    max-width: 100%;
+    text-align: left;
+    font-size: 12px;
+    opacity: 0.5;
+    font-style: normal;
+    padding: 4px 40px 0 40px;
+    margin: 2px 0;
+    border: none;
+    transition: opacity 0.2s ease;
+}
+
+.message.system i {
+    color: inherit;
+    margin-right: 4px;
+}
+
+.message.system:hover {
+    opacity: 0.7;
 }
 
 /* System messages styled exactly like thinking blocks */
@@ -618,7 +724,7 @@ body {
 }
 
 .system-prompt-header {
-    padding: 3px 4px;
+    padding: 5px;
     cursor: pointer;
     user-select: none;
     display: flex;
@@ -671,14 +777,14 @@ body {
 .assistant-group {
     background-color: transparent;
     color: var(--text-primary);
-    padding: 20px 40px;
+    padding: 20px 40px 0 40px;
     border-radius: 0;
     width: 100%;
     margin: 0;
     align-self: flex-start;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     position: relative;
 }
 
@@ -782,7 +888,7 @@ body {
     padding: 0.15em 0.3em;
     border-radius: 3px;
     font-family: 'IBM Plex Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
-    font-size: 0.9em;
+    font-size: 0.95em;
     border: none;
 }
 
@@ -879,7 +985,6 @@ body {
 .tool-block {
     margin: 6px 0;
     background-color: rgba(30, 30, 30, 0.3);
-    border: 1px solid var(--border-subtle);
     border-radius: 6px;
     overflow: visible;
     font-size: 11px;
@@ -900,7 +1005,7 @@ body {
 }
 
 .tool-header {
-    padding: 6px 12px;
+    padding: 5px;
     cursor: pointer;
     user-select: none;
     display: flex;
@@ -923,6 +1028,19 @@ body {
 .tool-label {
     font-weight: 500;
     color: var(--text-primary);
+    opacity: 0.7;
+}
+
+.tool-status {
+    font-weight: 500;
+    color: var(--text-primary);
+    opacity: 0.7;
+}
+
+.tool-metric {
+    font-weight: 500;
+    color: var(--text-primary);
+    opacity: 0.7;
 }
 
 .tool-info {
@@ -1013,7 +1131,7 @@ body {
 }
 
 .tool-content {
-    padding: 0px 8px;
+    padding: 0 8px;
     white-space: normal;
     line-height: 1.2;
     max-height: 400px;
@@ -1063,17 +1181,16 @@ body {
     background-color: rgba(30, 30, 30, 0.2);
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid var(--border-subtle);
-    opacity: 0.8;
+    opacity: 0.85;
     transition: opacity 0.2s ease;
 }
 
 .thinking-block:hover {
-    opacity: 1.0;
+    opacity: 1;
 }
 
 .thinking-header {
-    padding: 3px 4px;
+    padding: 6px;
     cursor: pointer;
     user-select: none;
     display: flex;
@@ -1081,6 +1198,10 @@ body {
     gap: 8px;
     background-color: rgba(0, 0, 0, 0.1);
     transition: background-color 0.2s;
+}
+
+.thinking-header:hover {
+    background-color: rgba(0, 0, 0, 0.2);
 }
 
 .thinking-label-row {
@@ -2271,7 +2392,8 @@ body {
 }
 
 [data-theme="dark"] .tool-header:hover,
-[data-theme="dark"] .system-prompt-header:hover {
+[data-theme="dark"] .system-prompt-header:hover,
+[data-theme="dark"] .thinking-header:hover {
     background-color: rgba(0, 122, 204, 0.1);
 }
 

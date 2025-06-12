@@ -2,7 +2,7 @@
  * Debug helper to analyze message structure issues
  */
 
-function debugMessages(messages, title = "Messages") {
+function debugMessages(messages, title = 'Messages') {
     console.group(`🔍 ${title}`);
     messages.forEach((msg, index) => {
         console.log(`Message ${index}:`, {
