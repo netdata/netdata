@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20466](https://github.com/netdata/netdata/pull/20466) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/ddsnmp\): add table metrics and tags caching optimization [\#20465](https://github.com/netdata/netdata/pull/20465) ([ilyam8](https://github.com/ilyam8))
+- Improve datafile rotation and indexing during shutdown [\#20464](https://github.com/netdata/netdata/pull/20464) ([stelfrag](https://github.com/stelfrag))
 - improvement\(go.d/ddsnmp\): add table metrics, tags from the same table [\#20463](https://github.com/netdata/netdata/pull/20463) ([ilyam8](https://github.com/ilyam8))
+- Handle orphan journal files by deleting unmatched entries [\#20462](https://github.com/netdata/netdata/pull/20462) ([stelfrag](https://github.com/stelfrag))
 - build: update otel-collector deps [\#20461](https://github.com/netdata/netdata/pull/20461) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/smartctl\): debug log exec output [\#20460](https://github.com/netdata/netdata/pull/20460) ([ilyam8](https://github.com/ilyam8))
 - improve database indexing and rotation handling in event loop [\#20459](https://github.com/netdata/netdata/pull/20459) ([stelfrag](https://github.com/stelfrag))
@@ -115,6 +119,7 @@
 - docs: fix tip in streaming readme [\#20310](https://github.com/netdata/netdata/pull/20310) ([ilyam8](https://github.com/ilyam8))
 - Netdata ai [\#20309](https://github.com/netdata/netdata/pull/20309) ([kanelatechnical](https://github.com/kanelatechnical))
 - Improve user transition log messages [\#20308](https://github.com/netdata/netdata/pull/20308) ([ilyam8](https://github.com/ilyam8))
+- Add MSSQL Wait statistics \(windows.plugin\) [\#20307](https://github.com/netdata/netdata/pull/20307) ([thiagoftsm](https://github.com/thiagoftsm))
 - Reduce memory allocations in event loops [\#20306](https://github.com/netdata/netdata/pull/20306) ([stelfrag](https://github.com/stelfrag))
 - fix use after free of streaming current parent [\#20305](https://github.com/netdata/netdata/pull/20305) ([ktsaou](https://github.com/ktsaou))
 - fix heap-use-after-free in plugins.d inflight functions [\#20304](https://github.com/netdata/netdata/pull/20304) ([ktsaou](https://github.com/ktsaou))
@@ -449,11 +454,6 @@
 - Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
 - Exclude external code from CodeQL scanning. [\#19923](https://github.com/netdata/netdata/pull/19923) ([Ferroin](https://github.com/Ferroin))
 - remove ilove endpoint [\#19919](https://github.com/netdata/netdata/pull/19919) ([ilyam8](https://github.com/ilyam8))
-- Dump Netdata buildinfo during CI. [\#19918](https://github.com/netdata/netdata/pull/19918) ([Ferroin](https://github.com/Ferroin))
-- Align cmsgbuf to size\_t to avoid unaligned memory access. [\#19917](https://github.com/netdata/netdata/pull/19917) ([vkalintiris](https://github.com/vkalintiris))
-- Make sure ACLK sync thread completes initialization [\#19916](https://github.com/netdata/netdata/pull/19916) ([stelfrag](https://github.com/stelfrag))
-- do not enqueue command if aclk is not initialized [\#19914](https://github.com/netdata/netdata/pull/19914) ([ktsaou](https://github.com/ktsaou))
-- detect null datafile while finding datafiles in range [\#19913](https://github.com/netdata/netdata/pull/19913) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
