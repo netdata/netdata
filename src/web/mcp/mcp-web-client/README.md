@@ -1,6 +1,6 @@
 # Netdata MCP LLM Client
 
-A web-based client for interacting with Netdata's Model Context Protocol (MCP) server using various LLM providers.
+An all-in-one proxy server and web client for interacting with Netdata's Model Context Protocol (MCP) server using various LLM providers. The proxy server handles API key management, serves the web interface, and provides comprehensive usage accounting.
 
 ## Setup Guide
 
@@ -9,10 +9,15 @@ A web-based client for interacting with Netdata's Model Context Protocol (MCP) s
 - Node.js (v14 or higher)
 - A running Netdata instance with MCP server enabled
 - API keys for at least one LLM provider (OpenAI, Anthropic, or Google)
+- Write permissions to `/var/log/llm-proxy` for accounting logs (or run with sudo)
 
 ### 1. Setting up the LLM Proxy Server
 
-The proxy server manages API keys securely and handles CORS for browser-based access to LLM APIs.
+The proxy server is the single entry point that:
+- Manages API keys securely (never exposed to the browser)
+- Serves the web client interface at http://localhost:8081/
+- Proxies all LLM API requests
+- Tracks usage and costs in accounting logs
 
 #### First Run
 
@@ -31,15 +36,21 @@ The proxy server manages API keys securely and handles CORS for browser-based ac
      "providers": {
        "openai": {
          "apiKey": "sk-YOUR-OPENAI-KEY",
-         "models": ["gpt-4-turbo-preview", "gpt-4", "gpt-3.5-turbo"]
+         "models": [
+           // Models are automatically populated from built-in definitions
+         ]
        },
        "anthropic": {
          "apiKey": "sk-ant-YOUR-ANTHROPIC-KEY",
-         "models": ["claude-3-opus-20240229", "claude-3-sonnet-20240229"]
+         "models": [
+           // Models are automatically populated from built-in definitions
+         ]
        },
        "google": {
          "apiKey": "YOUR-GOOGLE-AI-KEY",
-         "models": ["gemini-pro", "gemini-pro-vision"]
+         "models": [
+           // Models are automatically populated from built-in definitions
+         ]
        }
      }
    }
@@ -47,23 +58,44 @@ The proxy server manages API keys securely and handles CORS for browser-based ac
 
 4. Start the proxy server again:
    ```bash
+   # Create accounting log directory (one-time setup)
+   sudo mkdir -p /var/log/llm-proxy
+   sudo chown $USER /var/log/llm-proxy
+   
+   # Start the proxy
    node llm-proxy.js
    ```
 
    You should see output like:
    ```
-   LLM CORS Proxy Server running on http://localhost:8081
+   ============================================================
+   LLM Proxy Server & MCP Web Client
+   ============================================================
    
-   Configured providers:
-     - openai: 3 models
-     - anthropic: 2 models
+   🚀 Server Started Successfully!
+   ============================================================
+   
+   🌐 Available Services:
+      • Web UI:          http://localhost:8081/
+      • Models API:      http://localhost:8081/models
+      • Proxy Endpoint:  http://localhost:8081/proxy/<provider>/<path>
+   
+   📊 Accounting:
+      • Log directory:   /var/log/llm-proxy
+      • Today's log:     llm-accounting-2024-01-15.jsonl
+      • Format:          JSON Lines (JSONL)
    ```
 
 ### 2. Accessing the Web Client
 
-1. Open `index.html` in your web browser:
-   - You can open it directly as a file (`file:///path/to/index.html`)
-   - Or serve it via a web server if preferred
+1. The web client is served directly by the proxy server. Simply open:
+   ```
+   http://localhost:8081/
+   ```
+   Or if accessing remotely:
+   ```
+   http://YOUR_SERVER_IP:8081/
+   ```
 
 2. Click the settings icon (⚙️) in the bottom left
 
@@ -99,17 +131,268 @@ The proxy server manages API keys securely and handles CORS for browser-based ac
 
 - **Secure API Key Management**: API keys are stored only in the proxy server, never in the browser
 - **Multiple LLM Support**: Use OpenAI, Anthropic, or Google AI models
-- **Model Selection**: Choose specific models for each chat
+- **Model Selection**: Choose specific models for each chat with automatic pricing info
 - **MCP Integration**: Full access to Netdata metrics and functions
 - **Chat History**: All conversations are saved locally
 - **Temperature Control**: Adjust response creativity per chat
 - **Context Window Tracking**: Monitor token usage in real-time
+- **Cost Accounting**: Automatic tracking of all LLM usage with detailed cost breakdown
+- **Compressed Response Support**: Handles gzip, deflate, and brotli compressed responses
+- **Model Discovery**: Automatic model fetching from OpenAI and Google APIs
+- **Built-in Model Database**: Comprehensive pricing and context window information
+- **Strict Model Validation**: Enforces provider-specific pricing requirements to prevent silent failures
 
-## Proxy Endpoints
+## Proxy Server
+
+### Command Line Options
+
+```bash
+node llm-proxy.js [options]
+
+Options:
+  --help, -h          Show help message
+  --show-models       Display all configured models with pricing and status
+  --update-config     Update configuration with latest model definitions
+  --sync              Sync configuration with built-in MODEL_DEFINITIONS
+```
+
+### Managing Models
+
+#### Understanding Model Configuration
+
+**CRITICAL**: The proxy server enforces strict validation of all model configurations to prevent silent failures and ensure accurate cost tracking.
+
+The proxy server uses model information from two sources:
+
+1. **Configuration file** (`~/.config/llm-proxy-config.json`):
+   - **This is the ONLY source of truth during runtime**
+   - Contains your API keys and active models
+   - You MUST add models here for them to be available
+   - You control all pricing and context window settings
+   - If a model is not in the config, it cannot be used
+   - **All models MUST pass strict validation or they will be rejected**
+
+2. **Built-in MODEL_DEFINITIONS** (in `llm-proxy.js`):
+   - Reference database of known models
+   - Used ONLY for configuration management (--show-models, --sync)
+   - Provides defaults when setting up new configurations
+   - NEVER used during normal proxy operation
+
+#### Strict Model Validation
+
+**NEW**: The proxy server now enforces strict validation of all model configurations. Models that don't meet the requirements are automatically rejected and will not be available for use.
+
+##### Validation Requirements by Provider
+
+Each provider has specific pricing field requirements:
+
+- **Google models**: Must have `input` and `output` pricing. Must NOT have `cacheRead` or `cacheWrite`.
+- **OpenAI models**: Must have `input`, `output`, and `cacheRead` pricing. Must NOT have `cacheWrite`.
+- **Anthropic models**: Must have all four pricing fields: `input`, `output`, `cacheRead`, and `cacheWrite`.
+
+All models must also have:
+- Valid `id` (string)
+- Valid `contextWindow` (positive number)
+- Valid `pricing` object with the required fields
+
+##### Validation Behavior
+
+- **At startup**: Invalid models are logged with specific error messages. Server continues with only valid models.
+- **During requests**: Requests to invalid models are rejected with HTTP 400 error.
+- **In API responses**: Only valid models are exposed via the `/models` endpoint.
+
+##### Example Validation Errors
+
+```
+❌ Configuration validation errors:
+   - openai model "gpt-4": Invalid pricing.cacheRead: must be a number >= 0
+   - google model "gemini-pro": Invalid pricing: Google models should not have cacheRead
+   - anthropic model "claude-3": Missing required fields (cacheWrite)
+```
+
+#### Using --show-models to Discover Changes
+
+The `--show-models` command helps you understand the state of your configuration:
+
+```bash
+node llm-proxy.js --show-models
+```
+
+Output shows a status column for each model:
+- **same**: Configuration matches built-in definitions
+- **different**: Configuration has different pricing or context window
+- **not in code**: Model exists in your config but not in built-in definitions (custom or deprecated)
+- **not in config**: Model exists in built-in definitions but not in your config (new model available)
+
+Example output:
+```
+🏢 OPENAI
+---------------------------------------------------
+Model ID                    Status         Context    Input $/MTok  Output $/MTok
+gpt-4o                     same           128000     $2.00         $8.00
+gpt-4-turbo               different       128000     $10.00        $30.00
+custom-model              not in code     8192       $5.00         $10.00
+gpt-4o-mini               not in config   128000     $0.40         $1.60
+```
+
+#### Managing Models in Configuration
+
+##### Adding or Removing Models
+
+**IMPORTANT**: All models must follow the strict validation requirements listed above.
+
+Edit `~/.config/llm-proxy-config.json` to manage your models:
+
+```json
+{
+  "providers": {
+    "openai": {
+      "apiKey": "sk-...",
+      "models": [
+        {
+          "id": "gpt-4o",
+          "contextWindow": 128000,
+          "pricing": {
+            "input": 2.50,    // Update when prices change
+            "output": 10.00,
+            "cacheRead": 0.625  // Required for OpenAI models
+          }
+        },
+        // Add new models here - must follow validation rules
+        {
+          "id": "my-custom-openai-model",
+          "contextWindow": 100000,
+          "pricing": {
+            "input": 5.00,
+            "output": 20.00,
+            "cacheRead": 5.00  // Required for OpenAI models
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+##### Updating Pricing
+
+When providers change their pricing:
+
+1. Edit the configuration file directly
+2. Update the `pricing` object for affected models
+3. Restart the proxy server
+4. All future accounting will use the new prices
+
+##### Using --sync (Optional)
+
+The `--sync` command overwrites your model list with built-in definitions:
+
+```bash
+node llm-proxy.js --update-config --sync
+```
+
+**Warning**: This will:
+- Replace ALL models with those from MODEL_DEFINITIONS
+- Reset any custom pricing you've configured
+- Remove any custom models you've added
+- Preserve only your API keys
+
+Use `--sync` only when you want to reset to defaults or after major updates.
+
+#### Model Discovery from Provider APIs
+
+For some providers, the proxy can fetch available models directly:
+
+- **OpenAI**: Fetches from `/v1/models` endpoint
+- **Google**: Fetches from `/v1/models` endpoint  
+- **Anthropic**: No models endpoint available
+
+To check which models are actually available with your API key:
+```bash
+node llm-proxy.js --update-config --sync --check-availability
+```
+
+### Pricing Information
+
+#### How Pricing Works
+
+Model pricing is stored in the built-in MODEL_DEFINITIONS and includes:
+
+- **input**: Cost per million input tokens
+- **output**: Cost per million output tokens
+- **cacheRead**: Discounted rate for cached content (OpenAI/Anthropic)
+- **cacheWrite**: Additional cost for creating cache (Anthropic only, 25% surcharge)
+
+#### Pricing Sources
+
+All pricing in MODEL_DEFINITIONS is manually maintained based on official provider pricing:
+
+- **OpenAI**: https://openai.com/pricing
+- **Anthropic**: https://www.anthropic.com/pricing
+- **Google**: https://ai.google.dev/pricing
+
+**Note**: The proxy does NOT fetch pricing from provider APIs as this information is not available programmatically. Prices must be updated manually in the code when providers change their rates.
+
+#### Keeping Pricing Updated
+
+To ensure accurate cost tracking:
+
+1. Periodically check provider pricing pages for updates
+2. Edit your configuration file to update prices for affected models
+3. Restart the proxy server to load the new configuration
+
+The accounting logs ONLY use pricing from your configuration file. **With strict validation enabled, models without proper pricing information are automatically rejected and cannot be used.** This ensures you have full control and awareness of all pricing used in your system, and prevents requests to improperly configured models.
+
+### API Endpoints
 
 The proxy server provides:
-- `GET /models` - List available providers and models
-- `POST /proxy/<provider>/<api-path>` - Proxy requests to LLM providers
+- `GET /` - Serves the web client interface (index.html)
+- `GET /*.js`, `GET /*.css` - Serves web client static files
+- `GET /models` - Returns available providers and models with pricing (JSON API)
+- `POST /proxy/<provider>/<api-path>` - Proxies requests to LLM providers
+
+### Accounting Logs
+
+All LLM requests are logged to `/var/log/llm-proxy/llm-accounting-YYYY-MM-DD.jsonl`:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "clientIp": "127.0.0.1",
+  "provider": "openai",
+  "model": "gpt-4",
+  "endpoint": "/v1/chat/completions",
+  "statusCode": 200,
+  "duration": 1523,
+  "requestBytes": 1024,
+  "responseBytes": 2048,
+  "decompressedBytes": 8192,
+  "tokens": {
+    "prompt": 150,
+    "completion": 50,
+    "cachedRead": 0,
+    "cacheCreation": 0
+  },
+  "unitPricing": {
+    "input": 30,
+    "output": 60,
+    "cacheRead": 30,
+    "cacheWrite": 30
+  },
+  "costs": {
+    "input": 0.0045,
+    "output": 0.003,
+    "cacheRead": 0,
+    "cacheWrite": 0
+  },
+  "totalCost": 0.0075
+}
+```
+
+Status codes:
+- `200-299`: Successful responses
+- `400-599`: HTTP errors from provider
+- `0`: Network/connection failure
 
 ## Security Notes
 
@@ -124,6 +407,7 @@ The proxy server provides:
 - Check if port 8081 is already in use
 - Verify `~/.config/llm-proxy-config.json` is valid JSON
 - Ensure at least one API key is configured
+- Check permissions for `/var/log/llm-proxy` directory
 
 ### Can't connect to proxy
 - Verify the proxy is running (`node llm-proxy.js`)
@@ -132,10 +416,31 @@ The proxy server provides:
 
 ### No models available
 - Ensure API keys are correctly configured in `~/.config/llm-proxy-config.json`
+- **Check for validation errors**: Look at server startup logs for model validation failures
+- **Fix invalid models**: Ensure all models have required pricing fields for their provider
+- Run `node llm-proxy.js --sync --update-config` to sync models
 - Restart the proxy after configuration changes
 - Test the connection in the LLM provider settings
+
+### Zero costs in accounting logs
+- **This should no longer occur with strict validation** - invalid models are now rejected at startup
+- Check if the model name is being extracted correctly
+- Verify the model passes validation (see startup logs)
+- For Google, ensure the model name matches (e.g., "gemini-1.5-pro" not "gemini-pro")
+- Check console logs for "No pricing found for model" warnings (rare with validation)
 
 ### MCP connection fails
 - Verify Netdata is running and MCP is enabled
 - Check the WebSocket URL format
 - Ensure the API key has appropriate permissions
+
+### Model validation errors
+- **NEW**: Check server startup output for specific validation error messages
+- Fix pricing field requirements for each provider (see validation section above)
+- Remove or fix models that don't meet provider-specific requirements
+- Use `node llm-proxy.js --show-models` to compare config vs code definitions
+
+### Accounting logs not writing
+- Ensure `/var/log/llm-proxy` exists and is writable
+- Check console for "ACCOUNTING_FALLBACK" messages
+- Look for backup logs in `/tmp/llm-accounting-backup.jsonl`
