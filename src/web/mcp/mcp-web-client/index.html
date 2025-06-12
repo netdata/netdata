@@ -45,124 +45,17 @@
 
             <!-- Main Chat Area -->
             <main class="chat-main" id="chatMain">
-                <div class="chat-header" id="chatHeader">
-                    <div class="chat-info">
-                        <div>
-                            <h3 class="chat-title" id="chatTitle">Select or create a chat</h3>
-                            <div class="chat-meta">
-                                <span class="chat-mcp" id="chatMcp"></span>
-                                <span class="chat-llm" id="chatLlm"></span>
-                            </div>
-                        </div>
-                        <div class="chat-controls">
-                            <div class="metrics-dashboard">
-                                <!-- Context Window Indicator -->
-                                <div class="context-window-section" id="contextWindowIndicator" data-tooltip="Shows how much of the model's context is being used">
-                                    <div class="context-window-header">
-                                        <span class="context-window-label">CONTEXT WINDOW</span>
-                                    </div>
-                                    <div class="context-window-bar-container">
-                                        <div class="context-window-bar">
-                                            <div class="context-window-fill" id="contextWindowFill" style="width: 0%"></div>
-                                            <span class="context-window-stats" id="contextWindowStats">0 / 4k</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Cumulative Token Counters -->
-                                <div class="token-counters-section" id="tokenCounters">
-                                    <div class="token-counters-headers">
-                                        <span class="token-header-primary">TOKENS</span>
-                                        <span class="token-header-item"><i class="fas fa-file-alt"></i> INPUT</span>
-                                        <span class="token-header-item"><i class="fas fa-memory"></i> CACHE R</span>
-                                        <span class="token-header-item"><i class="fas fa-save"></i> CACHE W</span>
-                                        <span class="token-header-item"><i class="fas fa-upload"></i> OUTPUT</span>
-                                        <span class="token-header-item"><i class="fas fa-dollar-sign"></i> COST</span>
-                                    </div>
-                                    <div class="token-counters-values">
-                                        <span class="token-value-primary">PRIMARY</span>
-                                        <span id="cumulativeInputTokens" class="token-value-item">0</span>
-                                        <span id="cumulativeCacheReadTokens" class="token-value-item">0</span>
-                                        <span id="cumulativeCacheCreationTokens" class="token-value-item">0</span>
-                                        <span id="cumulativeOutputTokens" class="token-value-item">0</span>
-                                        <span id="cumulativeCost" class="token-value-item" style="color: #4CAF50;">$0.00</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="chat-content" id="chatContent">
-                    <div class="chat-messages" id="chatMessages"></div>
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px; margin: 5px auto; flex-wrap: wrap; padding: 0 10px; max-width: 900px;">
-                        <!-- Temperature Control -->
-                        <div class="dropdown" style="position: relative;">
-                            <button id="temperatureBtn" class="btn btn-secondary dropdown-toggle" data-tooltip="Adjust response randomness" style="min-width: 80px;">
-                                <span><i class="fas fa-thermometer-half"></i></span>
-                                <span id="currentTempText">0.7</span>
-                                <span style="margin-left: 5px;"><i class="fas fa-chevron-down"></i></span>
+                <!-- This will be the container for all chat DOMs -->
+                <div class="chat-containers" id="chatContainers">
+                    <!-- Individual chat containers will be dynamically created here -->
+                    <!-- Default welcome screen when no chat is selected -->
+                    <div class="welcome-screen" id="welcomeScreen">
+                        <div class="welcome-content">
+                            <h2>Welcome to Netdata MCP LLM Client</h2>
+                            <p>Select an existing chat or create a new one to get started</p>
+                            <button class="btn btn-primary" onclick="app.createNewChatDirectly()">
+                                <i class="fas fa-plus"></i> Create New Chat
                             </button>
-                            <div id="temperatureDropdown" class="dropdown-menu" style="display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; width: 200px;">
-                                <div style="padding: 12px;">
-                                    <label style="font-size: 12px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 8px;">Temperature: <span id="tempValueLabel">0.7</span></label>
-                                    <input type="range" id="temperatureSlider" min="0" max="2" step="0.1" value="0.7" style="width: 100%; margin-bottom: 8px;">
-                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary);">
-                                        <span>0 (Focused)</span>
-                                        <span>2 (Creative)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Model and MCP Server Selection -->
-                        <div class="dropdown" style="position: relative;">
-                            <button id="llmModelBtn" class="btn btn-secondary dropdown-toggle" data-tooltip="Switch LLM model">
-                                <span><i class="fas fa-robot"></i></span>
-                                <span id="currentModelText">Model</span>
-                                <span style="margin-left: 5px;"><i class="fas fa-chevron-down"></i></span>
-                            </button>
-                            <div id="llmModelDropdown" class="dropdown-menu" style="display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; max-height: 300px; overflow-y: auto;"></div>
-                        </div>
-                        
-                        <div class="dropdown" style="position: relative;">
-                            <button id="mcpServerBtn" class="btn btn-secondary dropdown-toggle" data-tooltip="Switch MCP server">
-                                <span><i class="fas fa-plug"></i></span>
-                                <span id="currentMcpText">MCP Server</span>
-                                <span style="margin-left: 5px;"><i class="fas fa-chevron-down"></i></span>
-                            </button>
-                            <div id="mcpServerDropdown" class="dropdown-menu" style="display: none; position: absolute; bottom: 100%; left: 0; margin-bottom: 5px; max-height: 300px; overflow-y: auto;"></div>
-                        </div>
-                        
-                        <!-- Existing buttons -->
-                        <button id="copyMetricsBtn" class="btn btn-secondary" data-tooltip="Copy all message metadata including tokens and timing">
-                            <span><i class="fas fa-copy"></i></span>
-                            <span>Log</span>
-                        </button>
-                        <button id="summarizeBtn" class="btn btn-secondary" data-tooltip="Summarize conversation to reduce context size">
-                            <span><i class="fas fa-compress-alt"></i></span>
-                            <span>Summarize</span>
-                        </button>
-                        <button id="globalToolToggleBtn" class="btn btn-secondary tool-toggle-global" data-tooltip="Control inclusion of all tools in LLM context">
-                            <span class="tool-toggle-icon"><i class="fas fa-check"></i></span>
-                            <span class="tool-toggle-text">All tools included</span>
-                        </button>
-                        <button id="generateTitleBtn" class="btn btn-secondary" data-tooltip="Generate or update chat title using AI">
-                            <span><i class="fas fa-edit"></i></span>
-                            <span>Title</span>
-                        </button>
-                    </div>
-                    <div class="resize-handle resize-handle-horizontal" id="chatInputResize"></div>
-                    <div class="chat-input-container" id="chatInputContainer">
-                        <button id="reconnectMcpBtn" class="btn btn-primary" style="display: none;">Reconnect MCP Server</button>
-                        <div class="chat-input-wrapper">
-                            <textarea 
-                                id="chatInput" 
-                                class="chat-input" 
-                                placeholder="Select or create a chat to start messaging..."
-                                rows="3"
-                                disabled
-                            ></textarea>
-                            <button id="sendMessageBtn" class="btn btn-send" disabled>Send</button>
                         </div>
                     </div>
                 </div>

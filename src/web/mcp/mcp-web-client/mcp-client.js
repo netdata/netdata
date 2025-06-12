@@ -31,9 +31,9 @@ class MCPClient {
         if (this.onLog) {
             this.onLog({
                 timestamp: new Date().toISOString(),
-                direction: direction, // 'sent', 'received', 'error', 'info'
-                message: message,
-                metadata: metadata
+                direction, // 'sent', 'received', 'error', 'info'
+                message,
+                metadata
             });
         }
     }
@@ -55,7 +55,7 @@ class MCPClient {
                 
                 this.ws.onopen = async () => {
                     console.log('WebSocket connected');
-                    this.log('info', 'WebSocket connection established', { url: url });
+                    this.log('info', 'WebSocket connection established', { url });
                     if (this.onConnectionChange) {
                         this.onConnectionChange('connected');
                     }
@@ -75,7 +75,7 @@ class MCPClient {
                 
                 this.ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    this.log('error', `WebSocket error: ${error.message || 'Unknown error'}`, { error: error });
+                    this.log('error', `WebSocket error: ${error.message || 'Unknown error'}`, { error });
                     if (this.onError) {
                         this.onError(error);
                     }
@@ -97,7 +97,7 @@ class MCPClient {
                 };
                 
             } catch (error) {
-                this.log('error', `Failed to create WebSocket connection: ${error.message}`, { url: url, error: error });
+                this.log('error', `Failed to create WebSocket connection: ${error.message}`, { url, error });
                 reject(error);
             }
         });
@@ -194,7 +194,7 @@ class MCPClient {
             throw new Error(`Tool '${toolName}' not found`);
         }
         
-        return await this.sendRequest('tools/call', {
+        return this.sendRequest('tools/call', {
             name: toolName,
             arguments: args
         });
@@ -208,8 +208,8 @@ class MCPClient {
             throw new Error(`Resource '${uri}' not found`);
         }
         
-        return await this.sendRequest('resources/read', {
-            uri: uri
+        return this.sendRequest('resources/read', {
+            uri
         });
     }
 
@@ -221,7 +221,7 @@ class MCPClient {
             throw new Error(`Prompt '${promptName}' not found`);
         }
         
-        return await this.sendRequest('prompts/get', {
+        return this.sendRequest('prompts/get', {
             name: promptName,
             arguments: args
         });
@@ -238,9 +238,9 @@ class MCPClient {
         const id = this.requestId++;
         const request = {
             jsonrpc: '2.0',
-            method: method,
-            params: params,
-            id: id
+            method,
+            params,
+            id
         };
 
         return new Promise((resolve, reject) => {
@@ -263,8 +263,8 @@ class MCPClient {
 
         const notification = {
             jsonrpc: '2.0',
-            method: method,
-            params: params
+            method,
+            params
         };
 
         const notificationStr = JSON.stringify(notification);

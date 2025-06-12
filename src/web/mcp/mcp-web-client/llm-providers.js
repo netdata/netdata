@@ -2,6 +2,146 @@
  * LLM Provider integrations for OpenAI, Anthropic, and Google
  */
 
+// Type definitions for API responses
+
+/**
+ * @typedef {Object} OpenAIMessage
+ * @property {string} role
+ * @property {string} content
+ * @property {Array<OpenAIToolCall>} [tool_calls]
+ */
+
+/**
+ * @typedef {Object} OpenAIToolCall
+ * @property {string} id
+ * @property {string} type
+ * @property {Object} function
+ * @property {string} function.name
+ * @property {string} function.arguments
+ */
+
+/**
+ * @typedef {Object} OpenAIChoice
+ * @property {OpenAIMessage} message
+ * @property {number} index
+ * @property {string} finish_reason
+ */
+
+/**
+ * @typedef {Object} OpenAIUsage
+ * @property {number} prompt_tokens
+ * @property {number} completion_tokens
+ * @property {number} total_tokens
+ */
+
+/**
+ * @typedef {Object} OpenAIResponse
+ * @property {Array<OpenAIChoice>} choices
+ * @property {OpenAIUsage} [usage]
+ * @property {string} id
+ * @property {string} model
+ */
+
+/**
+ * @typedef {Object} AnthropicContent
+ * @property {string} type - 'text' or 'tool_use'
+ * @property {string} [text]
+ * @property {string} [id]
+ * @property {string} [name]
+ * @property {Object} [input]
+ */
+
+/**
+ * @typedef {Object} AnthropicUsage
+ * @property {number} input_tokens
+ * @property {number} output_tokens
+ * @property {number} [cache_read_input_tokens]
+ * @property {number} [cache_creation_input_tokens]
+ */
+
+/**
+ * @typedef {Object} AnthropicResponse
+ * @property {Array<AnthropicContent>} content
+ * @property {AnthropicUsage} [usage]
+ * @property {string} id
+ * @property {string} model
+ * @property {string} role
+ */
+
+/**
+ * @typedef {Object} GoogleFunctionCall
+ * @property {string} name
+ * @property {Object} args
+ */
+
+/**
+ * @typedef {Object} GooglePart
+ * @property {string} [text]
+ * @property {GoogleFunctionCall} [functionCall]
+ */
+
+/**
+ * @typedef {Object} GoogleCandidate
+ * @property {Object} content
+ * @property {Array<GooglePart>} content.parts
+ * @property {string} content.role
+ * @property {number} index
+ * @property {string} [finishReason] - 'STOP', 'MAX_TOKENS', 'SAFETY', etc.
+ */
+
+/**
+ * @typedef {Object} GoogleUsageMetadata
+ * @property {number} promptTokenCount
+ * @property {number} candidatesTokenCount
+ * @property {number} totalTokenCount
+ */
+
+/**
+ * @typedef {Object} GoogleResponse
+ * @property {Array<GoogleCandidate>} candidates
+ * @property {GoogleUsageMetadata} [usageMetadata]
+ */
+
+// Internal message format types
+
+/**
+ * @typedef {Object} InternalMessage
+ * @property {string} role - 'user', 'assistant', 'system', 'tool-results', etc.
+ * @property {string|Array} content - Message content
+ * @property {Array<ToolCall>} [toolCalls] - Tool calls for assistant messages
+ * @property {Array<ToolResult>} [toolResults] - Tool results
+ * @property {string} [type] - Message type
+ * @property {string} [timestamp] - ISO timestamp
+ */
+
+/**
+ * @typedef {Object} ToolCall
+ * @property {string} id - Tool call ID
+ * @property {string} name - Tool name
+ * @property {Object} arguments - Tool arguments
+ * @property {boolean} [includeInContext] - Whether to include in context
+ */
+
+/**
+ * @typedef {Object} ToolResult
+ * @property {string} toolCallId - ID of the tool call this result belongs to
+ * @property {any} result - Tool execution result
+ * @property {string} [toolName] - Name of the tool
+ * @property {string} [id] - Result ID
+ */
+
+/**
+ * @typedef {Object} LLMResponse
+ * @property {string} content - Response content
+ * @property {Array<ToolCall>} toolCalls - Tool calls to execute
+ * @property {Object|null} usage - Token usage information
+ * @property {number} [usage.promptTokens]
+ * @property {number} [usage.completionTokens]
+ * @property {number} [usage.totalTokens]
+ * @property {number} [usage.cacheReadInputTokens]
+ * @property {number} [usage.cacheCreationInputTokens]
+ */
+
 /**
  * Shared utility functions for message conversion
  */
@@ -323,16 +463,26 @@ class LLMProvider {
         this.proxyUrl = proxyUrl;
     }
 
-    async sendMessage() {
+    /**
+     * Send messages to LLM provider - must be implemented by subclass
+     * @abstract
+     * @param {Array} _messages - Array of message objects
+     * @param {Array} _tools - Array of available tools
+     * @param {number} _temperature - Temperature for response generation
+     * @param {string} _mode - Tool inclusion mode
+     * @param {number|null} _cachePosition - Cache position for Anthropic
+     * @returns {Promise<LLMResponse>}
+     */
+    async sendMessage(_messages, _tools = [], _temperature = 0.7, _mode = 'cached', _cachePosition = null) {
         throw new Error('sendMessage must be implemented by subclass');
     }
 
     log(direction, message, metadata = {}) {
         const logEntry = {
             timestamp: new Date().toISOString(),
-            direction: direction,
-            message: message,
-            metadata: metadata
+            direction,
+            message,
+            metadata
         };
         
         // Log to UI callback only, not console
@@ -341,10 +491,6 @@ class LLMProvider {
         if (this.onLog) {
             this.onLog(logEntry);
         }
-    }
-
-    setProxyUrl(proxyUrl) {
-        this.proxyUrl = proxyUrl;
     }
 }
 
@@ -362,7 +508,16 @@ class OpenAIProvider extends LLMProvider {
         return `${this.proxyUrl}/proxy/openai/v1/chat/completions`;
     }
 
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
+    /**
+     * Send messages to OpenAI API
+     * @param {Array} messages - Array of message objects
+     * @param {Array} tools - Array of available tools
+     * @param {number} temperature - Temperature for response generation
+     * @param {string} mode - Tool inclusion mode
+     * @param {number|null} _cachePosition - Cache position (unused for OpenAI)
+     * @returns {Promise<LLMResponse>}
+     */
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
@@ -383,7 +538,7 @@ class OpenAIProvider extends LLMProvider {
             messages: openaiMessages,
             tools: openaiTools.length > 0 ? openaiTools : undefined,
             tool_choice: openaiTools.length > 0 ? 'auto' : undefined,
-            temperature: temperature,
+            temperature,
             max_tokens: 4096
         };
 
@@ -424,18 +579,27 @@ class OpenAIProvider extends LLMProvider {
             throw new Error(`OpenAI API error: ${error.error?.message || response.statusText}`);
         }
 
+        /** @type {OpenAIResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'openai' });
+        
+        if (!data.choices || data.choices.length === 0) {
+            throw new Error('OpenAI API returned no choices');
+        }
         
         const choice = data.choices[0];
         
         return {
             content: choice.message.content,
-            toolCalls: choice.message.tool_calls?.map(tc => ({
-                id: tc.id,
-                name: tc.function.name,
-                arguments: JSON.parse(tc.function.arguments)
-            })) || [],
+            toolCalls: choice.message.tool_calls?.map(tc => {
+                // Use destructuring to avoid direct 'arguments' reference
+                const { arguments: functionArgs } = tc.function;
+                return {
+                    id: tc.id,
+                    name: tc.function.name,
+                    arguments: JSON.parse(functionArgs)
+                };
+            }) || [],
             usage: data.usage ? {
                 promptTokens: data.usage.prompt_tokens,
                 completionTokens: data.usage.completion_tokens,
@@ -444,7 +608,7 @@ class OpenAIProvider extends LLMProvider {
         };
     }
 
-    convertMessages(messages, mode = 'cached') {
+    convertMessages(messages, _mode = 'cached') {
         // Convert messages for OpenAI format
         const converted = [];
         
@@ -477,16 +641,21 @@ class OpenAIProvider extends LLMProvider {
                 
                 // Add tool calls if present
                 if (msg.toolCalls && msg.toolCalls.length > 0) {
-                    openaiMsg.tool_calls = msg.toolCalls.map(tc => ({
-                        id: tc.id,
-                        type: 'function',
-                        function: {
-                            name: tc.function?.name || tc.name,
-                            arguments: typeof tc.function?.arguments === 'string' 
-                                ? tc.function.arguments 
-                                : JSON.stringify(tc.function?.arguments || tc.arguments || {})
-                        }
-                    }));
+                    openaiMsg.tool_calls = msg.toolCalls.map(tc => {
+                        // Use destructuring to avoid direct 'arguments' reference
+                        const { arguments: funcArgs } = tc.function || {};
+                        const { arguments: tcArgs } = tc || {};
+                        return {
+                            id: tc.id,
+                            type: 'function',
+                            function: {
+                                name: tc.function?.name || tc.name,
+                                arguments: typeof funcArgs === 'string' 
+                                    ? funcArgs 
+                                    : JSON.stringify(funcArgs || tcArgs || {})
+                            }
+                        };
+                    });
                 }
                 
                 converted.push(openaiMsg);
@@ -510,35 +679,10 @@ class OpenAIProvider extends LLMProvider {
         return converted;
     }
 
-    shouldIncludeToolCalls(msg, mode) {
-        // Determine if tool calls should be included based on mode
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
-        }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
-    }
-
-    shouldIncludeToolResults(msg, mode) {
-        // Tool results should only be included if their corresponding calls were included
-        // This logic matches the tool call inclusion logic
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
-        }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
-    }
-
-    formatToolResponse(toolCallId, result, toolName) {
+    formatToolResponse(toolCallId, result, _toolName) {
         // Format MCP tool results for OpenAI
         const formatted = MessageConversionUtils.formatMCPToolResult(result);
-        let content = '';
+        let content;
         
         if (formatted.type === 'text') {
             content = formatted.content;
@@ -566,7 +710,7 @@ class OpenAIProvider extends LLMProvider {
         return {
             role: 'tool',
             tool_call_id: toolCallId,
-            content: content
+            content
         };
     }
 }
@@ -585,6 +729,15 @@ class AnthropicProvider extends LLMProvider {
         return `${this.proxyUrl}/proxy/anthropic/v1/messages`;
     }
 
+    /**
+     * Send messages to Anthropic API
+     * @param {Array} messages - Array of message objects
+     * @param {Array} tools - Array of available tools
+     * @param {number} temperature - Temperature for response generation
+     * @param {string} mode - Tool inclusion mode
+     * @param {number|null} cachePosition - Cache position for Anthropic
+     * @returns {Promise<LLMResponse>}
+     */
     async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
@@ -624,10 +777,10 @@ class AnthropicProvider extends LLMProvider {
         const requestBody = {
             model: this.model,
             messages: anthropicMessages,
-            system: system,
+            system,
             tools: anthropicTools.length > 0 ? anthropicTools : undefined,
             max_tokens: 4096,
-            temperature: temperature
+            temperature
         };
 
         // Removed debug logging for message structure validation
@@ -684,6 +837,7 @@ class AnthropicProvider extends LLMProvider {
             throw new Error(`Anthropic API error: ${error.error?.message || response.statusText}`);
         }
 
+        /** @type {AnthropicResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'anthropic' });
         
@@ -722,7 +876,7 @@ class AnthropicProvider extends LLMProvider {
     convertMessagesWithCaching(messages, cachePosition = null, mode = 'cached') {
         // Convert messages WITHOUT adding cache control yet
         const converted = [];
-        let lastRole = null;
+        // let lastRole = null; // Removed - variable was never read
         
         let summaryContent = null;
         
@@ -755,7 +909,7 @@ class AnthropicProvider extends LLMProvider {
                             role: 'user',
                             content: msg.content
                         });
-                        lastRole = 'user';
+                        // lastRole = 'user';
                         continue;
                     } else if (typeof firstItem === 'string' && firstItem.includes('tool_result')) {
                         // This might be a stringified tool results array
@@ -766,7 +920,7 @@ class AnthropicProvider extends LLMProvider {
                                     role: 'user',
                                     content: parsedContent
                                 });
-                                lastRole = 'user';
+                                // lastRole = 'user';
                                 continue;
                             }
                         } catch {
@@ -809,7 +963,7 @@ class AnthropicProvider extends LLMProvider {
                     role: 'user',
                     content: [{ type: 'text', text: textContent }]
                 });
-                lastRole = 'user';
+                // lastRole = 'user';
             } else if (msgRole === 'assistant') {
                 // Convert assistant message to Anthropic format
                 const content = [];
@@ -835,11 +989,13 @@ class AnthropicProvider extends LLMProvider {
                 // Add tool use blocks if present and should be included
                 if (msg.toolCalls && msg.toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
                     for (const tc of msg.toolCalls) {
+                        // Use destructuring to avoid direct 'arguments' reference
+                        const { arguments: tcArgs } = tc || {};
                         content.push({
                             type: 'tool_use',
                             id: tc.id,
                             name: tc.name,
-                            input: tc.arguments
+                            input: tcArgs
                         });
                     }
                 }
@@ -847,9 +1003,9 @@ class AnthropicProvider extends LLMProvider {
                 if (content.length > 0) {
                     converted.push({
                         role: 'assistant',
-                        content: content
+                        content
                     });
-                    lastRole = 'assistant';
+                    // lastRole = 'assistant'; // Not needed - not used after this
                 }
             } else if (msgRole === 'tool-results') {
                 // Convert tool results to Anthropic format
@@ -873,9 +1029,9 @@ class AnthropicProvider extends LLMProvider {
                         // Tool results must be in user messages
                         converted.push({
                             role: 'user',
-                            content: content
+                            content
                         });
-                        lastRole = 'user';
+                        // lastRole = 'user'; // Not needed - last assignment
                     }
                 }
             }
@@ -912,7 +1068,7 @@ class AnthropicProvider extends LLMProvider {
         return { converted, summaryContent };
     }
 
-    convertMessages(messages, mode = 'cached') {
+    convertMessages(messages, _mode = 'cached') {
         // Convert messages for Anthropic format
         const converted = [];
         
@@ -942,11 +1098,16 @@ class AnthropicProvider extends LLMProvider {
                 // Add tool use blocks if present
                 if (msg.toolCalls && msg.toolCalls.length > 0) {
                     for (const tc of msg.toolCalls) {
+                        // Extract arguments avoiding direct reference to 'arguments' property
+                        // Use destructuring to avoid the reserved word issue
+                        const { arguments: funcArgs } = tc.function || {};
+                        const { arguments: tcArgs } = tc || {};
+                        const toolInput = funcArgs !== undefined ? funcArgs : (tcArgs || {});
                         content.push({
                             type: 'tool_use',
                             id: tc.id,
                             name: tc.function?.name || tc.name,
-                            input: tc.function?.arguments || tc.arguments || {}
+                            input: toolInput
                         });
                     }
                 }
@@ -954,7 +1115,7 @@ class AnthropicProvider extends LLMProvider {
                 if (content.length > 0) {
                     converted.push({
                         role: 'assistant',
-                        content: content
+                        content
                     });
                 }
             } else if (msgRole === 'tool-results') {
@@ -976,7 +1137,7 @@ class AnthropicProvider extends LLMProvider {
                     // Tool results must be in user messages
                     converted.push({
                         role: 'user',
-                        content: content
+                        content
                     });
                 }
             } else {
@@ -1013,7 +1174,7 @@ class AnthropicProvider extends LLMProvider {
         return true;
     }
 
-    formatToolResultForAnthropic(toolCallId, result, toolName) {
+    formatToolResultForAnthropic(toolCallId, result, _toolName) {
         // Format MCP tool results for Anthropic's tool_result blocks
         const formatted = MessageConversionUtils.formatMCPToolResult(result);
         let content = [];
@@ -1053,33 +1214,7 @@ class AnthropicProvider extends LLMProvider {
         return {
             type: 'tool_result',
             tool_use_id: toolCallId,
-            content: content
-        };
-    }
-
-    formatToolResponse(toolCallId, result) {
-        // For Anthropic, tool results must be in user messages with tool_result blocks
-        // Handle different types of results
-        let content;
-        if (typeof result === 'string') {
-            content = result;
-        } else if (Array.isArray(result)) {
-            // For arrays, stringify each element if needed and join
-            content = result.map(item => 
-                typeof item === 'string' ? item : JSON.stringify(item)
-            ).join('\n\n');
-        } else {
-            content = JSON.stringify(result);
-        }
-        
-        // Return in Anthropic's expected format
-        return {
-            role: 'user',
-            content: [{
-                type: 'tool_result',
-                tool_use_id: toolCallId,
-                content: content
-            }]
+            content
         };
     }
 }
@@ -1098,7 +1233,16 @@ class GoogleProvider extends LLMProvider {
         return `${this.proxyUrl}/proxy/google/v1beta/models/${this.model}/generateContent`;
     }
 
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
+    /**
+     * Send messages to Google Gemini API
+     * @param {Array} messages - Array of message objects
+     * @param {Array} tools - Array of available tools
+     * @param {number} temperature - Temperature for response generation
+     * @param {string} mode - Tool inclusion mode
+     * @param {number|null} _cachePosition - Cache position (unused for Google)
+     * @returns {Promise<LLMResponse>}
+     */
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
@@ -1113,9 +1257,9 @@ class GoogleProvider extends LLMProvider {
         }));
 
         const requestBody = {
-            contents: contents,
+            contents,
             generationConfig: {
-                temperature: temperature,
+                temperature,
                 maxOutputTokens: 4096
             }
         };
@@ -1170,6 +1314,7 @@ class GoogleProvider extends LLMProvider {
             throw new Error(`Google API error: ${error.error?.message || response.statusText}`);
         }
 
+        /** @type {GoogleResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'google' });
         const candidate = data.candidates[0];
@@ -1185,6 +1330,18 @@ class GoogleProvider extends LLMProvider {
             const error = new Error('Google Gemini blocked the response due to safety filters.');
             error.code = 'SAFETY';
             throw error;
+        } else if (candidate.finishReason === 'MALFORMED_FUNCTION_CALL') {
+            // Handle malformed function call - return error message instead of throwing
+            this.log('warn', 'Google Gemini returned a malformed function call', { provider: 'google' });
+            return {
+                content: 'I apologize, but I encountered an error while trying to execute tools to answer your question. This appears to be a temporary issue with the function calling system. Please try rephrasing your question or asking it again.',
+                toolCalls: [],
+                usage: data.usageMetadata ? {
+                    promptTokens: data.usageMetadata.promptTokenCount || 0,
+                    completionTokens: data.usageMetadata.candidatesTokenCount || 0,
+                    totalTokens: data.usageMetadata.totalTokenCount || 0
+                } : { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+            };
         } else if (candidate.finishReason && candidate.finishReason !== 'STOP') {
             // Handle other unexpected finish reasons
             const error = new Error(`Google Gemini response ended unexpectedly: ${candidate.finishReason}`);
@@ -1377,10 +1534,12 @@ class GoogleProvider extends LLMProvider {
                 }
                 if (msg.toolCalls && msg.toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
                     for (const tc of msg.toolCalls) {
+                        // Use destructuring to avoid direct 'arguments' reference
+                        const { arguments: tcArgs } = tc || {};
                         parts.push({
                             functionCall: {
                                 name: tc.name,
-                                args: tc.arguments
+                                args: tcArgs
                             }
                         });
                     }
@@ -1390,7 +1549,7 @@ class GoogleProvider extends LLMProvider {
             if (parts.length > 0) {
                 contents.push({
                     role: msgRole === 'assistant' ? 'model' : 'user',
-                    parts: parts
+                    parts
                 });
             }
         }
@@ -1455,41 +1614,6 @@ class GoogleProvider extends LLMProvider {
         return true;
     }
 
-    formatToolResultForGoogle(toolCallId, result, toolName) {
-        // Format MCP tool results for Google's functionResponse
-        const formatted = MessageConversionUtils.formatMCPToolResult(result);
-        let responseContent = {};
-        
-        if (formatted.type === 'text') {
-            responseContent = { text: formatted.content };
-        } else if (formatted.type === 'multi') {
-            // Handle multiple content items from MCP
-            const parts = [];
-            for (const item of formatted.items) {
-                if (item.type === 'text') {
-                    parts.push(item.content);
-                } else if (item.type === 'image') {
-                    // Google doesn't support images in function responses directly
-                    parts.push(`[Image: ${item.mimeType}]`);
-                } else if (item.type === 'resource') {
-                    parts.push(`[Resource: ${item.uri}]\n${item.text || ''}`);
-                }
-            }
-            responseContent = { text: parts.join('\n\n') };
-        } else if (formatted.type === 'json') {
-            responseContent = formatted.content; // Google accepts objects directly
-        } else {
-            responseContent = result; // Fallback
-        }
-        
-        return {
-            functionResponse: {
-                name: toolName,
-                response: responseContent
-            }
-        };
-    }
-    
     formatToolResultContent(result) {
         // Handle different types of results for Google format
         if (typeof result === 'string') {
@@ -1504,30 +1628,8 @@ class GoogleProvider extends LLMProvider {
         }
     }
 
-    formatToolResponse(toolCallId, result, toolName) {
-        // Handle different types of results
-        let content;
-        if (typeof result === 'string') {
-            content = result;
-        } else if (Array.isArray(result)) {
-            // For arrays, stringify each element if needed and join
-            content = result.map(item => 
-                typeof item === 'string' ? item : JSON.stringify(item)
-            ).join('\n\n');
-        } else {
-            content = JSON.stringify(result);
-        }
-        
-        return {
-            role: 'tool',
-            tool_call_id: toolCallId,
-            tool_name: toolName,
-            content: content
-        };
-    }
-
     generateId() {
-        return 'call_' + Math.random().toString(36).substr(2, 9);
+        return 'call_' + Math.random().toString(36).substring(2, 11);
     }
 
     /**
