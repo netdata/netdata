@@ -10,6 +10,99 @@
 
 import { ToolSummarizer } from './tool-summarizer.js';
 
+// Forward declarations to avoid no-use-before-define
+class ConclusionDetector {
+    isConclusion() {
+        return false;
+    }
+}
+
+class AssistantStateTracker {
+    constructor() {
+        this.state = 'idle';
+        this.conclusionCount = 0;
+        this.lastToolMessageIndex = -1;
+    }
+
+    updateState(msg) {
+        if (msg.role === 'assistant') {
+            if (this.hasToolCalls(msg)) {
+                this.state = 'using-tools';
+                return;
+            }
+            
+            if (this.isConclusion(msg)) {
+                this.state = 'concluded';
+                this.conclusionCount++;
+                return;
+            }
+            
+            this.state = 'thinking';
+        } else if (msg.role === 'tool-results') {
+            this.lastToolMessageIndex = this.conclusionCount;
+        } else if (msg.role === 'user') {
+            this.reset();
+        }
+    }
+
+    shouldFilterTools(threshold) {
+        return this.state === 'concluded' && 
+               (this.conclusionCount - this.lastToolMessageIndex) > threshold;
+    }
+
+    reset() {
+        this.state = 'idle';
+    }
+
+    hasToolCalls(msg) {
+        if (Array.isArray(msg.content)) {
+            return msg.content.some(block => block.type === 'tool_use');
+        }
+        return false;
+    }
+
+    isConclusion(msg) {
+        const text = this.extractText(msg).toLowerCase();
+        
+        const conclusionPhrases = [
+            'done', 'completed', 'finished',
+            'here is', 'here\'s', 'here are',
+            'successfully', 'accomplished'
+        ];
+        
+        const workingPhrases = [
+            'let me', 'I\'ll', 'I will',
+            'checking', 'looking', 'analyzing'
+        ];
+        
+        let score = 0;
+        conclusionPhrases.forEach(phrase => {
+            if (text.includes(phrase)) score += 2;
+        });
+        
+        workingPhrases.forEach(phrase => {
+            if (text.includes(phrase)) score -= 1;
+        });
+        
+        return score > 0;
+    }
+
+    extractText(msg) {
+        if (typeof msg.content === 'string') {
+            return msg.content;
+        }
+        
+        if (Array.isArray(msg.content)) {
+            return msg.content
+                .filter(block => block.type === 'text')
+                .map(block => block.text)
+                .join(' ');
+        }
+        
+        return '';
+    }
+}
+
 export class MessageOptimizer {
     constructor(settings) {
         // STRICT: Validate settings structure
@@ -22,17 +115,22 @@ export class MessageOptimizer {
         
         // Initialize tool summarizer if enabled
         this.toolSummarizer = null;
-        if (this.settings.toolSummarization.enabled) {
+        if (this.settings.optimisation.toolSummarisation.enabled) {
             if (!settings.llmProviderFactory) {
-                throw new Error('[MessageOptimizer] llmProviderFactory required when tool summarization is enabled');
+                throw new Error('[MessageOptimizer] llmProviderFactory required when tool summarisation is enabled');
             }
+            
+            // Convert model format for tool summarizer
+            const primaryModel = `${this.settings.model.provider}:${this.settings.model.id}`;
+            const summaryModel = this.settings.optimisation.toolSummarisation.model;
+            const secondaryModel = summaryModel ? `${summaryModel.provider}:${summaryModel.id}` : null;
             
             this.toolSummarizer = new ToolSummarizer({
                 llmProviderFactory: settings.llmProviderFactory,
-                primaryModel: this.settings.primaryModel,
-                secondaryModel: this.settings.secondaryModel,
-                threshold: this.settings.toolSummarization.threshold,
-                useSecondaryModel: this.settings.toolSummarization.useSecondaryModel
+                primaryModel,
+                secondaryModel,
+                threshold: this.settings.optimisation.toolSummarisation.thresholdKiB * 1024, // Convert KiB to bytes
+                useSecondaryModel: !!secondaryModel
             });
         }
         
@@ -47,88 +145,135 @@ export class MessageOptimizer {
      */
     validateSettings(settings) {
         const defaults = {
-            primaryModel: null,
-            secondaryModel: null,
-            toolSummarization: {
-                enabled: false,
-                threshold: 50000,
-                useSecondaryModel: true
+            model: {
+                provider: 'anthropic',
+                id: 'claude-3-5-sonnet-latest',
+                params: {
+                    temperature: 1,
+                    topP: 1,
+                    maxTokens: 4096,
+                    seed: {
+                        enabled: false,
+                        value: Math.floor(Math.random() * 1000000)
+                    }
+                }
             },
-            toolMemory: {
-                enabled: false,
-                forgetAfterConclusions: 1
+            optimisation: {
+                toolSummarisation: {
+                    enabled: false,
+                    thresholdKiB: 20,
+                    model: null
+                },
+                autoSummarisation: {
+                    enabled: false,
+                    triggerPercent: 50,
+                    model: null
+                },
+                toolMemory: {
+                    enabled: false,
+                    forgetAfterConclusions: 1
+                },
+                cacheControl: {
+                    enabled: false,
+                    strategy: 'smart'
+                },
+                titleGeneration: {
+                    enabled: true,
+                    model: null
+                }
             },
-            cacheControl: {
-                enabled: false,
-                strategy: 'smart'
-            },
-            autoSummarization: {
-                enabled: false,
-                triggerPercent: 50,
-                useSecondaryModel: true
-            }
+            mcpServer: 'http://localhost:5173'
         };
 
         // Deep merge with validation
-        const validated = { ...defaults };
+        const validated = JSON.parse(JSON.stringify(defaults));
         
-        if (settings.primaryModel !== undefined) {
-            if (typeof settings.primaryModel !== 'string') {
-                throw new Error('[MessageOptimizer] primaryModel must be a string');
+        // Validate model structure
+        if (settings.model) {
+            if (!settings.model.provider || !settings.model.id) {
+                throw new Error('[MessageOptimizer] model must have provider and id');
             }
-            validated.primaryModel = settings.primaryModel;
+            validated.model = settings.model;
+        } else if (!validated.model || !validated.model.provider || !validated.model.id) {
+            throw new Error('[MessageOptimizer] model configuration is required with provider and id');
         }
         
-        if (settings.secondaryModel !== undefined) {
-            if (settings.secondaryModel !== null && typeof settings.secondaryModel !== 'string') {
-                throw new Error('[MessageOptimizer] secondaryModel must be a string or null');
-            }
-            validated.secondaryModel = settings.secondaryModel;
+        // Validate optimisation structure
+        if (settings.optimisation) {
+            validated.optimisation = { ...validated.optimisation, ...settings.optimisation };
         }
 
-        // Validate tool summarization settings
-        if (settings.toolSummarization) {
-            const ts = settings.toolSummarization;
-            if (ts.enabled !== undefined && typeof ts.enabled !== 'boolean') {
-                throw new Error('[MessageOptimizer] toolSummarization.enabled must be boolean');
-            }
-            if (ts.threshold !== undefined) {
-                if (typeof ts.threshold !== 'number' || ts.threshold < 0) {
-                    throw new Error('[MessageOptimizer] toolSummarization.threshold must be positive number');
+        // Validate optimisation settings if provided
+        if (validated.optimisation) {
+            const opt = validated.optimisation;
+            
+            // Validate tool summarisation
+            if (opt.toolSummarisation) {
+                const ts = opt.toolSummarisation;
+                if (ts.enabled !== undefined && typeof ts.enabled !== 'boolean') {
+                    throw new Error('[MessageOptimizer] toolSummarisation.enabled must be boolean');
+                }
+                if (ts.thresholdKiB !== undefined && (typeof ts.thresholdKiB !== 'number' || ts.thresholdKiB < 0)) {
+                    throw new Error('[MessageOptimizer] toolSummarisation.thresholdKiB must be positive number');
+                }
+                if (ts.model !== undefined && ts.model !== null && (!ts.model.provider || !ts.model.id)) {
+                    throw new Error('[MessageOptimizer] toolSummarisation.model must have provider and id');
                 }
             }
-            Object.assign(validated.toolSummarization, ts);
-        }
 
-        // Validate tool memory settings
-        if (settings.toolMemory) {
-            const tm = settings.toolMemory;
-            if (tm.enabled !== undefined && typeof tm.enabled !== 'boolean') {
-                throw new Error('[MessageOptimizer] toolMemory.enabled must be boolean');
-            }
-            if (tm.forgetAfterConclusions !== undefined) {
-                if (typeof tm.forgetAfterConclusions !== 'number' || 
-                    tm.forgetAfterConclusions < 0 || 
-                    tm.forgetAfterConclusions > 5) {
-                    throw new Error('[MessageOptimizer] toolMemory.forgetAfterConclusions must be 0-5');
+            // Validate auto summarisation
+            if (opt.autoSummarisation) {
+                const as = opt.autoSummarisation;
+                if (as.enabled !== undefined && typeof as.enabled !== 'boolean') {
+                    throw new Error('[MessageOptimizer] autoSummarisation.enabled must be boolean');
+                }
+                if (as.triggerPercent !== undefined && (typeof as.triggerPercent !== 'number' || as.triggerPercent < 0 || as.triggerPercent > 100)) {
+                    throw new Error('[MessageOptimizer] autoSummarisation.triggerPercent must be 0-100');
+                }
+                if (as.model !== undefined && as.model !== null && (!as.model.provider || !as.model.id)) {
+                    throw new Error('[MessageOptimizer] autoSummarisation.model must have provider and id');
                 }
             }
-            Object.assign(validated.toolMemory, tm);
-        }
 
-        // Validate cache control settings
-        if (settings.cacheControl) {
-            const cc = settings.cacheControl;
-            if (cc.enabled !== undefined && typeof cc.enabled !== 'boolean') {
-                throw new Error('[MessageOptimizer] cacheControl.enabled must be boolean');
-            }
-            if (cc.strategy !== undefined) {
-                const validStrategies = ['aggressive', 'smart', 'minimal'];
-                if (!validStrategies.includes(cc.strategy)) {
-                    throw new Error(`[MessageOptimizer] cacheControl.strategy must be one of: ${validStrategies.join(', ')}`);
+            // Validate tool memory settings
+            if (opt.toolMemory) {
+                const tm = opt.toolMemory;
+                if (tm.enabled !== undefined && typeof tm.enabled !== 'boolean') {
+                    throw new Error('[MessageOptimizer] toolMemory.enabled must be boolean');
+                }
+                if (tm.forgetAfterConclusions !== undefined) {
+                    if (typeof tm.forgetAfterConclusions !== 'number' || 
+                        tm.forgetAfterConclusions < 0 || 
+                        tm.forgetAfterConclusions > 5) {
+                        throw new Error('[MessageOptimizer] toolMemory.forgetAfterConclusions must be 0-5');
+                    }
                 }
             }
-            Object.assign(validated.cacheControl, cc);
+
+            // Validate cache control settings
+            if (opt.cacheControl) {
+                const cc = opt.cacheControl;
+                if (cc.enabled !== undefined && typeof cc.enabled !== 'boolean') {
+                    throw new Error('[MessageOptimizer] cacheControl.enabled must be boolean');
+                }
+                if (cc.strategy !== undefined) {
+                    const validStrategies = ['aggressive', 'smart', 'minimal'];
+                    if (!validStrategies.includes(cc.strategy)) {
+                        throw new Error(`[MessageOptimizer] cacheControl.strategy must be one of: ${validStrategies.join(', ')}`);
+                    }
+                }
+            }
+
+            // Validate title generation settings
+            if (opt.titleGeneration) {
+                const tg = opt.titleGeneration;
+                if (tg.enabled !== undefined && typeof tg.enabled !== 'boolean') {
+                    throw new Error('[MessageOptimizer] titleGeneration.enabled must be boolean');
+                }
+                if (tg.model !== undefined && tg.model !== null && (!tg.model.provider || !tg.model.id)) {
+                    throw new Error('[MessageOptimizer] titleGeneration.model must have provider and id');
+                }
+            }
         }
 
         return validated;
@@ -174,7 +319,7 @@ export class MessageOptimizer {
             toolsFiltered: 0,
             toolsSummarized: 0,
             messagesSummarized: 0,
-            cacheStrategy: this.settings.cacheControl.strategy
+            cacheStrategy: this.settings.optimisation.cacheControl.strategy
         };
 
         try {
@@ -316,6 +461,10 @@ export class MessageOptimizer {
                     throw new Error(`[MessageOptimizer] ${messageType} message at index ${index} missing content`);
                 }
                 break;
+                
+            default:
+                // Other message types don't require specific validation
+                break;
         }
     }
 
@@ -385,9 +534,9 @@ export class MessageOptimizer {
      */
     processToolResults(msg, tracker, stats) {
         // Check if tools should be filtered based on assistant state
-        if (this.settings.toolMemory.enabled) {
+        if (this.settings.optimisation.toolMemory.enabled) {
             const shouldFilter = tracker.shouldFilterTools(
-                this.settings.toolMemory.forgetAfterConclusions
+                this.settings.optimisation.toolMemory.forgetAfterConclusions
             );
             
             if (shouldFilter) {
@@ -398,7 +547,7 @@ export class MessageOptimizer {
         }
 
         // Check if tools should be summarized
-        if (this.settings.toolSummarization.enabled) {
+        if (this.settings.optimisation.toolSummarisation.enabled) {
             return this.maybeSummarizeToolResults(msg, stats);
         }
 
@@ -457,7 +606,7 @@ export class MessageOptimizer {
      * @returns {number} - Cache control index (-1 for no cache)
      */
     determineCacheControl(messages, freezeCache, lastCacheIndex) {
-        if (!this.settings.cacheControl.enabled) {
+        if (!this.settings.optimisation.cacheControl.enabled) {
             return -1;
         }
 
@@ -466,7 +615,7 @@ export class MessageOptimizer {
             return lastCacheIndex;
         }
 
-        const strategy = this.settings.cacheControl.strategy;
+        const strategy = this.settings.optimisation.cacheControl.strategy;
         // console.log(`[MessageOptimizer] Applying cache strategy: ${strategy}`);
 
         switch (strategy) {
@@ -528,7 +677,7 @@ export class MessageOptimizer {
             throw new Error('[MessageOptimizer.performToolSummarization] context must be a valid object');
         }
         
-        if (!this.toolSummarizer || !this.settings.toolSummarization.enabled) {
+        if (!this.toolSummarizer || !this.settings.optimisation.toolSummarisation.enabled) {
             // Tool summarization not enabled, return messages as-is
             return messages;
         }
@@ -565,6 +714,7 @@ export class MessageOptimizer {
                 
                 // Get summaries for all large tool results
                 const toolsToSummarize = message.toolResults.filter(r => r._needsSummarization);
+                // eslint-disable-next-line no-await-in-loop
                 const summaries = await this.toolSummarizer.summarizeMultipleTools(
                     toolsToSummarize,
                     summaryContext
@@ -645,135 +795,4 @@ export class MessageOptimizer {
     }
 }
 
-/**
- * Tracks assistant state for smart tool filtering
- */
-class AssistantStateTracker {
-    constructor() {
-        this.state = 'idle';
-        this.conclusionCount = 0;
-        this.lastToolMessageIndex = -1;
-    }
 
-    /**
-     * Updates state based on message
-     * @param {Object} msg - Message to analyze
-     */
-    updateState(msg) {
-        if (msg.role === 'assistant') {
-            // Check for tool usage
-            if (this.hasToolCalls(msg)) {
-                this.state = 'using-tools';
-                return;
-            }
-            
-            // Check for conclusion
-            if (this.isConclusion(msg)) {
-                this.state = 'concluded';
-                this.conclusionCount++;
-                return;
-            }
-            
-            this.state = 'thinking';
-        } else if (msg.role === 'tool-results') {
-            this.lastToolMessageIndex = this.conclusionCount;
-        } else if (msg.role === 'user') {
-            this.reset();
-        }
-    }
-
-    /**
-     * Checks if tools should be filtered based on conclusion count
-     * @param {number} threshold - Number of conclusions after which to filter
-     * @returns {boolean} - True if tools should be filtered
-     */
-    shouldFilterTools(threshold) {
-        return this.state === 'concluded' && 
-               (this.conclusionCount - this.lastToolMessageIndex) > threshold;
-    }
-
-    /**
-     * Resets state (on new user message)
-     */
-    reset() {
-        this.state = 'idle';
-        // Don't reset conclusion count - it's cumulative
-    }
-
-    /**
-     * Checks if message contains tool calls
-     * @param {Object} msg - Assistant message
-     * @returns {boolean} - True if message has tool calls
-     */
-    hasToolCalls(msg) {
-        if (Array.isArray(msg.content)) {
-            return msg.content.some(block => block.type === 'tool_use');
-        }
-        return false;
-    }
-
-    /**
-     * Checks if assistant message indicates conclusion
-     * @param {Object} msg - Assistant message
-     * @returns {boolean} - True if message indicates conclusion
-     */
-    isConclusion(msg) {
-        const text = this.extractText(msg).toLowerCase();
-        
-        const conclusionPhrases = [
-            'done', 'completed', 'finished',
-            'here is', 'here\'s', 'here are',
-            'successfully', 'accomplished'
-        ];
-        
-        const workingPhrases = [
-            'let me', 'I\'ll', 'I will',
-            'checking', 'looking', 'analyzing'
-        ];
-        
-        let score = 0;
-        conclusionPhrases.forEach(phrase => {
-            if (text.includes(phrase)) score += 2;
-        });
-        
-        workingPhrases.forEach(phrase => {
-            if (text.includes(phrase)) score -= 1;
-        });
-        
-        return score > 0;
-    }
-
-    /**
-     * Extracts text content from message
-     * @param {Object} msg - Message
-     * @returns {string} - Extracted text
-     */
-    extractText(msg) {
-        if (typeof msg.content === 'string') {
-            return msg.content;
-        }
-        
-        if (Array.isArray(msg.content)) {
-            return msg.content
-                .filter(block => block.type === 'text')
-                .map(block => block.text)
-                .join(' ');
-        }
-        
-        return '';
-    }
-}
-
-/**
- * Detects when assistant has concluded vs still working
- * @deprecated - Use AssistantStateTracker instead
- */
-class ConclusionDetector {
-    constructor() {
-        // console.warn('[ConclusionDetector] Deprecated - use AssistantStateTracker');
-    }
-    
-    isConclusion() {
-        return false;
-    }
-}

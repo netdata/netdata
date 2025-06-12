@@ -2,12 +2,16 @@
 
 1. This is a new application. No need for backward compatibility.
 2. When a task is concluded existing eslint configuration MUST show zero errors and zero warnings.
-3. When migrating/refactoring code, NEVER use fallbacks. Let the code fail so that we can identify and fix issues immediately.
-4. FAIL FAST strategy, not fallback silently.
-5. Do not keep code for future use. If you need to implement a feature later, do it then.
-6. Do not use any deprecated or legacy code. This is a new application, so everything should be up-to-date.
-7. Avoid default values to parameters. Always call functions with explicit parameters and if adding new parameters, ensure all uses are updated accordingly.
-8. Remove any unused code, including imports, variables, functions, etc. If you need to use it later, re-implement it.
+3. Do not use any deprecated or legacy code. This is a new application, so everything should be up-to-date.
+4. Avoid default values to parameters. Always call functions with explicit parameters and if adding new parameters, ensure all uses are updated accordingly.
+5. Work in small increments so that the user can follow up with your changes and provide feedback.
+6. When dealing with issues, ALWAYS FIND THE ROOT CAUSE and fix it, rather than applying a workaround.
+
+## REFACTORING
+1. When migrating/refactoring code, NEVER use fallbacks. Let the code fail so that we can identify and fix issues immediately.
+2. Do not keep code for future use. If you need to implement a feature later, do it then.
+3. FAIL FAST strategy, not fallback silently.
+4. Remove any unused code, including imports, variables, functions, etc. If you need to use it later, re-implement it.
 
 ## WHEN COMMITING
 1. Commit with git add filename1 filename2 etc, to avoid committing unnecessary files.
@@ -18,6 +22,19 @@
 # MCP Web Client - Chat History Implementation
 
 This document describes the chat history implementation and message handling logic in the MCP web client.
+
+IMPORTANT:
+Each chat in this application is INDEPENDENT OF THE OTHERS. There shouldn't be ANY global configuration of ANY kind.
+Each chat has its own UNIQUE configuration, its own messages and data, and chats run IN PARALLEL. So, the user is able
+to SWITCH BETWEEN THEM AT ANY TIME without any issues, and let them run while he chats on another one of them.
+
+CRITICAL:
+No sharing between chats. No global settings. No shared structures.
+
+CRITICAL:
+NO HARDCODING OF PROVIDERS AND MODELS ALLOWED! The providers and models are coming from llm-proxy.js and are USER CONFIGURABLE.
+Even llm-proxy.js itself has an internal list only to help the user configure the providers and models.
+So, the application MUST NOT hardcode any providers or models. It should use the ones configured by the user.
 
 ## Message Roles and Types
 
