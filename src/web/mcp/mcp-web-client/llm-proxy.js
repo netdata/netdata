@@ -1,5 +1,49 @@
 #!/usr/bin/env node
 
+/**
+ * @typedef {Object} OpenAIUsage
+ * @property {number} prompt_tokens - Number of input tokens
+ * @property {number} completion_tokens - Number of output tokens
+ * @property {Object} [prompt_tokens_details] - Details about prompt tokens
+ * @property {number} [prompt_tokens_details.cached_tokens] - Number of cached tokens
+ */
+
+/**
+ * @typedef {Object} OpenAIResponse
+ * @property {OpenAIUsage} [usage] - Token usage information
+ */
+
+/**
+ * @typedef {Object} AnthropicUsage
+ * @property {number} input_tokens - Number of input tokens
+ * @property {number} output_tokens - Number of output tokens
+ * @property {number} [cache_read_input_tokens] - Number of cached tokens read
+ * @property {number} [cache_creation_input_tokens] - Number of tokens used to create cache
+ */
+
+/**
+ * @typedef {Object} AnthropicResponse
+ * @property {AnthropicUsage} [usage] - Token usage information
+ */
+
+/**
+ * @typedef {Object} GoogleUsageMetadata
+ * @property {number} promptTokenCount - Number of input tokens
+ * @property {number} candidatesTokenCount - Number of output tokens
+ */
+
+/**
+ * @typedef {Object} GoogleResponse
+ * @property {GoogleUsageMetadata} [usageMetadata] - Token usage information
+ */
+
+/**
+ * @typedef {Object} GoogleModel
+ * @property {string} name - Model name with prefix
+ * @property {string[]} [supportedGenerationMethods] - Supported generation methods
+ * @property {number} [inputTokenLimit] - Input token limit
+ */
+
 // ============================================================================
 // MODEL DEFINITIONS TABLE - Easy to find and edit
 // ============================================================================
@@ -487,7 +531,7 @@ function loadConfig() {
           }
           
           const modelId = model?.id || `index ${index}`;
-          const error = validateModelConfig(provider, model, modelId);
+          const error = validateModelConfig(provider, model);
           if (error) {
             validationErrors.push(`${provider} model "${modelId}": ${error}`);
           } else {
@@ -516,10 +560,9 @@ function loadConfig() {
     
     Object.entries(config.providers).forEach(([provider, settings]) => {
       if (settings.apiKey && settings.apiKey.length > 0) {
-        const validModels = (settings.models || []).filter((model, index) => {
+        const validModels = (settings.models || []).filter((model) => {
           if (typeof model === 'string') return false;
-          const modelId = model?.id || `index ${index}`;
-          return !validateModelConfig(provider, model, modelId);
+          return !validateModelConfig(provider, model);
         });
         
         if (validModels.length > 0) {
@@ -570,7 +613,7 @@ function loadConfig() {
 }
 
 // Validate model configuration
-function validateModelConfig(provider, model, modelId) {
+function validateModelConfig(provider, model) {
   // Check if model has required structure
   if (typeof model !== 'object' || !model.id || !model.contextWindow || !model.pricing) {
     return `Missing required fields (id, contextWindow, pricing)`;
@@ -685,7 +728,12 @@ function writeAccountingEntry(entry) {
   }
 }
 
-// Function to extract token usage from provider response
+/**
+ * Function to extract token usage from provider response
+ * @param {string} provider - The LLM provider name
+ * @param {OpenAIResponse|AnthropicResponse|GoogleResponse} responseData - Response data from the provider
+ * @returns {Object} Token usage information
+ */
 function extractTokenUsage(provider, responseData) {
   try {
     switch (provider.toLowerCase()) {
@@ -762,7 +810,12 @@ function calculateCosts(tokens, pricing) {
   };
 }
 
-// Fetch available models from provider APIs
+/**
+ * Fetch available models from provider APIs
+ * @param {string} provider - The provider name (openai, anthropic, google)
+ * @param {string} apiKey - API key for the provider
+ * @returns {Promise<Array|null>} Array of available models or null
+ */
 async function fetchAvailableModels(provider, apiKey) {
   if (!apiKey) return null;
   
@@ -782,7 +835,7 @@ async function fetchAvailableModels(provider, apiKey) {
           }
         };
         
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const req = https.request(options, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
@@ -847,7 +900,7 @@ async function fetchAvailableModels(provider, apiKey) {
           }
         };
         
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const req = https.request(options, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
@@ -861,12 +914,12 @@ async function fetchAvailableModels(provider, apiKey) {
               try {
                 const response = JSON.parse(data);
                 const models = response.models
-                  .filter(model => {
+                  .filter(/** @param {GoogleModel} model */ model => {
                     // Filter for generative models
                     return model.supportedGenerationMethods && 
                            model.supportedGenerationMethods.includes('generateContent');
                   })
-                  .map(model => {
+                  .map(/** @param {GoogleModel} model */ model => {
                     const modelId = model.name.replace('models/', '');
                     return {
                       id: modelId,
@@ -1033,7 +1086,7 @@ if (process.argv.includes('--show-models')) {
         const configPricing = configDef.pricing;
         const codePricing = codeDef.pricing;
         
-        let ctxSame = configCtx === codeCtx;
+        const ctxSame = configCtx === codeCtx;
         let pricingSame = true;
         
         if (configPricing && codePricing) {
@@ -1141,8 +1194,8 @@ if (process.argv.includes('--update-config')) {
         providers: {}
       };
       
-      // Merge providers, preserving API keys and using full MODEL_DEFINITIONS
-      for (const [provider, defaultProviderConfig] of Object.entries(DEFAULT_CONFIG.providers)) {
+      // Prepare promises for parallel execution
+      const providerProcessingPromises = Object.entries(DEFAULT_CONFIG.providers).map(async ([provider, defaultProviderConfig]) => {
         const existingProvider = existingConfig.providers?.[provider];
         
         // Get ALL models from MODEL_DEFINITIONS for this provider
@@ -1224,14 +1277,23 @@ if (process.argv.includes('--update-config')) {
           }
         }
         
-        updatedConfig.providers[provider] = {
-          ...defaultProviderConfig,
-          // Preserve existing API key if available
-          apiKey: existingProvider?.apiKey || '',
-          // Use merged models list
-          models: mergedModels
+        return {
+          provider,
+          config: {
+            ...defaultProviderConfig,
+            // Preserve existing API key if available
+            apiKey: existingProvider?.apiKey || '',
+            // Use merged models list
+            models: mergedModels
+          }
         };
-      }
+      });
+      
+      // Wait for all promises to complete
+      const results = await Promise.all(providerProcessingPromises);
+      results.forEach(result => {
+        updatedConfig.providers[result.provider] = result.config;
+      });
       
       // Also preserve any custom providers not in defaults
       if (existingConfig.providers) {
@@ -1324,7 +1386,7 @@ const server = http.createServer(async (req, res) => {
             if (!modelId) return null;
             
             // Validate model configuration
-            const validationError = validateModelConfig(provider, model, modelId);
+            const validationError = validateModelConfig(provider, model);
             if (validationError) {
               console.log(`   ⚠️  Skipping invalid model ${modelId}: ${validationError}`);
               return null;
@@ -1480,7 +1542,7 @@ const server = http.createServer(async (req, res) => {
     // For Google, extract model from URL path
     if (provider.toLowerCase() === 'google' && !requestModel) {
       // Path format: /v1beta/models/gemini-1.5-pro/generateContent
-      const pathMatch = apiPath.match(/\/models\/([^\/]+)\//);
+      const pathMatch = apiPath.match(/\/models\/([^/]+)\//);
       if (pathMatch && pathMatch[1]) {
         requestModel = pathMatch[1];
         modelInfo = ` (model: ${requestModel})`;
@@ -1488,21 +1550,21 @@ const server = http.createServer(async (req, res) => {
     }
     
     // Get client IP
-    const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     
     // Get pricing for the model from configuration (the only source of truth)
     let modelPricing = null;
     let modelConfig = null;
-    const providerConfig = config.providers[provider.toLowerCase()];
-    if (providerConfig && providerConfig.models && requestModel) {
-      modelConfig = providerConfig.models.find(m => 
+    const modelProviderConfig = config.providers[provider.toLowerCase()];
+    if (modelProviderConfig && modelProviderConfig.models && requestModel) {
+      modelConfig = modelProviderConfig.models.find(m => 
         (typeof m === 'string' ? m : m.id) === requestModel
       );
       if (modelConfig && typeof modelConfig === 'object') {
         modelPricing = modelConfig.pricing || null;
         
         // Validate the model configuration
-        const validationError = validateModelConfig(provider.toLowerCase(), modelConfig, requestModel);
+        const validationError = validateModelConfig(provider.toLowerCase(), modelConfig);
         if (validationError) {
           console.error(`[${new Date().toISOString()}] ❌ Invalid model configuration for ${requestModel}: ${validationError}`);
           res.writeHead(400, {
@@ -1534,7 +1596,6 @@ const server = http.createServer(async (req, res) => {
     
     // Track request start time
     const requestStartTime = Date.now();
-    let responseCompleted = false;
     
     // Make the request to the LLM provider
     const proxyReq = protocol.request(options, (proxyRes) => {
@@ -1580,7 +1641,6 @@ const server = http.createServer(async (req, res) => {
 
       proxyRes.on('end', () => {
         res.end();
-        responseCompleted = true; // Mark response as completed
         
         // Decompress response if needed
         if (contentEncoding && responseBuffer.length > 0) {
@@ -1630,7 +1690,7 @@ const server = http.createServer(async (req, res) => {
                         console.log(`   ✅ Found usage in line ${i}: ${JSON.stringify(parsed.usage)}`);
                         break;
                       }
-                    } catch (e) {
+                    } catch (_e) {
                       // Continue searching
                     }
                   }
@@ -1640,30 +1700,26 @@ const server = http.createServer(async (req, res) => {
               if (!finalResponse) {
                 console.log(`   ⚠️  No usage data found in streaming response`);
               }
-            } else {
+            } else if (responseBody && responseBody.trim()) {
               // Non-streaming response
-              if (responseBody && responseBody.trim()) {
-                try {
-                  finalResponse = JSON.parse(responseBody);
-                  if (finalResponse && finalResponse.usage) {
-                    console.log(`   ✅ Found usage in non-streaming response: ${JSON.stringify(finalResponse.usage)}`);
-                  }
-                } catch (e) {
-                  console.error(`❌ Failed to parse non-streaming response: ${e.message}`);
-                  console.error(`   Response preview: ${responseBody.substring(0, 200)}...`);
-                }
-              } else {
-                console.log(`   ⚠️  Empty response body`);
-              }
-            }
-          } else {
-            // Handle error responses
-            if (responseBody && responseBody.trim()) {
               try {
-                errorResponse = JSON.parse(responseBody);
+                finalResponse = JSON.parse(responseBody);
+                if (finalResponse && finalResponse.usage) {
+                  console.log(`   ✅ Found usage in non-streaming response: ${JSON.stringify(finalResponse.usage)}`);
+                }
               } catch (e) {
-                errorResponse = { error: responseBody || 'Unknown error' };
+                console.error(`❌ Failed to parse non-streaming response: ${e.message}`);
+                console.error(`   Response preview: ${responseBody.substring(0, 200)}...`);
               }
+            } else {
+              console.log(`   ⚠️  Empty response body`);
+            }
+          } else if (responseBody && responseBody.trim()) {
+            // Handle error responses
+            try {
+              errorResponse = JSON.parse(responseBody);
+            } catch (_e) {
+              errorResponse = { error: responseBody || 'Unknown error' };
             }
           }
           
@@ -1688,8 +1744,8 @@ const server = http.createServer(async (req, res) => {
           // Create accounting entry
           const accountingEntry = {
             timestamp: new Date().toISOString(),
-            clientIp: clientIp,
-            provider: provider,
+            clientIp,
+            provider,
             model: requestModel,
             endpoint: apiPath,
             statusCode: proxyRes.statusCode,
@@ -1750,8 +1806,8 @@ const server = http.createServer(async (req, res) => {
       // Log failed request attempts to accounting
       const accountingEntry = {
         timestamp: new Date().toISOString(),
-        clientIp: clientIp,
-        provider: provider,
+        clientIp,
+        provider,
         model: requestModel,
         endpoint: apiPath,
         statusCode: 0, // 0 indicates network/connection failure
@@ -1782,7 +1838,6 @@ const server = http.createServer(async (req, res) => {
       writeAccountingEntry(accountingEntry);
       console.log(`[${new Date().toISOString()}] ⚠️  Network error logged to accounting for ${requestModel || 'unknown model'}`);
       
-      responseCompleted = true; // Mark as completed to prevent duplicate logging
       
       res.writeHead(502, {
         'Content-Type': 'application/json',
