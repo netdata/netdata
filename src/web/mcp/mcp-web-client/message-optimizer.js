@@ -8,6 +8,8 @@
  * No backwards compatibility. Clean interfaces only.
  */
 
+import { ToolSummarizer } from './tool-summarizer.js';
+
 export class MessageOptimizer {
     constructor(settings) {
         // STRICT: Validate settings structure
@@ -17,6 +19,22 @@ export class MessageOptimizer {
         
         this.settings = this.validateSettings(settings);
         this.conclusionDetector = new ConclusionDetector();
+        
+        // Initialize tool summarizer if enabled
+        this.toolSummarizer = null;
+        if (this.settings.toolSummarization.enabled) {
+            if (!settings.llmProviderFactory) {
+                throw new Error('[MessageOptimizer] llmProviderFactory required when tool summarization is enabled');
+            }
+            
+            this.toolSummarizer = new ToolSummarizer({
+                llmProviderFactory: settings.llmProviderFactory,
+                primaryModel: this.settings.primaryModel,
+                secondaryModel: this.settings.secondaryModel,
+                threshold: this.settings.toolSummarization.threshold,
+                useSecondaryModel: this.settings.toolSummarization.useSecondaryModel
+            });
+        }
         
         // console.log('[MessageOptimizer] Initialized with settings:', this.settings);
     }
@@ -394,9 +412,41 @@ export class MessageOptimizer {
      * @returns {Object} - Original or modified message
      */
     maybeSummarizeToolResults(msg, stats) {
-        // For now, just return the message
-        // TODO: Implement actual summarization when tool summary system is ready
-        return msg;
+        if (!this.toolSummarizer) {
+            // Tool summarization not enabled
+            return msg;
+        }
+        
+        // Check each tool result
+        const toolResults = msg.toolResults || [];
+        let anySummarized = false;
+        
+        const processedResults = toolResults.map(result => {
+            if (this.toolSummarizer.shouldSummarize(result)) {
+                stats.toolsSummarized++;
+                anySummarized = true;
+                
+                // Mark this result for summarization
+                return {
+                    ...result,
+                    _needsSummarization: true,
+                    _originalSize: this.toolSummarizer.calculateSize(result.result)
+                };
+            }
+            return result;
+        });
+        
+        if (!anySummarized) {
+            return msg;
+        }
+        
+        // Return message with marked results
+        // Actual summarization will happen asynchronously
+        return {
+            ...msg,
+            toolResults: processedResults,
+            _hasPendingSummarization: true
+        };
     }
 
     /**
@@ -460,6 +510,138 @@ export class MessageOptimizer {
         }
         
         // console.log(`[MessageOptimizer] Final validation passed: ${messages.length} messages ready for API`);
+    }
+    
+    /**
+     * Performs async tool summarization for messages that need it
+     * @param {Array} messages - Messages array with marked tool results
+     * @param {Object} context - Context for summarization
+     * @returns {Promise<Array>} - Messages with summarized tool results
+     */
+    async performToolSummarization(messages, context) {
+        // STRICT: Validate inputs
+        if (!Array.isArray(messages)) {
+            throw new Error('[MessageOptimizer.performToolSummarization] messages must be an array');
+        }
+        
+        if (!context || typeof context !== 'object') {
+            throw new Error('[MessageOptimizer.performToolSummarization] context must be a valid object');
+        }
+        
+        if (!this.toolSummarizer || !this.settings.toolSummarization.enabled) {
+            // Tool summarization not enabled, return messages as-is
+            return messages;
+        }
+        
+        // Find messages with pending summarization
+        const messagesToProcess = [];
+        messages.forEach((msg, index) => {
+            if (msg._hasPendingSummarization && msg.toolResults) {
+                messagesToProcess.push({ message: msg, index });
+            }
+        });
+        
+        if (messagesToProcess.length === 0) {
+            return messages;
+        }
+        
+        // console.log(`[MessageOptimizer] Performing tool summarization for ${messagesToProcess.length} messages`);
+        
+        // Process each message with tool results
+        const updatedMessages = [...messages];
+        
+        for (const { message, index } of messagesToProcess) {
+            try {
+                // Get context for this message
+                const userQuestion = this.findPrecedingUserQuestion(messages, index);
+                const assistantReasoning = this.findAssistantReasoning(messages, index);
+                
+                // Prepare summarization context
+                const summaryContext = {
+                    ...context,
+                    userQuestion,
+                    assistantReasoning
+                };
+                
+                // Get summaries for all large tool results
+                const toolsToSummarize = message.toolResults.filter(r => r._needsSummarization);
+                const summaries = await this.toolSummarizer.summarizeMultipleTools(
+                    toolsToSummarize,
+                    summaryContext
+                );
+                
+                // Apply summaries to tool results
+                const updatedToolResults = message.toolResults.map(result => {
+                    if (result._needsSummarization && summaries.has(result.toolCallId)) {
+                        const summary = summaries.get(result.toolCallId);
+                        
+                        // Create summarized version
+                        return {
+                            toolCallId: result.toolCallId,
+                            toolName: result.toolName,
+                            result: {
+                                _type: 'summarized',
+                                summary: summary.summary,
+                                originalSize: summary.originalSize,
+                                summarizedSize: summary.summarizedSize,
+                                compressionRatio: summary.compressionRatio,
+                                model: summary.model
+                            }
+                        };
+                    }
+                    
+                    // Remove internal flags from non-summarized results
+                    const { _needsSummarization, _originalSize, ...cleanResult } = result;
+                    return cleanResult;
+                });
+                
+                // Update message
+                const { _hasPendingSummarization, ...cleanMessage } = message;
+                updatedMessages[index] = {
+                    ...cleanMessage,
+                    toolResults: updatedToolResults
+                };
+                
+            } catch (error) {
+                console.error(`[MessageOptimizer] Failed to summarize tools at index ${index}:`, error);
+                // Keep original message on error
+            }
+        }
+        
+        return updatedMessages;
+    }
+    
+    /**
+     * Finds the preceding user question for context
+     * @param {Array} messages - All messages
+     * @param {number} toolResultIndex - Index of tool result message
+     * @returns {string} - User question or default
+     */
+    findPrecedingUserQuestion(messages, toolResultIndex) {
+        // Search backwards for the most recent user message
+        for (let i = toolResultIndex - 1; i >= 0; i--) {
+            if (messages[i].role === 'user' && messages[i].content) {
+                return messages[i].content;
+            }
+        }
+        return 'No specific question provided';
+    }
+    
+    /**
+     * Finds the assistant's reasoning before tool calls
+     * @param {Array} messages - All messages  
+     * @param {number} toolResultIndex - Index of tool result message
+     * @returns {string} - Assistant reasoning or default
+     */
+    findAssistantReasoning(messages, toolResultIndex) {
+        // Tool results should immediately follow assistant message with tool calls
+        if (toolResultIndex > 0) {
+            const prevMsg = messages[toolResultIndex - 1];
+            if (prevMsg.role === 'assistant' && prevMsg.content) {
+                return prevMsg.content;
+            }
+        }
+        return 'Assistant decided to use tools';
     }
 }
 

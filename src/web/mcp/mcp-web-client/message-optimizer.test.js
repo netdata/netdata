@@ -114,10 +114,10 @@ function createDefaultSettings() {
     return {
         primaryModel: 'claude-3-sonnet',
         secondaryModel: 'claude-3-haiku',
-        toolSummarization: { enabled: false, threshold: 50000 },
+        toolSummarization: { enabled: false, threshold: 50000, useSecondaryModel: true },
         toolMemory: { enabled: false, forgetAfterConclusions: 1 },
         cacheControl: { enabled: false, strategy: 'smart' },
-        autoSummarization: { enabled: false, triggerPercent: 50 }
+        autoSummarization: { enabled: false, triggerPercent: 50, useSecondaryModel: true }
     };
 }
 
@@ -486,6 +486,58 @@ test.test('Edge case - message with both type and role', () => {
     const result = optimizer.buildMessagesForAPI(chat);
     
     test.assertEqual(result.messages.length, 2);
+});
+
+// Tool Summarization Tests
+test.test('Tool summarization - Disabled by default', () => {
+    const settings = createDefaultSettings();
+    const optimizer = new MessageOptimizer(settings);
+    test.assertEqual(optimizer.toolSummarizer, null);
+});
+
+test.test('Tool summarization - Enabled requires llmProviderFactory', () => {
+    const settings = createDefaultSettings();
+    settings.toolSummarization.enabled = true;
+    
+    test.assertThrows(
+        () => new MessageOptimizer(settings),
+        'llmProviderFactory required when tool summarization is enabled'
+    );
+});
+
+test.test('Tool summarization - Creates summarizer when enabled', () => {
+    const settings = createDefaultSettings();
+    settings.toolSummarization.enabled = true;
+    settings.llmProviderFactory = () => {}; // Mock factory
+    
+    const optimizer = new MessageOptimizer(settings);
+    test.assertTrue(optimizer.toolSummarizer !== null);
+});
+
+test.test('Tool summarization - Marks large results', () => {
+    const settings = createDefaultSettings();
+    settings.toolSummarization.enabled = true;
+    settings.toolSummarization.threshold = 100; // Low threshold for testing
+    settings.llmProviderFactory = () => {};
+    
+    const optimizer = new MessageOptimizer(settings);
+    const largeResult = 'x'.repeat(200); // 200 bytes
+    
+    const msg = {
+        role: 'tool-results',
+        toolResults: [
+            { toolCallId: 'call_1', toolName: 'test', result: largeResult },
+            { toolCallId: 'call_2', toolName: 'test2', result: 'small' }
+        ]
+    };
+    
+    const stats = { toolsSummarized: 0 };
+    const processed = optimizer.maybeSummarizeToolResults(msg, stats);
+    
+    test.assertEqual(stats.toolsSummarized, 1);
+    test.assertTrue(processed._hasPendingSummarization);
+    test.assertTrue(processed.toolResults[0]._needsSummarization);
+    test.assertFalse(processed.toolResults[1]._needsSummarization === true);
 });
 
 // Run all tests
