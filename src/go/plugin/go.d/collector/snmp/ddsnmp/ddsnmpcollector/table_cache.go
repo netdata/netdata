@@ -49,10 +49,10 @@ func (tc *tableCache) calculateTableTTL() time.Duration {
 	base := float64(tc.baseTTL)
 	jitter := tc.jitterPct
 
-	// Random jitter between -jitterPct and +jitterPct
+	// Random jitter between 0 and +jitterPct
 	// Note: This is called from within lock, so don't acquire lock here
 	randFloat := tc.rng.Float64()
-	multiplier := 1.0 + (randFloat*2-1)*jitter
+	multiplier := 1.0 + randFloat*jitter
 
 	return time.Duration(base * multiplier)
 }
@@ -65,13 +65,13 @@ func (tc *tableCache) getCachedData(tableOID string) (oids map[string]map[string
 		return nil, nil, false
 	}
 
-	timestamp, exists := tc.timestamps[tableOID]
-	if !exists {
+	timestamp, ok := tc.timestamps[tableOID]
+	if !ok {
 		return nil, nil, false
 	}
 
-	ttl, exists := tc.tableTTLs[tableOID]
-	if !exists || time.Since(timestamp) > ttl {
+	ttl, ok := tc.tableTTLs[tableOID]
+	if !ok || time.Since(timestamp) > ttl {
 		return nil, nil, false
 	}
 
