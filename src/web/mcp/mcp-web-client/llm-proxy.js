@@ -1,5 +1,350 @@
 #!/usr/bin/env node
 
+// ============================================================================
+// MODEL DEFINITIONS TABLE - Easy to find and edit
+// ============================================================================
+// Pricing is per million tokens (MTok)
+// For Anthropic models: input, cacheWrite, cacheRead, output
+// For OpenAI models: input, cacheRead, output  
+// For Google models: input, output
+const MODEL_DEFINITIONS = {
+  // ==================== OPENAI MODELS ====================
+  
+  // GPT-4o Series
+  'gpt-4o': { 
+    contextWindow: 128000, 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+  },
+  'gpt-4o-mini': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.40, cacheRead: 0.10, output: 1.60 } 
+  },
+  'gpt-4o-2024-05-13': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 15.00 } 
+  },
+  'gpt-4o-mini-2024-07-18': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  'gpt-4o-2024-08-06': { 
+    contextWindow: 128000, 
+    pricing: { input: 2.50, output: 10.00 } 
+  },
+  'gpt-4o-2024-11-20': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 20.00 } 
+  },
+  'chatgpt-4o-latest': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 15.00 } 
+  },
+  
+  // GPT-4 Turbo Series
+  'gpt-4-turbo': { 
+    contextWindow: 128000, 
+    pricing: { input: 10.00, output: 30.00 } 
+  },
+  'gpt-4-turbo-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 10.00, output: 30.00 } 
+  },
+  'gpt-4-turbo-2024-04-09': { 
+    contextWindow: 128000, 
+    pricing: { input: 10.00, output: 30.00 } 
+  },
+  'gpt-4-0125-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 10.00, output: 30.00 } 
+  },
+  'gpt-4-1106-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 10.00, output: 30.00 } 
+  },
+  
+  // GPT-4 Original
+  'gpt-4': { 
+    contextWindow: 8192, 
+    pricing: { input: 30.00, output: 60.00 } 
+  },
+  'gpt-4-0613': { 
+    contextWindow: 8192, 
+    pricing: { input: 30.00, output: 60.00 } 
+  },
+  
+  // GPT-4.5 Series (Being deprecated)
+  'gpt-4.5-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 75.00, output: 150.00 } 
+  },
+  'gpt-4.5-preview-2025-02-27': { 
+    contextWindow: 128000, 
+    pricing: { input: 75.00, output: 150.00 } 
+  },
+  
+  // GPT-4.1 Series (New models with 1M context)
+  'gpt-4.1': { 
+    contextWindow: 1000000, 
+    pricing: { input: 7.50, output: 30.00 } 
+  },
+  'gpt-4.1-2025-04-14': { 
+    contextWindow: 1000000, 
+    pricing: { input: 7.50, output: 30.00 } 
+  },
+  'gpt-4.1-mini': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.30, output: 1.20 } 
+  },
+  'gpt-4.1-mini-2025-04-14': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.30, output: 1.20 } 
+  },
+  'gpt-4.1-nano': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  'gpt-4.1-nano-2025-04-14': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  
+  // GPT-3.5 Turbo Series
+  'gpt-3.5-turbo': { 
+    contextWindow: 16384, 
+    pricing: { input: 0.50, output: 1.50 } 
+  },
+  'gpt-3.5-turbo-16k': { 
+    contextWindow: 16384, 
+    pricing: { input: 3.00, output: 4.00 } 
+  },
+  'gpt-3.5-turbo-0125': { 
+    contextWindow: 16384, 
+    pricing: { input: 0.50, output: 1.50 } 
+  },
+  'gpt-3.5-turbo-1106': { 
+    contextWindow: 16384, 
+    pricing: { input: 1.00, output: 2.00 } 
+  },
+  'gpt-3.5-turbo-instruct': { 
+    contextWindow: 4096, 
+    pricing: { input: 1.50, output: 2.00 } 
+  },
+  'gpt-3.5-turbo-instruct-0914': { 
+    contextWindow: 4096, 
+    pricing: { input: 1.50, output: 2.00 } 
+  },
+  
+  // Audio Models
+  'gpt-4o-audio-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 20.00 } // Text pricing, audio: $100/M input, $200/M output
+  },
+  'gpt-4o-audio-preview-2024-10-01': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 20.00 } 
+  },
+  'gpt-4o-audio-preview-2024-12-17': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 20.00 } 
+  },
+  'gpt-4o-mini-audio-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  'gpt-4o-mini-audio-preview-2024-12-17': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  
+  // Realtime Models
+  'gpt-4o-realtime-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 20.00 } 
+  },
+  'gpt-4o-realtime-preview-2024-10-01': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 20.00 } 
+  },
+  
+  // Search Models
+  'gpt-4o-search-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 15.00 } 
+  },
+  'gpt-4o-search-preview-2025-03-11': { 
+    contextWindow: 128000, 
+    pricing: { input: 5.00, output: 15.00 } 
+  },
+  'gpt-4o-mini-search-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  'gpt-4o-mini-search-preview-2025-03-11': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.15, output: 0.60 } 
+  },
+  
+  // Specialized Models
+  'gpt-4o-transcribe': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.006, output: 0.00 } // $0.006 per minute of audio
+  },
+  'gpt-4o-mini-transcribe': { 
+    contextWindow: 128000, 
+    pricing: { input: 0.006, output: 0.00 } 
+  },
+  'gpt-4o-mini-tts': { 
+    contextWindow: 128000, 
+    pricing: { input: 15.00, output: 30.00 } 
+  },
+  
+  // Legacy Models
+  'davinci-002': { 
+    contextWindow: 16384, 
+    pricing: { input: 2.00, output: 2.00 } 
+  },
+  'gpt-image-1': { 
+    contextWindow: 4096, 
+    pricing: { input: 2.00, output: 2.00 } 
+  },
+  
+  // ==================== ANTHROPIC MODELS ====================
+  
+  // Claude Opus 4
+  'claude-opus-4-20250514': { 
+    contextWindow: 200000, 
+    pricing: { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 } 
+  },
+  
+  // Claude Sonnet 4
+  'claude-sonnet-4-20250514': { 
+    contextWindow: 200000, 
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } 
+  },
+  
+  // Claude Sonnet 3.7
+  'claude-3-7-sonnet-20250219': { 
+    contextWindow: 200000, 
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } 
+  },
+  
+  // Claude 3.5 Series
+  'claude-3-5-haiku-20241022': { 
+    contextWindow: 200000, 
+    pricing: { input: 0.80, cacheWrite: 1.00, cacheRead: 0.08, output: 4.00 } 
+  },
+  'claude-3-5-sonnet-20241022': { 
+    contextWindow: 200000, 
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } 
+  },
+  'claude-3-5-sonnet-20240620': { 
+    contextWindow: 200000, 
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } 
+  },
+  
+  // Claude 3 Series
+  'claude-3-opus-20240229': { 
+    contextWindow: 200000, 
+    pricing: { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 } 
+  },
+  'claude-3-sonnet-20240229': { 
+    contextWindow: 200000, 
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } 
+  },
+  'claude-3-haiku-20240307': { 
+    contextWindow: 200000, 
+    pricing: { input: 0.25, cacheWrite: 0.30, cacheRead: 0.03, output: 1.25 } 
+  },
+  
+  // ==================== GOOGLE GEMINI MODELS ====================
+  
+  // Gemini 2.0 Series
+  'gemini-2.0-flash': { 
+    contextWindow: 1048576, 
+    pricing: { input: 0.10, output: 0.40 } 
+  },
+  'gemini-2.0-flash-001': { 
+    contextWindow: 1048576, 
+    pricing: { input: 0.10, output: 0.40 } 
+  },
+  'gemini-2.0-flash-lite': { 
+    contextWindow: 1048576, 
+    pricing: { input: 0.05, output: 0.20 } // Most cost-efficient
+  },
+  'gemini-2.0-flash-lite-001': { 
+    contextWindow: 1048576, 
+    pricing: { input: 0.05, output: 0.20 } 
+  },
+  'gemini-2.0-flash-exp': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.00, output: 0.00 } // Free experimental
+  },
+  'gemini-2.0-flash-thinking-exp-1219': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.00, output: 0.00 } // Free experimental
+  },
+  'gemini-2.0-flash-thinking-exp-01-21': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.00, output: 0.00 } // Free experimental
+  },
+  
+  // Gemini 1.5 Series
+  'gemini-1.5-pro': { 
+    contextWindow: 2000000, 
+    pricing: { input: 1.25, output: 5.00 } 
+  },
+  'gemini-1.5-pro-001': { 
+    contextWindow: 2000000, 
+    pricing: { input: 1.25, output: 5.00 } 
+  },
+  'gemini-1.5-pro-002': { 
+    contextWindow: 2000000, 
+    pricing: { input: 1.25, output: 5.00 } 
+  },
+  'gemini-1.5-flash': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.075, output: 0.30 } 
+  },
+  'gemini-1.5-flash-001': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.075, output: 0.30 } 
+  },
+  'gemini-1.5-flash-002': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.075, output: 0.30 } 
+  },
+  'gemini-1.5-flash-8b': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.05, output: 0.20 } // 8B model is cheaper
+  },
+  'gemini-1.5-flash-8b-001': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.05, output: 0.20 } 
+  },
+  'gemini-1.5-flash-001-tuning': { 
+    contextWindow: 16384, 
+    pricing: { input: 0.00, output: 0.00 } // Free for tuning
+  },
+  
+  // Gemini 1.0 Series
+  'gemini-pro': { 
+    contextWindow: 32760, 
+    pricing: { input: 0.50, output: 1.50 } 
+  },
+  'gemini-pro-vision': { 
+    contextWindow: 32760, 
+    pricing: { input: 0.50, output: 1.50 } 
+  },
+  'gemini-1.0-pro': { 
+    contextWindow: 32760, 
+    pricing: { input: 0.50, output: 1.50 } 
+  },
+  'gemini-1.0-pro-vision-latest': { 
+    contextWindow: 12288, 
+    pricing: { input: 0.50, output: 1.50 } 
+  }
+};
+
 const http = require('http');
 const https = require('https');
 const url = require('url');
@@ -16,93 +361,33 @@ console.log('='.repeat(60));
 const CONFIG_DIR = path.join(os.homedir(), '.config');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'llm-proxy-config.json');
 
-// Default configuration template
-// Model context window sizes
-const MODEL_CONTEXT_WINDOWS = {
-  // OpenAI
-  'gpt-4o': 128000,
-  'gpt-4o-mini': 128000,
-  'gpt-4-turbo': 128000,
-  'gpt-4-turbo-preview': 128000,
-  'gpt-4': 8192,
-  'gpt-3.5-turbo': 16384,
-  'gpt-3.5-turbo-16k': 16384,
-  
-  // Anthropic
-  'claude-opus-4-20250514': 200000,
-  'claude-sonnet-4-20250514': 200000,
-  'claude-3-7-sonnet-20250219': 200000,
-  'claude-3-5-haiku-20241022': 200000,
-  'claude-3-5-sonnet-20241022': 200000,
-  'claude-3-5-sonnet-20240620': 200000,
-  'claude-3-opus-20240229': 200000,
-  'claude-3-sonnet-20240229': 200000,
-  'claude-3-haiku-20240307': 200000,
-  
-  // Google
-  'gemini-2.0-flash-exp': 1000000,
-  'gemini-2.0-flash-thinking-exp-1219': 1000000,
-  'gemini-2.0-flash-thinking-exp-01-21': 1000000,
-  'gemini-1.5-pro': 2000000,
-  'gemini-1.5-pro-002': 2000000,
-  'gemini-1.5-flash': 1000000,
-  'gemini-1.5-flash-002': 1000000,
-  'gemini-1.5-flash-8b': 1000000,
-  'gemini-pro': 32760,
-  'gemini-pro-vision': 32760
-};
-
-// Model pricing per million tokens (MTok)
-// For Anthropic models: input, cacheWrite, cacheRead, output
-// For OpenAI models: input, cacheRead, output
-// For others: input, output
-const MODEL_PRICING = {
-  // OpenAI
-  'gpt-4o': { input: 2.00, cacheRead: 0.50, output: 8.00 },
-  'gpt-4o-mini': { input: 0.40, cacheRead: 0.10, output: 1.60 },
-  'gpt-4-turbo': { input: 10.00, output: 30.00 },
-  'gpt-4-turbo-preview': { input: 10.00, output: 30.00 },
-  'gpt-4': { input: 30.00, output: 60.00 },
-  'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
-  'gpt-3.5-turbo-16k': { input: 3.00, output: 4.00 },
-  
-  // Anthropic - Claude Opus 4
-  'claude-opus-4-20250514': { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 },
-  
-  // Anthropic - Claude Sonnet 4
-  'claude-sonnet-4-20250514': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
-  
-  // Anthropic - Claude Sonnet 3.7
-  'claude-3-7-sonnet-20250219': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
-  
-  // Anthropic - Claude Haiku 3.5
-  'claude-3-5-haiku-20241022': { input: 0.80, cacheWrite: 1.00, cacheRead: 0.08, output: 4.00 },
-  
-  // Anthropic - Claude Sonnet 3.5
-  'claude-3-5-sonnet-20241022': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
-  'claude-3-5-sonnet-20240620': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
-  
-  // Anthropic - Claude Opus 3
-  'claude-3-opus-20240229': { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 },
-  
-  // Anthropic - Claude Sonnet 3
-  'claude-3-sonnet-20240229': { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 },
-  
-  // Anthropic - Claude Haiku 3
-  'claude-3-haiku-20240307': { input: 0.25, cacheWrite: 0.30, cacheRead: 0.03, output: 1.25 },
-  
-  // Google Gemini
-  'gemini-2.0-flash-exp': { input: 0.00, output: 0.00 }, // Free experimental
-  'gemini-2.0-flash-thinking-exp-1219': { input: 0.00, output: 0.00 }, // Free experimental  
-  'gemini-2.0-flash-thinking-exp-01-21': { input: 0.00, output: 0.00 }, // Free experimental
-  'gemini-1.5-pro': { input: 1.25, output: 5.00 },
-  'gemini-1.5-pro-002': { input: 1.25, output: 5.00 },
-  'gemini-1.5-flash': { input: 0.075, output: 0.30 },
-  'gemini-1.5-flash-002': { input: 0.075, output: 0.30 },
-  'gemini-1.5-flash-8b': { input: 0.05, output: 0.20 }, // 8B model is cheaper
-  'gemini-pro': { input: 0.50, output: 1.50 },
-  'gemini-pro-vision': { input: 0.50, output: 1.50 }
-};
+// Helper function to generate models list from MODEL_DEFINITIONS
+function generateModelsForProvider(provider) {
+  const models = [];
+  Object.entries(MODEL_DEFINITIONS).forEach(([modelId, definition]) => {
+    // Filter models by provider based on model ID patterns
+    if (provider === 'openai' && (modelId.startsWith('gpt') || modelId.startsWith('davinci') || modelId === 'gpt-image-1')) {
+      models.push({
+        id: modelId,
+        contextWindow: definition.contextWindow,
+        pricing: definition.pricing
+      });
+    } else if (provider === 'anthropic' && modelId.startsWith('claude')) {
+      models.push({
+        id: modelId,
+        contextWindow: definition.contextWindow,
+        pricing: definition.pricing
+      });
+    } else if (provider === 'google' && modelId.startsWith('gemini')) {
+      models.push({
+        id: modelId,
+        contextWindow: definition.contextWindow,
+        pricing: definition.pricing
+      });
+    }
+  });
+  return models;
+}
 
 const DEFAULT_CONFIG = {
   port: 8081,
@@ -110,44 +395,15 @@ const DEFAULT_CONFIG = {
   providers: {
     openai: {
       apiKey: '',
-      models: [
-        { id: 'gpt-4o', contextWindow: 128000, pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } },
-        { id: 'gpt-4o-mini', contextWindow: 128000, pricing: { input: 0.40, cacheRead: 0.10, output: 1.60 } },
-        { id: 'gpt-4-turbo', contextWindow: 128000, pricing: { input: 10.00, output: 30.00 } },
-        { id: 'gpt-4-turbo-preview', contextWindow: 128000, pricing: { input: 10.00, output: 30.00 } },
-        { id: 'gpt-4', contextWindow: 8192, pricing: { input: 30.00, output: 60.00 } },
-        { id: 'gpt-3.5-turbo', contextWindow: 16384, pricing: { input: 0.50, output: 1.50 } },
-        { id: 'gpt-3.5-turbo-16k', contextWindow: 16384, pricing: { input: 3.00, output: 4.00 } }
-      ]
+      models: generateModelsForProvider('openai').slice(0, 7) // Include a subset for initial config
     },
     anthropic: {
       apiKey: '',
-      models: [
-        { id: 'claude-opus-4-20250514', contextWindow: 200000, pricing: { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 } },
-        { id: 'claude-sonnet-4-20250514', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
-        { id: 'claude-3-7-sonnet-20250219', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
-        { id: 'claude-3-5-haiku-20241022', contextWindow: 200000, pricing: { input: 0.80, cacheWrite: 1.00, cacheRead: 0.08, output: 4.00 } },
-        { id: 'claude-3-5-sonnet-20241022', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
-        { id: 'claude-3-5-sonnet-20240620', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
-        { id: 'claude-3-opus-20240229', contextWindow: 200000, pricing: { input: 15.00, cacheWrite: 18.75, cacheRead: 1.50, output: 75.00 } },
-        { id: 'claude-3-sonnet-20240229', contextWindow: 200000, pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } },
-        { id: 'claude-3-haiku-20240307', contextWindow: 200000, pricing: { input: 0.25, cacheWrite: 0.30, cacheRead: 0.03, output: 1.25 } }
-      ]
+      models: generateModelsForProvider('anthropic')
     },
     google: {
       apiKey: '',
-      models: [
-        { id: 'gemini-2.0-flash-exp', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
-        { id: 'gemini-2.0-flash-thinking-exp-1219', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
-        { id: 'gemini-2.0-flash-thinking-exp-01-21', contextWindow: 1000000, pricing: { input: 0.00, output: 0.00 } },
-        { id: 'gemini-1.5-pro', contextWindow: 2000000, pricing: { input: 1.25, output: 5.00 } },
-        { id: 'gemini-1.5-pro-002', contextWindow: 2000000, pricing: { input: 1.25, output: 5.00 } },
-        { id: 'gemini-1.5-flash', contextWindow: 1000000, pricing: { input: 0.075, output: 0.30 } },
-        { id: 'gemini-1.5-flash-002', contextWindow: 1000000, pricing: { input: 0.075, output: 0.30 } },
-        { id: 'gemini-1.5-flash-8b', contextWindow: 1000000, pricing: { input: 0.05, output: 0.20 } },
-        { id: 'gemini-pro', contextWindow: 32760, pricing: { input: 0.50, output: 1.50 } },
-        { id: 'gemini-pro-vision', contextWindow: 32760, pricing: { input: 0.50, output: 1.50 } }
-      ]
+      models: generateModelsForProvider('google').slice(0, 10) // Include a subset for initial config
     }
   }
 };
@@ -255,6 +511,148 @@ const config = loadConfig();
 const PROXY_PORT = config.port || 8081;
 const ALLOWED_ORIGINS = config.allowedOrigins || '*';
 
+// Fetch available models from provider APIs
+async function fetchAvailableModels(provider, apiKey) {
+  if (!apiKey) return null;
+  
+  console.log(`   🔍 Fetching available models from ${provider}...`);
+  
+  try {
+    switch (provider) {
+      case 'openai': {
+        const options = {
+          hostname: 'api.openai.com',
+          port: 443,
+          path: '/v1/models',
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        };
+        
+        return new Promise((resolve, reject) => {
+          const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              if (res.statusCode !== 200) {
+                console.log(`   ⚠️  Failed to fetch models from ${provider}: ${res.statusCode}`);
+                resolve(null);
+                return;
+              }
+              
+              try {
+                const response = JSON.parse(data);
+                const models = response.data
+                  .filter(model => {
+                    // Filter for chat/completion models
+                    return model.id.includes('gpt') || 
+                           model.id.includes('davinci') ||
+                           model.id.includes('turbo');
+                  })
+                  .map(model => ({
+                    id: model.id,
+                    contextWindow: MODEL_DEFINITIONS[model.id]?.contextWindow || 4096,
+                    pricing: MODEL_DEFINITIONS[model.id]?.pricing || null
+                  }));
+                
+                console.log(`   ✅ Found ${models.length} available models from ${provider}`);
+                resolve(models);
+              } catch (e) {
+                console.log(`   ⚠️  Error parsing response from ${provider}: ${e.message}`);
+                resolve(null);
+              }
+            });
+          });
+          
+          req.on('error', (e) => {
+            console.log(`   ⚠️  Error fetching models from ${provider}: ${e.message}`);
+            resolve(null);
+          });
+          
+          req.end();
+        });
+      }
+      
+      case 'anthropic': {
+        // Anthropic doesn't have a models endpoint, return null
+        console.log(`   ℹ️  ${provider} doesn't provide a models endpoint`);
+        return null;
+      }
+      
+      case 'google': {
+        // Google Gemini models endpoint
+        const targetUrl = new URL('https://generativelanguage.googleapis.com/v1/models');
+        targetUrl.searchParams.append('key', apiKey);
+        
+        const options = {
+          hostname: targetUrl.hostname,
+          port: 443,
+          path: targetUrl.pathname + targetUrl.search,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        };
+        
+        return new Promise((resolve, reject) => {
+          const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              if (res.statusCode !== 200) {
+                console.log(`   ⚠️  Failed to fetch models from ${provider}: ${res.statusCode}`);
+                resolve(null);
+                return;
+              }
+              
+              try {
+                const response = JSON.parse(data);
+                const models = response.models
+                  .filter(model => {
+                    // Filter for generative models
+                    return model.supportedGenerationMethods && 
+                           model.supportedGenerationMethods.includes('generateContent');
+                  })
+                  .map(model => {
+                    const modelId = model.name.replace('models/', '');
+                    return {
+                      id: modelId,
+                      contextWindow: MODEL_DEFINITIONS[modelId]?.contextWindow || 
+                                     (model.inputTokenLimit || 4096),
+                      pricing: MODEL_DEFINITIONS[modelId]?.pricing || null
+                    };
+                  });
+                
+                console.log(`   ✅ Found ${models.length} available models from ${provider}`);
+                resolve(models);
+              } catch (e) {
+                console.log(`   ⚠️  Error parsing response from ${provider}: ${e.message}`);
+                resolve(null);
+              }
+            });
+          });
+          
+          req.on('error', (e) => {
+            console.log(`   ⚠️  Error fetching models from ${provider}: ${e.message}`);
+            resolve(null);
+          });
+          
+          req.end();
+        });
+      }
+      
+      default:
+        console.log(`   ℹ️  Unknown provider ${provider}, skipping model fetch`);
+        return null;
+    }
+  } catch (error) {
+    console.log(`   ⚠️  Error fetching models from ${provider}: ${error.message}`);
+    return null;
+  }
+}
+
 // MIME types for static file serving
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -309,9 +707,12 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('\n📚 Usage:');
   console.log('   node llm-proxy.js [options]');
   console.log('\n🎯 Options:');
-  console.log('   --help, -h        Show this help message');
-  console.log('   --update-config   Update the configuration file with latest model definitions');
-  console.log('                     while preserving your API keys and custom settings');
+  console.log('   --help, -h                   Show this help message');
+  console.log('   --show-models                Display all configured models with their pricing information');
+  console.log('   --update-config              Update the configuration file with latest model definitions');
+  console.log('                                while preserving your API keys and custom settings');
+  console.log('   --sync                       When used with --update-config, sync configuration with');
+  console.log('                                MODEL_DEFINITIONS from code (optionally filtered by API availability)');
   console.log('\n📖 Description:');
   console.log('   This server provides:');
   console.log('   • A proxy for LLM API calls (OpenAI, Anthropic, Google)');
@@ -325,99 +726,302 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   process.exit(0);
 }
 
+if (process.argv.includes('--show-models')) {
+  console.log('\n📊 Configured Models and Pricing Information');
+  console.log('='.repeat(120));
+  
+  Object.entries(config.providers).forEach(([provider, providerConfig]) => {
+    if (!providerConfig.apiKey) return;
+    
+    console.log(`\n🏢 ${provider.toUpperCase()}`);
+    console.log('-'.repeat(120));
+    
+    if (!providerConfig.models || providerConfig.models.length === 0) {
+      console.log('   No models configured');
+      return;
+    }
+    
+    // Create a map of all models from MODEL_DEFINITIONS for this provider
+    const codeModels = new Set();
+    Object.keys(MODEL_DEFINITIONS).forEach(modelId => {
+      if ((provider === 'openai' && (modelId.startsWith('gpt') || modelId.startsWith('davinci') || modelId === 'gpt-image-1')) ||
+          (provider === 'anthropic' && modelId.startsWith('claude')) ||
+          (provider === 'google' && modelId.startsWith('gemini'))) {
+        codeModels.add(modelId);
+      }
+    });
+    
+    // Table header
+    console.log('   Model ID'.padEnd(45) + 
+                'Status'.padEnd(15) +
+                'Context Window'.padEnd(15) +
+                'Input $/MTok'.padEnd(13) +
+                'Output $/MTok'.padEnd(14) +
+                'Cache Read'.padEnd(12) +
+                'Cache Write');
+    console.log('   ' + '-'.repeat(114));
+    
+    providerConfig.models.forEach(model => {
+      const modelId = typeof model === 'string' ? model : model.id;
+      const configDef = typeof model === 'object' ? model : null;
+      const codeDef = MODEL_DEFINITIONS[modelId];
+      
+      // Determine status
+      let status = '';
+      if (!codeDef) {
+        status = 'not in code';
+      } else if (configDef) {
+        // Compare config with code
+        const configCtx = configDef.contextWindow;
+        const codeCtx = codeDef.contextWindow;
+        const configPricing = configDef.pricing;
+        const codePricing = codeDef.pricing;
+        
+        let ctxSame = configCtx === codeCtx;
+        let pricingSame = true;
+        
+        if (configPricing && codePricing) {
+          pricingSame = configPricing.input === codePricing.input &&
+                        configPricing.output === codePricing.output &&
+                        configPricing.cacheRead === codePricing.cacheRead &&
+                        configPricing.cacheWrite === codePricing.cacheWrite;
+        } else if (configPricing !== codePricing) {
+          pricingSame = false;
+        }
+        
+        if (ctxSame && pricingSame) {
+          status = 'same';
+        } else {
+          status = 'different';
+        }
+      } else {
+        status = 'not in config';
+      }
+      
+      // Remove from codeModels set as we've seen it
+      codeModels.delete(modelId);
+      
+      const contextWindow = configDef?.contextWindow || codeDef?.contextWindow || 'Unknown';
+      const pricing = configDef?.pricing || codeDef?.pricing;
+        
+      let pricingStr = '';
+      if (pricing) {
+        const input = pricing.input !== undefined ? '$' + pricing.input.toFixed(2) : 'N/A';
+        const output = pricing.output !== undefined ? '$' + pricing.output.toFixed(2) : 'N/A';
+        const cacheRead = pricing.cacheRead !== undefined ? '$' + pricing.cacheRead.toFixed(2) : '-';
+        const cacheWrite = pricing.cacheWrite !== undefined ? '$' + pricing.cacheWrite.toFixed(2) : '-';
+        
+        pricingStr = input.padEnd(13) + output.padEnd(14) + cacheRead.padEnd(12) + cacheWrite;
+      } else {
+        pricingStr = 'No pricing data available';
+      }
+      
+      console.log('   ' + modelId.padEnd(45) + 
+                  status.padEnd(15) +
+                  contextWindow.toString().padEnd(15) +
+                  pricingStr);
+    });
+    
+    // Show models that are in code but not in config
+    codeModels.forEach(modelId => {
+      const codeDef = MODEL_DEFINITIONS[modelId];
+      const status = 'not in config';
+      
+      let pricingStr = '';
+      if (codeDef.pricing) {
+        const input = codeDef.pricing.input !== undefined ? '$' + codeDef.pricing.input.toFixed(2) : 'N/A';
+        const output = codeDef.pricing.output !== undefined ? '$' + codeDef.pricing.output.toFixed(2) : 'N/A';
+        const cacheRead = codeDef.pricing.cacheRead !== undefined ? '$' + codeDef.pricing.cacheRead.toFixed(2) : '-';
+        const cacheWrite = codeDef.pricing.cacheWrite !== undefined ? '$' + codeDef.pricing.cacheWrite.toFixed(2) : '-';
+        
+        pricingStr = input.padEnd(13) + output.padEnd(14) + cacheRead.padEnd(12) + cacheWrite;
+      } else {
+        pricingStr = 'No pricing data available';
+      }
+      
+      console.log('   ' + modelId.padEnd(45) + 
+                  status.padEnd(15) +
+                  codeDef.contextWindow.toString().padEnd(15) +
+                  pricingStr);
+    });
+  });
+  
+  console.log('\n' + '='.repeat(120));
+  console.log('\n💡 Notes:');
+  console.log('   • Prices are per million tokens (MTok)');
+  console.log('   • Cache Read: Discounted rate for cached content (OpenAI/Anthropic)');
+  console.log('   • Cache Write: Additional cost for creating cache (Anthropic only, 25% surcharge)');
+  console.log('   • Status column meanings:');
+  console.log('     - "same": Configuration matches code defaults');
+  console.log('     - "different": Configuration differs from code defaults (context window or pricing)');
+  console.log('     - "not in code": Model exists in config but not in code definitions');
+  console.log('     - "not in config": Model exists in code but not in configuration\n');
+  
+  process.exit(0);
+}
+
 if (process.argv.includes('--update-config')) {
   console.log('\n🔄 Configuration Update Mode');
   console.log('   This will update your configuration file with the latest model definitions');
   console.log('   while preserving your API keys and custom settings.\n');
   
-  try {
-    // Read existing config to preserve API keys
-    let existingConfig = {};
-    if (fs.existsSync(CONFIG_FILE)) {
-      const configContent = fs.readFileSync(CONFIG_FILE, 'utf8');
-      existingConfig = JSON.parse(configContent);
-    }
-    
-    // Create new config with updated model lists and context windows
-    const updatedConfig = {
-      ...DEFAULT_CONFIG,
-      providers: {}
-    };
-    
-    // Merge providers, preserving API keys and custom models
-    Object.entries(DEFAULT_CONFIG.providers).forEach(([provider, defaultProviderConfig]) => {
-      const existingProvider = existingConfig.providers?.[provider];
+  const syncModels = process.argv.includes('--sync');
+  if (syncModels) {
+    console.log('   🔄 Will sync configuration with MODEL_DEFINITIONS from code\n');
+  }
+  
+  (async () => {
+    try {
+      // Read existing config to preserve API keys
+      let existingConfig = {};
+      if (fs.existsSync(CONFIG_FILE)) {
+        const configContent = fs.readFileSync(CONFIG_FILE, 'utf8');
+        existingConfig = JSON.parse(configContent);
+      }
       
-      // Create a map of default models for easy lookup
-      const defaultModelsMap = new Map();
-      defaultProviderConfig.models.forEach(model => {
-        const id = typeof model === 'string' ? model : model.id;
-        defaultModelsMap.set(id, model);
-      });
+      // Create new config with updated model lists and context windows
+      const updatedConfig = {
+        ...DEFAULT_CONFIG,
+        providers: {}
+      };
       
-      // Create merged models list
-      const mergedModels = [...defaultProviderConfig.models];
+      // Merge providers, preserving API keys and using full MODEL_DEFINITIONS
+      for (const [provider, defaultProviderConfig] of Object.entries(DEFAULT_CONFIG.providers)) {
+        const existingProvider = existingConfig.providers?.[provider];
+        
+        // Get ALL models from MODEL_DEFINITIONS for this provider
+        const allProviderModels = generateModelsForProvider(provider);
+        
+        // Create a map of all models from MODEL_DEFINITIONS
+        const modelDefsMap = new Map();
+        allProviderModels.forEach(model => {
+          modelDefsMap.set(model.id, model);
+        });
+        
+        let mergedModels;
+        
+        if (syncModels) {
+          // When syncing, use exactly what's in MODEL_DEFINITIONS
+          mergedModels = [...allProviderModels];
+          console.log(`   ✅ Syncing ${provider} with ${mergedModels.length} models from MODEL_DEFINITIONS`);
+        } else {
+          // Normal update: preserve custom models
+          mergedModels = [...allProviderModels];
+          
+          // Add any custom models from existing config that aren't in MODEL_DEFINITIONS
+          if (existingProvider?.models) {
+            existingProvider.models.forEach(existingModel => {
+              const id = typeof existingModel === 'string' ? existingModel : existingModel.id;
+              if (!modelDefsMap.has(id)) {
+                // This is a custom model not in our definitions, preserve it
+                mergedModels.push(existingModel);
+                console.log(`   ⚠️  Preserving custom model not in code: ${id}`);
+              }
+            });
+          }
+        }
+        
+        // If sync is requested and we have an API key, optionally filter by availability
+        if (syncModels && existingProvider?.apiKey && process.argv.includes('--check-availability')) {
+          const availableModels = await fetchAvailableModels(provider, existingProvider.apiKey);
+          
+          if (availableModels) {
+            // Create a set of available model IDs for faster lookup
+            const availableModelIds = new Set(availableModels.map(m => m.id));
+            
+            // Filter merged models to only include available ones
+            const beforeCount = mergedModels.length;
+            const filteredModels = [];
+            
+            mergedModels.forEach(model => {
+              const id = typeof model === 'string' ? model : model.id;
+              if (availableModelIds.has(id)) {
+                // Model is available, keep it with data from MODEL_DEFINITIONS
+                if (modelDefsMap.has(id)) {
+                  filteredModels.push(modelDefsMap.get(id));
+                } else {
+                  filteredModels.push(model);
+                }
+              }
+            });
+            
+            mergedModels = filteredModels;
+            
+            const removedCount = beforeCount - mergedModels.length;
+            if (removedCount > 0) {
+              console.log(`   🗑️  Removed ${removedCount} unavailable models from ${provider}`);
+            }
+            
+            // Also add any new models from the API that aren't in our MODEL_DEFINITIONS
+            availableModels.forEach(apiModel => {
+              if (!mergedModels.find(m => (typeof m === 'string' ? m : m.id) === apiModel.id)) {
+                // Check if we have this model in MODEL_DEFINITIONS
+                if (modelDefsMap.has(apiModel.id)) {
+                  mergedModels.push(modelDefsMap.get(apiModel.id));
+                  console.log(`   ✅ Added model from API with code defaults: ${apiModel.id}`);
+                } else {
+                  mergedModels.push(apiModel);
+                  console.log(`   ➕ Added new model from API (not in code): ${apiModel.id}`);
+                }
+              }
+            });
+          }
+        }
+        
+        updatedConfig.providers[provider] = {
+          ...defaultProviderConfig,
+          // Preserve existing API key if available
+          apiKey: existingProvider?.apiKey || '',
+          // Use merged models list
+          models: mergedModels
+        };
+      }
       
-      // Add any custom models from existing config that aren't in defaults
-      if (existingProvider?.models) {
-        existingProvider.models.forEach(existingModel => {
-          const id = typeof existingModel === 'string' ? existingModel : existingModel.id;
-          if (!defaultModelsMap.has(id)) {
-            // This is a custom model, preserve it
-            mergedModels.push(existingModel);
+      // Also preserve any custom providers not in defaults
+      if (existingConfig.providers) {
+        Object.entries(existingConfig.providers).forEach(([provider, providerConfig]) => {
+          if (!updatedConfig.providers[provider]) {
+            updatedConfig.providers[provider] = providerConfig;
           }
         });
       }
       
-      updatedConfig.providers[provider] = {
-        ...defaultProviderConfig,
-        // Preserve existing API key if available
-        apiKey: existingProvider?.apiKey || '',
-        // Use merged models list
-        models: mergedModels
-      };
-    });
-    
-    // Also preserve any custom providers not in defaults
-    if (existingConfig.providers) {
-      Object.entries(existingConfig.providers).forEach(([provider, providerConfig]) => {
-        if (!updatedConfig.providers[provider]) {
-          updatedConfig.providers[provider] = providerConfig;
-        }
+      // Preserve any custom settings
+      if (existingConfig.port) updatedConfig.port = existingConfig.port;
+      if (existingConfig.allowedOrigins) updatedConfig.allowedOrigins = existingConfig.allowedOrigins;
+      
+      // Write updated config
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedConfig, null, 2));
+      
+      console.log('   ✅ Configuration updated successfully!');
+      console.log('\n📊 Update Summary:');
+      console.log('   • API keys: Preserved');
+      console.log('   • Custom models: Preserved');
+      console.log('   • Latest model definitions: Added');
+      console.log('   • Context window sizes: Updated');
+      console.log('   • Pricing information: Added/Updated');
+      
+      if (syncModels) {
+        console.log('   • Synced with MODEL_DEFINITIONS from code');
+      }
+      
+      // Count total models
+      let totalModels = 0;
+      Object.values(updatedConfig.providers).forEach(provider => {
+        if (provider.models) totalModels += provider.models.length;
       });
+      console.log(`   • Total models available: ${totalModels}`);
+      
+      console.log('\n✨ Your configuration is now up to date!');
+      console.log('   You can start the server normally to use the new models.\n');
+      
+      process.exit(0);
+    } catch (error) {
+      console.error('\n❌ Error updating configuration:', error.message);
+      console.error('   Please check that your configuration file is valid JSON');
+      process.exit(1);
     }
-    
-    // Preserve any custom settings
-    if (existingConfig.port) updatedConfig.port = existingConfig.port;
-    if (existingConfig.allowedOrigins) updatedConfig.allowedOrigins = existingConfig.allowedOrigins;
-    
-    // Write updated config
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedConfig, null, 2));
-    
-    console.log('   ✅ Configuration updated successfully!');
-    console.log('\n📊 Update Summary:');
-    console.log('   • API keys: Preserved');
-    console.log('   • Custom models: Preserved');
-    console.log('   • Latest model definitions: Added');
-    console.log('   • Context window sizes: Updated');
-    console.log('   • Pricing information: Added/Updated');
-    
-    // Count total models
-    let totalModels = 0;
-    Object.values(updatedConfig.providers).forEach(provider => {
-      if (provider.models) totalModels += provider.models.length;
-    });
-    console.log(`   • Total models available: ${totalModels}`);
-    
-    console.log('\n✨ Your configuration is now up to date!');
-    console.log('   You can start the server normally to use the new models.\n');
-    
-    process.exit(0);
-  } catch (error) {
-    console.error('\n❌ Error updating configuration:', error.message);
-    console.error('   Please check that your configuration file is valid JSON');
-    process.exit(1);
-  }
+  })();
 }
 
 // Create proxy server
@@ -465,10 +1069,10 @@ const server = http.createServer(async (req, res) => {
               id: modelId,
               contextWindow: (typeof model === 'object' && model.contextWindow) 
                 ? model.contextWindow 
-                : MODEL_CONTEXT_WINDOWS[modelId] || 4096,
+                : MODEL_DEFINITIONS[modelId]?.contextWindow || 4096,
               pricing: (typeof model === 'object' && model.pricing) 
                 ? model.pricing 
-                : MODEL_PRICING[modelId] || null
+                : MODEL_DEFINITIONS[modelId]?.pricing || null
             };
           }).filter(Boolean)
         };
