@@ -2762,34 +2762,207 @@ body {
     padding: 4px 2px;
 }
 
-/* Responsive behavior */
-@media (max-width: 1200px) {
+/* Responsive behavior for metrics dashboard */
+@media (max-width: 1400px) {
+    .chat-controls {
+        max-width: 70%;
+    }
+    
     .metrics-dashboard {
         gap: 16px;
     }
     
     .context-window-section {
-        max-width: 300px;
+        max-width: 280px;
+        min-width: 160px;
     }
     
     .context-window-bar {
+        min-width: 120px;
+        height: 28px;
+    }
+    
+    .context-window-stats {
+        font-size: 12px;
+    }
+    
+    .token-counters-values {
+        font-size: 14px;
+    }
+    
+    .token-value-item {
+        width: 75px;
+    }
+    
+    .token-header-item {
+        width: 75px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .chat-controls {
+        max-width: 75%;
+        gap: 12px;
+    }
+    
+    .metrics-dashboard {
+        gap: 12px;
+    }
+    
+    .context-window-section {
+        max-width: 240px;
         min-width: 140px;
+    }
+    
+    .context-window-bar {
+        min-width: 100px;
+        height: 24px;
+    }
+    
+    .context-window-label {
+        font-size: 8px;
+    }
+    
+    .token-counters-headers {
+        font-size: 8px;
+    }
+    
+    .token-counters-values {
+        font-size: 13px;
+    }
+    
+    .token-value-item {
+        width: 70px;
+        font-size: 12px;
+    }
+    
+    .token-header-item {
+        width: 70px;
+    }
+    
+    .token-header-primary,
+    .token-value-primary {
+        width: 50px;
     }
 }
 
 @media (max-width: 1000px) {
-    .metrics-dashboard {
+    .chat-info {
         flex-direction: column;
+        align-items: flex-start;
         gap: 12px;
-        align-items: stretch;
+    }
+    
+    .chat-controls {
+        max-width: 100%;
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .metrics-dashboard {
+        width: 100%;
+        gap: 10px;
     }
     
     .context-window-section {
+        max-width: 200px;
+        min-width: 120px;
+    }
+    
+    /* Hide token labels on smaller screens */
+    .token-counters-headers {
+        display: none;
+    }
+    
+    .token-value-primary {
+        display: none;
+    }
+    
+    .token-counters-values {
+        font-size: 12px;
+    }
+    
+    .token-value-item {
+        width: 65px;
+        padding: 2px;
+    }
+}
+
+@media (max-width: 768px) {
+    .chat-header {
+        padding: 6px 12px;
+    }
+    
+    .metrics-dashboard {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .context-window-section {
+        width: 100%;
         max-width: none;
+        order: 2; /* Move below token counters */
     }
     
     .token-counters-section {
-        align-self: center;
+        order: 1;
+        align-self: flex-start;
+    }
+    
+    .context-window-bar {
+        min-width: 100%;
+        height: 20px;
+    }
+    
+    .context-window-stats {
+        font-size: 11px;
+    }
+    
+    .token-value-item {
+        width: 60px;
+        font-size: 11px;
+    }
+    
+    /* Reduce border width on small screens */
+    .token-value-item {
+        border-left-width: 0;
+    }
+    
+    .token-value-item:first-child {
+        border-left-width: 1px;
+    }
+}
+
+@media (max-width: 600px) {
+    /* Ultra compact mode for very small screens */
+    .chat-title {
+        font-size: 14px;
+    }
+    
+    .chat-meta {
+        font-size: 11px;
+    }
+    
+    .metrics-dashboard {
+        gap: 6px;
+    }
+    
+    /* Show only essential token info */
+    .token-value-item:nth-child(2),
+    .token-value-item:nth-child(3) {
+        display: none; /* Hide cache tokens on very small screens */
+    }
+    
+    .context-window-label {
+        display: none; /* Hide label to save space */
+    }
+    
+    .context-window-bar {
+        height: 16px;
+    }
+    
+    .context-window-stats {
+        font-size: 10px;
     }
 }
 
