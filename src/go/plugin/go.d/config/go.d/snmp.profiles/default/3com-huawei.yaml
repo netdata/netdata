@@ -26,12 +26,12 @@ metrics:
       - name: memory.total
         OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.2
         description: Total memory size
-        family: Memory
+        family: Memory/Total
         unit: "By"
       - name: memory.free
         OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.3
         description: Free memory size
-        family: Memory
+        family: Memory/Free
         unit: "By"
     metric_tags:
       - index: 1
