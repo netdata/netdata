@@ -307,20 +307,10 @@ jobs:
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
       - name: Build
-        if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.run == 'true' # Don’t use retries on PRs.
+        if: needs.file-check.outputs.run == 'true'
         run: |
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
           .github/scripts/build-static.sh ${{ matrix.arch }}
-      - name: Build
-        if: github.event_name == 'workflow_dispatch' && needs.file-check.outputs.run == 'true'
-        id: build
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 150
-          max_attempts: 2
-          command: |
-            [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
-            .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
