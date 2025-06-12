@@ -1541,7 +1541,7 @@ helps users understand your analysis methodology and builds confidence in your c
                     <span class="log-source">[${entry.source}]</span>
                     <span class="log-direction ${directionClass}">${directionSymbol}</span>
                 </div>
-                <button class="btn-copy-log" title="Copy to clipboard" data-entry-id="${entryId}"><i class="fas fa-clipboard"></i></button>
+                <button class="btn-copy-log" data-tooltip="Copy to clipboard" data-entry-id="${entryId}"><i class="fas fa-clipboard"></i></button>
             </div>
             ${metadataHtml}
             <div class="log-message" id="${entryId}">${this.formatLogMessage(entry.message)}</div>
@@ -1763,6 +1763,10 @@ helps users understand your analysis methodology and builds confidence in your c
                     if (chatData && chatData.id) {
                         // Ensure no chat is marked as active on load
                         chatData.isActive = false;
+                        // Clean up empty draft messages
+                        if (chatData.draftMessage === '' || (chatData.draftMessage && chatData.draftMessage.trim().length === 0)) {
+                            chatData.draftMessage = null;
+                        }
                         this.validateAndAddChat(chatData);
                     }
                 } catch (e) {
@@ -1831,6 +1835,19 @@ helps users understand your analysis methodology and builds confidence in your c
         // Ensure currentAssistantGroup exists for loaded chats
         if (!Object.prototype.hasOwnProperty.call(chat, 'currentAssistantGroup')) {
             chat.currentAssistantGroup = null;
+        }
+        
+        // Ensure pendingToolCalls is a Map (it gets serialized as {} in localStorage)
+        if (!chat.pendingToolCalls || !(chat.pendingToolCalls instanceof Map)) {
+            chat.pendingToolCalls = new Map();
+        }
+        
+        // Check if the chat was saved while waiting for a response (broken state)
+        if (chat.waitingForLLM || chat.waitingForMCP) {
+            chat.wasWaitingOnLoad = true;
+            // Clear the waiting states since we're not actually waiting anymore
+            chat.waitingForLLM = false;
+            chat.waitingForMCP = false;
         }
         
         this.chats.set(chat.id, chat);
@@ -2478,12 +2495,20 @@ helps users understand your analysis methodology and builds confidence in your c
         
         // Input field
         elements.input.addEventListener('input', (e) => {
-            // Save draft
+            // Save draft in memory only - don't update UI or save to storage on every keystroke
             chat.draftMessage = e.target.value;
-            this.autoSave(chatId);
             
             // Update send button state
             elements.sendBtn.disabled = !e.target.value.trim();
+            
+            // Debounce saving to storage - save after 2 seconds of no typing
+            if (this.draftSaveTimeout) {
+                clearTimeout(this.draftSaveTimeout);
+            }
+            this.draftSaveTimeout = setTimeout(() => {
+                this.autoSave(chatId);
+                // Still don't update UI here - just save to storage
+            }, 2000);
         });
         
         // Enter to send
@@ -2834,7 +2859,9 @@ All date/time interpretations must be based on the current date/time context pro
                 currentStepInTurn: 1 // Track current step in turn
             },
             // Per-chat assistant group tracking (DOM element for grouping messages)
-            currentAssistantGroup: null
+            currentAssistantGroup: null,
+            // Per-chat pending tool calls map
+            pendingToolCalls: new Map()
         };
         
         this.chats.set(chatId, chat);
@@ -2902,15 +2929,69 @@ All date/time interpretations must be based on the current date/time context pro
                 return new Date(b.updatedAt) - new Date(a.updatedAt);
             });
         
-        for (const chat of sortedChats) {
-            const sessionDiv = document.createElement('div');
-            sessionDiv.className = `chat-session-item ${chat.id === this.getActiveChatId() ? 'active' : ''} ${chat.isSaved === false ? 'unsaved' : ''}`;
-            sessionDiv.dataset.chatId = chat.id;
+        // Separate new/unsaved chats from saved chats
+        const newChats = sortedChats.filter(chat => chat.isSaved === false);
+        const savedChats = sortedChats.filter(chat => chat.isSaved !== false);
+        
+        // Create sticky container for new chats if any exist
+        if (newChats.length > 0) {
+            const stickyContainer = document.createElement('div');
+            stickyContainer.className = 'new-chats-sticky';
             
-            // Add processing state indicator
-            if (chat.isProcessing) {
-                sessionDiv.setAttribute('data-state', 'processing');
+            for (const chat of newChats) {
+                const sessionDiv = this.createChatSessionElement(chat);
+                stickyContainer.appendChild(sessionDiv);
             }
+            
+            this.chatSessions.appendChild(stickyContainer);
+        }
+        
+        // Add saved chats
+        for (const chat of savedChats) {
+            const sessionDiv = this.createChatSessionElement(chat);
+            this.chatSessions.appendChild(sessionDiv);
+        }
+    }
+    
+    createChatSessionElement(chat) {
+        const sessionDiv = document.createElement('div');
+        sessionDiv.className = `chat-session-item ${chat.id === this.getActiveChatId() ? 'active' : ''} ${chat.isSaved === false ? 'unsaved' : ''}`;
+        sessionDiv.dataset.chatId = chat.id;
+        
+            // Determine status
+            let statusIcon = '';
+            let statusClass = '';
+            if (chat.wasWaitingOnLoad) {
+                // Chat was saved while waiting for a response - broken state
+                statusIcon = '<i class="fas fa-chain-broken"></i>';
+                statusClass = 'status-broken';
+            } else if (chat.isProcessing) {
+                // Check if waiting for LLM or MCP
+                if (chat.waitingForLLM) {
+                    statusIcon = '<i class="fas fa-robot"></i>';
+                    statusClass = 'status-llm-active';
+                } else if (chat.waitingForMCP) {
+                    statusIcon = '<i class="fas fa-plug"></i>';
+                    statusClass = 'status-mcp-active';
+                } else {
+                    // Generic processing
+                    statusIcon = '<i class="fas fa-spinner fa-spin"></i>';
+                    statusClass = 'status-processing';
+                }
+            } else if (chat.hasError) {
+                statusIcon = '<i class="fas fa-exclamation-triangle"></i>';
+                statusClass = 'status-error';
+            } else if (chat.messages && chat.messages.length > 1) {
+                statusIcon = '<i class="fas fa-check-circle"></i>';
+                statusClass = 'status-ready';
+            } else {
+                statusIcon = '<i class="fas fa-pause-circle"></i>';
+                statusClass = 'status-idle';
+            }
+            
+            // Check for draft message - must have actual content
+            const hasDraft = chat.draftMessage && chat.draftMessage.trim().length > 0;
+            
             
             // Get model display name
             let modelDisplay = 'No model';
@@ -2918,46 +2999,114 @@ All date/time interpretations must be based on the current date/time context pro
                 // Extract model name from format "provider:model-name"
                 const parts = chat.model.split(':');
                 modelDisplay = parts.length > 1 ? parts[1] : chat.model;
+                // Shorten long model names
+                if (modelDisplay.length > 25) {
+                    modelDisplay = modelDisplay.substring(0, 22) + '...';
+                }
             }
             
-            // Calculate context usage from token history
-            let contextInfo = '';
+            // Get MCP server display name
+            let mcpDisplay = 'No MCP server';
+            if (chat.mcpServerId && this.mcpServers.has(chat.mcpServerId)) {
+                const server = this.mcpServers.get(chat.mcpServerId);
+                mcpDisplay = server.name;
+                // Shorten long server names
+                if (mcpDisplay.length > 25) {
+                    mcpDisplay = mcpDisplay.substring(0, 22) + '...';
+                }
+            }
+            
+            // Calculate context usage and tokens
             const tokenHistory = this.getTokenUsageForChat(chat.id);
+            let contextPercent = 0;
             if (tokenHistory.totalTokens > 0 && chat.model) {
-                // Extract model name from format "provider:model-name" if needed
                 let modelName = chat.model;
                 if (modelName && modelName.includes(':')) {
                     modelName = modelName.split(':')[1];
                 }
                 const limit = this.modelLimits[modelName] || 4096;
-                const contextK = (tokenHistory.totalTokens / 1000).toFixed(1);
-                contextInfo = ` • ${contextK}k/${(limit/1000).toFixed(0)}k`;
+                contextPercent = Math.min(100, Math.round((tokenHistory.totalTokens / limit) * 100));
             }
+            
+            // Get cumulative tokens and price
+            const cumulative = this.getCumulativeTokenUsage(chat.id);
+            const totalTokens = cumulative.inputTokens + cumulative.outputTokens + 
+                               cumulative.cacheReadTokens + cumulative.cacheCreationTokens;
+            const totalPrice = this.calculateTokenCost(chat.id) || 0;
+            
+            // Format tokens
+            let tokenDisplay = '0';
+            if (totalTokens >= 1000000) {
+                tokenDisplay = `${(totalTokens / 1000000).toFixed(1)}M`;
+            } else if (totalTokens >= 1000) {
+                tokenDisplay = `${Math.round(totalTokens / 1000)}k`;
+            } else {
+                tokenDisplay = totalTokens.toString();
+            }
+            
+            // Format date and time
+            const updatedDate = new Date(chat.updatedAt);
+            const dateStr = updatedDate.toLocaleDateString();
+            const timeStr = updatedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             // Add indicator for unsaved chats
             const titlePrefix = chat.isSaved === false ? '• ' : '';
-            const titleSuffix = chat.isSaved === false ? ' (unsaved)' : '';
             
             sessionDiv.innerHTML = `
                 <div class="session-content" onclick="app.loadChat('${chat.id}')">
-                    <div class="session-title" title="${chat.title}${titleSuffix}">${titlePrefix}${chat.title}${titleSuffix}</div>
-                    <div class="session-meta">
-                        <span>${modelDisplay}${contextInfo}</span>
-                        <span>${new Date(chat.updatedAt).toLocaleDateString()}</span>
+                    <div class="session-row session-title-row">
+                        <span class="session-title" data-tooltip="${chat.title}">${titlePrefix}${chat.title}</span>
+                    </div>
+                    <div class="session-row session-model-row">
+                        <span class="session-model">${modelDisplay}</span>
+                        <span class="session-date">${dateStr}</span>
+                    </div>
+                    <div class="session-row session-mcp-row">
+                        <span class="session-mcp">${mcpDisplay}</span>
+                        <span class="session-time">${timeStr}</span>
+                    </div>
+                    <div class="session-row session-metrics-row">
+                        <div class="session-metrics">
+                            <span class="metric-context" data-tooltip="Context window usage">${contextPercent}%</span>
+                            <span class="metric-separator">•</span>
+                            <span class="metric-tokens" data-tooltip="Total tokens">${tokenDisplay}</span>
+                            <span class="metric-separator">•</span>
+                            <span class="metric-price" data-tooltip="Total cost">$${totalPrice.toFixed(4)}</span>
+                        </div>
+                        <div class="session-actions">
+                            ${hasDraft ? '<span class="status-icon status-draft" data-tooltip="Draft message"><i class="fas fa-edit"></i></span>' : ''}
+                            <span class="status-icon ${statusClass}" data-tooltip="Chat status">${statusIcon}</span>
+                            <button class="btn-delete-chat" data-chat-id="${chat.id}" data-tooltip="Delete chat" onclick="event.stopPropagation(); app.deleteChat('${chat.id}')">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <button class="btn-delete-chat" data-chat-id="${chat.id}" title="Delete chat">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
             `;
             
-            this.chatSessions.appendChild(sessionDiv);
-        }
+            return sessionDiv;
     }
 
     loadChat(chatId, forceRender = false) {
         const chat = this.chats.get(chatId);
         if (!chat) {return;}
+        
+        // Save draft and update UI for the previous active chat before switching
+        const previousChatId = this.getActiveChatId();
+        if (previousChatId && previousChatId !== chatId) {
+            const previousChat = this.chats.get(previousChatId);
+            if (previousChat) {
+                // Save the previous chat (including its draft)
+                this.autoSave(previousChatId);
+                // Update chat list to show/hide draft indicator for the previous chat
+                this.updateChatSessions();
+            }
+        }
+        
+        // Clean up empty draft messages from old chats
+        if (chat.draftMessage === '' || (chat.draftMessage && chat.draftMessage.trim().length === 0)) {
+            chat.draftMessage = null;
+        }
         
         // Reset global state when switching chats to prevent state leakage
         this.resetGlobalChatState();
@@ -3341,6 +3490,16 @@ All date/time interpretations must be based on the current date/time context pro
                     if (chatInput && !chatInput.disabled) {
                         chatInput.focus();
                     }
+                    
+                    // Restore draft message if exists
+                    if (chatInput && chat.draftMessage) {
+                        chatInput.value = chat.draftMessage;
+                        // Update send button state
+                        const sendBtn = container._elements.sendBtn;
+                        if (sendBtn) {
+                            sendBtn.disabled = !chat.draftMessage.trim();
+                        }
+                    }
                 });
             });
         }, 50); // Small delay to ensure DOM is fully ready
@@ -3697,6 +3856,13 @@ All date/time interpretations must be based on the current date/time context pro
                 
             case 'hide-spinner':
                 this.hideLoadingSpinner();
+                // Clear waiting states
+                const chatForSpinner = this.chats.get(chatId);
+                if (chatForSpinner) {
+                    chatForSpinner.waitingForLLM = false;
+                    chatForSpinner.waitingForMCP = false;
+                    this.updateChatSessions();
+                }
                 break;
                 
             case 'reset-assistant-group':
@@ -3812,6 +3978,10 @@ All date/time interpretations must be based on the current date/time context pro
         const chat = this.chats.get(chatId);
         if (!chat) {return;}
         
+        // Clear error state when sending new message
+        chat.hasError = false;
+        chat.lastError = null;
+        
         let mcpConnection;
         try {
             // Try to ensure MCP connection (will reconnect if needed)
@@ -3840,6 +4010,15 @@ All date/time interpretations must be based on the current date/time context pro
         
         // Clear any current assistant group since we're starting a new conversation turn
         this.clearCurrentAssistantGroup(chat.id);
+        
+        // Clear the draft since we're sending the message
+        chat.draftMessage = null;
+        // Clear any pending draft save timeout
+        if (this.draftSaveTimeout) {
+            clearTimeout(this.draftSaveTimeout);
+            this.draftSaveTimeout = null;
+        }
+        this.updateChatSessions(); // Update UI to remove draft indicator
         
         // Disable input and update button to Stop
         this.chatInput.value = '';
@@ -4360,6 +4539,11 @@ All date/time interpretations must be based on the current date/time context pro
                         // Show spinner while executing tool
                         this.processRenderEvent({ type: 'show-spinner', text: `Executing ${toolCall.name}...` }, chat.id);
                         
+                        // Set MCP waiting state
+                        chat.waitingForMCP = true;
+                        chat.waitingForLLM = false;
+                        this.updateChatSessions();
+                        
                         // Execute tool and track timing
                         const toolStartTime = Date.now();
                         // eslint-disable-next-line no-await-in-loop
@@ -4465,9 +4649,16 @@ All date/time interpretations must be based on the current date/time context pro
                     this.processRenderEvent({ type: 'show-spinner', text: 'Thinking...' }, chat.id);
                 }
             }
+        } catch (error) {
+            // Set error state
+            chat.hasError = true;
+            chat.lastError = error.message;
+            throw error;
         } finally {
             // Clear processing state when done
             chat.isProcessing = false;
+            chat.waitingForLLM = false;
+            chat.waitingForMCP = false;
             this.updateChatSessions(); // Update sidebar to remove activity indicator
         }
     }
@@ -4626,11 +4817,8 @@ All date/time interpretations must be based on the current date/time context pro
             
             if (!systemBlock || systemBlock.dataset.type !== blockType) {
                 // For title generation, add "Generating chat title..." message before the collapsible
-                if (isTitle && messagesContainer) {
-                    const generatingDiv = document.createElement('div');
-                    generatingDiv.className = 'message system';
-                    generatingDiv.innerHTML = '<i class="fas fa-edit"></i> Generating chat title...';
-                    messagesContainer.appendChild(generatingDiv);
+                if (isTitle) {
+                    this.addSystemMessage('Generating chat title...', chatId, 'fas fa-edit');
                 }
                 
                 // Create new system block
@@ -4844,10 +5032,15 @@ All date/time interpretations must be based on the current date/time context pro
         });
     }
 
-    addSystemMessage(content, chatId) {
+    addSystemMessage(content, chatId, icon = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message system';
-        messageDiv.textContent = content;
+        
+        if (icon) {
+            messageDiv.innerHTML = `<i class="${icon}"></i> ${content}`;
+        } else {
+            messageDiv.textContent = content;
+        }
         
         const container = this.getChatContainer(chatId);
         if (container && container._elements && container._elements.messages) {
@@ -5113,8 +5306,8 @@ All date/time interpretations must be based on the current date/time context pro
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'edit-actions-floating';
         buttonsDiv.innerHTML = `
-            <button class="btn btn-small btn-primary" title="Save & Restart Chat (Enter)"><i class="fas fa-check"></i></button>
-            <button class="btn btn-small btn-secondary" title="Cancel (Escape)"><i class="fas fa-times"></i></button>
+            <button class="btn btn-small btn-primary" data-tooltip="Save & Restart Chat (Enter)"><i class="fas fa-check"></i></button>
+            <button class="btn btn-small btn-secondary" data-tooltip="Cancel (Escape)"><i class="fas fa-times"></i></button>
         `;
         contentDiv.parentElement.appendChild(buttonsDiv);
         
@@ -5337,8 +5530,8 @@ All date/time interpretations must be based on the current date/time context pro
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'edit-actions-floating';
         buttonsDiv.innerHTML = `
-            <button class="btn btn-small btn-primary" title="Save & Resend (Enter)"><i class="fas fa-check"></i></button>
-            <button class="btn btn-small btn-secondary" title="Cancel (Escape)"><i class="fas fa-times"></i></button>
+            <button class="btn btn-small btn-primary" data-tooltip="Save & Resend (Enter)"><i class="fas fa-check"></i></button>
+            <button class="btn btn-small btn-secondary" data-tooltip="Cancel (Escape)"><i class="fas fa-times"></i></button>
         `;
         contentDiv.parentElement.appendChild(buttonsDiv);
         
@@ -5477,7 +5670,7 @@ All date/time interpretations must be based on the current date/time context pro
             <span class="tool-label"><i class="fas fa-wrench"></i> ${toolName}</span>
             <span class="tool-info">
                 <span class="tool-status"><i class="fas fa-hourglass-half"></i> Calling...</span>
-                <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
+                <label class="tool-include-label" data-tooltip="${labelTitle}" ${labelOpacity}>
                     <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
                     <span class="tool-include-toggle"></span>
                     <span class="tool-include-text">Include</span>
@@ -5494,7 +5687,7 @@ All date/time interpretations must be based on the current date/time context pro
         requestSection.innerHTML = `
             <div class="tool-section-controls">
                 <span class="tool-section-label">📤 REQUEST</span>
-                <button class="tool-section-copy" title="Copy request"><i class="fas fa-clipboard"></i></button>
+                <button class="tool-section-copy" data-tooltip="Copy request"><i class="fas fa-clipboard"></i></button>
             </div>
             <pre>${JSON.stringify(args, null, 2)}</pre>
         `;
@@ -5559,8 +5752,9 @@ All date/time interpretations must be based on the current date/time context pro
         targetContainer.appendChild(toolDiv);
         
         // Store reference for later update - use toolId as key for proper matching
-        this.pendingToolCalls = this.pendingToolCalls || new Map();
-        this.pendingToolCalls.set(toolId, { toolName, toolDiv });
+        if (chat && chat.pendingToolCalls) {
+            chat.pendingToolCalls.set(toolId, { toolName, toolDiv });
+        }
         
         // Only append to chat if we created a standalone container
         if (needsAppendToChat) {
@@ -5585,15 +5779,21 @@ All date/time interpretations must be based on the current date/time context pro
             return;
         }
         
-        // Find the pending tool call using toolCallId
+        // Find the pending tool call using toolCallId from the chat
+        const chat = this.chats.get(chatId);
+        if (!chat || !chat.pendingToolCalls) {
+            console.error(`addToolResult: Chat ${chatId} not found or has no pendingToolCalls`);
+            return;
+        }
+        
         let toolInfo = null;
         let toolDiv = null;
         
-        if (this.pendingToolCalls?.has(toolCallId)) {
-            toolInfo = this.pendingToolCalls.get(toolCallId);
+        if (chat.pendingToolCalls.has(toolCallId)) {
+            toolInfo = chat.pendingToolCalls.get(toolCallId);
             toolDiv = toolInfo.toolDiv;
         } else {
-            console.error(`addToolResult: No pending tool call found with ID ${toolCallId} for tool ${toolName}`);
+            console.error(`addToolResult: No pending tool call found with ID ${toolCallId} for tool ${toolName} in chat ${chatId}`);
             return;
         }
         
@@ -5644,7 +5844,7 @@ All date/time interpretations must be based on the current date/time context pro
                     <span class="tool-status">${result.error ? '<i class="fas fa-times-circle"></i> Error' : '<i class="fas fa-check-circle"></i> Complete'}</span>
                     <span class="tool-metric"><i class="fas fa-clock"></i> ${timeInfo}</span>
                     <span class="tool-metric"><i class="fas fa-box"></i> ${sizeInfo}</span>
-                    <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
+                    <label class="tool-include-label" data-tooltip="${labelTitle}" ${labelOpacity}>
                         <input type="checkbox" class="tool-include-checkbox" ${wasChecked || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
                         <span class="tool-include-toggle"></span>
                         <span class="tool-include-text">Include</span>
@@ -5690,7 +5890,7 @@ All date/time interpretations must be based on the current date/time context pro
                 responseSection.innerHTML = `
                     <div class="tool-section-controls">
                         <span class="tool-section-label">📥 RESPONSE</span>
-                        <button class="tool-section-copy" title="Copy response"><i class="fas fa-clipboard"></i></button>
+                        <button class="tool-section-copy" data-tooltip="Copy response"><i class="fas fa-clipboard"></i></button>
                     </div>
                     ${formattedResult}
                 `;
@@ -5713,8 +5913,8 @@ All date/time interpretations must be based on the current date/time context pro
             }
             
             // Remove from pending using the toolCallId
-            if (toolCallId) {
-                this.pendingToolCalls.delete(toolCallId);
+            if (toolCallId && chat.pendingToolCalls) {
+                chat.pendingToolCalls.delete(toolCallId);
             }
         }
         
@@ -5772,7 +5972,7 @@ All date/time interpretations must be based on the current date/time context pro
             <span class="tool-info">
                 <span class="tool-metric"><i class="fas fa-clock"></i> ${timeInfo}</span>
                 <span class="tool-metric"><i class="fas fa-box"></i> ${sizeInfo}</span>
-                <label class="tool-include-label" title="${labelTitle}" ${labelOpacity}>
+                <label class="tool-include-label" data-tooltip="${labelTitle}" ${labelOpacity}>
                     <input type="checkbox" class="tool-include-checkbox" ${includeInContext || isCachedMode ? 'checked' : ''} ${checkboxDisabled}>
                     <span class="tool-include-toggle"></span>
                     <span class="tool-include-text">Include</span>
@@ -5984,6 +6184,13 @@ All date/time interpretations must be based on the current date/time context pro
         if (!chatId) {
             console.error('showLoadingSpinner called without chatId');
             return;
+        }
+        
+        // Set chat state to waiting for LLM
+        const chat = this.chats.get(chatId);
+        if (chat) {
+            chat.waitingForLLM = true;
+            this.updateChatSessions();
         }
         
         // Remove any existing spinner first
@@ -7196,17 +7403,8 @@ Remember: This summary will be the ONLY context available when resuming the conv
             });
             
             // Display the system-title request as a collapsible node
+            // The "Generating chat title..." message will be shown automatically before the collapsible
             this.processRenderEvent({ type: 'system-title-message', content: titleRequest }, chat.id);
-            
-            // Also show the simple separator that appears during chat loading
-            const separatorDiv = document.createElement('div');
-            separatorDiv.className = 'message system';
-            separatorDiv.innerHTML = '<i class="fas fa-edit"></i> Generating chat title...';
-            // Use chat-specific messages container
-            const targetChatContainer = this.getChatContainer(chat.id);
-            if (targetChatContainer && targetChatContainer._elements && targetChatContainer._elements.messages) {
-                targetChatContainer._elements.messages.appendChild(separatorDiv);
-            }
             
             // Show loading spinner
             this.processRenderEvent({ type: 'show-spinner' }, chat.id);
@@ -7542,10 +7740,7 @@ Remember: This summary will be the ONLY context available when resuming the conv
             this.spinnerInterval = null;
         }
         
-        // Clear pending tool calls
-        if (this.pendingToolCalls) {
-            this.pendingToolCalls.clear();
-        }
+        // Note: pendingToolCalls are now per-chat, so they don't need global cleanup
         
         // Clear selection state
         this.userHasSelectedChat = false;

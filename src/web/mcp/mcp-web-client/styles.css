@@ -200,39 +200,261 @@ body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 3px;
+    padding: 0 3px 3px 3px; /* Remove top padding */
+    position: relative;
+    scrollbar-gutter: stable; /* Reserve space for scrollbar to prevent layout shift */
 }
 
-.chat-session-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 2px;
-    background: transparent;
-    border-radius: 4px;
-    transition: all 0.15s;
+/* Sticky container for new/unsaved chats */
+.new-chats-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--sidebar-bg);
+    padding-top: 3px;
+    padding-bottom: 0; /* Remove bottom padding */
+    margin-bottom: 0; /* Remove bottom margin */
+    margin-top: 0;
+}
+
+/* Add a blur/fade effect at the top of sticky section */
+.new-chats-sticky::before {
+    content: '';
+    position: absolute;
+    top: -30px; /* Extend above the container */
+    left: -10px;
+    right: -10px;
+    height: 50px; /* Taller to cover any gaps */
+    background: linear-gradient(to top, 
+        transparent 0%,
+        var(--sidebar-bg) 60%, 
+        var(--sidebar-bg) 100%);
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    mask-image: linear-gradient(to top, transparent 0%, black 100%);
+    -webkit-mask-image: linear-gradient(to top, transparent 0%, black 100%);
+}
+
+/* Add a subtle fade at the bottom too */
+.new-chats-sticky::after {
+    content: '';
+    position: absolute;
+    bottom: -20px; /* Move it further down */
+    left: -10px;
+    right: -10px;
+    height: 20px;
+    background: linear-gradient(to bottom, 
+        var(--sidebar-bg) 0%, 
+        transparent 100%);
+    pointer-events: none;
+}
+
+/* Subtle highlight for new chats in the sticky section */
+.new-chats-sticky .chat-session-item {
+    border-color: var(--border-color);
+    background: var(--surface-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Ensure the first chat in sticky section doesn't move */
+.new-chats-sticky .chat-session-item:first-child {
+    margin-top: 3px;
+}
+
+.new-chats-sticky .chat-session-item.unsaved .session-title {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Ensure tooltips work in chat sessions */
+.chat-session-item .session-metrics > span,
+.chat-session-item .session-actions > span,
+.chat-session-item .session-actions > button,
+.chat-session-item .session-title {
     position: relative;
 }
 
+/* Allow tooltips to show properly in sidebar */
+.chat-sidebar [data-tooltip] {
+    overflow: visible !important;
+}
+
+/* Increase z-index for sidebar tooltips to show above everything */
+.chat-sidebar [data-tooltip]::before,
+.chat-sidebar [data-tooltip]::after {
+    z-index: 10000000;
+}
+
+/* For the delete button tooltip specifically - shift it left to avoid clipping */
+.chat-sidebar .btn-delete-chat[data-tooltip]::before {
+    left: auto;
+    right: -10px;
+    transform: translateX(0) translateY(4px);
+}
+
+.chat-sidebar .btn-delete-chat[data-tooltip]:hover::before {
+    transform: translateX(0) translateY(0);
+}
+
+.chat-sidebar .btn-delete-chat[data-tooltip]::after {
+    left: auto;
+    right: 5px;
+    transform: translateX(0);
+}
+
+/* Make delete button solid when hovering to show tooltip */
+.chat-sidebar .btn-delete-chat[data-tooltip]:hover {
+    opacity: 1 !important;
+}
+
+.chat-session-item {
+    margin-bottom: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.15s;
+    position: relative;
+    overflow: visible; /* Allow tooltips to show */
+}
+
 .session-content {
-    flex: 1;
-    padding: 8px 12px;
+    padding: 12px;
     cursor: pointer;
 }
 
+.session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.session-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Row 1: Title */
+.session-title-row {
+    margin-bottom: 6px;
+}
+
+.session-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* Row 2 & 3: Model/Date and MCP/Time */
+.session-model-row,
+.session-mcp-row {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.session-model,
+.session-mcp {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60%;
+}
+
+.session-date,
+.session-time {
+    color: var(--text-tertiary);
+}
+
+/* Row 4: Metrics and Actions */
+.session-metrics-row {
+    margin-top: 6px;
+    font-size: 11px;
+}
+
+.session-metrics {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-secondary);
+}
+
+.metric-context,
+.metric-tokens,
+.metric-price {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+}
+
+.metric-context {
+    font-weight: 500;
+}
+
+.metric-separator {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+}
+
+.session-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Status Icons */
+.status-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+}
+
+.status-llm-active i,
+.status-mcp-active i {
+    color: #4CAF50;
+    animation: glow-pulse 1.5s ease-in-out infinite;
+    text-shadow: 0 0 4px #4CAF50;
+}
+
+.status-error i {
+    color: var(--danger-color);
+}
+
+.status-broken i {
+    color: var(--warning-color);
+    opacity: 0.8;
+}
+
+.status-ready i {
+    color: #4CAF50;
+}
+
+.status-idle i {
+    color: var(--text-tertiary);
+}
+
+.status-draft i {
+    color: var(--warning-color);
+}
+
+.status-processing i {
+    color: var(--primary-color);
+}
+
+/* Delete Button */
 .btn-delete-chat {
     background: transparent;
     border: none;
     font-size: 12px;
     cursor: pointer;
-    padding: 6px;
+    padding: 4px;
+    color: var(--text-tertiary);
     opacity: 0;
     transition: all 0.15s ease;
-    color: var(--text-secondary);
-    position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
 }
 
 .chat-session-item:hover .btn-delete-chat {
@@ -244,87 +466,56 @@ body {
     opacity: 1;
 }
 
+/* Hover State */
 .chat-session-item:hover {
+    border-color: var(--primary-color);
     background: var(--hover-color);
 }
 
+/* Active State */
 .chat-session-item.active {
     background: var(--primary-dim);
-    border-left: 3px solid var(--primary-color);
-    padding-left: 9px;
+    border-color: var(--primary-color);
+    border-left-width: 3px;
 }
 
-.chat-session-item.active .session-content {
-    padding-left: 9px;
-}
-
-.chat-session-item.active .session-meta {
-    color: rgba(255, 255, 255, 0.8);
-}
-
-:root[data-theme="dark"] .chat-session-item.active .session-meta {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-/* Unsaved chat styling */
-.chat-session-item.unsaved {
-    opacity: 0.8;
-    font-style: italic;
-}
-
+/* Unsaved State */
 .chat-session-item.unsaved .session-title {
     color: var(--warning-color);
 }
 
-.session-title {
-    font-weight: 500;
-    font-size: 13px;
-    margin-bottom: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    line-height: 1.4;
-}
-
-.session-meta {
-    font-size: 11px;
-    color: var(--text-tertiary);
-    display: flex;
-    justify-content: space-between;
-}
-
-/* Chat session activity indicators */
-.chat-session-item[data-state="processing"] {
-    position: relative;
-}
-
-.chat-session-item[data-state="processing"]::after {
-    content: '';
-    position: absolute;
-    right: 40px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 8px;
-    height: 8px;
-    background: #4CAF50;
-    border-radius: 50%;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
+/* Animation for status icons */
 @keyframes pulse {
     0% {
         opacity: 1;
-        transform: translateY(-50%) scale(1);
+        transform: scale(1);
     }
     50% {
         opacity: 0.6;
-        transform: translateY(-50%) scale(1.2);
+        transform: scale(1.1);
     }
     100% {
         opacity: 1;
-        transform: translateY(-50%) scale(1);
+        transform: scale(1);
+    }
+}
+
+/* Enhanced glow animation for active status icons */
+@keyframes glow-pulse {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px #4CAF50);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 6px #4CAF50) drop-shadow(0 0 4px #4CAF50);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px #4CAF50);
     }
 }
 
