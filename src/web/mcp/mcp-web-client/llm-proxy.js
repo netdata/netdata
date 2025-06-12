@@ -351,6 +351,7 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const zlib = require('zlib');
 
 // Display startup banner
 console.log('='.repeat(60));
@@ -468,29 +469,87 @@ function loadConfig() {
     console.log('   Loading configuration...');
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     
-    // Check if any API keys are configured
-    const configuredProviders = [];
-    let totalModels = 0;
+    // Validate all models in configuration
+    let hasValidModels = false;
+    const validationErrors = [];
     
     Object.entries(config.providers).forEach(([provider, settings]) => {
       if (settings.apiKey && settings.apiKey.length > 0) {
-        const modelCount = settings.models ? settings.models.length : 0;
-        configuredProviders.push(`${provider} (${modelCount} models)`);
-        totalModels += modelCount;
+        if (!settings.models || !Array.isArray(settings.models)) {
+          validationErrors.push(`${provider}: No models array defined`);
+          return;
+        }
+        
+        settings.models.forEach((model, index) => {
+          if (typeof model === 'string') {
+            validationErrors.push(`${provider} model[${index}]: String format not supported, must be object with id, contextWindow, and pricing`);
+            return;
+          }
+          
+          const modelId = model?.id || `index ${index}`;
+          const error = validateModelConfig(provider, model, modelId);
+          if (error) {
+            validationErrors.push(`${provider} model "${modelId}": ${error}`);
+          } else {
+            hasValidModels = true;
+          }
+        });
       }
     });
     
-    if (configuredProviders.length === 0) {
-      console.error('\n❌ Error: No API keys configured!');
-      console.error('\n📝 Please edit the configuration file and add at least one API key:');
+    if (validationErrors.length > 0) {
+      console.error('\n❌ Configuration validation errors:');
+      validationErrors.forEach(error => console.error(`   - ${error}`));
+      
+      if (!hasValidModels) {
+        console.error('\n❌ No valid models found in configuration!');
+        console.error('   Please fix the errors above and restart the server.');
+        process.exit(1);
+      } else {
+        console.error('\n⚠️  Some models have errors and will be unavailable.');
+      }
+    }
+    
+    // Check if any API keys are configured
+    const configuredProviders = [];
+    let totalValidModels = 0;
+    
+    Object.entries(config.providers).forEach(([provider, settings]) => {
+      if (settings.apiKey && settings.apiKey.length > 0) {
+        const validModels = (settings.models || []).filter((model, index) => {
+          if (typeof model === 'string') return false;
+          const modelId = model?.id || `index ${index}`;
+          return !validateModelConfig(provider, model, modelId);
+        });
+        
+        if (validModels.length > 0) {
+          configuredProviders.push(`${provider} (${validModels.length} valid models)`);
+          totalValidModels += validModels.length;
+        }
+      }
+    });
+    
+    if (configuredProviders.length === 0 || totalValidModels === 0) {
+      console.error('\n❌ Error: No valid models configured!');
+      console.error('\n📝 Please edit the configuration file and add valid models:');
       console.error(`   ${CONFIG_FILE}`);
-      console.error('\nExample configuration:');
+      console.error('\nExample model configuration:');
       console.error('```json');
       console.error('{');
       console.error('  "providers": {');
       console.error('    "openai": {');
       console.error('      "apiKey": "sk-YOUR-API-KEY-HERE",');
-      console.error('      "models": [...]');
+      console.error('      "models": [');
+      console.error('        {');
+      console.error('          "id": "gpt-4",');
+      console.error('          "contextWindow": 8192,');
+      console.error('          "pricing": {');
+      console.error('            "input": 30.0,');
+      console.error('            "output": 60.0,');
+      console.error('            "cacheRead": 30.0');
+      console.error('          }');
+      console.error('        }');
+      console.error('      ]');
       console.error('    }');
       console.error('  }');
       console.error('}');
@@ -500,7 +559,7 @@ function loadConfig() {
     
     console.log('   ✅ Configuration loaded successfully!');
     console.log(`   Configured providers: ${configuredProviders.join(', ')}`);
-    console.log(`   Total models available: ${totalModels}`);
+    console.log(`   Total valid models available: ${totalValidModels}`);
 
     return config;
   } catch (error) {
@@ -509,6 +568,82 @@ function loadConfig() {
     process.exit(1);
   }
 }
+
+// Validate model configuration
+function validateModelConfig(provider, model, modelId) {
+  // Check if model has required structure
+  if (typeof model !== 'object' || !model.id || !model.contextWindow || !model.pricing) {
+    return `Missing required fields (id, contextWindow, pricing)`;
+  }
+  
+  // Validate context window
+  if (typeof model.contextWindow !== 'number' || model.contextWindow <= 0) {
+    return `Invalid contextWindow: must be a positive number`;
+  }
+  
+  // Validate pricing structure
+  if (typeof model.pricing !== 'object') {
+    return `Invalid pricing: must be an object`;
+  }
+  
+  const pricing = model.pricing;
+  
+  // Check for required pricing fields based on provider
+  switch (provider.toLowerCase()) {
+    case 'google':
+      // Google requires only input and output
+      if (typeof pricing.input !== 'number' || pricing.input < 0) {
+        return `Invalid pricing.input: must be a number >= 0`;
+      }
+      if (typeof pricing.output !== 'number' || pricing.output < 0) {
+        return `Invalid pricing.output: must be a number >= 0`;
+      }
+      // Google should NOT have cache fields
+      if ('cacheRead' in pricing || 'cacheWrite' in pricing) {
+        return `Invalid pricing: Google models should not have cacheRead or cacheWrite`;
+      }
+      break;
+      
+    case 'openai':
+      // OpenAI requires input, output, and cacheRead
+      if (typeof pricing.input !== 'number' || pricing.input < 0) {
+        return `Invalid pricing.input: must be a number >= 0`;
+      }
+      if (typeof pricing.output !== 'number' || pricing.output < 0) {
+        return `Invalid pricing.output: must be a number >= 0`;
+      }
+      if (typeof pricing.cacheRead !== 'number' || pricing.cacheRead < 0) {
+        return `Invalid pricing.cacheRead: must be a number >= 0`;
+      }
+      // OpenAI should NOT have cacheWrite
+      if ('cacheWrite' in pricing) {
+        return `Invalid pricing: OpenAI models should not have cacheWrite`;
+      }
+      break;
+      
+    case 'anthropic':
+      // Anthropic requires all four pricing fields
+      if (typeof pricing.input !== 'number' || pricing.input < 0) {
+        return `Invalid pricing.input: must be a number >= 0`;
+      }
+      if (typeof pricing.output !== 'number' || pricing.output < 0) {
+        return `Invalid pricing.output: must be a number >= 0`;
+      }
+      if (typeof pricing.cacheRead !== 'number' || pricing.cacheRead < 0) {
+        return `Invalid pricing.cacheRead: must be a number >= 0`;
+      }
+      if (typeof pricing.cacheWrite !== 'number' || pricing.cacheWrite < 0) {
+        return `Invalid pricing.cacheWrite: must be a number >= 0`;
+      }
+      break;
+      
+    default:
+      return `Unknown provider: ${provider}`;
+  }
+  
+  return null; // Valid
+}
+
 
 // Load configuration
 const config = loadConfig();
@@ -1182,18 +1317,23 @@ const server = http.createServer(async (req, res) => {
       if (providerConfig.apiKey && providerConfig.apiKey.length > 0) {
         availableProviders[provider] = {
           models: (providerConfig.models || []).map(model => {
-            // Handle both string format (backward compatibility) and object format
-            const modelId = typeof model === 'string' ? model : model.id;
+            // Skip string format models - not supported
+            if (typeof model === 'string') return null;
+            
+            const modelId = model.id;
             if (!modelId) return null;
+            
+            // Validate model configuration
+            const validationError = validateModelConfig(provider, model, modelId);
+            if (validationError) {
+              console.log(`   ⚠️  Skipping invalid model ${modelId}: ${validationError}`);
+              return null;
+            }
             
             return {
               id: modelId,
-              contextWindow: (typeof model === 'object' && model.contextWindow) 
-                ? model.contextWindow 
-                : MODEL_DEFINITIONS[modelId]?.contextWindow || 4096,
-              pricing: (typeof model === 'object' && model.pricing) 
-                ? model.pricing 
-                : MODEL_DEFINITIONS[modelId]?.pricing || null
+              contextWindow: model.contextWindow,
+              pricing: model.pricing
             };
           }).filter(Boolean)
         };
@@ -1337,52 +1477,64 @@ const server = http.createServer(async (req, res) => {
       // Ignore JSON parse errors
     }
     
+    // For Google, extract model from URL path
+    if (provider.toLowerCase() === 'google' && !requestModel) {
+      // Path format: /v1beta/models/gemini-1.5-pro/generateContent
+      const pathMatch = apiPath.match(/\/models\/([^\/]+)\//);
+      if (pathMatch && pathMatch[1]) {
+        requestModel = pathMatch[1];
+        modelInfo = ` (model: ${requestModel})`;
+      }
+    }
+    
     // Get client IP
     const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    
+    // Get pricing for the model from configuration (the only source of truth)
+    let modelPricing = null;
+    let modelConfig = null;
+    const providerConfig = config.providers[provider.toLowerCase()];
+    if (providerConfig && providerConfig.models && requestModel) {
+      modelConfig = providerConfig.models.find(m => 
+        (typeof m === 'string' ? m : m.id) === requestModel
+      );
+      if (modelConfig && typeof modelConfig === 'object') {
+        modelPricing = modelConfig.pricing || null;
+        
+        // Validate the model configuration
+        const validationError = validateModelConfig(provider.toLowerCase(), modelConfig, requestModel);
+        if (validationError) {
+          console.error(`[${new Date().toISOString()}] ❌ Invalid model configuration for ${requestModel}: ${validationError}`);
+          res.writeHead(400, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': ALLOWED_ORIGINS
+          });
+          res.end(JSON.stringify({ 
+            error: `Model ${requestModel} has invalid configuration: ${validationError}. Please fix the configuration and restart the server.` 
+          }));
+          return;
+        }
+      }
+    }
+    
+    // Check if model exists in configuration
+    if (!modelConfig) {
+      console.error(`[${new Date().toISOString()}] ❌ Model ${requestModel} not found in configuration for ${provider}`);
+      res.writeHead(400, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': ALLOWED_ORIGINS
+      });
+      res.end(JSON.stringify({ 
+        error: `Model ${requestModel} is not configured for ${provider}. Available models must be defined in the configuration file.` 
+      }));
+      return;
+    }
     
     console.log(`[${new Date().toISOString()}] 🔄 Proxy ${req.method} to ${provider}: ${targetUrl.pathname}${modelInfo}`);
     
     // Track request start time
     const requestStartTime = Date.now();
     let responseCompleted = false;
-    
-    // Handle client disconnection
-    req.on('close', () => {
-      if (!responseCompleted) {
-        console.log(`[${new Date().toISOString()}] ⚠️  Client disconnected before response completed`);
-        
-        // Log incomplete request
-        const accountingEntry = {
-          timestamp: new Date().toISOString(),
-          clientIp: clientIp,
-          provider: provider,
-          model: requestModel,
-          endpoint: apiPath,
-          statusCode: -1, // -1 indicates client disconnect
-          duration: Date.now() - requestStartTime,
-          tokens: {
-            prompt: 0,
-            completion: 0,
-            cachedRead: 0,
-            cacheCreation: 0
-          },
-          unitPricing: MODEL_DEFINITIONS[requestModel]?.pricing || null,
-          costs: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0
-          },
-          totalCost: 0,
-          error: {
-            type: 'client_disconnect',
-            message: 'Client disconnected before response completed'
-          }
-        };
-        
-        writeAccountingEntry(accountingEntry);
-      }
-    });
     
     // Make the request to the LLM provider
     const proxyReq = protocol.request(options, (proxyRes) => {
@@ -1407,18 +1559,52 @@ const server = http.createServer(async (req, res) => {
 
       // Collect response data for accounting
       let responseBody = '';
+      let responseBuffer = Buffer.alloc(0);
       const isStreaming = requestData.stream === true;
+      const contentEncoding = proxyRes.headers['content-encoding'];
+      
+      // Debug log
+      if (isStreaming) {
+        console.log(`[${new Date().toISOString()}] 📡 Streaming response detected`);
+      }
+      if (contentEncoding) {
+        console.log(`[${new Date().toISOString()}] 🗜️  Response encoding: ${contentEncoding}`);
+      }
       
       // Handle streaming response
       proxyRes.on('data', (chunk) => {
         res.write(chunk);
-        // Capture response for accounting
-        responseBody += chunk.toString();
+        // Capture response for accounting - keep as buffer for compressed responses
+        responseBuffer = Buffer.concat([responseBuffer, chunk]);
       });
 
       proxyRes.on('end', () => {
         res.end();
         responseCompleted = true; // Mark response as completed
+        
+        // Decompress response if needed
+        if (contentEncoding && responseBuffer.length > 0) {
+          try {
+            if (contentEncoding === 'gzip') {
+              responseBody = zlib.gunzipSync(responseBuffer).toString('utf8');
+            } else if (contentEncoding === 'deflate') {
+              responseBody = zlib.inflateSync(responseBuffer).toString('utf8');
+            } else if (contentEncoding === 'br') {
+              responseBody = zlib.brotliDecompressSync(responseBuffer).toString('utf8');
+            } else {
+              // Unknown encoding, use raw buffer
+              responseBody = responseBuffer.toString('utf8');
+            }
+          } catch (decompressError) {
+            console.error(`❌ Failed to decompress response: ${decompressError.message}`);
+            responseBody = responseBuffer.toString('utf8');
+          }
+        } else {
+          responseBody = responseBuffer.toString('utf8');
+        }
+        
+        // Debug logging
+        console.log(`[${new Date().toISOString()}] 📊 Response complete - Raw size: ${responseBuffer.length} bytes, Decompressed size: ${Buffer.byteLength(responseBody, 'utf8')} bytes, Streaming: ${isStreaming}`);
         
         // Process accounting for all responses (including errors)
         try {
@@ -1430,6 +1616,8 @@ const server = http.createServer(async (req, res) => {
             if (isStreaming) {
               // For streaming responses, find the last data line with usage info
               const lines = responseBody.split('\n');
+              console.log(`   📡 Processing ${lines.length} streaming lines`);
+              
               for (let i = lines.length - 1; i >= 0; i--) {
                 const line = lines[i].trim();
                 if (line.startsWith('data: ')) {
@@ -1439,6 +1627,7 @@ const server = http.createServer(async (req, res) => {
                       const parsed = JSON.parse(data);
                       if (parsed.usage) {
                         finalResponse = parsed;
+                        console.log(`   ✅ Found usage in line ${i}: ${JSON.stringify(parsed.usage)}`);
                         break;
                       }
                     } catch (e) {
@@ -1447,16 +1636,34 @@ const server = http.createServer(async (req, res) => {
                   }
                 }
               }
+              
+              if (!finalResponse) {
+                console.log(`   ⚠️  No usage data found in streaming response`);
+              }
             } else {
               // Non-streaming response
-              finalResponse = JSON.parse(responseBody);
+              if (responseBody && responseBody.trim()) {
+                try {
+                  finalResponse = JSON.parse(responseBody);
+                  if (finalResponse && finalResponse.usage) {
+                    console.log(`   ✅ Found usage in non-streaming response: ${JSON.stringify(finalResponse.usage)}`);
+                  }
+                } catch (e) {
+                  console.error(`❌ Failed to parse non-streaming response: ${e.message}`);
+                  console.error(`   Response preview: ${responseBody.substring(0, 200)}...`);
+                }
+              } else {
+                console.log(`   ⚠️  Empty response body`);
+              }
             }
           } else {
             // Handle error responses
-            try {
-              errorResponse = JSON.parse(responseBody);
-            } catch (e) {
-              errorResponse = { error: responseBody || 'Unknown error' };
+            if (responseBody && responseBody.trim()) {
+              try {
+                errorResponse = JSON.parse(responseBody);
+              } catch (e) {
+                errorResponse = { error: responseBody || 'Unknown error' };
+              }
             }
           }
           
@@ -1468,9 +1675,12 @@ const server = http.createServer(async (req, res) => {
             cacheCreationTokens: 0
           };
           
-          // Get pricing for the model
-          const modelDef = MODEL_DEFINITIONS[requestModel];
-          const pricing = modelDef?.pricing || null;
+          // Use pricing that was already looked up
+          const pricing = modelPricing;
+          
+          if (!pricing && requestModel) {
+            console.log(`   ⚠️  No pricing found for model: ${requestModel}`);
+          }
           
           // Calculate costs
           const costs = calculateCosts(tokens, pricing);
@@ -1484,6 +1694,9 @@ const server = http.createServer(async (req, res) => {
             endpoint: apiPath,
             statusCode: proxyRes.statusCode,
             duration: Date.now() - requestStartTime,
+            requestBytes: Buffer.byteLength(body || '', 'utf8'),
+            responseBytes: responseBuffer.length,  // Raw response size (compressed)
+            decompressedBytes: Buffer.byteLength(responseBody || '', 'utf8'),  // Decompressed size
             tokens: {
               prompt: tokens.promptTokens,
               completion: tokens.completionTokens,
@@ -1522,6 +1735,11 @@ const server = http.createServer(async (req, res) => {
           }
         } catch (error) {
           console.error('❌ Accounting error:', error.message);
+          // Debug: log response body length and first 100 chars
+          console.error(`   Response body length: ${responseBody.length}`);
+          if (responseBody) {
+            console.error(`   First 100 chars: ${responseBody.substring(0, 100)}...`);
+          }
         }
       });
     });
@@ -1538,13 +1756,15 @@ const server = http.createServer(async (req, res) => {
         endpoint: apiPath,
         statusCode: 0, // 0 indicates network/connection failure
         duration: Date.now() - requestStartTime,
+        requestBytes: Buffer.byteLength(body || '', 'utf8'),
+        responseBytes: 0,
         tokens: {
           prompt: 0,
           completion: 0,
           cachedRead: 0,
           cacheCreation: 0
         },
-        unitPricing: MODEL_DEFINITIONS[requestModel]?.pricing || null,
+        unitPricing: modelPricing,
         costs: {
           input: 0,
           output: 0,
@@ -1561,6 +1781,8 @@ const server = http.createServer(async (req, res) => {
       
       writeAccountingEntry(accountingEntry);
       console.log(`[${new Date().toISOString()}] ⚠️  Network error logged to accounting for ${requestModel || 'unknown model'}`);
+      
+      responseCompleted = true; // Mark as completed to prevent duplicate logging
       
       res.writeHead(502, {
         'Content-Type': 'application/json',
