@@ -50,28 +50,19 @@ struct exchange_workload {
 struct exchange_queue {
     RRDSET *st_exchange_queue_active_mailbox;
     RRDSET *st_exchange_queue_external_active_remote_delivery;
-    RRDSET *st_exchange_queue_external_largest_delivery;
     RRDSET *st_exchange_queue_internal_active_remote_delivery;
-    RRDSET *st_exchange_queue_internal_largest_delivery;
-    RRDSET *st_exchange_queue_retry_mailbox;
     RRDSET *st_exchange_queue_unreachable;
     RRDSET *st_exchange_queue_poison;
 
     RRDDIM *rd_exchange_queue_active_mailbox;
     RRDDIM *rd_exchange_queue_external_active_remote_delivery;
-    RRDDIM *rd_exchange_queue_external_largest_delivery;
     RRDDIM *rd_exchange_queue_internal_active_remote_delivery;
-    RRDDIM *rd_exchange_queue_internal_largest_delivery;
-    RRDDIM *rd_exchange_queue_retry_mailbox;
     RRDDIM *rd_exchange_queue_unreachable;
     RRDDIM *rd_exchange_queue_poison;
 
     COUNTER_DATA exchangeTransportQueuesActiveMailboxDelivery;
     COUNTER_DATA exchangeTransportQueuesExternalActiveRemoteDelivery;
-    COUNTER_DATA exchangeTransportQueuesExternalLargestDelivery;
     COUNTER_DATA exchangeTransportQueuesInternalActiveRemoteDeliery;
-    COUNTER_DATA exchangeTransportQueuesInternalLargestDelivery;
-    COUNTER_DATA exchangeTransportQueuesRetryMailboxDelivery;
     COUNTER_DATA exchangeTransportQueuesUnreachable;
     COUNTER_DATA exchangeTransportQueuesPoison;
 };
@@ -119,11 +110,8 @@ static void exchange_queue_initialize_variables(struct exchange_queue *eq)
 {
     eq->exchangeTransportQueuesActiveMailboxDelivery.key = "Active Mailbox Delivery Queue Length";
     eq->exchangeTransportQueuesExternalActiveRemoteDelivery.key = "External Active Remote Delivery Queue Length";
-    eq->exchangeTransportQueuesExternalLargestDelivery.key = "External Largest Delivery Queue Length";
     eq->exchangeTransportQueuesInternalActiveRemoteDeliery.key = "Internal Active Remote Delivery Queue Length";
-    eq->exchangeTransportQueuesInternalLargestDelivery.key = "Internal Largest Delivery Queue Length";
     eq->exchangeTransportQueuesPoison.key = "Poison Queue Length";
-    eq->exchangeTransportQueuesRetryMailboxDelivery.key = "Retry Mailbox Delivery Queue Length";
     eq->exchangeTransportQueuesUnreachable.key = "Unreachable Queue Length";
 }
 
@@ -446,7 +434,7 @@ static void netdata_exchange_rpc_requests(COUNTER_DATA *value, int update_every)
             RRDSET_TYPE_LINE);
 
         rd_exchange_rpc_requests =
-            rrddim_add(st_exchange_rpc_requests, "processed", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_exchange_rpc_requests, "processed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st_exchange_rpc_requests, rd_exchange_rpc_requests, (collected_number)value->current.Data);
@@ -651,7 +639,7 @@ static void netdata_exchange_proxy_avg_cas_processing_latency(struct exchange_pr
             RRDSET_TYPE_LINE);
 
         ep->rd_exchange_http_proxy_avg_cas_processing_latency = rrddim_add(
-            ep->st_exchange_http_proxy_avg_cas_processing_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ep->st_exchange_http_proxy_avg_cas_processing_latency, "latency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(
             ep->st_exchange_http_proxy_avg_cas_processing_latency->rrdlabels, "http_proxy", proxy, RRDLABEL_SRC_AUTO);
@@ -1114,39 +1102,6 @@ static void netdata_exchange_queue_external_active_remote_delivery(struct exchan
     rrdset_done(eq->st_exchange_queue_external_active_remote_delivery);
 }
 
-static void netdata_exchange_queue_external_largest_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
-{
-    if (unlikely(!eq->st_exchange_queue_external_largest_delivery)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_external_largest_delivery", mailbox);
-
-        eq->st_exchange_queue_external_largest_delivery = rrdset_create_localhost(
-            "exchange",
-            id,
-            NULL,
-            "queue",
-            "exchange.transport_queues_external_largest_delivery",
-            "External Largest Delivery Queue length.",
-            "messages",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibExchange",
-            PRIO_EXCHANGE_QUEUE_EXTERNAL_LARGEST_DELIVERY,
-            update_every,
-            RRDSET_TYPE_LINE);
-
-        eq->rd_exchange_queue_external_largest_delivery =
-            rrddim_add(eq->st_exchange_queue_external_largest_delivery, "largest", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        rrdlabels_add(eq->st_exchange_queue_external_largest_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
-    }
-
-    rrddim_set_by_pointer(
-        eq->st_exchange_queue_external_largest_delivery,
-        eq->rd_exchange_queue_external_largest_delivery,
-        (collected_number)eq->exchangeTransportQueuesExternalLargestDelivery.current.Data);
-    rrdset_done(eq->st_exchange_queue_external_largest_delivery);
-}
-
 static void netdata_exchange_queue_internal_active_remote_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
 {
     if (unlikely(!eq->st_exchange_queue_internal_active_remote_delivery)) {
@@ -1178,72 +1133,6 @@ static void netdata_exchange_queue_internal_active_remote_delivery(struct exchan
             eq->rd_exchange_queue_internal_active_remote_delivery,
             (collected_number)eq->exchangeTransportQueuesInternalActiveRemoteDeliery.current.Data);
     rrdset_done(eq->st_exchange_queue_internal_active_remote_delivery);
-}
-
-static void netdata_exchange_queue_internal_largest_delivery(struct exchange_queue *eq, char *mailbox, int update_every)
-{
-    if (unlikely(!eq->st_exchange_queue_internal_largest_delivery)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_internal_largest_delivery", mailbox);
-
-        eq->st_exchange_queue_internal_largest_delivery = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "queue",
-                "exchange.transport_queues_internal_largest_delivery",
-                "Internal Largest Delivery Queue length.",
-                "messages",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_QUEUE_INTERNAL_LARGEST_DELIVERY,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-        eq->rd_exchange_queue_internal_largest_delivery =
-                rrddim_add(eq->st_exchange_queue_internal_largest_delivery, "largest", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        rrdlabels_add(eq->st_exchange_queue_internal_largest_delivery->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
-    }
-
-    rrddim_set_by_pointer(
-            eq->st_exchange_queue_internal_largest_delivery,
-            eq->rd_exchange_queue_internal_largest_delivery,
-            (collected_number)eq->exchangeTransportQueuesInternalLargestDelivery.current.Data);
-    rrdset_done(eq->st_exchange_queue_internal_largest_delivery);
-}
-
-static void netdata_exchange_queue_retry_mailbox(struct exchange_queue *eq, char *mailbox, int update_every)
-{
-    if (unlikely(!eq->st_exchange_queue_retry_mailbox)) {
-        char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "exchange_transport_queues_%s_retry_mailbox_delivery", mailbox);
-
-        eq->st_exchange_queue_retry_mailbox = rrdset_create_localhost(
-                "exchange",
-                id,
-                NULL,
-                "queue",
-                "exchange.transport_queues_retry_mailbox_delivery",
-                "Retry Mailbox Delivery Queue Length.",
-                "messages",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibExchange",
-                PRIO_EXCHANGE_QUEUE_RETRY_MAILBOX_DELIVERY,
-                update_every,
-                RRDSET_TYPE_LINE);
-
-        eq->rd_exchange_queue_retry_mailbox =
-                rrddim_add(eq->st_exchange_queue_retry_mailbox, "retry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        rrdlabels_add(eq->st_exchange_queue_retry_mailbox->rrdlabels, "mailbox", mailbox, RRDLABEL_SRC_AUTO);
-    }
-
-    rrddim_set_by_pointer(
-            eq->st_exchange_queue_retry_mailbox,
-            eq->rd_exchange_queue_retry_mailbox,
-            (collected_number)eq->exchangeTransportQueuesRetryMailboxDelivery.current.Data);
-    rrdset_done(eq->st_exchange_queue_retry_mailbox);
 }
 
 static void netdata_exchange_queue_unreachable(struct exchange_queue *eq, char *mailbox, int update_every)
@@ -1341,17 +1230,8 @@ static void netdata_exchange_queues(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesExternalActiveRemoteDelivery))
             netdata_exchange_queue_external_active_remote_delivery(eq, windows_shared_buffer, update_every);
 
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesExternalLargestDelivery))
-            netdata_exchange_queue_external_largest_delivery(eq, windows_shared_buffer, update_every);
-
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesInternalActiveRemoteDeliery))
             netdata_exchange_queue_internal_active_remote_delivery(eq, windows_shared_buffer, update_every);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesInternalLargestDelivery))
-            netdata_exchange_queue_internal_largest_delivery(eq, windows_shared_buffer, update_every);
-
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesRetryMailboxDelivery))
-            netdata_exchange_queue_retry_mailbox(eq, windows_shared_buffer, update_every);
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &eq->exchangeTransportQueuesUnreachable))
             netdata_exchange_queue_unreachable(eq, windows_shared_buffer, update_every);
