@@ -1,3 +1,20 @@
+# ASSISTANTS **MUST** FOLLOW THESE RULES
+
+1. This is a new application. No need for backward compatibility.
+2. When a task is concluded existing eslint configuration MUST show zero errors and zero warnings.
+3. When migrating/refactoring code, NEVER use fallbacks. Let the code fail so that we can identify and fix issues immediately.
+4. FAIL FAST strategy, not fallback silently.
+5. Do not keep code for future use. If you need to implement a feature later, do it then.
+6. Do not use any deprecated or legacy code. This is a new application, so everything should be up-to-date.
+7. Avoid default values to parameters. Always call functions with explicit parameters and if adding new parameters, ensure all uses are updated accordingly.
+8. Remove any unused code, including imports, variables, functions, etc. If you need to use it later, re-implement it.
+
+## WHEN COMMITING
+1. Commit with git add filename1 filename2 etc, to avoid committing unnecessary files.
+2. Always do a git diff before committing to ensure only intended changes are included.
+
+---
+
 # MCP Web Client - Chat History Implementation
 
 This document describes the chat history implementation and message handling logic in the MCP web client.

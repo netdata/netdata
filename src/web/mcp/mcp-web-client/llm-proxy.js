@@ -21,191 +21,191 @@ const MODEL_DEFINITIONS = {
   },
   'gpt-4o-2024-05-13': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
   },
   'gpt-4o-mini-2024-07-18': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   'gpt-4o-2024-08-06': { 
     contextWindow: 128000, 
-    pricing: { input: 2.50, output: 10.00 } 
+    pricing: { input: 2.50, cacheRead: 1.25, output: 10.00 } 
   },
   'gpt-4o-2024-11-20': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 20.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
   },
   'chatgpt-4o-latest': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
   },
   
   // GPT-4 Turbo Series
   'gpt-4-turbo': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
   },
   'gpt-4-turbo-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
   },
   'gpt-4-turbo-2024-04-09': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
   },
   'gpt-4-0125-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
   },
   'gpt-4-1106-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 10.00, output: 30.00 } 
+    pricing: { input: 10.00, cacheRead: 5.00, output: 30.00 } 
   },
   
   // GPT-4 Original
   'gpt-4': { 
     contextWindow: 8192, 
-    pricing: { input: 30.00, output: 60.00 } 
+    pricing: { input: 30.00, cacheRead: 15.00, output: 60.00 } 
   },
   'gpt-4-0613': { 
     contextWindow: 8192, 
-    pricing: { input: 30.00, output: 60.00 } 
+    pricing: { input: 30.00, cacheRead: 15.00, output: 60.00 } 
   },
   
   // GPT-4.5 Series (Being deprecated)
   'gpt-4.5-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 75.00, output: 150.00 } 
+    pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
   },
   'gpt-4.5-preview-2025-02-27': { 
     contextWindow: 128000, 
-    pricing: { input: 75.00, output: 150.00 } 
+    pricing: { input: 75.00, cacheRead: 37.50, output: 150.00 } 
   },
   
   // GPT-4.1 Series (New models with 1M context)
   'gpt-4.1': { 
     contextWindow: 1000000, 
-    pricing: { input: 7.50, output: 30.00 } 
+    pricing: { input: 7.50, cacheRead: 3.75, output: 30.00 } 
   },
   'gpt-4.1-2025-04-14': { 
     contextWindow: 1000000, 
-    pricing: { input: 7.50, output: 30.00 } 
+    pricing: { input: 7.50, cacheRead: 3.75, output: 30.00 } 
   },
   'gpt-4.1-mini': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.30, output: 1.20 } 
+    pricing: { input: 0.30, cacheRead: 0.15, output: 1.20 } 
   },
   'gpt-4.1-mini-2025-04-14': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.30, output: 1.20 } 
+    pricing: { input: 0.30, cacheRead: 0.15, output: 1.20 } 
   },
   'gpt-4.1-nano': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   'gpt-4.1-nano-2025-04-14': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   
   // GPT-3.5 Turbo Series
   'gpt-3.5-turbo': { 
     contextWindow: 16384, 
-    pricing: { input: 0.50, output: 1.50 } 
+    pricing: { input: 0.50, cacheRead: 0.25, output: 1.50 } 
   },
   'gpt-3.5-turbo-16k': { 
     contextWindow: 16384, 
-    pricing: { input: 3.00, output: 4.00 } 
+    pricing: { input: 3.00, cacheRead: 1.50, output: 4.00 } 
   },
   'gpt-3.5-turbo-0125': { 
     contextWindow: 16384, 
-    pricing: { input: 0.50, output: 1.50 } 
+    pricing: { input: 0.50, cacheRead: 0.25, output: 1.50 } 
   },
   'gpt-3.5-turbo-1106': { 
     contextWindow: 16384, 
-    pricing: { input: 1.00, output: 2.00 } 
+    pricing: { input: 1.00, cacheRead: 0.50, output: 2.00 } 
   },
   'gpt-3.5-turbo-instruct': { 
     contextWindow: 4096, 
-    pricing: { input: 1.50, output: 2.00 } 
+    pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
   },
   'gpt-3.5-turbo-instruct-0914': { 
     contextWindow: 4096, 
-    pricing: { input: 1.50, output: 2.00 } 
+    pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
   },
   
   // Audio Models
   'gpt-4o-audio-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 20.00 } // Text pricing, audio: $100/M input, $200/M output
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } // Text pricing, audio: $100/M input, $200/M output
   },
   'gpt-4o-audio-preview-2024-10-01': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 20.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
   },
   'gpt-4o-audio-preview-2024-12-17': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 20.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
   },
   'gpt-4o-mini-audio-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   'gpt-4o-mini-audio-preview-2024-12-17': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   
   // Realtime Models
   'gpt-4o-realtime-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 20.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
   },
   'gpt-4o-realtime-preview-2024-10-01': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 20.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
   },
   
   // Search Models
   'gpt-4o-search-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
   },
   'gpt-4o-search-preview-2025-03-11': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
   },
   'gpt-4o-mini-search-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   'gpt-4o-mini-search-preview-2025-03-11': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   
   // Specialized Models
   'gpt-4o-transcribe': { 
     contextWindow: 128000, 
-    pricing: { input: 0.006, output: 0.00 } // $0.006 per minute of audio
+    pricing: { input: 0.006, cacheRead: 0.003, output: 0.00 } // $0.006 per minute of audio
   },
   'gpt-4o-mini-transcribe': { 
     contextWindow: 128000, 
-    pricing: { input: 0.006, output: 0.00 } 
+    pricing: { input: 0.006, cacheRead: 0.003, output: 0.00 } 
   },
   'gpt-4o-mini-tts': { 
     contextWindow: 128000, 
-    pricing: { input: 15.00, output: 30.00 } 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 30.00 } 
   },
   
   // Legacy Models
   'davinci-002': { 
     contextWindow: 16384, 
-    pricing: { input: 2.00, output: 2.00 } 
+    pricing: { input: 2.00, cacheRead: 1.00, output: 2.00 } 
   },
   'gpt-image-1': { 
     contextWindow: 4096, 
-    pricing: { input: 2.00, output: 2.00 } 
+    pricing: { input: 2.00, cacheRead: 1.00, output: 2.00 } 
   },
   
   // ==================== ANTHROPIC MODELS ====================
