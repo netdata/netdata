@@ -357,6 +357,10 @@ console.log('='.repeat(60));
 console.log('LLM Proxy Server & MCP Web Client');
 console.log('='.repeat(60));
 
+// Accounting log file path
+const ACCOUNTING_DIR = '/var/log/llm-proxy';
+const ACCOUNTING_FILE = path.join(ACCOUNTING_DIR, `llm-accounting-${new Date().toISOString().split('T')[0]}.jsonl`);
+
 // Configuration file path in user's home directory
 const CONFIG_DIR = path.join(os.homedir(), '.config');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'llm-proxy-config.json');
@@ -510,6 +514,118 @@ function loadConfig() {
 const config = loadConfig();
 const PROXY_PORT = config.port || 8081;
 const ALLOWED_ORIGINS = config.allowedOrigins || '*';
+
+// Ensure accounting directory exists
+if (!fs.existsSync(ACCOUNTING_DIR)) {
+  try {
+    fs.mkdirSync(ACCOUNTING_DIR, { recursive: true });
+    console.log(`\n📊 Created accounting directory: ${ACCOUNTING_DIR}`);
+  } catch (error) {
+    console.error(`\n❌ Failed to create accounting directory: ${ACCOUNTING_DIR}`);
+    console.error(`   Error: ${error.message}`);
+    console.error(`   You may need to run with sudo or create the directory manually:`);
+    console.error(`   sudo mkdir -p ${ACCOUNTING_DIR} && sudo chown $USER ${ACCOUNTING_DIR}`);
+    process.exit(1);
+  }
+}
+
+// Function to write accounting entry
+function writeAccountingEntry(entry) {
+  try {
+    fs.appendFileSync(ACCOUNTING_FILE, JSON.stringify(entry) + '\n');
+  } catch (error) {
+    console.error('❌ Failed to write accounting entry:', error.message);
+    
+    // Try to write to stderr as a fallback
+    console.error('📊 ACCOUNTING_FALLBACK:', JSON.stringify(entry));
+    
+    // Optionally, try to write to a backup location
+    try {
+      const backupFile = path.join(os.tmpdir(), 'llm-accounting-backup.jsonl');
+      fs.appendFileSync(backupFile, JSON.stringify(entry) + '\n');
+      console.error(`   ✓ Written to backup file: ${backupFile}`);
+    } catch (backupError) {
+      console.error('   ✗ Backup write also failed:', backupError.message);
+    }
+  }
+}
+
+// Function to extract token usage from provider response
+function extractTokenUsage(provider, responseData) {
+  try {
+    switch (provider.toLowerCase()) {
+      case 'openai':
+        return {
+          promptTokens: responseData.usage?.prompt_tokens || 0,
+          completionTokens: responseData.usage?.completion_tokens || 0,
+          cachedTokens: responseData.usage?.prompt_tokens_details?.cached_tokens || 0,
+          // OpenAI doesn't report cache creation separately
+          cacheCreationTokens: 0
+        };
+      
+      case 'anthropic':
+        return {
+          promptTokens: responseData.usage?.input_tokens || 0,
+          completionTokens: responseData.usage?.output_tokens || 0,
+          cachedTokens: responseData.usage?.cache_read_input_tokens || 0,
+          cacheCreationTokens: responseData.usage?.cache_creation_input_tokens || 0
+        };
+      
+      case 'google':
+        // Google Gemini token reporting
+        return {
+          promptTokens: responseData.usageMetadata?.promptTokenCount || 0,
+          completionTokens: responseData.usageMetadata?.candidatesTokenCount || 0,
+          // Google doesn't have cache tokens
+          cachedTokens: 0,
+          cacheCreationTokens: 0
+        };
+      
+      default:
+        return {
+          promptTokens: 0,
+          completionTokens: 0,
+          cachedTokens: 0,
+          cacheCreationTokens: 0
+        };
+    }
+  } catch (error) {
+    console.error('❌ Failed to extract token usage:', error.message);
+    return {
+      promptTokens: 0,
+      completionTokens: 0,
+      cachedTokens: 0,
+      cacheCreationTokens: 0
+    };
+  }
+}
+
+// Function to calculate costs based on tokens and pricing
+function calculateCosts(tokens, pricing) {
+  if (!pricing) {
+    return {
+      inputCost: 0,
+      outputCost: 0,
+      cacheReadCost: 0,
+      cacheWriteCost: 0,
+      totalCost: 0
+    };
+  }
+  
+  // Costs = tokens * price per million / 1,000,000
+  const inputCost = (tokens.promptTokens * (pricing.input || 0)) / 1000000;
+  const outputCost = (tokens.completionTokens * (pricing.output || 0)) / 1000000;
+  const cacheReadCost = (tokens.cachedTokens * (pricing.cacheRead || pricing.input || 0)) / 1000000;
+  const cacheWriteCost = (tokens.cacheCreationTokens * (pricing.cacheWrite || pricing.input || 0)) / 1000000;
+  
+  return {
+    inputCost,
+    outputCost,
+    cacheReadCost,
+    cacheWriteCost,
+    totalCost: inputCost + outputCost + cacheReadCost + cacheWriteCost
+  };
+}
 
 // Fetch available models from provider APIs
 async function fetchAvailableModels(provider, apiKey) {
@@ -718,10 +834,15 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('   • A proxy for LLM API calls (OpenAI, Anthropic, Google)');
   console.log('   • A web interface for the MCP (Model Context Protocol) client');
   console.log('   • Automatic model discovery and context window information');
+  console.log('   • Cost accounting and usage tracking');
   console.log('\n🌐 Endpoints:');
   console.log('   • Web UI:      http://localhost:' + (config.port || 8081) + '/');
   console.log('   • Models API:  http://localhost:' + (config.port || 8081) + '/models');
   console.log('   • Proxy API:   http://localhost:' + (config.port || 8081) + '/proxy/<provider>/<path>');
+  console.log('\n📊 Accounting:');
+  console.log('   • Log files:   ' + ACCOUNTING_DIR);
+  console.log('   • Format:      JSON Lines (one JSON object per line)');
+  console.log('   • Rotation:    Daily (new file each day)');
   console.log('\n');
   process.exit(0);
 }
@@ -1202,18 +1323,66 @@ const server = http.createServer(async (req, res) => {
     // Choose http or https module
     const protocol = targetUrl.protocol === 'https:' ? https : http;
 
-    // Extract model from request body for better logging
+    // Extract model from request body for better logging and accounting
     let modelInfo = '';
+    let requestModel = '';
+    let requestData = {};
     try {
-      const bodyData = JSON.parse(body);
-      if (bodyData.model) {
-        modelInfo = ` (model: ${bodyData.model})`;
+      requestData = JSON.parse(body);
+      if (requestData.model) {
+        modelInfo = ` (model: ${requestData.model})`;
+        requestModel = requestData.model;
       }
     } catch (_e) {
       // Ignore JSON parse errors
     }
     
+    // Get client IP
+    const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    
     console.log(`[${new Date().toISOString()}] 🔄 Proxy ${req.method} to ${provider}: ${targetUrl.pathname}${modelInfo}`);
+    
+    // Track request start time
+    const requestStartTime = Date.now();
+    let responseCompleted = false;
+    
+    // Handle client disconnection
+    req.on('close', () => {
+      if (!responseCompleted) {
+        console.log(`[${new Date().toISOString()}] ⚠️  Client disconnected before response completed`);
+        
+        // Log incomplete request
+        const accountingEntry = {
+          timestamp: new Date().toISOString(),
+          clientIp: clientIp,
+          provider: provider,
+          model: requestModel,
+          endpoint: apiPath,
+          statusCode: -1, // -1 indicates client disconnect
+          duration: Date.now() - requestStartTime,
+          tokens: {
+            prompt: 0,
+            completion: 0,
+            cachedRead: 0,
+            cacheCreation: 0
+          },
+          unitPricing: MODEL_DEFINITIONS[requestModel]?.pricing || null,
+          costs: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0
+          },
+          totalCost: 0,
+          error: {
+            type: 'client_disconnect',
+            message: 'Client disconnected before response completed'
+          }
+        };
+        
+        writeAccountingEntry(accountingEntry);
+      }
+    });
     
     // Make the request to the LLM provider
     const proxyReq = protocol.request(options, (proxyRes) => {
@@ -1236,18 +1405,163 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(proxyRes.statusCode, responseHeaders);
 
+      // Collect response data for accounting
+      let responseBody = '';
+      const isStreaming = requestData.stream === true;
+      
       // Handle streaming response
       proxyRes.on('data', (chunk) => {
         res.write(chunk);
+        // Capture response for accounting
+        responseBody += chunk.toString();
       });
 
       proxyRes.on('end', () => {
         res.end();
+        responseCompleted = true; // Mark response as completed
+        
+        // Process accounting for all responses (including errors)
+        try {
+          let finalResponse = null;
+          let errorResponse = null;
+          
+          // Handle successful responses
+          if (proxyRes.statusCode >= 200 && proxyRes.statusCode < 300) {
+            if (isStreaming) {
+              // For streaming responses, find the last data line with usage info
+              const lines = responseBody.split('\n');
+              for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (line.startsWith('data: ')) {
+                  const data = line.substring(6);
+                  if (data !== '[DONE]') {
+                    try {
+                      const parsed = JSON.parse(data);
+                      if (parsed.usage) {
+                        finalResponse = parsed;
+                        break;
+                      }
+                    } catch (e) {
+                      // Continue searching
+                    }
+                  }
+                }
+              }
+            } else {
+              // Non-streaming response
+              finalResponse = JSON.parse(responseBody);
+            }
+          } else {
+            // Handle error responses
+            try {
+              errorResponse = JSON.parse(responseBody);
+            } catch (e) {
+              errorResponse = { error: responseBody || 'Unknown error' };
+            }
+          }
+          
+          // Extract token usage (may be present even in error responses)
+          const tokens = finalResponse ? extractTokenUsage(provider, finalResponse) : {
+            promptTokens: 0,
+            completionTokens: 0,
+            cachedTokens: 0,
+            cacheCreationTokens: 0
+          };
+          
+          // Get pricing for the model
+          const modelDef = MODEL_DEFINITIONS[requestModel];
+          const pricing = modelDef?.pricing || null;
+          
+          // Calculate costs
+          const costs = calculateCosts(tokens, pricing);
+          
+          // Create accounting entry
+          const accountingEntry = {
+            timestamp: new Date().toISOString(),
+            clientIp: clientIp,
+            provider: provider,
+            model: requestModel,
+            endpoint: apiPath,
+            statusCode: proxyRes.statusCode,
+            duration: Date.now() - requestStartTime,
+            tokens: {
+              prompt: tokens.promptTokens,
+              completion: tokens.completionTokens,
+              cachedRead: tokens.cachedTokens,
+              cacheCreation: tokens.cacheCreationTokens
+            },
+            unitPricing: pricing ? {
+              input: pricing.input || 0,
+              output: pricing.output || 0,
+              cacheRead: pricing.cacheRead || pricing.input || 0,
+              cacheWrite: pricing.cacheWrite || pricing.input || 0
+            } : null,
+            costs: {
+              input: costs.inputCost,
+              output: costs.outputCost,
+              cacheRead: costs.cacheReadCost,
+              cacheWrite: costs.cacheWriteCost
+            },
+            totalCost: costs.totalCost
+          };
+          
+          // Add error information if present
+          if (errorResponse) {
+            accountingEntry.error = errorResponse;
+          }
+          
+          // Write to accounting log
+          writeAccountingEntry(accountingEntry);
+          
+          // Log to console
+          if (costs.totalCost > 0) {
+            console.log(`[${new Date().toISOString()}] 💰 Cost: $${costs.totalCost.toFixed(6)} for ${requestModel}`);
+          }
+          if (errorResponse) {
+            console.log(`[${new Date().toISOString()}] ⚠️  Error logged to accounting for ${requestModel}`);
+          }
+        } catch (error) {
+          console.error('❌ Accounting error:', error.message);
+        }
       });
     });
 
     proxyReq.on('error', (error) => {
       console.error(`[${new Date().toISOString()}] ❌ Proxy error for ${provider}: ${error.message}`);
+      
+      // Log failed request attempts to accounting
+      const accountingEntry = {
+        timestamp: new Date().toISOString(),
+        clientIp: clientIp,
+        provider: provider,
+        model: requestModel,
+        endpoint: apiPath,
+        statusCode: 0, // 0 indicates network/connection failure
+        duration: Date.now() - requestStartTime,
+        tokens: {
+          prompt: 0,
+          completion: 0,
+          cachedRead: 0,
+          cacheCreation: 0
+        },
+        unitPricing: MODEL_DEFINITIONS[requestModel]?.pricing || null,
+        costs: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0
+        },
+        totalCost: 0,
+        error: {
+          type: 'proxy_error',
+          message: error.message,
+          code: error.code || 'UNKNOWN'
+        }
+      };
+      
+      writeAccountingEntry(accountingEntry);
+      console.log(`[${new Date().toISOString()}] ⚠️  Network error logged to accounting for ${requestModel || 'unknown model'}`);
+      
       res.writeHead(502, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': ALLOWED_ORIGINS
@@ -1273,6 +1587,11 @@ server.listen(PROXY_PORT, () => {
   console.log(`   • Models API:      http://localhost:${PROXY_PORT}/models`);
   console.log(`   • Proxy Endpoint:  http://localhost:${PROXY_PORT}/proxy/<provider>/<path>`);
   
+  console.log('\n📊 Accounting:');
+  console.log(`   • Log directory:   ${ACCOUNTING_DIR}`);
+  console.log(`   • Today's log:     ${path.basename(ACCOUNTING_FILE)}`);
+  console.log('   • Format:          JSON Lines (JSONL)');
+  
   console.log('\n🔌 MCP Connection:');
   console.log('   The web client will automatically try to connect to:');
   console.log('   • MCP Server: ws://localhost:19999/mcp');
@@ -1287,6 +1606,7 @@ server.listen(PROXY_PORT, () => {
   console.log('   • Press Ctrl+C to stop the server');
   console.log('   • Logs are displayed here in real-time');
   console.log('   • Check the Communication Log in the web UI for detailed debugging');
+  console.log('   • Cost tracking is automatic for all LLM requests');
   
   console.log('\n' + '='.repeat(60));
   console.log('Server is ready and waiting for connections...\n');
