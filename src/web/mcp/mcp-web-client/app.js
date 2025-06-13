@@ -1164,14 +1164,15 @@ class NetdataMCPChat {
         const isAnthropicProvider = config.model && config.model.provider === 'anthropic';
         const cacheControlDiv = document.createElement('div');
         const cacheControlEnabled = config.optimisation.cacheControl.enabled;
-        cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!isAnthropicProvider ? 'opacity: 0.5;' : ''}`;
+        const cacheControlDisabled = !isAnthropicProvider || toolMemoryEnabled;
+        cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${cacheControlDisabled ? 'opacity: 0.5;' : ''}`;
         
         cacheControlDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: ${isAnthropicProvider ? 'pointer' : 'default'};">
+            <label style="display: flex; align-items: center; cursor: ${cacheControlDisabled ? 'default' : 'pointer'};">
                 <input type="checkbox" id="cacheControl_${chatId}" ${cacheControlEnabled ? 'checked' : ''}
                        style="margin-right: 6px;"
-                       ${!isAnthropicProvider ? 'disabled' : ''}>
-                <span>Enable Anthropic's cache control</span>
+                       ${cacheControlDisabled ? 'disabled' : ''}>
+                <span>Enable Anthropic's cache control${toolMemoryEnabled ? ' (disabled: tool memory is on)' : ''}</span>
             </label>
         `;
         
@@ -1313,6 +1314,30 @@ class NetdataMCPChat {
             const enabled = toolMemoryCheckbox.checked;
             toolMemorySelect.disabled = !enabled;
             toolMemoryDiv.style.opacity = enabled ? '1' : '0.5';
+            
+            // Update cache control state for Anthropic (mutually exclusive with tool memory)
+            if (isAnthropicProvider) {
+                const cacheControlCheckbox = section.querySelector(`#cacheControl_${chatId}`);
+                const cacheControlLabel = cacheControlCheckbox.closest('label');
+                const cacheControlSpan = cacheControlLabel.querySelector('span');
+                
+                if (enabled) {
+                    // Disable cache control when tool memory is enabled
+                    cacheControlCheckbox.disabled = true;
+                    cacheControlCheckbox.closest('div').style.opacity = '0.5';
+                    cacheControlSpan.textContent = 'Enable Anthropic\'s cache control (disabled: tool memory is on)';
+                    if (cacheControlCheckbox.checked) {
+                        cacheControlCheckbox.checked = false;
+                        this.updateOptimizationSetting(chatId, 'cacheControl', false);
+                    }
+                } else {
+                    // Re-enable cache control when tool memory is disabled
+                    cacheControlCheckbox.disabled = false;
+                    cacheControlCheckbox.closest('div').style.opacity = '1';
+                    cacheControlSpan.textContent = 'Enable Anthropic\'s cache control';
+                }
+            }
+            
             this.updateOptimizationSetting(chatId, 'toolMemory', enabled);
         });
         
@@ -2783,6 +2808,9 @@ class NetdataMCPChat {
         const chat = this.chats.get(chatId);
         if (!chat) {return;}
         
+        // Clear broken state when starting redo operation
+        chat.wasWaitingOnLoad = false;
+        
         // Find the message to redo from
         const message = chat.messages[messageIndex];
         if (!message) {return;}
@@ -3936,7 +3964,10 @@ class NetdataMCPChat {
         return chat && 
                this.mcpServers.has(chat.mcpServerId) && 
                this.llmProviders.has(chat.llmProviderId) &&
-               this.mcpConnections.has(chat.mcpServerId);
+               this.mcpConnections.has(chat.mcpServerId) &&
+               !chat.isProcessing &&
+               !chat.waitingForLLM &&
+               !chat.waitingForMCP;
     }
     
     updateChatInputState(chatId) {
@@ -3953,14 +3984,23 @@ class NetdataMCPChat {
         if (server && provider && this.mcpConnections.has(chat.mcpServerId)) {
             const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
             if (mcpConnection && mcpConnection.isReady()) {
-                elements.input.disabled = false;
-                elements.sendBtn.disabled = false;
-                elements.input.placeholder = 'Ask about your Netdata metrics...';
-                elements.reconnectBtn.style.display = 'none';
-                
-                // Focus input if this is the active chat
-                if (this.getActiveChatId() === chatId) {
-                    elements.input.focus();
+                // Only enable if connection ready AND chat not busy
+                if (!chat.isProcessing && !chat.waitingForLLM && !chat.waitingForMCP) {
+                    elements.input.disabled = false;
+                    elements.sendBtn.disabled = false;
+                    elements.input.placeholder = 'Ask about your Netdata metrics...';
+                    elements.reconnectBtn.style.display = 'none';
+                    
+                    // Focus input if this is the active chat
+                    if (this.getActiveChatId() === chatId) {
+                        elements.input.focus();
+                    }
+                } else {
+                    // Chat is busy - keep input disabled but hide reconnect button
+                    elements.input.disabled = true;
+                    elements.sendBtn.disabled = true;
+                    elements.input.placeholder = 'Processing...';
+                    elements.reconnectBtn.style.display = 'none';
                 }
                 
                 return;
@@ -4052,12 +4092,6 @@ class NetdataMCPChat {
             // Per-chat pending tool calls map
             pendingToolCalls: new Map()
         };
-        
-        // Debug: Check what we're passing
-        console.log('[createNewChat] chatConfig:', chatConfig);
-        console.log('[createNewChat] chatConfig.model:', chatConfig.model);
-        console.log('[createNewChat] optimizerSettings:', optimizerSettings);
-        console.log('[createNewChat] optimizerSettings.model:', optimizerSettings.model);
         
         // Create isolated MessageOptimizer instance for this chat
         chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
@@ -4466,10 +4500,19 @@ class NetdataMCPChat {
                 // Check if the connection is actually ready
                 const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
                 if (mcpConnection && mcpConnection.isReady()) {
-                    elements.input.disabled = false;
-                    elements.sendBtn.disabled = false;
-                    elements.input.placeholder = 'Ask about your Netdata metrics...';
-                    elements.reconnectBtn.style.display = 'none';
+                    // Only enable if connection ready AND chat not busy
+                    if (!chat.isProcessing && !chat.waitingForLLM && !chat.waitingForMCP) {
+                        elements.input.disabled = false;
+                        elements.sendBtn.disabled = false;
+                        elements.input.placeholder = 'Ask about your Netdata metrics...';
+                        elements.reconnectBtn.style.display = 'none';
+                    } else {
+                        // Chat is busy - keep input disabled
+                        elements.input.disabled = true;
+                        elements.sendBtn.disabled = true;
+                        elements.input.placeholder = 'Processing...';
+                        elements.reconnectBtn.style.display = 'none';
+                    }
                     
                 } else {
                     // Connection exists but not ready yet
@@ -4996,38 +5039,47 @@ class NetdataMCPChat {
             case 'error-message':
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message error';
+                messageDiv.style.position = 'relative';
                 
-                // Add redo button if we have the messageIndex from the event
-                if (event.messageIndex !== undefined && event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0) {
-                    // This is a loaded error with proper context
-                    messageDiv.style.position = 'relative';
-                    messageDiv.innerHTML = `<div><i class="fas fa-times-circle"></i> ${event.content}</div>`;
-                    
+                // Always show the error with a retry/redo button
+                messageDiv.innerHTML = `<div><i class="fas fa-times-circle"></i> ${event.content}</div>`;
+                
+                // If we have errorMessageIndex, use redo button, otherwise use retry button
+                if (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0) {
+                    // This error has context - use redo button
                     const redoBtn = document.createElement('button');
                     redoBtn.className = 'redo-button';
                     redoBtn.textContent = 'Redo';
                     redoBtn.onclick = () => this.redoFromMessage(event.errorMessageIndex, chatId);
                     messageDiv.appendChild(redoBtn);
                 } else {
-                    // This is a live error, use the old retry logic
-                    messageDiv.innerHTML = `
-                        <div><i class="fas fa-times-circle"></i> ${event.content}</div>
-                        <button class="btn btn-warning btn-small" style="margin-top: 8px;">
-                            <i class="fas fa-redo"></i> Retry
-                        </button>
-                    `;
+                    // No errorMessageIndex - create a retry button
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'btn btn-warning btn-small';
+                    retryBtn.style.marginTop = '8px';
+                    retryBtn.innerHTML = '<i class="fas fa-redo"></i> Retry';
                     
-                    const retryBtn = messageDiv.querySelector('button');
-                    retryBtn.onclick = async () => {
-                        retryBtn.disabled = true;
-                        retryBtn.textContent = 'Retrying...';
-                        
-                        // Get the current chat and find the last user message
-                        const currentChat = this.chats.get(chatId);
-                        if (!currentChat) {return;}
-                        
-                        const lastUserMessage = currentChat.messages.filter(m => m.role === 'user').pop();
-                        if (lastUserMessage) {
+                    // Check if we have a pending retry callback for this error
+                    if (this.pendingRetryCallbacks && this.pendingRetryCallbacks.has(event.content)) {
+                        const callback = this.pendingRetryCallbacks.get(event.content);
+                        retryBtn.onclick = async () => {
+                            retryBtn.disabled = true;
+                            retryBtn.textContent = 'Retrying...';
+                            this.pendingRetryCallbacks.delete(event.content);
+                            await callback();
+                        };
+                    } else {
+                        // Fallback to old retry logic for backwards compatibility
+                        retryBtn.onclick = async () => {
+                            retryBtn.disabled = true;
+                            retryBtn.textContent = 'Retrying...';
+                            
+                            // Get the current chat and find the last user message
+                            const currentChat = this.chats.get(chatId);
+                            if (!currentChat) {return;}
+                            
+                            const lastUserMessage = currentChat.messages.filter(m => m.role === 'user').pop();
+                            if (lastUserMessage) {
                         // ATOMIC OPERATION: Remove messages from the error onwards
                         const errorIndex = currentChat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
@@ -5062,7 +5114,7 @@ class NetdataMCPChat {
                             this.loadChat(chatId, true);
                             
                             // Hide any existing spinner before retry
-                            this.hideLoadingSpinner();
+                            this.hideLoadingSpinner(chatId);
                             
                             // Retry processing
                             try {
@@ -5112,6 +5164,9 @@ class NetdataMCPChat {
                         }
                     }
                 };
+                    }
+                    
+                    messageDiv.appendChild(retryBtn);
                 }
                 
                 // Use chat-specific messages container
@@ -5126,7 +5181,7 @@ class NetdataMCPChat {
                 break;
                 
             case 'hide-spinner':
-                this.hideLoadingSpinner();
+                this.hideLoadingSpinner(chatId);
                 // Clear waiting states
                 const chatForSpinner = this.chats.get(chatId);
                 if (chatForSpinner) {
@@ -5262,6 +5317,9 @@ class NetdataMCPChat {
         chat.hasError = false;
         chat.lastError = null;
         
+        // Clear broken state when starting new interaction
+        chat.wasWaitingOnLoad = false;
+        
         // Validate configuration early
         const proxyProvider = this.llmProviders.get(chat.llmProviderId);
         if (!proxyProvider) {
@@ -5301,7 +5359,8 @@ class NetdataMCPChat {
         
         // CRITICAL: Add and display the user's message immediately for better UX
         this.addMessage(chat.id, { type: 'user', role: 'user', content: message, turn: chat.currentTurn });
-        this.processRenderEvent({ type: 'user-message', content: message }, chat.id);
+        const userMessageIndex = chat.messages.length - 1;
+        this.processRenderEvent({ type: 'user-message', content: message, messageIndex: userMessageIndex }, chat.id);
         
         // Force scroll to bottom after DOM update
         requestAnimationFrame(() => {
@@ -5395,10 +5454,23 @@ class NetdataMCPChat {
                 // Find the last user message index for retry functionality
                 const lastUserMsgIdx = chat.messages.findLastIndex(m => m.role === 'user');
                 this.addMessage(chat.id, { type: 'error', content: continueMessage, errorMessageIndex: lastUserMsgIdx });
+                
+                // Display the continue message
+                this.processRenderEvent({ type: 'error-message', content: continueMessage, errorMessageIndex: lastUserMsgIdx }, chat.id);
             } else {
                 // Regular error handling
                 const errorMessage = `Error: ${error.message}`;
-                this.showErrorWithRetry(errorMessage, async () => {
+                // Don't use showErrorWithRetry as it creates a duplicate - just add the error message
+                // The error message will be rendered with a retry button when displayed
+                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                this.addMessage(chat.id, { type: 'error', content: errorMessage, errorMessageIndex: lastUserMessageIndex });
+                
+                // Display the error message
+                this.processRenderEvent({ type: 'error-message', content: errorMessage, errorMessageIndex: lastUserMessageIndex }, chat.id);
+                
+                // Create the retry callback for when the retry button is clicked
+                this.pendingRetryCallbacks = this.pendingRetryCallbacks || new Map();
+                this.pendingRetryCallbacks.set(errorMessage, async () => {
                     // Find and remove only the error message
                     const errorMessageIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === errorMessage);
                     if (errorMessageIndex !== -1) {
@@ -5432,11 +5504,11 @@ class NetdataMCPChat {
                         // Find the last user message index for retry functionality
                         const lastUserIdx = chat.messages.findLastIndex(m => m.role === 'user');
                         this.addMessage(chat.id, { type: 'error', content: retryErrorMessage, errorMessageIndex: lastUserIdx });
+                        
+                        // Display the retry error message
+                        this.processRenderEvent({ type: 'error-message', content: retryErrorMessage, errorMessageIndex: lastUserIdx }, chat.id);
                     }
-                }, 'Retry', chat.id);
-                // Find the last user message index for retry functionality
-                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
-                this.addMessage(chat.id, { type: 'error', content: errorMessage, errorMessageIndex: lastUserMessageIndex });
+                });
             }
         } finally {
             // Remove loading spinner event
@@ -5617,8 +5689,7 @@ class NetdataMCPChat {
                 }, chat.id);
                 
                 if (response.content) {
-                    // Then emit assistant message event
-                    this.processRenderEvent({ type: 'assistant-message', content: response.content }, chat.id);
+                    // Create the assistant message first
                     const assistantMsg = { 
                         type: 'assistant', 
                         role: 'assistant', 
@@ -5630,6 +5701,14 @@ class NetdataMCPChat {
                     };
                     // Use addMessage to calculate price and update cumulative totals
                     this.addMessage(chat.id, assistantMsg);
+                    
+                    // Then emit assistant message event with messageIndex
+                    const messageIndex = chat.messages.length - 1;
+                    this.processRenderEvent({ 
+                        type: 'assistant-message', 
+                        content: response.content,
+                        messageIndex
+                    }, chat.id);
                     
                     // Track token usage with model information
                     if (response.usage) {
@@ -5688,6 +5767,9 @@ class NetdataMCPChat {
                 }
                 
                 // Now display the message - after it's safely saved
+                // Get the message index after adding
+                assistantMessageIndex = chat.messages.length - 1;
+                
                 // Emit metrics event first (just like loaded chats)
                 this.processRenderEvent({ 
                     type: 'assistant-metrics', 
@@ -5697,9 +5779,12 @@ class NetdataMCPChat {
                 }, chat.id);
                 
                 if (response.content) {
-                    this.processRenderEvent({ type: 'assistant-message', content: response.content }, chat.id);
+                    this.processRenderEvent({ 
+                        type: 'assistant-message', 
+                        content: response.content,
+                        messageIndex: assistantMessageIndex
+                    }, chat.id);
                 }
-                assistantMessageIndex = chat.messages.length - 1;
                 
                 // Build the message for the API
                 const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
@@ -5725,7 +5810,11 @@ class NetdataMCPChat {
             if (response.toolCalls && response.toolCalls.length > 0) {
                 // Ensure we have an assistant group even if there was no content
                 if (!this.getCurrentAssistantGroup(chat.id)) {
-                    this.processRenderEvent({ type: 'assistant-message', content: '' }, chat.id);
+                    this.processRenderEvent({ 
+                        type: 'assistant-message', 
+                        content: '',
+                        messageIndex: assistantMessageIndex
+                    }, chat.id);
                 }
                 
                 const toolResults = [];
@@ -5911,6 +6000,12 @@ class NetdataMCPChat {
         if (!chatId) {
             console.error('renderMessage called without chatId');
             return;
+        }
+        
+        // Ensure content is a string
+        if (typeof content !== 'string') {
+            console.error('renderMessage: content is not a string', { role, content, messageIndex });
+            content = String(content || '');
         }
         
         let messageDiv;
@@ -6680,14 +6775,19 @@ class NetdataMCPChat {
             // 6. OUTPUT
             metricsHtml += `<span class="metric-item" data-tooltip="Output tokens"><i class="fas fa-upload"></i> ${formatNumber(usage.completionTokens || 0)}</span>`;
             
-            // 7. TOTAL
+            // 7. REASONING (only show if present)
+            if (usage.reasoningTokens) {
+                metricsHtml += `<span class="metric-item" data-tooltip="Reasoning tokens (o3/o1 models)"><i class="fas fa-brain"></i> ${formatNumber(usage.reasoningTokens)}</span>`;
+            }
+            
+            // 8. TOTAL
             const totalTokens = (usage.promptTokens || 0) + 
                                (usage.cacheReadInputTokens || 0) + 
                                (usage.cacheCreationInputTokens || 0) + 
                                (usage.completionTokens || 0);
             metricsHtml += `<span class="metric-item" data-tooltip="Total tokens"><i class="fas fa-chart-bar"></i> ${formatNumber(totalTokens)}</span>`;
             
-            // 8. DELTA - calculate based on message type
+            // 9. DELTA - calculate based on message type
             let deltaTokens;
             
             if (messageType === 'title') {
@@ -6710,7 +6810,7 @@ class NetdataMCPChat {
             const deltaSign = deltaTokens > 0 ? '+' : '';
             metricsHtml += `<span class="metric-item" data-tooltip="Change from previous">Δ ${deltaSign}${formatNumber(deltaTokens)}</span>`;
             
-            // 9. PRICE
+            // 10. PRICE
             if (model) {
                 const price = this.calculateMessagePrice(model, usage) || 0;
                 metricsHtml += `<span class="metric-item" data-tooltip="Cost"><i class="fas fa-dollar-sign"></i> ${price.toFixed(4)}</span>`;
@@ -7245,12 +7345,12 @@ class NetdataMCPChat {
             this.updateChatSessions();
         }
         
-        // Remove any existing spinner first
-        this.hideLoadingSpinner();
+        // Remove any existing spinner for this chat first
+        this.hideLoadingSpinner(chatId);
         
         // Create spinner element
         const spinnerDiv = document.createElement('div');
-        spinnerDiv.id = 'llm-loading-spinner';
+        spinnerDiv.id = `llm-loading-spinner-${chatId}`;
         spinnerDiv.className = 'message assistant loading-spinner';
         
         // Store start time
@@ -7264,14 +7364,22 @@ class NetdataMCPChat {
             </div>
         `;
         
+        // Initialize spinner intervals Map if not exists
+        if (!this.spinnerIntervals) {
+            this.spinnerIntervals = new Map();
+        }
+        
         // Update time every 100ms
-        this.spinnerInterval = setInterval(() => {
+        const interval = setInterval(() => {
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
             const timeElement = spinnerDiv.querySelector('.spinner-time');
             if (timeElement) {
                 timeElement.textContent = `(${elapsed}s)`;
             }
         }, 100);
+        
+        // Store interval for this chat
+        this.spinnerIntervals.set(chatId, interval);
         
         const container = this.getChatContainer(chatId);
         if (container && container._elements && container._elements.messages) {
@@ -7284,16 +7392,30 @@ class NetdataMCPChat {
         });
     }
 
-    hideLoadingSpinner() {
-        // Clear the interval
-        if (this.spinnerInterval) {
-            clearInterval(this.spinnerInterval);
-            this.spinnerInterval = null;
-        }
-        
-        const spinner = document.getElementById('llm-loading-spinner');
-        if (spinner) {
-            spinner.remove();
+    hideLoadingSpinner(chatId) {
+        if (chatId) {
+            // Clear chat-specific interval
+            if (this.spinnerIntervals && this.spinnerIntervals.has(chatId)) {
+                clearInterval(this.spinnerIntervals.get(chatId));
+                this.spinnerIntervals.delete(chatId);
+            }
+            
+            // Remove spinner for specific chat
+            const spinner = document.getElementById(`llm-loading-spinner-${chatId}`);
+            if (spinner) {
+                spinner.remove();
+            }
+        } else {
+            // Fallback: clear global interval and remove any spinner with old global ID (for backwards compatibility)
+            if (this.spinnerInterval) {
+                clearInterval(this.spinnerInterval);
+                this.spinnerInterval = null;
+            }
+            
+            const spinner = document.getElementById('llm-loading-spinner');
+            if (spinner) {
+                spinner.remove();
+            }
         }
     }
     
@@ -7304,7 +7426,7 @@ class NetdataMCPChat {
             return;
         }
         
-        const spinner = document.getElementById('llm-loading-spinner');
+        const spinner = document.getElementById(`llm-loading-spinner-${chatId}`);
         if (spinner && spinner.parentNode) {
             // Remove and re-append to ensure it's at the bottom
             spinner.parentNode.removeChild(spinner);
@@ -7425,9 +7547,6 @@ class NetdataMCPChat {
                 }
             }
         }
-        
-        // Log connection state changes for debugging
-        console.log(`MCP Connection State Change: ${mcpServerId} -> ${newState}`, details);
     }
     
     updateChatConnectionUI(chatId, connectionState, details = {}) {

@@ -495,6 +495,34 @@ class LLMProvider {
 }
 
 /**
+ * Model endpoint configuration
+ * Specifies which endpoint to use and whether tools are supported
+ */
+const MODEL_ENDPOINT_CONFIG = {
+    // Models that MUST use /v1/responses
+    'o3-pro': { endpoint: 'responses', supportsTools: true },
+    'o3-pro-2025-06-10': { endpoint: 'responses', supportsTools: true },
+    'o1-pro': { endpoint: 'responses', supportsTools: false },
+    'o1-pro-2025-03-19': { endpoint: 'responses', supportsTools: false },
+    
+    // o3 models use /v1/responses with tool support
+    'o3': { endpoint: 'responses', supportsTools: true },
+    'o3-2025-04-16': { endpoint: 'responses', supportsTools: true },
+    'o3-mini': { endpoint: 'responses', supportsTools: true },
+    'o3-mini-2025-01-31': { endpoint: 'responses', supportsTools: true },
+    
+    // o1 models use /v1/responses without tool support
+    'o1': { endpoint: 'responses', supportsTools: false },
+    'o1-mini': { endpoint: 'responses', supportsTools: false },
+    'o1-preview': { endpoint: 'responses', supportsTools: false },
+    'o1-2024-12-17': { endpoint: 'responses', supportsTools: false },
+    'o1-preview-2024-09-12': { endpoint: 'responses', supportsTools: false },
+    'o1-mini-2024-09-12': { endpoint: 'responses', supportsTools: false }
+    
+    // All other models use /v1/chat/completions
+};
+
+/**
  * OpenAI GPT Provider
  */
 class OpenAIProvider extends LLMProvider {
@@ -505,6 +533,12 @@ class OpenAIProvider extends LLMProvider {
     }
 
     get apiUrl() {
+        // Check model-specific endpoint configuration
+        const config = MODEL_ENDPOINT_CONFIG[this.model];
+        if (config && config.endpoint === 'responses') {
+            return `${this.proxyUrl}/proxy/openai/v1/responses`;
+        }
+        // Default to chat/completions for all other models
         return `${this.proxyUrl}/proxy/openai/v1/chat/completions`;
     }
 
@@ -518,13 +552,19 @@ class OpenAIProvider extends LLMProvider {
      * @returns {Promise<LLMResponse>}
      */
     async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null) {
+        // Check model configuration for endpoint and tool support
+        const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
+        const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
+        const supportsTools = !modelConfig || modelConfig.supportsTools !== false;
+        
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
         // Convert messages from internal format to OpenAI format
         const openaiMessages = this.convertMessages(messages, mode);
         
-        const openaiTools = tools.map(tool => ({
+        // Convert tools to OpenAI completions format (with nested function)
+        const openaiCompletionsTools = tools.map(tool => ({
             type: 'function',
             function: {
                 name: tool.name,
@@ -532,15 +572,90 @@ class OpenAIProvider extends LLMProvider {
                 parameters: tool.inputSchema || {}
             }
         }));
-
-        const requestBody = {
-            model: this.model,
-            messages: openaiMessages,
-            tools: openaiTools.length > 0 ? openaiTools : undefined,
-            tool_choice: openaiTools.length > 0 ? 'auto' : undefined,
-            temperature,
-            max_tokens: 4096
-        };
+        
+        // Convert tools to OpenAI responses format (requires type and name fields)
+        const openaiResponsesTools = tools.map(tool => ({
+            type: 'function',
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema || {}
+        }));
+        
+        let requestBody;
+        
+        if (useResponsesEndpoint) {
+            // Extract system prompt for instructions field
+            const { systemPrompt } = MessageConversionUtils.extractSystemAndSummary(messages);
+            
+            // Convert messages to input format (string or array)
+            const inputMessages = [];
+            for (const msg of openaiMessages) {
+                if (msg.role === 'system') continue; // Skip system, use instructions instead
+                
+                if (msg.role === 'user') {
+                    inputMessages.push({
+                        role: 'user',
+                        content: msg.content
+                    });
+                } else if (msg.role === 'assistant') {
+                    inputMessages.push({
+                        role: 'assistant',
+                        content: msg.content
+                    });
+                } else if (msg.role === 'tool') {
+                    // Tool results in responses format
+                    inputMessages.push({
+                        role: 'tool',
+                        tool_call_id: msg.tool_call_id,
+                        content: msg.content
+                    });
+                }
+            }
+            
+            // Build request for v1/responses endpoint
+            requestBody = {
+                model: this.model,
+                input: inputMessages,
+                max_output_tokens: 4096,
+                stream: false,
+                store: true
+            };
+            
+            // O3/O1 models don't support temperature parameter
+            if (!this.model.startsWith('o3') && !this.model.startsWith('o1')) {
+                requestBody.temperature = temperature;
+            }
+            
+            // Add system prompt as instructions
+            if (systemPrompt) {
+                requestBody.instructions = systemPrompt;
+            }
+            
+            // Add tools if supported - responses endpoint format
+            if (supportsTools && openaiResponsesTools.length > 0) {
+                requestBody.tools = openaiResponsesTools;
+                requestBody.tool_choice = 'auto';
+                requestBody.parallel_tool_calls = true;
+            }
+            
+            // Optional: Add reasoning configuration for o3/o1 models
+            if (this.model.startsWith('o3') || this.model.startsWith('o1')) {
+                requestBody.reasoning = { 
+                    effort: 'medium',
+                    summary: 'detailed'
+                };
+            }
+        } else {
+            // Regular models use standard v1/chat/completions structure
+            requestBody = {
+                model: this.model,
+                messages: openaiMessages,
+                tools: openaiCompletionsTools.length > 0 ? openaiCompletionsTools : undefined,
+                tool_choice: openaiCompletionsTools.length > 0 ? 'auto' : undefined,
+                temperature,
+                max_tokens: 4096
+            };
+        }
 
         this.log('sent', JSON.stringify(requestBody, null, 2), { 
             provider: 'openai', 
@@ -583,22 +698,114 @@ class OpenAIProvider extends LLMProvider {
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'openai' });
         
-        if (!data.choices || data.choices.length === 0) {
-            throw new Error('OpenAI API returned no choices');
+        let choice;
+        
+        if (useResponsesEndpoint) {
+            // All o1/o3 models use v1/responses with different response structure
+            if (!data.output) {
+                throw new Error('OpenAI API returned no output');
+            }
+            
+            // Parse the output array to find the message
+            let messageContent = '';
+            const toolCalls = [];
+            
+            if (Array.isArray(data.output)) {
+                // o3 format: array of objects with type and content
+                for (const outputItem of data.output) {
+                    if (outputItem.type === 'message' && outputItem.content) {
+                        // Extract text from content array
+                        if (Array.isArray(outputItem.content)) {
+                            for (const contentItem of outputItem.content) {
+                                if (contentItem.type === 'output_text' && contentItem.text) {
+                                    messageContent += contentItem.text;
+                                }
+                            }
+                        }
+                    } else if (outputItem.type === 'function_call') {
+                        // Handle individual function call in v1/responses format
+                        let args = outputItem.arguments;
+                        // Parse arguments if they're a string
+                        if (typeof args === 'string') {
+                            try {
+                                args = JSON.parse(args);
+                            } catch (e) {
+                                console.warn('Failed to parse tool arguments:', e);
+                                args = {};
+                            }
+                        }
+                        toolCalls.push({
+                            id: outputItem.call_id || this.generateId(),
+                            name: outputItem.name,
+                            arguments: args || {}
+                        });
+                    } else if (outputItem.type === 'tool_calls') {
+                        // Handle tool calls in v1/responses format (array format)
+                        // The structure can be either outputItem.calls or outputItem.content
+                        const calls = outputItem.calls || outputItem.content || [];
+                        for (const toolCall of calls) {
+                            // Skip if not a tool call type
+                            if (toolCall.type && toolCall.type !== 'tool_call') continue;
+                            
+                            let args = toolCall.arguments || toolCall.function?.arguments;
+                            // Parse arguments if they're a string
+                            if (typeof args === 'string') {
+                                try {
+                                    args = JSON.parse(args);
+                                } catch (e) {
+                                    console.warn('Failed to parse tool arguments:', e);
+                                    args = {};
+                                }
+                            }
+                            toolCalls.push({
+                                id: toolCall.id || this.generateId(),
+                                name: toolCall.name || toolCall.function?.name,
+                                arguments: args || {}
+                            });
+                        }
+                    }
+                }
+            } else if (typeof data.output === 'string') {
+                // o1 format: simple string
+                messageContent = data.output;
+            } else {
+                // Unknown format, stringify as fallback
+                console.warn('o3/o1 model returned unknown output format:', data.output);
+                messageContent = JSON.stringify(data.output);
+            }
+            
+            choice = {
+                message: {
+                    content: messageContent,
+                    tool_calls: toolCalls.length > 0 ? toolCalls : null
+                }
+            };
+        } else {
+            // Standard models use choices array
+            if (!data.choices || data.choices.length === 0) {
+                throw new Error('OpenAI API returned no choices');
+            }
+            choice = data.choices[0];
         }
         
-        const choice = data.choices[0];
-        
         // Handle proper tool_calls format
-        let toolCalls = choice.message.tool_calls?.map(tc => {
-            // Use destructuring to avoid direct 'arguments' reference
-            const { arguments: functionArgs } = tc.function;
-            return {
-                id: tc.id,
-                name: tc.function.name,
-                arguments: JSON.parse(functionArgs)
-            };
-        }) || [];
+        let toolCalls = [];
+        
+        // For responses endpoint, tool calls are already parsed
+        if (useResponsesEndpoint && choice.message.tool_calls) {
+            toolCalls = choice.message.tool_calls;
+        } else if (choice.message.tool_calls) {
+            // Standard format needs parsing
+            toolCalls = choice.message.tool_calls.map(tc => {
+                // Use destructuring to avoid direct 'arguments' reference
+                const { arguments: functionArgs } = tc.function;
+                return {
+                    id: tc.id,
+                    name: tc.function.name,
+                    arguments: JSON.parse(functionArgs)
+                };
+            });
+        }
         
         // Fallback: Parse legacy tool calling formats from content
         let content = choice.message.content;
@@ -615,11 +822,14 @@ class OpenAIProvider extends LLMProvider {
             content,
             toolCalls,
             usage: data.usage ? {
-                promptTokens: data.usage.prompt_tokens,
-                completionTokens: data.usage.completion_tokens,
-                totalTokens: data.usage.total_tokens,
-                cacheReadInputTokens: data.usage.prompt_tokens_details?.cached_tokens,
-                cacheCreationInputTokens: data.usage.prompt_tokens_details?.cache_creation_tokens
+                // Handle both standard and responses endpoint formats
+                promptTokens: data.usage.prompt_tokens || data.usage.input_tokens || 0,
+                completionTokens: data.usage.completion_tokens || data.usage.output_tokens || 0,
+                totalTokens: data.usage.total_tokens || 0,
+                cacheReadInputTokens: data.usage.prompt_tokens_details?.cached_tokens || data.usage.input_tokens_details?.cached_tokens || 0,
+                cacheCreationInputTokens: data.usage.prompt_tokens_details?.cache_creation_tokens || 0,
+                // Add reasoning tokens for o3/o1 models
+                reasoningTokens: data.usage.completion_tokens_details?.reasoning_tokens || data.usage.output_tokens_details?.reasoning_tokens || 0
             } : null
         };
     }
@@ -797,7 +1007,17 @@ class OpenAIProvider extends LLMProvider {
     }
 
     convertMessages(messages, _mode = 'cached') {
-        // Convert messages for OpenAI format
+        // Check if we're using the responses endpoint
+        const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
+        const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
+        
+        if (useResponsesEndpoint) {
+            // For /v1/responses, we return messages as-is (they'll be used in 'input' field)
+            // System prompt will be handled via 'instructions' parameter
+            return messages;
+        }
+        
+        // Convert messages for standard OpenAI format
         const converted = [];
         
         // Extract system prompt and handle summary
