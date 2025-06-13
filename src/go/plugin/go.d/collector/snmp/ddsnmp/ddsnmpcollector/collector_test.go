@@ -71,6 +71,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -138,6 +139,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Tags:           map[string]string{"device_vendor": "Cisco IOS"},
 					Metrics: []Metric{
@@ -211,6 +213,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source: "test-profile.yaml",
 					DeviceMetadata: map[string]string{
 						"vendor":        "dell",
 						"serial_number": "ABC123",
@@ -259,6 +262,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -387,6 +391,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "profile1.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -432,6 +437,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -502,6 +508,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Tags:           map[string]string{"device_type": "router"},
 					Metrics: []Metric{
@@ -572,6 +579,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -628,6 +636,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -685,6 +694,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -739,6 +749,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -864,6 +875,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -955,6 +967,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -1059,6 +1072,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -1133,6 +1147,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -1200,6 +1215,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -1279,6 +1295,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []*ProfileMetrics{
 				{
+					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Metrics: []Metric{
 						{
@@ -1315,6 +1332,15 @@ func TestCollector_Collect(t *testing.T) {
 			collector.tableCache.setTTL(0, 0)
 
 			result, err := collector.Collect()
+
+			// The Metric struct has a Profile field that contains a pointer to ProfileMetrics,
+			// which itself contains the Metrics slice.
+			// This creates a circular reference that makes ElementsMatch fail.
+			for _, profile := range result {
+				for i := range profile.Metrics {
+					profile.Metrics[i].Profile = nil
+				}
+			}
 
 			if tc.expectedError {
 				assert.Error(t, err)

@@ -25,21 +25,7 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 		if cfg.IsScalar() || cfg.Table.OID == "" || doneOids[cfg.Table.OID] {
 			continue
 		}
-		if func() bool {
-			for _, tagCfg := range cfg.MetricTags {
-				if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
-					c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
-					return true
-				}
-				if len(tagCfg.IndexTransform) > 0 {
-					c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
-					return true
-				}
-			}
-			return false
-		}() {
-			continue
-		}
+
 		if c.missingOIDs[trimOID(cfg.Table.OID)] {
 			missingOIDs = append(missingOIDs, cfg.Table.OID)
 			continue
@@ -66,6 +52,17 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 }
 
 func (c *Collector) collectSingleTable(cfg ddprofiledefinition.MetricsConfig) ([]Metric, error) {
+	for _, tagCfg := range cfg.MetricTags {
+		if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
+			c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
+			return nil, nil
+		}
+		if len(tagCfg.IndexTransform) > 0 {
+			c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
+			return nil, nil
+		}
+	}
+
 	columnOIDs := make(map[string]ddprofiledefinition.SymbolConfig)
 	for _, sym := range cfg.Symbols {
 		columnOIDs[trimOID(sym.OID)] = sym
@@ -198,14 +195,12 @@ func (c *Collector) collectTableWithCache(
 	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
 ) ([]Metric, error) {
 	var oidsToGet []string
-	oidToLocation := make(map[string]struct{ index, column string }) // full OID -> location
 
-	for index, columns := range cachedOIDs {
+	for _, columns := range cachedOIDs {
 		for columnOID, fullOID := range columns {
 			// Only GET metric columns, tags are cached
 			if _, isMetric := columnOIDs[columnOID]; isMetric {
 				oidsToGet = append(oidsToGet, fullOID)
-				oidToLocation[trimOID(fullOID)] = struct{ index, column string }{index, columnOID}
 			}
 		}
 	}
