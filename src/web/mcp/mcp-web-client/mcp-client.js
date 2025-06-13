@@ -11,6 +11,7 @@ class MCPClient {
         this.connectionPromise = null;
         this.capabilities = null;
         this.serverInfo = null;
+        this.instructions = null;
         this.tools = new Map();
         this.resources = new Map();
         this.prompts = new Map();
@@ -122,6 +123,7 @@ class MCPClient {
 
         this.serverInfo = initResponse.serverInfo;
         this.capabilities = initResponse.capabilities;
+        this.instructions = initResponse.instructions || null;
         
         // Notify server that we're initialized
         await this.sendNotification('notifications/initialized', {});
@@ -332,6 +334,7 @@ class MCPClient {
         this.tools.clear();
         this.resources.clear();
         this.prompts.clear();
+        this.instructions = null;
         this.ws = null;
     }
 

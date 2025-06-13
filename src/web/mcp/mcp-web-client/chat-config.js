@@ -3,11 +3,11 @@
 // Default configuration schema
 const DEFAULT_CONFIG = {
     model: {
-        provider: 'anthropic',
-        id: 'claude-3-5-sonnet-latest',
+        provider: null,  // Will be set to first available provider
+        id: null,        // Will be set to first available model
         params: {
-            temperature: 1,
-            topP: 1,
+            temperature: 0.7,
+            topP: 0.9,
             maxTokens: 4096,
             seed: {
                 enabled: false,
@@ -36,7 +36,7 @@ const DEFAULT_CONFIG = {
         },
         titleGeneration: {
             enabled: true,
-            model: null
+            model: null  // null means use the same model as the chat
         }
     },
     mcpServer: 'http://localhost:5173'
@@ -72,8 +72,8 @@ export function validateConfig(config) {
         return false;
     }
     
-    // Validate model structure
-    if (!config.model || !config.model.provider || !config.model.id || !config.model.params) {
+    // Validate model structure - provider and id can be null (will be set later)
+    if (!config.model || !config.model.params) {
         return false;
     }
     
@@ -122,14 +122,7 @@ export function migrateConfig(oldConfig) {
         newConfig.optimisation.toolSummarisation = {
             enabled: oldConfig.toolSummarization.enabled || false,
             thresholdKiB: Math.floor((oldConfig.toolSummarization.threshold || 50000) / 1024),
-            model: oldConfig.secondaryModel ? {
-                provider: 'anthropic',
-                id: oldConfig.secondaryModel,
-                params: {
-                    ...FEATURE_MODEL_DEFAULTS.toolSummarisation,
-                    seed: { enabled: false, value: Math.floor(Math.random() * 1000000) }
-                }
-            } : null
+            model: oldConfig.secondaryModel ? modelConfigFromString(oldConfig.secondaryModel) : null
         };
     }
     
@@ -137,14 +130,7 @@ export function migrateConfig(oldConfig) {
         newConfig.optimisation.autoSummarisation = {
             enabled: oldConfig.autoSummarization.enabled || false,
             triggerPercent: oldConfig.autoSummarization.triggerPercent || 50,
-            model: oldConfig.secondaryModel ? {
-                provider: 'anthropic',
-                id: oldConfig.secondaryModel,
-                params: {
-                    ...FEATURE_MODEL_DEFAULTS.autoSummarisation,
-                    seed: { enabled: false, value: Math.floor(Math.random() * 1000000) }
-                }
-            } : null
+            model: oldConfig.secondaryModel ? modelConfigFromString(oldConfig.secondaryModel) : null
         };
     }
     
@@ -280,8 +266,8 @@ export function modelConfigFromString(modelString, params = {}) {
         provider,
         id: idParts.join(':'),
         params: {
-            temperature: params.temperature ?? 1,
-            topP: params.topP ?? 1,
+            temperature: params.temperature ?? 0.7,
+            topP: params.topP ?? 0.9,
             maxTokens: params.maxTokens ?? 4096,
             seed: params.seed ?? { enabled: false, value: Math.floor(Math.random() * 1000000) }
         }
