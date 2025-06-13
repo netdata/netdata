@@ -12,7 +12,7 @@ import (
 // The table cache converts repeated SNMP walks into efficient GET operations.
 // - First collection: Full walk, cache structure and tags
 // - Subsequent collections: GET metrics only, use cached tags
-// - Per-table TTL with jitter prevents simultaneous refreshes
+// - Tables with dependencies expire together to maintain consistency
 
 type tableCache struct {
 	// Table OID -> row index -> column OID -> full OID
@@ -27,6 +27,10 @@ type tableCache struct {
 	// Table OID -> tag values (index -> tag name -> value)
 	tagValues map[string]map[string]map[string]string
 
+	// Table OID -> list of dependent table OIDs (bidirectional)
+	// If table A depends on table B, both A->B and B->A are stored
+	tableDeps map[string]map[string]bool
+
 	baseTTL   time.Duration
 	jitterPct float64
 	mu        sync.RWMutex
@@ -39,6 +43,7 @@ func newTableCache(baseTTL time.Duration, jitterPct float64) *tableCache {
 		timestamps: make(map[string]time.Time),
 		tableTTLs:  make(map[string]time.Duration),
 		tagValues:  make(map[string]map[string]map[string]string),
+		tableDeps:  make(map[string]map[string]bool),
 		baseTTL:    baseTTL,
 		jitterPct:  jitterPct,
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -50,7 +55,6 @@ func (tc *tableCache) calculateTableTTL() time.Duration {
 	jitter := tc.jitterPct
 
 	// Random jitter between 0 and +jitterPct
-	// Note: This is called from within lock, so don't acquire lock here
 	randFloat := tc.rng.Float64()
 	multiplier := 1.0 + randFloat*jitter
 
@@ -81,6 +85,10 @@ func (tc *tableCache) getCachedData(tableOID string) (oids map[string]map[string
 }
 
 func (tc *tableCache) cacheData(tableOID string, oidMap map[string]map[string]string, tagValues map[string]map[string]string) {
+	tc.cacheDataWithDeps(tableOID, oidMap, tagValues, nil)
+}
+
+func (tc *tableCache) cacheDataWithDeps(tableOID string, oidMap map[string]map[string]string, tagValues map[string]map[string]string, dependencies []string) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
@@ -111,6 +119,24 @@ func (tc *tableCache) cacheData(tableOID string, oidMap map[string]map[string]st
 	tc.tagValues[tableOID] = tagsCopy
 	tc.timestamps[tableOID] = time.Now()
 	tc.tableTTLs[tableOID] = tc.calculateTableTTL()
+
+	// Set up bidirectional dependencies
+	if len(dependencies) > 0 {
+		if tc.tableDeps[tableOID] == nil {
+			tc.tableDeps[tableOID] = make(map[string]bool)
+		}
+
+		for _, depTable := range dependencies {
+			// Add forward dependency
+			tc.tableDeps[tableOID][depTable] = true
+
+			// Add reverse dependency
+			if tc.tableDeps[depTable] == nil {
+				tc.tableDeps[depTable] = make(map[string]bool)
+			}
+			tc.tableDeps[depTable][tableOID] = true
+		}
+	}
 }
 
 func (tc *tableCache) clearExpired() []string {
@@ -120,15 +146,44 @@ func (tc *tableCache) clearExpired() []string {
 	var expired []string
 	now := time.Now()
 
+	// First pass: find naturally expired tables
+	expiredTables := make(map[string]bool)
 	for tableOID, timestamp := range tc.timestamps {
 		ttl := tc.tableTTLs[tableOID]
 		if now.Sub(timestamp) > ttl {
-			delete(tc.tables, tableOID)
-			delete(tc.timestamps, tableOID)
-			delete(tc.tableTTLs, tableOID)
-			delete(tc.tagValues, tableOID)
-			expired = append(expired, tableOID)
+			expiredTables[tableOID] = true
 		}
+	}
+
+	// Second pass: cascade expiration to dependent tables
+	for tableOID := range expiredTables {
+		for dep := range tc.tableDeps[tableOID] {
+			expiredTables[dep] = true
+		}
+	}
+
+	// Clear all expired tables
+	for tableOID := range expiredTables {
+		delete(tc.tables, tableOID)
+		delete(tc.timestamps, tableOID)
+		delete(tc.tableTTLs, tableOID)
+		delete(tc.tagValues, tableOID)
+
+		// Clean up dependencies
+		if deps, ok := tc.tableDeps[tableOID]; ok {
+			// Remove this table from other tables' dependency lists
+			for depTable := range deps {
+				if otherDeps, ok := tc.tableDeps[depTable]; ok {
+					delete(otherDeps, tableOID)
+					if len(otherDeps) == 0 {
+						delete(tc.tableDeps, depTable)
+					}
+				}
+			}
+			delete(tc.tableDeps, tableOID)
+		}
+
+		expired = append(expired, tableOID)
 	}
 
 	return expired
@@ -147,5 +202,64 @@ func (tc *tableCache) setTTL(baseTTL time.Duration, jitterPct float64) {
 		tc.timestamps = make(map[string]time.Time)
 		tc.tableTTLs = make(map[string]time.Duration)
 		tc.tagValues = make(map[string]map[string]map[string]string)
+		tc.tableDeps = make(map[string]map[string]bool)
 	}
+}
+
+// Helper method to check if a group of tables is cached
+// All tables must be cached and not expired
+func (tc *tableCache) areTablesCached(tableOIDs []string) bool {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	if tc.baseTTL == 0 {
+		return false
+	}
+
+	now := time.Now()
+	for _, tableOID := range tableOIDs {
+		timestamp, ok := tc.timestamps[tableOID]
+		if !ok {
+			return false
+		}
+
+		ttl, ok := tc.tableTTLs[tableOID]
+		if !ok || now.Sub(timestamp) > ttl {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (tc *tableCache) stats() (tables int, withDeps int, totalDeps int) {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	tables = len(tc.tables)
+
+	for _, deps := range tc.tableDeps {
+		if len(deps) > 0 {
+			withDeps++
+			totalDeps += len(deps)
+		}
+	}
+
+	return tables, withDeps, totalDeps
+}
+
+func (tc *tableCache) getDependencies(tableOID string) []string {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	deps, ok := tc.tableDeps[tableOID]
+	if !ok {
+		return nil
+	}
+
+	result := make([]string, 0, len(deps))
+	for dep := range deps {
+		result = append(result, dep)
+	}
+	return result
 }
