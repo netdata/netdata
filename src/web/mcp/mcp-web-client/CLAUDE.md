@@ -1,7 +1,7 @@
 # ASSISTANTS **MUST** FOLLOW THESE RULES
 
 1. This is a new application. No need for backward compatibility.
-2. When a task is concluded existing eslint configuration MUST show zero errors and zero warnings.
+2. When a task is concluded, existing `eslint` configuration MUST show zero errors and zero warnings.
 3. Do not use any deprecated or legacy code. This is a new application, so everything should be up-to-date.
 4. Avoid default values to parameters. Always call functions with explicit parameters and if adding new parameters, ensure all uses are updated accordingly.
 5. Work in small increments so that the user can follow up with your changes and provide feedback.
@@ -14,8 +14,12 @@
 4. Remove any unused code, including imports, variables, functions, etc. If you need to use it later, re-implement it.
 
 ## WHEN COMMITING
+1. BEFORE committing make sure `eslint` shows zero errors and zero warnings.
 1. Commit with git add filename1 filename2 etc, to avoid committing unnecessary files.
 2. Always do a git diff before committing to ensure only intended changes are included.
+
+NOTES:
+ - Run `npx eslint ...` not `npm run lint`.
 
 ---
 

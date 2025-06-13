@@ -17,12 +17,54 @@ class MCPClient {
         this.prompts = new Map();
         this.isInitialized = false;
         
+        // Connection state tracking
+        this.connectionState = 'DISCONNECTED'; // DISCONNECTED, CONNECTING, HANDSHAKING, INITIALIZING, CONNECTED, RECONNECTING, FAILED
+        this.connectionStartTime = null;
+        this.reconnectAttempts = 0;
+        
         // Event handlers
         this.onConnectionChange = null;
+        this.onConnectionStateChange = null; // New handler for detailed state changes
         this.onMessage = null;
         this.onError = null;
         this.onNotification = null;
         this.onLog = null; // New handler for logging
+    }
+
+    /**
+     * Update connection state and notify listeners
+     */
+    setConnectionState(newState, details = {}) {
+        const oldState = this.connectionState;
+        this.connectionState = newState;
+        
+        if (newState === 'CONNECTING' || newState === 'RECONNECTING') {
+            this.connectionStartTime = Date.now();
+            if (newState === 'RECONNECTING') {
+                this.reconnectAttempts++;
+            }
+        } else if (newState === 'CONNECTED') {
+            this.reconnectAttempts = 0;
+        }
+        
+        if (this.onConnectionStateChange) {
+            this.onConnectionStateChange({
+                oldState,
+                newState,
+                details,
+                duration: this.connectionStartTime ? Date.now() - this.connectionStartTime : null,
+                reconnectAttempts: this.reconnectAttempts
+            });
+        }
+        
+        // Also trigger legacy connection change handler for compatibility
+        if (this.onConnectionChange) {
+            if (newState === 'CONNECTED') {
+                this.onConnectionChange('connected');
+            } else if (newState === 'DISCONNECTED' || newState === 'FAILED') {
+                this.onConnectionChange('disconnected');
+            }
+        }
     }
 
     /**
@@ -42,12 +84,13 @@ class MCPClient {
     /**
      * Connect to the MCP WebSocket server
      */
-    async connect(url) {
+    async connect(url, isReconnect = false) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             throw new Error('Already connected');
         }
 
         this.url = url;
+        this.setConnectionState(isReconnect ? 'RECONNECTING' : 'CONNECTING');
         
         return new Promise((resolve, reject) => {
             try {
@@ -57,15 +100,15 @@ class MCPClient {
                 this.ws.onopen = async () => {
                     console.log('WebSocket connected');
                     this.log('info', 'WebSocket connection established', { url });
-                    if (this.onConnectionChange) {
-                        this.onConnectionChange('connected');
-                    }
+                    this.setConnectionState('HANDSHAKING');
                     
                     try {
                         // Initialize MCP session
                         await this.initialize();
+                        this.setConnectionState('CONNECTED');
                         resolve();
                     } catch (error) {
+                        this.setConnectionState('FAILED', { error: error.message });
                         reject(error);
                     }
                 };
@@ -77,6 +120,7 @@ class MCPClient {
                 this.ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
                     this.log('error', `WebSocket error: ${error.message || 'Unknown error'}`, { error });
+                    this.setConnectionState('FAILED', { error: error.message || 'WebSocket error' });
                     if (this.onError) {
                         this.onError(error);
                     }
@@ -91,8 +135,11 @@ class MCPClient {
                         wasClean: event.wasClean 
                     });
                     this.isInitialized = false;
-                    if (this.onConnectionChange) {
-                        this.onConnectionChange('disconnected');
+                    if (this.connectionState !== 'FAILED') {
+                        this.setConnectionState('DISCONNECTED', { 
+                            code: event.code, 
+                            reason: event.reason 
+                        });
                     }
                     this.cleanup();
                 };
@@ -108,6 +155,8 @@ class MCPClient {
      * Initialize MCP session with the server
      */
     async initialize() {
+        this.setConnectionState('INITIALIZING', { phase: 'handshake' });
+        
         // Send initialize request
         const initResponse = await this.sendRequest('initialize', {
             protocolVersion: '2024-11-05',
@@ -127,6 +176,8 @@ class MCPClient {
         
         // Notify server that we're initialized
         await this.sendNotification('notifications/initialized', {});
+        
+        this.setConnectionState('INITIALIZING', { phase: 'loading_tools' });
         
         // List available tools
         if (this.capabilities?.tools) {
@@ -322,6 +373,7 @@ class MCPClient {
     disconnect() {
         if (this.ws) {
             this.log('info', 'Closing WebSocket connection', { url: this.url, state: 'disconnecting' });
+            this.setConnectionState('DISCONNECTING');
             this.ws.close();
         }
     }
@@ -345,6 +397,20 @@ class MCPClient {
         return this.ws && 
                this.ws.readyState === WebSocket.OPEN && 
                this.isInitialized;
+    }
+    
+    /**
+     * Get the current connection state
+     */
+    getConnectionState() {
+        return this.connectionState;
+    }
+    
+    /**
+     * Check if currently connecting
+     */
+    isConnecting() {
+        return ['CONNECTING', 'HANDSHAKING', 'INITIALIZING', 'RECONNECTING'].includes(this.connectionState);
     }
 }
 
