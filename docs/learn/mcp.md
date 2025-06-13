@@ -77,7 +77,7 @@ flowchart TD
     
     %% Style definitions
     classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef traditional fill:#f44336,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef traditional fill:#E57373,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
     classDef ai fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
     classDef solution fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
     classDef result fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
