@@ -36,58 +36,34 @@ Instead of spending hours analyzing charts during an incident, you can now:
 
 ```mermaid
 flowchart TD
-    A("**🚨 EMQX Outage**<br/><br/>Message broker<br/><br/>goes down")
+    A("🚨 EMQX Outage Occurs")
     
-    B("**📊 Traditional Approach**<br/><br/>Manual investigation<br/><br/>starts")
+    B("📊 Traditional Approach")
+    C("🤖 Netdata + MCP")
     
-    C("**🤖 With Netdata MCP**<br/><br/>AI analysis<br/><br/>begins instantly")
+    D("Manual dashboard review<br/>⏱️ Hours of analysis")
+    E("AI analyzes all metrics<br/>⚡ Instant correlation")
     
-    D("**🔍 Check Services**<br/><br/>Manually examine<br/><br/>dozens of dashboards")
-    
-    E("**⏱️ Correlate Timeframes**<br/><br/>Compare charts across<br/><br/>multiple systems")
-    
-    F("**📝 Build Timeline**<br/><br/>Spend hours<br/><br/>piecing together events")
-    
-    G("**❌ Miss Dependencies**<br/><br/>Overlook subtle<br/><br/>service relationships")
-    
-    H("**🔍 Detect Anomalies**<br/><br/>AI identifies connection<br/><br/>anomalies instantly")
-    
-    I("**🔗 Map Dependencies**<br/><br/>Full dependency chain<br/><br/>EMQX to MQTT to Apps")
-    
-    J("**📊 Impact Analysis**<br/><br/>Detailed timing and<br/><br/>affected services")
-    
-    K("**💡 Suggest Solutions**<br/><br/>Specific remediation<br/><br/>steps provided")
-    
-    L("**⏰ Hours Later**<br/><br/>Problem eventually<br/><br/>understood")
-    
-    M("**✅ Minutes Later**<br/><br/>Problem solved<br/><br/>with AI guidance")
+    F("❌ Slow resolution<br/>Missed dependencies")
+    G("✅ Fast resolution<br/>Complete root cause")
     
     A --> B
     A --> C
     B --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> L
-    C --> H
-    H --> I
-    I --> J
-    J --> K
-    K --> M
+    C --> E
+    D --> F
+    E --> G
     
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef traditional fill:#E57373,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef ai fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef solution fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef result fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    %% Styling
+    classDef problem fill:#ffeb3b,stroke:#333,stroke-width:2px
+    classDef traditional fill:#ff7043,stroke:#333,stroke-width:2px
+    classDef ai fill:#42a5f5,stroke:#333,stroke-width:2px
+    classDef outcome fill:#f5f5f5,stroke:#333,stroke-width:2px
     
-    %% Apply styles
-    class A alert
-    class B,D,E,F,G traditional
-    class C,H,I,J,K ai
-    class L result
-    class M solution
+    class A problem
+    class B,D traditional
+    class C,E ai
+    class F,G outcome
 ```
 
 ### Advanced Anomaly Detection
