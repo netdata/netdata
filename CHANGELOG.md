@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Remove static build timeouts from regular builds. [\#20470](https://github.com/netdata/netdata/pull/20470) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#20466](https://github.com/netdata/netdata/pull/20466) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/ddsnmp\): add table metrics and tags caching optimization [\#20465](https://github.com/netdata/netdata/pull/20465) ([ilyam8](https://github.com/ilyam8))
 - Improve datafile rotation and indexing during shutdown [\#20464](https://github.com/netdata/netdata/pull/20464) ([stelfrag](https://github.com/stelfrag))
@@ -453,7 +454,6 @@
 - do not expose web server filenames [\#19925](https://github.com/netdata/netdata/pull/19925) ([ktsaou](https://github.com/ktsaou))
 - Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
 - Exclude external code from CodeQL scanning. [\#19923](https://github.com/netdata/netdata/pull/19923) ([Ferroin](https://github.com/Ferroin))
-- remove ilove endpoint [\#19919](https://github.com/netdata/netdata/pull/19919) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
