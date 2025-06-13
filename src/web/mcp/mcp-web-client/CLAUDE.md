@@ -232,3 +232,65 @@ The `getCumulativeTokenUsage()` function:
 - They only affect cumulative token display, not context window calculation
 - Multiple accounting nodes can exist in a chat history
 - They provide an audit trail of conversation edits and retries
+
+## Tool Memory - Rolling Window
+
+### Overview
+Tool Memory implements a rolling window for tool visibility. Tools and their responses are filtered based on how many "turns" have passed since they were used.
+
+### What is a Turn?
+A **turn** is a period of assistant activity that ends with a conclusion - an assistant message without tool calls. When the assistant sends a message without using tools, it marks the end of the current turn.
+
+### Configuration
+- `toolMemory.enabled`: Enable/disable the feature (default: false)
+- `toolMemory.forgetAfterConclusions`: Number of turns to keep tools visible (0-5, default: 1)
+
+### How It Works
+
+1. **Turn Tracking**: Each message is assigned to a turn number based on when it occurs
+2. **Turn Progression**: A new turn starts after the assistant concludes (sends a message without tools)
+3. **Filtering**: Tools are filtered if `(currentTurn - toolTurn) > forgetAfterConclusions`
+
+### Examples
+
+#### With `forgetAfterConclusions = 0` (immediate filtering):
+```
+Turn 0: Assistant uses tools A,B → concludes
+Turn 1: Assistant uses tools C,D → concludes
+Result: When in Turn 1, tools A,B are filtered (no longer visible)
+```
+
+#### With `forgetAfterConclusions = 1` (keep 1 turn):
+```
+Turn 0: Assistant uses tools A,B → concludes
+Turn 1: Assistant uses tools C,D → concludes  
+Turn 2: Assistant uses tools E,F → concludes
+Result: When in Turn 2, tools A,B are filtered, but C,D are still visible
+```
+
+### Implementation Details
+
+1. **Two-Pass Processing**:
+   - First pass: Build the turn map by analyzing all messages
+   - Second pass: Filter messages based on turn age
+
+2. **Complete Filtering**:
+   - Tool response messages (`tool-results`) are removed entirely
+   - Tool calls in assistant messages (`tool_use` blocks) are also removed
+   - This prevents the assistant from seeing orphaned tool calls without responses
+
+3. **User Messages**:
+   - User messages don't create new turns
+   - They reset the "hasToolsInCurrentTurn" flag but preserve turn counting
+
+### UI Integration
+- Checkbox to enable/disable tool memory
+- Dropdown to select threshold (0-5 turns)
+- Tooltip shows human-readable text:
+  - 0 = "forget immediately"
+  - 1 = "forget after 1 turn"
+  - 2+ = "forget after N turns"
+  - Disabled = "Always remember"
+
+### Purpose
+This feature helps manage context window size and reduces costs by automatically removing old tool interactions that are no longer relevant to the current conversation flow.

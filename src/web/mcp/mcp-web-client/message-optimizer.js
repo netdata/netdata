@@ -11,48 +11,60 @@
 import { ToolSummarizer } from './tool-summarizer.js';
 import * as SystemMsg from './system-msg.js';
 
-// Forward declarations to avoid no-use-before-define
-class ConclusionDetector {
-    isConclusion() {
-        return false;
-    }
-}
-
 class AssistantStateTracker {
     constructor() {
-        this.state = 'idle';
-        this.conclusionCount = 0;
-        this.lastToolMessageIndex = -1;
+        this.currentTurn = 0;
+        this.messageToTurn = new Map(); // Maps message index to turn number
+        this.hasToolsInCurrentTurn = false;
     }
 
-    updateState(msg) {
+    updateState(msg, index) {
         if (msg.role === 'assistant') {
             if (this.hasToolCalls(msg)) {
-                this.state = 'using-tools';
+                this.hasToolsInCurrentTurn = true;
+                this.messageToTurn.set(index, this.currentTurn);
                 return;
             }
             
-            if (this.isConclusion(msg)) {
-                this.state = 'concluded';
-                this.conclusionCount++;
-                return;
+            // Assistant message without tool calls = conclusion
+            this.messageToTurn.set(index, this.currentTurn);
+            // Only increment turn if we had tools in this turn
+            if (this.hasToolsInCurrentTurn) {
+                // console.log(`[AssistantStateTracker] Turn ${this.currentTurn} ends at message ${index}`);
+                this.currentTurn++;
+                this.hasToolsInCurrentTurn = false;
             }
-            
-            this.state = 'thinking';
         } else if (msg.role === 'tool-results') {
-            this.lastToolMessageIndex = this.conclusionCount;
+            // Tool results belong to the current turn
+            this.messageToTurn.set(index, this.currentTurn);
         } else if (msg.role === 'user') {
-            this.reset();
+            // User message doesn't reset turns, just marks that we're no longer in a tool-using state
+            this.hasToolsInCurrentTurn = false;
+            this.messageToTurn.set(index, this.currentTurn);
+        } else {
+            // Other messages belong to current turn
+            this.messageToTurn.set(index, this.currentTurn);
         }
     }
 
-    shouldFilterTools(threshold) {
-        return this.state === 'concluded' && 
-               (this.conclusionCount - this.lastToolMessageIndex) > threshold;
+    shouldFilterTools(messageIndex, threshold) {
+        const messageTurn = this.messageToTurn.get(messageIndex) || 0;
+        // Get the turn of the last message to know what turn we're actually in
+        const lastMessageTurn = Math.max(...Array.from(this.messageToTurn.values()), 0);
+        const turnDifference = lastMessageTurn - messageTurn;
+        // console.log(`[AssistantStateTracker] Message ${messageIndex}: turn=${messageTurn}, lastMessageTurn=${lastMessageTurn}, diff=${turnDifference}, threshold=${threshold}, filter=${turnDifference > threshold}`);
+        return turnDifference > threshold;
+    }
+
+    getMessageTurn(messageIndex) {
+        return this.messageToTurn.get(messageIndex) || 0;
     }
 
     reset() {
-        this.state = 'idle';
+        // Reset for new conversation
+        this.currentTurn = 0;
+        this.messageToTurn.clear();
+        this.hasToolsInCurrentTurn = false;
     }
 
     hasToolCalls(msg) {
@@ -63,45 +75,10 @@ class AssistantStateTracker {
     }
 
     isConclusion(msg) {
-        const text = this.extractText(msg).toLowerCase();
-        
-        const conclusionPhrases = [
-            'done', 'completed', 'finished',
-            'here is', 'here\'s', 'here are',
-            'successfully', 'accomplished'
-        ];
-        
-        const workingPhrases = [
-            'let me', 'I\'ll', 'I will',
-            'checking', 'looking', 'analyzing'
-        ];
-        
-        let score = 0;
-        conclusionPhrases.forEach(phrase => {
-            if (text.includes(phrase)) score += 2;
-        });
-        
-        workingPhrases.forEach(phrase => {
-            if (text.includes(phrase)) score -= 1;
-        });
-        
-        return score > 0;
+        // A conclusion is simply an assistant message without tool calls
+        return !this.hasToolCalls(msg);
     }
 
-    extractText(msg) {
-        if (typeof msg.content === 'string') {
-            return msg.content;
-        }
-        
-        if (Array.isArray(msg.content)) {
-            return msg.content
-                .filter(block => block.type === 'text')
-                .map(block => block.text)
-                .join(' ');
-        }
-        
-        return '';
-    }
 }
 
 export class MessageOptimizer {
@@ -112,7 +89,6 @@ export class MessageOptimizer {
         }
         
         this.settings = this.validateSettings(settings);
-        this.conclusionDetector = new ConclusionDetector();
         
         // Initialize tool summarizer if enabled
         this.toolSummarizer = null;
@@ -334,7 +310,20 @@ export class MessageOptimizer {
             // Step 3: Track assistant state for smart filtering
             const assistantTracker = new AssistantStateTracker();
 
-            // Step 4: Process each message from checkpoint onwards
+            // Step 4: First pass - build turn map
+            if (this.settings.optimisation.toolMemory.enabled) {
+                // console.log('[First Pass] Building turn map...');
+                for (let i = startIndex; i < chat.messages.length; i++) {
+                    const msg = chat.messages[i];
+                    if (!this.shouldSkipMessage(msg)) {
+                        // console.log(`[First Pass] Processing message ${i}: ${msg.role}`);
+                        assistantTracker.updateState(msg, i);
+                    }
+                }
+                // console.log(`[First Pass] Complete. Final turn: ${assistantTracker.currentTurn}`);
+            }
+
+            // Step 5: Second pass - process messages with filtering
             for (let i = startIndex; i < chat.messages.length; i++) {
                 const msg = chat.messages[i];
                 
@@ -346,9 +335,6 @@ export class MessageOptimizer {
                     // console.log(`[MessageOptimizer] Skipping message ${i}: ${msg.role || msg.type}`);
                     continue;
                 }
-
-                // Update assistant state tracking
-                assistantTracker.updateState(msg);
 
                 // Process based on message type with strict validation
                 const processedMsg = this.processMessage(
@@ -511,15 +497,13 @@ export class MessageOptimizer {
                 return index === 0 ? null : msg;
                 
             case 'user':
-                // Reset assistant state on new user input
-                tracker.reset();
                 return msg;
                 
             case 'assistant':
-                return msg;
+                return this.processAssistantMessage(msg, index, tracker, stats);
                 
             case 'tool-results':
-                return this.processToolResults(msg, tracker, stats);
+                return this.processToolResults(msg, index, tracker, stats);
                 
             case 'tool-summary':
                 // This will be handled by transforming existing tool-results
@@ -533,22 +517,76 @@ export class MessageOptimizer {
     }
 
     /**
+     * Processes assistant messages, potentially filtering tool calls
+     * @param {Object} msg - Assistant message
+     * @param {number} index - Message index
+     * @param {AssistantStateTracker} tracker - State tracker
+     * @param {Object} stats - Statistics object
+     * @returns {Object} - Processed message
+     */
+    processAssistantMessage(msg, index, tracker, stats) {
+        // If tool memory is not enabled, return as-is
+        if (!this.settings.optimisation.toolMemory.enabled) {
+            return msg;
+        }
+        
+        // If message has no tool calls, return as-is
+        if (!tracker.hasToolCalls(msg)) {
+            return msg;
+        }
+        
+        // Check if we should filter the tool calls based on turn age
+        const shouldFilter = tracker.shouldFilterTools(
+            index,
+            this.settings.optimisation.toolMemory.forgetAfterConclusions
+        );
+        
+        if (!shouldFilter) {
+            return msg;
+        }
+        
+        // Filter out tool_use blocks from content
+        if (Array.isArray(msg.content)) {
+            const filteredContent = msg.content.filter(block => block.type !== 'tool_use');
+            
+            // Count filtered tools
+            const toolsFiltered = msg.content.filter(block => block.type === 'tool_use').length;
+            stats.toolsFiltered += toolsFiltered;
+            
+            // If all content was tool calls, return null to skip the message entirely
+            if (filteredContent.length === 0) {
+                return null;
+            }
+            
+            // Return message with filtered content
+            return {
+                ...msg,
+                content: filteredContent
+            };
+        }
+        
+        return msg;
+    }
+
+    /**
      * Processes tool results based on optimization settings
      * @param {Object} msg - Tool results message
+     * @param {number} index - Message index
      * @param {AssistantStateTracker} tracker - State tracker
      * @param {Object} stats - Statistics object
      * @returns {Object|null} - Processed message or null if filtered
      */
-    processToolResults(msg, tracker, stats) {
+    processToolResults(msg, index, tracker, stats) {
         // Check if tools should be filtered based on assistant state
         if (this.settings.optimisation.toolMemory.enabled) {
             const shouldFilter = tracker.shouldFilterTools(
+                index,
                 this.settings.optimisation.toolMemory.forgetAfterConclusions
             );
             
             if (shouldFilter) {
                 stats.toolsFiltered += msg.toolResults.length;
-                // console.log(`[MessageOptimizer] Filtered ${msg.toolResults.length} tool results (assistant concluded)`);
+                // console.log(`[MessageOptimizer] Filtered ${msg.toolResults.length} tool results (turn too old)`);
                 return null;
             }
         }
