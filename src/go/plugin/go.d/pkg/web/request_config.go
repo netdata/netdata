@@ -53,6 +53,10 @@ type RequestConfig struct {
 
 // Copy makes a full copy of the RequestConfig.
 func (r RequestConfig) Copy() RequestConfig {
+	if r.Headers == nil {
+		return r
+	}
+
 	headers := make(map[string]string, len(r.Headers))
 	for k, v := range r.Headers {
 		headers[k] = v
@@ -63,28 +67,38 @@ func (r RequestConfig) Copy() RequestConfig {
 
 var userAgent = fmt.Sprintf("Netdata %s.plugin/%s", executable.Name, buildinfo.Version)
 
-// NewHTTPRequest returns a new *http.Requests given a RequestConfig configuration and an error if any.
+// NewHTTPRequest returns a new *http.Request given a RequestConfig configuration and an error if any.
 func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 	var body io.Reader
 	if cfg.Body != "" {
 		body = strings.NewReader(cfg.Body)
 	}
 
-	req, err := http.NewRequest(cfg.Method, cfg.URL, body)
+	method := cfg.Method
+	if method == "" {
+		method = http.MethodGet
+	}
+
+	req, err := http.NewRequest(method, cfg.URL, body)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("User-Agent", userAgent)
 
-	if cfg.Username != "" || cfg.Password != "" {
-		req.SetBasicAuth(cfg.Username, cfg.Password)
-	} else if cfg.BearerTokenFile != "" {
-		token, err := os.ReadFile(cfg.BearerTokenFile)
+	// Authentication priority: Bearer Token > Basic Auth
+	if cfg.BearerTokenFile != "" {
+		bs, err := os.ReadFile(cfg.BearerTokenFile)
 		if err != nil {
-			return nil, fmt.Errorf("bearer token file: %v", err)
+			return nil, fmt.Errorf("bearer token file: %w", err)
 		}
-		req.Header.Set("Authorization", "Bearer "+string(token))
+		token := strings.TrimSpace(string(bs))
+		if token == "" {
+			return nil, fmt.Errorf("bearer token file is empty")
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+	} else if cfg.Username != "" || cfg.Password != "" {
+		req.SetBasicAuth(cfg.Username, cfg.Password)
 	}
 
 	if cfg.ProxyUsername != "" && cfg.ProxyPassword != "" {
@@ -93,8 +107,8 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 	}
 
 	for k, v := range cfg.Headers {
-		switch k {
-		case "host", "Host":
+		switch strings.ToLower(k) {
+		case "host":
 			req.Host = v
 		default:
 			req.Header.Set(k, v)
@@ -104,18 +118,33 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 	return req, nil
 }
 
+// NewHTTPRequestWithPath creates a new HTTP request with the given path appended to the base URL.
 func NewHTTPRequestWithPath(cfg RequestConfig, urlPath string) (*http.Request, error) {
 	cfg = cfg.Copy()
 
 	v, err := url.JoinPath(cfg.URL, urlPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to join URL path: %v", err)
+		return nil, fmt.Errorf("failed to join URL path: %w", err)
 	}
 	cfg.URL = v
 
 	return NewHTTPRequest(cfg)
 }
 
+// URLQuery creates a URL-encoded query string from a single key-value pair.
 func URLQuery(key, value string) string {
 	return url.Values{key: []string{value}}.Encode()
+}
+
+// URLQueryMulti creates a URL-encoded query string from multiple key-value pairs.
+func URLQueryMulti(params map[string]string) string {
+	if len(params) == 0 {
+		return ""
+	}
+
+	values := url.Values{}
+	for k, v := range params {
+		values.Set(k, v)
+	}
+	return values.Encode()
 }
