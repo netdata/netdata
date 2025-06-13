@@ -2569,6 +2569,7 @@ body {
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
+    color: var(--text-primary);
     opacity: 0;
     transition: all 0.2s ease;
     line-height: 1;
