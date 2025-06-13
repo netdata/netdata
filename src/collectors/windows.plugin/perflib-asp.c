@@ -10,8 +10,7 @@ struct asp_app {
     RRDSET *st_aspnet_errors_during_compilation;
     RRDSET *st_aspnet_errors_during_execution;
     RRDSET *st_aspnet_errors_unhandled_execution_sec;
-    RRDSET *st_aspnet_requests_byte_total_in;
-    RRDSET *st_aspnet_requests_byte_total_out;
+    RRDSET *st_aspnet_requests_byte_total;
     RRDSET *st_aspnet_requests_executing;
     RRDSET *st_aspnet_requests_failed;
     RRDSET *st_aspnet_requests_not_found;
@@ -416,6 +415,108 @@ static inline void netdata_aspnet_apps_runtime_errors(PERF_DATA_BLOCK *pDataBloc
         netdata_apps_errors_during_unhandled_execution(aa, windows_shared_buffer, update_every);
 }
 
+static void netdata_apps_requests_bytes(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_requests_byte_total)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_requests_byte_total", app);
+
+        aa->st_aspnet_requests_byte_total = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.requests_byte_total",
+                "Request Bytes.",
+                "bytes",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_REQUESTS_BYTES_TOTAL,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_requests_byte_total_in =
+                rrddim_add(aa->st_aspnet_requests_byte_total, "in", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        aa->rd_aspnet_requests_byte_total_out =
+                rrddim_add(aa->st_aspnet_requests_byte_total, "out", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_requests_byte_total->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_requests_byte_total,
+            aa->rd_aspnet_requests_byte_total_in,
+            (collected_number) aa->aspnetRequestsBytesTotalIn.current.Data);
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_requests_byte_total,
+            aa->rd_aspnet_requests_byte_total_out,
+            (collected_number) aa->aspnetRequestsBytesTotalOut.current.Data);
+    rrdset_done(aa->st_aspnet_requests_byte_total);
+}
+
+static void netdata_apps_requests_executing(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_requests_executing)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_requests_executing", app);
+
+        aa->st_aspnet_requests_executing = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.requests_executing",
+                "The number of requests currently executing.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_REQUESTS_EXECUTING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_requests_executing =
+                rrddim_add(aa->st_aspnet_requests_executing, "executing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_requests_executing->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_requests_executing,
+            aa->rd_aspnet_requests_executing,
+            (collected_number) aa->aspnetRequestsBytesTotalIn.current.Data);
+    rrdset_done(aa->st_aspnet_requests_executing);
+}
+
+static inline void netdata_aspnet_apps_requests(PERF_DATA_BLOCK *pDataBlock,
+                                                PERF_OBJECT_TYPE *pObjectType,
+                                                struct asp_app *aa,
+                                                int update_every) {
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsBytesTotalIn) &&
+        perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsBytesTotalOut))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsExecuting))
+        netdata_apps_requests_executing(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsFailed))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsNotFound))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsNotAuthorized))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsTimeout))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsSuccessed))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsPerSec))
+        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+}
+
 static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every) {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -440,6 +541,8 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
             netdata_apps_compilations_total(aa, windows_shared_buffer, update_every);
 
         netdata_aspnet_apps_runtime_errors(pDataBlock, pObjectType, app, update_every);
+
+        netdata_aspnet_apps_requests(pDataBlock, pObjectType, app, update_every);
     }
 }
 

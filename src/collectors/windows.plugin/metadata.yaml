@@ -3225,3 +3225,16 @@ modules:
               chart_type: line
               dimensions:
                 - name: unhandled
+            - name: aspnet.requests_byte_total
+              description: Request Bytes.
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: aspnet.requests_executing
+              description: The number of requests currently executing.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: executing
