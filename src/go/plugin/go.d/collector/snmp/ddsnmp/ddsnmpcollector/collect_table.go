@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+// tableWalkResult holds the walked data for a single table
 type tableWalkResult struct {
 	tableOID string
 	pdus     map[string]gosnmp.SnmpPDU
@@ -21,14 +22,17 @@ type tableWalkResult struct {
 }
 
 func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
+	// Phase 1: Walk all tables and collect raw data
 	walkResults, err := c.walkAllTables(prof)
 	if err != nil {
 		return nil, err
 	}
 
+	// Phase 2: Process walked data into metrics
 	return c.processTableWalkResults(walkResults)
 }
 
+// Phase 1: Walk all tables
 func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
 	var results []tableWalkResult
 	var errs []error
@@ -48,15 +52,9 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 
 		doneOids[cfg.Table.OID] = true
 
-		// Check if we should skip this table
+		// Check if we should skip this table (only skip for index transforms now)
 		skipTable := false
-
 		for _, tagCfg := range cfg.MetricTags {
-			if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
-				c.log.Debugf("Skipping table %s: has cross-table tag from %s", cfg.Table.Name, tagCfg.Table)
-				skipTable = true
-				break
-			}
 			if len(tagCfg.IndexTransform) > 0 {
 				c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
 				skipTable = true
@@ -68,6 +66,7 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 			continue
 		}
 
+		// Walk the table
 		pdus, err := c.snmpWalk(cfg.Table.OID)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to walk table '%s': %w", cfg.Table.Name, err))
@@ -94,6 +93,7 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 	return results, nil
 }
 
+// Phase 2: Process walked data
 func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Metric, error) {
 	var metrics []Metric
 	var errs []error
@@ -104,9 +104,17 @@ func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Me
 		walkedData[result.tableOID] = result.pdus
 	}
 
+	// Build a map of table name to OID for cross-table lookups
+	tableNameToOID := make(map[string]string)
+	for _, result := range walkResults {
+		if result.config.Table.Name != "" {
+			tableNameToOID[result.config.Table.Name] = result.tableOID
+		}
+	}
+
 	// Process each table's walked data
 	for _, result := range walkResults {
-		tableMetrics, err := c.processTableData(result.config, result.pdus, walkedData)
+		tableMetrics, err := c.processTableData(result.config, result.pdus, walkedData, tableNameToOID)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("table '%s': %w", result.config.Table.Name, err))
 			continue
@@ -121,7 +129,8 @@ func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Me
 	return metrics, nil
 }
 
-func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, allWalkedData map[string]map[string]gosnmp.SnmpPDU) ([]Metric, error) {
+// Process a single table's data
+func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, allWalkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string) ([]Metric, error) {
 	// Try to use cache if available
 	if cachedOIDs, cachedTags, ok := c.tableCache.getCachedData(cfg.Table.OID); ok {
 		metrics, err := c.collectTableWithCache(cfg, cachedOIDs, cachedTags, buildColumnOIDs(cfg))
@@ -188,6 +197,55 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 			tags, err := processTableMetricTagValue(tagCfg, pdu)
 			if err != nil {
 				c.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
+				continue
+			}
+
+			for k, v := range tags {
+				rowTags[k] = v
+				tagCache[index][k] = v
+			}
+		}
+
+		// Process cross-table tags
+		for _, tagCfg := range cfg.MetricTags {
+			// Skip if not a cross-table tag
+			if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
+				continue
+			}
+
+			// Skip if has index transformation (not supported yet)
+			if len(tagCfg.IndexTransform) > 0 {
+				continue
+			}
+
+			// Find the referenced table's OID
+			refTableOID, ok := tableNameToOID[tagCfg.Table]
+			if !ok {
+				c.log.Debugf("Cannot find table OID for referenced table %s", tagCfg.Table)
+				continue
+			}
+
+			// Get the walked data for the referenced table
+			refTablePDUs, ok := allWalkedData[refTableOID]
+			if !ok {
+				c.log.Debugf("No walked data for referenced table %s (OID: %s)", tagCfg.Table, refTableOID)
+				continue
+			}
+
+			// Look up the value from the referenced table using the same index
+			refColumnOID := trimOID(tagCfg.Symbol.OID)
+			refFullOID := refColumnOID + "." + index
+
+			pdu, ok := refTablePDUs[refFullOID]
+			if !ok {
+				c.log.Debugf("Cannot find cross-table tag value at OID %s for table %s", refFullOID, tagCfg.Table)
+				continue
+			}
+
+			// Process the cross-table tag value
+			tags, err := processTableMetricTagValue(tagCfg, pdu)
+			if err != nil {
+				c.log.Debugf("Error processing cross-table tag %s from table %s: %v", tagCfg.Tag, tagCfg.Table, err)
 				continue
 			}
 
@@ -399,80 +457,4 @@ func (c *Collector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error) {
 	}
 
 	return pdus, nil
-}
-
-func (c *Collector) analyzeTableDependencies(prof *ddsnmp.Profile) map[string][]string {
-	deps := make(map[string][]string)
-
-	// Build a map of table name to OID for quick lookup
-	tableNameToOID := make(map[string]string)
-	for _, cfg := range prof.Definition.Metrics {
-		if cfg.Table.OID != "" {
-			tableNameToOID[cfg.Table.Name] = cfg.Table.OID
-		}
-	}
-
-	// Analyze each metric configuration
-	for _, cfg := range prof.Definition.Metrics {
-		if cfg.Table.OID == "" {
-			continue
-		}
-
-		mainTableOID := cfg.Table.OID
-		seenDeps := make(map[string]bool)
-
-		// Find all tables referenced in metric tags
-		for _, tagCfg := range cfg.MetricTags {
-			// Check if this tag references a different table
-			if tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name {
-				// Skip if uses index transformation (Phase 5)
-				if len(tagCfg.IndexTransform) > 0 {
-					c.log.Debugf("Table %s has cross-table tag with index transformation from %s (not supported yet)",
-						cfg.Table.Name, tagCfg.Table)
-					continue
-				}
-
-				// Find the OID for the referenced table
-				if refTableOID, ok := tableNameToOID[tagCfg.Table]; ok {
-					if !seenDeps[refTableOID] {
-						deps[mainTableOID] = append(deps[mainTableOID], refTableOID)
-						seenDeps[refTableOID] = true
-					}
-				} else {
-					c.log.Debugf("Table %s references unknown table %s in metric tags",
-						cfg.Table.Name, tagCfg.Table)
-				}
-			}
-		}
-	}
-
-	// Log the dependencies for debugging
-	for tableOID, depList := range deps {
-		if len(depList) > 0 {
-			c.log.Debugf("Table %s depends on tables: %v", tableOID, depList)
-		}
-	}
-
-	return deps
-}
-
-// findTableOIDByName searches through the profile to find a table's OID given its name
-func (c *Collector) findTableOIDByName(prof *ddsnmp.Profile, tableName string) string {
-	for _, cfg := range prof.Definition.Metrics {
-		if cfg.Table.Name == tableName {
-			return cfg.Table.OID
-		}
-	}
-	return ""
-}
-
-// getConfigsForTable returns all metric configs that define metrics for a given table OID
-func (c *Collector) getConfigsForTable(prof *ddsnmp.Profile, tableOID string) []ddprofiledefinition.MetricsConfig {
-	var configs []ddprofiledefinition.MetricsConfig
-	for _, cfg := range prof.Definition.Metrics {
-		if cfg.Table.OID == tableOID {
-			configs = append(configs, cfg)
-		}
-	}
-	return configs
 }
