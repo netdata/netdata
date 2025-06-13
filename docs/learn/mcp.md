@@ -93,6 +93,7 @@ flowchart TD
 ### Advanced Anomaly Detection
 
 Your AI assistant can:
+
 - **Detect anomaly patterns** across your entire infrastructure
 - **Identify cascade failures** before they become critical
 - **Explain complex service dependencies** in plain language
@@ -102,11 +103,11 @@ Your AI assistant can:
 
 ### What You Can Do Today
 
-| Capability | What You Get | Key Benefits |
-|------------|--------------|--------------|
-| **Infrastructure Analysis** | **Post-mortem analysis** of incidents with **root cause identification**, **real-time anomaly correlation** across all your services, **service dependency mapping** and impact analysis, **performance bottleneck identification** | Understand complex incidents in minutes instead of hours, identify cascading failures before they spread |
-| **Intelligent Querying** | Ask questions about your infrastructure in **natural language**, get **explanations of complex metrics** and their relationships, understand **streaming configurations** and network topologies, analyze **resource usage patterns** and trends | No more manual chart correlation - just ask and get expert-level insights |
-| **Expert Troubleshooting** | **AI-powered investigation** of performance issues, **automated correlation** of events across your infrastructure, **context-aware recommendations** based on your specific setup | Get the analysis that would normally require a senior engineer, available 24/7 |
+| Capability                  | What You Get                                                                                                                                                                                                                                     | Key Benefits                                                                                             |
+|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| **Infrastructure Analysis** | **Post-mortem analysis** of incidents with **root cause identification**, **real-time anomaly correlation** across all your services, **service dependency mapping** and impact analysis, **performance bottleneck identification**              | Understand complex incidents in minutes instead of hours, identify cascading failures before they spread |
+| **Intelligent Querying**    | Ask questions about your infrastructure in **natural language**, get **explanations of complex metrics** and their relationships, understand **streaming configurations** and network topologies, analyze **resource usage patterns** and trends | No more manual chart correlation - just ask and get expert-level insights                                |
+| **Expert Troubleshooting**  | **AI-powered investigation** of performance issues, **automated correlation** of events across your infrastructure, **context-aware recommendations** based on your specific setup                                                               | Get the analysis that would normally require a senior engineer, available 24/7                           |
 
 ### How to Get Started
 
@@ -128,7 +129,7 @@ Your AI assistant can:
 **The next major step**: MCP will integrate directly with Netdata Cloud, giving you access to your complete infrastructure data:
 
 - **Organization-wide analysis** across all your monitored infrastructure
-- **Cross-room correlation** for complex distributed systems  
+- **Cross-room correlation** for complex distributed systems
 - **Complete infrastructure visibility** through AI analysis
 - **Team-wide insights** from your centralized monitoring data
 
