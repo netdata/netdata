@@ -12,7 +12,7 @@
 
 ## How Netdata is Pioneering AI-Powered Monitoring
 
-Netdata is the **first monitoring platform** to integrate MCP, making us pioneers in AI-powered infrastructure analysis. We've built a direct connection between advanced AI models (like Claude) and your Netdata monitoring data, creating an intelligent troubleshooting partner that understands your specific infrastructure.
+Netdata is **one of the first monitoring platforms** to integrate MCP, placing us among the pioneers in AI-powered infrastructure analysis. We've built a direct connection between advanced AI models (like Claude) and your Netdata monitoring data, creating an intelligent troubleshooting partner that understands your specific infrastructure.
 
 ### What Makes This Revolutionary
 
