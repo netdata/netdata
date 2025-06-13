@@ -350,6 +350,8 @@ body {
 /* Row 1: Title */
 .session-title-row {
     margin-bottom: 6px;
+    display: flex;
+    align-items: center;
 }
 
 .session-title {
@@ -2703,7 +2705,7 @@ body {
 }
 
 :root[data-theme="dark"] .context-window-fill.danger {
-    background: var(--danger-color);
+    background: #8b2020; /* Darker red for better contrast in dark theme */
 }
 
 .context-window-stats {

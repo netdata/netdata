@@ -9,6 +9,7 @@
  */
 
 import { ToolSummarizer } from './tool-summarizer.js';
+import * as SystemMsg from './system-msg.js';
 
 // Forward declarations to avoid no-use-before-define
 class ConclusionDetector {
@@ -146,11 +147,11 @@ export class MessageOptimizer {
     validateSettings(settings) {
         const defaults = {
             model: {
-                provider: 'anthropic',
-                id: 'claude-3-5-sonnet-latest',
+                provider: null,
+                id: null,
                 params: {
-                    temperature: 1,
-                    topP: 1,
+                    temperature: 0.7,
+                    topP: 0.9,
                     maxTokens: 4096,
                     seed: {
                         enabled: false,
@@ -182,7 +183,7 @@ export class MessageOptimizer {
                     model: null
                 }
             },
-            mcpServer: 'http://localhost:5173'
+            mcpServer: null
         };
 
         // Deep merge with validation
@@ -286,7 +287,7 @@ export class MessageOptimizer {
      * @returns {Object} - { messages, cacheControlIndex, toolInclusionMode, stats }
      * @throws {Error} - If chat is invalid or processing fails
      */
-    buildMessagesForAPI(chat, freezeCache = false) {
+    buildMessagesForAPI(chat, freezeCache = false, mcpInstructions = null) {
         // STRICT: Validate input parameters
         if (!chat || typeof chat !== 'object') {
             throw new Error('[MessageOptimizer.buildMessagesForAPI] chat must be a valid object');
@@ -328,7 +329,7 @@ export class MessageOptimizer {
             // console.log(`[MessageOptimizer] Found summary checkpoint, starting from index ${startIndex}`);
 
             // Step 2: Initialize messages array with system prompt
-            const messages = this.initializeMessagesArray(chat.messages, summaryMessage);
+            const messages = this.initializeMessagesArray(chat.messages, summaryMessage, mcpInstructions);
 
             // Step 3: Track assistant state for smart filtering
             const assistantTracker = new AssistantStateTracker();
@@ -412,14 +413,20 @@ export class MessageOptimizer {
      * Initializes the messages array with system prompt and summary
      * @param {Array} allMessages - All chat messages
      * @param {Object|null} summaryMessage - Summary message if found
+     * @param {string|null} mcpInstructions - MCP server instructions to append
      * @returns {Array} - Initial messages array
      */
-    initializeMessagesArray(allMessages, summaryMessage) {
+    initializeMessagesArray(allMessages, summaryMessage, mcpInstructions = null) {
         const messages = [];
         
-        // Always include system prompt if it exists
+        // Always include system prompt if it exists, enhanced with MCP instructions
         if (allMessages.length > 0 && allMessages[0].role === 'system') {
-            messages.push(allMessages[0]);
+            // Use centralized system message enhancement logic
+            const enhancedSystemMessage = SystemMsg.enhanceSystemMessageWithMcp(
+                allMessages[0], 
+                mcpInstructions
+            );
+            messages.push(enhancedSystemMessage);
         }
         
         // Include summary if found

@@ -4,6 +4,8 @@
 
 import {MessageOptimizer} from './message-optimizer.js';
 import * as ChatConfig from './chat-config.js';
+import * as TitleGenerator from './title.js';
+import * as SystemMsg from './system-msg.js';
 
 class NetdataMCPChat {
     constructor() {
@@ -29,84 +31,7 @@ class NetdataMCPChat {
         
         
         // Default system prompt
-        this.defaultSystemPrompt =
-`You are a helpful SRE/DevOps expert, and you are asked questions about some specific infrastructure, to which you
-have access via your tools. Always come up with a plan to provide holistic, accurate, and trustworthy answers,
-examining all the possible aspects of the question asked. Your answers MUST be concise, clear, and complete, as
-expected by a highly professional DevOps engineer.
-
-Your goal is to explain, educate and provide actionable insights, not just to answer questions.
-We need to help users understand their infrastructure, how it works, and how to troubleshoot issues.
-
-DO NOT EVER provide answers that are not based on data.
-
-PROVIDE ACCURATE, COMPLETE, PROFESSIONAL AND TRUSTWORTHY ANSWERS!
-ALWAYS USE ALL THE TOOLS RELEVANT TO HELP YOU PROVIDE A COMPLETE ANSWER.
-
-ALWAYS BE ENTHUSIASTIC, HELPFUL, EDUCATIONAL, PROFESSIONAL AND FRIENDLY.
-
-For ANY request involving data analysis, troubleshooting, or complex queries, you MUST use <thinking> tags to show
-your complete reasoning process. In your <thinking> section, always include:
-
-  - Your interpretation of the user's request and what they're trying to accomplish
-  - Your strategy for approaching the problem (which tools to use and why)
-  - Analysis of each piece of data you retrieve
-  - Connections you're making between different metrics/nodes/alerts
-  - Any assumptions or limitations in your analysis
-  - Your reasoning for conclusions or recommendations
-
-For each request, follow this structured process:
-
-1. IDENTIFY WHAT IS RELEVANT
-  - Identify which of the tools may be relevant to the user's request to provide insights or data.
-  - Each tool has a description and parameters. Read them carefully to understand what data they can provide.
-  - Once you have a plan, use all the relevant tools to gather data IN PARALLEL (return an array of tools to execute).
-  
-  Usually your entry point will be:
-  
-  - If the user specified "what" is interested in, use:
-    - list_metrics: full text search on everything related to metrics
-    - list_nodes: search by hostname, machine guide, node id
-    
-  - If the user specified "when" is interested in, use:
-    - find_anomalous_metrics: search for anomalies in metrics
-      This will provide metric names, or labels, or nodes that are anomalous, which you can then use to find more data.
-      Netdata ML is real-time. The anomalies are detected in real-time during data collection and are stored in the database.
-      The percentage given represents the % of samples collected found anomalous. Depending on the time range queried,
-      this may be very low (e.g. 1%), but still it may indicate strong anomalies when narrowed down to a specific event.
-    - list_alert_transitions: search for alert transitions in the given time range
-      You may need to expand the time range to the past, to find already raised alerts during the time range.
-  
-2. FIND DATA TO ANSWER THE QUESTION
-  - Once you have identified which part of the infrastructure is relevant, use more tools to gather data.
-  - Pay attention to the parameters of each tool, as they may require specific inputs.
-  - For live information (processes, containers, sockets, etc) use Netdata functions.
-  - For logs queries, use Netdata functions.
-
-## FORMATTING GUIDELINES
-**CRITICAL**: Always use proper markdown formatting in your responses:
-
-- Use **bold** and *italic* for emphasis
-- Use proper markdown lists with dashes or numbers for structured information
-- For tree structures, node hierarchies, or ASCII diagrams, ALWAYS wrap them in code blocks with triple backticks
-- Use inline code formatting for technical terms, commands, and values
-- Use > blockquotes for important notes or warnings
-- Use tables when presenting structured data
-- Use headings (##, ###) to organize your response
-
-**Example of proper tree formatting:**
-Use triple backticks to wrap tree structures:
-📡 Streaming Path:
-└── parent (root)
-    ├── child1
-    └── child2
-
-## RESPONSE STYLE
-After your <thinking> analysis, provide your response following your existing style guidelines and the formatting
-guidelines above.
-
-CRITICAL: Never skip the <thinking> section. Even for simple queries, show your reasoning process. This transparency
-helps users understand your analysis methodology and builds confidence in your conclusions.`;
+        this.defaultSystemPrompt = SystemMsg.DEFAULT_SYSTEM_PROMPT;
         
         // Load last used system prompt from localStorage or use default
         this.lastSystemPrompt = localStorage.getItem('lastSystemPrompt') || this.defaultSystemPrompt;
@@ -1184,7 +1109,7 @@ helps users understand your analysis methodology and builds confidence in your c
         const titleGenEnabled = config.optimisation.titleGeneration?.enabled !== false; // Default to true
         titleGenDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!titleGenEnabled ? 'opacity: 0.5;' : ''}`;
         
-        const titleGenModel = ChatConfig.modelConfigToString(config.optimisation.titleGeneration?.model) || ChatConfig.getChatModelString(chat);
+        const titleGenModel = ChatConfig.modelConfigToString(config.optimisation.titleGeneration?.model);
         
         titleGenDiv.innerHTML = `
             <label style="display: flex; align-items: center; cursor: pointer;">
@@ -1235,17 +1160,17 @@ helps users understand your analysis methodology and builds confidence in your c
         
         section.appendChild(toolMemoryDiv);
         
-        // Cache Control Option (ghosted when not Anthropic)
-        const isAnthropicModel = chat.model && chat.model.includes('claude');
+        // Cache Control Option (only for Anthropic provider)
+        const isAnthropicProvider = config.model && config.model.provider === 'anthropic';
         const cacheControlDiv = document.createElement('div');
         const cacheControlEnabled = config.optimisation.cacheControl.enabled;
-        cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!isAnthropicModel ? 'opacity: 0.5;' : ''}`;
+        cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!isAnthropicProvider ? 'opacity: 0.5;' : ''}`;
         
         cacheControlDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: ${isAnthropicModel ? 'pointer' : 'default'};">
+            <label style="display: flex; align-items: center; cursor: ${isAnthropicProvider ? 'pointer' : 'default'};">
                 <input type="checkbox" id="cacheControl_${chatId}" ${cacheControlEnabled ? 'checked' : ''}
                        style="margin-right: 6px;"
-                       ${!isAnthropicModel ? 'disabled' : ''}>
+                       ${!isAnthropicProvider ? 'disabled' : ''}>
                 <span>Enable Anthropic's cache control</span>
             </label>
         `;
@@ -1306,6 +1231,7 @@ helps users understand your analysis methodology and builds confidence in your c
         
         tempSlider.addEventListener('change', (e) => {
             chat.config.model.params.temperature = parseFloat(e.target.value);
+            ChatConfig.saveChatConfig(chatId, chat.config);
             this.autoSave(chatId);
         });
         
@@ -1316,6 +1242,7 @@ helps users understand your analysis methodology and builds confidence in your c
         
         topPSlider.addEventListener('change', (e) => {
             chat.config.model.params.topP = parseFloat(e.target.value);
+            ChatConfig.saveChatConfig(chatId, chat.config);
             this.autoSave(chatId);
         });
         
@@ -1417,6 +1344,139 @@ helps users understand your analysis methodology and builds confidence in your c
         if (limit >= 1000000) return `${(limit / 1000000).toFixed(1)}M`;
         if (limit >= 1000) return `${(limit / 1000).toFixed(0)}k`;
         return limit.toString();
+    }
+    
+    /**
+     * Create a formatted HTML tooltip for model information
+     * @param {Object} chat - The chat object
+     * @returns {string} HTML string for the tooltip
+     */
+    createModelTooltip(chat) {
+        if (!chat || !chat.config || !chat.config.model) {
+            return 'No model configured';
+        }
+        
+        const config = chat.config;
+        const modelString = ChatConfig.modelConfigToString(config.model);
+        const modelInfo = this.modelPricing[config.model.id] || {};
+        const contextLimit = this.modelLimits[config.model.id] || 128000;
+        
+        // Get MCP server name
+        const mcpServer = this.mcpServers.get(config.mcpServer);
+        const mcpServerName = mcpServer ? mcpServer.name : config.mcpServer;
+        
+        // Get optimization models
+        const toolSumModel = config.optimisation.toolSummarisation.model ? 
+            ChatConfig.getModelDisplayName(ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model)) : 
+            'Primary';
+        const autoSumModel = config.optimisation.autoSummarisation.model ? 
+            ChatConfig.getModelDisplayName(ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model)) : 
+            'Primary';
+        const titleGenModel = config.optimisation.titleGeneration.model ? 
+            ChatConfig.getModelDisplayName(ChatConfig.modelConfigToString(config.optimisation.titleGeneration.model)) : 
+            'Primary';
+        
+        // Format prices more compactly with bold
+        const formatPrice = (price) => {
+            if (price === undefined || price === null) return 'N/A';
+            return `<b>$${price.toFixed(2)}</b>`;
+        };
+        
+        // Helper to show enabled/disabled status compactly
+        const status = (enabled) => enabled ? 
+            '<span style="color: var(--success-color);">✓</span>' : 
+            '<span style="color: var(--error-color);">✗</span>';
+        
+        let tooltipHtml = `
+            <div style="min-width: 300px;">
+                <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td colspan="2" style="padding: 6px; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${modelString}
+                        </td>
+                    </tr>`;
+        
+        // Model parameters section (no provider, more condensed)
+        tooltipHtml += `
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Context:</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatContextWindow(contextLimit)}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Params:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            T=${config.model.params.temperature} P=${config.model.params.topP} Max=${config.model.params.maxTokens}${config.model.params.seed.enabled ? ` Seed=${config.model.params.seed.value}` : ''}
+                        </td>
+                    </tr>`;
+        
+        // Pricing section (condensed with bold prices)
+        if (modelInfo.input || modelInfo.output) {
+            tooltipHtml += `
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Pricing/1M:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            In: ${formatPrice(modelInfo.input)} Out: ${formatPrice(modelInfo.output)}`;
+            
+            if (modelInfo.cacheRead !== undefined) {
+                tooltipHtml += ` CR: ${formatPrice(modelInfo.cacheRead)}`;
+            }
+            if (modelInfo.cacheWrite !== undefined) {
+                tooltipHtml += ` CW: ${formatPrice(modelInfo.cacheWrite)}`;
+            }
+            
+            tooltipHtml += `</td></tr>`;
+        }
+        
+        // All optimization settings in a compact section
+        tooltipHtml += `
+                    <tr style="border-top: 1px solid var(--border-color);">
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Tool Summary:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            ${status(config.optimisation.toolSummarisation.enabled)} 
+                            ${config.optimisation.toolSummarisation.enabled ? `${config.optimisation.toolSummarisation.thresholdKiB}KiB ${toolSumModel}` : 'Disabled'}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Auto Summary:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            ${status(config.optimisation.autoSummarisation.enabled)} 
+                            ${config.optimisation.autoSummarisation.enabled ? `${config.optimisation.autoSummarisation.triggerPercent}% ${autoSumModel}` : 'Disabled'}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Tool Memory:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            ${status(config.optimisation.toolMemory.enabled)} 
+                            ${config.optimisation.toolMemory.enabled ? `Forget after ${config.optimisation.toolMemory.forgetAfterConclusions}` : 'Always'}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Cache Control:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            ${status(config.optimisation.cacheControl.enabled)} 
+                            ${config.optimisation.cacheControl.enabled ? `Strategy: ${config.optimisation.cacheControl.strategy}` : 'Disabled'}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">Auto Title:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
+                            ${status(config.optimisation.titleGeneration.enabled)} 
+                            ${config.optimisation.titleGeneration.enabled ? titleGenModel : 'Disabled'}
+                        </td>
+                    </tr>`;
+        
+        // Server info with name
+        tooltipHtml += `
+                    <tr style="border-top: 1px solid var(--border-color);">
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">MCP Server:</td>
+                        <td style="padding: 4px 6px; text-align: right; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">
+                            ${mcpServerName}
+                        </td>
+                    </tr>
+                </table>
+            </div>`;
+        
+        return tooltipHtml;
     }
     
     getAllAvailableModels() {
@@ -1609,9 +1669,47 @@ helps users understand your analysis methodology and builds confidence in your c
                     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                     z-index: 10000;
                     max-height: 400px;
-                    overflow-y: auto;
                     min-width: 600px;
+                    display: flex;
+                    flex-direction: column;
                 `;
+                
+                // Add search box
+                const searchContainer = document.createElement('div');
+                searchContainer.style.cssText = `
+                    padding: 8px;
+                    border-bottom: 1px solid var(--border-color);
+                    background: var(--surface-color);
+                    position: sticky;
+                    top: 0;
+                    z-index: 2;
+                `;
+                
+                const searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.placeholder = 'Search models...';
+                searchInput.style.cssText = `
+                    width: 100%;
+                    padding: 6px 10px;
+                    border: 1px solid var(--border-color);
+                    border-radius: 4px;
+                    background: var(--background-color);
+                    color: var(--text-primary);
+                    font-size: 13px;
+                `;
+                searchContainer.appendChild(searchInput);
+                dropdown.appendChild(searchContainer);
+                
+                // Create scrollable content container
+                const contentContainer = document.createElement('div');
+                contentContainer.style.cssText = `
+                    flex: 1;
+                    overflow-y: auto;
+                `;
+                dropdown.appendChild(contentContainer);
+                
+                // Focus search input when dropdown opens
+                setTimeout(() => searchInput.focus(), 0);
                 
                 // Create pricing table
                 const models = this.getAllAvailableModels();
@@ -1637,7 +1735,7 @@ helps users understand your analysis methodology and builds confidence in your c
                 
                 // Check if there are any models
                 if (!models || models.length === 0) {
-                    dropdown.innerHTML = `
+                    contentContainer.innerHTML = `
                         <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
                             No models available. Please check your LLM provider configuration.
                         </div>
@@ -1712,9 +1810,13 @@ helps users understand your analysis methodology and builds confidence in your c
                 table.appendChild(thead);
                 
                 const tbody = document.createElement('tbody');
-                let currentProvider = null;
                 
-                models.forEach(model => {
+                // Function to rebuild table body with filtered models
+                const rebuildTableBody = (filteredModels) => {
+                    tbody.innerHTML = '';
+                    let currentProvider = null;
+                    
+                    filteredModels.forEach(model => {
                     // Add provider header row when provider changes
                     if (model.providerId !== currentProvider) {
                         currentProvider = model.providerId;
@@ -1774,6 +1876,57 @@ helps users understand your analysis methodology and builds confidence in your c
                     `;
                     
                     tbody.appendChild(tr);
+                    });
+                };
+                
+                // Initial build with all models
+                rebuildTableBody(models);
+                
+                // Add search functionality
+                searchInput.addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase().trim();
+                    
+                    if (!searchTerm) {
+                        rebuildTableBody(models);
+                        return;
+                    }
+                    
+                    const filteredModels = models.filter(model => {
+                        const modelId = model.id.toLowerCase();
+                        const providerId = model.providerId.toLowerCase();
+                        const fullId = `${providerId}:${modelId}`.toLowerCase();
+                        
+                        return modelId.includes(searchTerm) || 
+                               providerId.includes(searchTerm) || 
+                               fullId.includes(searchTerm);
+                    });
+                    
+                    if (filteredModels.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                                    No models found matching "${searchTerm}"
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        rebuildTableBody(filteredModels);
+                    }
+                });
+                
+                // Handle keyboard navigation
+                searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        dropdown.remove();
+                        button.removeAttribute('data-dropdown-open');
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const firstRow = tbody.querySelector('tr[style*="cursor: pointer"]');
+                        if (firstRow) {
+                            firstRow.focus();
+                            firstRow.style.background = 'var(--hover-color)';
+                        }
+                    }
                 });
                 
                 // Define functions before they're used
@@ -1829,7 +1982,7 @@ helps users understand your analysis methodology and builds confidence in your c
                 
                 // Now append elements after functions are defined
                 table.appendChild(tbody);
-                dropdown.appendChild(table);
+                contentContainer.appendChild(table);
                 
                 // Append dropdown to body for proper z-index layering
                 document.body.appendChild(dropdown);
@@ -1849,7 +2002,7 @@ helps users understand your analysis methodology and builds confidence in your c
             this.updateAutoSummarizationModel(chatId, model);
         });
         
-        createModelDropdown(`titleGenModel_${chatId}`, ChatConfig.modelConfigToString(chat.config.optimisation.titleGeneration?.model) || ChatConfig.getChatModelString(chat), (model) => {
+        createModelDropdown(`titleGenModel_${chatId}`, ChatConfig.modelConfigToString(chat.config.optimisation.titleGeneration?.model), (model) => {
             this.updateTitleGenerationModel(chatId, model);
         });
     }
@@ -3006,30 +3159,17 @@ helps users understand your analysis methodology and builds confidence in your c
         // Get the last used configuration
         const config = ChatConfig.getLastConfig();
         let mcpServerId = config.mcpServer;
-        let llmProviderId, model;
-        
-        // Extract legacy settings if they exist
-        try {
-            const lastConfig = localStorage.getItem('lastChatConfig');
-            if (lastConfig) {
-                const legacyConfig = JSON.parse(lastConfig);
-                // Verify these still exist
-                if (this.mcpServers.has(legacyConfig.mcpServerId) && this.llmProviders.has(legacyConfig.llmProviderId)) {
-                    mcpServerId = legacyConfig.mcpServerId;
-                    llmProviderId = legacyConfig.llmProviderId;
-                    model = legacyConfig.model;
-                }
-            }
-        } catch {
-            // Ignore errors
-        }
+        const llmProviderId = this.llmProviders.keys().next().value;
         
         // Use defaults if needed
-        if (!mcpServerId) {mcpServerId = this.mcpServers.keys().next().value;}
-        if (!llmProviderId) {llmProviderId = this.llmProviders.keys().next().value;}
+        if (!mcpServerId || !this.mcpServers.has(mcpServerId)) {
+            mcpServerId = this.mcpServers.keys().next().value;
+        }
         
-        // Get first available model if not specified
-        if (!model) {
+        
+        // Check if the config has a valid model, otherwise get first available
+        let model = null;
+        if (!config || !config.model || !config.model.provider || !config.model.id) {
             const provider = this.llmProviders.get(llmProviderId);
             if (provider && provider.availableProviders) {
                 const firstProvider = Object.keys(provider.availableProviders)[0];
@@ -3039,9 +3179,9 @@ helps users understand your analysis methodology and builds confidence in your c
                     model = `${firstProvider}:${modelId}`;
                 }
             }
+            
+            if (!model) {return;}
         }
-        
-        if (!model) {return;}
         
         // Create an unsaved chat
         const createOptions = {
@@ -3052,8 +3192,8 @@ helps users understand your analysis methodology and builds confidence in your c
             config  // Pass the config
         };
         
-        // Only pass model if config doesn't already have a valid one
-        if (!config || !config.model || !config.model.provider || !config.model.id) {
+        // Only pass model if we had to find one
+        if (model) {
             createOptions.model = model;
         }
         
@@ -3292,31 +3432,19 @@ helps users understand your analysis methodology and builds confidence in your c
             return;
         }
         
-        // Get the last used configuration or use defaults
-        let mcpServerId, llmProviderId, model;
-        
-        try {
-            const lastConfig = localStorage.getItem('lastChatConfig');
-            if (lastConfig) {
-                const config = JSON.parse(lastConfig);
-                // Verify these still exist
-                if (this.mcpServers.has(config.mcpServerId) && this.llmProviders.has(config.llmProviderId)) {
-                    mcpServerId = config.mcpServerId;
-                    llmProviderId = config.llmProviderId;
-                    model = config.model;
-                    // optimizerSettings removed - now using new config structure
-                }
-            }
-        } catch {
-            // Ignore errors
-        }
+        // Get the last used configuration
+        const config = ChatConfig.getLastConfig();
+        let mcpServerId = config.mcpServer;
+        const llmProviderId = this.llmProviders.keys().next().value; // Always use first available
         
         // Use defaults if needed
-        if (!mcpServerId) {mcpServerId = this.mcpServers.keys().next().value;}
-        if (!llmProviderId) {llmProviderId = this.llmProviders.keys().next().value;}
+        if (!mcpServerId || !this.mcpServers.has(mcpServerId)) {
+            mcpServerId = this.mcpServers.keys().next().value;
+        }
         
-        // Get first available model if not specified
-        if (!model) {
+        // Check if the config has a valid model, otherwise get first available
+        let model = null;
+        if (!config || !config.model || !config.model.provider || !config.model.id) {
             const provider = this.llmProviders.get(llmProviderId);
             if (provider && provider.availableProviders) {
                 const firstProvider = Object.keys(provider.availableProviders)[0];
@@ -3326,22 +3454,28 @@ helps users understand your analysis methodology and builds confidence in your c
                     model = `${firstProvider}:${modelId}`;
                 }
             }
-        }
-        
-        if (!model) {
-            this.showGlobalError('No models available');
-            return;
+            
+            if (!model) {
+                this.showGlobalError('No models available');
+                return;
+            }
         }
         
         // Create an unsaved chat
-        const chatId = await this.createNewChat({
+        const createOptions = {
             mcpServerId,
             llmProviderId,
-            model,
             title: 'New Chat',
             isSaved: false,
-            config: ChatConfig.getLastConfig()  // Pass the full config
-        });
+            config  // Pass the full config
+        };
+        
+        // Only pass model if we had to find one
+        if (model) {
+            createOptions.model = model;
+        }
+        
+        const chatId = await this.createNewChat(createOptions);
         
         // Load the chat immediately when created via button click
         if (chatId) {
@@ -3630,6 +3764,7 @@ helps users understand your analysis methodology and builds confidence in your c
             elements.maxTokensDropdown.addEventListener('change', (e) => {
                 const newMaxTokens = parseInt(e.target.value, 10);
                 chat.config.model.params.maxTokens = newMaxTokens;
+                ChatConfig.saveChatConfig(chatId, chat.config);
                 this.autoSave(chatId);
                 console.log(`Updated max tokens for chat ${chatId} to ${newMaxTokens}`);
             });
@@ -3777,12 +3912,34 @@ helps users understand your analysis methodology and builds confidence in your c
             const modelNameSpan = elements.llmMeta.querySelector('.model-name');
             if (modelNameSpan) {
                 modelNameSpan.textContent = modelDisplay;
-                elements.llmMeta.setAttribute('data-tooltip', tooltipLines.join('\n'));
+                
+                // Remove old data-tooltip and add mouse handlers
+                elements.llmMeta.removeAttribute('data-tooltip');
+                if (!elements.llmMeta.hasModelTooltipHandlers) {
+                    elements.llmMeta.hasModelTooltipHandlers = true;
+                    elements.llmMeta.addEventListener('mouseenter', (e) => {
+                        const currentChat = this.chats.get(chatId);
+                        if (currentChat) this.showModelTooltip(e, currentChat);
+                    });
+                    elements.llmMeta.addEventListener('mouseleave', () => {
+                        this.hideModelTooltip();
+                    });
+                }
             }
             
             // Also update dropdown button
             elements.currentModelText.textContent = modelDisplay;
-            elements.currentModelText.setAttribute('data-tooltip', tooltipLines.join('\n'));
+            elements.llmModelBtn.removeAttribute('data-tooltip');
+            if (!elements.llmModelBtn.hasModelTooltipHandlers) {
+                elements.llmModelBtn.hasModelTooltipHandlers = true;
+                elements.llmModelBtn.addEventListener('mouseenter', (e) => {
+                    const currentChat = this.chats.get(chatId);
+                    if (currentChat) this.showModelTooltip(e, currentChat);
+                });
+                elements.llmModelBtn.addEventListener('mouseleave', () => {
+                    this.hideModelTooltip();
+                });
+            }
         } else {
             elements.llmMeta.textContent = 'Model: Not found';
             elements.currentModelText.textContent = 'Select Model';
@@ -3880,39 +4037,12 @@ helps users understand your analysis methodology and builds confidence in your c
         
         const chatId = `chat_${Date.now()}`;
         
-        // Prepare system prompt with timestamp and timezone
-        let systemPromptWithTimestamp = this.lastSystemPrompt;
-        const currentTimestamp = new Date().toISOString();
-        const timezoneInfo = this.getTimezoneInfo();
-        const currentDate = new Date();
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const currentDayName = dayNames[currentDate.getDay()];
-        
-        systemPromptWithTimestamp += `\n\n## CRITICAL DATE/TIME CONTEXT
-Current date and time: ${currentTimestamp}
-Current day: ${currentDayName}
-Current timezone: ${timezoneInfo.name} (${timezoneInfo.offset})
-Current year: ${currentDate.getFullYear()}
-
-IMPORTANT DATE/TIME INTERPRETATION RULES FOR MONITORING DATA:
-1. When the user mentions dates without a year (e.g., "January 15", "last month"), use ${currentDate.getFullYear()} as the current year
-2. When the user mentions times without a timezone (e.g., "10pm", "14:30"), assume ${timezoneInfo.name} timezone
-3. ALL relative references refer to the PAST (this is a monitoring system analyzing historical data):
-   - "this morning" = earlier today, before noon
-   - "this afternoon" = earlier today, after noon
-   - "tonight" = earlier today, evening hours
-   - "this Thursday" or "on Thursday" = the most recent Thursday (if today is Thursday and it's past the mentioned time, use today; otherwise use last Thursday)
-   - "during the weekend" = the most recent Saturday and Sunday
-   - "Monday" or "on Monday" = the most recent Monday
-4. IMPORTANT: Distinguish between complete time periods and relative offsets:
-   - "yesterday" = the complete 24-hour period before today at 00:00 (e.g., if today is Jan 15, yesterday is Jan 14 00:00 to Jan 14 23:59:59)
-   - "last week" = the complete previous calendar week (Monday 00:00 to Sunday 23:59:59)
-   - "last hour" = the complete previous clock hour (e.g., if it's 14:35, last hour is 13:00 to 13:59:59)
-   - "last month" = the complete previous calendar month (e.g., if it's January, last month is December 1-31)
-   - BUT: "7 days ago", "3 hours ago", "2 weeks ago" = exactly that amount of time before now
-5. Never interpret relative references as future times - users are always asking about historical monitoring data
-
-All date/time interpretations must be based on the current date/time context provided above, NOT on your training data.`;
+        // Create system message using centralized logic
+        const systemMessage = SystemMsg.createSystemMessage({
+            basePrompt: this.lastSystemPrompt,
+            includeDateTimeContext: true,
+            mcpInstructions: null // MCP instructions will be added later during message building
+        });
         
         // Create configuration from options
         let chatConfig;
@@ -3937,15 +4067,8 @@ All date/time interpretations must be based on the current date/time context pro
             mcpServerId,
             llmProviderId,
             model: selectedModel || ChatConfig.modelConfigToString(chatConfig.model), // Selected model for this chat (legacy format)
-            messages: [
-                {
-                    role: 'system',
-                    content: systemPromptWithTimestamp,
-                    timestamp: new Date().toISOString()
-                }
-            ],
-            temperature: 0.7, // Default temperature
-            systemPrompt: systemPromptWithTimestamp, // System prompt with timestamp
+            messages: [systemMessage],
+            systemPrompt: systemMessage.content, // System prompt with timestamp
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             currentTurn: 0, // Track conversation turns
@@ -3982,13 +4105,6 @@ All date/time interpretations must be based on the current date/time context pro
         
         // Save the config for next time
         ChatConfig.saveLastConfig(chatConfig);
-        
-        // Also save legacy format for now
-        localStorage.setItem('lastChatConfig', JSON.stringify({
-            mcpServerId,
-            llmProviderId,
-            model: selectedModel
-        }));
         
         // Only save settings if this is a saved chat
         if (isSaved) {
@@ -4134,11 +4250,17 @@ All date/time interpretations must be based on the current date/time context pro
             
             // Calculate context usage and tokens
             const tokenHistory = this.getTokenUsageForChat(chat.id);
-            let contextPercent = 0;
-            if (tokenHistory.totalTokens > 0 && chat.config?.model?.id) {
-                const modelName = chat.config.model.id;
-                const limit = this.modelLimits[modelName] || 4096;
-                contextPercent = Math.min(100, Math.round((tokenHistory.totalTokens / limit) * 100));
+            let contextPercent = '-';
+            let contextPercentValue = 0;
+            
+            // Only show percentage if chat has been rendered or has token history
+            if (chat.hasBeenRendered || tokenHistory.totalTokens > 0) {
+                if (chat.config?.model?.id) {
+                    const modelName = chat.config.model.id;
+                    const limit = this.modelLimits[modelName] || 4096;
+                    contextPercentValue = Math.min(100, Math.round((tokenHistory.totalTokens / limit) * 100));
+                    contextPercent = contextPercentValue + '';
+                }
             }
             
             // Get cumulative tokens and price
@@ -4208,6 +4330,17 @@ All date/time interpretations must be based on the current date/time context pro
                 event.stopPropagation();
                 this.deleteChat(chat.id);
             });
+            
+            // Add model tooltip handlers
+            const modelSpan = sessionDiv.querySelector('.session-model');
+            if (modelSpan) {
+                modelSpan.addEventListener('mouseenter', (e) => {
+                    this.showModelTooltip(e, chat);
+                });
+                modelSpan.addEventListener('mouseleave', () => {
+                    this.hideModelTooltip();
+                });
+            }
             
             return sessionDiv;
     }
@@ -4592,6 +4725,9 @@ All date/time interpretations must be based on the current date/time context pro
         // Update all token displays
         this.updateAllTokenDisplays(chatId);
         
+        // Update chat sessions to reflect the calculated context window
+        this.updateChatSessions();
+        
         // Force scroll to bottom when loading chat (ignore the isAtBottom check)
         // Use setTimeout with requestAnimationFrame to ensure layout is complete
         // This is important when switching chats during page load
@@ -4767,7 +4903,7 @@ All date/time interpretations must be based on the current date/time context pro
                 break;
                 
             case 'error':
-                events.push({ type: 'error-message', content: msg.content });
+                events.push({ type: 'error-message', content: msg.content, errorMessageIndex: msg.errorMessageIndex });
                 break;
                 
             default:
@@ -4880,24 +5016,38 @@ All date/time interpretations must be based on the current date/time context pro
             case 'error-message':
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message error';
-                messageDiv.innerHTML = `
-                    <div><i class="fas fa-times-circle"></i> ${event.content}</div>
-                    <button class="btn btn-warning btn-small" style="margin-top: 8px;">
-                        <i class="fas fa-redo"></i> Retry
-                    </button>
-                `;
                 
-                const retryBtn = messageDiv.querySelector('button');
-                retryBtn.onclick = async () => {
-                    retryBtn.disabled = true;
-                    retryBtn.textContent = 'Retrying...';
+                // Add redo button if we have the messageIndex from the event
+                if (event.messageIndex !== undefined && event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0) {
+                    // This is a loaded error with proper context
+                    messageDiv.style.position = 'relative';
+                    messageDiv.innerHTML = `<div><i class="fas fa-times-circle"></i> ${event.content}</div>`;
                     
-                    // Get the current chat and find the last user message
-                    const currentChat = this.chats.get(chatId);
-                    if (!currentChat) {return;}
+                    const redoBtn = document.createElement('button');
+                    redoBtn.className = 'redo-button';
+                    redoBtn.textContent = 'Redo';
+                    redoBtn.onclick = () => this.redoFromMessage(event.errorMessageIndex, chatId);
+                    messageDiv.appendChild(redoBtn);
+                } else {
+                    // This is a live error, use the old retry logic
+                    messageDiv.innerHTML = `
+                        <div><i class="fas fa-times-circle"></i> ${event.content}</div>
+                        <button class="btn btn-warning btn-small" style="margin-top: 8px;">
+                            <i class="fas fa-redo"></i> Retry
+                        </button>
+                    `;
                     
-                    const lastUserMessage = currentChat.messages.filter(m => m.role === 'user').pop();
-                    if (lastUserMessage) {
+                    const retryBtn = messageDiv.querySelector('button');
+                    retryBtn.onclick = async () => {
+                        retryBtn.disabled = true;
+                        retryBtn.textContent = 'Retrying...';
+                        
+                        // Get the current chat and find the last user message
+                        const currentChat = this.chats.get(chatId);
+                        if (!currentChat) {return;}
+                        
+                        const lastUserMessage = currentChat.messages.filter(m => m.role === 'user').pop();
+                        if (lastUserMessage) {
                         // ATOMIC OPERATION: Remove messages from the error onwards
                         const errorIndex = currentChat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
@@ -4975,11 +5125,14 @@ All date/time interpretations must be based on the current date/time context pro
                                         retryBtn.click();
                                     }
                                 }, 'Retry', chatId);
-                                this.addMessage(chat.id, { type: 'error', content: retryErrorMessage });
+                                // Find the last user message index for retry functionality
+                        const lastUserIdx = chat.messages.findLastIndex(m => m.role === 'user');
+                        this.addMessage(chat.id, { type: 'error', content: retryErrorMessage, errorMessageIndex: lastUserIdx });
                             }
                         }
                     }
                 };
+                }
                 
                 // Use chat-specific messages container
                 const container = this.getChatContainer(chatId);
@@ -5204,33 +5357,27 @@ All date/time interpretations must be based on the current date/time context pro
         try {
             await this.processMessageWithTools(chat, mcpConnection, provider, message);
             
-            // Check if we should generate a title (first user message and got a response)
-            if (this.isFirstUserMessage(chat) && this.countAssistantMessages(chat) > 0 && !chat.titleGenerated) {
-                // Only proceed if title generation is enabled
-                if (chat.config?.optimisation?.titleGeneration?.enabled) {
-                    let titleProvider;
-                    
-                    // If a specific title model is configured, use that
-                    if (chat.config.optimisation.titleGeneration.model) {
-                        const titleModel = chat.config.optimisation.titleGeneration.model;
-                        const llmProxy = this.llmProviders.get(chat.llmProviderId);
-                        if (llmProxy) {
-                            titleProvider = createLLMProvider(
-                                titleModel.provider,
-                                llmProxy.proxyUrl,
-                                titleModel.id
-                            );
-                            titleProvider.onLog = llmProxy.onLog;
-                        }
-                    } else {
-                        // Use the chat's primary model if no specific title model configured
-                        titleProvider = provider;
-                    }
+            // Check if we should generate a title automatically
+            if (this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
+                const llmProxy = this.llmProviders.get(chat.llmProviderId);
+                if (llmProxy) {
+                    const titleProvider = TitleGenerator.getTitleGenerationProvider(
+                        chat, 
+                        llmProxy, 
+                        provider, 
+                        createLLMProvider
+                    );
                     
                     // Generate title automatically (force=false)
-                    await this.generateChatTitle(chat, mcpConnection, titleProvider, true, false);
+                    await TitleGenerator.generateChatTitle(
+                        chat, 
+                        mcpConnection, 
+                        titleProvider, 
+                        true, 
+                        false,
+                        this.getTitleGenerationCallbacks()
+                    );
                 }
-                // If title generation is disabled, do nothing
             }
             
             // Check if we should generate a summary (conditions to be defined later)
@@ -5261,7 +5408,9 @@ All date/time interpretations must be based on the current date/time context pro
                     this.chatInput.value = 'Please continue';
                     await this.sendMessage(chat.id);
                 }, 'Continue', chat.id);
-                this.addMessage(chat.id, { type: 'error', content: continueMessage });
+                // Find the last user message index for retry functionality
+                const lastUserMsgIdx = chat.messages.findLastIndex(m => m.role === 'user');
+                this.addMessage(chat.id, { type: 'error', content: continueMessage, errorMessageIndex: lastUserMsgIdx });
             } else {
                 // Regular error handling
                 const errorMessage = `Error: ${error.message}`;
@@ -5296,10 +5445,14 @@ All date/time interpretations must be based on the current date/time context pro
                             // Try again - resend the original message
                             await this.processMessageWithTools(chat, mcpConnection, provider, message);
                         }, 'Retry', chat.id);
-                        this.addMessage(chat.id, { type: 'error', content: retryErrorMessage });
+                        // Find the last user message index for retry functionality
+                        const lastUserIdx = chat.messages.findLastIndex(m => m.role === 'user');
+                        this.addMessage(chat.id, { type: 'error', content: retryErrorMessage, errorMessageIndex: lastUserIdx });
                     }
                 }, 'Retry', chat.id);
-                this.addMessage(chat.id, { type: 'error', content: errorMessage });
+                // Find the last user message index for retry functionality
+                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                this.addMessage(chat.id, { type: 'error', content: errorMessage, errorMessageIndex: lastUserMessageIndex });
             }
         } finally {
             // Remove loading spinner event
@@ -5318,32 +5471,6 @@ All date/time interpretations must be based on the current date/time context pro
         }
     }
 
-    // Get timezone information including name and UTC offset
-    getTimezoneInfo() {
-        const date = new Date();
-        
-        // Get UTC offset in minutes
-        const offsetMinutes = -date.getTimezoneOffset();
-        const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
-        const offsetMins = Math.abs(offsetMinutes) % 60;
-        const offsetSign = offsetMinutes >= 0 ? '+' : '-';
-        const offsetString = `UTC${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMins.toString().padStart(2, '0')}`;
-        
-        // Try to get timezone name
-        let timezoneName;
-        try {
-            // This returns something like "America/New_York"
-            timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        } catch {
-            // Fallback to basic timezone string
-            timezoneName = date.toString().match(/\(([^)]+)\)/)?.[1] || offsetString;
-        }
-        
-        return {
-            name: timezoneName,
-            offset: offsetString
-        };
-    }
 
     /**
      * Build messages for LLM context, stripping tool-related content
@@ -5416,15 +5543,18 @@ All date/time interpretations must be based on the current date/time context pro
         return cleanMessages;
     }
 
-    buildMessagesForAPI(chat, freezeCache = false) {
+    buildMessagesForAPI(chat, freezeCache = false, mcpConnection = null) {
         // STRICT: Use the chat's MessageOptimizer instance
         if (!chat.messageOptimizer) {
             throw new Error('[buildMessagesForAPI] Chat missing messageOptimizer instance');
         }
         
         try {
+            // Get MCP instructions if connection is provided
+            const mcpInstructions = mcpConnection && mcpConnection.instructions ? mcpConnection.instructions : null;
+            
             // Delegate to the chat's MessageOptimizer
-            const result = chat.messageOptimizer.buildMessagesForAPI(chat, freezeCache);
+            const result = chat.messageOptimizer.buildMessagesForAPI(chat, freezeCache, mcpInstructions);
             
             // Log optimization stats if available
             if (result.stats) {
@@ -5446,7 +5576,7 @@ All date/time interpretations must be based on the current date/time context pro
         
         try {
             // Build conversation history using the new function
-            const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat);
+            const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, false, mcpConnection);
             
             // Safety check: Ensure we have at least one message
             if (messages.length === 0) {
@@ -7822,6 +7952,81 @@ All date/time interpretations must be based on the current date/time context pro
         }
     }
     
+    showModelTooltip(event, chat) {
+        // Remove any existing tooltip
+        this.hideModelTooltip();
+        
+        // Create the tooltip element
+        const tooltipDiv = document.createElement('div');
+        tooltipDiv.id = 'modelTooltipHover';
+        tooltipDiv.className = 'model-tooltip-hover';
+        tooltipDiv.style.cssText = `
+            position: absolute;
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            z-index: 10000;
+            font-size: 12px;
+        `;
+        
+        tooltipDiv.innerHTML = this.createModelTooltip(chat);
+        document.body.appendChild(tooltipDiv);
+        
+        // Position the tooltip
+        const rect = event.target.getBoundingClientRect();
+        const tooltipRect = tooltipDiv.getBoundingClientRect();
+        
+        // Check if this is a chat list item (has .session-model class)
+        const isChatListItem = event.target.classList.contains('session-model');
+        
+        let top, left;
+        
+        if (isChatListItem) {
+            // For chat list items, position to the right
+            top = rect.top;
+            left = rect.right + 8;
+            
+            // Adjust if it goes off the right edge
+            if (left + tooltipRect.width > window.innerWidth - 8) {
+                // Position to the left instead
+                left = rect.left - tooltipRect.width - 8;
+            }
+            
+            // Adjust if it goes off the bottom
+            if (top + tooltipRect.height > window.innerHeight - 8) {
+                // Align with bottom of viewport
+                top = window.innerHeight - tooltipRect.height - 8;
+            }
+        } else {
+            // For other elements (header), position below
+            top = rect.bottom + 8;
+            left = rect.left;
+            
+            // Adjust if it goes off the right edge
+            if (left + tooltipRect.width > window.innerWidth - 8) {
+                left = window.innerWidth - tooltipRect.width - 8;
+            }
+            
+            // Adjust if it goes off the bottom
+            if (top + tooltipRect.height > window.innerHeight - 8) {
+                // Position above instead
+                top = rect.top - tooltipRect.height - 8;
+            }
+        }
+        
+        tooltipDiv.style.top = `${top}px`;
+        tooltipDiv.style.left = `${left}px`;
+    }
+    
+    hideModelTooltip() {
+        const tooltipDiv = document.getElementById('modelTooltipHover');
+        if (tooltipDiv) {
+            tooltipDiv.remove();
+        }
+    }
+    
     // Copy conversation metrics to clipboard
     async copyConversationMetrics(chatId) {
         if (!chatId) {
@@ -7953,33 +8158,35 @@ All date/time interpretations must be based on the current date/time context pro
                 throw new Error('LLM provider not found');
             }
             
-            // Determine which model to use for title generation
-            let providerType, modelName;
+            // Get the appropriate provider for title generation
+            const titleProvider = TitleGenerator.getTitleGenerationProvider(
+                chat,
+                proxyProvider,
+                null, // No default provider, will be created
+                createLLMProvider
+            );
             
-            // If title generation is enabled and has a model configured, use that
-            if (chat.config?.optimisation?.titleGeneration?.enabled && 
-                chat.config.optimisation.titleGeneration.model) {
-                const titleModel = chat.config.optimisation.titleGeneration.model;
-                providerType = titleModel.provider;
-                modelName = titleModel.id;
-                console.log('Using title generation model:', `${providerType}:${modelName}`);
-            } else {
-                // Fall back to chat's primary model
-                providerType = chat.config?.model?.provider;
-                modelName = chat.config?.model?.id;
+            // If no title provider (no model configured), create one from chat's primary model
+            const provider = titleProvider || (() => {
+                const providerType = chat.config?.model?.provider;
+                const modelName = chat.config?.model?.id;
                 if (!providerType || !modelName) {
                     throw new Error('Invalid model configuration in chat');
                 }
-                console.log('Using chat primary model:', `${providerType}:${modelName}`);
-            }
-            
-            // Create the actual LLM provider instance
-            console.log('Creating provider with proxyUrl:', proxyProvider.proxyUrl);
-            const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-            provider.onLog = proxyProvider.onLog;
+                const p = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+                p.onLog = proxyProvider.onLog;
+                return p;
+            })();
             
             // Generate the title (force=true for manual generation)
-            await this.generateChatTitle(chat, mcpConnection, provider, false, true);
+            await TitleGenerator.generateChatTitle(
+                chat, 
+                mcpConnection, 
+                provider, 
+                false, 
+                true,
+                this.getTitleGenerationCallbacks()
+            );
         } catch (error) {
             this.showError(`Failed to generate title: ${error.message}`, chatId);
         } finally {
@@ -7993,42 +8200,8 @@ All date/time interpretations must be based on the current date/time context pro
             // User request that clearly explains the purpose
             const summaryRequest = 'Please create a comprehensive summary of our discussion that I can save and later provide back to you so we can continue from where we left off. Include all the context, findings, and details needed to resume our conversation.';
             
-            // System prompt that frames the task as creating a reusable context
-            const summarySystemPrompt = `You are a helpful assistant that creates conversation summaries designed to be provided back to an AI assistant to continue discussions.
-
-When asked to summarize, you are creating a "conversation checkpoint" that captures the complete state of the discussion so far. This summary will be given to you (or another AI assistant) in a future conversation to provide full context.
-
-CRITICAL: You are summarizing the conversation that happened BEFORE the summary request. The conversation consists of:
-1. User messages (questions, requests, information provided)
-2. Assistant responses (analysis, findings, answers, data retrieved)
-3. Any tool usage or data collection that occurred
-
-Create a summary with these sections:
-
-## CONVERSATION SUMMARY (CHECKPOINT)
-
-### USER'S ORIGINAL REQUESTS
-Quote each user message exactly as written (excluding the summary request itself).
-
-### ASSISTANT'S FINDINGS AND RESPONSES
-Summarize what the assistant discovered, analyzed, and explained, including:
-- Complete responses provided
-- Data retrieved using tools
-- Analysis performed
-- Conclusions reached
-- Any specific numbers, configurations, or technical details mentioned
-
-### CURRENT UNDERSTANDING
-- What has been established about the user's environment/situation
-- Key facts and data points discovered
-- Current state of any investigations or analysis
-
-### CONTEXT FOR CONTINUATION
-- Where the conversation left off
-- Any pending questions or next steps
-- Relevant details that would be needed to continue the discussion
-
-Remember: This summary will be the ONLY context available when resuming the conversation, so include all important details, findings, and the current state of discussion.`;
+            // Use centralized system prompt for summaries
+            const summarySystemPrompt = SystemMsg.createSpecializedSystemPrompt('summary');
             
             // CRITICAL: Save summary request BEFORE displaying
             this.addMessage(chat.id, { 
@@ -8345,141 +8518,6 @@ Remember: This summary will be the ONLY context available when resuming the conv
         */
     }
     
-    // Unified title generation method
-    async generateChatTitle(chat, mcpConnection, provider, isAutomatic = false, force = false) {
-        // Check if title generation is enabled (unless forced)
-        if (!force && !chat.config?.optimisation?.titleGeneration?.enabled) {
-            console.log('Title generation is disabled in config, skipping');
-            return;
-        }
-        
-        try {
-            // Create a system message for title generation
-            const titleRequest = 'Please provide a short, descriptive title (max 50 characters) for this conversation. Respond with ONLY the title text, no quotes, no explanation.';
-            
-            // CRITICAL: Save title request BEFORE displaying
-            this.addMessage(chat.id, { 
-                role: 'system-title', 
-                content: titleRequest,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Display the system-title request as a collapsible node
-            // The "Generating chat title..." message will be shown automatically before the collapsible
-            this.processRenderEvent({ type: 'system-title-message', content: titleRequest }, chat.id);
-            
-            // Show loading spinner
-            this.processRenderEvent({ type: 'show-spinner' }, chat.id);
-            
-            // Build conversational messages (no tools) for title generation
-            const cleanMessages = this.buildConversationalMessages(chat.messages, false);
-            
-            // Create messages array with custom system prompt for title generation
-            const messages = [{
-                role: 'system', 
-                content: 'You are a helpful assistant that generates concise, descriptive titles for conversations. Respond with ONLY the title text, no quotes, no explanation, no markdown.' 
-            }];
-            
-            // Add clean conversational messages, truncating assistant responses
-            for (const msg of cleanMessages) {
-                if (msg.role === 'user') {
-                    messages.push(msg);
-                } else if (msg.role === 'assistant' && msg.content) {
-                    // Truncate long assistant messages for title context
-                    const truncated = msg.content.length > 500 ? msg.content.substring(0, 500) + '...' : msg.content;
-                    messages.push({ role: 'assistant', content: truncated });
-                }
-            }
-            
-            // Add the title request
-            messages.push({ role: 'user', content: titleRequest });
-            
-            // Send request with low temperature for consistent titles
-            const temperature = 0.3;
-            const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, [], temperature);
-            const llmResponseTime = Date.now() - llmStartTime;
-            
-            // Don't update token usage history for title generation
-            // as it shouldn't affect the context window
-            
-            // Process the title response
-            if (response.content) {
-                // Store the title response with the 'title' role
-                this.addMessage(chat.id, { 
-                    role: 'title', 
-                    content: response.content,
-                    usage: response.usage || null,
-                    responseTime: llmResponseTime || null,
-                    model: provider.model || ChatConfig.getChatModelString(chat),
-                    timestamp: new Date().toISOString()
-                });
-                
-                // Display the response as a title message WITH metrics
-                this.processRenderEvent({ 
-                    type: 'title-message', 
-                    content: response.content,
-                    usage: response.usage,
-                    responseTime: llmResponseTime,
-                    model: ChatConfig.getChatModelString(chat) || provider.model
-                }, chat.id);
-                
-                // Extract and clean the title
-                const newTitle = response.content.trim()
-                    .replace(/^["']|["']$/g, '') // Remove quotes
-                    .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
-                    .substring(0, 65); // Allow some tolerance beyond 50 chars
-                
-                // Update the chat title
-                if (newTitle && newTitle.length > 0) {
-                    chat.title = newTitle;
-                    chat.updatedAt = new Date().toISOString();
-                    
-                    // Mark that title was generated
-                    chat.titleGenerated = true;
-                    
-                    // Update UI
-                    this.updateChatSessions();
-                    const activeChatId = this.getActiveChatId();
-                    if (chat.id === activeChatId) {
-                        // Update chat-specific title
-                        const container = this.getChatContainer(chat.id);
-                        if (container && container._elements && container._elements.chatTitle) {
-                            container._elements.chatTitle.textContent = newTitle;
-                        }
-                    }
-                    
-                    // Save changes (unless automatic)
-                    if (!isAutomatic) {
-                        this.saveChatToStorage(chat.id);
-                    }
-                }
-            }
-            
-        } catch (error) {
-            console.error('Failed to generate title:', error);
-            
-            // Hide spinner on error
-            this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
-            
-            if (!isAutomatic) {
-                // Don't show error to user for manual requests, just log it
-            }
-            
-            // Remove the system-title message if it failed
-            const lastMsg = chat.messages[chat.messages.length - 1];
-            if (lastMsg && lastMsg.role === 'system-title') {
-                this.removeLastMessage(chat.id);
-            }
-            
-            throw error; // Re-throw for caller to handle
-        } finally {
-            // Hide spinner
-            this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
-            // Clear assistant group
-            this.clearCurrentAssistantGroup(chat.id);
-        }
-    }
     
     // Simple helper methods for assistant group management
     setCurrentAssistantGroup(chatId, groupElement) {
@@ -8499,6 +8537,25 @@ Remember: This summary will be the ONLY context available when resuming the conv
         if (chat) {
             chat.currentAssistantGroup = null;
         }
+    }
+    
+    // Get callbacks for title generation
+    getTitleGenerationCallbacks() {
+        return {
+            addMessage: (chatId, message) => this.addMessage(chatId, message),
+            processRenderEvent: (event, chatId) => this.processRenderEvent(event, chatId),
+            updateChatSessions: () => this.updateChatSessions(),
+            updateChatTitle: (chatId, title) => {
+                const container = this.getChatContainer(chatId);
+                if (container && container._elements && container._elements.title) {
+                    container._elements.title.textContent = title;
+                }
+            },
+            saveChatToStorage: (chatId) => this.saveChatToStorage(chatId),
+            showError: (message, chatId) => this.showError(message, chatId),
+            removeLastMessage: (chatId) => this.removeLastMessage(chatId),
+            clearCurrentAssistantGroup: (chatId) => this.clearCurrentAssistantGroup(chatId)
+        };
     }
     
     // Reset global state when switching chats

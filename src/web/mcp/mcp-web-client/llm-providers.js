@@ -319,14 +319,14 @@ function validateMessagesForAPI(messages) {
             lastAssistantMessage = null;
             
         } else if (msgRole === 'assistant') {
-            if (expectedRole !== 'assistant') {
+            if (expectedRole !== 'assistant' && expectedRole !== 'user-or-tool-results') {
                 const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'assistant'`;
                 console.error('[validateMessagesForAPI]', error);
                 console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.type === 'tool-results' ? 'tool-results' : (m.role || m.type)}`));
                 throw new Error(error);
             }
             lastAssistantMessage = msg;
-            // After assistant, we can have either tool-results or user
+            // After assistant, we can have either tool-results, user, or another assistant
             expectedRole = 'user-or-tool-results';
             
         } else if (msgRole === 'tool-results') {
@@ -589,23 +589,211 @@ class OpenAIProvider extends LLMProvider {
         
         const choice = data.choices[0];
         
+        // Handle proper tool_calls format
+        let toolCalls = choice.message.tool_calls?.map(tc => {
+            // Use destructuring to avoid direct 'arguments' reference
+            const { arguments: functionArgs } = tc.function;
+            return {
+                id: tc.id,
+                name: tc.function.name,
+                arguments: JSON.parse(functionArgs)
+            };
+        }) || [];
+        
+        // Fallback: Parse legacy tool calling formats from content
+        let content = choice.message.content;
+        if (!toolCalls.length && content) {
+            const legacyToolCalls = this.parseLegacyToolCalls(content);
+            if (legacyToolCalls.length > 0) {
+                toolCalls = legacyToolCalls;
+                // Remove the tool call text from content
+                content = this.cleanContentFromToolCalls(content);
+            }
+        }
+        
         return {
-            content: choice.message.content,
-            toolCalls: choice.message.tool_calls?.map(tc => {
-                // Use destructuring to avoid direct 'arguments' reference
-                const { arguments: functionArgs } = tc.function;
-                return {
-                    id: tc.id,
-                    name: tc.function.name,
-                    arguments: JSON.parse(functionArgs)
-                };
-            }) || [],
+            content,
+            toolCalls,
             usage: data.usage ? {
                 promptTokens: data.usage.prompt_tokens,
                 completionTokens: data.usage.completion_tokens,
-                totalTokens: data.usage.total_tokens
+                totalTokens: data.usage.total_tokens,
+                cacheReadInputTokens: data.usage.prompt_tokens_details?.cached_tokens,
+                cacheCreationInputTokens: data.usage.prompt_tokens_details?.cache_creation_tokens
             } : null
         };
+    }
+
+    /**
+     * Parse legacy tool calling formats from content text
+     * @param {string} content - Message content that might contain tool calls
+     * @returns {Array<ToolCall>} Parsed tool calls
+     */
+    parseLegacyToolCalls(content) {
+        const toolCalls = [];
+        
+        try {
+            // Pattern 1: JSON-like format with tool_uses array
+            // Example: { tool_uses: [{ recipient_name: "function.name", parameters: {...} }] }
+            const jsonPattern = /\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[(.*?)\]\s*\}/s;
+            const jsonMatch = content.match(jsonPattern);
+            
+            if (jsonMatch) {
+                try {
+                    // Clean up JavaScript-style syntax to make it valid JSON
+                    let cleanedContent = jsonMatch[1]
+                        .replace(/\/\/[^\n\r]*/g, '') // Remove // comments
+                        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+                        .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas before } or ]
+                        .replace(/(\w+)(\s*:)/g, '"$1"$2'); // Quote unquoted property names
+                    
+                    // Handle values that need quoting but aren't quoted yet
+                    // Be careful not to quote numbers or already quoted strings
+                    cleanedContent = cleanedContent.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_]*)/g, (match, value) => {
+                        // Don't quote if it looks like a number or boolean
+                        if (/^(true|false|\d+(\.\d+)?)$/.test(value)) {
+                            return match;
+                        }
+                        return `: "${value}"`;
+                    });
+                    
+                    // Try to parse as valid JSON
+                    const toolData = JSON.parse(`{"tool_uses":[${cleanedContent}]}`);
+                    if (toolData.tool_uses && Array.isArray(toolData.tool_uses)) {
+                        for (const tool of toolData.tool_uses) {
+                            if (tool.recipient_name && tool.parameters) {
+                                // Extract function name from recipient_name (e.g., "functions.list_alerts" -> "list_alerts")
+                                const functionName = tool.recipient_name.split('.').pop();
+                                toolCalls.push({
+                                    id: this.generateId(),
+                                    name: functionName,
+                                    arguments: tool.parameters
+                                });
+                            }
+                        }
+                    }
+                } catch (parseError) {
+                    // If JSON parsing fails, try manual parsing
+                    this.log('debug', 'Failed to parse tool calls as JSON, trying manual parsing', { 
+                        error: parseError.message, 
+                        content: jsonMatch[1].substring(0, 200) 
+                    });
+                    
+                    // Manual parsing for each tool object
+                    const toolPattern = /\{\s*recipient_name\s*:\s*["']([^"']+)["']\s*,\s*parameters\s*:\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\}/g;
+                    let match;
+                    
+                    while ((match = toolPattern.exec(jsonMatch[1])) !== null) {
+                        try {
+                            const functionName = match[1].split('.').pop();
+                            let parametersStr = match[2];
+                            
+                            // Clean up the parameters string more carefully
+                            parametersStr = parametersStr
+                                .replace(/\/\/[^\n\r]*/g, '') // Remove // comments
+                                .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+                                .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+                                .replace(/(\w+)(\s*:)/g, '"$1"$2'); // Quote property names
+                            
+                            // Handle unquoted string values carefully to avoid breaking ISO timestamps
+                            parametersStr = parametersStr.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\-:.]*)/g, (fullMatch, value) => {
+                                // Don't quote numbers, booleans, or things that look like ISO timestamps
+                                if (/^(true|false|\d+(\.\d+)?|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)$/.test(value)) {
+                                    return fullMatch;
+                                }
+                                return `: "${value}"`;
+                            });
+                            
+                            const parameters = JSON.parse(`{${parametersStr}}`);
+                            
+                            toolCalls.push({
+                                id: this.generateId(),
+                                name: functionName,
+                                arguments: parameters
+                            });
+                        } catch (manualParseError) {
+                            this.log('debug', 'Failed to parse individual tool call parameters', { 
+                                functionName: match[1], 
+                                parametersStr: match[2], 
+                                error: manualParseError.message 
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // Pattern 2: Individual tool objects without array wrapper
+            // Example: { recipient_name: "function.name", parameters: {...} }
+            if (toolCalls.length === 0) {
+                const toolPattern = /\{\s*(?:"?recipient_name"?|recipient_name)\s*:\s*["']([^"']+)["']\s*,\s*(?:"?parameters"?|parameters)\s*:\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\}/g;
+                let match;
+                while ((match = toolPattern.exec(content)) !== null) {
+                    try {
+                        const functionName = match[1].split('.').pop();
+                        let parametersStr = match[2];
+                        
+                        // Same careful cleaning as above
+                        parametersStr = parametersStr
+                            .replace(/\/\/[^\n\r]*/g, '')
+                            .replace(/\/\*[\s\S]*?\*\//g, '')
+                            .replace(/,(\s*[}\]])/g, '$1')
+                            .replace(/(\w+)(\s*:)/g, '"$1"$2');
+                        
+                        parametersStr = parametersStr.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\-:.]*)/g, (fullMatch, value) => {
+                            if (/^(true|false|\d+(\.\d+)?|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)$/.test(value)) {
+                                return fullMatch;
+                            }
+                            return `: "${value}"`;
+                        });
+                        
+                        const parameters = JSON.parse(`{${parametersStr}}`);
+                        
+                        toolCalls.push({
+                            id: this.generateId(),
+                            name: functionName,
+                            arguments: parameters
+                        });
+                    } catch (parseError) {
+                        this.log('debug', 'Failed to parse individual tool call', { 
+                            match: match[0], 
+                            error: parseError.message 
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            this.log('error', 'Error parsing legacy tool calls', { 
+                error: error.message, 
+                content: content.substring(0, 200) 
+            });
+        }
+        
+        return toolCalls;
+    }
+    
+    /**
+     * Remove tool call text from content
+     * @param {string} content - Original content
+     * @returns {string} Cleaned content
+     */
+    cleanContentFromToolCalls(content) {
+        // Remove JSON-like tool call blocks
+        let cleaned = content.replace(/\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[.*?\]\s*\}/gs, '');
+        
+        // Remove individual tool call blocks
+        cleaned = cleaned.replace(/\{\s*(?:"?recipient_name"?|recipient_name)\s*:.*?\}\s*\}/gs, '');
+        
+        // Remove multi_tool_use blocks
+        cleaned = cleaned.replace(/<multi_tool_use\.parallel>.*?<\/multi_tool_use\.parallel>/gs, '');
+        
+        // Clean up extra whitespace and newlines
+        cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+        
+        return cleaned;
+    }
+    
+    generateId() {
+        return 'call_' + Math.random().toString(36).substring(2, 11);
     }
 
     convertMessages(messages, _mode = 'cached') {
