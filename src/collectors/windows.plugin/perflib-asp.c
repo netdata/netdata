@@ -14,6 +14,7 @@ struct asp_app {
     RRDSET *st_aspnet_requests_executing;
     RRDSET *st_aspnet_requests_failed;
     RRDSET *st_aspnet_requests_not_found;
+    RRDSET *st_aspnet_requests_in_application_queue;
     RRDSET *st_aspnet_requests_not_authorized;
     RRDSET *st_aspnet_requests_timeout;
     RRDSET *st_aspnet_requests_successed;
@@ -44,6 +45,7 @@ struct asp_app {
     RRDDIM *rd_aspnet_requests_executing;
     RRDDIM *rd_aspnet_requests_failed;
     RRDDIM *rd_aspnet_requests_not_found;
+    RRDDIM *rd_aspnet_requests_in_application_queue;
     RRDDIM *rd_aspnet_requests_not_authorized;
     RRDDIM *rd_aspnet_requests_timeout;
     RRDDIM *rd_aspnet_requests_successed;
@@ -73,6 +75,7 @@ struct asp_app {
     COUNTER_DATA aspnetRequestsExecuting;
     COUNTER_DATA aspnetRequestsFailed;
     COUNTER_DATA aspnetRequestsNotFound;
+    COUNTER_DATA aspnetRequestsInApplicationQueue;
     COUNTER_DATA aspnetRequestsNotAuthorized;
     COUNTER_DATA aspnetRequestsTimeout;
     COUNTER_DATA aspnetRequestsSuccessed;
@@ -106,6 +109,7 @@ static void asp_app_initialize_variables(struct asp_app *ap) {
     ap->aspnetRequestsExecuting.key = "Requests Executing";
     ap->aspnetRequestsFailed.key = "Requests Failed";
     ap->aspnetRequestsNotFound.key = "Requests Not Found";
+    ap->aspnetRequestsInApplicationQueue.key = "Requests In Application Queue";
     ap->aspnetRequestsNotAuthorized.key = "Requests Not Authorized";
     ap->aspnetRequestsTimeout.key = "Requests Timed Out";
     ap->aspnetRequestsSuccessed.key = "Requests Succeeded";
@@ -426,7 +430,7 @@ static void netdata_apps_requests_bytes(struct asp_app *aa, char *app, int updat
                 NULL,
                 "aspnet",
                 "aspnet.requests_byte_total",
-                "Request Bytes.",
+                "Size of responses and request.",
                 "bytes",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibASP",
@@ -487,6 +491,102 @@ static void netdata_apps_requests_executing(struct asp_app *aa, char *app, int u
     rrdset_done(aa->st_aspnet_requests_executing);
 }
 
+static void netdata_apps_requests_failed(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_requests_failed)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_requests_failed", app);
+
+        aa->st_aspnet_requests_failed = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.requests_failed",
+                "Number of failed requests.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_REQUESTS_EXECUTING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_requests_failed =
+                rrddim_add(aa->st_aspnet_requests_failed, "failed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_requests_failed->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_requests_failed,
+            aa->rd_aspnet_requests_failed,
+            (collected_number) aa->aspnetRequestsFailed.current.Data);
+    rrdset_done(aa->st_aspnet_requests_failed);
+}
+
+static void netdata_apps_requests_not_found(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_requests_not_found)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_requests_not_found", app);
+
+        aa->st_aspnet_requests_not_found = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.requests_not_found",
+                "Requests for resources that were not found.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_REQUESTS_EXECUTING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_requests_not_found =
+                rrddim_add(aa->st_aspnet_requests_not_found, "not found", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_requests_not_found->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_requests_not_found,
+            aa->rd_aspnet_requests_not_found,
+            (collected_number) aa->aspnetRequestsNotFound.current.Data);
+    rrdset_done(aa->st_aspnet_requests_not_found);
+}
+
+static void netdata_apps_requests_in_application_queue(struct asp_app *aa, char *app, int update_every) {
+    if (unlikely(!aa->st_aspnet_requests_in_application_queue)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_requests_in_application_queue", app);
+
+        aa->st_aspnet_requests_in_application_queue = rrdset_create_localhost(
+                "aspnet",
+                id,
+                NULL,
+                "aspnet",
+                "aspnet.requests_in_application_queue",
+                "Requests in the application queue.",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibASP",
+                PRIO_ASP_REQUESTS_EXECUTING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_requests_in_application_queue =
+                rrddim_add(aa->st_aspnet_requests_in_application_queue, "queue", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_requests_in_application_queue->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            aa->st_aspnet_requests_in_application_queue,
+            aa->rd_aspnet_requests_in_application_queue,
+            (collected_number) aa->aspnetRequestsInApplicationQueue.current.Data);
+    rrdset_done(aa->st_aspnet_requests_in_application_queue);
+}
+
 static inline void netdata_aspnet_apps_requests(PERF_DATA_BLOCK *pDataBlock,
                                                 PERF_OBJECT_TYPE *pObjectType,
                                                 struct asp_app *aa,
@@ -499,10 +599,13 @@ static inline void netdata_aspnet_apps_requests(PERF_DATA_BLOCK *pDataBlock,
         netdata_apps_requests_executing(aa, windows_shared_buffer, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsFailed))
-        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+        netdata_apps_requests_failed(aa, windows_shared_buffer, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsNotFound))
-        netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);
+        netdata_apps_requests_not_found(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsInApplicationQueue))
+        netdata_apps_requests_in_application_queue(aa, windows_shared_buffer, update_every);
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsNotAuthorized))
         netdata_apps_requests_bytes(aa, windows_shared_buffer, update_every);

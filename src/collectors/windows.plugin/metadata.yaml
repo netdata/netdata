@@ -3226,7 +3226,7 @@ modules:
               dimensions:
                 - name: unhandled
             - name: aspnet.requests_byte_total
-              description: Request Bytes.
+              description: Size of responses and request.
               unit: bytes
               chart_type: line
               dimensions:
@@ -3238,3 +3238,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: executing
+            - name: aspnet.requests_failed
+              description: Number of failed requests.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: executing
+            - name: aspnet.requests_not_found
+              description: Requests for resources that were not found.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: not found
+            - name: aspnet.requests_in_application_queue
+              description: Requests in the application queue.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: queue
