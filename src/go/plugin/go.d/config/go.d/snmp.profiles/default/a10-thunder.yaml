@@ -556,10 +556,10 @@ metrics:
         unit: "{request}/s"
       - name: axVirtualServerStatTotalCurrL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.13
-        metric_type: monotonic_count
+        metric_type: gauge
         description: The number of current L7 requests if applicable
         family: Virtual Servers/Requests/L7
-        unit: "{request}/s"
+        unit: "{request}"
       - name: axVirtualServerStatTotalSuccL7Reqs
         OID: 1.3.6.1.4.1.22610.2.4.3.4.2.1.1.14
         metric_type: monotonic_count
