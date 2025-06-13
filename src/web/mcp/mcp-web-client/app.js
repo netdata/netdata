@@ -6,6 +6,7 @@ import {MessageOptimizer} from './message-optimizer.js';
 import * as ChatConfig from './chat-config.js';
 import * as TitleGenerator from './title.js';
 import * as SystemMsg from './system-msg.js';
+import {SafetyChecker, SafetyLimitError} from './safety-limits.js';
 
 class NetdataMCPChat {
     constructor() {
@@ -22,6 +23,9 @@ class NetdataMCPChat {
         this.modelPricing = {}; // Initialize model pricing storage
         this.modelLimits = {}; // Initialize model context limits storage
         this.copiedModel = null; // Track copied model for paste functionality
+        
+        // Safety protections
+        this.safetyChecker = new SafetyChecker();
         
         // Per-chat DOM management
         this.chatContainers = new Map(); // Map of chatId -> DOM container
@@ -5041,11 +5045,11 @@ class NetdataMCPChat {
                 messageDiv.className = 'message error';
                 messageDiv.style.position = 'relative';
                 
-                // Always show the error with a retry/redo button
+                // Show the error message
                 messageDiv.innerHTML = `<div><i class="fas fa-times-circle"></i> ${event.content}</div>`;
                 
-                // If we have errorMessageIndex, use redo button, otherwise use retry button
-                if (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0) {
+                // Only show retry/redo buttons for retryable errors (not safety limit errors)
+                if (event.errorType !== 'safety_limit' && (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0)) {
                     // This error has context - use redo button
                     const redoBtn = document.createElement('button');
                     redoBtn.className = 'redo-button';
@@ -5337,6 +5341,9 @@ class NetdataMCPChat {
         
         // Clear any current assistant group since we're starting a new conversation turn
         this.clearCurrentAssistantGroup(chat.id);
+        
+        // Reset safety iteration counter for new user message
+        this.safetyChecker.resetIterations(chat.id);
         
         // Clear the draft since we're sending the message
         chat.draftMessage = null;
@@ -5666,6 +5673,39 @@ class NetdataMCPChat {
             }
             
             
+            // SAFETY CHECK: Validate request before sending to LLM
+            try {
+                // Increment iteration count
+                this.safetyChecker.incrementIterations(chat.id);
+                
+                // Prepare request data for size validation
+                const requestData = {
+                    messages,
+                    tools,
+                    temperature: this.getCurrentTemperature(chat.id)
+                };
+                
+                // Validate all safety limits
+                this.safetyChecker.validateRequest(chat.id, requestData, []);
+            } catch (error) {
+                if (error instanceof SafetyLimitError) {
+                    // Show safety error with no retry option
+                    this.addMessage(chat.id, { 
+                        type: 'error', 
+                        content: error.message,
+                        errorType: 'safety_limit',
+                        isRetryable: false
+                    });
+                    this.processRenderEvent({ 
+                        type: 'error-message', 
+                        content: error.message, 
+                        errorType: 'safety_limit'
+                    }, chat.id);
+                    return; // Stop processing completely
+                }
+                throw error; // Re-throw non-safety errors
+            }
+            
             // Send to LLM with current temperature
             const temperature = this.getCurrentTemperature(chat.id);
             const llmStartTime = Date.now();
@@ -5808,6 +5848,28 @@ class NetdataMCPChat {
             
             // Execute tool calls and collect results
             if (response.toolCalls && response.toolCalls.length > 0) {
+                // SAFETY CHECK: Validate concurrent tools limit
+                try {
+                    this.safetyChecker.checkConcurrentToolsLimit(response.toolCalls);
+                } catch (error) {
+                    if (error instanceof SafetyLimitError) {
+                        // Show safety error with no retry option
+                        this.addMessage(chat.id, { 
+                            type: 'error', 
+                            content: error.message,
+                            errorType: 'safety_limit',
+                            isRetryable: false
+                        });
+                        this.processRenderEvent({ 
+                            type: 'error-message', 
+                            content: error.message, 
+                            errorType: 'safety_limit'
+                        }, chat.id);
+                        return; // Stop processing completely
+                    }
+                    throw error; // Re-throw non-safety errors
+                }
+                
                 // Ensure we have an assistant group even if there was no content
                 if (!this.getCurrentAssistantGroup(chat.id)) {
                     this.processRenderEvent({ 
@@ -7345,8 +7407,11 @@ class NetdataMCPChat {
             this.updateChatSessions();
         }
         
-        // Remove any existing spinner for this chat first
-        this.hideLoadingSpinner(chatId);
+        // CRITICAL FIX: Remove any existing spinners from ALL chats first
+        // This prevents orphaned spinners from appearing in wrong chats
+        this.chatContainers.forEach((container, id) => {
+            this.hideLoadingSpinner(id);
+        });
         
         // Create spinner element
         const spinnerDiv = document.createElement('div');
