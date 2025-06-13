@@ -242,14 +242,105 @@ class NetdataMCPChat {
             return;
         }
         
-        chat.messages.pop();
-        chat.updatedAt = new Date().toISOString();
+        // Use removeMessage API instead of direct pop()
+        if (chat.messages.length > 0) {
+            this.removeMessage(chatId, chat.messages.length - 1, 1);
+        }
+    }
+    
+    /**
+     * Truncate messages from a specific index onwards, creating accounting records if needed
+     * @param {string} chatId - The chat ID
+     * @param {number} startIndex - Index from which to truncate (exclusive - messages from this index onwards are removed)
+     * @param {string} reason - Reason for truncation (e.g., 'Redo from user message')
+     */
+    truncateMessages(chatId, startIndex, reason = 'Messages truncated') {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error('truncateMessages: chat not found for chatId:', chatId);
+            return;
+        }
         
-        // Update cumulative token pricing
-        this.updateChatTokenPricing(chat);
+        // Calculate messages to discard
+        const messagesToDiscard = chat.messages.length - startIndex;
+        if (messagesToDiscard <= 0) {
+            // Nothing to truncate
+            return;
+        }
         
-        // Update the cumulative token display
-        this.updateCumulativeTokenDisplay(chatId);
+        // Find messages that will be discarded (from startIndex onwards)
+        const discardedMessages = chat.messages.slice(startIndex);
+        
+        // Check if any discarded messages have non-zero tokens/costs
+        let hasTokens = false;
+        for (const message of discardedMessages) {
+            if (message.usage && message.model) {
+                const usage = message.usage;
+                if ((usage.promptTokens || 0) > 0 || 
+                    (usage.completionTokens || 0) > 0 || 
+                    (usage.cacheReadInputTokens || 0) > 0 || 
+                    (usage.cacheCreationInputTokens || 0) > 0) {
+                    hasTokens = true;
+                    break;
+                }
+            }
+        }
+        
+        // Only create accounting nodes if there are tokens to preserve
+        if (hasTokens) {
+            // Group discarded tokens by model
+            const tokensByModel = new Map();
+            
+            for (const message of discardedMessages) {
+                if (message.usage && message.model) {
+                    const model = message.model;
+                    if (!tokensByModel.has(model)) {
+                        tokensByModel.set(model, {
+                            inputTokens: 0,
+                            outputTokens: 0,
+                            cacheReadTokens: 0,
+                            cacheCreationTokens: 0,
+                            messageCount: 0
+                        });
+                    }
+                    
+                    const tokens = tokensByModel.get(model);
+                    tokens.inputTokens += message.usage.promptTokens || 0;
+                    tokens.outputTokens += message.usage.completionTokens || 0;
+                    tokens.cacheCreationTokens += message.usage.cacheCreationInputTokens || 0;
+                    tokens.cacheReadTokens += message.usage.cacheReadInputTokens || 0;
+                    tokens.messageCount++;
+                }
+            }
+            
+            // Create accounting nodes for each model
+            let insertIndex = startIndex;
+            for (const [model, tokens] of tokensByModel) {
+                // Only create accounting node if this model has non-zero tokens
+                if (tokens.inputTokens > 0 || tokens.outputTokens > 0 || 
+                    tokens.cacheReadTokens > 0 || tokens.cacheCreationTokens > 0) {
+                    const accountingNode = {
+                        role: 'accounting',
+                        timestamp: new Date().toISOString(),
+                        model,
+                        cumulativeTokens: tokens,
+                        reason,
+                        discardedMessages: tokens.messageCount
+                    };
+                    this.insertMessage(chatId, insertIndex, accountingNode);
+                    insertIndex++;
+                }
+            }
+            
+            // Remove all messages after accounting nodes
+            const toRemove = chat.messages.length - insertIndex;
+            if (toRemove > 0) {
+                this.removeMessage(chatId, insertIndex, toRemove);
+            }
+        } else {
+            // No tokens to preserve, just remove messages
+            this.removeMessage(chatId, startIndex, messagesToDiscard);
+        }
         
         this.autoSave(chatId);
     }
@@ -2261,7 +2352,7 @@ class NetdataMCPChat {
             item.onclick = () => {
                 this.switchMcpServer(id, targetChatId).catch(error => {
                     console.error('Failed to switch MCP server:', error);
-                    this.showError('Failed to switch MCP server', targetChatId);
+                    this.showError('Failed to switch MCP server', targetChatId, false);
                 });
                 targetDropdown.style.display = 'none';
             };
@@ -2305,7 +2396,7 @@ class NetdataMCPChat {
             });
             
         } catch (error) {
-            this.showError(`Failed to switch MCP server: ${error.message}`, chatId);
+            this.showError(`Failed to switch MCP server: ${error.message}`, chatId, false);
         }
     }
 
@@ -2604,7 +2695,7 @@ class NetdataMCPChat {
         }
     }
 
-    showError(message, chatId) {
+    showError(message, chatId, saveToMessages = true) {
         // Log to console
         console.error('MCP Client Error:', message, chatId ? `(Chat ID: ${chatId})` : '(Global)');
         
@@ -2626,6 +2717,24 @@ class NetdataMCPChat {
         
         // Also show in chat if chatId is provided
         if (chatId) {
+            const chat = this.chats.get(chatId);
+            
+            // Save to messages if requested and chat exists
+            if (saveToMessages && chat) {
+                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                this.addMessage(chatId, { 
+                    type: 'error', 
+                    content: message, 
+                    errorMessageIndex: lastUserMessageIndex,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Set error state so the chat list shows the warning icon
+                chat.hasError = true;
+                chat.lastError = message;
+                this.updateChatSessions();
+            }
+            
             const container = this.getChatContainer(chatId);
             if (container && container._elements && container._elements.messages) {
                 const messageDiv = document.createElement('div');
@@ -2932,9 +3041,7 @@ class NetdataMCPChat {
             if (message.type === 'user') {
                 // Redo from user message - truncate everything AFTER this message
                 // Keep all history up to and including this message
-                // noinspection JSDeprecatedSymbols (false positive - slice is not deprecated)
-                chat.messages = chat.messages.slice(0, messageIndex + 1);
-                this.autoSave(chat.id);
+                this.truncateMessages(chatId, messageIndex + 1, 'Redo from user message');
                 this.loadChat(chatId, true);
                 
                 // Show loading spinner AFTER loadChat to prevent it from being cleared
@@ -2951,23 +3058,19 @@ class NetdataMCPChat {
             } else if (message.type === 'assistant') {
                 // Redo from assistant message - find the user message that triggered it
                 let triggeringUserMessage = null;
-                let triggeringUserIndex = -1;
                 
                 // Find the most recent user message before this assistant message
                 for (let i = messageIndex - 1; i >= 0; i--) {
                     if (chat.messages[i].role === 'user') {
                         triggeringUserMessage = chat.messages[i];
-                        triggeringUserIndex = i;
                         break;
                     }
                 }
                 
                 if (triggeringUserMessage) {
-                    // Truncate to remove this assistant message and everything after
-                    // Keep everything up to the triggering user message
-                    // noinspection JSDeprecatedSymbols (false positive - slice is not deprecated)
-                    chat.messages = chat.messages.slice(0, triggeringUserIndex + 1);
-                    this.autoSave(chat.id);
+                    // Truncate from THIS assistant message onwards (not from the user message)
+                    // This handles cases where assistant sent multiple messages (e.g., with tool calls)
+                    this.truncateMessages(chatId, messageIndex, 'Redo from assistant message');
                     this.loadChat(chatId, true);
                     
                     // Show loading spinner AFTER loadChat to prevent it from being cleared
@@ -5042,6 +5145,10 @@ class NetdataMCPChat {
             return;
         }
         
+        // Clear error state when processing any event (it will be set again if there's an error)
+        chat.hasError = false;
+        chat.lastError = null;
+        
         // Ensure chat has renderingState
         if (!chat.renderingState) {
             chat.renderingState = {
@@ -5129,6 +5236,10 @@ class NetdataMCPChat {
                 break;
                 
             case 'error-message':
+                // Set error state for error messages
+                chat.hasError = true;
+                chat.lastError = event.content;
+                
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message error';
                 messageDiv.style.position = 'relative';
@@ -5175,31 +5286,15 @@ class NetdataMCPChat {
                         // ATOMIC OPERATION: Remove messages from the error onwards
                         const errorIndex = currentChat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
-                            try {
-                                // Check if we're actually discarding any conversation messages (not just the error)
-                                const messagesToDiscard = currentChat.messages.length - errorIndex - 1; // -1 to exclude the error itself
-                                
-                                // Only create accounting node if we're discarding actual conversation messages
-                                if (messagesToDiscard > 0) {
-                                    const accountingNodes = this.createAccountingNodes('Retry after error', messagesToDiscard);
-                                    // Insert all accounting nodes (one per model)
-                                    let insertIndex = errorIndex;
-                                    for (const accountingNode of accountingNodes) {
-                                        this.insertMessage(chat.id, insertIndex, accountingNode);
-                                        insertIndex++;
-                                    }
-                                    // Remove all messages after the accounting nodes
-                                    const messagesToRemove = chat.messages.length - insertIndex;
-                                    if (messagesToRemove > 0) {
-                                        this.removeMessage(chat.id, insertIndex, messagesToRemove);
-                                    }
-                                } else {
-                                    // Just remove the error message, no accounting needed
-                                    this.removeMessage(chat.id, errorIndex, 1);
-                                }
-                            } finally {
-                                // Exit batch mode and save atomically
-                                this.autoSave(chatId);
+                            // Check if we're actually discarding any conversation messages (not just the error)
+                            const messagesToDiscard = currentChat.messages.length - errorIndex - 1; // -1 to exclude the error itself
+                            
+                            if (messagesToDiscard > 0) {
+                                // Truncate from the error onwards (this will handle accounting)
+                                this.truncateMessages(chatId, errorIndex, 'Retry after error');
+                            } else {
+                                // Just remove the error message, no accounting needed
+                                this.removeMessage(chat.id, errorIndex, 1);
                             }
                             
                             // Reload chat to show cleaned history (force render to refresh UI)
@@ -7078,28 +7173,8 @@ class NetdataMCPChat {
             
             // Always proceed even if content is the same - user may want to regenerate response
             
-            // ATOMIC OPERATION: Batch mode to prevent partial saves
-            try {
-                // Create accounting node before discarding messages
-                const messagesToDiscard = chat.messages.length - messageIndex;
-                if (messagesToDiscard > 0) {
-                    const accountingNodes = this.createAccountingNodes('Message edited', messagesToDiscard);
-                    // Insert all accounting nodes (one per model)
-                    for (const accountingNode of accountingNodes) {
-                        this.insertMessage(chat.id, messageIndex, accountingNode);
-                        messageIndex++; // Adjust index after each insertion
-                    }
-                }
-                
-                // Clip history at this point - remove all messages after messageIndex
-                const toRemove = chat.messages.length - messageIndex;
-                if (toRemove > 0) {
-                    this.removeMessage(chat.id, messageIndex, toRemove);
-                }
-            } finally {
-                // Exit batch mode and save immediately
-                this.autoSave(chatId);
-            }
+            // Truncate messages after the edited message (keeping the edited message)
+            this.truncateMessages(chatId, messageIndex, 'Message edited');
             
             // Reload the chat to show clipped history (force render to refresh UI)
             this.loadChat(chatId, true);
