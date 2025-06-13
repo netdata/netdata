@@ -1364,6 +1364,205 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestAnalyzeTableDependencies(t *testing.T) {
+	tests := map[string]struct {
+		profile  *ddsnmp.Profile
+		expected map[string][]string
+	}{
+		"simple cross-table reference": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							MIB: "CISCO-IF-EXTENSION-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.9.9.276.1.1.2",
+								Name: "cieIfInterfaceTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.4.1.9.9.276.1.1.2.1.1", Name: "cieIfResetCount"},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+									Tag:   "interface",
+								},
+							},
+						},
+						{
+							MIB: "IF-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.31.1.1",
+								Name: "ifXTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.2.1.31.1.1.1.18", Name: "ifAlias"},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string][]string{
+				"1.3.6.1.4.1.9.9.276.1.1.2": {"1.3.6.1.2.1.31.1.1"},
+			},
+		},
+		"multiple dependencies": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							MIB: "MY-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.1000.1",
+								Name: "myTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.4.1.1000.1.1.1", Name: "myMetric"},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+									Tag:   "interface",
+								},
+								{
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2000.1.1.1",
+										Name: "otherName",
+									},
+									Table: "otherTable",
+									Tag:   "other_name",
+								},
+							},
+						},
+						{
+							MIB: "IF-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.31.1.1",
+								Name: "ifXTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.2.1.31.1.1.1.18", Name: "ifAlias"},
+							},
+						},
+						{
+							MIB: "OTHER-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.2000.1",
+								Name: "otherTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.4.1.2000.1.1.2", Name: "otherMetric"},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string][]string{
+				"1.3.6.1.4.1.1000.1": {"1.3.6.1.2.1.31.1.1", "1.3.6.1.4.1.2000.1"},
+			},
+		},
+		"skip index transformation": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							MIB: "MY-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.1000.1",
+								Name: "myTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.4.1.1000.1.1.1", Name: "myMetric"},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.31.1.1.1.1",
+										Name: "ifName",
+									},
+									Table: "ifXTable",
+									Tag:   "interface",
+									IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+										{Start: 1, End: 5},
+									},
+								},
+							},
+						},
+						{
+							MIB: "IF-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.31.1.1",
+								Name: "ifXTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.2.1.31.1.1.1.18", Name: "ifAlias"},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string][]string{}, // Should skip due to index transformation
+		},
+		"no cross-table tags": {
+			profile: &ddsnmp.Profile{
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							MIB: "IF-MIB",
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.2.2",
+								Name: "ifTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{OID: "1.3.6.1.2.1.2.2.1.10", Name: "ifInOctets"},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.2.2.1.2",
+										Name: "ifDescr",
+									},
+									Tag: "interface",
+									// No Table field means same table
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string][]string{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHandler := snmpmock.NewMockHandler(ctrl)
+			collector := New(mockHandler, []*ddsnmp.Profile{tc.profile}, logger.New())
+
+			deps := collector.analyzeTableDependencies(tc.profile)
+
+			assert.Equal(t, len(tc.expected), len(deps), "Wrong number of tables with dependencies")
+
+			for tableOID, expectedDeps := range tc.expected {
+				actualDeps, ok := deps[tableOID]
+				assert.True(t, ok, "Missing dependencies for table %s", tableOID)
+				assert.ElementsMatch(t, expectedDeps, actualDeps, "Wrong dependencies for table %s", tableOID)
+			}
+		})
+	}
+}
+
 func mustCompileRegex(pattern string) *regexp.Regexp {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
