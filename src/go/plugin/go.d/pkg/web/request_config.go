@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/hostinfo"
 )
 
 // RequestConfig is the configuration of the HTTP request.
@@ -86,19 +87,8 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 
 	req.Header.Set("User-Agent", userAgent)
 
-	// Authentication priority: Bearer Token > Basic Auth
-	if cfg.BearerTokenFile != "" {
-		bs, err := os.ReadFile(cfg.BearerTokenFile)
-		if err != nil {
-			return nil, fmt.Errorf("bearer token file: %w", err)
-		}
-		token := strings.TrimSpace(string(bs))
-		if token == "" {
-			return nil, fmt.Errorf("bearer token file is empty")
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-	} else if cfg.Username != "" || cfg.Password != "" {
-		req.SetBasicAuth(cfg.Username, cfg.Password)
+	if err := setAuthentication(req, cfg); err != nil {
+		return nil, err
 	}
 
 	if cfg.ProxyUsername != "" && cfg.ProxyPassword != "" {
@@ -118,10 +108,42 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 	return req, nil
 }
 
+func setAuthentication(req *http.Request, cfg RequestConfig) error {
+	// Priority: Bearer Token > Basic Auth
+	switch {
+	case cfg.BearerTokenFile != "":
+		return setBearerTokenAuth(req, cfg.BearerTokenFile)
+	case cfg.Username != "" || cfg.Password != "":
+		req.SetBasicAuth(cfg.Username, cfg.Password)
+	}
+	return nil
+}
+
+func setBearerTokenAuth(req *http.Request, tokenFile string) error {
+	tokenBs, err := os.ReadFile(tokenFile)
+	if err != nil {
+		// Ignore K8s service account token errors when running outside the cluster
+		if strings.HasPrefix(tokenFile, "/var/run/secrets/") && !hostinfo.IsInsideK8sCluster() {
+			return nil
+		}
+		return fmt.Errorf("bearer token file: %w", err)
+	}
+
+	token := strings.TrimSpace(string(tokenBs))
+	if token == "" {
+		return fmt.Errorf("bearer token file is empty")
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	return nil
+}
+
 // NewHTTPRequestWithPath creates a new HTTP request with the given path appended to the base URL.
 func NewHTTPRequestWithPath(cfg RequestConfig, urlPath string) (*http.Request, error) {
+	// Make a copy to avoid modifying the original config
 	cfg = cfg.Copy()
 
+	// Join the paths properly
 	v, err := url.JoinPath(cfg.URL, urlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to join URL path: %w", err)
