@@ -1916,8 +1916,8 @@ class NetdataMCPChat {
                 rebuildTableBody(models);
                 
                 // Add search functionality
-                searchInput.addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.toLowerCase().trim();
+                searchInput.addEventListener('input', (event) => {
+                    const searchTerm = event.target.value.toLowerCase().trim();
                     
                     if (!searchTerm) {
                         rebuildTableBody(models);
@@ -1948,12 +1948,12 @@ class NetdataMCPChat {
                 });
                 
                 // Handle keyboard navigation
-                searchInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
+                searchInput.addEventListener('keydown', (keyEvent) => {
+                    if (keyEvent.key === 'Escape') {
                         dropdown.remove();
                         button.removeAttribute('data-dropdown-open');
-                    } else if (e.key === 'ArrowDown') {
-                        e.preventDefault();
+                    } else if (keyEvent.key === 'ArrowDown') {
+                        keyEvent.preventDefault();
                         const firstRow = tbody.querySelector('tr[style*="cursor: pointer"]');
                         if (firstRow) {
                             firstRow.focus();
@@ -2736,28 +2736,46 @@ class NetdataMCPChat {
         // Create a unique ID for this entry
         const entryId = `log-entry-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         
-        entryDiv.innerHTML = `
-            <div class="log-entry-header">
-                <div class="log-entry-info">
-                    <span class="log-timestamp">${new Date(entry.timestamp).toLocaleTimeString()}</span>
-                    <span class="log-source">[${entry.source}]</span>
-                    <span class="log-direction ${directionClass}">${directionSymbol}</span>
-                </div>
-                <button class="btn-copy-log" data-tooltip="Copy to clipboard" data-entry-id="${entryId}"><i class="fas fa-clipboard"></i></button>
-            </div>
-            ${metadataHtml}
-            <div class="log-message" id="${entryId}">${this.formatLogMessage(entry.message)}</div>
+        // Create header with copy button
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'log-entry-header';
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'log-entry-info';
+        infoDiv.innerHTML = `
+            <span class="log-timestamp">${new Date(entry.timestamp).toLocaleTimeString()}</span>
+            <span class="log-source">[${entry.source}]</span>
+            <span class="log-direction ${directionClass}">${directionSymbol}</span>
         `;
         
-        // Add click handler for copy button
-        const copyBtn = entryDiv.querySelector('.btn-copy-log');
-        copyBtn.addEventListener('click', () => {
-            const messageElement = document.getElementById(entryId);
-            const textToCopy = messageElement.textContent || messageElement.innerText;
-            this.copyToClipboard(textToCopy, copyBtn).catch(error => {
-                console.error('Failed to copy to clipboard:', error);
-            });
+        // Create copy button using standardized method
+        const copyBtn = this.createCopyButton({
+            buttonClass: 'btn-copy-log',
+            onCopy: () => {
+                const messageElement = document.getElementById(entryId);
+                return messageElement.textContent || messageElement.innerText;
+            }
         });
+        copyBtn.setAttribute('data-entry-id', entryId);
+        
+        headerDiv.appendChild(infoDiv);
+        headerDiv.appendChild(copyBtn);
+        
+        entryDiv.appendChild(headerDiv);
+        
+        // Add metadata if present
+        if (metadataHtml) {
+            const metadataDiv = document.createElement('div');
+            metadataDiv.innerHTML = metadataHtml;
+            entryDiv.appendChild(metadataDiv);
+        }
+        
+        // Add message content
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'log-message';
+        messageDiv.id = entryId;
+        messageDiv.textContent = this.formatLogMessage(entry.message);
+        entryDiv.appendChild(messageDiv);
         
         this.logContent.appendChild(entryDiv);
         
@@ -2779,32 +2797,102 @@ class NetdataMCPChat {
         }
     }
 
-    async copyToClipboard(text, button) {
+    // Shared clipboard utility that works in all contexts
+    async writeToClipboard(text) {
+        // Check if clipboard API is available
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        } else {
+            // Fallback for older browsers or insecure contexts
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (!successful) {
+                    throw new Error('Copy command failed');
+                }
+            } finally {
+                textArea.remove();
+            }
+        }
+    }
+
+    // Create a standardized copy button
+    createCopyButton(options = {}) {
+        const {
+            tooltip = 'Copy to clipboard',
+            iconClass = 'fas fa-clipboard',
+            buttonClass = '',
+            onCopy = null
+        } = options;
+
+        const button = document.createElement('button');
+        button.className = `copy-button ${buttonClass}`.trim();
+        button.setAttribute('data-tooltip', tooltip);
+        button.innerHTML = `<i class="${iconClass}"></i>`;
+        
+        button.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (onCopy) {
+                try {
+                    const textToCopy = await onCopy();
+                    if (textToCopy !== undefined && textToCopy !== null) {
+                        await this.handleCopyButtonClick(button, textToCopy);
+                    }
+                } catch (error) {
+                    console.error('Copy button error:', error);
+                    this.showCopyButtonError(button);
+                }
+            }
+        });
+        
+        return button;
+    }
+
+    // Handle copy button click with standardized feedback
+    async handleCopyButtonClick(button, text) {
+        const originalHTML = button.innerHTML;
+        
         try {
-            await navigator.clipboard.writeText(text);
+            await this.writeToClipboard(text);
             
             // Show success feedback
-            const originalText = button.textContent;
             button.innerHTML = '<i class="fas fa-check"></i>';
             button.style.color = 'var(--success-color)';
             
             setTimeout(() => {
-                button.textContent = originalText;
+                button.innerHTML = originalHTML;
                 button.style.color = '';
             }, 1500);
         } catch (err) {
             console.error('Failed to copy to clipboard:', err);
-            
-            // Show error feedback
-            const originalText = button.textContent;
-            button.textContent = '✗';
-            button.style.color = 'var(--danger-color)';
-            
-            setTimeout(() => {
-                button.textContent = originalText;
-                button.style.color = '';
-            }, 1500);
+            this.showCopyButtonError(button, originalHTML);
         }
+    }
+
+    // Show error feedback on copy button
+    showCopyButtonError(button, originalHTML = null) {
+        const htmlToRestore = originalHTML || button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-times"></i>';
+        button.style.color = 'var(--danger-color)';
+        
+        setTimeout(() => {
+            button.innerHTML = htmlToRestore;
+            button.style.color = '';
+        }, 1500);
+    }
+
+    // Legacy method for backward compatibility
+    async copyToClipboard(text, button) {
+        await this.handleCopyButtonClick(button, text);
     }
     
     // Redo from a specific point in the conversation
@@ -6065,9 +6153,10 @@ class NetdataMCPChat {
         }
         
         // Ensure content is a string
-        if (typeof content !== 'string') {
-            console.error('renderMessage: content is not a string', { role, content, messageIndex });
-            content = String(content || '');
+        let messageContent = content;
+        if (typeof messageContent !== 'string') {
+            console.error('renderMessage: content is not a string', { role, content: messageContent, messageIndex });
+            messageContent = String(messageContent || '');
         }
         
         let messageDiv;
@@ -6113,7 +6202,7 @@ class NetdataMCPChat {
         
         // Check if content has thinking tags
         const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
-        const hasThinking = thinkingRegex.test(content);
+        const hasThinking = thinkingRegex.test(messageContent);
         
         // Make user messages editable on click
         if (role === 'user' && chatId) {
@@ -6123,7 +6212,7 @@ class NetdataMCPChat {
         // Process content
         if (hasThinking && role === 'assistant') {
             // Reset regex for actual processing
-            content.match(/<thinking>([\s\S]*?)<\/thinking>/g);
+            messageContent.match(/<thinking>([\s\S]*?)<\/thinking>/g);
             
             // Split content into parts
             const parts = [];
@@ -6131,12 +6220,12 @@ class NetdataMCPChat {
             let match;
             const regex = /<thinking>([\s\S]*?)<\/thinking>/g;
             
-            while ((match = regex.exec(content)) !== null) {
+            while ((match = regex.exec(messageContent)) !== null) {
                 // Add text before thinking
                 if (match.index > lastIndex) {
                     parts.push({
                         type: 'text',
-                        content: content.substring(lastIndex, match.index).trim()
+                        content: messageContent.substring(lastIndex, match.index).trim()
                     });
                 }
                 
@@ -6150,8 +6239,8 @@ class NetdataMCPChat {
             }
             
             // Add remaining text
-            if (lastIndex < content.length) {
-                const remaining = content.substring(lastIndex).trim();
+            if (lastIndex < messageContent.length) {
+                const remaining = messageContent.substring(lastIndex).trim();
                 if (remaining) {
                     parts.push({
                         type: 'text',
@@ -6367,14 +6456,14 @@ class NetdataMCPChat {
                 if (role === 'summary') {
                     const responseContent = document.createElement('div');
                     responseContent.className = 'message-content';
-                    responseContent.innerHTML = marked.parse(content, {
+                    responseContent.innerHTML = marked.parse(messageContent, {
                         breaks: true, gfm: true, sanitize: false
                     });
                     responseSection.appendChild(responseContent);
                 } else {
                     // For title, use plain text
                     const responseContent = document.createElement('pre');
-                    responseContent.textContent = content;
+                    responseContent.textContent = messageContent;
                     responseSection.appendChild(responseContent);
                 }
                 
@@ -6382,7 +6471,7 @@ class NetdataMCPChat {
                 
                 return; // Don't append messageDiv to chat
             } 
-                console.warn(`No ${blockType} block found for response:`, content);
+                console.warn(`No ${blockType} block found for response:`, messageContent);
             
         } else {
             // Regular message without thinking tags
@@ -6392,7 +6481,7 @@ class NetdataMCPChat {
             if (role === 'assistant' || role === 'user') {
                 // Use marked to render markdown for assistant and user messages
                 // Configure marked to preserve line breaks and handle whitespace properly
-                contentDiv.innerHTML = marked.parse(content, {
+                contentDiv.innerHTML = marked.parse(messageContent, {
                     breaks: true, // Convert line breaks to <br>
                     gfm: true, // GitHub Flavored Markdown
                     sanitize: false // Allow HTML (needed for thinking tags)
@@ -7079,25 +7168,28 @@ class NetdataMCPChat {
         // Add request section
         const requestSection = document.createElement('div');
         requestSection.className = 'tool-request-section';
-        requestSection.innerHTML = `
-            <div class="tool-section-controls">
-                <span class="tool-section-label">📤 REQUEST</span>
-                <button class="tool-section-copy" data-tooltip="Copy request"><i class="fas fa-clipboard"></i></button>
-            </div>
-            <pre>${JSON.stringify(args, null, 2)}</pre>
-        `;
-        toolContent.appendChild(requestSection);
         
-        // Add copy functionality for request
-        const requestCopyBtn = requestSection.querySelector('.tool-section-copy');
-        requestCopyBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const text = JSON.stringify(args, null, 2);
-            navigator.clipboard.writeText(text).then(() => {
-                requestCopyBtn.innerHTML = '<i class="fas fa-check"></i>';
-                setTimeout(() => { requestCopyBtn.innerHTML = '<i class="fas fa-clipboard"></i>'; }, 1000);
-            });
+        // Create controls div
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'tool-section-controls';
+        controlsDiv.innerHTML = '<span class="tool-section-label">📤 REQUEST</span>';
+        
+        // Create copy button using standardized method
+        const requestCopyBtn = this.createCopyButton({
+            buttonClass: 'tool-section-copy',
+            tooltip: 'Copy request',
+            onCopy: () => JSON.stringify(args, null, 2)
         });
+        
+        controlsDiv.appendChild(requestCopyBtn);
+        requestSection.appendChild(controlsDiv);
+        
+        // Add the request content
+        const preElement = document.createElement('pre');
+        preElement.textContent = JSON.stringify(args, null, 2);
+        requestSection.appendChild(preElement);
+        
+        toolContent.appendChild(requestSection);
         
         // Add separator (will be visible when response is added)
         const separator = document.createElement('div');
@@ -7230,25 +7322,30 @@ class NetdataMCPChat {
                     formattedResult = result;
                 }
                 
-                responseSection.innerHTML = `
-                    <div class="tool-section-controls">
-                        <span class="tool-section-label">📥 RESPONSE</span>
-                        <button class="tool-section-copy" data-tooltip="Copy response"><i class="fas fa-clipboard"></i></button>
-                    </div>
-                    ${formattedResult}
-                `;
-                responseSection.style.display = 'block';
+                // Clear and rebuild response section
+                responseSection.innerHTML = '';
                 
-                // Add copy functionality for response
-                const responseCopyBtn = responseSection.querySelector('.tool-section-copy');
-                responseCopyBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const text = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
-                    navigator.clipboard.writeText(text).then(() => {
-                        responseCopyBtn.innerHTML = '<i class="fas fa-check"></i>';
-                        setTimeout(() => { responseCopyBtn.innerHTML = '<i class="fas fa-clipboard"></i>'; }, 1000);
-                    });
+                // Create controls div
+                const responseControlsDiv = document.createElement('div');
+                responseControlsDiv.className = 'tool-section-controls';
+                responseControlsDiv.innerHTML = '<span class="tool-section-label">📥 RESPONSE</span>';
+                
+                // Create copy button using standardized method
+                const responseCopyBtn = this.createCopyButton({
+                    buttonClass: 'tool-section-copy',
+                    tooltip: 'Copy response',
+                    onCopy: () => typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)
                 });
+                
+                responseControlsDiv.appendChild(responseCopyBtn);
+                responseSection.appendChild(responseControlsDiv);
+                
+                // Add the formatted result
+                const resultDiv = document.createElement('div');
+                resultDiv.innerHTML = formattedResult;
+                responseSection.appendChild(resultDiv);
+                
+                responseSection.style.display = 'block';
                 
                 if (separator) {
                     separator.style.display = 'block';
@@ -8487,7 +8584,7 @@ class NetdataMCPChat {
         };
         
         try {
-            await navigator.clipboard.writeText(JSON.stringify(output, null, 2));
+            await this.writeToClipboard(JSON.stringify(output, null, 2));
             
             // Show success feedback
             const btn = this.copyMetricsBtn;
