@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
@@ -26,6 +27,11 @@ type RequestConfig struct {
 
 	// Password specifies the password for basic HTTPConfig authentication.
 	Password string `yaml:"password,omitempty" json:"password"`
+
+	// BearerTokenFile specifies the path to a file containing a bearer token
+	// to be used for HTTP authentication.
+	// The token is read from the file and included in the Authorization header as "Bearer <token>".
+	BearerTokenFile string `yaml:"bearer_token_file,omitempty" json:"bearer_token_file"`
 
 	// ProxyUsername specifies the username for basic HTTPConfig authentication.
 	// It is used to authenticate a user agent to a proxy server.
@@ -73,6 +79,12 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 
 	if cfg.Username != "" || cfg.Password != "" {
 		req.SetBasicAuth(cfg.Username, cfg.Password)
+	} else if cfg.BearerTokenFile != "" {
+		token, err := os.ReadFile(cfg.BearerTokenFile)
+		if err != nil {
+			return nil, fmt.Errorf("bearer token file: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+string(token))
 	}
 
 	if cfg.ProxyUsername != "" && cfg.ProxyPassword != "" {
