@@ -50,14 +50,6 @@ func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init(context.Background()))
 }
 
-func TestCollector_Init_ReadServiceAccountToken(t *testing.T) {
-	collr := New()
-	collr.TokenPath = "testdata/token.txt"
-
-	assert.NoError(t, collr.Init(context.Background()))
-	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), collr.RequestConfig.Headers["Authorization"])
-}
-
 func TestCollector_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	collr := New()
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
@@ -74,6 +66,7 @@ func TestCollector_Check(t *testing.T) {
 	defer ts.Close()
 
 	collr := New()
+	collr.BearerTokenFile = ""
 	collr.URL = ts.URL + "/metrics"
 	require.NoError(t, collr.Init(context.Background()))
 	assert.NoError(t, collr.Check(context.Background()))
@@ -95,6 +88,7 @@ func TestCollector_Collect(t *testing.T) {
 	defer ts.Close()
 
 	collr := New()
+	collr.BearerTokenFile = ""
 	collr.URL = ts.URL + "/metrics"
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
