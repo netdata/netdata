@@ -1137,7 +1137,7 @@ class NetdataMCPChat {
         const toolMemoryEnabled = config.optimisation.toolMemory.enabled;
         toolMemoryDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!toolMemoryEnabled ? 'opacity: 0.5;' : ''}`;
         
-        const forgetAfter = config.optimisation.toolMemory.forgetAfterConclusions || 1;
+        const forgetAfterConclusions = config.optimisation.toolMemory.forgetAfterConclusions;
         
         toolMemoryDiv.innerHTML = `
             <label style="display: flex; align-items: center; cursor: pointer;">
@@ -1150,10 +1150,10 @@ class NetdataMCPChat {
                            border-radius: 4px; background: var(--background-color); color: var(--text-primary);
                            cursor: pointer;"
                     ${!toolMemoryEnabled ? 'disabled' : ''}>
-                <option value="0" ${forgetAfter === 0 ? 'selected' : ''}>0</option>
-                <option value="1" ${forgetAfter === 1 ? 'selected' : ''}>1</option>
-                <option value="2" ${forgetAfter === 2 ? 'selected' : ''}>2</option>
-                <option value="3" ${forgetAfter === 3 ? 'selected' : ''}>3</option>
+                <option value="0" ${forgetAfterConclusions === 0 ? 'selected' : ''}>0</option>
+                <option value="1" ${forgetAfterConclusions === 1 ? 'selected' : ''}>1</option>
+                <option value="2" ${forgetAfterConclusions === 2 ? 'selected' : ''}>2</option>
+                <option value="3" ${forgetAfterConclusions === 3 ? 'selected' : ''}>3</option>
             </select>
             <span>times</span>
         `;
@@ -1318,8 +1318,8 @@ class NetdataMCPChat {
         
         toolMemorySelect.addEventListener('change', (e) => {
             e.stopPropagation();
-            const conclusions = parseInt(e.target.value, 10) || 1;
-            this.updateToolMemoryThreshold(chatId, conclusions);
+            const newForgetAfterConclusions = parseInt(e.target.value, 10);
+            this.updateToolMemoryThreshold(chatId, newForgetAfterConclusions);
         });
         
         // Other checkboxes (smart filtering, cache control)
@@ -1447,7 +1447,11 @@ class NetdataMCPChat {
                         <td style="padding: 4px 6px; color: var(--text-secondary);">Tool Memory:</td>
                         <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
                             ${status(config.optimisation.toolMemory.enabled)} 
-                            ${config.optimisation.toolMemory.enabled ? `Forget after ${config.optimisation.toolMemory.forgetAfterConclusions}` : 'Always'}
+                            ${config.optimisation.toolMemory.enabled ? 
+                                (config.optimisation.toolMemory.forgetAfterConclusions === 0 ? 'forget immediately' :
+                                 config.optimisation.toolMemory.forgetAfterConclusions === 1 ? 'forget after 1 turn' :
+                                 `forget after ${config.optimisation.toolMemory.forgetAfterConclusions} turns`) : 
+                                'Always remember'}
                         </td>
                     </tr>
                     <tr>
@@ -2164,12 +2168,12 @@ class NetdataMCPChat {
         this.autoSave(chatId);
     }
     
-    updateToolMemoryThreshold(chatId, conclusions) {
+    updateToolMemoryThreshold(chatId, forgetAfterConclusions) {
         const chat = this.chats.get(chatId);
         if (!chat) return;
         
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
-        config.optimisation.toolMemory.forgetAfterConclusions = conclusions;
+        config.optimisation.toolMemory.forgetAfterConclusions = forgetAfterConclusions;
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);

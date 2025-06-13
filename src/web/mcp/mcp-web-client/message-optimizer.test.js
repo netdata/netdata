@@ -319,20 +319,20 @@ test.test('Tool memory - enabled but no conclusions', () => {
     
     const optimizer = new MessageOptimizer(settings);
     
-    // Chat without conclusion indicators
+    // Chat without conclusions (assistant still using tools)
     const chat = {
         messages: [
             { role: 'system', content: 'Test' },
             { role: 'user', content: 'List files' },
             { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'list', input: {} }] },
             { role: 'tool-results', toolResults: [{ toolCallId: 'call_1', result: {} }] },
-            { role: 'assistant', content: 'I\'m still working on this...' }
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_2', name: 'list', input: {} }] }
         ]
     };
     
     const result = optimizer.buildMessagesForAPI(chat);
     
-    // Tools should still be included (no conclusion)
+    // Tools should still be included (no conclusion - assistant still using tools)
     test.assertTrue(result.messages.some(m => m.role === 'tool-results'));
 });
 
@@ -636,11 +636,20 @@ test.test('Tool memory - filters after multiple conclusions', () => {
     
     const result = optimizer.buildMessagesForAPI(chat);
     
-    // Verify the statistics are tracking properly
-    test.assertTrue(result.stats.originalMessages === chat.messages.length);
-    test.assertTrue(result.stats.optimizedMessages > 0);
-    // Tool filtering behavior is complex, just verify stats exist
-    test.assertTrue('toolsFiltered' in result.stats);
+    // With forgetAfterConclusions = 0, all tools from previous turns should be filtered
+    // Turn 0 had call_1 and result1, these should be filtered when processing turn 1
+    test.assertTrue(result.stats.toolsFiltered >= 2);
+    
+    // Check that tool-results were filtered
+    const toolResults = result.messages.filter(m => m.role === 'tool-results');
+    test.assertEqual(toolResults.length, 1); // Only the last one should remain
+    
+    // Check that tool calls were removed from assistant messages in old turns
+    const assistantMessages = result.messages.filter(m => m.role === 'assistant');
+    const toolCallMessages = assistantMessages.filter(m => 
+        Array.isArray(m.content) && m.content.some(c => c.type === 'tool_use')
+    );
+    test.assertEqual(toolCallMessages.length, 1); // Only the last tool call should remain
 });
 
 test.test('Tool memory - conclusion detection patterns', () => {
@@ -668,8 +677,158 @@ test.test('Tool memory - conclusion detection patterns', () => {
     
     const result = optimizer.buildMessagesForAPI(chat);
     
-    // Tool memory behavior is complex - just verify stats are tracked
-    test.assertTrue(result.stats.toolsFiltered >= 0); // At least track the stat
+    // With forgetAfterConclusions = 1:
+    // First set of tools (call_1) should be kept since we're only 1 turn away
+    // Both tool results should be present
+    const toolResults = result.messages.filter(m => m.role === 'tool-results');
+    test.assertEqual(toolResults.length, 2);
+    
+    // Both tool calls should be present in assistant messages
+    const assistantMessages = result.messages.filter(m => m.role === 'assistant');
+    const toolCallMessages = assistantMessages.filter(m => 
+        Array.isArray(m.content) && m.content.some(c => c.type === 'tool_use')
+    );
+    test.assertEqual(toolCallMessages.length, 2);
+    
+    // No tools should be filtered with threshold of 1
+    test.assertEqual(result.stats.toolsFiltered, 0);
+});
+
+// Test rolling window behavior
+test.test('Tool memory - rolling window across multiple turns', () => {
+    const settings = createDefaultSettings();
+    settings.optimisation.toolMemory.enabled = true;
+    settings.optimisation.toolMemory.forgetAfterConclusions = 1;
+    
+    const optimizer = new MessageOptimizer(settings);
+    
+    const chat = {
+        messages: [
+            { role: 'system', content: 'Test' },
+            { role: 'user', content: 'Start' },
+            // Turn 0
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'tool_0', name: 'search', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'tool_0', result: 'turn 0 data' }] },
+            { role: 'assistant', content: 'Turn 0 complete' }, // Conclusion -> Turn 1
+            // Turn 1
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'tool_1', name: 'fetch', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'tool_1', result: 'turn 1 data' }] },
+            { role: 'assistant', content: 'Turn 1 complete' }, // Conclusion -> Turn 2
+            // Turn 2
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'tool_2', name: 'analyze', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'tool_2', result: 'turn 2 data' }] },
+            { role: 'assistant', content: 'Turn 2 complete' }, // Conclusion -> Turn 3
+            // Now in turn 3
+            { role: 'user', content: 'What have you found?' }
+        ]
+    };
+    
+    const result = optimizer.buildMessagesForAPI(chat);
+    
+    // With forgetAfterConclusions = 1, in turn 3:
+    // - Turn 0 tools: (3 - 0 = 3) > 1 -> FILTERED
+    // - Turn 1 tools: (3 - 1 = 2) > 1 -> FILTERED  
+    // - Turn 2 tools: (3 - 2 = 1) <= 1 -> KEPT
+    
+    // Should have filtered 4 items (2 tool calls + 2 tool results from turns 0 and 1)
+    test.assertEqual(result.stats.toolsFiltered, 4);
+    
+    // Only turn 2 tools should remain
+    const toolResults = result.messages.filter(m => m.role === 'tool-results');
+    test.assertEqual(toolResults.length, 1);
+    test.assertTrue(toolResults[0].toolResults[0].result === 'turn 2 data');
+    
+    // Only turn 2 tool call should remain in assistant messages
+    const assistantWithTools = result.messages.filter(m => 
+        m.role === 'assistant' && 
+        Array.isArray(m.content) && 
+        m.content.some(c => c.type === 'tool_use')
+    );
+    test.assertEqual(assistantWithTools.length, 1);
+    test.assertTrue(assistantWithTools[0].content[0].id === 'tool_2');
+});
+
+// New Tool Memory Rolling Window Tests
+test.test('Tool memory - forgetAfterConclusions = 0 (immediate filtering)', () => {
+    const settings = createDefaultSettings();
+    settings.optimisation.toolMemory.enabled = true;
+    settings.optimisation.toolMemory.forgetAfterConclusions = 0;
+    
+    const optimizer = new MessageOptimizer(settings);
+    
+    const chat = {
+        messages: [
+            { role: 'system', content: 'Test' },
+            { role: 'user', content: 'First question' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'weather', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_1', result: '72F sunny' }] },
+            { role: 'assistant', content: 'It is 72F and sunny' }, // Turn 0 ends
+            { role: 'user', content: 'What about tomorrow?' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_2', name: 'weather', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_2', result: '68F cloudy' }] },
+            { role: 'assistant', content: 'Tomorrow will be 68F' } // Turn 1 ends
+        ]
+    };
+    
+    const result = optimizer.buildMessagesForAPI(chat);
+    
+    
+    // With forgetAfterConclusions = 0, Turn 0 tools should be filtered when we're in Turn 1
+    test.assertTrue(!result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === '72F sunny'
+    ), 'Turn 0 tools should be filtered');
+    
+    // But Turn 1 tools should still be present
+    test.assertTrue(result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === '68F cloudy'
+    ), 'Turn 1 tools should be present');
+    
+    test.assertEqual(result.stats.toolsFiltered, 2); // 1 tool call + 1 tool result from Turn 0
+});
+
+test.test('Tool memory - forgetAfterConclusions = 1 (keep 1 turn)', () => {
+    const settings = createDefaultSettings();
+    settings.optimisation.toolMemory.enabled = true;
+    settings.optimisation.toolMemory.forgetAfterConclusions = 1;
+    
+    const optimizer = new MessageOptimizer(settings);
+    
+    const chat = {
+        messages: [
+            { role: 'system', content: 'Test' },
+            { role: 'user', content: 'Q1' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 't1', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_1', result: 'r1' }] },
+            { role: 'assistant', content: 'Answer 1' }, // Turn 0 ends
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_2', name: 't2', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_2', result: 'r2' }] },
+            { role: 'assistant', content: 'Answer 2' }, // Turn 1 ends
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_3', name: 't3', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_3', result: 'r3' }] },
+            { role: 'assistant', content: 'Answer 3' } // Turn 2 ends
+        ]
+    };
+    
+    const result = optimizer.buildMessagesForAPI(chat);
+    
+    // We're in Turn 2, so:
+    // - Turn 0 tools should be filtered (2 - 0 = 2 > 1)
+    // - Turn 1 tools should be kept (2 - 1 = 1 <= 1)
+    // - Turn 2 tools should be kept (2 - 2 = 0 <= 1)
+    
+    test.assertTrue(!result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === 'r1'
+    ), 'Turn 0 tools should be filtered');
+    
+    test.assertTrue(result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === 'r2'
+    ), 'Turn 1 tools should be present');
+    
+    test.assertTrue(result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === 'r3'
+    ), 'Turn 2 tools should be present');
+    
+    test.assertEqual(result.stats.toolsFiltered, 2); // Turn 0: 1 tool call + 1 tool result
 });
 
 // Statistics Accuracy Tests
