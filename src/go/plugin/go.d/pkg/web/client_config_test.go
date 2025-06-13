@@ -97,8 +97,8 @@ func TestNewHTTPClient(t *testing.T) {
 				require.True(t, ok)
 
 				// Set env var for testing
-				os.Setenv("HTTP_PROXY", "http://env-proxy:8080")
-				defer os.Unsetenv("HTTP_PROXY")
+				_ = os.Setenv("HTTP_PROXY", "http://env-proxy:8080")
+				defer func() { _ = os.Unsetenv("HTTP_PROXY") }()
 
 				req := httptest.NewRequest("GET", "http://example.com", nil)
 				proxyURL, err := transport.Proxy(req)
@@ -248,8 +248,8 @@ func TestProxyFunc(t *testing.T) {
 			proxyURL: "",
 			envProxy: "http://env-proxy:8080",
 			validate: func(t *testing.T, proxyFunc func(*http.Request) (*url.URL, error)) {
-				os.Setenv("HTTP_PROXY", "http://env-proxy:8080")
-				defer os.Unsetenv("HTTP_PROXY")
+				_ = os.Setenv("HTTP_PROXY", "http://env-proxy:8080")
+				defer func() { _ = os.Unsetenv("HTTP_PROXY") }()
 
 				req := httptest.NewRequest("GET", "http://example.com", nil)
 				proxyURL, err := proxyFunc(req)
@@ -342,12 +342,12 @@ func TestClientIntegration(t *testing.T) {
 			redirectCount++
 			http.Redirect(w, r, "/final", http.StatusFound)
 		case "/final":
-			w.Write([]byte("final destination"))
+			_, _ = w.Write([]byte("final destination"))
 		case "/timeout":
 			time.Sleep(time.Second * 2)
-			w.Write([]byte("too late"))
+			_, _ = w.Write([]byte("too late"))
 		default:
-			w.Write([]byte("default response"))
+			_, _ = w.Write([]byte("default response"))
 		}
 	}))
 	defer server.Close()
@@ -360,7 +360,7 @@ func TestClientIntegration(t *testing.T) {
 
 		resp, err := client.Get(server.URL + "/redirect")
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, "/final", resp.Request.URL.Path)
 	})
@@ -408,25 +408,25 @@ func TestTransportWithDifferentSchemes(t *testing.T) {
 
 	// HTTP server
 	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("http"))
+		_, _ = w.Write([]byte("http"))
 	}))
 	defer httpServer.Close()
 
 	// HTTPS server
 	httpsServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("https"))
+		_, _ = w.Write([]byte("https"))
 	}))
 	defer httpsServer.Close()
 
 	// Test HTTP
 	resp, err := client.Get(httpServer.URL)
 	require.NoError(t, err)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Test HTTPS
 	resp, err = client.Get(httpsServer.URL)
 	require.NoError(t, err)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestHTTP2TransportStructure(t *testing.T) {
@@ -457,39 +457,4 @@ func TestHTTP2TransportStructure(t *testing.T) {
 			assert.True(t, transport.t2c.AllowHTTP)
 		}
 	})
-}
-
-// Benchmark tests
-func BenchmarkNewHTTPClient(b *testing.B) {
-	cfg := ClientConfig{
-		Timeout:  confopt.Duration(time.Second * 30),
-		ProxyURL: "http://proxy:8080",
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = NewHTTPClient(cfg)
-	}
-}
-
-func BenchmarkHTTP2Transport(b *testing.B) {
-	client, _ := NewHTTPClient(ClientConfig{
-		ForceHTTP2: true,
-		TLSConfig: tlscfg.TLSConfig{
-			InsecureSkipVerify: true,
-		},
-	})
-
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("benchmark response"))
-	}))
-	defer server.Close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		resp, _ := client.Get(server.URL)
-		if resp != nil {
-			resp.Body.Close()
-		}
-	}
 }
