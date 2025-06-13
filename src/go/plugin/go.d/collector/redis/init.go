@@ -41,7 +41,9 @@ func (c *Collector) initRedisClient() (*redis.Client, error) {
 	}
 
 	opts.PoolSize = 1
-	opts.TLSConfig = tlsConfig
+	if tlsConfig != nil {
+		opts.TLSConfig = tlsConfig
+	}
 	opts.DialTimeout = c.Timeout.Duration()
 	opts.ReadTimeout = c.Timeout.Duration()
 	opts.WriteTimeout = c.Timeout.Duration()
