@@ -57,15 +57,15 @@ const MODEL_DEFINITIONS = {
   // GPT-4o Series
   'gpt-4o': { 
     contextWindow: 128000, 
-    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+    pricing: { input: 2.50, cacheRead: 1.25, output: 10.00 } 
   },
   'gpt-4o-mini': { 
     contextWindow: 128000, 
-    pricing: { input: 0.40, cacheRead: 0.10, output: 1.60 } 
+    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
   },
   'gpt-4o-2024-05-13': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
+    pricing: { input: 5.00, cacheRead: 0.00, output: 15.00 } 
   },
   'gpt-4o-mini-2024-07-18': { 
     contextWindow: 128000, 
@@ -77,7 +77,7 @@ const MODEL_DEFINITIONS = {
   },
   'gpt-4o-2024-11-20': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
+    pricing: { input: 2.50, cacheRead: 1.25, output: 10.00 } 
   },
   'chatgpt-4o-latest': { 
     contextWindow: 128000, 
@@ -129,27 +129,27 @@ const MODEL_DEFINITIONS = {
   // GPT-4.1 Series (New models with 1M context)
   'gpt-4.1': { 
     contextWindow: 1000000, 
-    pricing: { input: 7.50, cacheRead: 3.75, output: 30.00 } 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
   },
   'gpt-4.1-2025-04-14': { 
     contextWindow: 1000000, 
-    pricing: { input: 7.50, cacheRead: 3.75, output: 30.00 } 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
   },
   'gpt-4.1-mini': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.30, cacheRead: 0.15, output: 1.20 } 
+    pricing: { input: 0.40, cacheRead: 0.10, output: 1.60 } 
   },
   'gpt-4.1-mini-2025-04-14': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.30, cacheRead: 0.15, output: 1.20 } 
+    pricing: { input: 0.40, cacheRead: 0.10, output: 1.60 } 
   },
   'gpt-4.1-nano': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
+    pricing: { input: 0.10, cacheRead: 0.025, output: 0.40 } 
   },
   'gpt-4.1-nano-2025-04-14': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
+    pricing: { input: 0.10, cacheRead: 0.025, output: 0.40 } 
   },
   
   // GPT-3.5 Turbo Series
@@ -178,78 +178,115 @@ const MODEL_DEFINITIONS = {
     pricing: { input: 1.50, cacheRead: 0.75, output: 2.00 } 
   },
   
-  // Audio Models
-  'gpt-4o-audio-preview': { 
-    contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } // Text pricing, audio: $100/M input, $200/M output
-  },
-  'gpt-4o-audio-preview-2024-10-01': { 
-    contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
-  },
-  'gpt-4o-audio-preview-2024-12-17': { 
-    contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
-  },
-  'gpt-4o-mini-audio-preview': { 
-    contextWindow: 128000, 
-    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
-  },
-  'gpt-4o-mini-audio-preview-2024-12-17': { 
-    contextWindow: 128000, 
-    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
-  },
-  
-  // Realtime Models
-  'gpt-4o-realtime-preview': { 
-    contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
-  },
-  'gpt-4o-realtime-preview-2024-10-01': { 
-    contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 20.00 } 
-  },
   
   // Search Models
   'gpt-4o-search-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
+    pricing: { input: 2.50, cacheRead: 0.00, output: 10.00 } 
   },
   'gpt-4o-search-preview-2025-03-11': { 
     contextWindow: 128000, 
-    pricing: { input: 5.00, cacheRead: 2.50, output: 15.00 } 
+    pricing: { input: 2.50, cacheRead: 0.00, output: 10.00 } 
   },
   'gpt-4o-mini-search-preview': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.00, output: 0.60 } 
   },
   'gpt-4o-mini-search-preview-2025-03-11': { 
     contextWindow: 128000, 
-    pricing: { input: 0.15, cacheRead: 0.075, output: 0.60 } 
+    pricing: { input: 0.15, cacheRead: 0.00, output: 0.60 } 
   },
   
   // Specialized Models
-  'gpt-4o-transcribe': { 
-    contextWindow: 128000, 
-    pricing: { input: 0.006, cacheRead: 0.003, output: 0.00 } // $0.006 per minute of audio
-  },
-  'gpt-4o-mini-transcribe': { 
-    contextWindow: 128000, 
-    pricing: { input: 0.006, cacheRead: 0.003, output: 0.00 } 
-  },
-  'gpt-4o-mini-tts': { 
-    contextWindow: 128000, 
-    pricing: { input: 15.00, cacheRead: 7.50, output: 30.00 } 
-  },
   
   // Legacy Models
   'davinci-002': { 
     contextWindow: 16384, 
     pricing: { input: 2.00, cacheRead: 1.00, output: 2.00 } 
   },
-  'gpt-image-1': { 
-    contextWindow: 4096, 
-    pricing: { input: 2.00, cacheRead: 1.00, output: 2.00 } 
+  
+  // o1 Series (Reasoning Models)
+  'o1': { 
+    contextWindow: 200000, 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+  },
+  'o1-2024-12-17': { 
+    contextWindow: 200000, 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+  },
+  'o1-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+  },
+  'o1-preview-2024-09-12': { 
+    contextWindow: 128000, 
+    pricing: { input: 15.00, cacheRead: 7.50, output: 60.00 } 
+  },
+  'o1-mini': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+  },
+  'o1-mini-2024-09-12': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+  },
+  'o1-pro': { 
+    contextWindow: 200000, 
+    pricing: { input: 150.00, cacheRead: 0.00, output: 600.00 } 
+  },
+  'o1-pro-2025-03-19': { 
+    contextWindow: 200000, 
+    pricing: { input: 150.00, cacheRead: 0.00, output: 600.00 } 
+  },
+  
+  // o3 Series
+  'o3': { 
+    contextWindow: 200000, 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+  },
+  'o3-2025-04-16': { 
+    contextWindow: 200000, 
+    pricing: { input: 2.00, cacheRead: 0.50, output: 8.00 } 
+  },
+  'o3-mini': { 
+    contextWindow: 200000, 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+  },
+  'o3-mini-2025-01-31': { 
+    contextWindow: 200000, 
+    pricing: { input: 1.10, cacheRead: 0.55, output: 4.40 } 
+  },
+  'o3-pro': { 
+    contextWindow: 200000, 
+    pricing: { input: 20.00, cacheRead: 0.00, output: 80.00 } 
+  },
+  'o3-pro-2025-06-10': { 
+    contextWindow: 200000, 
+    pricing: { input: 20.00, cacheRead: 0.00, output: 80.00 } 
+  },
+  
+  // o4 Series
+  'o4-mini': { 
+    contextWindow: 200000, 
+    pricing: { input: 1.10, cacheRead: 0.275, output: 4.40 } 
+  },
+  'o4-mini-2025-04-16': { 
+    contextWindow: 200000, 
+    pricing: { input: 1.10, cacheRead: 0.275, output: 4.40 } 
+  },
+  
+  // Specialized Models
+  'codex-mini-latest': { 
+    contextWindow: 128000, 
+    pricing: { input: 1.50, cacheRead: 0.375, output: 6.00 } 
+  },
+  'computer-use-preview': { 
+    contextWindow: 128000, 
+    pricing: { input: 3.00, cacheRead: 0.00, output: 12.00 } 
+  },
+  'computer-use-preview-2025-03-11': { 
+    contextWindow: 128000, 
+    pricing: { input: 3.00, cacheRead: 0.00, output: 12.00 } 
   },
   
   // ==================== ANTHROPIC MODELS ====================
@@ -313,11 +350,11 @@ const MODEL_DEFINITIONS = {
   },
   'gemini-2.0-flash-lite': { 
     contextWindow: 1048576, 
-    pricing: { input: 0.05, output: 0.20 } // Most cost-efficient
+    pricing: { input: 0.075, output: 0.30 } 
   },
   'gemini-2.0-flash-lite-001': { 
     contextWindow: 1048576, 
-    pricing: { input: 0.05, output: 0.20 } 
+    pricing: { input: 0.075, output: 0.30 } 
   },
   'gemini-2.0-flash-exp': { 
     contextWindow: 1000000, 
@@ -330,6 +367,16 @@ const MODEL_DEFINITIONS = {
   'gemini-2.0-flash-thinking-exp-01-21': { 
     contextWindow: 1000000, 
     pricing: { input: 0.00, output: 0.00 } // Free experimental
+  },
+  
+  // Gemini 2.5 Series
+  'gemini-2.5-flash-preview': { 
+    contextWindow: 1000000, 
+    pricing: { input: 0.15, output: 0.60 } // Non-thinking output pricing
+  },
+  'gemini-2.5-pro-preview': { 
+    contextWindow: 2000000, 
+    pricing: { input: 1.25, output: 10.00 } // For prompts <= 200k tokens
   },
   
   // Gemini 1.5 Series
@@ -359,11 +406,11 @@ const MODEL_DEFINITIONS = {
   },
   'gemini-1.5-flash-8b': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.05, output: 0.20 } // 8B model is cheaper
+    pricing: { input: 0.0375, output: 0.15 } // Pricing for prompts <= 128k
   },
   'gemini-1.5-flash-8b-001': { 
     contextWindow: 1000000, 
-    pricing: { input: 0.05, output: 0.20 } 
+    pricing: { input: 0.0375, output: 0.15 } 
   },
   'gemini-1.5-flash-001-tuning': { 
     contextWindow: 16384, 
@@ -413,21 +460,25 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'llm-proxy-config.json');
 // Helper function to generate models list from MODEL_DEFINITIONS
 function generateModelsForProvider(provider) {
   const models = [];
+  
+  // Define which models belong to which provider
+  // Since MODEL_DEFINITIONS is organized by provider sections, we'll check model prefixes
+  const providerPrefixes = {
+    openai: ['gpt', 'o1', 'o3', 'o4', 'davinci', 'chatgpt', 'codex', 'computer-use'],
+    anthropic: ['claude'],
+    google: ['gemini']
+  };
+  
+  const prefixes = providerPrefixes[provider.toLowerCase()];
+  if (!prefixes) return models;
+  
   Object.entries(MODEL_DEFINITIONS).forEach(([modelId, definition]) => {
-    // Filter models by provider based on model ID patterns
-    if (provider === 'openai' && (modelId.startsWith('gpt') || modelId.startsWith('davinci') || modelId === 'gpt-image-1')) {
-      models.push({
-        id: modelId,
-        contextWindow: definition.contextWindow,
-        pricing: definition.pricing
-      });
-    } else if (provider === 'anthropic' && modelId.startsWith('claude')) {
-      models.push({
-        id: modelId,
-        contextWindow: definition.contextWindow,
-        pricing: definition.pricing
-      });
-    } else if (provider === 'google' && modelId.startsWith('gemini')) {
+    // Check if this model belongs to the requested provider
+    const belongsToProvider = prefixes.some(prefix => 
+      modelId.startsWith(prefix) || modelId.includes('-' + prefix + '-')
+    );
+    
+    if (belongsToProvider) {
       models.push({
         id: modelId,
         contextWindow: definition.contextWindow,
@@ -435,6 +486,7 @@ function generateModelsForProvider(provider) {
       });
     }
   });
+  
   return models;
 }
 
@@ -738,12 +790,15 @@ function extractTokenUsage(provider, responseData) {
   try {
     switch (provider.toLowerCase()) {
       case 'openai':
+        // Handle both standard OpenAI format and o3/o1 reasoning model format
         return {
-          promptTokens: responseData.usage?.prompt_tokens || 0,
-          completionTokens: responseData.usage?.completion_tokens || 0,
-          cachedTokens: responseData.usage?.prompt_tokens_details?.cached_tokens || 0,
+          promptTokens: responseData.usage?.prompt_tokens || responseData.usage?.input_tokens || 0,
+          completionTokens: responseData.usage?.completion_tokens || responseData.usage?.output_tokens || 0,
+          cachedTokens: responseData.usage?.prompt_tokens_details?.cached_tokens || responseData.usage?.input_tokens_details?.cached_tokens || 0,
           // OpenAI doesn't report cache creation separately
-          cacheCreationTokens: 0
+          cacheCreationTokens: 0,
+          // Add reasoning tokens for o3/o1 models (included in output_tokens)
+          reasoningTokens: responseData.usage?.output_tokens_details?.reasoning_tokens || 0
         };
       
       case 'anthropic':
@@ -841,7 +896,17 @@ async function fetchAvailableModels(provider, apiKey) {
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
               if (res.statusCode !== 200) {
-                console.log(`   ⚠️  Failed to fetch models from ${provider}: ${res.statusCode}`);
+                console.log(`   ⚠️  Failed to fetch models from ${provider}: HTTP ${res.statusCode}`);
+                if (data) {
+                  try {
+                    const error = JSON.parse(data);
+                    if (error.error?.message) {
+                      console.log(`      Error: ${error.error.message}`);
+                    }
+                  } catch (_e) {
+                    // Ignore JSON parse errors for error response
+                  }
+                }
                 resolve(null);
                 return;
               }
@@ -1242,6 +1307,8 @@ if (process.argv.includes('--update-config')) {
             const beforeCount = mergedModels.length;
             const filteredModels = [];
             
+            const excludedModels = [];
+            
             mergedModels.forEach(model => {
               const id = typeof model === 'string' ? model : model.id;
               if (availableModelIds.has(id)) {
@@ -1251,8 +1318,19 @@ if (process.argv.includes('--update-config')) {
                 } else {
                   filteredModels.push(model);
                 }
+              } else {
+                // Model not available
+                excludedModels.push(id);
               }
             });
+            
+            // Log excluded models
+            if (excludedModels.length > 0) {
+              console.log(`   🚫 Excluded ${provider} models not available to your API key:`);
+              excludedModels.forEach(modelId => {
+                console.log(`      - ${modelId}`);
+              });
+            }
             
             mergedModels = filteredModels;
             
@@ -1388,7 +1466,7 @@ const server = http.createServer(async (req, res) => {
             // Validate model configuration
             const validationError = validateModelConfig(provider, model);
             if (validationError) {
-              console.log(`   ⚠️  Skipping invalid model ${modelId}: ${validationError}`);
+              // Silently skip invalid models (these are typically audio/video models)
               return null;
             }
             
@@ -1757,7 +1835,8 @@ const server = http.createServer(async (req, res) => {
               prompt: tokens.promptTokens,
               completion: tokens.completionTokens,
               cachedRead: tokens.cachedTokens,
-              cacheCreation: tokens.cacheCreationTokens
+              cacheCreation: tokens.cacheCreationTokens,
+              reasoning: tokens.reasoningTokens || 0
             },
             unitPricing: pricing ? {
               input: pricing.input || 0,
@@ -1818,7 +1897,8 @@ const server = http.createServer(async (req, res) => {
           prompt: 0,
           completion: 0,
           cachedRead: 0,
-          cacheCreation: 0
+          cacheCreation: 0,
+          reasoning: 0
         },
         unitPricing: modelPricing,
         costs: {

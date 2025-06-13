@@ -654,6 +654,14 @@ export class MessageOptimizer {
         if (!this.settings.optimisation.cacheControl.enabled) {
             return -1;
         }
+        
+        // For Anthropic models, cache control and tool memory are mutually exclusive
+        // When tool memory filters out old tools, cached content would be wasted
+        if (this.settings.model.provider === 'anthropic' && 
+            this.settings.optimisation.toolMemory.enabled) {
+            // console.log('[MessageOptimizer] Cache control disabled - tool memory is enabled for Anthropic');
+            return -1;
+        }
 
         if (freezeCache && lastCacheIndex !== null) {
             // console.log(`[MessageOptimizer] Using frozen cache index: ${lastCacheIndex}`);

@@ -294,3 +294,10 @@ Result: When in Turn 2, tools A,B are filtered, but C,D are still visible
 
 ### Purpose
 This feature helps manage context window size and reduces costs by automatically removing old tool interactions that are no longer relevant to the current conversation flow.
+
+### Important: Mutual Exclusivity with Cache Control
+For Anthropic models, Tool Memory and Cache Control are mutually exclusive features:
+- When Tool Memory is enabled, Cache Control is automatically disabled
+- This prevents wasting money on caching content that will be filtered out
+- The cached content would include tools that Tool Memory removes in later turns
+- The UI enforces this by disabling the cache control option when tool memory is active

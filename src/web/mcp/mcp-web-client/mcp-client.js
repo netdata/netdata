@@ -98,7 +98,6 @@ class MCPClient {
                 this.ws = new WebSocket(url, ['mcp']);
                 
                 this.ws.onopen = async () => {
-                    console.log('WebSocket connected');
                     this.log('info', 'WebSocket connection established', { url });
                     this.setConnectionState('HANDSHAKING');
                     
