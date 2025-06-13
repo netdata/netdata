@@ -995,7 +995,7 @@ class NetdataMCPChat {
             </div>
             
             <div style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
-                <label style="font-size: 12px; color: var(--text-secondary);">Max tokens:</label>
+                <label style="font-size: 12px; color: var(--text-secondary);">max output tokens:</label>
                 <select id="maxTokens_${chatId}" 
                         style="padding: 2px 6px; border: 1px solid var(--border-color); 
                                border-radius: 4px; background: var(--background-color); 
@@ -2506,8 +2506,8 @@ class NetdataMCPChat {
                 }
                 
                 if (sizes.logPanel && this.logPanel) {
-                    // Only set width if not collapsed, or if we have a saved non-collapsed state
-                    if (!this.logPanel.classList.contains('collapsed') || !sizes.logPanelCollapsed) {
+                    // Only set width if the panel is not currently collapsed
+                    if (!this.logPanel.classList.contains('collapsed')) {
                         this.logPanel.style.width = sizes.logPanel + 'px';
                     }
                 }
@@ -3490,6 +3490,13 @@ class NetdataMCPChat {
             if (container) {
                 this.chatContainersEl.appendChild(container);
                 this.chatContainers.set(chatId, container);
+                
+                // Apply any pending connection state
+                const chat = this.chats.get(chatId);
+                if (chat && chat.pendingConnectionState) {
+                    this.updateChatConnectionUI(chatId, chat.pendingConnectionState.state, chat.pendingConnectionState.details);
+                    delete chat.pendingConnectionState;
+                }
             }
         }
         return this.chatContainers.get(chatId);
@@ -3511,20 +3518,8 @@ class NetdataMCPChat {
                         <h3 class="chat-title">${chat.title}</h3>
                         <div class="chat-meta">
                             <span class="chat-mcp"></span>
-                            <span class="chat-llm" style="display: inline-flex; align-items: center; gap: 8px;">
+                            <span class="chat-llm">
                                 <span class="model-name"></span>
-                                <select class="max-tokens-dropdown" style="padding: 2px 4px; border: 1px solid var(--border-color); 
-                                        border-radius: 4px; background: var(--background-color); color: var(--text-primary);
-                                        cursor: pointer; font-size: 12px;">
-                                    <option value="1024">1k</option>
-                                    <option value="2048">2k</option>
-                                    <option value="4096" selected>4k</option>
-                                    <option value="8192">8k</option>
-                                    <option value="16384">16k</option>
-                                    <option value="32768">32k</option>
-                                    <option value="65536">64k</option>
-                                    <option value="131072">128k</option>
-                                </select>
                             </span>
                         </div>
                     </div>
@@ -3624,7 +3619,6 @@ class NetdataMCPChat {
             title: container.querySelector('.chat-title'),
             mcpMeta: container.querySelector('.chat-mcp'),
             llmMeta: container.querySelector('.chat-llm'),
-            maxTokensDropdown: container.querySelector('.max-tokens-dropdown'),
             messages: container.querySelector('.chat-messages'),
             input: container.querySelector('.chat-input'),
             sendBtn: container.querySelector('.send-message-btn'),
@@ -3753,22 +3747,6 @@ class NetdataMCPChat {
                 });
             }
         });
-        
-        // Max tokens dropdown
-        if (elements.maxTokensDropdown) {
-            // Set initial value from config
-            const currentMaxTokens = chat.config.model.params.maxTokens || 4096;
-            elements.maxTokensDropdown.value = currentMaxTokens;
-            
-            // Add change handler
-            elements.maxTokensDropdown.addEventListener('change', (e) => {
-                const newMaxTokens = parseInt(e.target.value, 10);
-                chat.config.model.params.maxTokens = newMaxTokens;
-                ChatConfig.saveChatConfig(chatId, chat.config);
-                this.autoSave(chatId);
-                console.log(`Updated max tokens for chat ${chatId} to ${newMaxTokens}`);
-            });
-        }
         
         // Resize handle for input - delay to ensure DOM is ready
         if (elements.inputResizeHandle) {
@@ -3948,11 +3926,6 @@ class NetdataMCPChat {
         // Update MCP dropdown text
         elements.currentMcpText.textContent = server ? server.name : 'Select MCP';
         
-        // Update max tokens dropdown value
-        if (elements.maxTokensDropdown && chat.config && chat.config.model && chat.config.model.params) {
-            const currentMaxTokens = chat.config.model.params.maxTokens || 4096;
-            elements.maxTokensDropdown.value = currentMaxTokens;
-        }
     }
     
     isChatReady(chat) {
@@ -4018,15 +3991,8 @@ class NetdataMCPChat {
             return null;
         }
         
-        // Ensure MCP connection
-        try {
-            await this.ensureMcpConnection(mcpServerId);
-            // Update server list to show connected status
-            this.updateMcpServersList();
-        } catch (error) {
-            this.showError(`Failed to connect to MCP server: ${error.message}`, null);
-            return;
-        }
+        // Generate chat ID early so we can show the tab immediately
+        const chatId = `chat_${Date.now()}`;
         
         // Generate title if not provided
         if (!title) {
@@ -4034,8 +4000,6 @@ class NetdataMCPChat {
             const provider = this.llmProviders.get(llmProviderId);
             title = `${server.name} - ${provider.name}`;
         }
-        
-        const chatId = `chat_${Date.now()}`;
         
         // Create system message using centralized logic
         const systemMessage = SystemMsg.createSystemMessage({
@@ -4095,6 +4059,9 @@ class NetdataMCPChat {
         chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
         chat.config = chatConfig;
         
+        // Add connection state to the chat
+        chat.connectionState = 'CONNECTING';
+        
         this.chats.set(chatId, chat);
         
         // Initialize token usage history for new chat
@@ -4112,8 +4079,17 @@ class NetdataMCPChat {
         }
         this.updateChatSessions();
         
-        // Don't automatically load the chat - let the caller decide
-        // this.loadChat(chatId);
+        // Connect to MCP server asynchronously
+        this.ensureMcpConnection(mcpServerId, chatId)
+            .then(() => {
+                chat.connectionState = 'CONNECTED';
+                // Update server list to show connected status
+                this.updateMcpServersList();
+            })
+            .catch((error) => {
+                chat.connectionState = 'FAILED';
+                this.showError(`Failed to connect to MCP server: ${error.message}`, chatId);
+            });
         
         return chatId;
     }
@@ -5282,15 +5258,7 @@ class NetdataMCPChat {
         chat.hasError = false;
         chat.lastError = null;
         
-        let mcpConnection;
-        try {
-            // Try to ensure MCP connection (will reconnect if needed)
-            mcpConnection = await this.ensureMcpConnection(chat.mcpServerId);
-        } catch (error) {
-            this.showError(`Failed to connect to MCP server: ${error.message}`, chat.id);
-            return;
-        }
-        
+        // Validate configuration early
         const proxyProvider = this.llmProviders.get(chat.llmProviderId);
         if (!proxyProvider) {
             this.showError('LLM proxy not available', chat.id);
@@ -5304,10 +5272,6 @@ class NetdataMCPChat {
             this.showError('sendMessage(): Invalid model configuration', chat.id);
             return;
         }
-        
-        // Create the actual LLM provider instance
-        const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-        provider.onLog = proxyProvider.onLog;
         
         // Clear any current assistant group since we're starting a new conversation turn
         this.clearCurrentAssistantGroup(chat.id);
@@ -5331,10 +5295,8 @@ class NetdataMCPChat {
         // Increment turn counter for new user message
         chat.currentTurn = (chat.currentTurn || 0) + 1;
         
-        // CRITICAL: Save message BEFORE displaying it to prevent data loss
+        // CRITICAL: Add and display the user's message immediately for better UX
         this.addMessage(chat.id, { type: 'user', role: 'user', content: message, turn: chat.currentTurn });
-        
-        // Now display it - if save failed, user won't see a message that wasn't saved
         this.processRenderEvent({ type: 'user-message', content: message }, chat.id);
         
         // Force scroll to bottom after DOM update
@@ -5350,6 +5312,24 @@ class NetdataMCPChat {
         
         // Save this specific chat after adding message
         this.autoSave(chat.id);
+        
+        // Now check MCP connection asynchronously
+        let mcpConnection;
+        try {
+            // Try to ensure MCP connection (will reconnect if needed)
+            mcpConnection = await this.ensureMcpConnection(chat.mcpServerId);
+        } catch (error) {
+            this.showError(`Failed to connect to MCP server: ${error.message}`, chat.id);
+            // Re-enable input so user can try again
+            this.chatInput.disabled = false;
+            this.isProcessing = false;
+            this.updateSendButton();
+            return;
+        }
+        
+        // Create the actual LLM provider instance
+        const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+        provider.onLog = proxyProvider.onLog;
         
         // Show loading spinner event
         this.processRenderEvent({ type: 'show-spinner' }, chat.id);
@@ -7416,7 +7396,223 @@ class NetdataMCPChat {
     }
 
     // Also add auto-reconnect on send if disconnected
-    async ensureMcpConnection(mcpServerId) {
+    handleMcpConnectionStateChange(mcpServerId, stateChange, chatId = null) {
+        const { newState, details } = stateChange;
+        
+        // Update the server status in the list
+        this.updateMcpServersList();
+        
+        // If we have a chatId, update the specific chat's UI
+        if (chatId) {
+            const chat = this.chats.get(chatId);
+            if (chat) {
+                this.updateChatConnectionUI(chatId, newState, details);
+            }
+        }
+        
+        // Update all chats using this MCP server
+        for (const [cId, chat] of this.chats) {
+            if (chat.mcpServerId === mcpServerId) {
+                this.updateChatConnectionUI(cId, newState, details);
+                
+                // Handle cleanup for disconnected/failed states
+                if (newState === 'DISCONNECTED' || newState === 'FAILED') {
+                    this.cleanupPendingToolCalls(cId, details);
+                }
+            }
+        }
+        
+        // Log connection state changes for debugging
+        console.log(`MCP Connection State Change: ${mcpServerId} -> ${newState}`, details);
+    }
+    
+    updateChatConnectionUI(chatId, connectionState, details = {}) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        const chatContainer = document.querySelector(`.chat-container[data-chat-id="${chatId}"]`);
+        if (!chatContainer) {
+            // Chat UI not ready yet, store the state for later
+            chat.pendingConnectionState = { state: connectionState, details };
+            return;
+        }
+        
+        const messagesArea = chatContainer.querySelector('.chat-messages');
+        const userInput = chatContainer.querySelector('.user-input');
+        const sendButton = chatContainer.querySelector('.send-button');
+        
+        // Check if elements exist
+        if (!messagesArea || !userInput || !sendButton) {
+            // UI elements not ready, store state for later
+            chat.pendingConnectionState = { state: connectionState, details };
+            return;
+        }
+        
+        // Remove any existing connection overlay
+        const existingOverlay = chatContainer.querySelector('.connection-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+        
+        // Handle different connection states
+        switch (connectionState) {
+            case 'CONNECTING':
+            case 'RECONNECTING':
+            case 'HANDSHAKING':
+            case 'INITIALIZING':
+                // Create connection progress overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'connection-overlay';
+                overlay.innerHTML = `
+                    <div class="connection-progress">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="sr-only">Connecting...</span>
+                        </div>
+                        <div class="connection-status">
+                            ${this.getConnectionStatusMessage(connectionState, details)}
+                        </div>
+                        ${details.reconnectAttempts > 0 ? `<div class="reconnect-attempts">Attempt ${details.reconnectAttempts}</div>` : ''}
+                    </div>
+                `;
+                messagesArea.appendChild(overlay);
+                
+                // Disable input and send button
+                userInput.disabled = true;
+                userInput.placeholder = this.getConnectionStatusMessage(connectionState, details);
+                sendButton.disabled = true;
+                break;
+                
+            case 'CONNECTED':
+                // Enable input and send button
+                userInput.disabled = false;
+                userInput.placeholder = 'Ask about your Netdata metrics...';
+                sendButton.disabled = false;
+                
+                // Show success message briefly
+                const successOverlay = document.createElement('div');
+                successOverlay.className = 'connection-overlay success';
+                successOverlay.innerHTML = `
+                    <div class="connection-progress">
+                        <i class="fas fa-check-circle"></i>
+                        <div class="connection-status">Connected successfully</div>
+                    </div>
+                `;
+                messagesArea.appendChild(successOverlay);
+                setTimeout(() => successOverlay.remove(), 2000);
+                break;
+                
+            case 'FAILED':
+            case 'DISCONNECTED':
+                // Show error state
+                userInput.disabled = true;
+                userInput.placeholder = details.error || 'MCP server disconnected - click Reconnect';
+                sendButton.disabled = true;
+                
+                // Show reconnect button if not already showing
+                const reconnectBtn = chatContainer.querySelector('.btn-reconnect-mcp');
+                if (!reconnectBtn) {
+                    const errorOverlay = document.createElement('div');
+                    errorOverlay.className = 'connection-overlay error';
+                    errorOverlay.innerHTML = `
+                        <div class="connection-progress">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <div class="connection-status">${details.error || 'Connection lost'}</div>
+                            <button class="btn btn-sm btn-primary btn-reconnect-mcp mt-2" onclick="app.reconnectMcpServer('${chat.mcpServerId}')">
+                                <i class="fas fa-plug"></i> Reconnect
+                            </button>
+                        </div>
+                    `;
+                    messagesArea.appendChild(errorOverlay);
+                }
+                break;
+                
+            default:
+                // For any other states, just log them
+                console.log(`Unhandled connection state: ${connectionState}`, details);
+                break;
+        }
+    }
+    
+    getConnectionStatusMessage(state, details) {
+        switch (state) {
+            case 'CONNECTING':
+                return '🔄 Establishing connection...';
+            case 'RECONNECTING':
+                return '🔄 Reconnecting to MCP server...';
+            case 'HANDSHAKING':
+                return '🤝 Performing MCP handshake...';
+            case 'INITIALIZING':
+                if (details.phase === 'loading_tools') {
+                    return '📋 Loading available tools...';
+                }
+                return '⚙️ Initializing MCP session...';
+            case 'CONNECTED':
+                return '✅ Connected successfully';
+            case 'FAILED':
+                return `❌ Connection failed: ${details.error || 'Unknown error'}`;
+            case 'DISCONNECTED':
+                return '🔌 Disconnected from MCP server';
+            default:
+                return 'Connecting...';
+        }
+    }
+    
+    cleanupPendingToolCalls(chatId, details = {}) {
+        const chat = this.chats.get(chatId);
+        if (!chat || !chat.pendingToolCalls || chat.pendingToolCalls.size === 0) return;
+        
+        const container = this.getChatContainer(chatId);
+        if (!container || !container._elements || !container._elements.messages) return;
+        
+        // Hide any loading spinners
+        this.hideLoadingSpinner(chatId);
+        
+        // Process each pending tool call
+        for (const [_toolCallId, toolInfo] of chat.pendingToolCalls) {
+            const { toolDiv } = toolInfo;
+            
+            if (toolDiv) {
+                // Find the response section
+                const responseSection = toolDiv.querySelector('.tool-response-section');
+                if (responseSection && !responseSection.querySelector('.tool-response-content')) {
+                    // Add error message to the response section
+                    const errorContent = document.createElement('div');
+                    errorContent.className = 'tool-response-content error';
+                    errorContent.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            Tool execution failed: MCP server disconnected
+                            ${details.error ? `<br><small>${details.error}</small>` : ''}
+                        </div>
+                    `;
+                    responseSection.appendChild(errorContent);
+                    
+                    // Update the header to show error state
+                    const responseLabel = responseSection.querySelector('.tool-section-label');
+                    if (responseLabel) {
+                        responseLabel.innerHTML = '<i class="fas fa-exclamation-circle" style="color: var(--danger-color);"></i> RESPONSE';
+                    }
+                }
+            }
+        }
+        
+        // Count pending tools before clearing
+        const pendingCount = chat.pendingToolCalls.size;
+        
+        // Clear all pending tool calls for this chat
+        chat.pendingToolCalls.clear();
+        
+        // Add a system message about the disconnection if there were pending tools
+        if (pendingCount > 0) {
+            this.addSystemMessage(
+                `MCP server disconnected. ${pendingCount} pending tool execution(s) were cancelled.`,
+                chatId,
+                'fas fa-plug'
+            );
+        }
+    }
+
+    async ensureMcpConnection(mcpServerId, chatId = null) {
         if (this.mcpConnections.has(mcpServerId)) {
             const connection = this.mcpConnections.get(mcpServerId);
             if (connection.isReady()) {
@@ -7453,7 +7649,14 @@ class NetdataMCPChat {
         
         const mcpConnection = new MCPClient();
         mcpConnection.onLog = (logEntry) => this.addLogEntry(`MCP-${server.name}`, logEntry);
-        await mcpConnection.connect(server.url);
+        
+        // Set up connection state handler
+        mcpConnection.onConnectionStateChange = (stateChange) => {
+            this.handleMcpConnectionStateChange(mcpServerId, stateChange, chatId);
+        };
+        
+        const isReconnect = existingConnection !== undefined;
+        await mcpConnection.connect(server.url, isReconnect);
         
         this.mcpConnections.set(mcpServerId, mcpConnection);
         return mcpConnection;

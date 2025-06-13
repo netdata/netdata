@@ -3511,3 +3511,101 @@ body {
     color: var(--text-secondary);
     text-transform: uppercase;
 }
+
+/* Connection Overlay Styles */
+.connection-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.connection-overlay.success {
+    background: rgba(0, 171, 68, 0.1);
+}
+
+.connection-overlay.error {
+    background: rgba(244, 71, 71, 0.1);
+}
+
+.connection-progress {
+    background: var(--surface-color);
+    padding: 20px 30px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    max-width: 400px;
+}
+
+.connection-status {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.reconnect-attempts {
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.connection-overlay .spinner-border {
+    color: var(--primary-color);
+}
+
+.connection-overlay.success .connection-progress {
+    border: 2px solid var(--success-color);
+}
+
+.connection-overlay.success .fa-check-circle {
+    color: var(--success-color);
+    font-size: 24px;
+}
+
+.connection-overlay.error .connection-progress {
+    border: 2px solid var(--danger-color);
+}
+
+.connection-overlay.error .fa-exclamation-circle {
+    color: var(--danger-color);
+    font-size: 24px;
+}
+
+.btn-reconnect-mcp {
+    background: var(--primary-color);
+    border: none;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.btn-reconnect-mcp:hover {
+    background: var(--primary-hover);
+}
+
+/* Tool response error state */
+.tool-response-content.error {
+    color: var(--danger-color);
+    padding: 10px;
+    background: rgba(244, 71, 71, 0.1);
+    border-radius: 4px;
+}
+
+.tool-response-content.error .error-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-response-content.error .fa-exclamation-circle {
+    font-size: 18px;
+}
