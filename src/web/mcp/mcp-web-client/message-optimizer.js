@@ -21,11 +21,9 @@ class AssistantStateTracker {
     updateState(msg, index) {
         // Consistently get the message type - messages use either 'role' or 'type'
         const messageType = msg.role;
-        console.log(`[AssistantStateTracker.updateState] Message ${index}: messageType=${messageType}, hasToolsInCurrentTurn=${this.hasToolsInCurrentTurn}, currentTurn=${this.currentTurn}`);
         
         if (messageType === 'assistant') {
             if (this.hasToolCalls(msg)) {
-                console.log(`[AssistantStateTracker] Message ${index} has tool calls`);
                 this.hasToolsInCurrentTurn = true;
                 this.messageToTurn.set(index, this.currentTurn);
                 return;
@@ -35,7 +33,6 @@ class AssistantStateTracker {
             this.messageToTurn.set(index, this.currentTurn);
             // Only increment turn if we had tools in this turn
             if (this.hasToolsInCurrentTurn) {
-                console.log(`[AssistantStateTracker] Turn ${this.currentTurn} ends at message ${index} - incrementing turn`);
                 this.currentTurn++;
                 this.hasToolsInCurrentTurn = false;
             }
@@ -57,7 +54,6 @@ class AssistantStateTracker {
         // Get the turn of the last message to know what turn we're actually in
         const lastMessageTurn = Math.max(...Array.from(this.messageToTurn.values()), 0);
         const turnDifference = lastMessageTurn - messageTurn;
-        console.log(`[AssistantStateTracker.shouldFilterTools] Message ${messageIndex}: turn=${messageTurn}, lastMessageTurn=${lastMessageTurn}, diff=${turnDifference}, threshold=${threshold}, filter=${turnDifference > threshold}`);
         return turnDifference > threshold;
     }
 
@@ -74,11 +70,8 @@ class AssistantStateTracker {
 
     hasToolCalls(msg) {
         if (Array.isArray(msg.content)) {
-            const hasTools = msg.content.some(block => block.type === 'tool_use');
-            console.log(`[hasToolCalls] Message has array content, checking for tools:`, hasTools, 'content:', msg.content);
-            return hasTools;
+            return msg.content.some(block => block.type === 'tool_use');
         }
-        console.log(`[hasToolCalls] Message content is not array:`, typeof msg.content);
         return false;
     }
 
@@ -297,6 +290,7 @@ export class MessageOptimizer {
         }
 
         // console.log(`[MessageOptimizer.buildMessagesForAPI] Processing ${chat.messages.length} messages for chat ${chat.id || 'unknown'}`);
+        // console.log(`[MessageOptimizer.buildMessagesForAPI] Tool Memory Settings:`, this.settings.optimisation.toolMemory);
 
         const stats = {
             originalMessages: chat.messages.length,
@@ -320,30 +314,13 @@ export class MessageOptimizer {
 
             // Step 4: First pass - build turn map
             if (this.settings.optimisation.toolMemory.enabled) {
-                console.log('[MessageOptimizer] Tool Memory is ENABLED with forgetAfterConclusions:', this.settings.optimisation.toolMemory.forgetAfterConclusions);
-                console.log('[First Pass] Building turn map...');
-                console.log('[First Pass] Total messages to process:', chat.messages.length);
+                // console.log('[MessageOptimizer] Tool Memory is ENABLED with forgetAfterConclusions:', this.settings.optimisation.toolMemory.forgetAfterConclusions);
                 for (let i = startIndex; i < chat.messages.length; i++) {
                     const msg = chat.messages[i];
-                    console.log(`[First Pass] Message ${i} structure:`, {
-                        role: msg.role,
-                        hasContent: !!msg.content,
-                        contentType: typeof msg.content,
-                        isArray: Array.isArray(msg.content),
-                        contentSample: Array.isArray(msg.content) ? msg.content.slice(0, 2) : msg.content?.substring?.(0, 50)
-                    });
                     if (!this.shouldSkipMessage(msg)) {
-                        const role = msg.role;
-                        console.log(`[First Pass] Processing message ${i}: role=${role}`);
                         assistantTracker.updateState(msg, i);
-                    } else {
-                        console.log(`[First Pass] Skipping message ${i}: role=${msg.role}`);
                     }
                 }
-                console.log(`[First Pass] Complete. Final turn: ${assistantTracker.currentTurn}`);
-                console.log(`[First Pass] Message to turn map:`, Array.from(assistantTracker.messageToTurn.entries()));
-            } else {
-                console.log('[MessageOptimizer] Tool Memory is DISABLED');
             }
 
             // Step 5: Second pass - process messages with filtering
@@ -355,7 +332,6 @@ export class MessageOptimizer {
                 
                 // Skip UI-only messages
                 if (this.shouldSkipMessage(msg)) {
-                    // console.log(`[MessageOptimizer] Skipping message ${i}: ${msg.role}`);
                     continue;
                 }
 
@@ -384,7 +360,19 @@ export class MessageOptimizer {
 
             stats.optimizedMessages = messages.length;
             
-            // console.log(`[MessageOptimizer] Optimization complete:`, stats);
+            console.log(`[MessageOptimizer] Optimization complete:`, stats);
+            console.log(`[MessageOptimizer] Final messages array length: ${messages.length}`);
+            console.log(`[MessageOptimizer] Messages by role:`, messages.reduce((acc, msg) => {
+                acc[msg.role] = (acc[msg.role] || 0) + 1;
+                return acc;
+            }, {}));
+            
+            // Debug: Check for toolCalls in final output
+            const messagesWithToolCalls = messages.filter(m => m.toolCalls && m.toolCalls.length > 0);
+            console.log(`[MessageOptimizer] Messages with toolCalls: ${messagesWithToolCalls.length}`);
+            messagesWithToolCalls.forEach(m => {
+                console.log(`  - ${m.role} (turn ${m.turn || 'unknown'}): ${m.toolCalls.length} toolCalls`);
+            });
 
             return {
                 messages,
@@ -578,11 +566,16 @@ export class MessageOptimizer {
                 return null;
             }
             
-            // Return message with filtered content
-            return {
+            // Return message with filtered content and remove toolCalls
+            const filteredMsg = {
                 ...msg,
                 content: filteredContent
             };
+            
+            // Remove toolCalls array since we filtered the tools
+            delete filteredMsg.toolCalls;
+            
+            return filteredMsg;
         }
         
         return msg;
