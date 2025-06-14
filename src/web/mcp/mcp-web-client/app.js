@@ -127,6 +127,22 @@ class NetdataMCPChat {
     }
     
     /**
+     * Extract tool calls from message content array
+     * @param {Array|string} content - Message content (can be array of blocks or string)
+     * @returns {Array} - Array of tool call objects with id, name, and arguments
+     */
+    extractToolsFromContent(content) {
+        if (!Array.isArray(content)) return [];
+        return content
+            .filter(block => block.type === 'tool_use')
+            .map(block => ({
+                id: block.id,
+                name: block.name,
+                arguments: block.input
+            }));
+    }
+    
+    /**
      * Safe message operations that automatically persist changes
      * These methods ensure messages are never lost by auto-saving after each operation
      * 
@@ -2294,7 +2310,12 @@ class NetdataMCPChat {
         if (!chat) return;
         
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
-        config.optimisation.titleGeneration.model = ChatConfig.modelConfigFromString(model);
+        // Use feature-specific defaults for title generation
+        config.optimisation.titleGeneration.model = ChatConfig.modelConfigFromString(model, {
+            temperature: 0.7,
+            topP: 0.9,
+            maxTokens: 100  // Title generation should use limited tokens
+        });
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
@@ -2960,7 +2981,8 @@ class NetdataMCPChat {
         }
         
         // If no tool calls, display response and finish
-        if (!response.toolCalls || response.toolCalls.length === 0) {
+        const toolsInContent = this.extractToolsFromContent(response.content);
+        if (toolsInContent.length === 0) {
             // Emit metrics event first
             this.processRenderEvent({ 
                 type: 'assistant-metrics', 
@@ -3015,14 +3037,10 @@ class NetdataMCPChat {
         let assistantMessageIndex = null;
         
         // Save assistant message first
-        if (response.content || response.toolCalls) {
+        if (response.content || toolsInContent.length > 0) {
             const assistantMessage = {
                 role: 'assistant',
                 content: response.content || '',
-                toolCalls: (response.toolCalls || []).map(tc => ({
-                    ...tc,
-                    includeInContext: true
-                })),
                 usage: response.usage || null,
                 responseTime: llmResponseTime || null,
                 model: provider.model || ChatConfig.getChatModelString(chat),
@@ -3061,30 +3079,28 @@ class NetdataMCPChat {
                 }, chat.id);
             }
             
-            // Add to API messages
-            const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
+            // Add to API messages - keep original content with tool calls
             const assistantMsg = {
                 role: 'assistant',
-                content: cleanedContent
+                content: response.content || ''
             };
             
-            if (response.toolCalls && response.toolCalls.length > 0) {
-                assistantMsg.toolCalls = response.toolCalls;
-            }
-            
-            if (cleanedContent || (response.toolCalls && response.toolCalls.length > 0)) {
+            // Only add if there's content or tool calls
+            const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
+            if (cleanedContent || this.extractToolsFromContent(response.content).length > 0) {
                 messages.push(assistantMsg);
             }
         }
         
-        // Execute tool calls
-        if (response.toolCalls && response.toolCalls.length > 0) {
+        // Execute tool calls - extract from content array
+        const extractedTools = this.extractToolsFromContent(response.content);
+        if (extractedTools.length > 0) {
             // Increment iteration counter when we have tool calls
             this.safetyChecker.incrementIterations(chat.id);
             
             // Safety check for concurrent tools
             try {
-                this.safetyChecker.checkConcurrentToolsLimit(response.toolCalls);
+                this.safetyChecker.checkConcurrentToolsLimit(extractedTools);
             } catch (error) {
                 if (error instanceof SafetyLimitError) {
                     this.addMessage(chat.id, { 
@@ -3113,7 +3129,7 @@ class NetdataMCPChat {
             }
             
             // Execute tools and collect results
-            const toolResults = await this.executeToolCalls(chat, mcpConnection, response.toolCalls, assistantMessageIndex);
+            const toolResults = await this.executeToolCalls(chat, mcpConnection, extractedTools, assistantMessageIndex);
             
             // Store tool results
             if (toolResults.length > 0) {
@@ -3806,7 +3822,15 @@ class NetdataMCPChat {
                 }
                 
                 // Resend the user message with full prior context
-                await this.processMessageWithTools(freshChat, mcpConnection, provider, message.content);
+                const result = await this.processMessageWithTools(freshChat, mcpConnection, provider, message.content);
+                
+                // Check if rate limit was handled - don't conclude if so
+                if (result && result.rateLimitHandled) {
+                    return;
+                }
+                
+                // Success - assistant has concluded
+                this.assistantConcluded(chatId);
             } else if (message.role === 'assistant') {
                 // Redo from assistant message - find the user message that triggered it
                 let triggeringUserMessage = null;
@@ -4134,6 +4158,11 @@ class NetdataMCPChat {
             
             // Create MessageOptimizer instance
             chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+        }
+        
+        // Ensure pendingToolCalls map exists
+        if (!chat.pendingToolCalls) {
+            chat.pendingToolCalls = new Map();
         }
         
         // Add to memory - DO NOT SAVE!
@@ -5654,6 +5683,11 @@ class NetdataMCPChat {
             // Clear and re-render messages
             elements.messages.innerHTML = '';
             
+            // Clear pending tool calls map when re-rendering
+            if (chat.pendingToolCalls) {
+                chat.pendingToolCalls.clear();
+            }
+            
             // Display system prompt as first message
             const systemPromptToDisplay = chat.systemPrompt || this.defaultSystemPrompt;
             this.displaySystemPrompt(systemPromptToDisplay, chatId);
@@ -5931,21 +5965,20 @@ class NetdataMCPChat {
                     events.push({ type: 'assistant-message', content: msg.content });
                 }
                 
-                // Then add tool calls
-                if (msg.toolCalls && msg.toolCalls.length > 0) {
-                    for (const toolCall of msg.toolCalls) {
-                        if (!toolCall.id) {
-                            console.error('[convertMessageToEvents] Tool call missing required id:', toolCall);
+                // Extract and add tool calls from content array
+                const tools = this.extractToolsFromContent(msg.content);
+                if (tools.length > 0) {
+                    for (const tool of tools) {
+                        if (!tool.id) {
+                            console.error('[convertMessageToEvents] Tool call missing required id:', tool);
                             continue; // Skip invalid tool calls
                         }
-                        // Use destructuring to avoid direct 'arguments' reference
-                        const { arguments: toolArgs } = toolCall || {};
                         events.push({ 
                             type: 'tool-call', 
-                            name: toolCall.name, 
-                            arguments: toolArgs,
-                            id: toolCall.id,  // Required tool call ID for matching
-                            includeInContext: toolCall.includeInContext !== false,
+                            name: tool.name, 
+                            arguments: tool.arguments,
+                            id: tool.id,  // Required tool call ID for matching
+                            includeInContext: true, // Tools in content are always included
                             turn: msg.turn
                         });
                     }
@@ -6422,7 +6455,7 @@ class NetdataMCPChat {
         }
         
         // Create the actual LLM provider instance
-        const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+        const provider = window.createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
         provider.onLog = (logEntry) => {
             const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
             const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
@@ -6618,7 +6651,8 @@ class NetdataMCPChat {
             } else if (msgRole === 'assistant') {
                 // Only include assistant messages that DON'T have tool calls
                 // Skip ALL messages with tool calls, even if they have content
-                if (!msg.toolCalls || msg.toolCalls.length === 0) {
+                const hasToolCalls = this.extractToolsFromContent(msg.content).length > 0;
+                if (!hasToolCalls) {
                     // This is a pure conversational response
                     if (msg.content) {
                         const cleanedContent = this.cleanContentForAPI(msg.content);
@@ -6779,10 +6813,15 @@ class NetdataMCPChat {
             return;
         }
         
-        // Ensure content is a string
+        // Extract text content from array if needed
         let messageContent = content;
-        if (typeof messageContent !== 'string') {
-            console.error('renderMessage: content is not a string', { role, content: messageContent, messageIndex });
+        if (Array.isArray(messageContent)) {
+            // Content is an array with tool calls and text blocks
+            // Extract only the text blocks
+            const textBlocks = messageContent.filter(block => block.type === 'text');
+            messageContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
+        } else if (typeof messageContent !== 'string') {
+            console.error('renderMessage: unexpected content type', { role, content: messageContent, messageIndex });
             messageContent = String(messageContent || '');
         }
         
@@ -8066,8 +8105,23 @@ class NetdataMCPChat {
 
     // Helper method to clean content before sending to API
     cleanContentForAPI(content) {
-        // Remove thinking tags and their content
-        return content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        // Handle array content (with tool calls)
+        if (Array.isArray(content)) {
+            // Extract text blocks and concatenate them
+            const textBlocks = content.filter(block => block.type === 'text');
+            const textContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
+            // Remove thinking tags from the extracted text
+            return textContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        }
+        
+        // Handle string content
+        if (typeof content === 'string') {
+            // Remove thinking tags and their content
+            return content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        }
+        
+        // Fallback for other types
+        return '';
     }
 
     // Helper method to parse tool results from MCP
@@ -9428,13 +9482,6 @@ class NetdataMCPChat {
                     : JSON.stringify(message.content).length;
             }
             
-            // Sanitize tool calls - keep structure but remove args
-            if (message.toolCalls && message.toolCalls.length > 0) {
-                sanitized.toolCalls = message.toolCalls.map(tc => ({
-                    ...tc,
-                    args: undefined  // Remove args but keep other fields
-                }));
-            }
             
             // Handle toolResults field
             if (message.toolResults && Array.isArray(message.toolResults)) {

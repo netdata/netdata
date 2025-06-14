@@ -104,8 +104,18 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
                 }, chat.id);
             }
             
+            // Extract text content from response
+            let titleText = '';
+            if (typeof response.content === 'string') {
+                titleText = response.content;
+            } else if (Array.isArray(response.content)) {
+                // Extract text from content array
+                const textBlocks = response.content.filter(block => block.type === 'text');
+                titleText = textBlocks.map(block => block.text || '').join(' ').trim();
+            }
+            
             // Extract and clean the title
-            const newTitle = response.content.trim()
+            const newTitle = titleText.trim()
                 .replace(/^["']|["']$/g, '') // Remove quotes
                 .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
                 .substring(0, 65); // Allow some tolerance beyond 50 chars

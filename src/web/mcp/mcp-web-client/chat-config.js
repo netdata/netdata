@@ -233,7 +233,7 @@ export function migrateConfig(oldConfig) {
         newConfig.optimisation.toolSummarisation = {
             enabled: oldConfig.toolSummarization.enabled || false,
             thresholdKiB: Math.floor((oldConfig.toolSummarization.threshold || 50000) / 1024),
-            model: oldConfig.secondaryModel ? modelConfigFromString(oldConfig.secondaryModel) : null
+            model: oldConfig.secondaryModel ? modelConfigFromString(oldConfig.secondaryModel, FEATURE_MODEL_DEFAULTS.toolSummarisation) : null
         };
     }
     
@@ -241,7 +241,7 @@ export function migrateConfig(oldConfig) {
         newConfig.optimisation.autoSummarisation = {
             enabled: oldConfig.autoSummarization.enabled || false,
             triggerPercent: oldConfig.autoSummarization.triggerPercent || 50,
-            model: oldConfig.secondaryModel ? modelConfigFromString(oldConfig.secondaryModel) : null
+            model: oldConfig.secondaryModel ? modelConfigFromString(oldConfig.secondaryModel, FEATURE_MODEL_DEFAULTS.autoSummarisation) : null
         };
     }
     

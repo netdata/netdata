@@ -173,7 +173,7 @@ ${summaryContent}`;
         const remainingMessages = [];
         
         // First message is always system
-        if (messages[0].role === 'system') {
+        if (messages[0] && messages[0].role === 'system') {
             systemPrompt = messages[0].content;
         }
         
@@ -374,6 +374,22 @@ function validateMessagesForAPI(messages) {
 }
 
 /**
+ * Extract tool calls from content array
+ * @param {Array|string} content - Message content
+ * @returns {Array} Array of tool calls
+ */
+function extractToolCallsFromContent(content) {
+    if (!Array.isArray(content)) return [];
+    return content
+        .filter(block => block.type === 'tool_use')
+        .map(block => ({
+            id: block.id,
+            name: block.name,
+            arguments: block.input
+        }));
+}
+
+/**
  * Validates that tool results match the assistant's tool calls exactly
  * @param {Object} assistantMsg - The assistant message with tool calls
  * @param {Object} toolResultsMsg - The tool-results message
@@ -381,8 +397,8 @@ function validateMessagesForAPI(messages) {
  * @throws {Error} If validation fails
  */
 function validateToolCalls(assistantMsg, toolResultsMsg, position) {
-    // Extract tool calls from assistant message
-    const toolCalls = assistantMsg.toolCalls || [];
+    // Extract tool calls from assistant message content
+    const toolCalls = extractToolCallsFromContent(assistantMsg.content);
     // STRICT: Only accept toolResults property
     const toolResults = toolResultsMsg.toolResults || [];
     
@@ -629,19 +645,29 @@ class OpenAIProvider extends LLMProvider {
                 if (msg.role === 'user') {
                     inputMessages.push({
                         role: 'user',
-                        content: msg.content
+                        content: msg.content || ''
                     });
                 } else if (msg.role === 'assistant') {
+                    // Extract text content from array if needed
+                    let textContent = msg.content;
+                    if (Array.isArray(msg.content)) {
+                        const textBlocks = msg.content.filter(block => block.type === 'text');
+                        textContent = textBlocks.map(block => block.text || '').join('\n\n').trim() || '';
+                    }
+                    // Ensure content is never null for o3/o1 models
+                    if (textContent === null || textContent === undefined) {
+                        textContent = '';
+                    }
                     inputMessages.push({
                         role: 'assistant',
-                        content: msg.content
+                        content: textContent
                     });
                 } else if (msg.role === 'tool') {
                     // Tool results in responses format
                     inputMessages.push({
                         role: 'tool',
                         tool_call_id: msg.tool_call_id,
-                        content: msg.content
+                        content: msg.content || ''
                     });
                 }
             }
@@ -835,39 +861,81 @@ class OpenAIProvider extends LLMProvider {
             choice = data.choices[0];
         }
         
-        // Handle proper tool_calls format
-        let toolCalls = [];
+        // Convert OpenAI response to unified content array format
+        const contentArray = [];
         
-        // For responses endpoint, tool calls are already parsed
-        if (useResponsesEndpoint && choice.message.tool_calls) {
-            toolCalls = choice.message.tool_calls;
-        } else if (choice.message.tool_calls) {
-            // Standard format needs parsing
-            toolCalls = choice.message.tool_calls.map(tc => {
-                // Use destructuring to avoid direct 'arguments' reference
-                const { arguments: functionArgs } = tc.function;
-                return {
-                    id: tc.id,
-                    name: tc.function.name,
-                    arguments: JSON.parse(functionArgs)
-                };
-            });
+        // Add text content if present
+        if (choice.message.content) {
+            contentArray.push({ type: 'text', text: choice.message.content });
+        }
+        
+        // Add tool calls to content array
+        if (choice.message.tool_calls) {
+            for (const tc of choice.message.tool_calls) {
+                // Handle both standard OpenAI format and o3 simplified format
+                let toolCallId, toolCallName, toolCallArgs;
+                
+                if (tc.function) {
+                    // Standard OpenAI format: {id, type, function: {name, arguments}}
+                    toolCallId = tc.id;
+                    toolCallName = tc.function.name;
+                    toolCallArgs = tc.function.arguments;
+                } else {
+                    // o3 simplified format: {id, name, arguments}
+                    toolCallId = tc.id;
+                    toolCallName = tc.name;
+                    toolCallArgs = tc.arguments;
+                }
+                
+                // Parse arguments
+                let parsedArgs;
+                if (typeof toolCallArgs === 'string') {
+                    try {
+                        parsedArgs = JSON.parse(toolCallArgs);
+                    } catch (_e) {
+                        console.error('[OpenAIProvider] Failed to parse tool arguments:', toolCallArgs);
+                        parsedArgs = {};
+                    }
+                } else {
+                    // Already parsed (o3 format)
+                    parsedArgs = toolCallArgs || {};
+                }
+                
+                contentArray.push({
+                    type: 'tool_use',
+                    id: toolCallId,
+                    name: toolCallName,
+                    input: parsedArgs
+                });
+            }
         }
         
         // Fallback: Parse legacy tool calling formats from content
-        let content = choice.message.content;
-        if (!toolCalls.length && content) {
-            const legacyToolCalls = this.parseLegacyToolCalls(content);
+        if (!choice.message.tool_calls && choice.message.content) {
+            const legacyToolCalls = this.parseLegacyToolCalls(choice.message.content);
             if (legacyToolCalls.length > 0) {
-                toolCalls = legacyToolCalls;
-                // Remove the tool call text from content
-                content = this.cleanContentFromToolCalls(content);
+                // Remove tool text from content
+                const cleanedText = this.cleanContentFromToolCalls(choice.message.content);
+                // Replace text content
+                contentArray.length = 0;
+                if (cleanedText) {
+                    contentArray.push({ type: 'text', text: cleanedText });
+                }
+                // Add legacy tools to content
+                for (const tc of legacyToolCalls) {
+                    contentArray.push({
+                        type: 'tool_use',
+                        id: tc.id,
+                        name: tc.name,
+                        input: tc.arguments
+                    });
+                }
             }
         }
         
         return {
-            content,
-            toolCalls,
+            content: contentArray,
+            toolCalls: [],
             usage: data.usage ? {
                 // Handle both standard and responses endpoint formats
                 promptTokens: data.usage.prompt_tokens || data.usage.input_tokens || 0,
@@ -890,10 +958,21 @@ class OpenAIProvider extends LLMProvider {
         const toolCalls = [];
         
         try {
+            // Pattern 0: <|parallel|> format
+            // Example: <|parallel|>{ tool_uses: [...] }</|parallel|>
+            const parallelPattern = /<\|parallel\|>([\s\S]*?)<\/\|parallel\|>/;
+            const parallelMatch = content.match(parallelPattern);
+            let searchContent = content;
+            
+            if (parallelMatch) {
+                // Extract content between the tags
+                searchContent = parallelMatch[1];
+            }
+            
             // Pattern 1: JSON-like format with tool_uses array
             // Example: { tool_uses: [{ recipient_name: "function.name", parameters: {...} }] }
             const jsonPattern = /\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[(.*?)\]\s*\}/s;
-            const jsonMatch = content.match(jsonPattern);
+            const jsonMatch = searchContent.match(jsonPattern);
             
             if (jsonMatch) {
                 try {
@@ -979,7 +1058,50 @@ class OpenAIProvider extends LLMProvider {
                 }
             }
             
-            // Pattern 2: Individual tool objects without array wrapper
+            // Pattern 2: multi_tool_use.parallel self-closing tag format
+            // Example: <multi_tool_use.parallel tool_uses={[...]}/>
+            if (toolCalls.length === 0) {
+                const multiToolPattern = /<multi_tool_use\.parallel\s+tool_uses=\{(\[[\s\S]*?\])\}\/>/;
+                const multiToolMatch = content.match(multiToolPattern);
+                
+                if (multiToolMatch) {
+                    try {
+                        // Extract the array content
+                        let arrayContent = multiToolMatch[1];
+                        
+                        // Clean up JavaScript-style syntax
+                        arrayContent = arrayContent
+                            .replace(/\/\/[^\n\r]*/g, '') // Remove // comments
+                            .replace(/recipient_name:\s*/g, '"recipient_name":') // Quote property names
+                            .replace(/parameters:\s*/g, '"parameters":')
+                            .replace(/(\w+):\s*"([^"]+)"/g, '"$1": "$2"') // Ensure all properties are quoted
+                            .replace(/(\w+):\s*(-?\d+)/g, '"$1": $2') // Handle numeric values
+                            .replace(/(\w+):\s*\[/g, '"$1": [') // Handle array values
+                            .replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
+                        
+                        // Parse the array
+                        const toolArray = JSON.parse(arrayContent);
+                        
+                        for (const tool of toolArray) {
+                            if (tool.recipient_name && tool.parameters) {
+                                const functionName = tool.recipient_name.split('.').pop();
+                                toolCalls.push({
+                                    id: this.generateId(),
+                                    name: functionName,
+                                    arguments: tool.parameters
+                                });
+                            }
+                        }
+                    } catch (parseError) {
+                        this.log('debug', 'Failed to parse multi_tool_use.parallel format', {
+                            error: parseError.message,
+                            content: multiToolMatch[1].substring(0, 200)
+                        });
+                    }
+                }
+            }
+            
+            // Pattern 3: Individual tool objects without array wrapper
             // Example: { recipient_name: "function.name", parameters: {...} }
             if (toolCalls.length === 0) {
                 const toolPattern = /\{\s*(?:"?recipient_name"?|recipient_name)\s*:\s*["']([^"']+)["']\s*,\s*(?:"?parameters"?|parameters)\s*:\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\}/g;
@@ -1034,14 +1156,18 @@ class OpenAIProvider extends LLMProvider {
      * @returns {string} Cleaned content
      */
     cleanContentFromToolCalls(content) {
+        // Remove <|parallel|> blocks
+        let cleaned = content.replace(/<\|parallel\|>[\s\S]*?<\/\|parallel\|>/g, '');
+        
         // Remove JSON-like tool call blocks
-        let cleaned = content.replace(/\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[.*?\]\s*\}/gs, '');
+        cleaned = cleaned.replace(/\{\s*(?:"?tool_uses"?|tool_uses)\s*:\s*\[.*?\]\s*\}/gs, '');
         
         // Remove individual tool call blocks
         cleaned = cleaned.replace(/\{\s*(?:"?recipient_name"?|recipient_name)\s*:.*?\}\s*\}/gs, '');
         
-        // Remove multi_tool_use blocks
+        // Remove multi_tool_use blocks (both opening/closing and self-closing formats)
         cleaned = cleaned.replace(/<multi_tool_use\.parallel>.*?<\/multi_tool_use\.parallel>/gs, '');
+        cleaned = cleaned.replace(/<multi_tool_use\.parallel\s+tool_uses=\{[\s\S]*?\}\/>/g, '');
         
         // Clean up extra whitespace and newlines
         cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
@@ -1088,29 +1214,40 @@ class OpenAIProvider extends LLMProvider {
                     content: msg.content
                 });
             } else if (msgRole === 'assistant') {
+                // Extract text content and tool calls from message
+                let textContent = null;
+                let toolCalls = [];
+                
+                if (Array.isArray(msg.content)) {
+                    // Extract text blocks
+                    const textBlocks = msg.content.filter(block => block.type === 'text');
+                    if (textBlocks.length > 0) {
+                        textContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
+                    }
+                    // Extract tool calls
+                    toolCalls = extractToolCallsFromContent(msg.content);
+                } else if (typeof msg.content === 'string') {
+                    textContent = msg.content;
+                }
+                
                 // Convert assistant message to OpenAI format
                 const openaiMsg = {
                     role: 'assistant',
-                    content: msg.content || null
+                    content: textContent
                 };
                 
                 // Add tool calls if present
-                if (msg.toolCalls && msg.toolCalls.length > 0) {
-                    openaiMsg.tool_calls = msg.toolCalls.map(tc => {
-                        // Use destructuring to avoid direct 'arguments' reference
-                        const { arguments: funcArgs } = tc.function || {};
-                        const { arguments: tcArgs } = tc || {};
-                        return {
-                            id: tc.id,
-                            type: 'function',
-                            function: {
-                                name: tc.function?.name || tc.name,
-                                arguments: typeof funcArgs === 'string' 
-                                    ? funcArgs 
-                                    : JSON.stringify(funcArgs || tcArgs || {})
-                            }
-                        };
-                    });
+                if (toolCalls.length > 0) {
+                    openaiMsg.tool_calls = toolCalls.map(tc => ({
+                        id: tc.id,
+                        type: 'function',
+                        function: {
+                            name: tc.name,
+                            arguments: typeof tc.arguments === 'string' 
+                                ? tc.arguments 
+                                : JSON.stringify(tc.arguments || {})
+                        }
+                    }));
                 }
                 
                 converted.push(openaiMsg);
@@ -1303,28 +1440,10 @@ class AnthropicProvider extends LLMProvider {
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'anthropic' });
         
-        // Extract content and tool calls
-        let content = '';
-        const toolCalls = [];
-        
-        for (const block of data.content) {
-            if (block.type === 'text') {
-                content += block.text;
-            } else if (block.type === 'tool_use') {
-                toolCalls.push({
-                    id: block.id,
-                    name: block.name,
-                    arguments: block.input
-                });
-            } else {
-                // Log any unknown block types
-                console.warn('Unknown block type in Anthropic response:', block.type, block);
-            }
-        }
         
         return { 
-            content, 
-            toolCalls,
+            content: data.content,
+            toolCalls: [],
             usage: data.usage ? {
                 promptTokens: data.usage.input_tokens,
                 completionTokens: data.usage.output_tokens,
@@ -1421,46 +1540,56 @@ class AnthropicProvider extends LLMProvider {
                     textContent = '';
                 }
                 
+                // Ensure textContent is a valid string
+                if (textContent === null || textContent === undefined) {
+                    textContent = '';
+                }
+                
                 converted.push({
                     role: 'user',
-                    content: [{ type: 'text', text: textContent }]
+                    content: [{ type: 'text', text: String(textContent) }]
                 });
                 // lastRole = 'user';
             } else if (msgRole === 'assistant') {
                 // Convert assistant message to Anthropic format
-                const content = [];
+                let content;
                 
-                // Add text content if present
                 if (msg.content) {
-                    // msg.content might be a string or already an array
                     if (typeof msg.content === 'string') {
-                        content.push({ type: 'text', text: msg.content });
+                        // Legacy string format - convert to array
+                        content = [{ type: 'text', text: msg.content }];
                     } else if (Array.isArray(msg.content)) {
-                        // Content is already an array - extract text content only
-                        const textContent = msg.content.find(item => 
-                            typeof item === 'string' || (item && item.type === 'text')
-                        );
-                        if (typeof textContent === 'string') {
-                            content.push({ type: 'text', text: textContent });
-                        } else if (textContent && textContent.text) {
-                            content.push({ type: 'text', text: textContent.text });
-                        }
+                        // Content is already an array - validate and fix text blocks
+                        // This preserves tool_use blocks that were filtered by MessageOptimizer
+                        content = msg.content.map(block => {
+                            if (block.type === 'text') {
+                                let textValue = block.text;
+                                
+                                // Handle nested array structure (shouldn't happen, but defensive coding)
+                                if (Array.isArray(textValue)) {
+                                    console.warn('[AnthropicProvider] Found nested array in text block, flattening:', textValue);
+                                    // Extract text from nested structure
+                                    const textBlocks = textValue.filter(item => item && item.type === 'text');
+                                    textValue = textBlocks.map(item => item.text || '').join('\n\n').trim();
+                                }
+                                
+                                // Ensure text property is a valid string
+                                return {
+                                    type: 'text',
+                                    text: String(textValue || '')
+                                };
+                            }
+                            // Return other block types (like tool_use) as-is
+                            return block;
+                        });
+                    } else {
+                        // Unknown format - convert to text
+                        content = [{ type: 'text', text: String(msg.content) }];
                     }
+                } else {
+                    content = [];
                 }
                 
-                // Add tool use blocks if present and should be included
-                if (msg.toolCalls && msg.toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
-                    for (const tc of msg.toolCalls) {
-                        // Use destructuring to avoid direct 'arguments' reference
-                        const { arguments: tcArgs } = tc || {};
-                        content.push({
-                            type: 'tool_use',
-                            id: tc.id,
-                            name: tc.name,
-                            input: tcArgs
-                        });
-                    }
-                }
                 
                 if (content.length > 0) {
                     converted.push({
@@ -1550,28 +1679,42 @@ class AnthropicProvider extends LLMProvider {
                 });
             } else if (msgRole === 'assistant') {
                 // Convert assistant message to Anthropic format
-                const content = [];
+                let content;
                 
-                // Add text content if present
                 if (msg.content) {
-                    content.push({ type: 'text', text: msg.content });
-                }
-                
-                // Add tool use blocks if present
-                if (msg.toolCalls && msg.toolCalls.length > 0) {
-                    for (const tc of msg.toolCalls) {
-                        // Extract arguments avoiding direct reference to 'arguments' property
-                        // Use destructuring to avoid the reserved word issue
-                        const { arguments: funcArgs } = tc.function || {};
-                        const { arguments: tcArgs } = tc || {};
-                        const toolInput = funcArgs !== undefined ? funcArgs : (tcArgs || {});
-                        content.push({
-                            type: 'tool_use',
-                            id: tc.id,
-                            name: tc.function?.name || tc.name,
-                            input: toolInput
+                    if (typeof msg.content === 'string') {
+                        // Legacy string format - convert to array
+                        content = [{ type: 'text', text: msg.content }];
+                    } else if (Array.isArray(msg.content)) {
+                        // Content is already an array - validate and fix text blocks
+                        // This preserves tool_use blocks that were included
+                        content = msg.content.map(block => {
+                            if (block.type === 'text') {
+                                let textValue = block.text;
+                                
+                                // Handle nested array structure (shouldn't happen, but defensive coding)
+                                if (Array.isArray(textValue)) {
+                                    console.warn('[AnthropicProvider] Found nested array in text block, flattening:', textValue);
+                                    // Extract text from nested structure
+                                    const textBlocks = textValue.filter(item => item && item.type === 'text');
+                                    textValue = textBlocks.map(item => item.text || '').join('\n\n').trim();
+                                }
+                                
+                                // Ensure text property is a valid string
+                                return {
+                                    type: 'text',
+                                    text: String(textValue || '')
+                                };
+                            }
+                            // Return other block types (like tool_use) as-is
+                            return block;
                         });
+                    } else {
+                        // Unknown format - convert to text
+                        content = [{ type: 'text', text: String(msg.content) }];
                     }
+                } else {
+                    content = [];
                 }
                 
                 if (content.length > 0) {
@@ -1828,23 +1971,35 @@ class GoogleProvider extends LLMProvider {
             throw error;
         }
         
-        // Extract content and function calls
-        let content = '';
-        const toolCalls = [];
+        // Convert Google response to unified content array format
+        const contentArray = [];
+        let textContent = '';
         
         // Ensure parts array exists
         if (candidate.content && candidate.content.parts) {
             for (const part of candidate.content.parts) {
                 if (part.text) {
-                    content += part.text;
+                    textContent += part.text;
                 } else if (part.functionCall) {
-                    toolCalls.push({
+                    // If we have accumulated text, add it first
+                    if (textContent) {
+                        contentArray.push({ type: 'text', text: textContent });
+                        textContent = '';
+                    }
+                    // Add tool use block
+                    contentArray.push({
+                        type: 'tool_use',
                         id: this.generateId(),
                         name: part.functionCall.name,
-                        arguments: part.functionCall.args
+                        input: part.functionCall.args
                     });
                 }
             }
+        }
+        
+        // Add any remaining text content
+        if (textContent) {
+            contentArray.push({ type: 'text', text: textContent });
         }
         
         // Google returns token counts in usageMetadata
@@ -1857,7 +2012,11 @@ class GoogleProvider extends LLMProvider {
             thoughtsTokenCount: data.usageMetadata.thoughtsTokenCount || 0
         } : null;
         
-        return { content, toolCalls, usage };
+        return { 
+            content: contentArray,
+            toolCalls: [],
+            usage 
+        };
     }
 
     convertMessages(messages, mode = 'cached') {
@@ -1882,8 +2041,9 @@ class GoogleProvider extends LLMProvider {
             const msgRole = msg.role;
             
             // Check for tool calls in assistant messages
-            if (msgRole === 'assistant' && msg.toolCalls && this.shouldIncludeToolCalls(msg, mode)) {
-                for (const tc of msg.toolCalls) {
+            const toolCalls = extractToolCallsFromContent(msg.content);
+            if (msgRole === 'assistant' && toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
+                for (const tc of toolCalls) {
                     if (!allToolCalls.has(tc.name)) {
                         allToolCalls.set(tc.name, []);
                     }
@@ -1917,12 +2077,15 @@ class GoogleProvider extends LLMProvider {
                         responseIndex,
                         callIndices,
                         responseIndices,
-                        messages: messages.map((m, i) => ({
-                            index: i,
-                            role: m.role,
-                            hasToolCalls: !!m.toolCalls,
-                            toolCallNames: m.toolCalls?.map(tc => tc.name)
-                        }))
+                        messages: messages.map((m, i) => {
+                            const tools = extractToolCallsFromContent(m.content);
+                            return {
+                                index: i,
+                                role: m.role,
+                                hasToolCalls: tools.length > 0,
+                                toolCallNames: tools.map(tc => tc.name)
+                            };
+                        })
                     });
                     throw new Error(
                         `Google API Error: Tool "${toolName}" response found without a preceding function call. ` +
@@ -1986,7 +2149,8 @@ class GoogleProvider extends LLMProvider {
             
             // Reset the function call tracking when we encounter a new assistant message
             if (msgRole === 'assistant') {
-                lastAssistantHadFunctionCalls = msg.toolCalls && msg.toolCalls.length > 0 && 
+                const toolCalls = extractToolCallsFromContent(msg.content);
+                lastAssistantHadFunctionCalls = toolCalls.length > 0 && 
                                                this.shouldIncludeToolCalls(msg, mode);
                 // Track if assistant message has function calls
             }
@@ -2005,14 +2169,42 @@ class GoogleProvider extends LLMProvider {
             
             if (msgRole === 'user') {
                 // User messages
-                parts.push({ text: msg.content });
+                let textContent = '';
+                
+                // Handle both string and array content
+                if (typeof msg.content === 'string') {
+                    textContent = msg.content;
+                } else if (Array.isArray(msg.content)) {
+                    // Extract text from content array (in case of tool results in user message)
+                    const textBlocks = msg.content.filter(block => block.type === 'text');
+                    textContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
+                }
+                
+                if (textContent || textContent === '') {
+                    parts.push({ text: textContent });
+                }
             } else if (msgRole === 'assistant') {
                 // Assistant messages - include text and optionally tool calls
-                if (msg.content) {
-                    parts.push({ text: msg.content });
+                let textContent = '';
+                
+                // Extract text content from array if needed
+                if (typeof msg.content === 'string') {
+                    textContent = msg.content;
+                } else if (Array.isArray(msg.content)) {
+                    // Extract text from content array
+                    const textBlocks = msg.content.filter(block => block.type === 'text');
+                    textContent = textBlocks.map(block => block.text || '').join('\n\n').trim();
                 }
-                if (msg.toolCalls && msg.toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
-                    for (const tc of msg.toolCalls) {
+                
+                // Add text content if present
+                if (textContent) {
+                    parts.push({ text: textContent });
+                }
+                
+                // Extract and add tool calls
+                const toolCalls = extractToolCallsFromContent(msg.content);
+                if (toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
+                    for (const tc of toolCalls) {
                         // Use destructuring to avoid direct 'arguments' reference
                         const { arguments: tcArgs } = tc || {};
                         parts.push({
