@@ -3256,3 +3256,15 @@ modules:
               chart_type: line
               dimensions:
                 - name: queue
+            - name: aspnet.requests_timeout
+              description: Requests that timed out.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: timeout
+            - name: aspnet.requests_succeeded
+              description: Requests that executed successfully.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: success
