@@ -23,6 +23,7 @@ class TestRunner {
         
         for (const { name, fn } of this.tests) {
             try {
+                // eslint-disable-next-line no-await-in-loop
                 await fn();
                 console.log(`✅ ${name}`);
                 this.passed++;
@@ -784,6 +785,96 @@ test.test('Tool memory - forgetAfterConclusions = 0 (immediate filtering)', () =
     ), 'Turn 1 tools should be present');
     
     test.assertEqual(result.stats.toolsFiltered, 2); // 1 tool call + 1 tool result from Turn 0
+});
+
+// Test with string content for assistant messages
+test.test('Tool memory - with string content assistant messages', () => {
+    const settings = createDefaultSettings();
+    settings.optimisation.toolMemory.enabled = true;
+    settings.optimisation.toolMemory.forgetAfterConclusions = 0;
+    
+    const optimizer = new MessageOptimizer(settings);
+    
+    const chat = {
+        messages: [
+            { role: 'system', content: 'Test' },
+            { role: 'user', content: 'First question' },
+            // Assistant with tool call but string content (common in actual usage)
+            { role: 'assistant', content: 'Let me check the weather' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'weather', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_1', result: '72F sunny' }] },
+            { role: 'assistant', content: 'It is 72F and sunny' }, // Turn 0 ends
+            { role: 'user', content: 'What about tomorrow?' },
+            { role: 'assistant', content: 'Checking tomorrow\'s weather' },
+            { role: 'assistant', content: [{ type: 'tool_use', id: 'call_2', name: 'weather', input: {} }] },
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_2', result: '68F cloudy' }] },
+            { role: 'assistant', content: 'Tomorrow will be 68F' } // Turn 1 ends
+        ]
+    };
+    
+    const result = optimizer.buildMessagesForAPI(chat);
+    
+    // Turn 0 tools should be filtered
+    test.assertTrue(!result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === '72F sunny'
+    ), 'Turn 0 tools should be filtered');
+    
+    // Turn 1 tools should be present
+    test.assertTrue(result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === '68F cloudy'
+    ), 'Turn 1 tools should be present');
+});
+
+// Test mixed content format (text + tool calls in same message)
+test.test('Tool memory - mixed content format', () => {
+    const settings = createDefaultSettings();
+    settings.optimisation.toolMemory.enabled = true;
+    settings.optimisation.toolMemory.forgetAfterConclusions = 0;
+    
+    const optimizer = new MessageOptimizer(settings);
+    
+    const chat = {
+        messages: [
+            { role: 'system', content: 'Test' },
+            { role: 'user', content: 'First question' },
+            // Mixed content: text + tool call in same message
+            { role: 'assistant', content: [
+                { type: 'text', text: 'Let me check the weather' },
+                { type: 'tool_use', id: 'call_1', name: 'weather', input: {} }
+            ]},
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_1', result: '72F sunny' }] },
+            { role: 'assistant', content: 'It is 72F and sunny' }, // Turn 0 ends
+            { role: 'user', content: 'What about tomorrow?' },
+            { role: 'assistant', content: [
+                { type: 'text', text: 'Checking tomorrow\'s forecast' },
+                { type: 'tool_use', id: 'call_2', name: 'weather', input: {} }
+            ]},
+            { role: 'tool-results', toolResults: [{ toolCallId: 'call_2', result: '68F cloudy' }] },
+            { role: 'assistant', content: 'Tomorrow will be 68F' } // Turn 1 ends
+        ]
+    };
+    
+    const result = optimizer.buildMessagesForAPI(chat);
+    
+    // Turn 0 tools should be filtered
+    test.assertTrue(!result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === '72F sunny'
+    ), 'Turn 0 tools should be filtered');
+    
+    // Turn 1 tools should be present
+    test.assertTrue(result.messages.some(m => 
+        m.role === 'tool-results' && m.toolResults && m.toolResults[0].result === '68F cloudy'
+    ), 'Turn 1 tools should be present');
+    
+    // Check that tool_use blocks were filtered from assistant messages
+    const turn0Assistant = result.messages.find(m => 
+        m.role === 'assistant' && Array.isArray(m.content) && 
+        m.content.some(c => c.type === 'text' && c.text === 'Let me check the weather')
+    );
+    if (turn0Assistant) {
+        test.assertTrue(!turn0Assistant.content.some(c => c.type === 'tool_use'), 
+            'Turn 0 tool_use blocks should be filtered from assistant message');
+    }
 });
 
 test.test('Tool memory - forgetAfterConclusions = 1 (keep 1 turn)', () => {

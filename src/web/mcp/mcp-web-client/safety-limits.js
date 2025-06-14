@@ -25,13 +25,13 @@ export const SAFETY_LIMITS = {
     MAX_CONCURRENT_TOOLS_PER_REQUEST: 15,
     
     // Maximum JSON request size in bytes before stopping with error
-    MAX_REQUEST_SIZE_BYTES: 200 * 1024, // 200 KiB
+    MAX_REQUEST_SIZE_BYTES: 400 * 1024, // 400 KiB
     
     // Error messages for each safety violation
     ERRORS: {
-        TOO_MANY_ITERATIONS: 'Assistant exceeded maximum consecutive tool iterations limit. This conversation has been stopped to prevent runaway behavior.',
-        TOO_MANY_CONCURRENT_TOOLS: 'Request contains too many concurrent tools. This conversation has been stopped to prevent resource exhaustion.',
-        REQUEST_TOO_LARGE: 'Request size exceeds maximum limit. This conversation has been stopped to prevent memory issues.'
+        TOO_MANY_ITERATIONS: (current, limit) => `Assistant has made ${current} consecutive tool iterations. Maximum allowed is ${limit}.`,
+        TOO_MANY_CONCURRENT_TOOLS: (current, limit) => `Request contains ${current} concurrent tool calls. Maximum allowed is ${limit}.`,
+        REQUEST_TOO_LARGE: (currentBytes, limitBytes) => `Request size is ${(currentBytes / 1024).toFixed(2)} KiB (${currentBytes} bytes). Maximum allowed is ${(limitBytes / 1024).toFixed(2)} KiB (${limitBytes} bytes).`
     }
 };
 
@@ -72,7 +72,9 @@ export class SafetyChecker {
     checkIterationLimit(chatId) {
         const count = this.getIterationCount(chatId);
         if (count >= SAFETY_LIMITS.MAX_CONSECUTIVE_TOOL_ITERATIONS) {
-            throw new SafetyLimitError('ITERATIONS', SAFETY_LIMITS.ERRORS.TOO_MANY_ITERATIONS);
+            const errorMsg = SAFETY_LIMITS.ERRORS.TOO_MANY_ITERATIONS(count, SAFETY_LIMITS.MAX_CONSECUTIVE_TOOL_ITERATIONS);
+            console.error(`[SafetyLimit] Iteration limit exceeded for chat ${chatId}:`, errorMsg);
+            throw new SafetyLimitError('ITERATIONS', errorMsg);
         }
     }
     
@@ -83,7 +85,10 @@ export class SafetyChecker {
         if (!Array.isArray(toolCalls)) return;
         
         if (toolCalls.length > SAFETY_LIMITS.MAX_CONCURRENT_TOOLS_PER_REQUEST) {
-            throw new SafetyLimitError('CONCURRENT_TOOLS', SAFETY_LIMITS.ERRORS.TOO_MANY_CONCURRENT_TOOLS);
+            const errorMsg = SAFETY_LIMITS.ERRORS.TOO_MANY_CONCURRENT_TOOLS(toolCalls.length, SAFETY_LIMITS.MAX_CONCURRENT_TOOLS_PER_REQUEST);
+            console.error(`[SafetyLimit] Concurrent tools limit exceeded:`, errorMsg);
+            console.error(`[SafetyLimit] Tool calls:`, toolCalls.map(tc => tc.name || tc.function?.name));
+            throw new SafetyLimitError('CONCURRENT_TOOLS', errorMsg);
         }
     }
     
@@ -95,12 +100,21 @@ export class SafetyChecker {
         const sizeInBytes = new TextEncoder().encode(jsonString).length;
         
         if (sizeInBytes > SAFETY_LIMITS.MAX_REQUEST_SIZE_BYTES) {
-            throw new SafetyLimitError('REQUEST_SIZE', SAFETY_LIMITS.ERRORS.REQUEST_TOO_LARGE);
+            const errorMsg = SAFETY_LIMITS.ERRORS.REQUEST_TOO_LARGE(sizeInBytes, SAFETY_LIMITS.MAX_REQUEST_SIZE_BYTES);
+            console.error(`[SafetyLimit] Request size limit exceeded:`, errorMsg);
+            console.error(`[SafetyLimit] Request structure:`, {
+                messages: requestData.messages?.length || 0,
+                tools: requestData.tools?.length || 0,
+                model: requestData.model,
+                sizeBytes: sizeInBytes
+            });
+            throw new SafetyLimitError('REQUEST_SIZE', errorMsg);
         }
     }
     
     /**
      * Comprehensive safety check before sending request
+     * @deprecated Use individual check methods instead
      */
     validateRequest(chatId, requestData, toolCalls = []) {
         // Check iteration limit (only if this is a tool-using iteration)
@@ -111,7 +125,7 @@ export class SafetyChecker {
         // Check concurrent tools limit
         this.checkConcurrentToolsLimit(toolCalls);
         
-        // Check request size limit
-        this.checkRequestSizeLimit(requestData);
+        // NOTE: Request size check removed - now done in LLM providers
+        // where the actual request is built with all fields
     }
 }

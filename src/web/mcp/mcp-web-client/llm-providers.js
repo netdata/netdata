@@ -303,8 +303,7 @@ function validateMessagesForAPI(messages) {
     
     for (let i = startIdx; i < messages.length; i++) {
         const msg = messages[i];
-        // For tool-results, always use 'tool-results' even if role is set
-        const msgRole = msg.type === 'tool-results' ? 'tool-results' : (msg.role || msg.type);
+        const msgRole = msg.role;
         
         // Check role at position i
         
@@ -312,7 +311,7 @@ function validateMessagesForAPI(messages) {
             if (expectedRole !== 'user' && expectedRole !== 'user-or-tool-results') {
                 const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'user'`;
                 console.error('[validateMessagesForAPI]', error);
-                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.type === 'tool-results' ? 'tool-results' : (m.role || m.type)}`));
+                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
                 throw new Error(error);
             }
             expectedRole = 'assistant';
@@ -322,7 +321,7 @@ function validateMessagesForAPI(messages) {
             if (expectedRole !== 'assistant' && expectedRole !== 'user-or-tool-results') {
                 const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'assistant'`;
                 console.error('[validateMessagesForAPI]', error);
-                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.type === 'tool-results' ? 'tool-results' : (m.role || m.type)}`));
+                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
                 throw new Error(error);
             }
             lastAssistantMessage = msg;
@@ -333,7 +332,7 @@ function validateMessagesForAPI(messages) {
             if (expectedRole !== 'user-or-tool-results') {
                 const error = `Message sequence error at position ${i}: expected '${expectedRole}', but got 'tool-results'`;
                 console.error('[validateMessagesForAPI]', error);
-                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.type === 'tool-results' ? 'tool-results' : (m.role || m.type)}`));
+                console.error('[validateMessagesForAPI] Full sequence:', messages.map((m, idx) => `${idx}: ${m.role || m.type}`));
                 throw new Error(error);
             }
             
@@ -474,7 +473,9 @@ class LLMProvider {
      * @returns {Promise<LLMResponse>}
      */
     async sendMessage(_messages, _tools = [], _temperature = 0.7, _mode = 'cached', _cachePosition = null) {
-        throw new Error('sendMessage must be implemented by subclass');
+        const error = 'sendMessage must be implemented by subclass';
+        console.error('[LLMProvider]', error);
+        throw new Error(error);
     }
 
     log(direction, message, metadata = {}) {
@@ -491,6 +492,39 @@ class LLMProvider {
         if (this.onLog) {
             this.onLog(logEntry);
         }
+    }
+
+    /**
+     * Check request size before sending to API
+     * @param {Object} requestBody - The request body to check
+     * @param {number} maxSizeBytes - Maximum allowed size in bytes (default 400KB)
+     * @throws {Error} If request exceeds size limit
+     */
+    checkRequestSize(requestBody, maxSizeBytes = 400 * 1024) {
+        const jsonString = JSON.stringify(requestBody);
+        const sizeInBytes = new TextEncoder().encode(jsonString).length;
+        
+        if (sizeInBytes > maxSizeBytes) {
+            const sizeKB = (sizeInBytes / 1024).toFixed(1);
+            const maxKB = (maxSizeBytes / 1024).toFixed(1);
+            const errorMsg = `Request size is ${sizeKB} KiB. Maximum allowed is ${maxKB} KiB.`;
+            console.error(`[LLMProvider] Request size exceeded:`, errorMsg);
+            console.error(`[LLMProvider] Request details:`, {
+                model: requestBody.model,
+                messagesCount: requestBody.messages?.length || requestBody.contents?.length || 0,
+                toolsCount: requestBody.tools?.length || 0,
+                sizeBytes: sizeInBytes,
+                maxBytes: maxSizeBytes
+            });
+            throw new Error(errorMsg);
+        }
+        
+        // Log the actual size for debugging
+        console.log(`[LLMProvider] Request size: ${(sizeInBytes / 1024).toFixed(1)} KiB (${sizeInBytes} bytes)`);
+        this.log('info', `Request size: ${(sizeInBytes / 1024).toFixed(1)} KiB`, {
+            sizeBytes: sizeInBytes,
+            maxBytes: maxSizeBytes
+        });
     }
 }
 
@@ -663,6 +697,9 @@ class OpenAIProvider extends LLMProvider {
             url: this.apiUrl
         });
 
+        // Check request size before sending
+        this.checkRequestSize(requestBody);
+
         let response;
         try {
             response = await fetch(this.apiUrl, {
@@ -679,7 +716,9 @@ class OpenAIProvider extends LLMProvider {
                 url: this.apiUrl
             });
             if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                throw new Error(`Connection Error: Cannot reach OpenAI API at ${this.apiUrl}. Please ensure the proxy server is running.`);
+                const connectionError = `Connection Error: Cannot reach OpenAI API at ${this.apiUrl}. Please ensure the proxy server is running.`;
+                console.error('[OpenAIProvider] Connection error:', connectionError, '\nOriginal error:', error);
+                throw new Error(connectionError);
             }
             throw error;
         }
@@ -691,7 +730,9 @@ class OpenAIProvider extends LLMProvider {
                 status: response.status,
                 statusText: response.statusText
             });
-            throw new Error(`OpenAI API error: ${error.error?.message || response.statusText}`);
+            const apiError = `OpenAI API error: ${error.error?.message || response.statusText}`;
+            console.error('[OpenAIProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+            throw new Error(apiError);
         }
 
         /** @type {OpenAIResponse} */
@@ -703,7 +744,10 @@ class OpenAIProvider extends LLMProvider {
         if (useResponsesEndpoint) {
             // All o1/o3 models use v1/responses with different response structure
             if (!data.output) {
-                throw new Error('OpenAI API returned no output');
+                const error = 'OpenAI API returned no output';
+                console.error('[OpenAIProvider]', error);
+                this.log('error', error, { provider: 'openai', model: this.model });
+                throw new Error(error);
             }
             
             // Parse the output array to find the message
@@ -783,7 +827,10 @@ class OpenAIProvider extends LLMProvider {
         } else {
             // Standard models use choices array
             if (!data.choices || data.choices.length === 0) {
-                throw new Error('OpenAI API returned no choices');
+                const error = 'OpenAI API returned no choices';
+                console.error('[OpenAIProvider]', error);
+                this.log('error', error, { provider: 'openai', model: this.model });
+                throw new Error(error);
             }
             choice = data.choices[0];
         }
@@ -1033,7 +1080,7 @@ class OpenAIProvider extends LLMProvider {
         
         // Process remaining messages
         for (const msg of remainingMessages) {
-            const msgRole = msg.role || msg.type;
+            const msgRole = msg.role;
             
             if (msgRole === 'user') {
                 converted.push({
@@ -1212,6 +1259,9 @@ class AnthropicProvider extends LLMProvider {
             url: this.apiUrl
         });
 
+        // Check request size before sending
+        this.checkRequestSize(requestBody);
+
         let response;
         try {
             response = await fetch(this.apiUrl, {
@@ -1230,7 +1280,9 @@ class AnthropicProvider extends LLMProvider {
                 url: this.apiUrl
             });
             if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                throw new Error(`Connection Error: Cannot reach Anthropic API at ${this.apiUrl}. Please ensure the proxy server is running.`);
+                const connectionError = `Connection Error: Cannot reach Anthropic API at ${this.apiUrl}. Please ensure the proxy server is running.`;
+                console.error('[AnthropicProvider] Connection error:', connectionError, '\nOriginal error:', error);
+                throw new Error(connectionError);
             }
             throw error;
         }
@@ -1242,7 +1294,9 @@ class AnthropicProvider extends LLMProvider {
                 status: response.status,
                 statusText: response.statusText
             });
-            throw new Error(`Anthropic API error: ${error.error?.message || response.statusText}`);
+            const apiError = `Anthropic API error: ${error.error?.message || response.statusText}`;
+            console.error('[AnthropicProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+            throw new Error(apiError);
         }
 
         /** @type {AnthropicResponse} */
@@ -1304,7 +1358,7 @@ class AnthropicProvider extends LLMProvider {
             
             // Handle internal message format
             // Use same role detection logic as validation
-            const msgRole = msg.type === 'tool-results' ? 'tool-results' : (msg.role || msg.type);
+            const msgRole = msg.role;
             
             if (msgRole === 'user') {
                 // Check if this is a user message with tool results
@@ -1486,7 +1540,7 @@ class AnthropicProvider extends LLMProvider {
         // Process remaining messages
         for (const msg of remainingMessages) {
             // Use same role detection logic as validation
-            const msgRole = msg.type === 'tool-results' ? 'tool-results' : (msg.role || msg.type);
+            const msgRole = msg.role;
             
             if (msgRole === 'user') {
                 // Convert user message to Anthropic format with content blocks
@@ -1691,6 +1745,9 @@ class GoogleProvider extends LLMProvider {
             url: this.apiUrl
         });
 
+        // Check request size before sending
+        this.checkRequestSize(requestBody);
+
         let response;
         try {
             response = await fetch(this.apiUrl, {
@@ -1707,7 +1764,9 @@ class GoogleProvider extends LLMProvider {
                 url: this.apiUrl
             });
             if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                throw new Error(`Connection Error: Cannot reach Google AI API at ${this.apiUrl}. Please ensure the proxy server is running.`);
+                const connectionError = `Connection Error: Cannot reach Google AI API at ${this.apiUrl}. Please ensure the proxy server is running.`;
+                console.error('[GoogleProvider] Connection error:', connectionError, '\nOriginal error:', error);
+                throw new Error(connectionError);
             }
             throw error;
         }
@@ -1719,7 +1778,9 @@ class GoogleProvider extends LLMProvider {
                 status: response.status,
                 statusText: response.statusText
             });
-            throw new Error(`Google API error: ${error.error?.message || response.statusText}`);
+            const apiError = `Google API error: ${error.error?.message || response.statusText}`;
+            console.error('[GoogleProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+            throw new Error(apiError);
         }
 
         /** @type {GoogleResponse} */
@@ -1730,17 +1791,24 @@ class GoogleProvider extends LLMProvider {
         // Check finish reason for potential issues
         if (candidate.finishReason === 'MAX_TOKENS') {
             // Handle token limit error
-            const error = new Error('Google Gemini response was truncated due to token limit. The model\'s context window is full. Consider starting a new conversation or summarizing the current one.');
+            const errorMsg = 'Google Gemini response was truncated due to token limit. The model\'s context window is full. Consider starting a new conversation or summarizing the current one.';
+            console.error('[GoogleProvider] MAX_TOKENS error:', errorMsg);
+            this.log('error', errorMsg, { provider: 'google', code: 'MAX_TOKENS', finishReason: candidate.finishReason });
+            const error = new Error(errorMsg);
             error.code = 'MAX_TOKENS';
             throw error;
         } else if (candidate.finishReason === 'SAFETY') {
             // Handle safety filter
-            const error = new Error('Google Gemini blocked the response due to safety filters.');
+            const errorMsg = 'Google Gemini blocked the response due to safety filters.';
+            console.error('[GoogleProvider] SAFETY error:', errorMsg);
+            this.log('error', errorMsg, { provider: 'google', code: 'SAFETY', finishReason: candidate.finishReason });
+            const error = new Error(errorMsg);
             error.code = 'SAFETY';
             throw error;
         } else if (candidate.finishReason === 'MALFORMED_FUNCTION_CALL') {
             // Handle malformed function call - return error message instead of throwing
-            this.log('warn', 'Google Gemini returned a malformed function call', { provider: 'google' });
+            console.warn('[GoogleProvider] MALFORMED_FUNCTION_CALL:', 'Google Gemini returned a malformed function call');
+            this.log('warn', 'Google Gemini returned a malformed function call', { provider: 'google', finishReason: candidate.finishReason });
             return {
                 content: 'I apologize, but I encountered an error while trying to execute tools to answer your question. This appears to be a temporary issue with the function calling system. Please try rephrasing your question or asking it again.',
                 toolCalls: [],
@@ -1752,7 +1820,10 @@ class GoogleProvider extends LLMProvider {
             };
         } else if (candidate.finishReason && candidate.finishReason !== 'STOP') {
             // Handle other unexpected finish reasons
-            const error = new Error(`Google Gemini response ended unexpectedly: ${candidate.finishReason}`);
+            const errorMsg = `Google Gemini response ended unexpectedly: ${candidate.finishReason}`;
+            console.error('[GoogleProvider] Unexpected finish reason:', errorMsg);
+            this.log('error', errorMsg, { provider: 'google', code: candidate.finishReason, finishReason: candidate.finishReason });
+            const error = new Error(errorMsg);
             error.code = candidate.finishReason;
             throw error;
         }
@@ -1808,7 +1879,7 @@ class GoogleProvider extends LLMProvider {
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
             // Use same role detection logic as validation
-            const msgRole = msg.type === 'tool-results' ? 'tool-results' : (msg.role || msg.type);
+            const msgRole = msg.role;
             
             // Check for tool calls in assistant messages
             if (msgRole === 'assistant' && msg.toolCalls && this.shouldIncludeToolCalls(msg, mode)) {
@@ -1870,7 +1941,7 @@ class GoogleProvider extends LLMProvider {
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
             // Use same role detection logic as validation
-            const msgRole = msg.type === 'tool-results' ? 'tool-results' : (msg.role || msg.type);
+            const msgRole = msg.role;
             
             if (msgRole === 'system') {
                 // Prepend system message to first user message
@@ -2111,7 +2182,9 @@ function createLLMProvider(provider, proxyUrl, model) {
         case 'google':
             return new GoogleProvider(proxyUrl, model);
         default:
-            throw new Error(`Unknown provider: ${provider}`);
+            const error = `Unknown provider: ${provider}`;
+            console.error('[createLLMProvider]', error);
+            throw new Error(error);
     }
 }
 
