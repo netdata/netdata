@@ -367,12 +367,6 @@ export class MessageOptimizer {
                 return acc;
             }, {}));
             
-            // Debug: Check for toolCalls in final output
-            const messagesWithToolCalls = messages.filter(m => m.toolCalls && m.toolCalls.length > 0);
-            console.log(`[MessageOptimizer] Messages with toolCalls: ${messagesWithToolCalls.length}`);
-            messagesWithToolCalls.forEach(m => {
-                console.log(`  - ${m.role} (turn ${m.turn || 'unknown'}): ${m.toolCalls.length} toolCalls`);
-            });
 
             return {
                 messages,
@@ -566,14 +560,11 @@ export class MessageOptimizer {
                 return null;
             }
             
-            // Return message with filtered content and remove toolCalls
             const filteredMsg = {
                 ...msg,
                 content: filteredContent
             };
             
-            // Remove toolCalls array since we filtered the tools
-            delete filteredMsg.toolCalls;
             
             return filteredMsg;
         }
