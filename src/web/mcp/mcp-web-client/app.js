@@ -2682,6 +2682,703 @@ class NetdataMCPChat {
         }
     }
 
+    handleRateLimitError(chatId, retryAfterSeconds, retryCount = 0) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        // Store retry count in chat for tracking
+        chat.rateLimitRetryCount = retryCount;
+        
+        // If we couldn't parse retry time, use exponential backoff
+        let waitTime;
+        if (retryAfterSeconds && retryAfterSeconds > 0) {
+            // Add a small buffer to ensure we wait long enough
+            waitTime = retryAfterSeconds + 1;
+        } else {
+            // Exponential backoff: 5s, 10s, 20s, 40s, 80s...
+            waitTime = Math.min(5 * Math.pow(2, retryCount), 120); // Cap at 2 minutes
+            console.log(`[Rate Limit] No retry time found, using exponential backoff: ${waitTime}s (attempt ${retryCount + 1})`);
+        }
+        
+        let remainingSeconds = Math.ceil(waitTime);
+        
+        // Mark that we're in rate limit countdown - this prevents other operations from clearing the spinner
+        chat.isInRateLimitCountdown = true;
+        
+        // Show waiting spinner with countdown immediately
+        this.showWaitingCountdown(chatId, remainingSeconds);
+        
+        const updateCountdown = () => {
+            remainingSeconds--;
+            if (remainingSeconds > 0) {
+                // Only update if we're still in countdown mode
+                if (chat.isInRateLimitCountdown) {
+                    this.updateWaitingCountdown(chatId, remainingSeconds);
+                    setTimeout(updateCountdown, 1000);
+                }
+            } else {
+                // Clear the flag and retry
+                chat.isInRateLimitCountdown = false;
+                // Don't hide the countdown - let retryLLMRequest transition to thinking spinner
+                // This ensures there's no gap in the spinner display
+                this.retryLLMRequest(chatId);
+            }
+        };
+        
+        // Start the countdown
+        setTimeout(updateCountdown, 1000);
+    }
+    
+    async retryLLMRequest(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        try {
+            const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
+            const proxyProvider = this.llmProviders.get(chat.llmProviderId);
+            
+            if (!mcpConnection || !proxyProvider || !chat.config?.model) {
+                this.showError('Cannot retry: MCP server or LLM provider not available', chatId);
+                return;
+            }
+            
+            // Create provider instance
+            const providerType = chat.config.model.provider;
+            const modelName = chat.config.model.id;
+            const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
+            provider.onLog = proxyProvider.onLog;
+            
+            // Build messages from current state
+            const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider.prefersCachedTools, mcpConnection);
+            
+            // Get available tools
+            const tools = Array.from(mcpConnection.tools.values());
+            
+            // Increment retry count for next attempt
+            const currentRetryCount = chat.rateLimitRetryCount || 0;
+            chat.rateLimitRetryCount = currentRetryCount + 1;
+            
+            // Call assistant with proper error handling
+            const temperature = this.getCurrentTemperature(chatId);
+            const response = await this.callAssistant({
+                chatId,
+                provider,
+                messages,
+                tools,
+                temperature,
+                cacheControlIndex,
+                context: `Retry (attempt ${chat.rateLimitRetryCount})`
+            });
+            
+            // Check if rate limit was handled
+            if (response._rateLimitHandled) {
+                return; // Rate limit retry will happen automatically with exponential backoff
+            }
+            
+            // Success - reset retry count
+            chat.rateLimitRetryCount = 0;
+            
+            // Process the response - extract the core loop logic from processMessageWithTools
+            // This continues the conversation from where it left off
+            await this.processLLMResponseLoop(chat, mcpConnection, provider, messages, tools, cacheControlIndex, response);
+            
+            // Success - assistant has concluded
+            this.assistantConcluded(chatId);
+            
+        } catch (error) {
+            // Clean up on error - but preserve rate limit waiting spinner
+            this.assistantFailed(chatId, error);
+            
+            // Only show error if not a handled rate limit
+            if (!error._rateLimitHandled) {
+                // Show error with manual retry button
+                const errorMessage = `${error.context || 'Error'}: ${error.message}`;
+                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                
+                // Determine error type
+                let errorType = 'llm_error';
+                if (error.message.includes('MCP') || error.message.includes('connection')) {
+                    errorType = 'mcp_error';
+                } else if (error.message.includes('Tool')) {
+                    errorType = 'tool_error';
+                }
+                
+                // Update error state
+                this.showError(chatId, errorMessage, errorType);
+                
+                // Add error message
+                this.addMessage(chatId, { 
+                    type: 'error', 
+                    content: errorMessage, 
+                    errorMessageIndex: lastUserMessageIndex,
+                    errorType
+                });
+                
+                this.processRenderEvent({ 
+                    type: 'error-message', 
+                    content: errorMessage, 
+                    errorMessageIndex: lastUserMessageIndex,
+                    errorType
+                }, chatId);
+            }
+        }
+    }
+    
+    async processLLMResponseLoop(chat, mcpConnection, provider, messages, tools, cacheControlIndex, initialResponse = null) {
+        // If we have an initial response (from retry), process it first
+        if (initialResponse) {
+            await this.processSingleLLMResponse(chat, mcpConnection, provider, messages, tools, cacheControlIndex, initialResponse);
+        }
+        
+        // Continue the loop
+        while (true) {
+            // Check if we should stop processing
+            if (this.shouldStopProcessing) {
+                break;
+            }
+            
+            // Check if the last response had tool calls
+            const lastMessage = messages[messages.length - 1];
+            if (!lastMessage || lastMessage.role !== 'tool-results') {
+                // No more tool results to process, we're done
+                break;
+            }
+            
+            // Safety check before next iteration
+            try {
+                this.safetyChecker.incrementIterations(chat.id);
+                const requestData = { messages, tools, temperature: this.getCurrentTemperature(chat.id) };
+                this.safetyChecker.validateRequest(chat.id, requestData, []);
+            } catch (error) {
+                if (error instanceof SafetyLimitError) {
+                    this.addMessage(chat.id, { 
+                        type: 'error', 
+                        content: error.message,
+                        errorType: 'safety_limit',
+                        isRetryable: false
+                    });
+                    this.processRenderEvent({ 
+                        type: 'error-message', 
+                        content: error.message, 
+                        errorType: 'safety_limit'
+                    }, chat.id);
+                    return;
+                }
+                throw error;
+            }
+            
+            // Send next request to LLM
+            const temperature = this.getCurrentTemperature(chat.id);
+            const response = await this.callAssistant({
+                chatId: chat.id,
+                provider,
+                messages,
+                tools,
+                temperature,
+                cacheControlIndex,
+                context: 'Processing tools'
+            });
+            
+            // Check if rate limit was handled automatically
+            if (response._rateLimitHandled) {
+                return { rateLimitHandled: true };
+            }
+            
+            // Process the response
+            await this.processSingleLLMResponse(chat, mcpConnection, provider, messages, tools, cacheControlIndex, response);
+        }
+    }
+    
+    async processSingleLLMResponse(chat, mcpConnection, provider, messages, tools, cacheControlIndex, response) {
+        const llmResponseTime = response._responseTime || 0;
+        
+        // Track token usage
+        if (response.usage) {
+            this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || provider.model);
+        }
+        
+        // If no tool calls, display response and finish
+        if (!response.toolCalls || response.toolCalls.length === 0) {
+            // Emit metrics event first
+            this.processRenderEvent({ 
+                type: 'assistant-metrics', 
+                usage: response.usage, 
+                responseTime: llmResponseTime, 
+                model: ChatConfig.getChatModelString(chat) || provider.model
+            }, chat.id);
+            
+            if (response.content) {
+                // Create and save the assistant message
+                const assistantMsg = { 
+                    type: 'assistant', 
+                    role: 'assistant', 
+                    content: response.content,
+                    usage: response.usage || null,
+                    responseTime: llmResponseTime || null,
+                    model: provider.model || ChatConfig.getChatModelString(chat),
+                    turn: chat.currentTurn
+                };
+                this.addMessage(chat.id, assistantMsg);
+                
+                // Display it
+                const messageIndex = chat.messages.length - 1;
+                this.processRenderEvent({ 
+                    type: 'assistant-message', 
+                    content: response.content,
+                    messageIndex
+                }, chat.id);
+                
+                // Track cumulative tokens
+                if (response.usage) {
+                    const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
+                    this.addCumulativeTokens(
+                        chat.id,
+                        modelUsed,
+                        response.usage.promptTokens || 0,
+                        response.usage.completionTokens || 0,
+                        response.usage.cacheReadInputTokens || 0,
+                        response.usage.cacheCreationInputTokens || 0
+                    );
+                }
+                
+                // Clean and add to messages for API
+                const cleanedContent = this.cleanContentForAPI(response.content);
+                if (cleanedContent && cleanedContent.trim()) {
+                    messages.push({ role: 'assistant', content: cleanedContent });
+                }
+            }
+            return;
+        }
+        
+        // Process response with tool calls
+        let assistantMessageIndex = null;
+        
+        // Save assistant message first
+        if (response.content || response.toolCalls) {
+            const assistantMessage = {
+                type: 'assistant',
+                role: 'assistant',
+                content: response.content || '',
+                toolCalls: (response.toolCalls || []).map(tc => ({
+                    ...tc,
+                    includeInContext: true
+                })),
+                usage: response.usage || null,
+                responseTime: llmResponseTime || null,
+                model: provider.model || ChatConfig.getChatModelString(chat),
+                turn: chat.currentTurn,
+                cacheControlIndex
+            };
+            this.addMessage(chat.id, assistantMessage);
+            assistantMessageIndex = chat.messages.length - 1;
+            
+            // Track cumulative tokens
+            if (response.usage) {
+                const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
+                this.addCumulativeTokens(
+                    chat.id,
+                    modelUsed,
+                    response.usage.promptTokens || 0,
+                    response.usage.completionTokens || 0,
+                    response.usage.cacheReadInputTokens || 0,
+                    response.usage.cacheCreationInputTokens || 0
+                );
+            }
+            
+            // Display metrics and content
+            this.processRenderEvent({ 
+                type: 'assistant-metrics', 
+                usage: response.usage, 
+                responseTime: llmResponseTime, 
+                model: ChatConfig.getChatModelString(chat) || provider.model
+            }, chat.id);
+            
+            if (response.content) {
+                this.processRenderEvent({ 
+                    type: 'assistant-message', 
+                    content: response.content,
+                    messageIndex: assistantMessageIndex
+                }, chat.id);
+            }
+            
+            // Add to API messages
+            const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
+            const assistantMsg = {
+                role: 'assistant',
+                content: cleanedContent
+            };
+            
+            if (response.toolCalls && response.toolCalls.length > 0) {
+                assistantMsg.toolCalls = response.toolCalls;
+            }
+            
+            if (cleanedContent || (response.toolCalls && response.toolCalls.length > 0)) {
+                messages.push(assistantMsg);
+            }
+        }
+        
+        // Execute tool calls
+        if (response.toolCalls && response.toolCalls.length > 0) {
+            // Safety check for concurrent tools
+            try {
+                this.safetyChecker.checkConcurrentToolsLimit(response.toolCalls);
+            } catch (error) {
+                if (error instanceof SafetyLimitError) {
+                    this.addMessage(chat.id, { 
+                        type: 'error', 
+                        content: error.message,
+                        errorType: 'safety_limit',
+                        isRetryable: false
+                    });
+                    this.processRenderEvent({ 
+                        type: 'error-message', 
+                        content: error.message, 
+                        errorType: 'safety_limit'
+                    }, chat.id);
+                    return;
+                }
+                throw error;
+            }
+            
+            // Ensure assistant group exists
+            if (!this.getCurrentAssistantGroup(chat.id)) {
+                this.processRenderEvent({ 
+                    type: 'assistant-message', 
+                    content: '',
+                    messageIndex: assistantMessageIndex
+                }, chat.id);
+            }
+            
+            // Execute tools and collect results
+            const toolResults = await this.executeToolCalls(chat, mcpConnection, response.toolCalls, assistantMessageIndex);
+            
+            // Store tool results
+            if (toolResults.length > 0) {
+                this.addMessage(chat.id, {
+                    type: 'tool-results',
+                    toolResults,
+                    turn: chat.currentTurn
+                });
+                
+                // Add to messages for API
+                const includedResults = toolResults.filter(tr => tr.includeInContext !== false);
+                if (includedResults.length > 0) {
+                    const toolResultsMessage = {
+                        role: 'tool-results',
+                        toolResults: includedResults.map(tr => ({
+                            toolCallId: tr.toolCallId,
+                            toolName: tr.name,
+                            result: tr.result
+                        }))
+                    };
+                    
+                    messages.push(toolResultsMessage);
+                    
+                    // Tool summarization if enabled
+                    if (chat.messageOptimizer && chat.config?.optimisation?.toolSummarisation?.enabled) {
+                        try {
+                            const toolSchemas = new Map();
+                            for (const tool of tools) {
+                                toolSchemas.set(tool.name, tool);
+                            }
+                            
+                            const summarizedMessages = await chat.messageOptimizer.performToolSummarization(
+                                messages,
+                                {
+                                    toolSchemas,
+                                    providerInfo: { url: provider.proxyUrl }
+                                }
+                            );
+                            
+                            messages.length = 0;
+                            messages.push(...summarizedMessages);
+                        } catch (error) {
+                            console.error('[Tool Summarization] Failed:', error);
+                        }
+                    }
+                }
+                
+                // Reset assistant group and show thinking spinner for next iteration
+                this.processRenderEvent({ type: 'reset-assistant-group' }, chat.id);
+                this.showAssistantThinking(chat.id);
+            }
+        }
+    }
+    
+    async executeToolCalls(chat, mcpConnection, toolCalls, assistantMessageIndex) {
+        const toolResults = [];
+        
+        for (const toolCall of toolCalls) {
+            if (!toolCall.id) {
+                console.error('[executeToolCalls] Tool call missing required id:', toolCall);
+                continue;
+            }
+            
+            try {
+                const { arguments: toolArgs } = toolCall || {};
+                
+                // Show tool call in UI
+                this.processRenderEvent({ 
+                    type: 'tool-call', 
+                    name: toolCall.name, 
+                    arguments: toolArgs,
+                    id: toolCall.id,
+                    includeInContext: toolCall.includeInContext !== false 
+                }, chat.id);
+                
+                // Show tool execution spinner
+                this.showToolExecuting(chat.id, toolCall.name);
+                
+                // Execute tool
+                const toolStartTime = Date.now();
+                const rawResult = await mcpConnection.callTool(toolCall.name, toolArgs);
+                const toolResponseTime = Date.now() - toolStartTime;
+                
+                // Hide tool execution spinner
+                this.hideToolExecuting(chat.id);
+                
+                // Parse result
+                const result = this.parseToolResult(rawResult);
+                const responseSize = typeof result === 'string' 
+                    ? result.length 
+                    : JSON.stringify(result).length;
+                
+                // Show result
+                this.processRenderEvent({ 
+                    type: 'tool-result', 
+                    name: toolCall.name, 
+                    result, 
+                    toolCallId: toolCall.id,
+                    responseTime: toolResponseTime, 
+                    responseSize, 
+                    messageIndex: assistantMessageIndex 
+                }, chat.id);
+                
+                toolResults.push({
+                    toolCallId: toolCall.id,
+                    name: toolCall.name,
+                    result,
+                    includeInContext: true
+                });
+                
+            } catch (error) {
+                const errorMsg = `Tool error (${toolCall.name}): ${error.message}`;
+                this.processRenderEvent({ 
+                    type: 'tool-result', 
+                    name: toolCall.name, 
+                    result: { error: errorMsg }, 
+                    responseTime: 0, 
+                    responseSize: errorMsg.length, 
+                    messageIndex: assistantMessageIndex, 
+                    toolCallId: toolCall.id 
+                }, chat.id);
+                
+                toolResults.push({
+                    toolCallId: toolCall.id,
+                    name: toolCall.name,
+                    result: { error: errorMsg },
+                    includeInContext: true
+                });
+            }
+        }
+        
+        return toolResults;
+    }
+    
+    /**
+     * Centralized function to call the assistant API with consistent error handling
+     * @param {Object} params - Parameters for the assistant call
+     * @param {string} params.chatId - Chat ID
+     * @param {Object} params.provider - LLM provider instance
+     * @param {Array} params.messages - Messages array
+     * @param {Array} params.tools - Available tools
+     * @param {number} params.temperature - Temperature setting
+     * @param {number} params.cacheControlIndex - Cache control index
+     * @param {string} params.context - Context for error messages (e.g., 'Redo', 'Retry', 'Send')
+     * @returns {Promise<Object>} Response from the assistant
+     */
+    async callAssistant({ chatId, provider, messages, tools, temperature, cacheControlIndex, context = 'Request' }) {
+        if (!chatId) {
+            throw new Error('[callAssistant] Missing required chatId parameter');
+        }
+        
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            throw new Error(`[callAssistant] Chat not found: ${chatId}`);
+        }
+        
+        // Show thinking spinner
+        this.showAssistantThinking(chatId);
+        
+        try {
+            // Track timing
+            const llmStartTime = Date.now();
+            const response = await provider.sendMessage(messages, tools, temperature, cacheControlIndex);
+            const llmResponseTime = Date.now() - llmStartTime;
+            
+            // Store response time
+            response._responseTime = llmResponseTime;
+            
+            // Hide spinner on success
+            this.hideAssistantThinking(chatId);
+            
+            return response;
+            
+        } catch (error) {
+            // Check for rate limit error FIRST before hiding spinner
+            const isRateLimitError = error.message && (
+                error.message.includes('Rate limit') || 
+                error.message.includes('429') ||
+                error.message.includes('rate_limit_exceeded')
+            );
+            
+            // Extract retry-after seconds if available (handles multiple formats)
+            let retryAfterSeconds = null;
+            
+            // Try different patterns
+            const patterns = [
+                /Please try again in (\d+(?:\.\d+)?)s/,  // "Please try again in 4.742s"
+                /Please retry after (\d+) second/,        // "Please retry after 5 seconds"
+                /try again in (\d+(?:\.\d+)?) second/i   // Various formats
+            ];
+            
+            for (const pattern of patterns) {
+                const match = error.message && error.message.match(pattern);
+                if (match) {
+                    retryAfterSeconds = parseFloat(match[1]);
+                    break;
+                }
+            }
+            
+            if (isRateLimitError) {
+                // Always handle rate limit errors, even without retry time
+                // Don't hide spinner - let handleRateLimitError manage the transition
+                const retryCount = chat.rateLimitRetryCount || 0;
+                this.handleRateLimitError(chatId, retryAfterSeconds, retryCount);
+                // Return a special marker to indicate rate limit handling
+                return { _rateLimitHandled: true };
+            }
+            
+            // Only hide spinner for non-rate-limit errors
+            this.hideAssistantThinking(chatId);
+            
+            // Add context to error
+            error.context = context;
+            throw error;
+        }
+    }
+    
+    /**
+     * Called when the assistant has finished processing and no more actions will occur
+     * Ensures proper cleanup of UI state and chat processing flags
+     */
+    assistantConcluded(chatId) {
+        if (!chatId) {
+            console.error('[assistantConcluded] Called without chatId');
+            return;
+        }
+        
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[assistantConcluded] Chat not found: ${chatId}`);
+            return;
+        }
+        
+        // Clear any spinners
+        this.clearSpinnerState(chatId);
+        
+        // Clear processing states
+        chat.isProcessing = false;
+        
+        // Clear error state on successful conclusion
+        this.clearError(chatId);
+        
+        // Clear current assistant group
+        this.clearCurrentAssistantGroup(chatId);
+        
+        // Reset safety checker iterations for next user message
+        this.safetyChecker.resetIterations(chatId);
+        
+        // Update only this chat's tile
+        this.updateChatTileStatus(chatId);
+        
+        // Save the chat state
+        chat.updatedAt = new Date().toISOString();
+        this.autoSave(chatId);
+        
+        // Re-enable input if it's the active chat
+        if (chatId === this.getActiveChatId()) {
+            const container = this.getChatContainer(chatId);
+            if (container && container._elements) {
+                const input = container._elements.input;
+                if (input) {
+                    input.disabled = false;
+                    input.focus();
+                }
+                
+                // Update send button state
+                const sendBtn = container._elements.sendBtn;
+                if (sendBtn && input) {
+                    sendBtn.disabled = !input.value.trim();
+                }
+            }
+        }
+    }
+    
+    /**
+     * Called when the assistant fails with an error
+     * Handles cleanup differently based on error type
+     */
+    assistantFailed(chatId, error = null) {
+        if (!chatId) {
+            console.error('[assistantFailed] Called without chatId');
+            return;
+        }
+        
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[assistantFailed] Chat not found: ${chatId}`);
+            return;
+        }
+        
+        // Check if this is a rate limit error that's being handled
+        const isRateLimitHandled = error && error._rateLimitHandled;
+        
+        // Only clear spinners if NOT a handled rate limit error
+        if (!isRateLimitHandled) {
+            this.clearSpinnerState(chatId);
+        }
+        // If rate limit is handled, the waiting spinner should continue
+        
+        // Clear processing states
+        chat.isProcessing = false;
+        
+        // Clear current assistant group
+        this.clearCurrentAssistantGroup(chatId);
+        
+        // Reset safety checker iterations for next user message
+        this.safetyChecker.resetIterations(chatId);
+        
+        // Update only this chat's tile
+        this.updateChatTileStatus(chatId);
+        
+        // Save the chat state
+        chat.updatedAt = new Date().toISOString();
+        this.autoSave(chatId);
+        
+        // Re-enable input if it's the active chat and not rate limited
+        if (!isRateLimitHandled && chatId === this.getActiveChatId()) {
+            const container = this.getChatContainer(chatId);
+            if (container && container._elements) {
+                const input = container._elements.input;
+                if (input) {
+                    input.disabled = false;
+                    input.focus();
+                }
+            }
+        }
+    }
+    
     showError(message, chatId, saveToMessages = true) {
         // Log to console
         console.error('MCP Client Error:', message, chatId ? `(Chat ID: ${chatId})` : '(Global)');
@@ -3031,8 +3728,8 @@ class NetdataMCPChat {
                 this.truncateMessages(chatId, messageIndex + 1, 'Redo from user message');
                 this.loadChat(chatId, true);
                 
-                // Show loading spinner AFTER loadChat to prevent it from being cleared
-                this.processRenderEvent({ type: 'show-spinner' }, chatId);
+                // Show thinking spinner AFTER loadChat to prevent it from being cleared
+                this.showAssistantThinking(chatId);
                 
                 // Get fresh chat object after loadChat
                 const freshChat = this.chats.get(chatId);
@@ -3060,8 +3757,8 @@ class NetdataMCPChat {
                     this.truncateMessages(chatId, messageIndex, 'Redo from assistant message');
                     this.loadChat(chatId, true);
                     
-                    // Show loading spinner AFTER loadChat to prevent it from being cleared
-                    this.processRenderEvent({ type: 'show-spinner' }, chatId);
+                    // Show thinking spinner AFTER loadChat to prevent it from being cleared
+                    this.showAssistantThinking(chatId);
                     
                     // Get fresh chat object after loadChat
                     const freshChat = this.chats.get(chatId);
@@ -3070,7 +3767,15 @@ class NetdataMCPChat {
                     }
                     
                     // Resend the triggering user message with full prior context
-                    await this.processMessageWithTools(freshChat, mcpConnection, provider, triggeringUserMessage.content);
+                    const result = await this.processMessageWithTools(freshChat, mcpConnection, provider, triggeringUserMessage.content);
+                    
+                    // Check if rate limit was handled - don't conclude if so
+                    if (result && result.rateLimitHandled) {
+                        return;
+                    }
+                    
+                    // Success - assistant has concluded
+                    this.assistantConcluded(chatId);
                 } else {
                     this.showError('Cannot find the user message that triggered this response', chatId);
                 }
@@ -3079,10 +3784,50 @@ class NetdataMCPChat {
                 this.showError('Redo is only available for user and assistant messages', chatId);
             }
         } catch (error) {
-            this.showError(`Redo failed: ${error.message}`, chatId);
-        } finally {
-            // Hide spinner
-            this.processRenderEvent({ type: 'hide-spinner' }, chatId);
+            // Check for rate limit error
+            const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
+            const retryMatch = error.message.match(/Please try again in (\d+(?:\.\d+)?)s/);
+            const retryAfterSeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
+            
+            if (isRateLimitError) {
+                // Handle rate limit with automatic retry (even without retry time)
+                const retryCount = chat.rateLimitRetryCount || 0;
+                this.handleRateLimitError(chatId, retryAfterSeconds, retryCount);
+                // Mark error as handled to prevent spinner clearing
+                error._rateLimitHandled = true;
+                // Don't show error UI for rate limits
+                this.assistantFailed(chatId, error);
+                return;
+            } else {
+                // Show error with retry button
+                const errorMessage = `Redo failed: ${error.message}`;
+                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                
+                // Determine error type
+                let errorType = 'llm_error';
+                if (error.message.includes('MCP') || error.message.includes('connection')) {
+                    errorType = 'mcp_error';
+                } else if (error.message.includes('Tool')) {
+                    errorType = 'tool_error';
+                }
+                
+                this.addMessage(chatId, { 
+                    type: 'error', 
+                    content: errorMessage, 
+                    errorMessageIndex: lastUserMessageIndex,
+                    errorType 
+                });
+                
+                this.processRenderEvent({ 
+                    type: 'error-message', 
+                    content: errorMessage, 
+                    errorMessageIndex: lastUserMessageIndex,
+                    errorType
+                }, chatId);
+            }
+            
+            // Clean up on error - but preserve rate limit waiting spinner
+            this.assistantFailed(chatId, error);
         }
     }
 
@@ -3245,11 +3990,11 @@ class NetdataMCPChat {
         }
         
         // Check if the chat was saved while waiting for a response (broken state)
-        if (chat.waitingForLLM || chat.waitingForMCP) {
+        if (chat.spinnerState || chat.isProcessing) {
             chat.wasWaitingOnLoad = true;
-            // Clear the waiting states since we're not actually waiting anymore
-            chat.waitingForLLM = false;
-            chat.waitingForMCP = false;
+            // Clear the spinner state since we're not actually waiting anymore
+            chat.spinnerState = null;
+            chat.isProcessing = false;
         }
         
         // Reconstruct MessageOptimizer instance for loaded chats
@@ -4148,8 +4893,7 @@ class NetdataMCPChat {
                this.llmProviders.has(chat.llmProviderId) &&
                this.mcpConnections.has(chat.mcpServerId) &&
                !chat.isProcessing &&
-               !chat.waitingForLLM &&
-               !chat.waitingForMCP;
+               !chat.spinnerState;
     }
     
     updateChatInputState(chatId) {
@@ -4167,7 +4911,7 @@ class NetdataMCPChat {
             const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
             if (mcpConnection && mcpConnection.isReady()) {
                 // Only enable if connection ready AND chat not busy
-                if (!chat.isProcessing && !chat.waitingForLLM && !chat.waitingForMCP) {
+                if (!chat.isProcessing && !chat.spinnerState) {
                     elements.input.disabled = false;
                     elements.sendBtn.disabled = false;
                     elements.input.placeholder = 'Ask about your Netdata metrics...';
@@ -4388,22 +5132,32 @@ class NetdataMCPChat {
                 // Chat was saved while waiting for a response - broken state
                 statusIcon = '<i class="fas fa-chain-broken"></i>';
                 statusClass = 'status-broken';
-            } else if (chat.isProcessing) {
-                // Check if waiting for LLM or MCP
-                if (chat.waitingForLLM) {
-                    statusIcon = '<i class="fas fa-robot"></i>';
-                    statusClass = 'status-llm-active';
-                } else if (chat.waitingForMCP) {
-                    statusIcon = '<i class="fas fa-plug"></i>';
-                    statusClass = 'status-mcp-active';
-                } else {
-                    // Generic processing
-                    statusIcon = '<i class="fas fa-spinner fa-spin"></i>';
-                    statusClass = 'status-processing';
-                }
             } else if (chat.hasError) {
                 statusIcon = '<i class="fas fa-exclamation-triangle"></i>';
                 statusClass = 'status-error';
+            } else if (chat.spinnerState) {
+                // Active spinner state
+                switch (chat.spinnerState.type) {
+                    case 'thinking':
+                        statusIcon = '<i class="fas fa-robot"></i>';
+                        statusClass = 'status-llm-active';
+                        break;
+                    case 'tool':
+                        statusIcon = '<i class="fas fa-plug"></i>';
+                        statusClass = 'status-mcp-active';
+                        break;
+                    case 'waiting':
+                        statusIcon = '<i class="fas fa-clock"></i>';
+                        statusClass = 'status-waiting';
+                        break;
+                    default:
+                        statusIcon = '<i class="fas fa-spinner fa-spin"></i>';
+                        statusClass = 'status-processing';
+                }
+            } else if (chat.isProcessing) {
+                // Legacy processing state (fallback)
+                statusIcon = '<i class="fas fa-spinner fa-spin"></i>';
+                statusClass = 'status-processing';
             } else if (chat.messages && chat.messages.length > 1) {
                 statusIcon = '<i class="fas fa-check-circle"></i>';
                 statusClass = 'status-ready';
@@ -4683,7 +5437,7 @@ class NetdataMCPChat {
                 const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
                 if (mcpConnection && mcpConnection.isReady()) {
                     // Only enable if connection ready AND chat not busy
-                    if (!chat.isProcessing && !chat.waitingForLLM && !chat.waitingForMCP) {
+                    if (!chat.isProcessing && !chat.spinnerState) {
                         elements.input.disabled = false;
                         elements.sendBtn.disabled = false;
                         elements.input.placeholder = 'Ask about your Netdata metrics...';
@@ -5242,103 +5996,64 @@ class NetdataMCPChat {
                     redoBtn.textContent = 'Redo';
                     redoBtn.onclick = () => this.redoFromMessage(event.errorMessageIndex, chatId);
                     messageDiv.appendChild(redoBtn);
-                } else {
-                    // No errorMessageIndex - create a retry button
+                } else if (event.errorType !== 'safety_limit') {
+                    // Create a retry button with error type info
                     const retryBtn = document.createElement('button');
                     retryBtn.className = 'btn btn-warning btn-small';
                     retryBtn.style.marginTop = '8px';
                     retryBtn.innerHTML = '<i class="fas fa-redo"></i> Retry';
                     
-                    // Check if we have a pending retry callback for this error
-                    if (this.pendingRetryCallbacks && this.pendingRetryCallbacks.has(event.content)) {
-                        const callback = this.pendingRetryCallbacks.get(event.content);
-                        retryBtn.onclick = async () => {
-                            retryBtn.disabled = true;
-                            retryBtn.textContent = 'Retrying...';
-                            this.pendingRetryCallbacks.delete(event.content);
-                            await callback();
-                        };
-                    } else {
-                        // Fallback to old retry logic for backwards compatibility
-                        retryBtn.onclick = async () => {
-                            retryBtn.disabled = true;
-                            retryBtn.textContent = 'Retrying...';
-                            
-                            // Get the current chat and find the last user message
-                            const currentChat = this.chats.get(chatId);
-                            if (!currentChat) {return;}
-                            
-                            const lastUserMessage = currentChat.messages.filter(m => m.role === 'user').pop();
-                            if (lastUserMessage) {
-                        // ATOMIC OPERATION: Remove messages from the error onwards
+                    // Store error type and chat ID in the button
+                    retryBtn.dataset.chatId = chatId;
+                    retryBtn.dataset.errorType = event.errorType || 'llm_error';
+                    
+                    retryBtn.onclick = async () => {
+                        retryBtn.disabled = true;
+                        retryBtn.textContent = 'Retrying...';
+                        
+                        const errorType = retryBtn.dataset.errorType;
+                        const retryChatId = retryBtn.dataset.chatId;
+                        
+                        // Remove the error message from chat
+                        const currentChat = this.chats.get(retryChatId);
+                        if (!currentChat) return;
+                        
                         const errorIndex = currentChat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
-                            // Check if we're actually discarding any conversation messages (not just the error)
-                            const messagesToDiscard = currentChat.messages.length - errorIndex - 1; // -1 to exclude the error itself
-                            
-                            if (messagesToDiscard > 0) {
-                                // Truncate from the error onwards (this will handle accounting)
-                                this.truncateMessages(chatId, errorIndex, 'Retry after error');
-                            } else {
-                                // Just remove the error message, no accounting needed
-                                this.removeMessage(chat.id, errorIndex, 1);
-                            }
-                            
-                            // Reload chat to show cleaned history (force render to refresh UI)
-                            this.loadChat(chatId, true);
-                            
-                            // Hide any existing spinner before retry
-                            this.hideLoadingSpinner(chatId);
-                            
-                            // Retry processing
-                            try {
-                                const mcpConnection = this.mcpConnections.get(chat.mcpServerId);
-                                const proxyProvider = this.llmProviders.get(chat.llmProviderId);
-                                
-                                if (mcpConnection && proxyProvider && chat.config?.model) {
-                                    // Get model config
-                                    const providerType = chat.config.model.provider;
-                                    const modelName = chat.config.model.id;
-                                    if (!providerType || !modelName) {
-                                        this.showError('Invalid model configuration in chat', chatId);
-                                        return;
-                                    }
-                                    
-                                    // Create the actual LLM provider instance
-                                    const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-                                    provider.onLog = proxyProvider.onLog;
-                                    
-                                    await this.processMessageWithTools(chat, mcpConnection, provider, lastUserMessage.content);
-                                    
-                                    // Save the chat after successful retry
-                                    chat.updatedAt = new Date().toISOString();
-                                    this.autoSave(chat.id);
-                                } else {
-                                    this.showError('Cannot retry: MCP server or LLM provider not available', chatId);
-                                }
-                            } catch (retryError) {
-                                // Show error with retry button
-                                const retryErrorMessage = `Retry failed: ${retryError.message}`;
-                                this.showErrorWithRetry(retryErrorMessage, async () => {
-                                    // Remove the retry error message
-                                    const retryErrorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === retryErrorMessage);
-                                    if (retryErrorIndex !== -1) {
-                                        this.removeMessage(chat.id, retryErrorIndex, 1);
-                                        this.loadChat(chatId, true);
-                                    }
-                                    // Try again - trigger a click event on the original retry button
-                                    if (retryBtn) {
-                                        retryBtn.click();
-                                    }
-                                }, 'Retry', chatId);
-                                // Find the last user message index for retry functionality
-                        const lastUserIdx = chat.messages.findLastIndex(m => m.role === 'user');
-                        this.addMessage(chat.id, { type: 'error', content: retryErrorMessage, errorMessageIndex: lastUserIdx });
-                            }
+                            this.removeMessage(retryChatId, errorIndex, 1);
+                            this.loadChat(retryChatId, true);
                         }
-                    }
-                };
-                    }
+                        
+                        try {
+                            switch(errorType) {
+                                case 'llm_error':
+                                    await this.retryLLMRequest(retryChatId);
+                                    break;
+                                    
+                                case 'mcp_error':
+                                    // Try to reconnect MCP first
+                                    const mcpConnection = this.mcpConnections.get(currentChat.mcpServerId);
+                                    if (!mcpConnection || !mcpConnection.connected) {
+                                        await this.connectMCPServer(currentChat.mcpServerId);
+                                    }
+                                    // Then retry the request
+                                    await this.retryLLMRequest(retryChatId);
+                                    break;
+                                    
+                                case 'tool_error':
+                                    // For tool errors, retry from the last LLM state
+                                    await this.retryLLMRequest(retryChatId);
+                                    break;
+                                    
+                                default:
+                                    // Default to LLM retry
+                                    await this.retryLLMRequest(retryChatId);
+                            }
+                        } catch (error) {
+                            console.error('Retry failed:', error);
+                            // Error will be displayed by the retry methods
+                        }
+                    };
                     
                     messageDiv.appendChild(retryBtn);
                 }
@@ -5351,18 +6066,26 @@ class NetdataMCPChat {
                 break;
                 
             case 'show-spinner':
-                this.showLoadingSpinner(chatId, event.text || 'Thinking...');
+                // Determine spinner type based on text
+                if (event.text && event.text.includes('Executing')) {
+                    // Extract tool name from "Executing toolName..."
+                    const match = event.text.match(/Executing (.+)\.\.\./);
+                    const toolName = match ? match[1] : 'tool';
+                    this.showToolExecuting(chatId, toolName);
+                } else if (event.text && event.text.includes('Waiting')) {
+                    // Extract seconds from "Waiting... Xs"
+                    const match = event.text.match(/Waiting\.\.\. (\d+)s/);
+                    const seconds = match ? parseInt(match[1], 10) : 0;
+                    this.showWaitingCountdown(chatId, seconds);
+                } else {
+                    // Default to thinking
+                    this.showAssistantThinking(chatId);
+                }
                 break;
                 
             case 'hide-spinner':
-                this.hideLoadingSpinner(chatId);
-                // Clear waiting states
-                const chatForSpinner = this.chats.get(chatId);
-                if (chatForSpinner) {
-                    chatForSpinner.waitingForLLM = false;
-                    chatForSpinner.waitingForMCP = false;
-                    this.updateChatSessions();
-                }
+                // Clear any spinner state
+                this.clearSpinnerState(chatId);
                 break;
                 
             case 'reset-assistant-group':
@@ -5571,11 +6294,16 @@ class NetdataMCPChat {
         const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
         provider.onLog = proxyProvider.onLog;
         
-        // Show loading spinner event
-        this.processRenderEvent({ type: 'show-spinner' }, chat.id);
+        // Show thinking spinner
+        this.showAssistantThinking(chat.id);
         
         try {
-            await this.processMessageWithTools(chat, mcpConnection, provider, message);
+            const result = await this.processMessageWithTools(chat, mcpConnection, provider, message);
+            
+            // Check if rate limit was handled - don't conclude if so
+            if (result && result.rateLimitHandled) {
+                return;
+            }
             
             // Check if we should generate a title automatically
             if (this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
@@ -5609,6 +6337,18 @@ class NetdataMCPChat {
                     console.error('Automatic summary generation failed:', error);
                 }
             }
+            
+            // Success - assistant has concluded
+            this.assistantConcluded(chat.id);
+            
+            // Reset global processing state
+            this.isProcessing = false;
+            this.shouldStopProcessing = false;
+            
+            // Re-enable send button if the input has text
+            if (this.chatInput && this.chatInput.value.trim()) {
+                this.sendBtn.disabled = false;
+            }
         } catch (error) {
             // Check if the user stopped processing
             if (this.shouldStopProcessing) {
@@ -5635,72 +6375,61 @@ class NetdataMCPChat {
                 // Display the continue message
                 this.processRenderEvent({ type: 'error-message', content: continueMessage, errorMessageIndex: lastUserMsgIdx }, chat.id);
             } else {
-                // Regular error handling
-                const errorMessage = `Error: ${error.message}`;
-                // Don't use showErrorWithRetry as it creates a duplicate - just add the error message
-                // The error message will be rendered with a retry button when displayed
-                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
-                this.addMessage(chat.id, { type: 'error', content: errorMessage, errorMessageIndex: lastUserMessageIndex });
+                // Check for rate limit error (429)
+                const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
+                const retryMatch = error.message.match(/Please try again in (\d+(?:\.\d+)?)s/);
+                const retryAfterSeconds = retryMatch ? parseFloat(retryMatch[1]) : null;
                 
-                // Display the error message
-                this.processRenderEvent({ type: 'error-message', content: errorMessage, errorMessageIndex: lastUserMessageIndex }, chat.id);
-                
-                // Create the retry callback for when the retry button is clicked
-                this.pendingRetryCallbacks = this.pendingRetryCallbacks || new Map();
-                this.pendingRetryCallbacks.set(errorMessage, async () => {
-                    // Find and remove only the error message
-                    const errorMessageIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === errorMessage);
-                    if (errorMessageIndex !== -1) {
-                        this.removeMessage(chat.id, errorMessageIndex, 1);
-                        
-                        // Reload chat to remove the error from display (force render to refresh UI)
-                        this.loadChat(chat.id, true);
+                if (isRateLimitError) {
+                    // Handle rate limit with automatic retry (even without retry time)
+                    const retryCount = chat.rateLimitRetryCount || 0;
+                    this.handleRateLimitError(chat.id, retryAfterSeconds, retryCount);
+                    // Mark error as handled to prevent spinner clearing
+                    error._rateLimitHandled = true;
+                    // Clean up but preserve waiting spinner
+                    this.assistantFailed(chat.id, error);
+                } else {
+                    // Regular error handling
+                    const errorMessage = `Error: ${error.message}`;
+                    const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                    
+                    // Determine error type for retry
+                    let errorType = 'llm_error'; // Default to LLM error
+                    if (error.message.includes('MCP') || error.message.includes('connection')) {
+                        errorType = 'mcp_error';
+                    } else if (error.message.includes('Tool')) {
+                        errorType = 'tool_error';
                     }
                     
-                    // Retry processing without removing any other messages
-                    try {
-                        // Continue the conversation from where it left off
-                        await this.processMessageWithTools(chat, mcpConnection, provider, message);
-                        
-                        // Save the chat after successful retry
-                        chat.updatedAt = new Date().toISOString();
-                        this.autoSave(chat.id);
-                    } catch (retryError) {
-                        // Show error with retry button
-                        const retryErrorMessage = `Retry failed: ${retryError.message}`;
-                        this.showErrorWithRetry(retryErrorMessage, async () => {
-                            // Remove the retry error message
-                            const retryErrIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === retryErrorMessage);
-                            if (retryErrIndex !== -1) {
-                                this.removeMessage(chat.id, retryErrIndex, 1);
-                                this.loadChat(chat.id, true);
-                            }
-                            // Try again - resend the original message
-                            await this.processMessageWithTools(chat, mcpConnection, provider, message);
-                        }, 'Retry', chat.id);
-                        // Find the last user message index for retry functionality
-                        const lastUserIdx = chat.messages.findLastIndex(m => m.role === 'user');
-                        this.addMessage(chat.id, { type: 'error', content: retryErrorMessage, errorMessageIndex: lastUserIdx });
-                        
-                        // Display the retry error message
-                        this.processRenderEvent({ type: 'error-message', content: retryErrorMessage, errorMessageIndex: lastUserIdx }, chat.id);
-                    }
-                });
+                    this.addMessage(chat.id, { 
+                        type: 'error', 
+                        content: errorMessage, 
+                        errorMessageIndex: lastUserMessageIndex,
+                        errorType 
+                    });
+                    
+                    // Display the error message with error type
+                    this.processRenderEvent({ 
+                        type: 'error-message', 
+                        content: errorMessage, 
+                        errorMessageIndex: lastUserMessageIndex,
+                        errorType
+                    }, chat.id);
+                    
+                    // Clean up on error
+                    this.assistantFailed(chat.id, error);
+                }
+                
+                // Clean up for stop case
+                if (this.shouldStopProcessing) {
+                    this.assistantFailed(chat.id, { message: 'User stopped processing' });
+                }
             }
-        } finally {
-            // Remove loading spinner event
-            this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
             
-            // Clear current assistant group after processing is complete
-            this.clearCurrentAssistantGroup(chat.id);
-            
-            chat.updatedAt = new Date().toISOString();
-            this.autoSave(chat.id);
-            this.chatInput.disabled = false;
+            // Reset global processing state (for all cases)
             this.isProcessing = false;
             this.shouldStopProcessing = false;
             this.updateSendButton();
-            this.chatInput.focus();
         }
     }
 
@@ -5878,341 +6607,31 @@ class NetdataMCPChat {
             
             // Send to LLM with current temperature
             const temperature = this.getCurrentTemperature(chat.id);
-            const llmStartTime = Date.now();
             // eslint-disable-next-line no-await-in-loop
-            const response = await provider.sendMessage(messages, tools, temperature, cacheControlIndex);
-            const llmResponseTime = Date.now() - llmStartTime;
+            const response = await this.callAssistant({
+                chatId: chat.id,
+                provider,
+                messages,
+                tools,
+                temperature,
+                cacheControlIndex,
+                context: 'Processing tools sequentially'
+            });
             
-            // Track token usage
-            if (response.usage) {
-                this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || provider.model);
+            // Check if rate limit was handled automatically
+            if (response._rateLimitHandled) {
+                return { rateLimitHandled: true };
             }
             
-            // If no tool calls, display response and finish
-            if (!response.toolCalls || response.toolCalls.length === 0) {
-                // Emit metrics event first (just like loaded chats)
-                this.processRenderEvent({ 
-                    type: 'assistant-metrics', 
-                    usage: response.usage, 
-                    responseTime: llmResponseTime, 
-                    model: ChatConfig.getChatModelString(chat) || provider.model
-                }, chat.id);
-                
-                if (response.content) {
-                    // Create the assistant message first
-                    const assistantMsg = { 
-                        type: 'assistant', 
-                        role: 'assistant', 
-                        content: response.content,
-                        usage: response.usage || null,
-                        responseTime: llmResponseTime || null,
-                        model: provider.model || ChatConfig.getChatModelString(chat),
-                        turn: chat.currentTurn
-                    };
-                    // Use addMessage to calculate price and update cumulative totals
-                    this.addMessage(chat.id, assistantMsg);
-                    
-                    // Then emit assistant message event with messageIndex
-                    const messageIndex = chat.messages.length - 1;
-                    this.processRenderEvent({ 
-                        type: 'assistant-message', 
-                        content: response.content,
-                        messageIndex
-                    }, chat.id);
-                    
-                    // Track token usage with model information
-                    if (response.usage) {
-                        const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
-                        this.addCumulativeTokens(
-                            chat.id,
-                            modelUsed,
-                            response.usage.promptTokens || 0,
-                            response.usage.completionTokens || 0,
-                            response.usage.cacheReadInputTokens || 0,
-                            response.usage.cacheCreationInputTokens || 0
-                        );
-                    }
-                    // Clean content before sending back to API
-                    const cleanedContent = this.cleanContentForAPI(response.content);
-                    if (cleanedContent && cleanedContent.trim()) {
-                        messages.push({ role: 'assistant', content: cleanedContent });
-                    }
-                }
+            // Process the response
+            await this.processSingleLLMResponse(chat, mcpConnection, provider, messages, tools, cacheControlIndex, response);
+            
+            // Check if we should continue (if the response had tool calls)
+            const lastMessage = messages[messages.length - 1];
+            if (!lastMessage || lastMessage.role !== 'tool-results') {
+                // No tool results, we're done
                 break;
             }
-            
-            // Initialize assistantMessageIndex here so it's available for tool execution
-            let assistantMessageIndex = null;
-            
-            // Store assistant message with tool calls if any
-            if (response.content || response.toolCalls) {
-                // CRITICAL: Save assistant message BEFORE displaying
-                const assistantMessage = {
-                    type: 'assistant',
-                    role: 'assistant',
-                    content: response.content || '',
-                    toolCalls: (response.toolCalls || []).map(tc => ({
-                        ...tc,
-                        includeInContext: true // Default to included
-                    })),
-                    usage: response.usage || null,
-                    responseTime: llmResponseTime || null,
-                    model: provider.model || ChatConfig.getChatModelString(chat),
-                    turn: chat.currentTurn,
-                    cacheControlIndex // Store where cache control was placed
-                };
-                this.addMessage(chat.id, assistantMessage);
-                
-                // Track token usage with model information
-                if (response.usage) {
-                    const modelUsed = ChatConfig.getChatModelString(chat) || provider.model;
-                    this.addCumulativeTokens(
-                        chat.id,
-                        modelUsed,
-                        response.usage.promptTokens || 0,
-                        response.usage.completionTokens || 0,
-                        response.usage.cacheReadInputTokens || 0,
-                        response.usage.cacheCreationInputTokens || 0
-                    );
-                }
-                
-                // Now display the message - after it's safely saved
-                // Get the message index after adding
-                assistantMessageIndex = chat.messages.length - 1;
-                
-                // Emit metrics event first (just like loaded chats)
-                this.processRenderEvent({ 
-                    type: 'assistant-metrics', 
-                    usage: response.usage, 
-                    responseTime: llmResponseTime, 
-                    model: ChatConfig.getChatModelString(chat) || provider.model
-                }, chat.id);
-                
-                if (response.content) {
-                    this.processRenderEvent({ 
-                        type: 'assistant-message', 
-                        content: response.content,
-                        messageIndex: assistantMessageIndex
-                    }, chat.id);
-                }
-                
-                // Build the message for the API
-                const cleanedContent = response.content ? this.cleanContentForAPI(response.content) : '';
-                
-                // Create standard assistant message
-                const assistantMsg = {
-                    role: 'assistant',
-                    content: cleanedContent
-                };
-                
-                // Add tool calls if present (providers will convert to their format)
-                if (response.toolCalls && response.toolCalls.length > 0) {
-                    assistantMsg.toolCalls = response.toolCalls;
-                }
-                
-                // Only add message if it has content or tool calls
-                if (cleanedContent || response.toolCalls && response.toolCalls.length > 0) {
-                    messages.push(assistantMsg);
-                }
-            }
-            
-            // Execute tool calls and collect results
-            if (response.toolCalls && response.toolCalls.length > 0) {
-                // SAFETY CHECK: Validate concurrent tools limit
-                try {
-                    this.safetyChecker.checkConcurrentToolsLimit(response.toolCalls);
-                } catch (error) {
-                    if (error instanceof SafetyLimitError) {
-                        // Show safety error with no retry option
-                        this.addMessage(chat.id, { 
-                            type: 'error', 
-                            content: error.message,
-                            errorType: 'safety_limit',
-                            isRetryable: false
-                        });
-                        this.processRenderEvent({ 
-                            type: 'error-message', 
-                            content: error.message, 
-                            errorType: 'safety_limit'
-                        }, chat.id);
-                        return; // Stop processing completely
-                    }
-                    throw error; // Re-throw non-safety errors
-                }
-                
-                // Ensure we have an assistant group even if there was no content
-                if (!this.getCurrentAssistantGroup(chat.id)) {
-                    this.processRenderEvent({ 
-                        type: 'assistant-message', 
-                        content: '',
-                        messageIndex: assistantMessageIndex
-                    }, chat.id);
-                }
-                
-                const toolResults = [];
-                
-                for (const toolCall of response.toolCalls) {
-                    if (!toolCall.id) {
-                        console.error('[processMessageWithTools] Tool call missing required id:', toolCall);
-                        continue; // Skip invalid tool calls
-                    }
-                    try {
-                        // Use destructuring to avoid direct 'arguments' reference
-                        const { arguments: toolArgs } = toolCall || {};
-                        // Show tool call in UI
-                        this.processRenderEvent({ 
-                            type: 'tool-call', 
-                            name: toolCall.name, 
-                            arguments: toolArgs,
-                            id: toolCall.id,  // Required tool ID for proper matching
-                            includeInContext: toolCall.includeInContext !== false 
-                        }, chat.id);
-                        
-                        // Show spinner while executing tool
-                        this.processRenderEvent({ type: 'show-spinner', text: `Executing ${toolCall.name}...` }, chat.id);
-                        
-                        // Set MCP waiting state
-                        chat.waitingForMCP = true;
-                        chat.waitingForLLM = false;
-                        this.updateChatSessions();
-                        
-                        // Execute tool and track timing
-                        const toolStartTime = Date.now();
-                        // eslint-disable-next-line no-await-in-loop
-                        const rawResult = await mcpConnection.callTool(toolCall.name, toolArgs);
-                        const toolResponseTime = Date.now() - toolStartTime;
-                        
-                        // Hide spinner after tool execution
-                        this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
-                        
-                        // Parse the result to handle MCP's response format
-                        const result = this.parseToolResult(rawResult);
-                        
-                        // Calculate response size
-                        const responseSize = typeof result === 'string' 
-                            ? result.length 
-                            : JSON.stringify(result).length;
-                        
-                        // Show result in UI with timing and size
-                        this.processRenderEvent({ 
-                            type: 'tool-result', 
-                            name: toolCall.name, 
-                            result, 
-                            toolCallId: toolCall.id,  // Pass tool call ID for proper matching
-                            responseTime: toolResponseTime, 
-                            responseSize, 
-                            messageIndex: assistantMessageIndex 
-                        }, chat.id);
-                        
-                        // Collect result
-                        toolResults.push({
-                            toolCallId: toolCall.id,
-                            name: toolCall.name,
-                            result,
-                            includeInContext: true // Will be updated based on checkbox state
-                        });
-                        
-                    } catch (error) {
-                        const errorMsg = `Tool error (${toolCall.name}): ${error.message}`;
-                        this.processRenderEvent({ type: 'tool-result', name: toolCall.name, result: { error: errorMsg }, responseTime: 0, responseSize: errorMsg.length, messageIndex: assistantMessageIndex, toolCallId: toolCall.id }, chat.id);
-                        
-                        // Collect error result
-                        toolResults.push({
-                            toolCallId: toolCall.id,
-                            name: toolCall.name,
-                            result: { error: errorMsg },
-                            includeInContext: true // Will be updated based on checkbox state
-                        });
-                    }
-                }
-                
-                // Update tool results with inclusion state from checkboxes
-                if (toolResults.length > 0) {
-                    // Check current checkbox states
-                    toolResults.forEach(tr => {
-                        // Tool inclusion checkboxes have been removed
-                        // Always include tool results in context
-                        tr.includeInContext = true;
-                    });
-                    }
-                    
-                    // Store all tool results together
-                    // NOTE: Tool results are displayed during execution for user feedback,
-                    // but the consolidated results are saved here to ensure consistency
-                    this.addMessage(chat.id, {
-                        type: 'tool-results',
-                        toolResults,
-                        turn: chat.currentTurn
-                    });
-                    
-                    // Filter included results for API
-                    const includedResults = toolResults.filter(tr => tr.includeInContext !== false);
-                    
-                    if (includedResults.length > 0) {
-                        // Add standard tool-results message
-                        // Providers will convert to their specific format
-                        const toolResultsMessage = {
-                            role: 'tool-results',
-                            toolResults: includedResults.map(tr => ({
-                                toolCallId: tr.toolCallId,
-                                toolName: tr.name,
-                                result: tr.result
-                            }))
-                        };
-                        
-                        messages.push(toolResultsMessage);
-                        
-                        // Check if we need to perform tool summarization
-                        if (chat.messageOptimizer && chat.config?.optimisation?.toolSummarisation?.enabled) {
-                            try {
-                                // Get tool schemas for context
-                                const toolSchemas = new Map();
-                                for (const tool of tools) {
-                                    toolSchemas.set(tool.name, tool);
-                                }
-                                
-                                // Get provider info
-                                const providerInfo = {
-                                    url: provider.proxyUrl
-                                };
-                                
-                                // Perform async summarization
-                                // eslint-disable-next-line no-await-in-loop
-                                const summarizedMessages = await chat.messageOptimizer.performToolSummarization(
-                                    messages,
-                                    {
-                                        toolSchemas,
-                                        providerInfo
-                                    }
-                                );
-                                
-                                // Replace messages array with summarized version
-                                messages.length = 0;
-                                messages.push(...summarizedMessages);
-                                
-                                // Log summarization stats
-                                const lastToolMessage = messages[messages.length - 1];
-                                if (lastToolMessage && lastToolMessage.toolResults) {
-                                    const summarizedCount = lastToolMessage.toolResults.filter(
-                                        tr => tr.result && tr.result._type === 'summarized'
-                                    ).length;
-                                    if (summarizedCount > 0) {
-                                        console.log(`[Tool Summarization] Summarized ${summarizedCount} large tool responses`);
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('[Tool Summarization] Failed:', error);
-                                // Continue with original messages on error
-                            }
-                        }
-                    }
-                    
-                    // Reset assistant group after tool results so next metrics appears separately
-                    this.processRenderEvent({ type: 'reset-assistant-group' }, chat.id);
-                    
-                    // Show thinking spinner again before next LLM call
-                    this.processRenderEvent({ type: 'show-spinner', text: 'Thinking...' }, chat.id);
-                }
             }
         } catch (error) {
             // Set error state
@@ -6220,11 +6639,9 @@ class NetdataMCPChat {
             chat.lastError = error.message;
             throw error;
         } finally {
-            // Clear processing state when done
-            chat.isProcessing = false;
-            chat.waitingForLLM = false;
-            chat.waitingForMCP = false;
-            this.updateChatSessions(); // Update sidebar to remove activity indicator
+            // Note: Full cleanup is handled by the caller (sendMessage) via assistantConcluded()
+            // We only update the sidebar here to remove activity indicator
+            this.updateChatSessions();
         }
     }
 
@@ -7553,28 +7970,127 @@ class NetdataMCPChat {
         return result;
     }
 
-    showLoadingSpinner(chatId, text = 'Thinking...') {
-        if (!chatId) {
-            console.error('showLoadingSpinner called without chatId');
+    // ===== NEW CENTRALIZED SPINNER AND STATUS MANAGEMENT =====
+    
+    /**
+     * Shows spinner for assistant thinking state
+     */
+    showAssistantThinking(chatId) {
+        this.setSpinnerState(chatId, 'thinking', 'Thinking...');
+    }
+    
+    /**
+     * Hides assistant thinking spinner
+     */
+    hideAssistantThinking(chatId) {
+        this.clearSpinnerState(chatId);
+    }
+    
+    /**
+     * Shows spinner for tool execution
+     */
+    showToolExecuting(chatId, toolName) {
+        this.setSpinnerState(chatId, 'tool', `Executing ${toolName}...`);
+    }
+    
+    /**
+     * Hides tool execution spinner
+     */
+    hideToolExecuting(chatId) {
+        this.clearSpinnerState(chatId);
+    }
+    
+    /**
+     * Shows waiting countdown spinner
+     */
+    showWaitingCountdown(chatId, seconds) {
+        this.setSpinnerState(chatId, 'waiting', `Waiting... ${seconds}s`);
+    }
+    
+    /**
+     * Updates waiting countdown text
+     */
+    updateWaitingCountdown(chatId, seconds) {
+        const chat = this.chats.get(chatId);
+        if (!chat || !chat.spinnerState || chat.spinnerState.type !== 'waiting') return;
+        
+        chat.spinnerState.text = `Waiting... ${seconds}s`;
+        this.updateSpinnerText(chatId, chat.spinnerState.text);
+    }
+    
+    /**
+     * Hides waiting countdown spinner
+     */
+    hideWaitingCountdown(chatId) {
+        this.clearSpinnerState(chatId);
+    }
+    
+    /**
+     * Central method to set spinner state
+     */
+    setSpinnerState(chatId, type, text) {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[setSpinnerState] Chat not found: ${chatId}`);
             return;
         }
         
-        // Set chat state to waiting for LLM
-        const chat = this.chats.get(chatId);
-        if (chat) {
-            chat.waitingForLLM = true;
-            this.updateChatSessions();
+        // Special handling for rate limit countdown
+        if (chat.isInRateLimitCountdown && type !== 'waiting') {
+            console.log(`[setSpinnerState] Ignoring ${type} spinner during rate limit countdown`);
+            return;
         }
         
-        // CRITICAL FIX: Remove any existing spinners from ALL chats first
-        // This prevents orphaned spinners from appearing in wrong chats
-        this.chatContainers.forEach((container, id) => {
-            this.hideLoadingSpinner(id);
-        });
+        // Clear any existing spinner first
+        this.clearSpinnerState(chatId);
+        
+        // Set new spinner state
+        chat.spinnerState = {
+            type, // 'thinking', 'tool', 'waiting'
+            text,
+            startTime: Date.now()
+        };
+        
+        // Update only this chat's tile status
+        this.updateChatTileStatus(chatId);
+        
+        // Show spinner in message area
+        this.displaySpinner(chatId, text);
+    }
+    
+    /**
+     * Clear spinner state and remove spinner
+     */
+    clearSpinnerState(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        // Don't clear spinner if we're in a rate limit countdown
+        if (chat.isInRateLimitCountdown) {
+            console.log('[clearSpinnerState] Preserving rate limit countdown spinner');
+            return;
+        }
+        
+        // Clear state
+        chat.spinnerState = null;
+        
+        // Update only this chat's tile status
+        this.updateChatTileStatus(chatId);
+        
+        // Remove spinner from message area
+        this.removeSpinner(chatId);
+    }
+    
+    /**
+     * Display spinner in message area
+     */
+    displaySpinner(chatId, text) {
+        // Remove any existing spinner for this chat
+        this.removeSpinner(chatId);
         
         // Create spinner element
         const spinnerDiv = document.createElement('div');
-        spinnerDiv.id = `llm-loading-spinner-${chatId}`;
+        spinnerDiv.id = `spinner-${chatId}`;
         spinnerDiv.className = 'message assistant loading-spinner';
         
         // Store start time
@@ -7593,6 +8109,11 @@ class NetdataMCPChat {
             this.spinnerIntervals = new Map();
         }
         
+        // Clear any existing interval for this chat
+        if (this.spinnerIntervals.has(chatId)) {
+            clearInterval(this.spinnerIntervals.get(chatId));
+        }
+        
         // Update time every 100ms
         const interval = setInterval(() => {
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -7605,6 +8126,7 @@ class NetdataMCPChat {
         // Store interval for this chat
         this.spinnerIntervals.set(chatId, interval);
         
+        // Add to message area
         const container = this.getChatContainer(chatId);
         if (container && container._elements && container._elements.messages) {
             container._elements.messages.appendChild(spinnerDiv);
@@ -7615,32 +8137,147 @@ class NetdataMCPChat {
             this.scrollToBottom(chatId, true);
         });
     }
-
-    hideLoadingSpinner(chatId) {
-        if (chatId) {
-            // Clear chat-specific interval
-            if (this.spinnerIntervals && this.spinnerIntervals.has(chatId)) {
-                clearInterval(this.spinnerIntervals.get(chatId));
-                this.spinnerIntervals.delete(chatId);
-            }
-            
-            // Remove spinner for specific chat
-            const spinner = document.getElementById(`llm-loading-spinner-${chatId}`);
-            if (spinner) {
-                spinner.remove();
-            }
-        } else {
-            // Fallback: clear global interval and remove any spinner with old global ID (for backwards compatibility)
-            if (this.spinnerInterval) {
-                clearInterval(this.spinnerInterval);
-                this.spinnerInterval = null;
-            }
-            
-            const spinner = document.getElementById('llm-loading-spinner');
-            if (spinner) {
-                spinner.remove();
+    
+    /**
+     * Update spinner text without recreating it
+     */
+    updateSpinnerText(chatId, text) {
+        const spinner = document.getElementById(`spinner-${chatId}`);
+        if (spinner) {
+            const textElement = spinner.querySelector('.spinner-text');
+            if (textElement) {
+                const timeSpan = textElement.querySelector('.spinner-time');
+                const currentTime = timeSpan ? timeSpan.textContent : '(0s)';
+                textElement.innerHTML = `${text} <span class="spinner-time">${currentTime}</span>`;
             }
         }
+    }
+    
+    /**
+     * Remove spinner from message area
+     */
+    removeSpinner(chatId) {
+        // Clear interval if exists
+        if (this.spinnerIntervals && this.spinnerIntervals.has(chatId)) {
+            clearInterval(this.spinnerIntervals.get(chatId));
+            this.spinnerIntervals.delete(chatId);
+        }
+        
+        // Remove spinner element
+        const spinner = document.getElementById(`spinner-${chatId}`);
+        if (spinner) {
+            spinner.remove();
+        }
+    }
+    
+    /**
+     * Update only a specific chat tile's status icon
+     */
+    updateChatTileStatus(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        // Find the specific tile
+        const tile = document.querySelector(`.chat-session-item[data-chat-id="${chatId}"]`);
+        if (!tile) return;
+        
+        const statusIcon = tile.querySelector('.status-icon');
+        if (!statusIcon) return;
+        
+        // Determine status based on state
+        let iconHtml;
+        let statusClass;
+        
+        if (chat.hasError) {
+            iconHtml = '<i class="fas fa-exclamation-triangle"></i>';
+            statusClass = 'status-error';
+        } else if (chat.spinnerState) {
+            switch (chat.spinnerState.type) {
+                case 'thinking':
+                    iconHtml = '<i class="fas fa-robot"></i>';
+                    statusClass = 'status-llm-active';
+                    break;
+                case 'tool':
+                    iconHtml = '<i class="fas fa-plug"></i>';
+                    statusClass = 'status-mcp-active';
+                    break;
+                case 'waiting':
+                    iconHtml = '<i class="fas fa-clock"></i>';
+                    statusClass = 'status-waiting';
+                    break;
+                default:
+                    iconHtml = '<i class="fas fa-spinner fa-spin"></i>';
+                    statusClass = 'status-processing';
+            }
+        } else if (chat.wasWaitingOnLoad) {
+            iconHtml = '<i class="fas fa-chain-broken"></i>';
+            statusClass = 'status-broken';
+        } else if (chat.messages && chat.messages.length > 1) {
+            iconHtml = '<i class="fas fa-check-circle"></i>';
+            statusClass = 'status-ready';
+        } else {
+            iconHtml = '<i class="fas fa-pause-circle"></i>';
+            statusClass = 'status-idle';
+        }
+        
+        // Update icon
+        statusIcon.innerHTML = iconHtml;
+        statusIcon.className = 'status-icon ' + statusClass;
+    }
+    
+    /**
+     * Show error and update chat state
+     */
+    showError(chatId, errorMessage, errorType = 'general') {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[showError] Chat not found: ${chatId}`);
+            return;
+        }
+        
+        // Clear any spinners
+        this.clearSpinnerState(chatId);
+        
+        // Set error state
+        chat.hasError = true;
+        chat.lastError = {
+            message: errorMessage,
+            type: errorType,
+            timestamp: Date.now()
+        };
+        
+        // Update tile
+        this.updateChatTileStatus(chatId);
+        
+        // Error display is handled by existing addMessage/processRenderEvent
+    }
+    
+    /**
+     * Clear error state
+     */
+    clearError(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        chat.hasError = false;
+        chat.lastError = null;
+        
+        // Update tile
+        this.updateChatTileStatus(chatId);
+    }
+    
+    // ===== DEPRECATED: Old spinner methods - TO BE REMOVED =====
+    
+    showLoadingSpinner(chatId, text = 'Thinking...') {
+        console.warn('[DEPRECATED] showLoadingSpinner is deprecated. Use showAssistantThinking, showToolExecuting, or showWaitingCountdown instead.');
+        // For backwards compatibility during transition
+        this.setSpinnerState(chatId, 'thinking', text);
+    }
+
+    hideLoadingSpinner(chatId) {
+        console.warn('[DEPRECATED] hideLoadingSpinner is deprecated. Use hideAssistantThinking, hideToolExecuting, or hideWaitingCountdown instead.');
+        // For backwards compatibility during transition
+        this.clearSpinnerState(chatId);
     }
     
     // Helper to ensure spinner stays at bottom
@@ -7911,8 +8548,8 @@ class NetdataMCPChat {
         const container = this.getChatContainer(chatId);
         if (!container || !container._elements || !container._elements.messages) return;
         
-        // Hide any loading spinners
-        this.hideLoadingSpinner(chatId);
+        // Clear any spinner state
+        this.clearSpinnerState(chatId);
         
         // Process each pending tool call
         for (const [_toolCallId, toolInfo] of chat.pendingToolCalls) {
@@ -8763,8 +9400,8 @@ class NetdataMCPChat {
             // Now display it
             this.processRenderEvent({ type: 'system-summary-message', content: summaryRequest }, chat.id);
             
-            // Show loading spinner
-            this.processRenderEvent({ type: 'show-spinner' }, chat.id);
+            // Show thinking spinner
+            this.showAssistantThinking(chat.id);
             
             // Build conversational messages (no tools) for summary generation
             // Don't include the original system prompt - we'll use a custom one
@@ -8806,12 +9443,20 @@ class NetdataMCPChat {
             
             // Send request with low temperature for consistent summaries
             const temperature = 0.5;
-            const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, [], temperature, cacheControlIndex);
-            const llmResponseTime = Date.now() - llmStartTime;
+            const response = await this.callAssistant({
+                chatId: chat.id,
+                provider,
+                messages,
+                tools: [],
+                temperature,
+                cacheControlIndex,
+                context: 'Summary request'
+            });
             
-            // Hide spinner
-            this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
+            // Check if rate limit was handled automatically
+            if (response._rateLimitHandled) {
+                return { rateLimitHandled: true };
+            }
             
             // Update metrics
             if (response.usage) {
@@ -8858,7 +9503,7 @@ class NetdataMCPChat {
             console.error('Failed to summarize conversation:', error);
             
             // Hide spinner on error
-            this.processRenderEvent({ type: 'hide-spinner' }, chat.id);
+            this.hideAssistantThinking(chat.id);
             
             if (!isAutomatic) {
                 this.showError(`Failed to summarize: ${error.message}`, chat.id);
@@ -8925,7 +9570,7 @@ class NetdataMCPChat {
             console.error('Failed to summarize conversation:', error);
             
             // Hide spinner on error
-            this.processRenderEvent({ type: 'hide-spinner' }, chatId);
+            this.hideAssistantThinking(chatId);
             
             this.showError(`Failed to summarize: ${error.message}`, chatId);
             
