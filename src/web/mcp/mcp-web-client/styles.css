@@ -155,6 +155,8 @@ body {
     flex-direction: column;
     position: relative;
     transition: width 0.2s ease, margin-left 0.2s ease;
+    box-sizing: border-box;
+    overflow: visible; /* Allow proper ellipsis rendering */
 }
 
 .chat-sidebar.collapsed {
@@ -215,6 +217,8 @@ body {
     overflow-x: hidden;
     padding: 0 3px 3px 3px; /* Remove top padding */
     position: relative;
+    width: 100%;
+    box-sizing: border-box;
     scrollbar-gutter: stable; /* Reserve space for scrollbar to prevent layout shift */
 }
 
@@ -288,8 +292,8 @@ body {
     position: relative;
 }
 
-/* Allow tooltips to show properly in sidebar */
-.chat-sidebar [data-tooltip] {
+/* Allow tooltips to show properly in sidebar - but not for text that needs ellipsis */
+.chat-sidebar [data-tooltip]:not(.session-title) {
     overflow: visible !important;
 }
 
@@ -328,12 +332,16 @@ body {
     border-radius: 6px;
     transition: all 0.15s;
     position: relative;
-    overflow: visible; /* Allow tooltips to show */
+    overflow: hidden; /* Hide overflow for ellipsis to work */
+    width: 100%; /* Ensure it takes full width of sidebar */
+    box-sizing: border-box;
 }
 
 .session-content {
     padding: 12px;
     cursor: pointer;
+    min-width: 0; /* Allow content to shrink for text truncation */
+    box-sizing: border-box;
 }
 
 .session-row {
@@ -341,6 +349,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 4px;
+    min-width: 0; /* Allow row to shrink */
 }
 
 .session-row:last-child {
@@ -350,9 +359,9 @@ body {
 /* Row 1: Title */
 .session-title-row {
     margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    min-width: 0; /* Allow flex container to shrink below its content size */
+    display: block; /* Change from flex to block */
+    min-width: 0; /* Allow container to shrink below its content size */
+    width: 100%; /* Take full width available */
 }
 
 .session-title {
@@ -362,8 +371,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex: 1;
-    min-width: 0; /* Allow flex item to shrink below its content size */
+    display: block;
 }
 
 /* Row 2 & 3: Model/Date and MCP/Time */
@@ -1104,6 +1112,31 @@ body {
     background-color: transparent;
     padding: 0;
     border: none;
+}
+
+/* Special styling for pre/code blocks in user messages */
+/* Light theme: user bg is #00ab44 (green), make code blocks slightly darker green */
+:root[data-theme="light"] .message.user .message-content pre {
+    background-color: rgba(0, 140, 60, 0.15);  /* Slightly darker green tint */
+    border: 1px solid rgba(0, 140, 60, 0.25);
+    color: var(--chat-user-text);
+}
+
+:root[data-theme="light"] .message.user .message-content code {
+    background-color: rgba(0, 140, 60, 0.15);
+    color: var(--chat-user-text);
+}
+
+/* Dark theme: user bg is #00d952 (bright green), make code blocks slightly darker */
+:root[data-theme="dark"] .message.user .message-content pre {
+    background-color: rgba(0, 180, 70, 0.2);  /* Darker green overlay */
+    border: 1px solid rgba(0, 180, 70, 0.3);
+    color: var(--chat-user-text);
+}
+
+:root[data-theme="dark"] .message.user .message-content code {
+    background-color: rgba(0, 180, 70, 0.2);
+    color: var(--chat-user-text);
 }
 
 .message-content blockquote {
