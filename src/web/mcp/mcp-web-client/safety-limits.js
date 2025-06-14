@@ -5,6 +5,18 @@
  * runaway assistant behavior and excessive resource usage.
  */
 
+/**
+ * Custom error class for safety limit violations
+ */
+export class SafetyLimitError extends Error {
+    constructor(type, message) {
+        super(message);
+        this.name = 'SafetyLimitError';
+        this.type = type; // 'ITERATIONS', 'CONCURRENT_TOOLS', 'REQUEST_SIZE'
+        this.isRetryable = false; // These errors should never allow retry
+    }
+}
+
 export const SAFETY_LIMITS = {
     // Maximum consecutive tool iterations before stopping with error
     MAX_CONSECUTIVE_TOOL_ITERATIONS: 10,
@@ -101,17 +113,5 @@ export class SafetyChecker {
         
         // Check request size limit
         this.checkRequestSizeLimit(requestData);
-    }
-}
-
-/**
- * Custom error class for safety limit violations
- */
-export class SafetyLimitError extends Error {
-    constructor(type, message) {
-        super(message);
-        this.name = 'SafetyLimitError';
-        this.type = type; // 'ITERATIONS', 'CONCURRENT_TOOLS', 'REQUEST_SIZE'
-        this.isRetryable = false; // These errors should never allow retry
     }
 }

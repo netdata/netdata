@@ -2187,9 +2187,6 @@ class NetdataMCPChat {
         const chat = this.chats.get(chatId);
         if (!chat) return;
         
-        // Store the old model before updating
-        const oldModelString = ChatConfig.modelConfigToString(chat.config?.model);
-        
         // Update config
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
         const modelConfig = ChatConfig.modelConfigFromString(model);
@@ -2199,19 +2196,9 @@ class NetdataMCPChat {
             config.model = modelConfig;
         }
         
-        // Update models in optimization features if they were using the old model
-        if (oldModelString && config.optimisation.toolSummarisation.model && 
-            ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model) === oldModelString) {
-            config.optimisation.toolSummarisation.model = { ...config.model };
-        }
-        if (oldModelString && config.optimisation.autoSummarisation.model && 
-            ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model) === oldModelString) {
-            config.optimisation.autoSummarisation.model = { ...config.model };
-        }
-        if (oldModelString && config.optimisation.titleGeneration.model && 
-            ChatConfig.modelConfigToString(config.optimisation.titleGeneration.model) === oldModelString) {
-            config.optimisation.titleGeneration.model = { ...config.model };
-        }
+        // Note: We intentionally do NOT auto-update optimization feature models
+        // If a user explicitly selected a model for a feature, it should stay as that model
+        // Only null values (which mean "use chat model") will automatically follow the chat model
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);

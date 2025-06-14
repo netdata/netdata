@@ -83,7 +83,7 @@ export class ToolSummarizer {
         try {
             const stringified = JSON.stringify(result);
             return new Blob([stringified]).size;
-        } catch (error) {
+        } catch (_error) {
             // If can't stringify (circular refs etc), estimate
             return 0;
         }
@@ -144,7 +144,7 @@ export class ToolSummarizer {
                 originalSize: this.calculateSize(params.toolResult.result),
                 summarizedSize: this.calculateSize(summary),
                 compressionRatio: this.calculateCompressionRatio(params.toolResult.result, summary),
-                summary: summary,
+                summary,
                 model: modelToUse,
                 usage: response.usage,
                 timestamp: new Date().toISOString()
@@ -268,7 +268,7 @@ Focus on clarity and conciseness while maintaining completeness.`;
         // For objects/arrays, pretty print
         try {
             return JSON.stringify(result, null, 2);
-        } catch (error) {
+        } catch (_error) {
             return String(result);
         }
     }
