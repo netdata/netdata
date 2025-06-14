@@ -2372,7 +2372,7 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
         if (is_worker)
             worker_is_idle();
 
-        metadata_scan_host(host, work_buffer, true);
+        metadata_scan_host(host, work_buffer, is_worker);
 
         if (!is_worker)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
@@ -2634,8 +2634,13 @@ static void *metadata_event_loop(void *arg)
     uv_walk(loop, libuv_close_callback, NULL);
 
     size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+
+    // are we waiting for callbacks?
+    bool callbacks_pending = (config->metadata_running || config->ctx_load_running);
+
     while ((config->metadata_running || config->ctx_load_running) && loop_count > 0) {
-        if (!uv_run(loop, UV_RUN_NOWAIT))
+        callbacks_pending = uv_run(loop, UV_RUN_NOWAIT);
+        if (!callbacks_pending)
             break;  // No pending callbacks
         sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
         loop_count--;
@@ -2643,11 +2648,12 @@ static void *metadata_event_loop(void *arg)
 
     (void)uv_loop_close(loop);
 
-    store_hosts_metadata(work_buffer, false);
-
-    store_alert_transitions(pending_alert_list, false);
-
-    store_sql_statements(pending_sql_statement, false);
+    // If we are still waitinng for callbacks we timed out, don't run these
+    if (!callbacks_pending) {
+        store_hosts_metadata(work_buffer, false);
+        store_alert_transitions(pending_alert_list, false);
+        store_sql_statements(pending_sql_statement, false);
+    }
 
     if (pending_ctx_cleanup_list) {
         Word_t Index = 0;
@@ -2666,7 +2672,7 @@ static void *metadata_event_loop(void *arg)
     buffer_free(work_buffer);
     release_cmd_pool(&config->cmd_pool);
     worker_unregister();
-
+    service_exits();
     completion_mark_complete(&config->start_stop_complete);
 
     return NULL;
