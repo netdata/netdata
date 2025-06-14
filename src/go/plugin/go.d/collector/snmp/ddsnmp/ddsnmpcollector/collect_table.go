@@ -213,6 +213,11 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
+			// Skip if it's an index-based tag (handled separately)
+			if tagCfg.Index != 0 {
+				continue
+			}
+
 			// Skip if has index transformation (not supported yet)
 			if len(tagCfg.IndexTransform) > 0 {
 				continue
@@ -253,6 +258,29 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				rowTags[k] = v
 				tagCache[index][k] = v
 			}
+		}
+
+		// Process index-based tags
+		for _, tagCfg := range cfg.MetricTags {
+			// Skip if not an index-based tag
+			if tagCfg.Index == 0 {
+				continue
+			}
+
+			indexValue, ok := getIndexPosition(index, tagCfg.Index)
+			if !ok {
+				c.log.Debugf("Cannot extract position %d from index %s", tagCfg.Index, index)
+				continue
+			}
+
+			tagName := ternary(tagCfg.Tag != "", tagCfg.Tag, fmt.Sprintf("index%d", tagCfg.Index))
+
+			if v, ok := tagCfg.Mapping[indexValue]; ok {
+				indexValue = v
+			}
+
+			rowTags[tagName] = indexValue
+			tagCache[index][tagName] = indexValue
 		}
 
 		// Process metrics for this row
@@ -449,12 +477,38 @@ func (c *Collector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error) {
 	}
 
 	for _, pdu := range resp {
-		if !isPduWithData(pdu) {
-			c.missingOIDs[trimOID(pdu.Name)] = true
-			continue
+		if isPduWithData(pdu) {
+			pdus[trimOID(pdu.Name)] = pdu
 		}
-		pdus[trimOID(pdu.Name)] = pdu
+	}
+
+	if len(pdus) == 0 {
+		c.missingOIDs[trimOID(oid)] = true
 	}
 
 	return pdus, nil
+}
+
+// getIndexPosition extracts a specific position from an index
+// Position uses 1-based indexing as per the profile format
+// Example: index "7.8.9", position 2 → "8"
+func getIndexPosition(index string, position uint) (string, bool) {
+	if position == 0 {
+		return "", false
+	}
+
+	var n uint
+	for {
+		n++
+		i := strings.IndexByte(index, '.')
+		if i == -1 {
+			break
+		}
+		if n == position {
+			return index[:i], true
+		}
+		index = index[i+1:]
+	}
+
+	return index, n == position && index != ""
 }
