@@ -6,7 +6,7 @@ import {MessageOptimizer} from './message-optimizer.js';
 import * as ChatConfig from './chat-config.js';
 import * as TitleGenerator from './title.js';
 import * as SystemMsg from './system-msg.js';
-import {SafetyChecker, SafetyLimitError} from './safety-limits.js';
+import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js';
 
 class NetdataMCPChat {
     constructor() {
@@ -70,7 +70,7 @@ class NetdataMCPChat {
         // Initialize providers and then create default chat
         Promise.all([
             this.initializeDefaultLLMProvider(),
-            this.initializeDefaultMCPServer()
+            this.initializeDefaultMCPServers()
         ]).then(async () => {
             // Update chat sessions after providers are loaded
             this.updateChatSessions();
@@ -1960,20 +1960,33 @@ class NetdataMCPChat {
                     }
                     
                     const tr = document.createElement('tr');
+                    
+                    // Capture the full model string in the closure
+                    const fullModelId = `${model.providerId}:${model.id}`;
+                    
+                    // Check if this is the currently selected model
+                    const isSelected = fullModelId === currentModel;
+                    
                     tr.style.cssText = `
                         cursor: pointer;
                         transition: background 0.1s;
                         border-bottom: 1px solid var(--border-subtle, var(--border-color));
+                        ${isSelected ? 'background: var(--hover-color);' : ''}
                     `;
+                    
+                    // Mark selected row for scrolling
+                    if (isSelected) {
+                        tr.setAttribute('data-selected', 'true');
+                    }
+                    
                     tr.addEventListener('mouseenter', () => {
                         tr.style.background = 'var(--hover-color)';
                     });
                     tr.addEventListener('mouseleave', () => {
-                        tr.style.background = '';
+                        if (!isSelected) {
+                            tr.style.background = '';
+                        }
                     });
-                    
-                    // Capture the full model string in the closure
-                    const fullModelId = `${model.providerId}:${model.id}`;
                     
                     // Add click handler directly here
                     tr.addEventListener('click', () => {
@@ -2006,6 +2019,27 @@ class NetdataMCPChat {
                 // Initial build with all models
                 rebuildTableBody(models);
                 
+                // Auto-scroll to currently selected model after initial table build
+                requestAnimationFrame(() => {
+                    const selectedRow = tbody.querySelector('tr[data-selected="true"]');
+                    if (selectedRow) {
+                        const scrollContainer = contentContainer;
+                        const containerRect = scrollContainer.getBoundingClientRect();
+                        const rowRect = selectedRow.getBoundingClientRect();
+                        
+                        const rowTop = rowRect.top - containerRect.top + scrollContainer.scrollTop;
+                        const rowBottom = rowTop + rowRect.height;
+                        const containerHeight = scrollContainer.clientHeight;
+                        
+                        // Check if row is outside visible area
+                        if (rowTop < scrollContainer.scrollTop || rowBottom > scrollContainer.scrollTop + containerHeight) {
+                            // Center the selected row in the viewport
+                            const scrollTarget = rowTop - (containerHeight / 2) + (rowRect.height / 2);
+                            scrollContainer.scrollTop = Math.max(0, scrollTarget);
+                        }
+                    }
+                });
+                
                 // Add search functionality
                 searchInput.addEventListener('input', (event) => {
                     const searchTerm = event.target.value.toLowerCase().trim();
@@ -2035,6 +2069,25 @@ class NetdataMCPChat {
                         `;
                     } else {
                         rebuildTableBody(filteredModels);
+                        
+                        // Auto-scroll to selected model after search rebuild
+                        requestAnimationFrame(() => {
+                            const selectedRow = tbody.querySelector('tr[data-selected="true"]');
+                            if (selectedRow) {
+                                const scrollContainer = contentContainer;
+                                const containerRect = scrollContainer.getBoundingClientRect();
+                                const rowRect = selectedRow.getBoundingClientRect();
+                                
+                                const rowTop = rowRect.top - containerRect.top + scrollContainer.scrollTop;
+                                const rowBottom = rowTop + rowRect.height;
+                                const containerHeight = scrollContainer.clientHeight;
+                                
+                                if (rowTop < scrollContainer.scrollTop || rowBottom > scrollContainer.scrollTop + containerHeight) {
+                                    const scrollTarget = rowTop - (containerHeight / 2) + (rowRect.height / 2);
+                                    scrollContainer.scrollTop = Math.max(0, scrollTarget);
+                                }
+                            }
+                        });
                     }
                 });
                 
@@ -2746,7 +2799,11 @@ class NetdataMCPChat {
             const providerType = chat.config.model.provider;
             const modelName = chat.config.model.id;
             const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-            provider.onLog = proxyProvider.onLog;
+            provider.onLog = (logEntry) => {
+                const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
+                const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
+                this.addLogEntry(`${prefix}: ${providerName}`, logEntry);
+            };
             
             // Build messages from current state
             const { messages, cacheControlIndex } = this.buildMessagesForAPI(chat, provider.prefersCachedTools, mcpConnection);
@@ -2808,7 +2865,7 @@ class NetdataMCPChat {
                 
                 // Add error message
                 this.addMessage(chatId, { 
-                    type: 'error', 
+                    role: 'error', 
                     content: errorMessage, 
                     errorMessageIndex: lastUserMessageIndex,
                     errorType
@@ -2844,15 +2901,18 @@ class NetdataMCPChat {
                 break;
             }
             
-            // Safety check before next iteration
+            // Safety check: Check iteration limit before continuing
             try {
-                this.safetyChecker.incrementIterations(chat.id);
-                const requestData = { messages, tools, temperature: this.getCurrentTemperature(chat.id) };
-                this.safetyChecker.validateRequest(chat.id, requestData, []);
+                // Only check iteration limit here, not request size
+                // Request size will be checked in the provider when actual request is built
+                const currentIterations = this.safetyChecker.getIterationCount(chat.id);
+                if (currentIterations >= SAFETY_LIMITS.MAX_CONSECUTIVE_TOOL_ITERATIONS) {
+                    throw new SafetyLimitError('ITERATIONS', SAFETY_LIMITS.ERRORS.TOO_MANY_ITERATIONS(currentIterations, SAFETY_LIMITS.MAX_CONSECUTIVE_TOOL_ITERATIONS));
+                }
             } catch (error) {
                 if (error instanceof SafetyLimitError) {
                     this.addMessage(chat.id, { 
-                        type: 'error', 
+                        role: 'error', 
                         content: error.message,
                         errorType: 'safety_limit',
                         isRetryable: false
@@ -2869,6 +2929,7 @@ class NetdataMCPChat {
             
             // Send next request to LLM
             const temperature = this.getCurrentTemperature(chat.id);
+            // eslint-disable-next-line no-await-in-loop
             const response = await this.callAssistant({
                 chatId: chat.id,
                 provider,
@@ -2885,6 +2946,7 @@ class NetdataMCPChat {
             }
             
             // Process the response
+            // eslint-disable-next-line no-await-in-loop
             await this.processSingleLLMResponse(chat, mcpConnection, provider, messages, tools, cacheControlIndex, response);
         }
     }
@@ -2910,7 +2972,6 @@ class NetdataMCPChat {
             if (response.content) {
                 // Create and save the assistant message
                 const assistantMsg = { 
-                    type: 'assistant', 
                     role: 'assistant', 
                     content: response.content,
                     usage: response.usage || null,
@@ -2956,7 +3017,6 @@ class NetdataMCPChat {
         // Save assistant message first
         if (response.content || response.toolCalls) {
             const assistantMessage = {
-                type: 'assistant',
                 role: 'assistant',
                 content: response.content || '',
                 toolCalls: (response.toolCalls || []).map(tc => ({
@@ -3019,13 +3079,16 @@ class NetdataMCPChat {
         
         // Execute tool calls
         if (response.toolCalls && response.toolCalls.length > 0) {
+            // Increment iteration counter when we have tool calls
+            this.safetyChecker.incrementIterations(chat.id);
+            
             // Safety check for concurrent tools
             try {
                 this.safetyChecker.checkConcurrentToolsLimit(response.toolCalls);
             } catch (error) {
                 if (error instanceof SafetyLimitError) {
                     this.addMessage(chat.id, { 
-                        type: 'error', 
+                        role: 'error', 
                         content: error.message,
                         errorType: 'safety_limit',
                         isRetryable: false
@@ -3055,7 +3118,7 @@ class NetdataMCPChat {
             // Store tool results
             if (toolResults.length > 0) {
                 this.addMessage(chat.id, {
-                    type: 'tool-results',
+                    role: 'tool-results',
                     toolResults,
                     turn: chat.currentTurn
                 });
@@ -3131,6 +3194,7 @@ class NetdataMCPChat {
                 
                 // Execute tool
                 const toolStartTime = Date.now();
+                // eslint-disable-next-line no-await-in-loop
                 const rawResult = await mcpConnection.callTool(toolCall.name, toolArgs);
                 const toolResponseTime = Date.now() - toolStartTime;
                 
@@ -3407,7 +3471,7 @@ class NetdataMCPChat {
             if (saveToMessages && chat) {
                 const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
                 this.addMessage(chatId, { 
-                    type: 'error', 
+                    role: 'error', 
                     content: message, 
                     errorMessageIndex: lastUserMessageIndex,
                     timestamp: new Date().toISOString()
@@ -3719,10 +3783,14 @@ class NetdataMCPChat {
         
         // Create the LLM provider
         const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-        provider.onLog = proxyProvider.onLog;
+        provider.onLog = (logEntry) => {
+            const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
+            const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
+            this.addLogEntry(`${prefix}: ${providerName}`, logEntry);
+        };
         
         try {
-            if (message.type === 'user') {
+            if (message.role === 'user') {
                 // Redo from user message - truncate everything AFTER this message
                 // Keep all history up to and including this message
                 this.truncateMessages(chatId, messageIndex + 1, 'Redo from user message');
@@ -3739,7 +3807,7 @@ class NetdataMCPChat {
                 
                 // Resend the user message with full prior context
                 await this.processMessageWithTools(freshChat, mcpConnection, provider, message.content);
-            } else if (message.type === 'assistant') {
+            } else if (message.role === 'assistant') {
                 // Redo from assistant message - find the user message that triggered it
                 let triggeringUserMessage = null;
                 
@@ -3812,7 +3880,7 @@ class NetdataMCPChat {
                 }
                 
                 this.addMessage(chatId, { 
-                    type: 'error', 
+                    role: 'error', 
                     content: errorMessage, 
                     errorMessageIndex: lastUserMessageIndex,
                     errorType 
@@ -3944,9 +4012,50 @@ class NetdataMCPChat {
         }
         
         // Ensure config is valid
-        if (!ChatConfig.validateConfig(chat.config)) {
-            console.error(`Chat ${chat.id} has invalid config, creating default`);
-            chat.config = ChatConfig.createDefaultConfig();
+        chat.config = ChatConfig.validateConfig(chat.config);
+        
+        // Migrate old tool-results format to new format
+        if (chat.messages && Array.isArray(chat.messages)) {
+            chat.messages = chat.messages.map(msg => {
+                // Convert old tool-results format with results field
+                if (msg.type === 'tool-results' && msg.results) {
+                    // Convert to new format
+                    return {
+                        role: 'tool-results',
+                        toolResults: msg.results.map(result => ({
+                            toolCallId: result.toolCallId,
+                            toolName: result.toolName || 'unknown',
+                            result: result.content || result.result || ''
+                        })),
+                        timestamp: msg.timestamp
+                    };
+                }
+                
+                // Convert tool-results that have type but no role
+                if (msg.type === 'tool-results' && !msg.role && msg.toolResults) {
+                    const cleanMsg = { ...msg };
+                    delete cleanMsg.type;
+                    cleanMsg.role = 'tool-results';
+                    return cleanMsg;
+                }
+                
+                // Clean up messages that have both type and role - remove type
+                if (msg.type && msg.role) {
+                    const cleanMsg = { ...msg };
+                    delete cleanMsg.type;
+                    return cleanMsg;
+                }
+                
+                // Convert any remaining messages with type but no role
+                if (msg.type && !msg.role) {
+                    const cleanMsg = { ...msg };
+                    cleanMsg.role = cleanMsg.type;
+                    delete cleanMsg.type;
+                    return cleanMsg;
+                }
+                
+                return msg;
+            });
         }
         
         // Validate that the chat's model still exists
@@ -3976,6 +4085,22 @@ class NetdataMCPChat {
                     // DO NOT automatically reset or save!
                     // The user must manually select a valid model
                 }
+            }
+        }
+        
+        // Validate MCP server ID - set to null if it doesn't exist
+        if (chat.config && chat.config.mcpServer) {
+            if (!this.mcpServers.has(chat.config.mcpServer)) {
+                console.error(`Chat ${chat.id} has invalid MCP server: ${chat.config.mcpServer} - setting to null`);
+                chat.config.mcpServer = null;
+            }
+            // Sync mcpServerId with config
+            chat.mcpServerId = chat.config.mcpServer;
+        } else if (chat.mcpServerId && !this.mcpServers.has(chat.mcpServerId)) {
+            console.error(`Chat ${chat.id} has invalid mcpServerId: ${chat.mcpServerId} - setting to null`);
+            chat.mcpServerId = null;
+            if (chat.config) {
+                chat.config.mcpServer = null;
             }
         }
         
@@ -4057,10 +4182,13 @@ class NetdataMCPChat {
                 const providerId = 'default_llm_provider';
                 const provider = {
                     id: providerId,
-                    name: 'Local LLM Proxy',
+                    name: 'LLM Provider',
                     proxyUrl,
                     availableProviders: providers,
-                    onLog: (logEntry) => this.addLogEntry('Local LLM Proxy', logEntry)
+                    onLog: (logEntry) => {
+                        const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
+                        this.addLogEntry(`${prefix}: LLM Provider`, logEntry);
+                    }
                 };
                 this.llmProviders.set(providerId, provider);
             }
@@ -4159,70 +4287,70 @@ class NetdataMCPChat {
         return this.createNewChat(createOptions);
     }
 
-    async initializeDefaultMCPServer() {
-        // Check if we already have MCP servers or if the default one exists
-        const defaultUrl = 'ws://localhost:19999/mcp';
-        const defaultName = 'Local Netdata';
-        
-        // Check if this URL already exists
-        for (const [, server] of this.mcpServers) {
-            if (server.url === defaultUrl) {
-                // Already exists, no need to add
-                return;
-            }
-        }
-        
-        // If we have no MCP servers, add the default one
-        if (this.mcpServers.size === 0) {
-            try {
-                // Try to connect to the default MCP server
-                const testClient = new MCPClient();
-                testClient.onLog = (logEntry) => this.addLogEntry(`MCP-${defaultName}`, logEntry);
-                
-                await testClient.connect(defaultUrl);
-                
-                // Connection successful, save server
-                const serverId = 'default_mcp_server';
-                const server = {
-                    id: serverId,
-                    name: defaultName,
-                    url: defaultUrl,
-                    connected: true,
-                    lastConnected: new Date().toISOString()
-                };
-                
-                this.mcpServers.set(serverId, server);
-                this.mcpConnections.set(serverId, testClient);
-                this.saveSettings();
-                this.updateMcpServersList();
+    async initializeDefaultMCPServers() {
+        // Default MCP servers to add
+        const defaultServers = [
+            { id: 'costa_desktop', name: 'Costa-Desktop', url: 'ws://localhost:19999/mcp?api_key=b1eb964a-ff57-48f1-b87a-15b01702cdc7' },
+            { id: 'prod_aws_parent0', name: 'Production (aws-parent0)', url: 'ws://10.20.1.126:19999/mcp?api_key=1ddcfc20-0f08-4562-a5e5-f016786f1641' },
+            { id: 'prod_aws_parent1', name: 'Production (aws-parent1)', url: 'ws://10.20.1.127:19999/mcp?api_key=39c4cca3-a15b-4e56-8921-e0e4144c6820' },
+            { id: 'demos_registry', name: 'Demos (registry)', url: 'ws://10.20.1.96:19999/mcp?api_key=edfa4484-c721-4973-8ff4-58adc360031d' },
+            { id: 'demos_frankfurt', name: 'Demos (frankfurt)', url: 'ws://10.20.1.97:19999/mcp?api_key=11557d81-d887-472e-bc6a-a39ea704398d' },
+            { id: 'demos_sanfrancisco', name: 'Demos (sanfrancisco)', url: 'ws://10.20.1.98:19999/mcp?api_key=1ab30d97-4e1e-4aef-bbe9-5aee3a795fb3' },
+            { id: 'agent_events', name: 'Agent-Events', url: 'ws://10.20.1.105:19999/mcp?api_key=5759ff1c-d6d9-4ba7-9ccc-1b6b3f3f592e' }
+        ];
 
-                this.addLogEntry('SYSTEM', {
-                    timestamp: new Date().toISOString(),
-                    direction: 'info',
-                    message: `Auto-connected to default MCP server at ${defaultUrl}`
-                });
-                
-            } catch {
-                // Connection failed, but still add the server for manual connection later
-                const serverId = 'default_mcp_server';
+        // Handle migration of old default_mcp_server if it exists
+        const oldDefaultServer = this.mcpServers.get('default_mcp_server');
+        if (oldDefaultServer && oldDefaultServer.url === 'ws://localhost:19999/mcp') {
+            // Remove the old default server as it's being replaced by Costa-Desktop
+            this.mcpServers.delete('default_mcp_server');
+        }
+
+        // Create a map of existing servers by URL for easy lookup
+        const existingServersByUrl = new Map();
+        for (const [id, server] of this.mcpServers) {
+            existingServersByUrl.set(server.url, { id, server });
+        }
+
+        // Add or update default servers
+        for (const defaultServer of defaultServers) {
+            const existing = existingServersByUrl.get(defaultServer.url);
+            
+            if (existing) {
+                // Server with this URL exists, update it with default info if it's one of our defaults
+                // But keep user-defined servers untouched
+                if (existing.id.startsWith('costa_') || existing.id.startsWith('prod_') || 
+                    existing.id.startsWith('demos_') || existing.id === 'agent_events' ||
+                    existing.id === 'default_mcp_server') {
+                    // It's one of our default servers, update it
+                    existing.server.id = defaultServer.id;
+                    existing.server.name = defaultServer.name;
+                    this.mcpServers.delete(existing.id);
+                    this.mcpServers.set(defaultServer.id, existing.server);
+                }
+                // Otherwise it's a user-defined server, leave it alone
+            } else {
+                // Server doesn't exist, add it
                 const server = {
-                    id: serverId,
-                    name: defaultName,
-                    url: defaultUrl,
+                    id: defaultServer.id,
+                    name: defaultServer.name,
+                    url: defaultServer.url,
                     connected: false
                 };
-                
-                this.mcpServers.set(serverId, server);
-                this.saveSettings();
-                this.updateMcpServersList();
-
-                this.addLogEntry('SYSTEM', {
-                    timestamp: new Date().toISOString(),
-                    direction: 'warning',
-                    message: `Added default MCP server at ${defaultUrl} (not connected)`
-                });
+                this.mcpServers.set(defaultServer.id, server);
             }
         }
+
+        // Save the updated server list
+        this.saveSettings();
+        this.updateMcpServersList();
+
+        // Log the initialization
+        this.addLogEntry('SYSTEM', {
+            timestamp: new Date().toISOString(),
+            direction: 'info',
+            message: 'Initialized default MCP servers'
+        });
     }
 
     saveSettings() {
@@ -4270,7 +4398,10 @@ class NetdataMCPChat {
         // Test connection
         try {
             const testClient = new MCPClient();
-            testClient.onLog = (logEntry) => this.addLogEntry(`MCP-${name}`, logEntry);
+            testClient.onLog = (logEntry) => {
+                const prefix = logEntry.direction === 'sent' ? 'mcp-request' : 'mcp-response';
+                this.addLogEntry(`${prefix}: ${name}`, logEntry);
+            };
             await testClient.connect(url);
             
             // Connection successful, save server
@@ -5660,7 +5791,7 @@ class NetdataMCPChat {
                 }
                 
                 // Reset assistant group after each message to ensure proper separation
-                if (msg.type === 'tool-results') {
+                if (msg.role === 'tool-results') {
                     this.clearCurrentAssistantGroup(chatId);
                 }
             }
@@ -5757,7 +5888,7 @@ class NetdataMCPChat {
         const events = [];
         
         // Handle messages by role (new system) or type (legacy)
-        const messageRole = msg.role || msg.type;
+        const messageRole = msg.role;
         
         switch(messageRole) {
             case 'user':
@@ -6258,7 +6389,7 @@ class NetdataMCPChat {
         chat.currentTurn = (chat.currentTurn || 0) + 1;
         
         // CRITICAL: Add and display the user's message immediately for better UX
-        this.addMessage(chat.id, { type: 'user', role: 'user', content: message, turn: chat.currentTurn });
+        this.addMessage(chat.id, { role: 'user', content: message, turn: chat.currentTurn });
         const userMessageIndex = chat.messages.length - 1;
         this.processRenderEvent({ type: 'user-message', content: message, messageIndex: userMessageIndex }, chat.id);
         
@@ -6292,7 +6423,11 @@ class NetdataMCPChat {
         
         // Create the actual LLM provider instance
         const provider = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-        provider.onLog = proxyProvider.onLog;
+        provider.onLog = (logEntry) => {
+            const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
+            const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
+            this.addLogEntry(`${prefix}: ${providerName}`, logEntry);
+        };
         
         // Show thinking spinner
         this.showAssistantThinking(chat.id);
@@ -6370,7 +6505,7 @@ class NetdataMCPChat {
                 }, 'Continue', chat.id);
                 // Find the last user message index for retry functionality
                 const lastUserMsgIdx = chat.messages.findLastIndex(m => m.role === 'user');
-                this.addMessage(chat.id, { type: 'error', content: continueMessage, errorMessageIndex: lastUserMsgIdx });
+                this.addMessage(chat.id, { role: 'error', content: continueMessage, errorMessageIndex: lastUserMsgIdx });
                 
                 // Display the continue message
                 this.processRenderEvent({ type: 'error-message', content: continueMessage, errorMessageIndex: lastUserMsgIdx }, chat.id);
@@ -6402,7 +6537,7 @@ class NetdataMCPChat {
                     }
                     
                     this.addMessage(chat.id, { 
-                        type: 'error', 
+                        role: 'error', 
                         content: errorMessage, 
                         errorMessageIndex: lastUserMessageIndex,
                         errorType 
@@ -6464,7 +6599,7 @@ class NetdataMCPChat {
                 continue;
             }
             
-            const msgRole = msg.role || msg.type;
+            const msgRole = msg.role;
             
             if (msgRole === 'user') {
                 // Check if we have consecutive user messages (which can happen after filtering)
@@ -6572,25 +6707,17 @@ class NetdataMCPChat {
             }
             
             
-            // SAFETY CHECK: Validate request before sending to LLM
+            // SAFETY CHECK: Check iteration limit before continuing
             try {
-                // Increment iteration count
-                this.safetyChecker.incrementIterations(chat.id);
-                
-                // Prepare request data for size validation
-                const requestData = {
-                    messages,
-                    tools,
-                    temperature: this.getCurrentTemperature(chat.id)
-                };
-                
-                // Validate all safety limits
-                this.safetyChecker.validateRequest(chat.id, requestData, []);
+                const currentIterations = this.safetyChecker.getIterationCount(chat.id);
+                if (currentIterations >= SAFETY_LIMITS.MAX_CONSECUTIVE_TOOL_ITERATIONS) {
+                    throw new SafetyLimitError('ITERATIONS', SAFETY_LIMITS.ERRORS.TOO_MANY_ITERATIONS(currentIterations, SAFETY_LIMITS.MAX_CONSECUTIVE_TOOL_ITERATIONS));
+                }
             } catch (error) {
                 if (error instanceof SafetyLimitError) {
                     // Show safety error with no retry option
                     this.addMessage(chat.id, { 
-                        type: 'error', 
+                        role: 'error', 
                         content: error.message,
                         errorType: 'safety_limit',
                         isRetryable: false
@@ -6624,6 +6751,7 @@ class NetdataMCPChat {
             }
             
             // Process the response
+            // eslint-disable-next-line no-await-in-loop
             await this.processSingleLLMResponse(chat, mcpConnection, provider, messages, tools, cacheControlIndex, response);
             
             // Check if we should continue (if the response had tool calls)
@@ -7853,12 +7981,28 @@ class NetdataMCPChat {
         
         const chatMessages = container._elements.messages;
         
+        // Store scroll state before any DOM changes
+        const chat = this.chats.get(chatId);
+        if (chat && !chat.scrollState) {
+            chat.scrollState = {};
+        }
+        
         // Only scroll if user is already near the bottom, unless forced
         const threshold = 100; // pixels from bottom to consider "at bottom"
-        const isAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < threshold;
+        const distanceFromBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+        const isAtBottom = distanceFromBottom < threshold;
+        
+        // Store the current "at bottom" state for this chat
+        if (chat) {
+            chat.scrollState.wasAtBottom = isAtBottom;
+            chat.scrollState.lastCheck = Date.now();
+        }
         
         if (isAtBottom || force) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            // Use requestAnimationFrame to ensure DOM has updated
+            requestAnimationFrame(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
         }
     }
     
@@ -8129,13 +8273,27 @@ class NetdataMCPChat {
         // Add to message area
         const container = this.getChatContainer(chatId);
         if (container && container._elements && container._elements.messages) {
-            container._elements.messages.appendChild(spinnerDiv);
+            const chatMessages = container._elements.messages;
+            const chat = this.chats.get(chatId);
+            
+            // Check if we should auto-scroll BEFORE adding the spinner
+            const threshold = 100;
+            const wasAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < threshold;
+            
+            // Add the spinner
+            chatMessages.appendChild(spinnerDiv);
+            
+            // Only auto-scroll if user was already at bottom or if we recently checked and they were at bottom
+            const shouldScroll = wasAtBottom || 
+                (chat && chat.scrollState && chat.scrollState.wasAtBottom && 
+                 (Date.now() - chat.scrollState.lastCheck) < 1000);
+            
+            if (shouldScroll) {
+                requestAnimationFrame(() => {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                });
+            }
         }
-        
-        // Force scroll to bottom when showing spinner
-        requestAnimationFrame(() => {
-            this.scrollToBottom(chatId, true);
-        });
     }
     
     /**
@@ -8163,10 +8321,27 @@ class NetdataMCPChat {
             this.spinnerIntervals.delete(chatId);
         }
         
+        // Get current scroll position before removing spinner
+        const container = this.getChatContainer(chatId);
+        let wasAtBottom = false;
+        
+        if (container && container._elements && container._elements.messages) {
+            const chatMessages = container._elements.messages;
+            const threshold = 100;
+            wasAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < threshold;
+        }
+        
         // Remove spinner element
         const spinner = document.getElementById(`spinner-${chatId}`);
         if (spinner) {
             spinner.remove();
+            
+            // If user was at bottom before spinner removal, keep them at bottom
+            if (wasAtBottom && container && container._elements && container._elements.messages) {
+                requestAnimationFrame(() => {
+                    container._elements.messages.scrollTop = container._elements.messages.scrollHeight;
+                });
+            }
         }
     }
     
@@ -8324,7 +8499,10 @@ class NetdataMCPChat {
         
         try {
             const mcpConnection = new MCPClient();
-            mcpConnection.onLog = (logEntry) => this.addLogEntry(`MCP-${server.name}`, logEntry);
+            mcpConnection.onLog = (logEntry) => {
+                const prefix = logEntry.direction === 'sent' ? 'mcp-request' : 'mcp-response';
+                this.addLogEntry(`${prefix}: ${server.name}`, logEntry);
+            };
             await mcpConnection.connect(server.url);
             
             // Store the connection
@@ -8632,7 +8810,10 @@ class NetdataMCPChat {
         }
         
         const mcpConnection = new MCPClient();
-        mcpConnection.onLog = (logEntry) => this.addLogEntry(`MCP-${server.name}`, logEntry);
+        mcpConnection.onLog = (logEntry) => {
+            const prefix = logEntry.direction === 'sent' ? 'mcp-request' : 'mcp-response';
+            this.addLogEntry(`${prefix}: ${server.name}`, logEntry);
+        };
         
         // Set up connection state handler
         mcpConnection.onConnectionStateChange = (stateChange) => {
@@ -9227,49 +9408,48 @@ class NetdataMCPChat {
             return;
         }
         
-        // Create a sanitized copy of the messages without payloads
+        // Create a copy of the messages array with empty payloads
         const sanitizedMessages = chat.messages.map((message, index) => {
-            const sanitized = {
-                index,
-                type: message.type,
-                role: message.role
-            };
+            // Start with a shallow copy of the message
+            const sanitized = { ...message, index };
             
-            // Add metadata fields but not content
-            if (message.usage) {
-                sanitized.usage = message.usage;
+            // Clean up: remove 'type' field if 'role' exists
+            if (sanitized.role && sanitized.type) {
+                delete sanitized.type;
             }
             
-            if (message.responseTime) {
-                sanitized.responseTime = message.responseTime;
-            }
+            // Remove the actual content/payload
+            delete sanitized.content;
             
-            if (message.toolCalls && message.toolCalls.length > 0) {
-                sanitized.toolCalls = message.toolCalls.map(tc => ({
-                    name: tc.name,
-                    toolCallId: tc.toolCallId
-                    // Don't include args or result
-                }));
-            }
-            
-            if (message.results && Array.isArray(message.results)) {
-                sanitized.results = message.results.map(r => ({
-                    name: r.name,
-                    toolCallId: r.toolCallId,
-                    resultSize: r.result 
-                        ? typeof r.result === 'string' 
-                            ? r.result.length 
-                            : JSON.stringify(r.result).length
-                        : 0
-                    // Don't include actual result
-                }));
-            }
-            
-            // Add content size but not content itself
+            // Add content size for debugging
             if (message.content) {
                 sanitized.contentSize = typeof message.content === 'string' 
                     ? message.content.length 
                     : JSON.stringify(message.content).length;
+            }
+            
+            // Sanitize tool calls - keep structure but remove args
+            if (message.toolCalls && message.toolCalls.length > 0) {
+                sanitized.toolCalls = message.toolCalls.map(tc => ({
+                    ...tc,
+                    args: undefined  // Remove args but keep other fields
+                }));
+            }
+            
+            // Handle toolResults field
+            if (message.toolResults && Array.isArray(message.toolResults)) {
+                sanitized.toolResults = message.toolResults.map(r => {
+                    const resultCopy = { ...r };
+                    if (r.result) {
+                        resultCopy.resultSize = typeof r.result === 'string' 
+                            ? r.result.length 
+                            : JSON.stringify(r.result).length;
+                        resultCopy.result = '<tool response omitted>';  // Replace with placeholder
+                    }
+                    return resultCopy;
+                });
+                // Add total size for all tool results
+                sanitized.totalToolResultsSize = sanitized.toolResults.reduce((sum, r) => sum + (r.resultSize || 0), 0);
             }
             
             return sanitized;
@@ -9279,7 +9459,8 @@ class NetdataMCPChat {
             title: chat.title,
             model: ChatConfig.getChatModelString(chat),
             messageCount: chat.messages.length,
-            messages: sanitizedMessages
+            messages: sanitizedMessages,
+            configuration: chat.config  // Include the entire config as-is
         };
         
         try {
@@ -9287,12 +9468,12 @@ class NetdataMCPChat {
             
             // Show success feedback
             const btn = this.copyMetricsBtn;
-            const originalText = btn.textContent;
+            const originalHTML = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-check"></i> Copied JSON!';
             btn.classList.add('btn-success');
             
             setTimeout(() => {
-                btn.textContent = originalText;
+                btn.innerHTML = originalHTML;
                 btn.classList.remove('btn-success');
             }, 2000);
         } catch (error) {
@@ -9361,7 +9542,11 @@ class NetdataMCPChat {
                     throw new Error('Invalid model configuration in chat');
                 }
                 const p = createLLMProvider(providerType, proxyProvider.proxyUrl, modelName);
-                p.onLog = proxyProvider.onLog;
+                p.onLog = (logEntry) => {
+                    const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
+                    const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
+                    this.addLogEntry(`${prefix}: ${providerName}`, logEntry);
+                };
                 return p;
             })();
             
@@ -9561,7 +9746,11 @@ class NetdataMCPChat {
                 llmProviderConfig.proxyUrl,
                 modelName
             );
-            provider.onLog = llmProviderConfig.onLog;
+            provider.onLog = (logEntry) => {
+                const prefix = logEntry.direction === 'sent' ? 'llm-request' : 'llm-response';
+                const providerName = providerType.charAt(0).toUpperCase() + providerType.slice(1);
+                this.addLogEntry(`${prefix}: ${providerName}`, logEntry);
+            };
             
             // Use the unified method
             await this.generateChatSummary(chat, mcpConnection, provider, false);

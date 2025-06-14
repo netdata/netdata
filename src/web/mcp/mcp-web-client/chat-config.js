@@ -39,7 +39,7 @@ const DEFAULT_CONFIG = {
             model: null  // null means use the same model as the chat
         }
     },
-    mcpServer: 'http://localhost:5173'
+    mcpServer: null // Will be set to first available MCP server
 };
 
 // Feature-specific default model parameters
@@ -66,31 +66,142 @@ export function createDefaultConfig() {
     return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
 
-// Validate configuration structure
+// Validate and normalize configuration - always returns a valid config
 export function validateConfig(config) {
+    // Start with a default config as base
+    const validConfig = createDefaultConfig();
+    
+    // If no config provided, return default
     if (!config || typeof config !== 'object') {
-        return false;
+        console.error('[validateConfig] Invalid input: config is not an object, using default');
+        return validConfig;
     }
     
-    // Validate model structure - provider and id can be null (will be set later)
-    if (!config.model || !config.model.params) {
-        return false;
+    // Copy model settings if valid
+    if (config.model && typeof config.model === 'object') {
+        validConfig.model.provider = config.model.provider || validConfig.model.provider;
+        validConfig.model.id = config.model.id || validConfig.model.id;
+        
+        if (!config.model.provider) {
+            console.warn('[validateConfig] model.provider is missing');
+        }
+        if (!config.model.id) {
+            console.warn('[validateConfig] model.id is missing');
+        }
+        
+        // Copy model params if valid
+        if (config.model.params && typeof config.model.params === 'object') {
+            const params = config.model.params;
+            
+            // Temperature
+            if (typeof params.temperature === 'number' && params.temperature >= 0 && params.temperature <= 2) {
+                validConfig.model.params.temperature = params.temperature;
+            } else {
+                console.warn('[validateConfig] Invalid temperature:', params.temperature, '- using default:', validConfig.model.params.temperature);
+            }
+            
+            // TopP
+            if (typeof params.topP === 'number' && params.topP >= 0 && params.topP <= 1) {
+                validConfig.model.params.topP = params.topP;
+            } else {
+                console.warn('[validateConfig] Invalid topP:', params.topP, '- using default:', validConfig.model.params.topP);
+            }
+            
+            // MaxTokens
+            if (typeof params.maxTokens === 'number' && params.maxTokens >= 1) {
+                validConfig.model.params.maxTokens = params.maxTokens;
+            } else {
+                console.warn('[validateConfig] Invalid maxTokens:', params.maxTokens, '- using default:', validConfig.model.params.maxTokens);
+            }
+            
+            // Seed
+            if (params.seed && typeof params.seed === 'object') {
+                validConfig.model.params.seed = {
+                    enabled: !!params.seed.enabled,
+                    value: typeof params.seed.value === 'number' ? params.seed.value : Math.floor(Math.random() * 1000000)
+                };
+                if (typeof params.seed.value !== 'number') {
+                    console.warn('[validateConfig] Invalid seed value:', params.seed.value, '- generating random');
+                }
+            }
+        } else {
+            console.warn('[validateConfig] model.params missing or invalid');
+        }
+    } else {
+        console.warn('[validateConfig] model section missing or invalid');
     }
     
-    // Validate model params
-    const params = config.model.params;
-    if (typeof params.temperature !== 'number' || params.temperature < 0 || params.temperature > 2) {
-        return false;
-    }
-    if (typeof params.topP !== 'number' || params.topP < 0 || params.topP > 1) {
-        return false;
-    }
-    if (typeof params.maxTokens !== 'number' || params.maxTokens < 1) {
-        return false;
+    // Copy optimisation settings if valid
+    if (config.optimisation && typeof config.optimisation === 'object') {
+        Object.assign(validConfig.optimisation, config.optimisation);
+    } else {
+        console.warn('[validateConfig] optimisation section missing or invalid');
     }
     
-    // Validate optimisation structure
-    return !(!config.optimisation || typeof config.optimisation !== 'object');
+    // Copy mcpServer if valid
+    if (config.mcpServer && typeof config.mcpServer === 'string') {
+        validConfig.mcpServer = config.mcpServer;
+    } else {
+        console.warn('[validateConfig] mcpServer missing or invalid:', config.mcpServer);
+    }
+    
+    // Normalize the config
+    normalizeConfig(validConfig);
+    
+    return validConfig;
+}
+
+// Normalize configuration values to ensure consistency
+export function normalizeConfig(config) {
+    // Ensure all optimisation sections exist
+    const opt = config.optimisation;
+    
+    // Tool Memory normalization
+    if (!opt.toolMemory || typeof opt.toolMemory !== 'object') {
+        console.warn('[normalizeConfig] toolMemory missing, creating default');
+        opt.toolMemory = { enabled: false, forgetAfterConclusions: 1 };
+    } else if (opt.toolMemory.forgetAfterConclusions === undefined || 
+               opt.toolMemory.forgetAfterConclusions === null ||
+               typeof opt.toolMemory.forgetAfterConclusions !== 'number' ||
+               opt.toolMemory.forgetAfterConclusions < 0 ||
+               opt.toolMemory.forgetAfterConclusions > 5) {
+        console.error('[normalizeConfig] Invalid toolMemory.forgetAfterConclusions:', opt.toolMemory.forgetAfterConclusions, '- disabling tool memory');
+        opt.toolMemory.enabled = false;
+        opt.toolMemory.forgetAfterConclusions = 1;
+    }
+    
+    // Title Generation normalization - ensure maxTokens is capped at 100
+    if (!opt.titleGeneration || typeof opt.titleGeneration !== 'object') {
+        console.warn('[normalizeConfig] titleGeneration missing, creating default');
+        opt.titleGeneration = { enabled: true, model: null };
+    } else if (opt.titleGeneration.model && opt.titleGeneration.model.params) {
+        // Cap title generation tokens at 100
+        if (opt.titleGeneration.model.params.maxTokens > 100) {
+            console.warn('[normalizeConfig] titleGeneration.model.params.maxTokens too high:', opt.titleGeneration.model.params.maxTokens, '- capping at 100');
+            opt.titleGeneration.model.params.maxTokens = 100;
+        }
+    }
+    
+    // Tool Summarisation normalization
+    if (!opt.toolSummarisation || typeof opt.toolSummarisation !== 'object') {
+        console.warn('[normalizeConfig] toolSummarisation missing, creating default');
+        opt.toolSummarisation = { enabled: false, thresholdKiB: 20, model: null };
+    }
+    
+    // Auto Summarisation normalization
+    if (!opt.autoSummarisation || typeof opt.autoSummarisation !== 'object') {
+        console.warn('[normalizeConfig] autoSummarisation missing, creating default');
+        opt.autoSummarisation = { enabled: false, triggerPercent: 50, model: null };
+    }
+    
+    // Cache Control normalization
+    if (!opt.cacheControl || typeof opt.cacheControl !== 'object') {
+        console.warn('[normalizeConfig] cacheControl missing, creating default');
+        opt.cacheControl = { enabled: false, strategy: 'smart' };
+    }
+    
+    // MCP Server validation happens in app.js where the server list is available
+    // We just pass through whatever value is in the config
 }
 
 // Migrate old configuration format to new format
@@ -101,7 +212,7 @@ export function migrateConfig(oldConfig) {
     
     // If already in new format, validate and return
     if (oldConfig.model && oldConfig.optimisation) {
-        return validateConfig(oldConfig) ? oldConfig : createDefaultConfig();
+        return validateConfig(oldConfig);
     }
     
     // Migration from old format
@@ -136,8 +247,8 @@ export function migrateConfig(oldConfig) {
     
     if (oldConfig.toolMemory) {
         newConfig.optimisation.toolMemory = {
-            enabled: oldConfig.toolMemory.enabled || false,
-            forgetAfterConclusions: oldConfig.toolMemory.forgetAfterConclusions || 1
+            enabled: oldConfig.toolMemory.enabled,
+            forgetAfterConclusions: oldConfig.toolMemory.forgetAfterConclusions
         };
     }
     
@@ -152,7 +263,8 @@ export function migrateConfig(oldConfig) {
         newConfig.mcpServer = oldConfig.mcpServer;
     }
     
-    return newConfig;
+    // Validate and normalize the migrated config
+    return validateConfig(newConfig);
 }
 
 // Load configuration for a specific chat
@@ -176,9 +288,11 @@ export function loadChatConfig(chatId) {
 export function saveChatConfig(chatId, config) {
     const key = `chatConfig_${chatId}`;
     try {
-        localStorage.setItem(key, JSON.stringify(config));
+        // Validate and normalize before saving
+        const validConfig = validateConfig(config);
+        localStorage.setItem(key, JSON.stringify(validConfig));
         // Also save as last config
-        saveLastConfig(config);
+        saveLastConfig(validConfig);
     } catch (e) {
         console.error('Error saving chat config:', e);
     }
@@ -307,12 +421,8 @@ export function createConfigFromOptions(options = {}) {
         config.mcpServer = options.mcpServerId;
     }
     
-    // Validate the final config
-    if (!validateConfig(config)) {
-        throw new Error('Invalid configuration created from options');
-    }
-    
-    return config;
+    // Validate and normalize the final config
+    return validateConfig(config);
 }
 
 // Get optimizer settings from config

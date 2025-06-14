@@ -369,6 +369,7 @@ Focus on clarity and conciseness while maintaining completeness.`;
         for (let i = 0; i < toSummarize.length; i += concurrencyLimit) {
             const batch = toSummarize.slice(i, i + concurrencyLimit);
             
+            // eslint-disable-next-line no-await-in-loop
             const batchResults = await Promise.all(
                 batch.map(async (toolResult) => {
                     try {
