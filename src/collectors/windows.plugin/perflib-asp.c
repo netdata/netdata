@@ -22,7 +22,7 @@ struct asp_app {
     RRDSET *st_aspnet_sessions_abandoned;
     RRDSET *st_aspnet_sessions_timed_out;
     RRDSET *st_aspnet_transactions_aborted;
-    RRDSET *st_aspnet_transactions_commited;
+    RRDSET *st_aspnet_transactions_committed;
     RRDSET *st_aspnet_transactions_pending;
     RRDSET *st_aspnet_transactions_per_sec;
     RRDSET *st_aspnet_error_events_raised;
@@ -52,7 +52,7 @@ struct asp_app {
     RRDDIM *rd_aspnet_sessions_abandoned;
     RRDDIM *rd_aspnet_sessions_timed_out;
     RRDDIM *rd_aspnet_transactions_aborted;
-    RRDDIM *rd_aspnet_transactions_commited;
+    RRDDIM *rd_aspnet_transactions_committed;
     RRDDIM *rd_aspnet_transactions_pending;
     RRDDIM *rd_aspnet_transactions_per_sec;
     RRDDIM *rd_aspnet_error_events_raised_per_sec;
@@ -739,29 +739,29 @@ static void netdata_apps_sessions_active(struct asp_app *aa, char *app, int upda
         snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_sessions_active", app);
 
         aa->st_aspnet_sessions_active = rrdset_create_localhost(
-                "aspnet",
-                id,
-                NULL,
-                "aspnet",
-                "aspnet.sessions_active",
-                "Sessions currently active.",
-                "sessions",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibASP",
-                PRIO_ASP_SESSIONS_ACTIVE,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.sessions_active",
+            "Sessions currently active.",
+            "sessions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_SESSIONS_ACTIVE,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_sessions_active =
-                rrddim_add(aa->st_aspnet_sessions_active, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_sessions_active, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(aa->st_aspnet_sessions_active->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            aa->st_aspnet_sessions_active,
-            aa->rd_aspnet_sessions_active,
-            (collected_number)aa->aspnetSessionsActive.current.Data);
+        aa->st_aspnet_sessions_active,
+        aa->rd_aspnet_sessions_active,
+        (collected_number)aa->aspnetSessionsActive.current.Data);
     rrdset_done(aa->st_aspnet_sessions_active);
 }
 
@@ -772,29 +772,29 @@ static void netdata_apps_sessions_abandoned(struct asp_app *aa, char *app, int u
         snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_sessions_abandoned", app);
 
         aa->st_aspnet_sessions_abandoned = rrdset_create_localhost(
-                "aspnet",
-                id,
-                NULL,
-                "aspnet",
-                "aspnet.sessions_abandoned",
-                "Sessions explicitly abandoned.",
-                "sessions",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibASP",
-                PRIO_ASP_SESSIONS_ABANDONED,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.sessions_abandoned",
+            "Sessions explicitly abandoned.",
+            "sessions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_SESSIONS_ABANDONED,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_sessions_abandoned =
-                rrddim_add(aa->st_aspnet_sessions_abandoned, "abandoned", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_sessions_abandoned, "abandoned", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(aa->st_aspnet_sessions_abandoned->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            aa->st_aspnet_sessions_abandoned,
-            aa->rd_aspnet_sessions_abandoned,
-            (collected_number)aa->aspnetSessionsAbandoned.current.Data);
+        aa->st_aspnet_sessions_abandoned,
+        aa->rd_aspnet_sessions_abandoned,
+        (collected_number)aa->aspnetSessionsAbandoned.current.Data);
     rrdset_done(aa->st_aspnet_sessions_abandoned);
 }
 
@@ -804,38 +804,38 @@ static void netdata_apps_sessions_timedout(struct asp_app *aa, char *app, int up
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_sessions_timed_out", app);
 
-        aa->st_aspnet_sessions_timed_out= rrdset_create_localhost(
-                "aspnet",
-                id,
-                NULL,
-                "aspnet",
-                "aspnet.sessions_timed_out",
-                "Sessions timed out.",
-                "sessions",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibASP",
-                PRIO_ASP_SESSIONS_TIMEDOUT,
-                update_every,
-                RRDSET_TYPE_LINE);
+        aa->st_aspnet_sessions_timed_out = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.sessions_timed_out",
+            "Sessions timed out.",
+            "sessions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_SESSIONS_TIMEDOUT,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        aa->rd_aspnet_sessions_timed_out=
-                rrddim_add(aa->st_aspnet_sessions_timed_out, "timed out", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        aa->rd_aspnet_sessions_timed_out =
+            rrddim_add(aa->st_aspnet_sessions_timed_out, "timed out", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(aa->st_aspnet_sessions_timed_out->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            aa->st_aspnet_sessions_timed_out,
-            aa->rd_aspnet_sessions_timed_out,
-            (collected_number)aa->aspnetSessionsTimedOut.current.Data);
+        aa->st_aspnet_sessions_timed_out,
+        aa->rd_aspnet_sessions_timed_out,
+        (collected_number)aa->aspnetSessionsTimedOut.current.Data);
     rrdset_done(aa->st_aspnet_sessions_timed_out);
 }
 
 static inline void netdata_aspnet_apps_sessions(
-        PERF_DATA_BLOCK *pDataBlock,
-        PERF_OBJECT_TYPE *pObjectType,
-        struct asp_app *aa,
-        int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    struct asp_app *aa,
+    int update_every)
 {
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetSessionsActive))
         netdata_apps_sessions_active(aa, windows_shared_buffer, update_every);
@@ -845,6 +845,157 @@ static inline void netdata_aspnet_apps_sessions(
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetSessionsTimedOut))
         netdata_apps_sessions_timedout(aa, windows_shared_buffer, update_every);
+}
+
+static void netdata_apps_transactions_aborted(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_transactions_aborted)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_aborted", app);
+
+        aa->st_aspnet_transactions_aborted = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.transactions_aborted",
+            "Transactions Aborted",
+            "transactions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_TRANSACTIONS_ABORTED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_transactions_aborted =
+            rrddim_add(aa->st_aspnet_transactions_aborted, "aborted", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_transactions_aborted->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_transactions_aborted,
+        aa->rd_aspnet_transactions_aborted,
+        (collected_number)aa->aspnetTransactionsAborted.current.Data);
+    rrdset_done(aa->st_aspnet_transactions_aborted);
+}
+
+static void netdata_apps_transactions_committed(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_transactions_committed)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_committed", app);
+
+        aa->st_aspnet_transactions_committed = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.transactions_committed",
+            "Transactions Committed.",
+            "transactions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_TRANSACTIONS_COMMITED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_transactions_committed =
+            rrddim_add(aa->st_aspnet_transactions_committed, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_transactions_committed->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_transactions_committed,
+        aa->rd_aspnet_transactions_committed,
+        (collected_number)aa->aspnetTransactionsCommited.current.Data);
+    rrdset_done(aa->st_aspnet_transactions_committed);
+}
+
+static void netdata_apps_transactions_pending(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_transactions_pending)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_pending", app);
+
+        aa->st_aspnet_transactions_pending = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.transactions_pending",
+            "Transactions Pending.",
+            "transactions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_TRANSACTIONS_COMMITED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_transactions_pending =
+            rrddim_add(aa->st_aspnet_transactions_pending, "pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_transactions_pending->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_transactions_pending,
+        aa->rd_aspnet_transactions_pending,
+        (collected_number)aa->aspnetTransactionsPending.current.Data);
+    rrdset_done(aa->st_aspnet_transactions_pending);
+}
+
+static void netdata_apps_transactions_per_sec(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_transactions_per_sec)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_transactions_per_sec", app);
+
+        aa->st_aspnet_transactions_per_sec = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.transactions_per_sec",
+            "Transactions Started.",
+            "transactions",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_TRANSACTIONS_COMMITED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_transactions_per_sec =
+            rrddim_add(aa->st_aspnet_transactions_per_sec, "transactions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(aa->st_aspnet_transactions_per_sec->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_transactions_per_sec,
+        aa->rd_aspnet_transactions_per_sec,
+        (collected_number)aa->aspnetTransactionsPerSec.current.Data);
+    rrdset_done(aa->st_aspnet_transactions_per_sec);
+}
+
+static inline void netdata_aspnet_apps_transactions(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    struct asp_app *aa,
+    int update_every)
+{
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsAborted))
+        netdata_apps_transactions_aborted(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsCommited))
+        netdata_apps_transactions_committed(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsPending))
+        netdata_apps_transactions_aborted(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsPerSec))
+        netdata_apps_transactions_aborted(aa, windows_shared_buffer, update_every);
 }
 
 static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
@@ -876,6 +1027,8 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         netdata_aspnet_apps_requests(pDataBlock, pObjectType, app, update_every);
 
         netdata_aspnet_apps_sessions(pDataBlock, pObjectType, app, update_every);
+
+        netdata_aspnet_apps_transactions(pDataBlock, pObjectType, app, update_every);
     }
 }
 
