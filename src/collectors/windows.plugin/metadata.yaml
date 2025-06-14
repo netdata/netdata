@@ -3292,3 +3292,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: timed out
+            - name: aspnet.transactions_aborted
+              description: Transactions Aborted.
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: aborted
+            - name: aspnet.transactions_committed
+              description: Transactions Committed.
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: aspnet.transactions_pending
+              description: Transactions Pending.
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: pending
