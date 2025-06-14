@@ -3268,3 +3268,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: success
+            - name: aspnet.sessions_active
+              description: Sessions currently active.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: aspnet.sessions_abandoned
+              description: Sessions explicitly abandoned.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: abandoned
+            - name: aspnet.sessions_abandoned
+              description: Sessions explicitly abandoned.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: abandoned
+            - name: aspnet.sessions_timed_out
+              description: Sessions timed out.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: timed out
