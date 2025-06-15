@@ -6212,7 +6212,7 @@ class NetdataMCPChat {
                         const currentChat = this.chats.get(retryChatId);
                         if (!currentChat) return;
                         
-                        const errorIndex = currentChat.messages.findIndex(m => m.type === 'error' && m.content === event.content);
+                        const errorIndex = currentChat.messages.findIndex(m => m.role === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
                             this.removeMessage(retryChatId, errorIndex, 1);
                             this.loadChat(retryChatId, true);
@@ -6556,7 +6556,7 @@ class NetdataMCPChat {
                 const continueMessage = '⏸️ Processing paused. You can continue the conversation by sending a new message or clicking Continue.';
                 this.showErrorWithRetry(continueMessage, async () => {
                     // Find and remove the pause message
-                    const errorIndex = chat.messages.findIndex(m => m.type === 'error' && m.content === continueMessage);
+                    const errorIndex = chat.messages.findIndex(m => m.role === 'error' && m.content === continueMessage);
                     if (errorIndex !== -1) {
                         this.removeMessage(chat.id, errorIndex, 1);
                         
