@@ -25,9 +25,9 @@ struct asp_app {
     RRDSET *st_aspnet_transactions_committed;
     RRDSET *st_aspnet_transactions_pending;
     RRDSET *st_aspnet_transactions_per_sec;
-    RRDSET *st_aspnet_error_events_raised;
+    RRDSET *st_aspnet_events_raised_per_sec;
     RRDSET *st_aspnet_error_events_raised_per_sec;
-    RRDSET *st_aspnet_request_error_events_raised_per_sec;
+    RRDSET *st_aspnet_audit_success_events_raised;
     RRDSET *st_aspnet_audit_failures_events_raised;
     RRDSET *st_aspnet_membership_authentication_success;
     RRDSET *st_aspnet_membership_authentication_failure;
@@ -55,8 +55,9 @@ struct asp_app {
     RRDDIM *rd_aspnet_transactions_committed;
     RRDDIM *rd_aspnet_transactions_pending;
     RRDDIM *rd_aspnet_transactions_per_sec;
+    RRDDIM *rd_aspnet_events_raised_per_sec;
     RRDDIM *rd_aspnet_error_events_raised_per_sec;
-    RRDDIM *rd_aspnet_request_error_events_raised_per_sec;
+    RRDDIM *rd_aspnet_audit_success_events_raised;
     RRDDIM *rd_aspnet_audit_failures_events_raised;
     RRDDIM *rd_aspnet_membership_authentication_success;
     RRDDIM *rd_aspnet_membership_authentication_failure;
@@ -84,8 +85,9 @@ struct asp_app {
     COUNTER_DATA aspnetTransactionsCommited;
     COUNTER_DATA aspnetTransactionsPending;
     COUNTER_DATA aspnetTransactionsPerSec;
+    COUNTER_DATA aspnetEventsRaisedPerSec;
     COUNTER_DATA aspnetErrorEventsRaisedPerSec;
-    COUNTER_DATA aspnetRequestErrorEventsRaisedPerSec;
+    COUNTER_DATA aspnetAuditSuccessEventsRaised;
     COUNTER_DATA aspnetAuditFailuresEventsRaised;
     COUNTER_DATA aspnetMembershipAuthenticationSuccess;
     COUNTER_DATA aspnetMembershipAuthenticationFailure;
@@ -118,8 +120,9 @@ static void asp_app_initialize_variables(struct asp_app *ap)
     ap->aspnetTransactionsCommited.key = "Transactions Committed";
     ap->aspnetTransactionsPending.key = "Transactions Pending";
     ap->aspnetTransactionsPerSec.key = "Transactions/Sec";
-    ap->aspnetErrorEventsRaisedPerSec.key = "Events Raised/Sec";
-    ap->aspnetRequestErrorEventsRaisedPerSec.key = "Error Events Raised/Sec";
+    ap->aspnetEventsRaisedPerSec.key = "Events Raised/Sec";
+    ap->aspnetErrorEventsRaisedPerSec.key = "Error Events Raised/Sec";
+    ap->aspnetAuditSuccessEventsRaised.key = "Audit Success Events Raised";
     ap->aspnetAuditFailuresEventsRaised.key = "Audit Failure Events Raised";
     ap->aspnetMembershipAuthenticationSuccess.key = "Membership Authentication Success";
     ap->aspnetMembershipAuthenticationFailure.key = "Membership Authentication Failure";
@@ -998,6 +1001,154 @@ static inline void netdata_aspnet_apps_transactions(
         netdata_apps_transactions_aborted(aa, windows_shared_buffer, update_every);
 }
 
+static void netdata_apps_events_raised(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_events_raised_per_sec)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_events_raised_per_sec", app);
+
+        aa->st_aspnet_events_raised_per_sec = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.events_raised_per_sec",
+            "Instrumentation events.",
+            "events",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_EVENTS_RAISED_PER_SEC,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_events_raised_per_sec =
+            rrddim_add(aa->st_aspnet_events_raised_per_sec, "raised", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(aa->st_aspnet_events_raised_per_sec->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_events_raised_per_sec,
+        aa->rd_aspnet_transactions_per_sec,
+        (collected_number)aa->aspnetEventsRaisedPerSec.current.Data);
+    rrdset_done(aa->st_aspnet_events_raised_per_sec);
+}
+
+static void netdata_apps_error_events_raised(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_error_events_raised_per_sec)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_error_events_raised_per_sec", app);
+
+        aa->st_aspnet_error_events_raised_per_sec = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.error_events_raised_per_sec",
+            "Runtime error events raised.",
+            "errors",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_EVENTS_RAISED_PER_SEC,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_error_events_raised_per_sec =
+            rrddim_add(aa->st_aspnet_error_events_raised_per_sec, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(aa->st_aspnet_error_events_raised_per_sec->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_error_events_raised_per_sec,
+        aa->rd_aspnet_error_events_raised_per_sec(collected_number) aa->aspnetErrorEventsRaisedPerSec.current.Data);
+    rrdset_done(aa->st_aspnet_error_events_raised_per_sec);
+}
+
+static void netdata_apps_events_audit_success(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_audit_success_events_raised)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_events_audit_success", app);
+
+        aa->st_aspnet_audit_success_events_raised = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.events_audit_success",
+            "Audit successes in the application.",
+            "errors",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_AUDIT_SUCCESS_EVENTS_RAISED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_audit_success_events_raised =
+            rrddim_add(aa->st_aspnet_audit_success_events_raised, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(aa->st_aspnet_audit_success_events_raised->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_audit_success_events_raised,
+        aa->rd_aspnet_audit_success_events_raised(collected_number) aa->aspnetAuditSuccessEventsRaised.current.Data);
+    rrdset_done(aa->st_aspnet_audit_success_events_raised);
+}
+
+static void netdata_apps_events_audit_failure(struct asp_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_audit_failures_events_raised)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_events_audit_failure", app);
+
+        aa->st_aspnet_audit_failures_events_raised = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.events_audit_failure",
+            "Audit Failure Events Raised",
+            "failures",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASP_AUDIT_FAILURES_EVENTS_RAISED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_audit_failures_events_raised =
+            rrddim_add(aa->st_aspnet_audit_failures_events_raised, "audit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(aa->st_aspnet_audit_failures_events_raised->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_audit_failures_events_raised,
+        aa->rd_aspnet_audit_failures_events_raised(collected_number) aa->aspnetAuditFailuresEventsRaised.current.Data);
+    rrdset_done(aa->st_aspnet_audit_failures_events_raised);
+}
+
+static inline void netdata_aspnet_apps_events(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    struct asp_app *aa,
+    int update_every)
+{
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetEventsRaisedPerSec))
+        netdata_apps_events_raised(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetErrorEventsRaisedPerSec))
+        netdata_apps_error_events_raised(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetAuditSuccessEventsRaised))
+        netdata_apps_events_audit_success(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetAuditFailuresEventsRaised))
+        netdata_apps_events_audit_failure(aa, windows_shared_buffer, update_every);
+}
+
 static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -1029,6 +1180,8 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         netdata_aspnet_apps_sessions(pDataBlock, pObjectType, app, update_every);
 
         netdata_aspnet_apps_transactions(pDataBlock, pObjectType, app, update_every);
+
+        netdata_aspnet_apps_events(pDataBlock, pObjectType, app, update_every);
     }
 }
 

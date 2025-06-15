@@ -3310,3 +3310,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: pending
+            - name: aspnet.events_raised_per_sec
+              description: Instrumentation events.
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: raised
+            - name: aspnet.error_events_raised_per_sec
+              description: Runtime error events raised.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: aspnet.events_audit_success
+              description: Audit successes in the application.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: aspnet.events_audit_failure
+              description: Audit Failure Events Raised
+              unit: failures
+              chart_type: line
+              dimensions:
+                - name: audit
