@@ -45,56 +45,62 @@ Netdata deliberately avoids using deep learning models, as they would introduce 
 
 ```mermaid
 flowchart TD
-    %% Node styling
-    classDef neutral fill:#f9f9f9,stroke:#000000,color:#000000,stroke-width:2px
-    classDef success fill:#4caf50,stroke:#000000,color:#000000,stroke-width:2px
-    classDef warning fill:#ffeb3b,stroke:#000000,color:#000000,stroke-width:2px
-    classDef danger fill:#f44336,stroke:#000000,color:#000000,stroke-width:2px
+    Raw("**Raw Metrics**<br/><br/>Last 4 Hours")
+    Preprocess("**Preprocess**<br/><br/>Feature Vectors")
+    Train("**Train k-means<br/><br/>k=2**")
+    Model("**Trained Model**")
     
-    %% Training Process
-    subgraph TrainingProcess["Training Process"]
-        direction TB
-        Raw["Raw Metrics<br/>(Last 4 Hours)"] --> Preprocess["Preprocess<br/>Feature Vectors"]
-        Preprocess --> Train["Train k-means<br/>(k=2)"]
-        Train --> Model["Trained Model"]
-    end
+    M1("Model 1<br/><br/>**Recent Data**") 
+    M2("Model 2<br/><br/>**Older Data**")
+    M3("Model 3<br/><br/>**Even Older Data**")
+    MN("Model N<br/><br/>**Up to 2 Days Old**")
     
-    %% Multiple Models
-    subgraph MultipleModels["Multiple Models Over Time"]
-        direction TB
-        M1["Model 1<br/>Recent Data"] 
-        M2["Model 2<br/>Older Data"]
-        M3["Model 3<br/>Even Older Data"]
-        MN["Model N<br/>Up to 2 Days Old"]
-    end
+    NewData("**New Metrics**")
+    DistCalc("**Calculate**<br/><br/>Euclidean Distance<br/>to Cluster Centers")
+    Threshold("**Distance > 99th**<br/><br/>Percentile?")
+    FlagA("**Flag as Anomalous**<br/><br/>in This Model")
+    FlagN("**Flag as Normal**<br/><br/>in This Model")
     
-    %% Detection Process
-    subgraph DetectionProcess["Detection Process"]
-        direction TB
-        NewData["New Metrics"] --> DistCalc["Calculate Euclidean Distance<br/>to Cluster Centers"]
-        DistCalc --> Threshold{"Distance > 99th<br/>Percentile?"}
-        Threshold -->|Yes| FlagA["Flag as Anomalous<br/>in This Model"]
-        Threshold -->|No| FlagN["Flag as Normal<br/>in This Model"]
-    end
+    AllResults("**Results from All Models**")
+    AllAgree("**All Models<br/><br/>Agree it's<br/><br/>Anomalous?**")
+    SetBit("**Set Anomaly Bit = 100**<br/><br/>True")
+    ClearBit("**Set Anomaly Bit = 0**<br/><br/>False")
     
-    %% Consensus
-    subgraph Consensus["Consensus Decision"]
-        direction TB
-        AllResults["Results from All Models"] --> AllAgree{"All Models<br/>Agree it's<br/>Anomalous?"}
-        AllAgree -->|Yes| SetBit["Set Anomaly Bit = 100<br/>(True)"]
-        AllAgree -->|No| ClearBit["Set Anomaly Bit = 0<br/>(False)"]
-    end
+    Raw --> Preprocess
+    Preprocess --> Train
+    Train --> Model
+    Model --> M1
+    Model --> M2
+    Model --> M3
+    Model --> MN
     
-    %% Flow between subgraphs
-    TrainingProcess --> MultipleModels
-    MultipleModels --> DetectionProcess
-    DetectionProcess --> Consensus
+    M1 --> NewData
+    M2 --> NewData
+    M3 --> NewData
+    MN --> NewData
+    
+    NewData --> DistCalc
+    DistCalc --> Threshold
+    Threshold -->|Yes| FlagA
+    Threshold -->|No| FlagN
+    
+    FlagA --> AllResults
+    FlagN --> AllResults
+    AllResults --> AllAgree
+    AllAgree -->|Yes| SetBit
+    AllAgree -->|No| ClearBit
+    
+    %% Style definitions
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
+    classDef anomaly fill:#f44336,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
     
     %% Apply styles
     class Raw,Preprocess,NewData,AllResults neutral
-    class Train,Model,M1,M2,M3,MN,DistCalc success
-    class Threshold,FlagA,FlagN,AllAgree warning
-    class SetBit,ClearBit danger
+    class Train,Model,M1,M2,M3,MN,DistCalc,Threshold,AllAgree process
+    class FlagN,ClearBit complete
+    class FlagA,SetBit anomaly
 ```
 
 ### Training & Detection

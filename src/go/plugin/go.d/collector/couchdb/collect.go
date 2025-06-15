@@ -201,7 +201,10 @@ func findMaxMQSize(MessageQueues map[string]any) int64 {
 }
 
 func (c *Collector) pingCouchDB() error {
-	req, _ := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(c.RequestConfig)
+	if err != nil {
+		return err
+	}
 
 	var info struct{ Couchdb string }
 

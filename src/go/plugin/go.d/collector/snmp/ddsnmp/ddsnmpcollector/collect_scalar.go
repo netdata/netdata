@@ -17,15 +17,29 @@ import (
 
 func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
 	var oids []string
+	var missingOIDs []string
 
 	for _, m := range prof.Definition.Metrics {
-		if m.IsScalar() {
-			oids = append(oids, m.Symbol.OID)
+		if !m.IsScalar() {
+			continue
 		}
+		if c.missingOIDs[trimOID(m.Symbol.OID)] {
+			missingOIDs = append(missingOIDs, m.Symbol.OID)
+			continue
+		}
+		oids = append(oids, m.Symbol.OID)
+	}
+
+	if len(missingOIDs) > 0 {
+		c.log.Debugf("scalar metrics missing OIDs: %v", missingOIDs)
 	}
 
 	slices.Sort(oids)
 	oids = slices.Compact(oids)
+
+	if len(oids) == 0 {
+		return nil, nil
+	}
 
 	pdus, err := c.snmpGet(oids)
 	if err != nil {
@@ -67,24 +81,26 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 
 	value, err := processSymbolValue(cfg.Symbol, pdu)
 	if err != nil {
-		return nil, fmt.Errorf("error processing value: %w", err)
+		return nil, fmt.Errorf("error processing value for OID %s (%s): %w", cfg.Symbol.Name, cfg.Symbol.OID, err)
 	}
 
-	tags := make(map[string]string)
+	staticTags := make(map[string]string)
 
 	for _, tag := range cfg.StaticTags {
 		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
-			tags[n] = v
+			staticTags[n] = v
 		}
 	}
 
 	return &Metric{
 		Name:        cfg.Symbol.Name,
 		Value:       value,
-		Tags:        tags,
+		StaticTags:  ternary(len(staticTags) > 0, staticTags, nil),
 		Unit:        cfg.Symbol.Unit,
 		Description: cfg.Symbol.Description,
-		MetricType:  string(getMetricType(cfg.Symbol, pdu)),
+		Family:      cfg.Symbol.Family,
+		Mappings:    convSymMappingToNumeric(cfg.Symbol),
+		MetricType:  getMetricType(cfg.Symbol, pdu),
 	}, nil
 }
 
@@ -93,11 +109,18 @@ func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU
 
 	if isPduNumericType(pdu) {
 		value = gosnmp.ToBigInt(pdu.Value).Int64()
+		if len(sym.Mapping) > 0 {
+			s := strconv.FormatInt(value, 10)
+			if v, ok := sym.Mapping[s]; ok && isInt(v) {
+				value, _ = strconv.ParseInt(v, 10, 64)
+			}
+		}
 	} else {
 		s, err := convPduToStringf(pdu, sym.Format)
 		if err != nil {
 			return 0, err
 		}
+
 		switch {
 		case sym.ExtractValueCompiled != nil:
 			if sm := sym.ExtractValueCompiled.FindStringSubmatch(s); len(sm) > 1 {
@@ -108,7 +131,15 @@ func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU
 				s = replaceSubmatches(sym.MatchValue, sm)
 			}
 		}
-		if v, ok := sym.Mapping[s]; ok {
+
+		// Handle mapping based on the mapping type:
+		// 1. Int -> String mapping (e.g., {"1": "up", "2": "down"}):
+		//    - Used for creating dimensions later
+		//    - Value remains numeric, no conversion needed here
+		// 2. String -> Int mapping (e.g., {"OK": "0", "WARNING": "1"}):
+		//    - Used to convert string values to numeric values
+		//    - Apply the mapping to get the numeric representation
+		if v, ok := sym.Mapping[s]; ok && isInt(v) {
 			s = v
 		}
 

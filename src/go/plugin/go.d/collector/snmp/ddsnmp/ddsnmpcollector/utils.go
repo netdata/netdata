@@ -8,11 +8,35 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
+
+func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
+	if len(cfg.Mapping) == 0 {
+		return nil
+	}
+
+	mappings := make(map[int64]string)
+
+	if isMappingKeysNumeric(cfg.Mapping) {
+		for k, v := range cfg.Mapping {
+			intKey, _ := strconv.ParseInt(k, 10, 64)
+			mappings[intKey] = v
+		}
+	} else {
+		for k, v := range cfg.Mapping {
+			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
+				mappings[intVal] = k
+			}
+		}
+	}
+
+	return mappings
+}
 
 func getMetricType(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
 	if sym.MetricType != "" {
@@ -114,10 +138,8 @@ func convPduToString(pdu gosnmp.SnmpPDU) (string, error) {
 			return "", fmt.Errorf("OctetString has unexpected type %T", pdu.Value)
 		}
 
-		// Convert to string and check if it can be represented as a raw string literal
-		s := string(bs)
-		if strconv.CanBackquote(s) {
-			return s, nil
+		if utf8.Valid(bs) {
+			return strings.ToValidUTF8(string(bs), "�"), nil
 		}
 		return hex.EncodeToString(bs), nil
 	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32, gosnmp.Uinteger32, gosnmp.TimeTicks:
@@ -214,3 +236,28 @@ func ternary[T any](cond bool, a, b T) T {
 	}
 	return b
 }
+
+func isInt(s string) bool {
+	_, err := strconv.ParseInt(s, 10, 64)
+	return err == nil
+}
+
+func isMappingKeysNumeric(mapping map[string]string) bool {
+	for k := range mapping {
+		if !isInt(k) {
+			return false
+		}
+	}
+	return true
+}
+func cleanTags(metrics []*ProfileMetrics) {
+	for _, pm := range metrics {
+		for _, m := range pm.Metrics {
+			for k, v := range m.Tags {
+				m.Tags[k] = tagReplacer.Replace(v)
+			}
+		}
+	}
+}
+
+var tagReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ")

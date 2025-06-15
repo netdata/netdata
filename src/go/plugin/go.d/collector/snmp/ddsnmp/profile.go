@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v2"
 
@@ -19,29 +21,34 @@ import (
 
 var log = logger.New().With("component", "snmp/ddsnmp")
 
-var ddProfiles []*Profile
+var (
+	ddProfiles []*Profile
+	loadOnce   sync.Once
+)
 
-func init() {
-	dir := getProfilesDir()
+func load() {
+	loadOnce.Do(func() {
+		dir := getProfilesDir()
 
-	profiles, err := loadProfiles(dir)
-	if err != nil {
-		log.Errorf("failed to loadProfiles dd snmp profiles: %v", err)
-		return
-	}
+		profiles, err := loadProfiles(dir)
+		if err != nil {
+			log.Errorf("failed to loadProfiles dd snmp profiles: %v", err)
+			return
+		}
 
-	if len(profiles) == 0 {
-		log.Warningf("no dd snmp profiles found in '%s'", dir)
-		return
-	}
+		if len(profiles) == 0 {
+			log.Warningf("no dd snmp profiles found in '%s'", dir)
+			return
+		}
 
-	log.Infof("found %d profiles in '%s'", len(profiles), dir)
-	ddProfiles = profiles
-
-	return
+		log.Infof("found %d profiles in '%s'", len(profiles), dir)
+		ddProfiles = profiles
+	})
 }
 
 func FindProfiles(sysObjId string) []*Profile {
+	load()
+
 	var profiles []*Profile
 
 	for _, prof := range ddProfiles {
@@ -73,11 +80,48 @@ func (p *Profile) clone() *Profile {
 }
 
 func (p *Profile) merge(base *Profile) {
-	// Append metrics (deep clone already handled in the Definition.Clone method)
-	p.Definition.Metrics = append(p.Definition.Metrics, base.Definition.Metrics...)
+	p.mergeMetrics(base)
+	// Append other fields as before (these likely don't need deduplication)
 	p.Definition.MetricTags = append(p.Definition.MetricTags, base.Definition.MetricTags...)
 	p.Definition.StaticTags = append(p.Definition.StaticTags, base.Definition.StaticTags...)
+	p.mergeMetadata(base)
+}
 
+func (p *Profile) mergeMetrics(base *Profile) {
+	seen := make(map[string]bool)
+
+	for _, m := range p.Definition.Metrics {
+		switch {
+		case m.IsScalar():
+			seen[m.Symbol.Name] = true
+		case m.IsColumn():
+			for _, symbol := range m.Symbols {
+				seen[symbol.Name] = true
+			}
+		}
+	}
+
+	for _, bm := range base.Definition.Metrics {
+		switch {
+		case bm.IsScalar():
+			if !seen[bm.Symbol.Name] {
+				p.Definition.Metrics = append(p.Definition.Metrics, bm)
+				seen[bm.Symbol.Name] = true
+			}
+		case bm.IsColumn():
+			bm.Symbols = slices.DeleteFunc(bm.Symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
+				v := seen[sym.Name]
+				seen[sym.Name] = true
+				return v
+			})
+			if len(bm.Symbols) > 0 {
+				p.Definition.Metrics = append(p.Definition.Metrics, bm)
+			}
+		}
+	}
+}
+
+func (p *Profile) mergeMetadata(base *Profile) {
 	if p.Definition.Metadata == nil {
 		p.Definition.Metadata = make(ddprofiledefinition.MetadataConfig)
 	}

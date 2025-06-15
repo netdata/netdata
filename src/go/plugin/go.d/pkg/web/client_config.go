@@ -68,12 +68,12 @@ func NewHTTPClient(cfg ClientConfig) (*http.Client, error) {
 func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
 	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating TLS config: %v", err)
+		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
 
 	if cfg.ProxyURL != "" {
 		if _, err := url.Parse(cfg.ProxyURL); err != nil {
-			return nil, fmt.Errorf("error on parsing proxy URL '%s': %v", cfg.ProxyURL, err)
+			return nil, fmt.Errorf("error on parsing proxy URL '%s': %w", cfg.ProxyURL, err)
 		}
 	}
 
@@ -92,7 +92,7 @@ func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
 func newHTTP2Transport(cfg ClientConfig) (*http2Transport, error) {
 	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating TLS config: %v", err)
+		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
 
 	d := &net.Dialer{Timeout: cfg.Timeout.Duration()}

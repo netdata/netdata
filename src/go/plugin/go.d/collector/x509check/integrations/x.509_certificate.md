@@ -233,6 +233,12 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m x509check
   ```
 
+  To debug a specific job:
+
+  ```bash
+  ./go.d.plugin -d -m x509check -j jobName
+  ```
+
 ### Getting Logs
 
 If you're encountering problems with the `x509check` collector, follow these steps to retrieve logs and identify potential issues:

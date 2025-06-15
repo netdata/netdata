@@ -61,6 +61,9 @@ func New() *Collector {
 		checkMaxReps:  true,
 		collectIfMib:  true,
 		netInterfaces: make(map[string]*netInterface),
+
+		seenScalarMetrics: make(map[string]bool),
+		seenTableMetrics:  make(map[string]bool),
 	}
 }
 
@@ -90,6 +93,9 @@ type Collector struct {
 	customOids []string
 
 	snmpProfiles []*ddsnmp.Profile
+
+	seenScalarMetrics map[string]bool
+	seenTableMetrics  map[string]bool
 }
 
 func (c *Collector) Configuration() any {

@@ -144,9 +144,10 @@ void nd_web_api_init(void) {
     time_grouping_init();
 }
 
-void web_client_progress_functions_update(void *data, size_t done, size_t all) {
+void web_client_progress_functions_update(nd_uuid_t *transaction, void *data, size_t done, size_t all) {
     // handle progress updates from the plugin
-    struct web_client *w = data;
-    query_progress_functions_update(&w->transaction, done, all);
+    // data parameter is no longer used - transaction is provided directly
+    (void)data;
+    query_progress_functions_update(transaction, done, all);
 }
 

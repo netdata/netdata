@@ -1705,7 +1705,8 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics, you must:
+            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics,
+            the size of all the data files, and the wait stats in the database you must:
 
             - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
             - Configure a database connection (see Setup → Configuration → Examples).
@@ -1718,8 +1719,10 @@ modules:
         list:
           - title: Configure SQL Server for Monitoring
             description: |
+              For **each SQL Server** instance you want to monitor, complete the following steps:
+
               1. **Create Monitoring User**
-              
+
                  Create an SQL Server user with the necessary permissions to collect monitoring data:
 
                  ```tsql
@@ -1730,9 +1733,9 @@ modules:
                  GRANT VIEW SERVER STATE TO netdata_user;
                  GO
                  ```
-              
+
               2. **Enable Query Store**
-              
+
                  Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
 
                  ```tsql
@@ -1752,6 +1755,30 @@ modules:
                  DEALLOCATE nd_user_cursor
                  GO
                  ```
+
+              3. **Configure SQL Server Network Settings**
+
+                 Enable SQL Server to accept TCP connections:
+
+                - Open `SQL Server Configuration Manager`
+                - Expand `SQL Server Network Configuration`
+                - Select `Protocols for <instance name>` in the console panel
+                - Double-click the `TCP` protocol in the details panel and set `Enabled` to `Yes`
+                - Go to the `IP Address` tab and locate the `IPAII` section:
+                  - Clear any value from the `TCP Dynamic Ports` field
+                  - Enter a port number in the `TCP Port` field (default is `1433`)
+                - Select `SQL Server Services` and restart your SQL Server instance
+
+              4. **Configure SQL Server Authentication (Optional)**
+
+                 If you're using SQL Server authentication (rather than Windows authentication):
+
+                - Open `SQL Server Management Studio`
+                - Right-click your server and select `Properties`
+                - Select `Security` in the left panel
+                - Choose `SQL Server and Windows Authentication mode` under `Server authentication`
+                - Click `OK`
+                - Right-click your server and select `Restart`
       configuration:
         file:
           name: "netdata.conf"
@@ -1936,50 +1963,72 @@ modules:
               chart_type: line
               dimensions:
                 - name: benefit
-            - name: mssql.instance_resource_deadlocks
-              description: Active lock requests that resulted in deadlock per resource
-              unit: deadlocks/s
-              chart_type: line
-              dimensions:
-                - name: alloc_unit
-                - name: application
-                - name: database
-                - name: extent
-                - name: file
-                - name: hobt
-                - name: key
-                - name: metadata
-                - name: oib
-                - name: object
-                - name: page
-                - name: rid
-                - name: row_group
-                - name: xact
-            - name: mssql.instance_resource_lock_wait
-              description: Active lock requests that required the caller to wait
-              unit: locks/s
-              chart_type: line
-              dimensions:
-                - name: alloc_unit
-                - name: application
-                - name: database
-                - name: extent
-                - name: file
-                - name: hobt
-                - name: key
-                - name: metadata
-                - name: oib
-                - name: object
-                - name: page
-                - name: rid
-                - name: row_group
-                - name: xact
             - name: mssql.instance_blocked_processes
               description: Blocked processes
               unit: processes
               chart_type: line
               dimensions:
                 - name: blocked
+        - name: MSSQL Resource Locks
+          description: "Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases."
+          labels:
+            - name: mssql_instance
+              description: The SQL Server instance name (e.g., 'MSSQLSERVER' for default instance or named instance like 'INSTANCE01').
+            - name: resource
+              description: "The specific resource type being locked (e.g., 'Database', 'Table', 'Page', 'Row', 'Key', 'Extent', 'RID', 'Application', 'Metadata', 'Allocation_Unit')."
+          metrics:
+            - name: mssql.instance_resource_deadlocks
+              description: Active lock requests that resulted in deadlock per resource
+              unit: deadlock/s
+              chart_type: line
+              dimensions:
+                - name: locks
+            - name: mssql.instance_resource_lock_waits
+              description: Lock requests that required the caller to wait per resource
+              unit: lock/s
+              chart_type: line
+              dimensions:
+                - name: locks
+        - name: MSSQL Waits
+          description: "These metrics refer to the Microsoft SQL Server instances defined on the host and their associated wait events."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: wait_type
+              description: A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes.
+            - name: wait_category
+              description: "Wait categories are groupings of specific wait types that indicate the reason a SQL Server worker is waiting."
+          metrics:
+            - name: mssql.instance_total_wait_time
+              description: Wait time for each wait type and category
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.instance_resource_wait_time
+              description: Wait time for threads waiting on specific resource types for each wait type and category
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.instance_signal_wait_time
+              description: Delay between thread wakeup signal and actual execution start for each wait type and category
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.instance_max_wait_time
+              description: Maximum wait time for each wait type and category
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.instance_waits
+              description: Number of waits for each wait type and category
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
         - name: Database
           description: "These metrics refer to Microsoft SQL Server databases."
           labels:
@@ -3045,4 +3094,3 @@ modules:
                 - name: pause_pending
                 - name: paused
                 - name: unknown
-

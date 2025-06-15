@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netdata MCP LLM Client</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Error Toast Container -->
+    <div class="error-toast-container" id="errorToastContainer"></div>
+
+    <!-- Main Application Layout -->
+    <div class="app-container">
+        <div class="app-body">
+            <!-- Chat Sessions Sidebar -->
+            <aside class="chat-sidebar" id="chatSidebar">
+                <div class="sidebar-header">
+                    <h2>Chats</h2>
+                    <button id="newChatBtn" class="btn btn-primary btn-small">+ New</button>
+                </div>
+                <div class="chat-sessions" id="chatSessions"></div>
+                <div class="sidebar-footer">
+                    <button id="themeToggle" class="btn-icon" title="Toggle Theme">
+                        <span class="theme-icon-light">🌙</span>
+                        <span class="theme-icon-dark">☀️</span>
+                    </button>
+                    <button id="settingsBtn" class="btn-icon" title="Settings">
+                        ⚙️
+                    </button>
+                </div>
+            </aside>
+            <div class="resize-handle resize-handle-vertical" id="chatSidebarResize"></div>
+
+            <!-- Main Chat Area -->
+            <main class="chat-main" id="chatMain">
+                <div class="chat-header" id="chatHeader">
+                    <div class="chat-info">
+                        <div>
+                            <h3 class="chat-title" id="chatTitle">Select or create a chat</h3>
+                            <div class="chat-meta">
+                                <span class="chat-mcp" id="chatMcp"></span>
+                                <span class="chat-llm" id="chatLlm"></span>
+                            </div>
+                        </div>
+                        <div class="chat-controls">
+                            <!-- Temperature Control -->
+                            <div class="temperature-control compact" id="temperatureControl" style="display: flex;">
+                                <span class="temperature-label">Temperature</span>
+                                <div class="temperature-controls">
+                                    <input type="range" class="temperature-slider" id="temperatureSlider" 
+                                           min="0" max="2" step="0.1" value="0.7">
+                                    <span class="temperature-value" id="temperatureValue">0.7</span>
+                                </div>
+                            </div>
+                            <!-- Context Window Indicator -->
+                            <div class="context-window-indicator compact" id="contextWindowIndicator" style="display: flex;">
+                                <span class="context-label">Context Window</span>
+                                <div class="context-window-bar">
+                                    <div class="context-window-fill" id="contextWindowFill" style="width: 0%"></div>
+                                    <span class="context-window-stats" id="contextWindowStats">0 / 4k</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-content" id="chatContent">
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="resize-handle resize-handle-horizontal" id="chatInputResize"></div>
+                    <div class="chat-input-container" id="chatInputContainer">
+                        <button id="reconnectMcpBtn" class="btn btn-primary" style="display: none;">Reconnect MCP Server</button>
+                        <div class="chat-input-wrapper">
+                            <textarea 
+                                id="chatInput" 
+                                class="chat-input" 
+                                placeholder="Select or create a chat to start messaging..."
+                                rows="3"
+                                disabled
+                            ></textarea>
+                            <button id="sendMessageBtn" class="btn btn-send" disabled>Send</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            <div class="resize-handle resize-handle-vertical" id="logPanelResize"></div>
+
+            <!-- Communication Log -->
+            <aside class="log-panel" id="logPanel">
+                <div class="log-header">
+                    <h3>Communication Log</h3>
+                    <button id="toggleLogBtn" class="btn-icon" title="Toggle Log">
+                        ◀
+                    </button>
+                </div>
+                <div class="log-controls">
+                    <button id="clearLogBtn" class="btn btn-small">Clear</button>
+                    <button id="downloadLogBtn" class="btn btn-small">Download</button>
+                </div>
+                <div class="log-content" id="logContent"></div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-backdrop" id="settingsBackdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="btn-icon modal-close" id="closeSettingsBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-tabs">
+                    <button class="tab-btn active" data-tab="mcp-servers">MCP Servers</button>
+                    <button class="tab-btn" data-tab="llm-providers">LLM Providers</button>
+                </div>
+                
+                <!-- MCP Servers Tab -->
+                <div class="tab-content active" id="mcp-servers-tab">
+                    <div class="config-section">
+                        <h3>MCP Servers</h3>
+                        <div class="config-list" id="mcpServersList"></div>
+                        <button id="addMcpServerBtn" class="btn btn-primary">+ Add MCP Server</button>
+                    </div>
+                </div>
+                
+                <!-- LLM Providers Tab -->
+                <div class="tab-content" id="llm-providers-tab">
+                    <div class="config-section">
+                        <h3>LLM Providers</h3>
+                        <div class="config-list" id="llmProvidersList"></div>
+                        <button id="addLlmProviderBtn" class="btn btn-primary">+ Add LLM Provider</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Chat Modal -->
+    <div class="modal" id="newChatModal">
+        <div class="modal-backdrop" id="newChatBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>New Chat</h2>
+                <button class="btn-icon modal-close" id="closeNewChatBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newChatMcpServer">MCP Server*</label>
+                    <select id="newChatMcpServer" required>
+                        <option value="">Select MCP Server</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newChatLlmProvider">LLM Provider*</label>
+                    <select id="newChatLlmProvider" required>
+                        <option value="">Select LLM Provider</option>
+                    </select>
+                </div>
+                <div class="form-group" id="newChatModelGroup" style="display: none;">
+                    <label for="newChatModel">Model*</label>
+                    <select id="newChatModel" required>
+                        <option value="">Select Model</option>
+                    </select>
+                    <small>Choose a model for this chat. You can change it later.</small>
+                </div>
+                <div class="form-group">
+                    <label for="newChatTitle">Chat Title (optional)</label>
+                    <input type="text" id="newChatTitle" placeholder="Auto-generated if empty">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelNewChatBtn" class="btn btn-secondary">Cancel</button>
+                <button id="createChatBtn" class="btn btn-primary">Create Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add MCP Server Modal -->
+    <div class="modal" id="addMcpModal">
+        <div class="modal-backdrop" id="addMcpBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Add MCP Server</h2>
+                <button class="btn-icon modal-close" id="closeAddMcpBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="mcpServerUrl">WebSocket URL*</label>
+                    <input type="text" id="mcpServerUrl" placeholder="ws://localhost:19999/ws/mcp?api_key=YOUR_KEY" required>
+                    <small>Include API key in URL if needed</small>
+                </div>
+                <div class="form-group">
+                    <label for="mcpServerName">Server Name*</label>
+                    <input type="text" id="mcpServerName" placeholder="e.g., Local Netdata, Production Server" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelAddMcpBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveMcpServerBtn" class="btn btn-primary">Add Server</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add LLM Provider Modal -->
+    <div class="modal" id="addLlmModal">
+        <div class="modal-backdrop" id="addLlmBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Add LLM Provider</h2>
+                <button class="btn-icon modal-close" id="closeAddLlmBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="llmProxyUrl">Proxy URL*</label>
+                    <input type="text" id="llmProxyUrl" placeholder="http://localhost:8081" value="http://localhost:8081" required>
+                    <small>The LLM proxy server manages API keys and provides access to models</small>
+                </div>
+                <div class="form-group">
+                    <label for="llmProviderName">Provider Name*</label>
+                    <input type="text" id="llmProviderName" placeholder="e.g., Local LLM Proxy" required>
+                </div>
+                <div class="form-group" id="llmProvidersStatus" style="display: none;">
+                    <label>Available Providers</label>
+                    <div id="llmProvidersInfo" style="padding: 10px; background: var(--bg-secondary); border-radius: 4px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelAddLlmBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveLlmProviderBtn" class="btn btn-primary">Add Provider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Prompt Modal -->
+    <div class="modal" id="systemPromptModal">
+        <div class="modal-backdrop" id="systemPromptBackdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit System Prompt</h2>
+                <button class="btn-icon modal-close" id="closeSystemPromptBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="systemPromptTextarea">System Prompt</label>
+                    <textarea id="systemPromptTextarea" rows="10" style="width: 100%; font-family: inherit;" placeholder="Enter the system prompt that will be sent at the beginning of each conversation..."></textarea>
+                    <small>This prompt is sent as the first message to the LLM to set its behavior and context. Changes will restart the conversation.</small>
+                </div>
+                <div class="form-group">
+                    <button id="resetToDefaultPromptBtn" class="btn btn-secondary btn-small">Reset to Default</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelSystemPromptBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveSystemPromptBtn" class="btn btn-primary">Save & Restart Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="debug-messages.js"></script>
+    <script src="mcp-client.js"></script>
+    <script src="llm-providers.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
