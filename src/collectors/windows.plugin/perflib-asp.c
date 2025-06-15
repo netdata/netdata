@@ -160,7 +160,7 @@ static void netdata_aspnet_application_restarts(COUNTER_DATA *value, int update_
             "restarts",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_APPLICATION_RESTART,
+            PRIO_ASPNET_APPLICATION_RESTART,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -189,7 +189,7 @@ static void netdata_ask_worker_process_restarts(COUNTER_DATA *value, int update_
             "restarts",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_WORKER_PROCESS_RESTART,
+            PRIO_ASPNET_WORKER_PROCESS_RESTART,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -230,7 +230,7 @@ static void netdata_apps_anonymous_request(struct asp_app *aa, char *app, int up
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_APP_ANONYMOUS_REQUEST,
+            PRIO_ASPNET_APP_ANONYMOUS_REQUEST,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -263,7 +263,7 @@ static void netdata_apps_compilations_total(struct asp_app *aa, char *app, int u
             "compilations",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_APP_COMPILATION_TOTALS,
+            PRIO_ASPNET_APP_COMPILATION_TOTALS,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -296,7 +296,7 @@ static void netdata_apps_errors_during_preprocessing(struct asp_app *aa, char *a
             "errors",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_ERRORS_DURING_PREPROCESSING,
+            PRIO_ASPNET_ERRORS_DURING_PREPROCESSING,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -329,7 +329,7 @@ static void netdata_apps_errors_during_compilation(struct asp_app *aa, char *app
             "errors",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_ERRORS_DURING_COMPILATION,
+            PRIO_ASPNET_ERRORS_DURING_COMPILATION,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -362,7 +362,7 @@ static void netdata_apps_errors_during_execution(struct asp_app *aa, char *app, 
             "errors",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_ERRORS_DURING_EXECUTION,
+            PRIO_ASPNET_ERRORS_DURING_EXECUTION,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -395,7 +395,7 @@ static void netdata_apps_errors_during_unhandled_execution(struct asp_app *aa, c
             "errors",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_ERRORS_UNHANDLED_EXECUTION_PER_SEC,
+            PRIO_ASPNET_ERRORS_UNHANDLED_EXECUTION_PER_SEC,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -447,7 +447,7 @@ static void netdata_apps_requests_bytes(struct asp_app *aa, char *app, int updat
             "bytes",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_BYTES_TOTAL,
+            PRIO_ASPNET_REQUESTS_BYTES_TOTAL,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -488,7 +488,7 @@ static void netdata_apps_requests_executing(struct asp_app *aa, char *app, int u
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_EXECUTING,
+            PRIO_ASPNET_REQUESTS_EXECUTING,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -521,7 +521,7 @@ static void netdata_apps_requests_failed(struct asp_app *aa, char *app, int upda
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_FAILED,
+            PRIO_ASPNET_REQUESTS_FAILED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -554,7 +554,7 @@ static void netdata_apps_requests_not_found(struct asp_app *aa, char *app, int u
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_NOT_FOUND,
+            PRIO_ASPNET_REQUESTS_NOT_FOUND,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -587,7 +587,7 @@ static void netdata_apps_requests_in_application_queue(struct asp_app *aa, char 
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_IN_APPLICATION_QUEUE,
+            PRIO_ASPNET_REQUESTS_IN_APPLICATION_QUEUE,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -620,7 +620,7 @@ static void netdata_apps_requests_not_authorized(struct asp_app *aa, char *app, 
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_NOT_AUTHORIZED,
+            PRIO_ASPNET_REQUESTS_NOT_AUTHORIZED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -653,7 +653,7 @@ static void netdata_apps_requests_timeout(struct asp_app *aa, char *app, int upd
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_TIMEOUT,
+            PRIO_ASPNET_REQUESTS_TIMEOUT,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -686,7 +686,7 @@ static void netdata_apps_requests_succeeded(struct asp_app *aa, char *app, int u
             "requests",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_REQUESTS_SUCCEEDED,
+            PRIO_ASPNET_REQUESTS_SUCCEEDED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -751,7 +751,7 @@ static void netdata_apps_sessions_active(struct asp_app *aa, char *app, int upda
             "sessions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_SESSIONS_ACTIVE,
+            PRIO_ASPNET_SESSIONS_ACTIVE,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -784,7 +784,7 @@ static void netdata_apps_sessions_abandoned(struct asp_app *aa, char *app, int u
             "sessions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_SESSIONS_ABANDONED,
+            PRIO_ASPNET_SESSIONS_ABANDONED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -817,7 +817,7 @@ static void netdata_apps_sessions_timedout(struct asp_app *aa, char *app, int up
             "sessions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_SESSIONS_TIMEDOUT,
+            PRIO_ASPNET_SESSIONS_TIMEDOUT,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -866,7 +866,7 @@ static void netdata_apps_transactions_aborted(struct asp_app *aa, char *app, int
             "transactions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_TRANSACTIONS_ABORTED,
+            PRIO_ASPNET_TRANSACTIONS_ABORTED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -899,7 +899,7 @@ static void netdata_apps_transactions_committed(struct asp_app *aa, char *app, i
             "transactions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_TRANSACTIONS_COMMITED,
+            PRIO_ASPNET_TRANSACTIONS_COMMITED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -932,7 +932,7 @@ static void netdata_apps_transactions_pending(struct asp_app *aa, char *app, int
             "transactions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_TRANSACTIONS_COMMITED,
+            PRIO_ASPNET_TRANSACTIONS_COMMITED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -965,7 +965,7 @@ static void netdata_apps_transactions_per_sec(struct asp_app *aa, char *app, int
             "transactions",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_TRANSACTIONS_COMMITED,
+            PRIO_ASPNET_TRANSACTIONS_COMMITED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1017,7 +1017,7 @@ static void netdata_apps_events_raised(struct asp_app *aa, char *app, int update
             "events",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_EVENTS_RAISED_PER_SEC,
+            PRIO_ASPNET_EVENTS_RAISED_PER_SEC,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1050,7 +1050,7 @@ static void netdata_apps_error_events_raised(struct asp_app *aa, char *app, int 
             "errors",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_EVENTS_RAISED_PER_SEC,
+            PRIO_ASPNET_EVENTS_RAISED_PER_SEC,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1082,7 +1082,7 @@ static void netdata_apps_events_audit_success(struct asp_app *aa, char *app, int
             "errors",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_AUDIT_SUCCESS_EVENTS_RAISED,
+            PRIO_ASPNET_AUDIT_SUCCESS_EVENTS_RAISED,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -1114,7 +1114,7 @@ static void netdata_apps_events_audit_failure(struct asp_app *aa, char *app, int
             "failures",
             PLUGIN_WINDOWS_NAME,
             "PerflibASP",
-            PRIO_ASP_AUDIT_FAILURES_EVENTS_RAISED,
+            PRIO_ASPNET_AUDIT_FAILURES_EVENTS_RAISED,
             update_every,
             RRDSET_TYPE_LINE);
 
