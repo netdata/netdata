@@ -94,7 +94,7 @@ struct aspnet_app {
     COUNTER_DATA aspnetFormAuthenticationFailure;
 };
 
-DICTIONARY *asp_apps;
+DICTIONARY *aspnet_apps;
 
 static void asp_app_initialize_variables(struct aspnet_app *ap)
 {
@@ -139,9 +139,9 @@ dict_aspnet_insert_app_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
 static void initialize(void)
 {
-    asp_apps = dictionary_create_advanced(
+    aspnet_apps = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct aspnet_app));
-    dictionary_register_insert_callback(asp_apps, dict_aspnet_insert_app_cb, NULL);
+    dictionary_register_insert_callback(aspnet_apps, dict_aspnet_insert_app_cb, NULL);
 }
 
 static void netdata_aspnet_application_restarts(COUNTER_DATA *value, int update_every)
@@ -1163,7 +1163,7 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct aspnet_app *aa = dictionary_set(asp_apps, windows_shared_buffer, NULL, sizeof(*aa));
+        struct aspnet_app *aa = dictionary_set(aspnet_apps, windows_shared_buffer, NULL, sizeof(*aa));
         if (!aa)
             continue;
 
