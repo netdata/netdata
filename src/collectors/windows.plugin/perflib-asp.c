@@ -1331,17 +1331,17 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetCompilationsTotal))
             netdata_aspnet_compilations_total(aa, windows_shared_buffer, update_every);
 
-        netdata_aspnet_apps_runtime_errors(pDataBlock, pObjectType, app, update_every);
+        netdata_aspnet_apps_runtime_errors(pDataBlock, pObjectType, aa, update_every);
 
-        netdata_aspnet_apps_requests(pDataBlock, pObjectType, app, update_every);
+        netdata_aspnet_apps_requests(pDataBlock, pObjectType, aa, update_every);
 
-        netdata_aspnet_apps_sessions(pDataBlock, pObjectType, app, update_every);
+        netdata_aspnet_apps_sessions(pDataBlock, pObjectType, aa, update_every);
 
-        netdata_aspnet_apps_transactions(pDataBlock, pObjectType, app, update_every);
+        netdata_aspnet_apps_transactions(pDataBlock, pObjectType, aa, update_every);
 
-        netdata_aspnet_apps_events(pDataBlock, pObjectType, app, update_every);
+        netdata_aspnet_apps_events(pDataBlock, pObjectType, aa, update_every);
 
-        netdata_aspnet_apps_auth(pDataBlock, pObjectType, app, update_every);
+        netdata_aspnet_apps_auth(pDataBlock, pObjectType, aa, update_every);
     }
 }
 
@@ -1353,9 +1353,8 @@ struct netdata_exchange_objects {
     {.fnct = netdata_aspnet_apps_objects, .object = "ASP.NET Applications"},
 
     // This is the end of the loop
-    {.fnct = NULL, .object = NULL}};
-}
-;
+    {.fnct = NULL, .object = NULL}
+};
 
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused)
 {
