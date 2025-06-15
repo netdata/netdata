@@ -3,15 +3,15 @@
 // Default configuration schema
 const DEFAULT_CONFIG = {
     model: {
-        provider: null,  // Will be set to first available provider
-        id: null,        // Will be set to first available model
+        provider: "anthropic",
+        id: "claude-3-haiku-20240307",
         params: {
             temperature: 0.7,
             topP: 0.9,
             maxTokens: 4096,
             seed: {
                 enabled: false,
-                value: Math.floor(Math.random() * 1000000)
+                value: 216569
             }
         }
     },
@@ -27,8 +27,8 @@ const DEFAULT_CONFIG = {
             model: null
         },
         toolMemory: {
-            enabled: false,
-            forgetAfterConclusions: 1
+            enabled: true,
+            forgetAfterConclusions: 0
         },
         cacheControl: {
             enabled: false,
@@ -36,10 +36,22 @@ const DEFAULT_CONFIG = {
         },
         titleGeneration: {
             enabled: true,
-            model: null  // null means use the same model as the chat
+            model: {
+                provider: "google",
+                id: "gemini-1.5-flash-8b",
+                params: {
+                    temperature: 0.7,
+                    topP: 0.9,
+                    maxTokens: 100,
+                    seed: {
+                        enabled: false,
+                        value: 872763
+                    }
+                }
+            }
         }
     },
-    mcpServer: null // Will be set to first available MCP server
+    mcpServer: "prod_aws_parent0"
 };
 
 // Feature-specific default model parameters
