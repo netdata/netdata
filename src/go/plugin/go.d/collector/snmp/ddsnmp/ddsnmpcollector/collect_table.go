@@ -52,20 +52,6 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 
 		doneOids[cfg.Table.OID] = true
 
-		// Check if we should skip this table (only skip for index transforms now)
-		skipTable := false
-		for _, tagCfg := range cfg.MetricTags {
-			if len(tagCfg.IndexTransform) > 0 {
-				c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
-				skipTable = true
-				break
-			}
-		}
-
-		if skipTable {
-			continue
-		}
-
 		// Walk the table
 		pdus, err := c.snmpWalk(cfg.Table.OID)
 		if err != nil {
@@ -218,11 +204,6 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
-			// Skip if has index transformation (not supported yet)
-			if len(tagCfg.IndexTransform) > 0 {
-				continue
-			}
-
 			// Find the referenced table's OID
 			refTableOID, ok := tableNameToOID[tagCfg.Table]
 			if !ok {
@@ -237,13 +218,22 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
+			lookupIndex := index
+			if len(tagCfg.IndexTransform) > 0 {
+				lookupIndex = applyIndexTransform(index, tagCfg.IndexTransform)
+				if lookupIndex == "" {
+					c.log.Debugf("Index transformation failed for index %s with transforms %v", index, tagCfg.IndexTransform)
+					continue
+				}
+			}
+
 			// Look up the value from the referenced table using the same index
 			refColumnOID := trimOID(tagCfg.Symbol.OID)
-			refFullOID := refColumnOID + "." + index
+			refFullOID := refColumnOID + "." + lookupIndex
 
 			pdu, ok := refTablePDUs[refFullOID]
 			if !ok {
-				c.log.Debugf("Cannot find cross-table tag value at OID %s for table %s", refFullOID, tagCfg.Table)
+				c.log.Debugf("Cannot find cross-table tag value at OID %s for table %s (lookup index: %s)", refFullOID, tagCfg.Table, lookupIndex)
 				continue
 			}
 
@@ -511,4 +501,30 @@ func getIndexPosition(index string, position uint) (string, bool) {
 	}
 
 	return index, n == position && index != ""
+}
+
+// applyIndexTransform applies index transformation rules to extract a subset of the index
+// Example: index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}] → "6.0.36.155.53.3.246"
+func applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIndexTransform) string {
+	if len(transforms) == 0 {
+		return index
+	}
+
+	parts := strings.Split(index, ".")
+	var result []string
+
+	for _, transform := range transforms {
+		// Convert to 0-based indexing
+		start := transform.Start - 1
+		end := transform.End - 1
+
+		if start < 0 || int(start) >= len(parts) || end < start || int(end) >= len(parts) {
+			continue
+		}
+
+		// Extract the range (inclusive)
+		result = append(result, parts[start:end+1]...)
+	}
+
+	return strings.Join(result, ".")
 }

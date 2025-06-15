@@ -1708,55 +1708,6 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"cross-table tags with index transformation should be skipped": {
-			profiles: []*ddsnmp.Profile{
-				{
-					SourceFile: "test-profile.yaml",
-					Definition: &ddprofiledefinition.ProfileDefinition{
-						Metrics: []ddprofiledefinition.MetricsConfig{
-							{
-								MIB: "MY-MIB",
-								Table: ddprofiledefinition.SymbolConfig{
-									OID:  "1.3.6.1.4.1.1000.1",
-									Name: "myTable",
-								},
-								Symbols: []ddprofiledefinition.SymbolConfig{
-									{
-										OID:  "1.3.6.1.4.1.1000.1.1.1",
-										Name: "myMetric",
-									},
-								},
-								MetricTags: []ddprofiledefinition.MetricTagConfig{
-									{
-										Symbol: ddprofiledefinition.SymbolConfigCompat{
-											OID:  "1.3.6.1.2.1.31.1.1.1.1",
-											Name: "ifName",
-										},
-										Table: "ifXTable",
-										Tag:   "interface",
-										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
-											{Start: 1, End: 3},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
-				// Table should be skipped due to index transformation
-			},
-			expectedResult: []*ProfileMetrics{
-				{
-					Source:         "test-profile.yaml",
-					DeviceMetadata: nil,
-					Metrics:        []Metric{},
-				},
-			},
-			expectedError: false,
-		},
 		"multiple cross-table tags from different tables": {
 			profiles: []*ddsnmp.Profile{
 				{
@@ -2437,6 +2388,594 @@ func TestCollector_Collect(t *testing.T) {
 							Name:       "myMetric",
 							Value:      100,
 							Tags:       map[string]string{"id": "42"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+
+		"cross-table tags with index transformation": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "CPI-UNITY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.30932.1.10.1.3.110",
+									Name: "cpiPduBranchTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.30932.1.10.1.3.110.1.3",
+										Name: "cpiPduBranchCurrent",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.30932.1.10.1.2.10.1.3",
+											Name: "cpiPduName",
+										},
+										Table: "cpiPduTable",
+										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+											{Start: 2, End: 8},
+										},
+										Tag: "pdu_name",
+									},
+								},
+							},
+							{
+								MIB: "CPI-UNITY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.30932.1.10.1.2.10",
+									Name: "cpiPduTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									// No symbols needed - only used for cross-table reference
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// Walk cpiPduBranchTable
+				// Index structure: <branch_id>.<mac_address>
+				// Example: 1.6.0.36.155.53.3.246
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.30932.1.10.1.3.110").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.30932.1.10.1.3.110.1.3.1.6.0.36.155.53.3.246",
+							Type:  gosnmp.Gauge32,
+							Value: uint(150), // 1.5 Amps
+						},
+						{
+							Name:  "1.3.6.1.4.1.30932.1.10.1.3.110.1.3.2.6.0.36.155.53.3.247",
+							Type:  gosnmp.Gauge32,
+							Value: uint(200), // 2.0 Amps
+						},
+					}, nil,
+				)
+
+				// Walk cpiPduTable
+				// Index structure: <mac_address> only
+				// Example: 6.0.36.155.53.3.246
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.30932.1.10.1.2.10").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.30932.1.10.1.2.10.1.3.6.0.36.155.53.3.246",
+							Type:  gosnmp.OctetString,
+							Value: []byte("PDU-A"),
+						},
+						{
+							Name:  "1.3.6.1.4.1.30932.1.10.1.2.10.1.3.6.0.36.155.53.3.247",
+							Type:  gosnmp.OctetString,
+							Value: []byte("PDU-B"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "cpiPduBranchCurrent",
+							Value:      150,
+							Tags:       map[string]string{"pdu_name": "PDU-A"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+						{
+							Name:       "cpiPduBranchCurrent",
+							Value:      200,
+							Tags:       map[string]string{"pdu_name": "PDU-B"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tags with multiple index transformations": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myComplexTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.1000.2.1.1",
+											Name: "refName",
+										},
+										Table: "refTable",
+										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+											{Start: 1, End: 2},
+											{Start: 4, End: 6},
+										},
+										Tag: "ref_name",
+									},
+								},
+							},
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.2",
+									Name: "refTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									// No symbols needed
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// Walk myComplexTable
+				// Index: 1.2.3.4.5.6.7
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.1.2.3.4.5.6.7",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+					}, nil,
+				)
+
+				// Walk refTable
+				// Expected transformed index: 1.2.4.5.6 (positions 1-2 and 4-6)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.2").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.2.1.1.1.2.4.5.6",
+							Type:  gosnmp.OctetString,
+							Value: []byte("Complex-Ref"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "myMetric",
+							Value:      100,
+							Tags:       map[string]string{"ref_name": "Complex-Ref"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tags with index transformation no match": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.1000.2.1.1",
+											Name: "refName",
+										},
+										Table: "refTable",
+										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+											{Start: 2, End: 4},
+										},
+										Tag: "ref_name",
+									},
+								},
+							},
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.2",
+									Name: "refTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									// No symbols needed
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// Walk myTable
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.1.2.3",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+					}, nil,
+				)
+
+				// Walk refTable - but it doesn't have the transformed index
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.2").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.2.1.1.9.9.9", // Different index
+							Type:  gosnmp.OctetString,
+							Value: []byte("Other-Ref"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "myMetric",
+							Value:      100,
+							Tags:       nil, // No tag because transformed index not found
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tags with invalid index transformation": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.1000.2.1.1",
+											Name: "refName",
+										},
+										Table: "refTable",
+										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+											{Start: 5, End: 10}, // Out of bounds
+										},
+										Tag: "ref_name",
+									},
+								},
+							},
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.2",
+									Name: "refTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									// No symbols needed
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// Walk myTable with short index
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.1.2",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+					}, nil,
+				)
+
+				// Walk refTable
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.2").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.2.1.1.1.2",
+							Type:  gosnmp.OctetString,
+							Value: []byte("Ref"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "myMetric",
+							Value:      100,
+							Tags:       nil, // No tag because transformation failed
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tags with transformation and mapping": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.1000.2.1.1",
+											Name: "refType",
+										},
+										Table: "refTable",
+										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+											{Start: 2, End: 3},
+										},
+										Tag: "ref_type",
+										Mapping: map[string]string{
+											"1": "primary",
+											"2": "secondary",
+											"3": "backup",
+										},
+									},
+								},
+							},
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.2",
+									Name: "refTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									// No symbols needed
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// Walk myTable
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.5.10.20",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.6.20.30",
+							Type:  gosnmp.Gauge32,
+							Value: uint(200),
+						},
+					}, nil,
+				)
+
+				// Walk refTable with transformed indexes
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.2").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.2.1.1.10.20", // Matches first row (positions 2-3)
+							Type:  gosnmp.Integer,
+							Value: 1, // Will map to "primary"
+						},
+						{
+							Name:  "1.3.6.1.4.1.1000.2.1.1.20.30", // Matches second row (positions 2-3)
+							Type:  gosnmp.Integer,
+							Value: 3, // Will map to "backup"
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "myMetric",
+							Value:      100,
+							Tags:       map[string]string{"ref_type": "primary"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+						{
+							Name:       "myMetric",
+							Value:      200,
+							Tags:       map[string]string{"ref_type": "backup"},
+							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tags mixed with index-based tags": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.1",
+									Name: "myTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.1000.1.1.1",
+										Name: "myMetric",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Index: 1,
+										Tag:   "branch_id",
+									},
+									{
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.1000.2.1.1",
+											Name: "pduName",
+										},
+										Table: "pduTable",
+										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+											{Start: 2, End: 8},
+										},
+										Tag: "pdu_name",
+									},
+								},
+							},
+							{
+								MIB: "MY-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.1000.2",
+									Name: "pduTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									// No symbols needed
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// Walk myTable
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.1").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.1.1.1.1.6.0.36.155.53.3.246",
+							Type:  gosnmp.Gauge32,
+							Value: uint(100),
+						},
+					}, nil,
+				)
+
+				// Walk pduTable
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.1000.2").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.4.1.1000.2.1.1.6.0.36.155.53.3.246",
+							Type:  gosnmp.OctetString,
+							Value: []byte("Main-PDU"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:  "myMetric",
+							Value: 100,
+							Tags: map[string]string{
+								"branch_id": "1",
+								"pdu_name":  "Main-PDU",
+							},
 							MetricType: ddprofiledefinition.ProfileMetricTypeGauge,
 							IsTable:    true,
 						},
