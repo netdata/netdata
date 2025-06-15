@@ -6,7 +6,17 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/ddsnmp\): collect cross-table metrics and tags [\#20481](https://github.com/netdata/netdata/pull/20481) ([ilyam8](https://github.com/ilyam8))
+- Correctly ignore patches that are already applied. [\#20480](https://github.com/netdata/netdata/pull/20480) ([Ferroin](https://github.com/Ferroin))
+- chore\(go.d/ddsnmp\): split table collection into walk and process phases [\#20479](https://github.com/netdata/netdata/pull/20479) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/redis\): don't clear tls for `rediss` [\#20478](https://github.com/netdata/netdata/pull/20478) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d\): add bearer\_token\_file to request cfg [\#20476](https://github.com/netdata/netdata/pull/20476) ([ilyam8](https://github.com/ilyam8))
+- Update mcp.md [\#20475](https://github.com/netdata/netdata/pull/20475) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): add dependency-based expiration to table cache [\#20474](https://github.com/netdata/netdata/pull/20474) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d/snmp\): create table charts [\#20471](https://github.com/netdata/netdata/pull/20471) ([ilyam8](https://github.com/ilyam8))
 - Remove static build timeouts from regular builds. [\#20470](https://github.com/netdata/netdata/pull/20470) ([Ferroin](https://github.com/Ferroin))
+- Add MCP documentation [\#20469](https://github.com/netdata/netdata/pull/20469) ([kanelatechnical](https://github.com/kanelatechnical))
+- Modify Uninstall Action \(windows.installer\) [\#20467](https://github.com/netdata/netdata/pull/20467) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#20466](https://github.com/netdata/netdata/pull/20466) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/ddsnmp\): add table metrics and tags caching optimization [\#20465](https://github.com/netdata/netdata/pull/20465) ([ilyam8](https://github.com/ilyam8))
 - Improve datafile rotation and indexing during shutdown [\#20464](https://github.com/netdata/netdata/pull/20464) ([stelfrag](https://github.com/stelfrag))
@@ -446,14 +456,6 @@
 - status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
 - Fix logic for libbacktrace enablement in CMakeLists,txt [\#19936](https://github.com/netdata/netdata/pull/19936) ([Ferroin](https://github.com/Ferroin))
 - Fix path to copy drop-in crontab from [\#19935](https://github.com/netdata/netdata/pull/19935) ([ralphm](https://github.com/ralphm))
-- Fix max\_page\_length calculation for GORILLA\_32BIT page type [\#19932](https://github.com/netdata/netdata/pull/19932) ([stelfrag](https://github.com/stelfrag))
-- Fix compile without dbengine [\#19930](https://github.com/netdata/netdata/pull/19930) ([stelfrag](https://github.com/stelfrag))
-- Metadata event loop code cleanup [\#19929](https://github.com/netdata/netdata/pull/19929) ([stelfrag](https://github.com/stelfrag))
-- status file v21 [\#19928](https://github.com/netdata/netdata/pull/19928) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.1 to 9.7.3 in /src/go [\#19926](https://github.com/netdata/netdata/pull/19926) ([dependabot[bot]](https://github.com/apps/dependabot))
-- do not expose web server filenames [\#19925](https://github.com/netdata/netdata/pull/19925) ([ktsaou](https://github.com/ktsaou))
-- Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
-- Exclude external code from CodeQL scanning. [\#19923](https://github.com/netdata/netdata/pull/19923) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
