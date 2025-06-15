@@ -1786,6 +1786,9 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every __maybe_unused)
 {
+    if (unlikely(!mi->conn) || unlikely(!mi->conn->is_connected))
+        return;
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_LOCKS]);
     if (pObjectType) {
         if (pObjectType->NumInstances) {
