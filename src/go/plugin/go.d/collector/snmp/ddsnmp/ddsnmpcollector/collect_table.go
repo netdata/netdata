@@ -52,20 +52,6 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 
 		doneOids[cfg.Table.OID] = true
 
-		// Check if we should skip this table (only skip for index transforms now)
-		skipTable := false
-		for _, tagCfg := range cfg.MetricTags {
-			if len(tagCfg.IndexTransform) > 0 {
-				c.log.Debugf("Skipping table %s: has index transformation", cfg.Table.Name)
-				skipTable = true
-				break
-			}
-		}
-
-		if skipTable {
-			continue
-		}
-
 		// Walk the table
 		pdus, err := c.snmpWalk(cfg.Table.OID)
 		if err != nil {
@@ -213,8 +199,8 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
-			// Skip if has index transformation (not supported yet)
-			if len(tagCfg.IndexTransform) > 0 {
+			// Skip if it's an index-based tag (handled separately)
+			if tagCfg.Index != 0 {
 				continue
 			}
 
@@ -232,13 +218,22 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
+			lookupIndex := index
+			if len(tagCfg.IndexTransform) > 0 {
+				lookupIndex = applyIndexTransform(index, tagCfg.IndexTransform)
+				if lookupIndex == "" {
+					c.log.Debugf("Index transformation failed for index %s with transforms %v", index, tagCfg.IndexTransform)
+					continue
+				}
+			}
+
 			// Look up the value from the referenced table using the same index
 			refColumnOID := trimOID(tagCfg.Symbol.OID)
-			refFullOID := refColumnOID + "." + index
+			refFullOID := refColumnOID + "." + lookupIndex
 
 			pdu, ok := refTablePDUs[refFullOID]
 			if !ok {
-				c.log.Debugf("Cannot find cross-table tag value at OID %s for table %s", refFullOID, tagCfg.Table)
+				c.log.Debugf("Cannot find cross-table tag value at OID %s for table %s (lookup index: %s)", refFullOID, tagCfg.Table, lookupIndex)
 				continue
 			}
 
@@ -253,6 +248,29 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				rowTags[k] = v
 				tagCache[index][k] = v
 			}
+		}
+
+		// Process index-based tags
+		for _, tagCfg := range cfg.MetricTags {
+			// Skip if not an index-based tag
+			if tagCfg.Index == 0 {
+				continue
+			}
+
+			indexValue, ok := getIndexPosition(index, tagCfg.Index)
+			if !ok {
+				c.log.Debugf("Cannot extract position %d from index %s", tagCfg.Index, index)
+				continue
+			}
+
+			tagName := ternary(tagCfg.Tag != "", tagCfg.Tag, fmt.Sprintf("index%d", tagCfg.Index))
+
+			if v, ok := tagCfg.Mapping[indexValue]; ok {
+				indexValue = v
+			}
+
+			rowTags[tagName] = indexValue
+			tagCache[index][tagName] = indexValue
 		}
 
 		// Process metrics for this row
@@ -449,12 +467,63 @@ func (c *Collector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error) {
 	}
 
 	for _, pdu := range resp {
-		if !isPduWithData(pdu) {
-			c.missingOIDs[trimOID(pdu.Name)] = true
-			continue
+		if isPduWithData(pdu) {
+			pdus[trimOID(pdu.Name)] = pdu
 		}
-		pdus[trimOID(pdu.Name)] = pdu
+	}
+
+	if len(pdus) == 0 {
+		c.missingOIDs[trimOID(oid)] = true
 	}
 
 	return pdus, nil
+}
+
+// getIndexPosition extracts a specific position from an index
+// Position uses 1-based indexing as per the profile format
+// Example: index "7.8.9", position 2 → "8"
+func getIndexPosition(index string, position uint) (string, bool) {
+	if position == 0 {
+		return "", false
+	}
+
+	var n uint
+	for {
+		n++
+		i := strings.IndexByte(index, '.')
+		if i == -1 {
+			break
+		}
+		if n == position {
+			return index[:i], true
+		}
+		index = index[i+1:]
+	}
+
+	return index, n == position && index != ""
+}
+
+// applyIndexTransform applies index transformation rules to extract a subset of the index
+// Example: index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}] → "6.0.36.155.53.3.246"
+func applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIndexTransform) string {
+	if len(transforms) == 0 {
+		return index
+	}
+
+	parts := strings.Split(index, ".")
+	var result []string
+
+	for _, transform := range transforms {
+		start := transform.Start
+		end := transform.End
+
+		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
+			continue
+		}
+
+		// Extract the range (inclusive)
+		result = append(result, parts[start:end+1]...)
+	}
+
+	return strings.Join(result, ".")
 }
