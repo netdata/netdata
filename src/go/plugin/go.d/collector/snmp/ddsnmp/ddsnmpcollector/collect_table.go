@@ -518,7 +518,7 @@ func applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIn
 		start := transform.Start - 1
 		end := transform.End - 1
 
-		if start < 0 || int(start) >= len(parts) || end < start || int(end) >= len(parts) {
+		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
 			continue
 		}
 
