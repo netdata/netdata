@@ -2984,6 +2984,354 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+
+		"scalar metric with OpaqueFloat": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+									Name: "temperature",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.6574.4.2.12.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+								Type:  gosnmp.OpaqueFloat,
+								Value: float32(29.5),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "temperature",
+							Value:      29, // Truncated from 29.5
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"scalar metric with OpaqueDouble": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.6574.4.4.1.1.0",
+									Name: "voltage",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.6574.4.4.1.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.6574.4.4.1.1.0",
+								Type:  gosnmp.OpaqueDouble,
+								Value: float64(232.75),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "voltage",
+							Value:      232, // Truncated from 232.75
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"scalar metric with OpaqueFloat and scale factor": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:         "1.3.6.1.4.1.6574.4.2.12.1.0",
+									Name:        "temperatureMilliDegrees",
+									ScaleFactor: 1000, // Convert to milli-degrees to preserve precision
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.6574.4.2.12.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+								Type:  gosnmp.OpaqueFloat,
+								Value: float32(29.567),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "temperatureMilliDegrees",
+							Value:      29566, // 29.567 * 1000
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"table metric with OpaqueFloat": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								MIB: "SYNOLOGY-SYSTEM-MIB",
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.6574.1",
+									Name: "temperatureTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.6574.1.2",
+										Name: "temperature",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "sensor",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.6574.1.1",
+											Name: "temperatureIndex",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.6574.1").Return(
+					[]gosnmp.SnmpPDU{
+						// Row 1
+						{
+							Name:  "1.3.6.1.4.1.6574.1.1.1",
+							Type:  gosnmp.Integer,
+							Value: 1,
+						},
+						{
+							Name:  "1.3.6.1.4.1.6574.1.2.1",
+							Type:  gosnmp.OpaqueFloat,
+							Value: float32(65.5),
+						},
+						// Row 2
+						{
+							Name:  "1.3.6.1.4.1.6574.1.1.2",
+							Type:  gosnmp.Integer,
+							Value: 2,
+						},
+						{
+							Name:  "1.3.6.1.4.1.6574.1.2.2",
+							Type:  gosnmp.OpaqueFloat,
+							Value: float32(71.25),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "temperature",
+							Value:      65, // Truncated from 65.5
+							Tags:       map[string]string{"sensor": "1"},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+						{
+							Name:       "temperature",
+							Value:      71, // Truncated from 71.25
+							Tags:       map[string]string{"sensor": "2"},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"OpaqueFloat with unexpected type": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+									Name: "temperature",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.6574.4.2.12.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+								Type:  gosnmp.OpaqueFloat,
+								Value: "29.5", // Wrong type - should be float32
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: nil,
+			expectedError:  true,
+			errorContains:  "OpaqueFloat has unexpected type",
+		},
+		"OpaqueFloat with negative value": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+									Name: "temperature",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.6574.4.2.12.1.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.6574.4.2.12.1.0",
+								Type:  gosnmp.OpaqueFloat,
+								Value: float32(-15.5),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "temperature",
+							Value:      -15, // Truncated from -15.5
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"OpaqueFloat with very large value": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.6574.4.4.2.2.0",
+									Name: "power",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.6574.4.4.2.2.0"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.6574.4.4.2.2.0",
+								Type:  gosnmp.OpaqueFloat,
+								Value: float32(1234567.89),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []Metric{
+						{
+							Name:       "power",
+							Value:      1234567, // Truncated from 1234567.89
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
 	}
 
 	for name, tc := range tests {

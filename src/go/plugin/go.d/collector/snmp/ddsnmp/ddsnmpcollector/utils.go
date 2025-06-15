@@ -201,7 +201,9 @@ func isPduNumericType(pdu gosnmp.SnmpPDU) bool {
 		gosnmp.Integer,
 		gosnmp.Gauge32,
 		gosnmp.Uinteger32,
-		gosnmp.TimeTicks:
+		gosnmp.TimeTicks,
+		gosnmp.OpaqueFloat,
+		gosnmp.OpaqueDouble:
 		return true
 	default:
 		return false

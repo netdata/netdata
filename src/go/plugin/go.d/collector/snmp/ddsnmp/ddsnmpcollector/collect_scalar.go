@@ -108,11 +108,28 @@ func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU
 	var value int64
 
 	if isPduNumericType(pdu) {
-		value = gosnmp.ToBigInt(pdu.Value).Int64()
-		if len(sym.Mapping) > 0 {
-			s := strconv.FormatInt(value, 10)
-			if v, ok := sym.Mapping[s]; ok && isInt(v) {
-				value, _ = strconv.ParseInt(v, 10, 64)
+		switch pdu.Type {
+		case gosnmp.OpaqueFloat:
+			floatVal, ok := pdu.Value.(float32)
+			if !ok {
+				return 0, fmt.Errorf("OpaqueFloat has unexpected type %T", pdu.Value)
+			}
+			value = ternary(sym.ScaleFactor != 0, int64(float64(floatVal)*sym.ScaleFactor), int64(floatVal))
+			return value, nil
+		case gosnmp.OpaqueDouble:
+			floatVal, ok := pdu.Value.(float64)
+			if !ok {
+				return 0, fmt.Errorf("OpaqueFloat has unexpected type %T", pdu.Value)
+			}
+			value = ternary(sym.ScaleFactor != 0, int64(floatVal*sym.ScaleFactor), int64(floatVal))
+			return value, nil
+		default:
+			value = gosnmp.ToBigInt(pdu.Value).Int64()
+			if len(sym.Mapping) > 0 {
+				s := strconv.FormatInt(value, 10)
+				if v, ok := sym.Mapping[s]; ok && isInt(v) {
+					value, _ = strconv.ParseInt(v, 10, 64)
+				}
 			}
 		}
 	} else {
