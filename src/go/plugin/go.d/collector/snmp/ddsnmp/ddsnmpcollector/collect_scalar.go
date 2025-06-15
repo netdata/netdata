@@ -23,7 +23,7 @@ func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error)
 		if !m.IsScalar() {
 			continue
 		}
-		if c.missingOIDs[trimOID(m.Symbol.OID)] {
+		if c.skipOIDs[trimOID(m.Symbol.OID)] {
 			missingOIDs = append(missingOIDs, m.Symbol.OID)
 			continue
 		}

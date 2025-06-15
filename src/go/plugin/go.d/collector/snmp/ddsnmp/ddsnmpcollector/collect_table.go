@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"sync"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/sourcegraph/conc/pool"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -35,45 +37,59 @@ func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) 
 // Phase 1: Walk all tables
 func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
 	var results []tableWalkResult
-	var errs []error
-	var missingOIDs []string
+	mu := sync.Mutex{}
 
+	var missingOIDs []string
 	doneOids := make(map[string]bool)
+	var tablesToWalk []ddprofiledefinition.MetricsConfig
 
 	for _, cfg := range prof.Definition.Metrics {
 		if cfg.IsScalar() || cfg.Table.OID == "" || doneOids[cfg.Table.OID] {
 			continue
 		}
 
-		if c.missingOIDs[trimOID(cfg.Table.OID)] {
+		if c.skipOIDs[trimOID(cfg.Table.OID)] {
 			missingOIDs = append(missingOIDs, cfg.Table.OID)
 			continue
 		}
 
 		doneOids[cfg.Table.OID] = true
+		tablesToWalk = append(tablesToWalk, cfg)
+	}
 
-		// Walk the table
-		pdus, err := c.snmpWalk(cfg.Table.OID)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to walk table '%s': %w", cfg.Table.Name, err))
-			continue
-		}
+	p := pool.New().WithMaxGoroutines(c.maxConcurrentRequests).WithErrors()
 
-		if len(pdus) > 0 {
-			results = append(results, tableWalkResult{
-				tableOID: cfg.Table.OID,
-				pdus:     pdus,
-				config:   cfg,
-			})
-		}
+	for _, cfg := range tablesToWalk {
+		cfg := cfg
+		p.Go(func() error {
+			pdus, err := c.snmpWalk(cfg.Table.OID)
+			if err != nil {
+				return fmt.Errorf("failed to walk table '%s': %w", cfg.Table.Name, err)
+			}
+
+			mu.Lock()
+			switch len(pdus) {
+			case 0:
+				c.skipOIDs[trimOID(cfg.Table.OID)] = true
+			default:
+				results = append(results, tableWalkResult{
+					tableOID: cfg.Table.OID,
+					pdus:     pdus,
+					config:   cfg,
+				})
+			}
+			mu.Unlock()
+
+			return nil
+		})
 	}
 
 	if len(missingOIDs) > 0 {
 		c.log.Debugf("table metrics missing OIDs: %v", missingOIDs)
 	}
 
-	if len(results) == 0 && len(errs) > 0 {
-		return nil, errors.Join(errs...)
+	if err := p.Wait(); err != nil && len(results) == 0 {
+		return nil, err
 	}
 
 	return results, nil
@@ -470,10 +486,6 @@ func (c *Collector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error) {
 		if isPduWithData(pdu) {
 			pdus[trimOID(pdu.Name)] = pdu
 		}
-	}
-
-	if len(pdus) == 0 {
-		c.missingOIDs[trimOID(oid)] = true
 	}
 
 	return pdus, nil
