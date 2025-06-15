@@ -3,7 +3,7 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-struct asp_app {
+struct aspnet_app {
     RRDSET *st_aspnet_anonymous_request;
     RRDSET *st_aspnet_compilations_total;
     RRDSET *st_aspnet_errors_during_preprocessing;
@@ -96,7 +96,7 @@ struct asp_app {
 
 DICTIONARY *asp_apps;
 
-static void asp_app_initialize_variables(struct asp_app *ap)
+static void asp_app_initialize_variables(struct aspnet_app *ap)
 {
     ap->aspnetAnonymousRequestPerSec.key = "Anonymous Requests/Sec";
     ap->aspnetCompilationsTotal.key = "Compilations Total";
@@ -132,7 +132,7 @@ static void asp_app_initialize_variables(struct asp_app *ap)
 static void
 dict_aspnet_insert_app_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
-    struct asp_app *ap = value;
+    struct aspnet_app *ap = value;
 
     asp_app_initialize_variables(ap);
 }
@@ -140,7 +140,7 @@ dict_aspnet_insert_app_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 static void initialize(void)
 {
     asp_apps = dictionary_create_advanced(
-        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct asp_app));
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct aspnet_app));
     dictionary_register_insert_callback(asp_apps, dict_aspnet_insert_app_cb, NULL);
 }
 
@@ -214,7 +214,7 @@ static void netdata_aspnet_global_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
         netdata_ask_worker_process_restarts(&appWorkerProcessRestarts, update_every);
 }
 
-static void netdata_apps_anonymous_request(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_anonymous_request(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_anonymous_request)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -247,7 +247,7 @@ static void netdata_apps_anonymous_request(struct asp_app *aa, char *app, int up
     rrdset_done(aa->st_aspnet_anonymous_request);
 }
 
-static void netdata_apps_compilations_total(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_compilations_total(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_compilations_total)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -280,7 +280,7 @@ static void netdata_apps_compilations_total(struct asp_app *aa, char *app, int u
     rrdset_done(aa->st_aspnet_compilations_total);
 }
 
-static void netdata_apps_errors_during_preprocessing(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_errors_during_preprocessing(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_errors_during_preprocessing)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -313,7 +313,7 @@ static void netdata_apps_errors_during_preprocessing(struct asp_app *aa, char *a
     rrdset_done(aa->st_aspnet_errors_during_preprocessing);
 }
 
-static void netdata_apps_errors_during_compilation(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_errors_during_compilation(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_errors_during_compilation)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -346,7 +346,7 @@ static void netdata_apps_errors_during_compilation(struct asp_app *aa, char *app
     rrdset_done(aa->st_aspnet_errors_during_compilation);
 }
 
-static void netdata_apps_errors_during_execution(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_errors_during_execution(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_errors_during_execution)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -379,7 +379,7 @@ static void netdata_apps_errors_during_execution(struct asp_app *aa, char *app, 
     rrdset_done(aa->st_aspnet_errors_during_execution);
 }
 
-static void netdata_apps_errors_during_unhandled_execution(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_errors_during_unhandled_execution(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_errors_unhandled_execution_sec)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -415,7 +415,7 @@ static void netdata_apps_errors_during_unhandled_execution(struct asp_app *aa, c
 static inline void netdata_aspnet_apps_runtime_errors(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
-    struct asp_app *aa,
+    struct aspnet_app *aa,
     int update_every)
 {
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetErrorsDuringPreProcessing))
@@ -431,7 +431,7 @@ static inline void netdata_aspnet_apps_runtime_errors(
         netdata_apps_errors_during_unhandled_execution(aa, windows_shared_buffer, update_every);
 }
 
-static void netdata_apps_requests_bytes(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_bytes(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_byte_total)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -472,7 +472,7 @@ static void netdata_apps_requests_bytes(struct asp_app *aa, char *app, int updat
     rrdset_done(aa->st_aspnet_requests_byte_total);
 }
 
-static void netdata_apps_requests_executing(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_executing(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_executing)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -505,7 +505,7 @@ static void netdata_apps_requests_executing(struct asp_app *aa, char *app, int u
     rrdset_done(aa->st_aspnet_requests_executing);
 }
 
-static void netdata_apps_requests_failed(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_failed(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_failed)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -538,7 +538,7 @@ static void netdata_apps_requests_failed(struct asp_app *aa, char *app, int upda
     rrdset_done(aa->st_aspnet_requests_failed);
 }
 
-static void netdata_apps_requests_not_found(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_not_found(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_not_found)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -571,7 +571,7 @@ static void netdata_apps_requests_not_found(struct asp_app *aa, char *app, int u
     rrdset_done(aa->st_aspnet_requests_not_found);
 }
 
-static void netdata_apps_requests_in_application_queue(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_in_application_queue(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_in_application_queue)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -604,7 +604,7 @@ static void netdata_apps_requests_in_application_queue(struct asp_app *aa, char 
     rrdset_done(aa->st_aspnet_requests_in_application_queue);
 }
 
-static void netdata_apps_requests_not_authorized(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_not_authorized(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_not_authorized)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -637,7 +637,7 @@ static void netdata_apps_requests_not_authorized(struct asp_app *aa, char *app, 
     rrdset_done(aa->st_aspnet_requests_not_authorized);
 }
 
-static void netdata_apps_requests_timeout(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_timeout(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_timeout)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -670,7 +670,7 @@ static void netdata_apps_requests_timeout(struct asp_app *aa, char *app, int upd
     rrdset_done(aa->st_aspnet_requests_timeout);
 }
 
-static void netdata_apps_requests_succeeded(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_requests_succeeded(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_requests_succeeded)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -706,7 +706,7 @@ static void netdata_apps_requests_succeeded(struct asp_app *aa, char *app, int u
 static inline void netdata_aspnet_apps_requests(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
-    struct asp_app *aa,
+    struct aspnet_app *aa,
     int update_every)
 {
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetRequestsBytesTotalIn) &&
@@ -735,7 +735,7 @@ static inline void netdata_aspnet_apps_requests(
         netdata_apps_requests_succeeded(aa, windows_shared_buffer, update_every);
 }
 
-static void netdata_apps_sessions_active(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_sessions_active(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_sessions_active)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -768,7 +768,7 @@ static void netdata_apps_sessions_active(struct asp_app *aa, char *app, int upda
     rrdset_done(aa->st_aspnet_sessions_active);
 }
 
-static void netdata_apps_sessions_abandoned(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_sessions_abandoned(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_sessions_abandoned)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -801,7 +801,7 @@ static void netdata_apps_sessions_abandoned(struct asp_app *aa, char *app, int u
     rrdset_done(aa->st_aspnet_sessions_abandoned);
 }
 
-static void netdata_apps_sessions_timedout(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_sessions_timedout(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_sessions_timed_out)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -837,7 +837,7 @@ static void netdata_apps_sessions_timedout(struct asp_app *aa, char *app, int up
 static inline void netdata_aspnet_apps_sessions(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
-    struct asp_app *aa,
+    struct aspnet_app *aa,
     int update_every)
 {
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetSessionsActive))
@@ -850,7 +850,7 @@ static inline void netdata_aspnet_apps_sessions(
         netdata_apps_sessions_timedout(aa, windows_shared_buffer, update_every);
 }
 
-static void netdata_apps_transactions_aborted(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_transactions_aborted(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_transactions_aborted)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -883,7 +883,7 @@ static void netdata_apps_transactions_aborted(struct asp_app *aa, char *app, int
     rrdset_done(aa->st_aspnet_transactions_aborted);
 }
 
-static void netdata_apps_transactions_committed(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_transactions_committed(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_transactions_committed)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -916,7 +916,7 @@ static void netdata_apps_transactions_committed(struct asp_app *aa, char *app, i
     rrdset_done(aa->st_aspnet_transactions_committed);
 }
 
-static void netdata_apps_transactions_pending(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_transactions_pending(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_transactions_pending)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -949,7 +949,7 @@ static void netdata_apps_transactions_pending(struct asp_app *aa, char *app, int
     rrdset_done(aa->st_aspnet_transactions_pending);
 }
 
-static void netdata_apps_transactions_per_sec(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_transactions_per_sec(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_transactions_per_sec)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -985,7 +985,7 @@ static void netdata_apps_transactions_per_sec(struct asp_app *aa, char *app, int
 static inline void netdata_aspnet_apps_transactions(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
-    struct asp_app *aa,
+    struct aspnet_app *aa,
     int update_every)
 {
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetTransactionsAborted))
@@ -1001,7 +1001,7 @@ static inline void netdata_aspnet_apps_transactions(
         netdata_apps_transactions_aborted(aa, windows_shared_buffer, update_every);
 }
 
-static void netdata_apps_events_raised(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_events_raised(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_events_raised_per_sec)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1034,7 +1034,7 @@ static void netdata_apps_events_raised(struct asp_app *aa, char *app, int update
     rrdset_done(aa->st_aspnet_events_raised_per_sec);
 }
 
-static void netdata_apps_error_events_raised(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_error_events_raised(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_error_events_raised_per_sec)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1066,7 +1066,7 @@ static void netdata_apps_error_events_raised(struct asp_app *aa, char *app, int 
     rrdset_done(aa->st_aspnet_error_events_raised_per_sec);
 }
 
-static void netdata_apps_events_audit_success(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_events_audit_success(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_audit_success_events_raised)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1098,7 +1098,7 @@ static void netdata_apps_events_audit_success(struct asp_app *aa, char *app, int
     rrdset_done(aa->st_aspnet_audit_success_events_raised);
 }
 
-static void netdata_apps_events_audit_failure(struct asp_app *aa, char *app, int update_every)
+static void netdata_apps_events_audit_failure(struct aspnet_app *aa, char *app, int update_every)
 {
     if (unlikely(!aa->st_aspnet_audit_failures_events_raised)) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -1133,7 +1133,7 @@ static void netdata_apps_events_audit_failure(struct asp_app *aa, char *app, int
 static inline void netdata_aspnet_apps_events(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
-    struct asp_app *aa,
+    struct aspnet_app *aa,
     int update_every)
 {
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetEventsRaisedPerSec))
@@ -1163,7 +1163,7 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct asp_app *aa = dictionary_set(asp_apps, windows_shared_buffer, NULL, sizeof(*aa));
+        struct aspnet_app *aa = dictionary_set(asp_apps, windows_shared_buffer, NULL, sizeof(*aa));
         if (!aa)
             continue;
 
