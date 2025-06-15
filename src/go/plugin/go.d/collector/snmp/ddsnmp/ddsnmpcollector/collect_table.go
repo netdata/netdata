@@ -514,9 +514,8 @@ func applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIn
 	var result []string
 
 	for _, transform := range transforms {
-		// Convert to 0-based indexing
-		start := transform.Start - 1
-		end := transform.End - 1
+		start := transform.Start
+		end := transform.End
 
 		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
 			continue

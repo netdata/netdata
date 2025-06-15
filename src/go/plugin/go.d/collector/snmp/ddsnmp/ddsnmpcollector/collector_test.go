@@ -2423,7 +2423,7 @@ func TestCollector_Collect(t *testing.T) {
 										},
 										Table: "cpiPduTable",
 										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
-											{Start: 2, End: 8},
+											{Start: 1, End: 7},
 										},
 										Tag: "pdu_name",
 									},
@@ -2533,8 +2533,8 @@ func TestCollector_Collect(t *testing.T) {
 										},
 										Table: "refTable",
 										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
-											{Start: 1, End: 2},
-											{Start: 4, End: 6},
+											{Start: 0, End: 1},
+											{Start: 3, End: 5},
 										},
 										Tag: "ref_name",
 									},
@@ -2803,7 +2803,7 @@ func TestCollector_Collect(t *testing.T) {
 										},
 										Table: "refTable",
 										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
-											{Start: 2, End: 3},
+											{Start: 1, End: 2},
 										},
 										Tag: "ref_type",
 										Mapping: map[string]string{
@@ -2918,7 +2918,7 @@ func TestCollector_Collect(t *testing.T) {
 										},
 										Table: "pduTable",
 										IndexTransform: []ddprofiledefinition.MetricIndexTransform{
-											{Start: 2, End: 8},
+											{Start: 1, End: 7},
 										},
 										Tag: "pdu_name",
 									},
