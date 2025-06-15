@@ -3334,3 +3334,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: audit
+            - name: aspnet.membership_auth_success
+              description: Membership Authentication Success.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.form_authentication_success
+              description: Membership Authentication Failure.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.form_authentication_success
+              description: Forms Authentication Success.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.form_authentication_failure
+              description: Forms Authentication Failure.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: failure

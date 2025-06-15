@@ -31,7 +31,8 @@ struct aspnet_app {
     RRDSET *st_aspnet_audit_failures_events_raised;
     RRDSET *st_aspnet_membership_authentication_success;
     RRDSET *st_aspnet_membership_authentication_failure;
-    RRDSET *rd_aspnet_form_authentication_failure;
+    RRDSET *st_aspnet_form_authentication_success;
+    RRDSET *st_aspnet_form_authentication_failure;
 
     RRDDIM *rd_aspnet_anonymous_request;
     RRDDIM *rd_aspnet_compilations_total;
@@ -61,6 +62,7 @@ struct aspnet_app {
     RRDDIM *rd_aspnet_audit_failures_events_raised;
     RRDDIM *rd_aspnet_membership_authentication_success;
     RRDDIM *rd_aspnet_membership_authentication_failure;
+    RRDDIM *rd_aspnet_form_authentication_success;
     RRDDIM *rd_aspnet_form_authentication_failure;
 
     COUNTER_DATA aspnetAnonymousRequestPerSec;
@@ -91,6 +93,7 @@ struct aspnet_app {
     COUNTER_DATA aspnetAuditFailuresEventsRaised;
     COUNTER_DATA aspnetMembershipAuthenticationSuccess;
     COUNTER_DATA aspnetMembershipAuthenticationFailure;
+    COUNTER_DATA aspnetFormAuthenticationSuccess;
     COUNTER_DATA aspnetFormAuthenticationFailure;
 };
 
@@ -126,6 +129,7 @@ static void aspnet_app_initialize_variables(struct aspnet_app *ap)
     ap->aspnetAuditFailuresEventsRaised.key = "Audit Failure Events Raised";
     ap->aspnetMembershipAuthenticationSuccess.key = "Membership Authentication Success";
     ap->aspnetMembershipAuthenticationFailure.key = "Membership Authentication Failure";
+    ap->aspnetFormAuthenticationSuccess.key = "Forms Authentication Success";
     ap->aspnetFormAuthenticationFailure.key = "Forms Authentication Failure";
 };
 
@@ -1062,7 +1066,8 @@ static void netdata_aspnet_error_events_raised(struct aspnet_app *aa, char *app,
 
     rrddim_set_by_pointer(
         aa->st_aspnet_error_events_raised_per_sec,
-        aa->rd_aspnet_error_events_raised_per_sec(collected_number) aa->aspnetErrorEventsRaisedPerSec.current.Data);
+        aa->rd_aspnet_error_events_raised_per_sec,
+        (collected_number)aa->aspnetErrorEventsRaisedPerSec.current.Data);
     rrdset_done(aa->st_aspnet_error_events_raised_per_sec);
 }
 
@@ -1094,7 +1099,8 @@ static void netdata_aspnet_events_audit_success(struct aspnet_app *aa, char *app
 
     rrddim_set_by_pointer(
         aa->st_aspnet_audit_success_events_raised,
-        aa->rd_aspnet_audit_success_events_raised(collected_number) aa->aspnetAuditSuccessEventsRaised.current.Data);
+        aa->rd_aspnet_audit_success_events_raised,
+        (collected_number)aa->aspnetAuditSuccessEventsRaised.current.Data);
     rrdset_done(aa->st_aspnet_audit_success_events_raised);
 }
 
@@ -1126,7 +1132,8 @@ static void netdata_aspnet_events_audit_failure(struct aspnet_app *aa, char *app
 
     rrddim_set_by_pointer(
         aa->st_aspnet_audit_failures_events_raised,
-        aa->rd_aspnet_audit_failures_events_raised(collected_number) aa->aspnetAuditFailuresEventsRaised.current.Data);
+        aa->rd_aspnet_audit_failures_events_raised,
+        (collected_number)aa->aspnetAuditFailuresEventsRaised.current.Data);
     rrdset_done(aa->st_aspnet_audit_failures_events_raised);
 }
 
@@ -1147,6 +1154,157 @@ static inline void netdata_aspnet_apps_events(
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetAuditFailuresEventsRaised))
         netdata_aspnet_events_audit_failure(aa, windows_shared_buffer, update_every);
+}
+
+static void netdata_aspnet_membership_authentication_success(struct aspnet_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_membership_authentication_success)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_membership_auth_success", app);
+
+        aa->st_aspnet_membership_authentication_success = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.membership_auth_success",
+            "Membership Authentication Success.",
+            "auth",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_SUCCESS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_membership_authentication_success =
+            rrddim_add(aa->st_aspnet_membership_authentication_success, "success", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_membership_authentication_success->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_membership_authentication_success,
+        aa->rd_aspnet_membership_authentication_success,
+        (collected_number)aa->aspnetMembershipAuthenticationSuccess.current.Data);
+    rrdset_done(aa->st_aspnet_membership_authentication_success);
+}
+
+static void netdata_aspnet_membership_authentication_failure(struct aspnet_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_membership_authentication_failure)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_membership_auth_failure", app);
+
+        aa->st_aspnet_membership_authentication_failure = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.membership_auth_failure",
+            "Membership Authentication Failure.",
+            "auth",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_membership_authentication_failure =
+            rrddim_add(aa->st_aspnet_membership_authentication_failure, "failure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_membership_authentication_failure->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_membership_authentication_failure,
+        aa->rd_aspnet_membership_authentication_failure,
+        (collected_number)aa->aspnetMembershipAuthenticationFailure.current.Data);
+    rrdset_done(aa->st_aspnet_membership_authentication_failure);
+}
+
+static void netdata_aspnet_form_authentication_success(struct aspnet_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_form_authentication_success)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_form_authentication_success", app);
+
+        aa->st_aspnet_form_authentication_success = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.form_authentication_success",
+            "Forms Authentication Success.",
+            "auth",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_form_authentication_success =
+            rrddim_add(aa->st_aspnet_form_authentication_success, "success", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_form_authentication_success->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_form_authentication_success,
+        aa->rd_aspnet_form_authentication_success,
+        (collected_number)aa->aspnetFormAuthenticationSuccess.current.Data);
+    rrdset_done(aa->st_aspnet_form_authentication_success);
+}
+
+static void netdata_aspnet_form_authentication_failure(struct aspnet_app *aa, char *app, int update_every)
+{
+    if (unlikely(!aa->st_aspnet_form_authentication_failure)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "aspnet_app_%s_form_authentication_failure", app);
+
+        aa->st_aspnet_form_authentication_failure = rrdset_create_localhost(
+            "aspnet",
+            id,
+            NULL,
+            "aspnet",
+            "aspnet.form_authentication_failure",
+            "Forms Authentication Failure.",
+            "auth",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibASP",
+            PRIO_ASPNET_MEMBERSHIP_AUTHENTICATION_FAILURE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        aa->rd_aspnet_form_authentication_failure =
+            rrddim_add(aa->st_aspnet_form_authentication_failure, "failure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(aa->st_aspnet_form_authentication_failure->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+        aa->st_aspnet_form_authentication_failure,
+        aa->rd_aspnet_form_authentication_failure,
+        (collected_number)aa->aspnetFormAuthenticationFailure.current.Data);
+    rrdset_done(aa->st_aspnet_form_authentication_failure);
+}
+
+static inline void netdata_aspnet_apps_auth(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    struct aspnet_app *aa,
+    int update_every)
+{
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetMembershipAuthenticationSuccess))
+        netdata_aspnet_membership_authentication_success(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetMembershipAuthenticationFailure))
+        netdata_aspnet_membership_authentication_failure(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetFormAuthenticationSuccess))
+        netdata_aspnet_form_authentication_success(aa, windows_shared_buffer, update_every);
+
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &aa->aspnetFormAuthenticationFailure))
+        netdata_aspnet_form_authentication_failure(aa, windows_shared_buffer, update_every);
 }
 
 static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
@@ -1182,6 +1340,8 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         netdata_aspnet_apps_transactions(pDataBlock, pObjectType, app, update_every);
 
         netdata_aspnet_apps_events(pDataBlock, pObjectType, app, update_every);
+
+        netdata_aspnet_apps_auth(pDataBlock, pObjectType, app, update_every);
     }
 }
 
