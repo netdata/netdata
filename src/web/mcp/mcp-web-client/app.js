@@ -421,6 +421,23 @@ class NetdataMCPChat {
         }, 100); // 100ms debounce
     }
     
+    /**
+     * Save chat configuration - only saves to chatConfig_chat_XXX for saved chats
+     * For unsaved chats, only updates lastChatConfig
+     */
+    saveChatConfigSmart(chatId, config) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        // Always save as last config for new chats to inherit
+        ChatConfig.saveLastConfig(config);
+        
+        // Only save chat-specific config if the chat is saved
+        if (chat.isSaved !== false && chat.messages.length > 0) {
+            this.saveChatConfigSmart(chatId, config);
+        }
+    }
+    
     // Calculate price for a single message based on its model and usage
     calculateMessagePrice(model, usage) {
         if (!usage || !model) {return null;}
@@ -1343,7 +1360,7 @@ class NetdataMCPChat {
         
         tempSlider.addEventListener('change', (e) => {
             chat.config.model.params.temperature = parseFloat(e.target.value);
-            ChatConfig.saveChatConfig(chatId, chat.config);
+            this.saveChatConfigSmart(chatId, chat.config);
             this.autoSave(chatId);
         });
         
@@ -1354,7 +1371,7 @@ class NetdataMCPChat {
         
         topPSlider.addEventListener('change', (e) => {
             chat.config.model.params.topP = parseFloat(e.target.value);
-            ChatConfig.saveChatConfig(chatId, chat.config);
+            this.saveChatConfigSmart(chatId, chat.config);
             this.autoSave(chatId);
         });
         
@@ -2245,7 +2262,7 @@ class NetdataMCPChat {
         }
 
         // Save config
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         
         // Auto-save chat
         this.autoSave(chatId);
@@ -2271,7 +2288,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
         
         // Update displays
@@ -2288,7 +2305,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
     }
     
@@ -2301,7 +2318,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
     }
     
@@ -2319,7 +2336,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
     }
     
@@ -2332,7 +2349,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
     }
     
@@ -2345,7 +2362,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
     }
     
@@ -2358,7 +2375,7 @@ class NetdataMCPChat {
         
         chat.config = config;
         this.recreateMessageOptimizer(chat, config);
-        ChatConfig.saveChatConfig(chatId, config);
+        this.saveChatConfigSmart(chatId, config);
         this.autoSave(chatId);
     }
     
@@ -2387,7 +2404,11 @@ class NetdataMCPChat {
         
         targetDropdown.innerHTML = '';
         
-        for (const [id, server] of this.mcpServers) {
+        // Sort servers by name
+        const sortedServers = Array.from(this.mcpServers.entries())
+            .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+        
+        for (const [id, server] of sortedServers) {
             const item = document.createElement('button');
             item.className = 'dropdown-item';
             
@@ -3949,11 +3970,11 @@ class NetdataMCPChat {
         // The proxy handles CORS issues that would normally prevent direct API access
         
         // Load theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
         
-        // Load log collapsed state
-        const logCollapsed = localStorage.getItem('logCollapsed') === 'true';
+        // Load log collapsed state (default to collapsed)
+        const logCollapsed = localStorage.getItem('logCollapsed') !== 'false';
         if (logCollapsed) {
             this.logPanel.classList.add('collapsed');
             this.toggleLogBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
@@ -3984,8 +4005,8 @@ class NetdataMCPChat {
     }
 
     loadChatsFromStorage() {
-        // Load from split storage (mcp_chat_* keys)
-        const chatKeyPrefix = 'mcp_chat_';
+        // Load chats with pattern chat_TIMESTAMP
+        const chatKeyPrefix = 'chat_';
         
         // Scan localStorage for individual chat keys
         for (let i = 0; i < localStorage.length; i++) {
@@ -4279,7 +4300,10 @@ class NetdataMCPChat {
         
         // Use defaults if needed
         if (!mcpServerId || !this.mcpServers.has(mcpServerId)) {
-            mcpServerId = this.mcpServers.keys().next().value;
+            // Get first server from sorted list
+            const sortedServers = Array.from(this.mcpServers.entries())
+                .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+            mcpServerId = sortedServers[0]?.[0];
         }
         
         
@@ -4403,9 +4427,8 @@ class NetdataMCPChat {
         const chat = this.chats.get(chatId);
         if (!chat || chat.isSaved === false) {return;}
         
-        const key = `mcp_chat_${chatId}`;
         try {
-            localStorage.setItem(key, JSON.stringify(chat));
+            localStorage.setItem(chatId, JSON.stringify(chat));
         } catch (e) {
             console.error(`Failed to save chat ${chatId}:`, e);
             if (e.name === 'QuotaExceededError') {
@@ -4472,7 +4495,11 @@ class NetdataMCPChat {
             return;
         }
         
-        for (const [id, server] of this.mcpServers) {
+        // Sort servers by name
+        const sortedServers = Array.from(this.mcpServers.entries())
+            .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+        
+        for (const [id, server] of sortedServers) {
             const connection = this.mcpConnections.get(id);
             const isConnected = connection && connection.isReady();
             
@@ -4558,7 +4585,10 @@ class NetdataMCPChat {
         
         // Use defaults if needed
         if (!mcpServerId || !this.mcpServers.has(mcpServerId)) {
-            mcpServerId = this.mcpServers.keys().next().value;
+            // Get first server from sorted list
+            const sortedServers = Array.from(this.mcpServers.entries())
+                .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+            mcpServerId = sortedServers[0]?.[0];
         }
         
         // Check if the config has a valid model, otherwise get first available
@@ -6276,9 +6306,11 @@ class NetdataMCPChat {
         if (confirm(`Delete chat "${chat.title}"?`)) {
             this.chats.delete(chatId);
             
-            // Remove from split storage
-            const key = `mcp_chat_${chatId}`;
-            localStorage.removeItem(key);
+            // Remove from storage
+            localStorage.removeItem(chatId);
+            
+            // Also remove chat config if it exists
+            localStorage.removeItem(`chatConfig_${chatId}`);
             
             this.updateChatSessions();
             

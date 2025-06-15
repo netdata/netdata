@@ -19,7 +19,7 @@ export class SafetyLimitError extends Error {
 
 export const SAFETY_LIMITS = {
     // Maximum consecutive tool iterations before stopping with error
-    MAX_CONSECUTIVE_TOOL_ITERATIONS: 10,
+    MAX_CONSECUTIVE_TOOL_ITERATIONS: 20,
     
     // Maximum concurrent tools per request before stopping with error
     MAX_CONCURRENT_TOOLS_PER_REQUEST: 15,

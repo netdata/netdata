@@ -205,7 +205,7 @@ export function getTitleGenerationProvider(chat, llmProvider, defaultProvider, c
     }
     
     // Otherwise use the default provider (chat's primary model)
-    console.log('Using chat primary model for title generation');
+    console.warn('Using chat primary model for title generation - no dedicated title model configured');
     return defaultProvider;
 }
 

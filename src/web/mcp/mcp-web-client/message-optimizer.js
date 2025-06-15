@@ -274,10 +274,6 @@ export class MessageOptimizer {
             throw new Error('[MessageOptimizer.buildMessagesForAPI] chat.messages must be an array');
         }
         
-        if (chat.messages.length === 0) {
-            throw new Error('[MessageOptimizer.buildMessagesForAPI] chat.messages cannot be empty');
-        }
-        
         // Validate all messages have basic structure before processing
         for (let i = 0; i < chat.messages.length; i++) {
             if (!chat.messages[i] || typeof chat.messages[i] !== 'object') {
@@ -307,7 +303,7 @@ export class MessageOptimizer {
             // console.log(`[MessageOptimizer] Found summary checkpoint, starting from index ${startIndex}`);
 
             // Step 2: Initialize messages array with system prompt
-            const messages = this.initializeMessagesArray(chat.messages, summaryMessage, mcpInstructions);
+            const messages = this.initializeMessagesArray(chat, summaryMessage, mcpInstructions);
 
             // Step 3: Track assistant state for smart filtering
             const assistantTracker = new AssistantStateTracker();
@@ -360,12 +356,6 @@ export class MessageOptimizer {
 
             stats.optimizedMessages = messages.length;
             
-            console.log(`[MessageOptimizer] Optimization complete:`, stats);
-            console.log(`[MessageOptimizer] Final messages array length: ${messages.length}`);
-            console.log(`[MessageOptimizer] Messages by role:`, messages.reduce((acc, msg) => {
-                acc[msg.role] = (acc[msg.role] || 0) + 1;
-                return acc;
-            }, {}));
             
 
             return {
@@ -402,19 +392,33 @@ export class MessageOptimizer {
 
     /**
      * Initializes the messages array with system prompt and summary
-     * @param {Array} allMessages - All chat messages
+     * @param {Object} chat - The chat object containing messages and systemPrompt
      * @param {Object|null} summaryMessage - Summary message if found
      * @param {string|null} mcpInstructions - MCP server instructions to append
      * @returns {Array} - Initial messages array
      */
-    initializeMessagesArray(allMessages, summaryMessage, mcpInstructions = null) {
+    initializeMessagesArray(chat, summaryMessage, mcpInstructions = null) {
         const messages = [];
         
-        // Always include system prompt if it exists, enhanced with MCP instructions
-        if (allMessages.length > 0 && allMessages[0].role === 'system') {
-            // Use centralized system message enhancement logic
+        // Always include system prompt, either from messages array or from chat.systemPrompt
+        let systemMessage = null;
+        
+        // First check if there's a system message in the messages array
+        if (chat.messages.length > 0 && chat.messages[0].role === 'system') {
+            systemMessage = chat.messages[0];
+        } 
+        // Otherwise use the chat's systemPrompt property
+        else if (chat.systemPrompt) {
+            systemMessage = {
+                role: 'system',
+                content: chat.systemPrompt
+            };
+        }
+        
+        // If we found a system message, enhance it with MCP instructions
+        if (systemMessage) {
             const enhancedSystemMessage = SystemMsg.enhanceSystemMessageWithMcp(
-                allMessages[0], 
+                systemMessage, 
                 mcpInstructions
             );
             messages.push(enhancedSystemMessage);

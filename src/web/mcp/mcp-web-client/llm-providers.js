@@ -535,8 +535,6 @@ class LLMProvider {
             throw new Error(errorMsg);
         }
         
-        // Log the actual size for debugging
-        console.log(`[LLMProvider] Request size: ${(sizeInBytes / 1024).toFixed(1)} KiB (${sizeInBytes} bytes)`);
         this.log('info', `Request size: ${(sizeInBytes / 1024).toFixed(1)} KiB`, {
             sizeBytes: sizeInBytes,
             maxBytes: maxSizeBytes
