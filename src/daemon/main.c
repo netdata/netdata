@@ -868,6 +868,7 @@ int netdata_main(int argc, char **argv) {
 
     analytics_reset();
     get_system_timezone();
+    rrdlabels_aral_init();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("pulse");

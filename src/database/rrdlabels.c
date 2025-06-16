@@ -29,7 +29,7 @@ typedef struct labels_registry_idx_entry {
 
 typedef struct rrdlabels {
     SPINLOCK spinlock;
-    size_t version;
+    uint32_t version;
     Pvoid_t JudyL;
 } RRDLABELS;
 
@@ -76,13 +76,35 @@ __attribute__((constructor)) void initialize_label_stats(void) {
     dictionary_stats_category_rrdlabels.memory.values = 0;
 }
 
+
+static ARAL *labels_aral;
+
+static struct aral_statistics label_aral_statistics = { 0 };
+
+void rrdlabels_aral_init(void)
+{
+    labels_aral =
+        aral_create("label_stat", sizeof(RRDLABELS), 1, 0, &label_aral_statistics, NULL, NULL, false, false, false);
+
+    pulse_aral_register_statistics(&label_aral_statistics, "labels");
+}
+
+void rrdlabels_aral_destroy(void)
+{
+    aral_destroy(labels_aral);
+    pulse_aral_unregister_statistics(&label_aral_statistics);
+}
+
+
 // ----------------------------------------------------------------------------
 // rrdlabels_create()
 
 RRDLABELS *rrdlabels_create(void)
 {
-    RRDLABELS *labels = callocz(1, sizeof(*labels));
+    RRDLABELS *labels = aral_mallocz(labels_aral);
     spinlock_init(&labels->spinlock);
+    labels->version = 0;
+    labels->JudyL = NULL;
     RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS));
     return labels;
 }
@@ -200,7 +222,7 @@ void rrdlabels_destroy(RRDLABELS *labels)
         return;
 
     rrdlabels_flush(labels);
-    freez(labels);
+    aral_freez(labels_aral, labels);
 }
 
 //
