@@ -127,6 +127,16 @@
         "description": "Specifies the path to the file containing cookies. For more information about the cookie file format, see [cookie file format](https://everything.curl.dev/http/cookies/fileformat).",
         "type": "string"
       },
+      "bearer_token_file": {
+        "title": "Bearer Token File",
+        "description": "Path to a file containing a bearer token for HTTP authentication.",
+        "type": "string"
+      },
+      "force_http2": {
+        "title": "Force HTTP2",
+        "description": "If set, forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).",
+        "type": "boolean"
+      },
       "proxy_url": {
         "title": "Proxy URL",
         "description": "The URL of the proxy server.",
@@ -246,6 +256,13 @@
     },
     "uiOptions": {
       "fullPage": true
+    },
+    "bearer_token_file": {
+      "ui:help": "The token is sent in the Authorization header as `Bearer <token>`. **Takes priority over basic authentication**.",
+      "ui:widget": "hidden"
+    },
+    "force_http2": {
+      "ui:widget": "hidden"
     },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
