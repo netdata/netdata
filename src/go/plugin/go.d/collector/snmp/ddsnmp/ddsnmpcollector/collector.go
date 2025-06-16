@@ -26,6 +26,7 @@ type (
 		Metrics        []Metric
 	}
 	Metric struct {
+		Profile     *ProfileMetrics
 		Name        string
 		Description string
 		Family      string
@@ -45,7 +46,8 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(5*time.Minute, 0.2), // 5 min TTL with 20% jitter
+		tableCache:  newTableCache(5*time.Minute, 1), // 5 min TTL with 100% jitter
+		//doTableMetrics: true,
 	}
 
 	for _, prof := range profiles {
@@ -136,12 +138,17 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		metrics = append(metrics, tableMetrics...)
 	}
 
-	return &ProfileMetrics{
+	pm := &ProfileMetrics{
 		Source:         ps.profile.SourceFile,
 		DeviceMetadata: maps.Clone(ps.deviceMetadata),
 		Tags:           maps.Clone(ps.globalTags),
 		Metrics:        metrics,
-	}, nil
+	}
+	for i := range pm.Metrics {
+		pm.Metrics[i].Profile = pm
+	}
+
+	return pm, nil
 }
 
 func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {

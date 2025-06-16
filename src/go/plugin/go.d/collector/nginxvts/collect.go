@@ -40,7 +40,10 @@ func (c *Collector) collectServerZones(collected map[string]any, ms *vtsMetrics)
 }
 
 func (c *Collector) scapeVTS() (*vtsMetrics, error) {
-	req, _ := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(c.RequestConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	var total vtsMetrics
 	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &total); err != nil {

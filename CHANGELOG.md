@@ -6,6 +6,19 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.2 to 1.9.3 in /src/go [\#20483](https://github.com/netdata/netdata/pull/20483) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(go.d/ddsnmp\):  add index-based tags and cross-table index transformation support [\#20482](https://github.com/netdata/netdata/pull/20482) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): collect cross-table metrics and tags [\#20481](https://github.com/netdata/netdata/pull/20481) ([ilyam8](https://github.com/ilyam8))
+- Correctly ignore patches that are already applied. [\#20480](https://github.com/netdata/netdata/pull/20480) ([Ferroin](https://github.com/Ferroin))
+- chore\(go.d/ddsnmp\): split table collection into walk and process phases [\#20479](https://github.com/netdata/netdata/pull/20479) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/redis\): don't clear tls for `rediss` [\#20478](https://github.com/netdata/netdata/pull/20478) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d\): add bearer\_token\_file to request cfg [\#20476](https://github.com/netdata/netdata/pull/20476) ([ilyam8](https://github.com/ilyam8))
+- Update mcp.md [\#20475](https://github.com/netdata/netdata/pull/20475) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): add dependency-based expiration to table cache [\#20474](https://github.com/netdata/netdata/pull/20474) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d/snmp\): create table charts [\#20471](https://github.com/netdata/netdata/pull/20471) ([ilyam8](https://github.com/ilyam8))
+- Remove static build timeouts from regular builds. [\#20470](https://github.com/netdata/netdata/pull/20470) ([Ferroin](https://github.com/Ferroin))
+- Add MCP documentation [\#20469](https://github.com/netdata/netdata/pull/20469) ([kanelatechnical](https://github.com/kanelatechnical))
+- Modify Uninstall Action \(windows.installer\) [\#20467](https://github.com/netdata/netdata/pull/20467) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#20466](https://github.com/netdata/netdata/pull/20466) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/ddsnmp\): add table metrics and tags caching optimization [\#20465](https://github.com/netdata/netdata/pull/20465) ([ilyam8](https://github.com/ilyam8))
 - Improve datafile rotation and indexing during shutdown [\#20464](https://github.com/netdata/netdata/pull/20464) ([stelfrag](https://github.com/stelfrag))
@@ -41,6 +54,7 @@
 - chore\(go.d/ddsnmp\): correctly handle all mapping types [\#20420](https://github.com/netdata/netdata/pull/20420) ([ilyam8](https://github.com/ilyam8))
 - SNMP: apc\_ups.yaml [\#20419](https://github.com/netdata/netdata/pull/20419) ([Ancairon](https://github.com/Ancairon))
 - update\_installer: Update remove instruction [\#20418](https://github.com/netdata/netdata/pull/20418) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix typo. [\#20417](https://github.com/netdata/netdata/pull/20417) ([de-authority](https://github.com/de-authority))
 - Fix context updates [\#20416](https://github.com/netdata/netdata/pull/20416) ([stelfrag](https://github.com/stelfrag))
 - improvement\(go.d\): add ddsnmp profile collector \(scalar only\) [\#20415](https://github.com/netdata/netdata/pull/20415) ([ilyam8](https://github.com/ilyam8))
 - Improve metrics centralization points documentation [\#20412](https://github.com/netdata/netdata/pull/20412) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -284,7 +298,6 @@
 - Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
 - SNMP, Custom descriptions and units [\#20100](https://github.com/netdata/netdata/pull/20100) ([Ancairon](https://github.com/Ancairon))
 - Fix MSSQL and improvements [\#20032](https://github.com/netdata/netdata/pull/20032) ([thiagoftsm](https://github.com/thiagoftsm))
-- Sqlite upgrade to version 3.49.1 [\#19933](https://github.com/netdata/netdata/pull/19933) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
@@ -444,16 +457,6 @@
 - detect low ram conditions more aggresively [\#19938](https://github.com/netdata/netdata/pull/19938) ([ktsaou](https://github.com/ktsaou))
 - status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
 - Fix logic for libbacktrace enablement in CMakeLists,txt [\#19936](https://github.com/netdata/netdata/pull/19936) ([Ferroin](https://github.com/Ferroin))
-- Fix path to copy drop-in crontab from [\#19935](https://github.com/netdata/netdata/pull/19935) ([ralphm](https://github.com/ralphm))
-- Fix max\_page\_length calculation for GORILLA\_32BIT page type [\#19932](https://github.com/netdata/netdata/pull/19932) ([stelfrag](https://github.com/stelfrag))
-- Fix compile without dbengine [\#19930](https://github.com/netdata/netdata/pull/19930) ([stelfrag](https://github.com/stelfrag))
-- Metadata event loop code cleanup [\#19929](https://github.com/netdata/netdata/pull/19929) ([stelfrag](https://github.com/stelfrag))
-- status file v21 [\#19928](https://github.com/netdata/netdata/pull/19928) ([ktsaou](https://github.com/ktsaou))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.7.1 to 9.7.3 in /src/go [\#19926](https://github.com/netdata/netdata/pull/19926) ([dependabot[bot]](https://github.com/apps/dependabot))
-- do not expose web server filenames [\#19925](https://github.com/netdata/netdata/pull/19925) ([ktsaou](https://github.com/ktsaou))
-- Fix TOCTOU race in daemon status file handling. [\#19924](https://github.com/netdata/netdata/pull/19924) ([Ferroin](https://github.com/Ferroin))
-- Exclude external code from CodeQL scanning. [\#19923](https://github.com/netdata/netdata/pull/19923) ([Ferroin](https://github.com/Ferroin))
-- remove ilove endpoint [\#19919](https://github.com/netdata/netdata/pull/19919) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
