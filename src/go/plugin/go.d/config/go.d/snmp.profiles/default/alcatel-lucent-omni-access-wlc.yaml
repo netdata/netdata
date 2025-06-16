@@ -1,12 +1,17 @@
 extends:
   - alcatel-lucent.yaml
-sysobjectid:
-  - 1.3.6.1.4.1.6486.800.1.1.2.2.2.*
+
 metadata:
   device:
     fields:
       type:
-        value: "WLC"
+        value: Switch/WLC
+      vendor:
+        value: Alcatel-Lucent
+
+sysobjectid:
+  - 1.3.6.1.4.1.6486.800.1.1.2.2.2.*
+
 metrics:
   - MIB: WLSX-SWITCH-MIB
     table:
@@ -15,7 +20,8 @@ metrics:
     symbols:
       - name: cpu.usage
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.3
-        description: The average, over the last minute, of the percentage of time that this processor was not idle.
+        description: The average, over the last minute, of the percentage of time that this processor was not idle
+        family: CPU/Usage
         unit: "%"
     metric_tags:
       - index: 1
@@ -31,13 +37,14 @@ metrics:
     symbols:
       - name: sysXStorageSize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
-        description: Size of the storage filesystem in MB.
+        description: Size of the storage filesystem
+        family: Storage/Filesystem
         unit: "MBy"
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
-        description: Size of the storage filesystem in MB.
+        description: Storage filesystem usage
+        family: Storage/Filesystem
         unit: "MBy"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.2
@@ -50,6 +57,7 @@ metrics:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.5
           name: sysXStorageName
         tag: sys_x_storage_name
+
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSysXMemoryTable
@@ -57,36 +65,43 @@ metrics:
     symbols:
       - name: memory.total
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.2
-        description: Total memory in KB.
+        description: Total memory in KB
+        family: Memory/Total
         unit: "kBy"
       - name: memory.used
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.3
-        description: Used memory in KB.
+        description: Used memory in KB
+        family: Memory/Used
         unit: "kBy"
       - name: memory.free
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.4
-        description: Free memory in KB.
+        description: Free memory in KB
+        family: Memory/Free
         unit: "kBy"
     metric_tags:
       - index: 1
         tag: mem
+
   - MIB: WLSX-SWITCH-MIB
     symbol:
       name: wlsxSwitchTotalNumAccessPoints
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.1.0
-      description: Total number of access points connected to this switch.
-      unit: "{access_point}"
+      description: Total number of access points connected to this switch
+      family: Access Points
+      unit: "{ap}"
+
   - MIB: WLSX-SWITCH-MIB
     symbol:
       name: wlsxSwitchTotalNumStationsAssociated
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.2.0
       description: Total number of stations associated to this switch.
+      family: Stations
       unit: "{station}"
+
 metric_tags:
   - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
     symbol: wlsxModelName
     tag: wlsx_model_name
-  # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
   - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.4.0
     symbol: wlsxSwitchRole
     tag: wlsx_switch_role
