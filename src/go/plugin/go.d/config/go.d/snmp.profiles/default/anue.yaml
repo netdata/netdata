@@ -6,7 +6,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "anue"
+        value: Anue
 
 sysobjectid:
   - 1.3.6.1.4.1.32620.1.*
