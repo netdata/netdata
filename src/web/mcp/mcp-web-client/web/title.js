@@ -200,7 +200,6 @@ export function getTitleGenerationProvider(chat, llmProvider, defaultProvider, c
             titleModel.id
         );
         provider.onLog = llmProvider.onLog;
-        console.log('Using title generation model:', `${titleModel.provider}:${titleModel.id}`);
         return provider;
     }
     

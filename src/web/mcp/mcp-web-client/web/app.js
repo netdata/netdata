@@ -72,14 +72,11 @@ class NetdataMCPChat {
         
         // Initialize providers and then create default chat
         // First initialize LLM provider, then MCP servers (which need the provider URL)
-        console.log('Starting provider initialization...');
         this.initializeDefaultLLMProvider().then(() => {
-            console.log('LLM provider initialized, now loading MCP servers...');
             return this.initializeDefaultMCPServers();
         }).then(async () => {
             // Mark providers as loaded
             this.providersLoaded = true;
-            console.log(`Providers loaded. MCP servers: ${this.mcpServers.size}, LLM providers: ${this.llmProviders.size}`);
             
             // Update chat sessions after providers are loaded
             this.updateChatSessions();
@@ -4349,7 +4346,6 @@ class NetdataMCPChat {
     }
 
     async initializeDefaultMCPServers() {
-        console.log('Starting initializeDefaultMCPServers...');
         try {
             // Get the proxy URL - try to get from LLM provider or use current origin
             let proxyUrl;
@@ -4357,14 +4353,11 @@ class NetdataMCPChat {
             const defaultProvider = [...this.llmProviders.values()].find(p => p.url);
             if (defaultProvider && defaultProvider.url) {
                 proxyUrl = defaultProvider.url;
-                console.log(`Using LLM provider URL: ${proxyUrl}`);
             } else {
                 // Use the same origin as the current page (since we're being served by the proxy)
                 proxyUrl = window.location.origin;
-                console.log(`No LLM provider configured yet, using current origin: ${proxyUrl}`);
             }
             
-            console.log(`Fetching MCP servers from: ${proxyUrl}/mcp-servers`);
             const response = await fetch(`${proxyUrl}/mcp-servers`);
             if (!response.ok) {
                 console.warn('Failed to fetch default MCP servers from proxy:', response.status);
@@ -4375,11 +4368,8 @@ class NetdataMCPChat {
             const defaultServers = data.servers || [];
             
             if (defaultServers.length === 0) {
-                console.log('No default MCP servers configured in proxy');
                 return;
             }
-            
-            console.log(`Loaded ${defaultServers.length} default MCP servers from proxy:`, defaultServers);
 
             // Handle migration of old default_mcp_server if it exists
             const oldDefaultServer = this.mcpServers.get('default_mcp_server');
