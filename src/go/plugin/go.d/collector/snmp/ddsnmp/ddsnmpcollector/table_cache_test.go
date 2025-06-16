@@ -23,35 +23,21 @@ func TestTableCache(t *testing.T) {
 
 			// Test data
 			tableOID := "1.3.6.1.2.1.2.2"
-			oidMap := map[string]map[string]string{
-				"1": {
-					"1.3.6.1.2.1.2.2.1.2":  "1.3.6.1.2.1.2.2.1.2.1",
-					"1.3.6.1.2.1.2.2.1.10": "1.3.6.1.2.1.2.2.1.10.1",
-				},
-				"2": {
-					"1.3.6.1.2.1.2.2.1.2":  "1.3.6.1.2.1.2.2.1.2.2",
-					"1.3.6.1.2.1.2.2.1.10": "1.3.6.1.2.1.2.2.1.10.2",
-				},
-			}
-			tagValues := map[string]map[string]string{
-				"1": {"interface": "eth0"},
-				"2": {"interface": "eth1"},
-			}
+			indexes := []string{"1", "2", "3"}
 
 			// Cache data
-			cache.cacheData(tableOID, oidMap, tagValues)
+			cache.cacheIndexes(tableOID, indexes)
 
 			// Retrieve cached data - should work
-			cachedOIDs, cachedTags, found := cache.getCachedData(tableOID)
+			cachedIndexes, found := cache.getCachedIndexes(tableOID)
 			assert.True(t, found)
-			assert.Equal(t, oidMap, cachedOIDs)
-			assert.Equal(t, tagValues, cachedTags)
+			assert.Equal(t, indexes, cachedIndexes)
 
 			// Wait for expiration (considering jitter)
 			time.Sleep(150 * time.Millisecond)
 
 			// Should be expired now
-			_, _, found = cache.getCachedData(tableOID)
+			_, found = cache.getCachedIndexes(tableOID)
 			assert.False(t, found)
 
 			// Clean expired entries
@@ -59,10 +45,9 @@ func TestTableCache(t *testing.T) {
 			assert.Contains(t, expired, tableOID)
 
 			// Cache should be empty now
-			assert.Empty(t, cache.tables)
+			assert.Empty(t, cache.tableIndexes)
 			assert.Empty(t, cache.timestamps)
 			assert.Empty(t, cache.tableTTLs)
-			assert.Empty(t, cache.tagValues)
 		})
 	}
 }
@@ -75,31 +60,17 @@ func TestTableCacheDependencies(t *testing.T) {
 	table2OID := "1.3.6.1.2.1.31.1.1"  // ifXTable
 	table3OID := "1.3.6.1.4.1.9.9.276" // cieIfInterfaceTable
 
-	oidMap1 := map[string]map[string]string{
-		"1": {"1.3.6.1.2.1.2.2.1.10": "1.3.6.1.2.1.2.2.1.10.1"},
-	}
-	tagValues1 := map[string]map[string]string{
-		"1": {"interface": "eth0"},
-	}
-
-	oidMap2 := map[string]map[string]string{
-		"1": {"1.3.6.1.2.1.31.1.1.1.1": "1.3.6.1.2.1.31.1.1.1.1.1"},
-	}
-	tagValues2 := map[string]map[string]string{
-		"1": {"ifname": "GigabitEthernet0/1"},
-	}
-
-	oidMap3 := map[string]map[string]string{
-		"1": {"1.3.6.1.4.1.9.9.276.1.1": "1.3.6.1.4.1.9.9.276.1.1.1"},
-	}
+	indexes1 := []string{"1", "2"}
+	indexes2 := []string{"1", "2"}
+	indexes3 := []string{"1", "2"}
 
 	// Cache tables with dependencies
 	// table1 and table2 depend on each other
-	cache.cacheDataWithDeps(table1OID, oidMap1, tagValues1, []string{table2OID})
-	cache.cacheDataWithDeps(table2OID, oidMap2, tagValues2, []string{table1OID})
+	cache.cacheIndexesWithDeps(table1OID, indexes1, []string{table2OID})
+	cache.cacheIndexesWithDeps(table2OID, indexes2, []string{table1OID})
 
 	// table3 depends on table2
-	cache.cacheDataWithDeps(table3OID, oidMap3, nil, []string{table2OID})
+	cache.cacheIndexesWithDeps(table3OID, indexes3, []string{table2OID})
 
 	// All tables should be cached
 	assert.True(t, cache.areTablesCached([]string{table1OID, table2OID, table3OID}))
@@ -134,7 +105,7 @@ func TestTableCacheDependencies(t *testing.T) {
 	assert.Contains(t, expired, table3OID)
 
 	// Cache should be empty
-	assert.Empty(t, cache.tables)
+	assert.Empty(t, cache.tableIndexes)
 	assert.Empty(t, cache.tableDeps)
 }
 
@@ -147,13 +118,13 @@ func TestTableCacheDependenciesCascade(t *testing.T) {
 	tableC := "1.3.6.1.2.1.3"
 	tableD := "1.3.6.1.2.1.4"
 
-	data := map[string]map[string]string{"1": {"col": "val"}}
+	indexes := []string{"1"}
 
 	// Cache with chain dependencies
-	cache.cacheDataWithDeps(tableA, data, nil, []string{tableB})
-	cache.cacheDataWithDeps(tableB, data, nil, []string{tableA, tableC})
-	cache.cacheDataWithDeps(tableC, data, nil, []string{tableB, tableD})
-	cache.cacheDataWithDeps(tableD, data, nil, []string{tableC})
+	cache.cacheIndexesWithDeps(tableA, indexes, []string{tableB})
+	cache.cacheIndexesWithDeps(tableB, indexes, []string{tableA, tableC})
+	cache.cacheIndexesWithDeps(tableC, indexes, []string{tableB, tableD})
+	cache.cacheIndexesWithDeps(tableD, indexes, []string{tableC})
 
 	// All should be cached
 	assert.True(t, cache.areTablesCached([]string{tableA, tableB, tableC, tableD}))
@@ -182,20 +153,23 @@ func TestTableCacheMixedDependencies(t *testing.T) {
 	// Table without deps
 	table3 := "1.3.6.1.2.1.3"
 
-	data := map[string]map[string]string{"1": {"col": "val"}}
+	indexes := []string{"1", "2", "3"}
 
 	// Cache tables
-	cache.cacheDataWithDeps(table1, data, nil, []string{table2})
-	cache.cacheDataWithDeps(table2, data, nil, []string{table1})
-	cache.cacheData(table3, data, nil) // No dependencies
+	cache.cacheIndexesWithDeps(table1, indexes, []string{table2})
+	cache.cacheIndexesWithDeps(table2, indexes, []string{table1})
+	cache.cacheIndexes(table3, indexes) // No dependencies
 
 	// All should be cached
-	_, _, found1 := cache.getCachedData(table1)
-	_, _, found2 := cache.getCachedData(table2)
-	_, _, found3 := cache.getCachedData(table3)
+	indexes1, found1 := cache.getCachedIndexes(table1)
+	indexes2, found2 := cache.getCachedIndexes(table2)
+	indexes3, found3 := cache.getCachedIndexes(table3)
 	assert.True(t, found1)
 	assert.True(t, found2)
 	assert.True(t, found3)
+	assert.Equal(t, indexes, indexes1)
+	assert.Equal(t, indexes, indexes2)
+	assert.Equal(t, indexes, indexes3)
 
 	// Wait for expiration
 	time.Sleep(120 * time.Millisecond)
@@ -235,57 +209,48 @@ func TestTableCacheDisabled(t *testing.T) {
 	cache := newTableCache(0, 0) // Disabled cache
 
 	tableOID := "1.3.6.1.2.1.2.2"
-	oidMap := map[string]map[string]string{
-		"1": {"1.3.6.1.2.1.2.2.1.2": "1.3.6.1.2.1.2.2.1.2.1"},
-	}
-	tagValues := map[string]map[string]string{
-		"1": {"interface": "eth0"},
-	}
+	indexes := []string{"1", "2", "3"}
 
 	// Try to cache data
-	cache.cacheData(tableOID, oidMap, tagValues)
+	cache.cacheIndexes(tableOID, indexes)
 
 	// Should not find anything
-	_, _, found := cache.getCachedData(tableOID)
+	_, found := cache.getCachedIndexes(tableOID)
 	assert.False(t, found)
 
 	// Try to cache with dependencies
-	cache.cacheDataWithDeps(tableOID, oidMap, tagValues, []string{"other.table"})
+	cache.cacheIndexesWithDeps(tableOID, indexes, []string{"other.table"})
 
 	// Should not find anything
-	_, _, found = cache.getCachedData(tableOID)
+	_, found = cache.getCachedIndexes(tableOID)
 	assert.False(t, found)
 	assert.False(t, cache.areTablesCached([]string{tableOID}))
 
 	// Cache should remain empty
-	assert.Empty(t, cache.tables)
+	assert.Empty(t, cache.tableIndexes)
 }
 
 func TestTableCacheDeepCopy(t *testing.T) {
 	cache := newTableCache(1*time.Hour, 0)
 
 	// Original data
-	oidMap := map[string]map[string]string{
-		"1": {"col1": "1.2.3.4.1"},
-	}
-	tagValues := map[string]map[string]string{
-		"1": {"tag1": "value1"},
-	}
+	indexes := []string{"1", "2", "3"}
 
 	// Cache the data
-	cache.cacheData("table1", oidMap, tagValues)
+	cache.cacheIndexes("table1", indexes)
 
-	// Modify original maps
-	oidMap["1"]["col2"] = "should not appear"
-	tagValues["1"]["tag2"] = "should not appear"
+	// Modify original slice
+	indexes[0] = "999"
+	indexes = append(indexes, "4")
 
 	// Retrieve cached data
-	cachedOIDs, cachedTags, found := cache.getCachedData("table1")
+	cachedIndexes, found := cache.getCachedIndexes("table1")
 	require.True(t, found)
 
 	// Cached data should not have the modifications
-	assert.NotContains(t, cachedOIDs["1"], "col2")
-	assert.NotContains(t, cachedTags["1"], "tag2")
+	assert.Equal(t, []string{"1", "2", "3"}, cachedIndexes)
+	assert.NotContains(t, cachedIndexes, "999")
+	assert.NotContains(t, cachedIndexes, "4")
 }
 
 func TestTableCacheDependencyCleanup(t *testing.T) {
@@ -295,11 +260,11 @@ func TestTableCacheDependencyCleanup(t *testing.T) {
 	table1 := "1.3.6.1.2.1.1"
 	table2 := "1.3.6.1.2.1.2"
 
-	data := map[string]map[string]string{"1": {"col": "val"}}
+	indexes := []string{"1"}
 
 	// Cache with circular deps
-	cache.cacheDataWithDeps(table1, data, nil, []string{table2})
-	cache.cacheDataWithDeps(table2, data, nil, []string{table1})
+	cache.cacheIndexesWithDeps(table1, indexes, []string{table2})
+	cache.cacheIndexesWithDeps(table2, indexes, []string{table1})
 
 	// Check initial state
 	tables, withDeps, totalDeps := cache.stats()
@@ -327,17 +292,17 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 	cache := newTableCache(100*time.Millisecond, 0)
 
 	// Cache tableA with dependency on non-existent tableB
-	cache.cacheDataWithDeps("tableA",
-		map[string]map[string]string{"1": {"col": "val"}},
-		nil,
+	cache.cacheIndexesWithDeps("tableA",
+		[]string{"1", "2"},
 		[]string{"tableB"})
 
 	// tableA should be cached
-	_, _, found := cache.getCachedData("tableA")
+	indexes, found := cache.getCachedIndexes("tableA")
 	assert.True(t, found)
+	assert.Equal(t, []string{"1", "2"}, indexes)
 
 	// tableB should not be cached
-	_, _, found = cache.getCachedData("tableB")
+	_, found = cache.getCachedIndexes("tableB")
 	assert.False(t, found)
 
 	// Dependencies should exist
@@ -345,9 +310,8 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 	assert.Contains(t, cache.getDependencies("tableB"), "tableA")
 
 	// Now cache tableB
-	cache.cacheDataWithDeps("tableB",
-		map[string]map[string]string{"1": {"col": "val"}},
-		nil,
+	cache.cacheIndexesWithDeps("tableB",
+		[]string{"1", "2"},
 		[]string{"tableA"})
 
 	// Both should be cached
@@ -361,4 +325,61 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 	assert.Len(t, expired, 2)
 	assert.Contains(t, expired, "tableA")
 	assert.Contains(t, expired, "tableB")
+}
+
+// Helper methods that need to be added to tableCache for tests
+func (tc *tableCache) areTablesCached(tableOIDs []string) bool {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	if tc.baseTTL == 0 {
+		return false
+	}
+
+	now := time.Now()
+	for _, tableOID := range tableOIDs {
+		timestamp, ok := tc.timestamps[tableOID]
+		if !ok {
+			return false
+		}
+
+		ttl, ok := tc.tableTTLs[tableOID]
+		if !ok || now.Sub(timestamp) > ttl {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (tc *tableCache) getDependencies(tableOID string) []string {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	deps, ok := tc.tableDeps[tableOID]
+	if !ok {
+		return nil
+	}
+
+	result := make([]string, 0, len(deps))
+	for dep := range deps {
+		result = append(result, dep)
+	}
+	return result
+}
+
+func (tc *tableCache) stats() (tables int, withDeps int, totalDeps int) {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	tables = len(tc.tableIndexes)
+
+	for _, deps := range tc.tableDeps {
+		if len(deps) > 0 {
+			withDeps++
+			totalDeps += len(deps)
+		}
+	}
+
+	return tables, withDeps, totalDeps
 }

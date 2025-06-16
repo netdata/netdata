@@ -252,14 +252,18 @@ func isMappingKeysNumeric(mapping map[string]string) bool {
 	}
 	return true
 }
-func cleanTags(metrics []*ProfileMetrics) {
-	for _, pm := range metrics {
-		for _, m := range pm.Metrics {
+func cleanMetrics(pms []*ProfileMetrics) {
+	for _, pm := range pms {
+		for i := range pm.Metrics {
+			m := &pm.Metrics[i]
+			m.Description = metricMetaReplacer.Replace(m.Description)
+			m.Family = metricMetaReplacer.Replace(m.Family)
+			m.Unit = metricMetaReplacer.Replace(m.Unit)
 			for k, v := range m.Tags {
-				m.Tags[k] = tagReplacer.Replace(v)
+				m.Tags[k] = metricMetaReplacer.Replace(v)
 			}
 		}
 	}
 }
 
-var tagReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ")
+var metricMetaReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ")

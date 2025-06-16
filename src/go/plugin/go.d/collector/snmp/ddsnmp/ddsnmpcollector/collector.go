@@ -100,7 +100,7 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 	}
 
 	c.updateMetricFamily(metrics)
-	cleanTags(metrics)
+	cleanMetrics(metrics)
 
 	return metrics, nil
 }
