@@ -45,6 +45,7 @@
 // MCP default values for all tools
 #define MCP_DEFAULT_AFTER_TIME              (-3600) // 1 hour ago
 #define MCP_DEFAULT_BEFORE_TIME             0    // now
+#define MCP_DEFAULT_TIMEOUT_WEIGHTS         300  // 5 minutes
 #define MCP_METADATA_CARDINALITY_LIMIT      50   // For metadata queries
 #define MCP_DATA_CARDINALITY_LIMIT          10   // For data queries
 #define MCP_WEIGHTS_CARDINALITY_LIMIT       50   // For weights queries (minimum is 30)

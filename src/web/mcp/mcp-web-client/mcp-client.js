@@ -11,17 +11,60 @@ class MCPClient {
         this.connectionPromise = null;
         this.capabilities = null;
         this.serverInfo = null;
+        this.instructions = null;
         this.tools = new Map();
         this.resources = new Map();
         this.prompts = new Map();
         this.isInitialized = false;
         
+        // Connection state tracking
+        this.connectionState = 'DISCONNECTED'; // DISCONNECTED, CONNECTING, HANDSHAKING, INITIALIZING, CONNECTED, RECONNECTING, FAILED
+        this.connectionStartTime = null;
+        this.reconnectAttempts = 0;
+        
         // Event handlers
         this.onConnectionChange = null;
+        this.onConnectionStateChange = null; // New handler for detailed state changes
         this.onMessage = null;
         this.onError = null;
         this.onNotification = null;
         this.onLog = null; // New handler for logging
+    }
+
+    /**
+     * Update connection state and notify listeners
+     */
+    setConnectionState(newState, details = {}) {
+        const oldState = this.connectionState;
+        this.connectionState = newState;
+        
+        if (newState === 'CONNECTING' || newState === 'RECONNECTING') {
+            this.connectionStartTime = Date.now();
+            if (newState === 'RECONNECTING') {
+                this.reconnectAttempts++;
+            }
+        } else if (newState === 'CONNECTED') {
+            this.reconnectAttempts = 0;
+        }
+        
+        if (this.onConnectionStateChange) {
+            this.onConnectionStateChange({
+                oldState,
+                newState,
+                details,
+                duration: this.connectionStartTime ? Date.now() - this.connectionStartTime : null,
+                reconnectAttempts: this.reconnectAttempts
+            });
+        }
+        
+        // Also trigger legacy connection change handler for compatibility
+        if (this.onConnectionChange) {
+            if (newState === 'CONNECTED') {
+                this.onConnectionChange('connected');
+            } else if (newState === 'DISCONNECTED' || newState === 'FAILED') {
+                this.onConnectionChange('disconnected');
+            }
+        }
     }
 
     /**
@@ -31,9 +74,9 @@ class MCPClient {
         if (this.onLog) {
             this.onLog({
                 timestamp: new Date().toISOString(),
-                direction: direction, // 'sent', 'received', 'error', 'info'
-                message: message,
-                metadata: metadata
+                direction, // 'sent', 'received', 'error', 'info'
+                message,
+                metadata
             });
         }
     }
@@ -41,12 +84,13 @@ class MCPClient {
     /**
      * Connect to the MCP WebSocket server
      */
-    async connect(url) {
+    async connect(url, isReconnect = false) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             throw new Error('Already connected');
         }
 
         this.url = url;
+        this.setConnectionState(isReconnect ? 'RECONNECTING' : 'CONNECTING');
         
         return new Promise((resolve, reject) => {
             try {
@@ -54,17 +98,16 @@ class MCPClient {
                 this.ws = new WebSocket(url, ['mcp']);
                 
                 this.ws.onopen = async () => {
-                    console.log('WebSocket connected');
-                    this.log('info', 'WebSocket connection established', { url: url });
-                    if (this.onConnectionChange) {
-                        this.onConnectionChange('connected');
-                    }
+                    this.log('info', 'WebSocket connection established', { url });
+                    this.setConnectionState('HANDSHAKING');
                     
                     try {
                         // Initialize MCP session
                         await this.initialize();
+                        this.setConnectionState('CONNECTED');
                         resolve();
                     } catch (error) {
+                        this.setConnectionState('FAILED', { error: error.message });
                         reject(error);
                     }
                 };
@@ -75,7 +118,8 @@ class MCPClient {
                 
                 this.ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    this.log('error', `WebSocket error: ${error.message || 'Unknown error'}`, { error: error });
+                    this.log('error', `WebSocket error: ${error.message || 'Unknown error'}`, { error });
+                    this.setConnectionState('FAILED', { error: error.message || 'WebSocket error' });
                     if (this.onError) {
                         this.onError(error);
                     }
@@ -90,14 +134,17 @@ class MCPClient {
                         wasClean: event.wasClean 
                     });
                     this.isInitialized = false;
-                    if (this.onConnectionChange) {
-                        this.onConnectionChange('disconnected');
+                    if (this.connectionState !== 'FAILED') {
+                        this.setConnectionState('DISCONNECTED', { 
+                            code: event.code, 
+                            reason: event.reason 
+                        });
                     }
                     this.cleanup();
                 };
                 
             } catch (error) {
-                this.log('error', `Failed to create WebSocket connection: ${error.message}`, { url: url, error: error });
+                this.log('error', `Failed to create WebSocket connection: ${error.message}`, { url, error });
                 reject(error);
             }
         });
@@ -107,6 +154,8 @@ class MCPClient {
      * Initialize MCP session with the server
      */
     async initialize() {
+        this.setConnectionState('INITIALIZING', { phase: 'handshake' });
+        
         // Send initialize request
         const initResponse = await this.sendRequest('initialize', {
             protocolVersion: '2024-11-05',
@@ -122,9 +171,12 @@ class MCPClient {
 
         this.serverInfo = initResponse.serverInfo;
         this.capabilities = initResponse.capabilities;
+        this.instructions = initResponse.instructions || null;
         
         // Notify server that we're initialized
         await this.sendNotification('notifications/initialized', {});
+        
+        this.setConnectionState('INITIALIZING', { phase: 'loading_tools' });
         
         // List available tools
         if (this.capabilities?.tools) {
@@ -194,7 +246,7 @@ class MCPClient {
             throw new Error(`Tool '${toolName}' not found`);
         }
         
-        return await this.sendRequest('tools/call', {
+        return this.sendRequest('tools/call', {
             name: toolName,
             arguments: args
         });
@@ -208,8 +260,8 @@ class MCPClient {
             throw new Error(`Resource '${uri}' not found`);
         }
         
-        return await this.sendRequest('resources/read', {
-            uri: uri
+        return this.sendRequest('resources/read', {
+            uri
         });
     }
 
@@ -221,7 +273,7 @@ class MCPClient {
             throw new Error(`Prompt '${promptName}' not found`);
         }
         
-        return await this.sendRequest('prompts/get', {
+        return this.sendRequest('prompts/get', {
             name: promptName,
             arguments: args
         });
@@ -238,9 +290,9 @@ class MCPClient {
         const id = this.requestId++;
         const request = {
             jsonrpc: '2.0',
-            method: method,
-            params: params,
-            id: id
+            method,
+            params,
+            id
         };
 
         return new Promise((resolve, reject) => {
@@ -249,14 +301,7 @@ class MCPClient {
             this.log('sent', requestStr, { method, params });
             this.ws.send(requestStr);
             
-            // Set timeout for request
-            setTimeout(() => {
-                if (this.pendingRequests.has(id)) {
-                    this.pendingRequests.delete(id);
-                    this.log('error', `Request ${id} timed out`, { method, id });
-                    reject(new Error(`Request ${id} timed out`));
-                }
-            }, 30000); // 30 second timeout
+            // No client-side timeout - let the backend handle its own timeouts
         });
     }
 
@@ -270,8 +315,8 @@ class MCPClient {
 
         const notification = {
             jsonrpc: '2.0',
-            method: method,
-            params: params
+            method,
+            params
         };
 
         const notificationStr = JSON.stringify(notification);
@@ -327,6 +372,7 @@ class MCPClient {
     disconnect() {
         if (this.ws) {
             this.log('info', 'Closing WebSocket connection', { url: this.url, state: 'disconnecting' });
+            this.setConnectionState('DISCONNECTING');
             this.ws.close();
         }
     }
@@ -339,6 +385,7 @@ class MCPClient {
         this.tools.clear();
         this.resources.clear();
         this.prompts.clear();
+        this.instructions = null;
         this.ws = null;
     }
 
@@ -349,6 +396,20 @@ class MCPClient {
         return this.ws && 
                this.ws.readyState === WebSocket.OPEN && 
                this.isInitialized;
+    }
+    
+    /**
+     * Get the current connection state
+     */
+    getConnectionState() {
+        return this.connectionState;
+    }
+    
+    /**
+     * Check if currently connecting
+     */
+    isConnecting() {
+        return ['CONNECTING', 'HANDSHAKING', 'INITIALIZING', 'RECONNECTING'].includes(this.connectionState);
     }
 }
 
