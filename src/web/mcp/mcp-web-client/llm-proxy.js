@@ -1120,6 +1120,8 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('                                while preserving your API keys and custom settings');
   console.log('   --sync                       When used with --update-config, sync configuration with');
   console.log('                                MODEL_DEFINITIONS from code (optionally filtered by API availability)');
+  console.log('   --check-availability         When used with --sync and --update-config, filter models by');
+  console.log('                                actual availability from provider APIs (requires valid API keys)');
   console.log('\n📖 Description:');
   console.log('   This server provides:');
   console.log('   • A proxy for LLM API calls (OpenAI, Anthropic, Google)');
