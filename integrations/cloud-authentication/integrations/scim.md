@@ -36,15 +36,14 @@ This integration adheres to SCIM v2 specifications. Supported features include:
 - Update user attributes
 - Deactivate users
 - Create groups
-- Import groups
-- Associate users to groups
 - Nested groups supported
 - Patch operations: Supported
-- Bulk operations: Not supported
 - Filtering: Supported (max results: 200)
+- Authentication schemes: OAuth Bearer Token
+- Import groups: Not supported
+- Bulk operations: Not supported
 - Password synchronization: Not supported, as we rely on SSO/OIDC authentication
 - eTag: Not supported
-- Authentication schemes: OAuth Bearer Token
 
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon).
