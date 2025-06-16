@@ -191,7 +191,7 @@
     "method": {
       "ui:widget": "hidden"
     },
-    "permit_view": {
+    "permit_plugin": {
       "ui:widget": "hidden"
     },
     "bearer_token_file": {
