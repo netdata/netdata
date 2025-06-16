@@ -35,6 +35,8 @@ run ./netdata-installer.sh \
   --dont-wait \
   --dont-start-it \
   --disable-exporting-mongodb \
+  --enable-plugin-systemd-journal \
+  --internal-systemd-journal \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
   --enable-lto \
