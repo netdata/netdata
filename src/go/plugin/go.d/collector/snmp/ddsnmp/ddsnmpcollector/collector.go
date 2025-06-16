@@ -9,9 +9,11 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/sourcegraph/conc/pool"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -42,11 +44,12 @@ type (
 
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
 	coll := &Collector{
-		log:         log.With(slog.String("ddsnmp", "collector")),
-		snmpClient:  snmpClient,
-		profiles:    make(map[string]*profileState),
-		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(5*time.Minute, 1), // 5 min TTL with 100% jitter
+		log:                   log.With(slog.String("ddsnmp", "collector")),
+		snmpClient:            snmpClient,
+		profiles:              make(map[string]*profileState),
+		skipOIDs:              make(map[string]bool),
+		tableCache:            newTableCache(5*time.Minute, 1), // 5 min TTL with 100% jitter
+		maxConcurrentRequests: 10,
 		//doTableMetrics: true,
 	}
 
@@ -60,13 +63,14 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 
 type (
 	Collector struct {
-		log         *logger.Logger
-		snmpClient  gosnmp.Handler
-		profiles    map[string]*profileState
-		missingOIDs map[string]bool
-		tableCache  *tableCache
+		log        *logger.Logger
+		snmpClient gosnmp.Handler
+		profiles   map[string]*profileState
+		skipOIDs   map[string]bool
+		tableCache *tableCache
 
-		doTableMetrics bool
+		maxConcurrentRequests int
+		doTableMetrics        bool
 	}
 	profileState struct {
 		profile        *ddsnmp.Profile
@@ -181,20 +185,34 @@ func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {
 
 func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
+	mu := sync.Mutex{}
+
+	p := pool.New().WithMaxGoroutines(c.maxConcurrentRequests).WithErrors()
 
 	for chunk := range slices.Chunk(oids, c.snmpClient.MaxOids()) {
-		result, err := c.snmpClient.Get(chunk)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				c.missingOIDs[trimOID(pdu.Name)] = true
-				continue
+		chunk := chunk
+		p.Go(func() error {
+			result, err := c.snmpClient.Get(chunk)
+			if err != nil {
+				return err
 			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
+
+			mu.Lock()
+			for _, pdu := range result.Variables {
+				if !isPduWithData(pdu) {
+					c.skipOIDs[trimOID(pdu.Name)] = true
+					continue
+				}
+				pdus[trimOID(pdu.Name)] = pdu
+			}
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	if err := p.Wait(); err != nil && len(pdus) == 0 {
+		return nil, err
 	}
 
 	return pdus, nil
