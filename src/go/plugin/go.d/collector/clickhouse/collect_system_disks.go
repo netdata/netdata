@@ -26,7 +26,10 @@ type diskStats struct {
 }
 
 func (c *Collector) collectSystemDisks(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(c.RequestConfig)
+	if err != nil {
+		return err
+	}
 	req.URL.RawQuery = makeURLQuery(querySystemDisks)
 
 	seen := make(map[string]*diskStats)
@@ -42,7 +45,7 @@ func (c *Collector) collectSystemDisks(mx map[string]int64) error {
 
 	var name string
 
-	err := c.doHTTP(req, func(column, value string, lineEnd bool) {
+	err = c.doHTTP(req, func(column, value string, lineEnd bool) {
 		switch column {
 		case "name":
 			name = value
