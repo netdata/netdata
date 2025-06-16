@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.2 to 1.9.3 in /src/go [\#20483](https://github.com/netdata/netdata/pull/20483) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(go.d/ddsnmp\):  add index-based tags and cross-table index transformation support [\#20482](https://github.com/netdata/netdata/pull/20482) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): collect cross-table metrics and tags [\#20481](https://github.com/netdata/netdata/pull/20481) ([ilyam8](https://github.com/ilyam8))
 - Correctly ignore patches that are already applied. [\#20480](https://github.com/netdata/netdata/pull/20480) ([Ferroin](https://github.com/Ferroin))
 - chore\(go.d/ddsnmp\): split table collection into walk and process phases [\#20479](https://github.com/netdata/netdata/pull/20479) ([ilyam8](https://github.com/ilyam8))
@@ -52,6 +54,7 @@
 - chore\(go.d/ddsnmp\): correctly handle all mapping types [\#20420](https://github.com/netdata/netdata/pull/20420) ([ilyam8](https://github.com/ilyam8))
 - SNMP: apc\_ups.yaml [\#20419](https://github.com/netdata/netdata/pull/20419) ([Ancairon](https://github.com/Ancairon))
 - update\_installer: Update remove instruction [\#20418](https://github.com/netdata/netdata/pull/20418) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix typo. [\#20417](https://github.com/netdata/netdata/pull/20417) ([de-authority](https://github.com/de-authority))
 - Fix context updates [\#20416](https://github.com/netdata/netdata/pull/20416) ([stelfrag](https://github.com/stelfrag))
 - improvement\(go.d\): add ddsnmp profile collector \(scalar only\) [\#20415](https://github.com/netdata/netdata/pull/20415) ([ilyam8](https://github.com/ilyam8))
 - Improve metrics centralization points documentation [\#20412](https://github.com/netdata/netdata/pull/20412) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -295,7 +298,6 @@
 - Work to find leaks easily [\#20106](https://github.com/netdata/netdata/pull/20106) ([ktsaou](https://github.com/ktsaou))
 - SNMP, Custom descriptions and units [\#20100](https://github.com/netdata/netdata/pull/20100) ([Ancairon](https://github.com/Ancairon))
 - Fix MSSQL and improvements [\#20032](https://github.com/netdata/netdata/pull/20032) ([thiagoftsm](https://github.com/thiagoftsm))
-- Sqlite upgrade to version 3.49.1 [\#19933](https://github.com/netdata/netdata/pull/19933) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.4.0](https://github.com/netdata/netdata/tree/v2.4.0) (2025-04-14)
 
@@ -455,7 +457,6 @@
 - detect low ram conditions more aggresively [\#19938](https://github.com/netdata/netdata/pull/19938) ([ktsaou](https://github.com/ktsaou))
 - status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
 - Fix logic for libbacktrace enablement in CMakeLists,txt [\#19936](https://github.com/netdata/netdata/pull/19936) ([Ferroin](https://github.com/Ferroin))
-- Fix path to copy drop-in crontab from [\#19935](https://github.com/netdata/netdata/pull/19935) ([ralphm](https://github.com/ralphm))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
