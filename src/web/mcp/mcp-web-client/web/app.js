@@ -67,19 +67,30 @@ class NetdataMCPChat {
         // Track if we have a pending new chat load
         this.pendingNewChatLoad = false;
         
+        // Track if providers are loaded
+        this.providersLoaded = false;
+        
         // Initialize providers and then create default chat
-        Promise.all([
-            this.initializeDefaultLLMProvider(),
-            this.initializeDefaultMCPServers()
-        ]).then(async () => {
+        // First initialize LLM provider, then MCP servers (which need the provider URL)
+        console.log('Starting provider initialization...');
+        this.initializeDefaultLLMProvider().then(() => {
+            console.log('LLM provider initialized, now loading MCP servers...');
+            return this.initializeDefaultMCPServers();
+        }).then(async () => {
+            // Mark providers as loaded
+            this.providersLoaded = true;
+            console.log(`Providers loaded. MCP servers: ${this.mcpServers.size}, LLM providers: ${this.llmProviders.size}`);
+            
             // Update chat sessions after providers are loaded
             this.updateChatSessions();
             
-            // Always create a new chat on startup
-            const newChatId = await this.createDefaultChatIfNeeded();
-            
-            // If a new chat was created AND user hasn't selected a chat, load it
-            if (newChatId && !this.userHasSelectedChat) {
+            // Only create a new chat if we have both MCP servers and LLM providers
+            if (this.mcpServers.size > 0 && this.llmProviders.size > 0) {
+                // Always create a new chat on startup
+                const newChatId = await this.createDefaultChatIfNeeded();
+                
+                // If a new chat was created AND user hasn't selected a chat, load it
+                if (newChatId && !this.userHasSelectedChat) {
                 // Mark that we have a pending new chat load
                 this.pendingNewChatLoad = true;
                 this.pendingNewChatId = newChatId;
@@ -100,6 +111,7 @@ class NetdataMCPChat {
                     }, 500);
                 }, 100);
             }
+            } // Close the if (this.mcpServers.size > 0 && this.llmProviders.size > 0)
         }).catch(error => {
             console.error('Failed to initialize providers:', error);
             // Still update chat sessions even if providers fail
@@ -1141,25 +1153,24 @@ class NetdataMCPChat {
         `;
         section.appendChild(chatModelDiv);
         
-        // Tool Summarization Option
+        // Tool Summarization Option (DISABLED - Not Implemented)
         const toolSumDiv = document.createElement('div');
-        const isEnabled = config.optimisation.toolSummarisation.enabled;
-        toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!isEnabled ? 'opacity: 0.5;' : ''}`;
+        const isEnabled = false; // Force disabled - not implemented
+        toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
         
         const currentThreshold = config.optimisation.toolSummarisation.thresholdKiB || 20; // Default 20KB
         const toolSumModel = ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model) || ChatConfig.getChatModelString(chat);
         
         toolSumDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="toolSummarization_${chatId}" ${isEnabled ? 'checked' : ''}
+            <label style="display: flex; align-items: center; cursor: not-allowed;">
+                <input type="checkbox" id="toolSummarization_${chatId}" disabled
                        style="margin-right: 6px;">
-                <span>Summarize tool responses of at least</span>
+                <span style="text-decoration: line-through;">Summarize tool responses of at least</span>
             </label>
-            <select id="toolThreshold_${chatId}" 
+            <select id="toolThreshold_${chatId}" disabled
                     style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
                            border-radius: 4px; background: var(--background-color); color: var(--text-primary);
-                           cursor: pointer;"
-                    ${!isEnabled ? 'disabled' : ''}>
+                           cursor: not-allowed; text-decoration: line-through;">
                 <option value="0">0 (all)</option>
                 <option value="5">5</option>
                 <option value="10">10</option>
@@ -1173,14 +1184,13 @@ class NetdataMCPChat {
                 <option value="90">90</option>
                 <option value="100">100</option>
             </select>
-            <span>KiB size, with</span>
+            <span style="text-decoration: line-through;">KiB size, with</span>
             <div class="model-select-wrapper" style="position: relative; display: inline-block;">
-                <button class="model-select-btn" id="toolSumModel_${chatId}" 
+                <button class="model-select-btn" id="toolSumModel_${chatId}" disabled
                         style="padding: 2px 8px; border: 1px solid var(--border-color); 
                                border-radius: 4px; background: var(--background-color); 
-                               color: var(--text-primary); cursor: pointer;
-                               display: flex; align-items: center; gap: 4px;"
-                        ${!isEnabled ? 'disabled' : ''}>
+                               color: var(--text-primary); cursor: not-allowed;
+                               display: flex; align-items: center; gap: 4px; text-decoration: line-through;">
                     <span class="model-name">${toolSumModel || 'Select model'}</span>
                     <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                 </button>
@@ -1189,25 +1199,24 @@ class NetdataMCPChat {
         
         section.appendChild(toolSumDiv);
         
-        // Auto-summarization Option (second)
+        // Auto-summarization Option (DISABLED - Not Implemented)
         const autoSumDiv = document.createElement('div');
-        const autoSumEnabled = config.optimisation.autoSummarisation.enabled;
-        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!autoSumEnabled ? 'opacity: 0.5;' : ''}`;
+        const autoSumEnabled = false; // Force disabled - not implemented
+        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
         
         const currentPercent = config.optimisation.autoSummarisation.triggerPercent || 50;
         const autoSumModel = ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model) || ChatConfig.getChatModelString(chat);
         
         autoSumDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="autoSummarization_${chatId}" ${autoSumEnabled ? 'checked' : ''}
+            <label style="display: flex; align-items: center; cursor: not-allowed;">
+                <input type="checkbox" id="autoSummarization_${chatId}" disabled
                        style="margin-right: 6px;">
-                <span>Summarize conversation when context window above</span>
+                <span style="text-decoration: line-through;">Summarize conversation when context window above</span>
             </label>
-            <select id="autoSumThreshold_${chatId}" 
+            <select id="autoSumThreshold_${chatId}" disabled
                     style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
                            border-radius: 4px; background: var(--background-color); color: var(--text-primary);
-                           cursor: pointer;"
-                    ${!autoSumEnabled ? 'disabled' : ''}>
+                           cursor: not-allowed; text-decoration: line-through;">
                 <option value="30">30%</option>
                 <option value="40">40%</option>
                 <option value="50" ${currentPercent === 50 ? 'selected' : ''}>50%</option>
@@ -1216,14 +1225,13 @@ class NetdataMCPChat {
                 <option value="80">80%</option>
                 <option value="90">90%</option>
             </select>
-            <span>with</span>
+            <span style="text-decoration: line-through;">with</span>
             <div class="model-select-wrapper" style="position: relative; display: inline-block;">
-                <button class="model-select-btn" id="autoSumModel_${chatId}" 
+                <button class="model-select-btn" id="autoSumModel_${chatId}" disabled
                         style="padding: 2px 8px; border: 1px solid var(--border-color); 
                                border-radius: 4px; background: var(--background-color); 
-                               color: var(--text-primary); cursor: pointer;
-                               display: flex; align-items: center; gap: 4px;"
-                        ${!autoSumEnabled ? 'disabled' : ''}>
+                               color: var(--text-primary); cursor: not-allowed;
+                               display: flex; align-items: center; gap: 4px; text-decoration: line-through;">
                     <span class="model-name">${autoSumModel || 'Select model'}</span>
                     <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                 </button>
@@ -3984,7 +3992,7 @@ class NetdataMCPChat {
         // Load pane sizes
         this.loadPaneSizes();
         
-        // Load MCP servers
+        // Load MCP servers from localStorage (but these will be merged with proxy servers later)
         const savedMcpServers = localStorage.getItem('mcpServers');
         if (savedMcpServers) {
             try {
@@ -3992,7 +4000,7 @@ class NetdataMCPChat {
                 servers.forEach(server => {
                     this.mcpServers.set(server.id, server);
                 });
-                this.updateMcpServersList();
+                // Don't update the UI yet - wait for proxy servers to be loaded too
             } catch (e) {
                 console.error('Failed to load MCP servers:', e);
             }
@@ -4341,19 +4349,40 @@ class NetdataMCPChat {
     }
 
     async initializeDefaultMCPServers() {
-        // Default MCP servers to add
-        const defaultServers = [
-            { id: 'costa_desktop', name: 'Costa-Desktop', url: 'ws://localhost:19999/mcp?api_key=b1eb964a-ff57-48f1-b87a-15b01702cdc7' },
-            { id: 'prod_aws_parent0', name: 'Production (aws-parent0)', url: 'ws://10.20.1.126:19999/mcp?api_key=1ddcfc20-0f08-4562-a5e5-f016786f1641' },
-            { id: 'prod_aws_parent1', name: 'Production (aws-parent1)', url: 'ws://10.20.1.127:19999/mcp?api_key=39c4cca3-a15b-4e56-8921-e0e4144c6820' },
-            { id: 'demos_registry', name: 'Demos (registry)', url: 'ws://10.20.1.96:19999/mcp?api_key=edfa4484-c721-4973-8ff4-58adc360031d' },
-            { id: 'demos_frankfurt', name: 'Demos (frankfurt)', url: 'ws://10.20.1.97:19999/mcp?api_key=11557d81-d887-472e-bc6a-a39ea704398d' },
-            { id: 'demos_sanfrancisco', name: 'Demos (sanfrancisco)', url: 'ws://10.20.1.98:19999/mcp?api_key=1ab30d97-4e1e-4aef-bbe9-5aee3a795fb3' },
-            { id: 'agent_events', name: 'Agent-Events', url: 'ws://10.20.1.105:19999/mcp?api_key=5759ff1c-d6d9-4ba7-9ccc-1b6b3f3f592e' }
-        ];
+        console.log('Starting initializeDefaultMCPServers...');
+        try {
+            // Get the proxy URL - try to get from LLM provider or use current origin
+            let proxyUrl;
+            
+            const defaultProvider = [...this.llmProviders.values()].find(p => p.url);
+            if (defaultProvider && defaultProvider.url) {
+                proxyUrl = defaultProvider.url;
+                console.log(`Using LLM provider URL: ${proxyUrl}`);
+            } else {
+                // Use the same origin as the current page (since we're being served by the proxy)
+                proxyUrl = window.location.origin;
+                console.log(`No LLM provider configured yet, using current origin: ${proxyUrl}`);
+            }
+            
+            console.log(`Fetching MCP servers from: ${proxyUrl}/mcp-servers`);
+            const response = await fetch(`${proxyUrl}/mcp-servers`);
+            if (!response.ok) {
+                console.warn('Failed to fetch default MCP servers from proxy:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            const defaultServers = data.servers || [];
+            
+            if (defaultServers.length === 0) {
+                console.log('No default MCP servers configured in proxy');
+                return;
+            }
+            
+            console.log(`Loaded ${defaultServers.length} default MCP servers from proxy:`, defaultServers);
 
-        // Handle migration of old default_mcp_server if it exists
-        const oldDefaultServer = this.mcpServers.get('default_mcp_server');
+            // Handle migration of old default_mcp_server if it exists
+            const oldDefaultServer = this.mcpServers.get('default_mcp_server');
         if (oldDefaultServer && oldDefaultServer.url === 'ws://localhost:19999/mcp') {
             // Remove the old default server as it's being replaced by Costa-Desktop
             this.mcpServers.delete('default_mcp_server');
@@ -4395,15 +4424,19 @@ class NetdataMCPChat {
         }
 
         // Save the updated server list
-        this.saveSettings();
-        this.updateMcpServersList();
+            this.saveSettings();
+            this.updateMcpServersList();
 
-        // Log the initialization
-        this.addLogEntry('SYSTEM', {
-            timestamp: new Date().toISOString(),
-            direction: 'info',
-            message: 'Initialized default MCP servers'
-        });
+            // Log the initialization
+            this.addLogEntry('SYSTEM', {
+                timestamp: new Date().toISOString(),
+                direction: 'info',
+                message: 'Initialized default MCP servers'
+            });
+        } catch (error) {
+            console.error('Failed to initialize default MCP servers:', error);
+            // Continue without default servers - user can add them manually
+        }
     }
 
     saveSettings() {
@@ -4554,6 +4587,12 @@ class NetdataMCPChat {
 
     // Chat Management
     async createNewChatDirectly() {
+        // Check if providers are still loading
+        if (!this.providersLoaded) {
+            this.showGlobalError('Please wait, loading providers...');
+            return;
+        }
+        
         // Check if there's an unsaved chat
         const unsavedChat = Array.from(this.chats.values()).find(chat => chat.isSaved === false);
         if (unsavedChat) {

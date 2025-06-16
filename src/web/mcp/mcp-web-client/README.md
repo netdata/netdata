@@ -2,6 +2,59 @@
 
 An all-in-one proxy server and web client for interacting with Netdata's Model Context Protocol (MCP) server using various LLM providers. The proxy server handles API key management, serves the web interface, and provides comprehensive usage accounting.
 
+## Installation
+
+### System-wide Installation (Recommended)
+
+For a production setup, install the LLM proxy server as a system service:
+
+```bash
+# Clone or download the repository
+cd /path/to/mcp-web-client
+
+# Run the installation script (requires root)
+sudo ./install.sh
+```
+
+This will:
+- Install files to `/opt/llm-proxy`
+- Create a systemd service named `llm-proxy`
+- Set up logs directory at `/opt/llm-proxy/logs`
+- Configure proper security permissions
+
+After installation:
+1. Create your configuration:
+   ```bash
+   sudo nano /opt/llm-proxy/llm-proxy-config.json
+   ```
+   (The service will create a template on first run)
+
+2. Start the service:
+   ```bash
+   sudo systemctl start llm-proxy
+   sudo systemctl enable llm-proxy  # Enable auto-start on boot
+   ```
+
+3. Check status and logs:
+   ```bash
+   sudo systemctl status llm-proxy
+   sudo journalctl -u llm-proxy -f
+   ```
+
+4. Access the web interface at: http://localhost:8081
+
+### Development Setup
+
+For development or testing, you can run directly from the source directory:
+
+```bash
+cd /path/to/mcp-web-client
+node llm-proxy.js
+```
+
+Configuration will be created in the current directory as `llm-proxy-config.json`.
+Logs will be written to `./logs/`.
+
 ## Setup Guide
 
 ### Prerequisites
@@ -9,7 +62,6 @@ An all-in-one proxy server and web client for interacting with Netdata's Model C
 - Node.js (v14 or higher)
 - A running Netdata instance with MCP server enabled
 - API keys for at least one LLM provider (OpenAI, Anthropic, or Google)
-- Write permissions to `/var/log/llm-proxy` for accounting logs (or run with sudo)
 
 ### 1. Setting up the LLM Proxy Server
 
@@ -19,16 +71,15 @@ The proxy server is the single entry point that:
 - Proxies all LLM API requests
 - Tracks usage and costs in accounting logs
 
-#### First Run
+#### Configuration
 
-1. Start the proxy server:
-   ```bash
-   node llm-proxy.js
-   ```
+The proxy server needs a configuration file with your API keys. The location depends on how you run it:
+- **System service**: `/opt/llm-proxy/llm-proxy-config.json`
+- **Development**: `./llm-proxy-config.json` (current directory)
 
-2. On first run, it will create `~/.config/llm-proxy-config.json` and exit with instructions.
+On first run without a config file, the server will create a template and exit.
 
-3. Edit `~/.config/llm-proxy-config.json` to add your API keys:
+Edit the configuration file to add your API keys:
    ```json
    {
      "port": 8081,
@@ -56,13 +107,12 @@ The proxy server is the single entry point that:
    }
    ```
 
-4. Start the proxy server again:
+4. Start the service (system installation) or run directly (development):
    ```bash
-   # Create accounting log directory (one-time setup)
-   sudo mkdir -p /var/log/llm-proxy
-   sudo chown $USER /var/log/llm-proxy
+   # For system service:
+   sudo systemctl restart llm-proxy
    
-   # Start the proxy
+   # For development:
    node llm-proxy.js
    ```
 
@@ -81,7 +131,7 @@ The proxy server is the single entry point that:
       • Proxy Endpoint:  http://localhost:8081/proxy/<provider>/<path>
    
    📊 Accounting:
-      • Log directory:   /var/log/llm-proxy
+      • Log directory:   /opt/llm-proxy/logs (or ./logs for development)
       • Today's log:     llm-accounting-2024-01-15.jsonl
       • Format:          JSON Lines (JSONL)
    ```
@@ -164,7 +214,7 @@ Options:
 
 The proxy server uses model information from two sources:
 
-1. **Configuration file** (`~/.config/llm-proxy-config.json`):
+1. **Configuration file** (`llm-proxy-config.json`):
    - **This is the ONLY source of truth during runtime**
    - Contains your API keys and active models
    - You MUST add models here for them to be available
@@ -241,7 +291,7 @@ gpt-4o-mini               not in config   128000     $0.40         $1.60
 
 **IMPORTANT**: All models must follow the strict validation requirements listed above.
 
-Edit `~/.config/llm-proxy-config.json` to manage your models:
+Edit your configuration file to manage your models:
 
 ```json
 {
@@ -343,17 +393,51 @@ To ensure accurate cost tracking:
 
 The accounting logs ONLY use pricing from your configuration file. **With strict validation enabled, models without proper pricing information are automatically rejected and cannot be used.** This ensures you have full control and awareness of all pricing used in your system, and prevents requests to improperly configured models.
 
+### MCP Server Configuration
+
+You can configure default MCP servers that will be automatically available in the web client:
+
+```json
+{
+  "mcpServers": [
+    {
+      "id": "local_netdata",
+      "name": "Local Netdata",
+      "url": "ws://localhost:19999/mcp?api_key=YOUR_API_KEY"
+    },
+    {
+      "id": "remote_server",
+      "name": "Remote Server",
+      "url": "ws://remote.example.com:19999/mcp?api_key=YOUR_API_KEY"
+    }
+  ]
+}
+```
+
+- **id**: Unique identifier for the server (required)
+- **name**: Display name shown in the UI (required)
+- **url**: WebSocket URL for the MCP server (required)
+
+These servers will be automatically loaded when users access the web client. Users can still add additional servers through the UI, which are stored in their browser's localStorage.
+
+**Note**: If no MCP servers are configured, the proxy will automatically provide a default server pointing to `ws://localhost:19999/mcp` to ensure the web client can start properly. You'll need to configure the API key through the UI or add your own servers to the configuration.
+
 ### API Endpoints
 
 The proxy server provides:
 - `GET /` - Serves the web client interface (index.html)
 - `GET /*.js`, `GET /*.css` - Serves web client static files
 - `GET /models` - Returns available providers and models with pricing (JSON API)
+- `GET /mcp-servers` - Returns configured MCP servers (JSON API)
 - `POST /proxy/<provider>/<api-path>` - Proxies requests to LLM providers
 
 ### Accounting Logs
 
-All LLM requests are logged to `/var/log/llm-proxy/llm-accounting-YYYY-MM-DD.jsonl`:
+All LLM requests are logged to:
+- **System service**: `/opt/llm-proxy/logs/llm-accounting-YYYY-MM-DD.jsonl`
+- **Development**: `./logs/llm-accounting-YYYY-MM-DD.jsonl`
+
+Log format:
 
 ```json
 {
@@ -396,18 +480,20 @@ Status codes:
 
 ## Security Notes
 
-- API keys are only stored in `~/.config/llm-proxy-config.json` on the server
+- API keys are only stored in the server's configuration file
 - The web client never sees or stores API keys
 - Configure `allowedOrigins` in production for better security
-- Keep `~/.config/llm-proxy-config.json` secure and never commit it to version control
+- Keep your configuration file secure and never commit it to version control
+- System service runs as dedicated `llm-proxy` user with restricted permissions
 
 ## Troubleshooting
 
 ### Proxy won't start
 - Check if port 8081 is already in use
-- Verify `~/.config/llm-proxy-config.json` is valid JSON
+- Verify your configuration file is valid JSON
 - Ensure at least one API key is configured
-- Check permissions for `/var/log/llm-proxy` directory
+- For system service: check `sudo journalctl -u llm-proxy -e`
+- For development: ensure `./logs` directory is writable
 
 ### Can't connect to proxy
 - Verify the proxy is running (`node llm-proxy.js`)
@@ -415,10 +501,10 @@ Status codes:
 - Check browser console for CORS errors
 
 ### No models available
-- Ensure API keys are correctly configured in `~/.config/llm-proxy-config.json`
+- Ensure API keys are correctly configured in your configuration file
 - **Check for validation errors**: Look at server startup logs for model validation failures
 - **Fix invalid models**: Ensure all models have required pricing fields for their provider
-- Run `node llm-proxy.js --sync --update-config` to sync models
+- Run `node llm-proxy.js --sync --update-config` to sync models (development)
 - Restart the proxy after configuration changes
 - Test the connection in the LLM provider settings
 
@@ -441,6 +527,7 @@ Status codes:
 - Use `node llm-proxy.js --show-models` to compare config vs code definitions
 
 ### Accounting logs not writing
-- Ensure `/var/log/llm-proxy` exists and is writable
+- For system service: Check `/opt/llm-proxy/logs` permissions
+- For development: Ensure `./logs` directory exists and is writable
 - Check console for "ACCOUNTING_FALLBACK" messages
 - Look for backup logs in `/tmp/llm-accounting-backup.jsonl`

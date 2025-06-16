@@ -450,12 +450,11 @@ console.log('LLM Proxy Server & MCP Web Client');
 console.log('='.repeat(60));
 
 // Accounting log file path
-const ACCOUNTING_DIR = '/var/log/llm-proxy';
+const ACCOUNTING_DIR = path.join(process.cwd(), 'logs');
 const ACCOUNTING_FILE = path.join(ACCOUNTING_DIR, `llm-accounting-${new Date().toISOString().split('T')[0]}.jsonl`);
 
-// Configuration file path in user's home directory
-const CONFIG_DIR = path.join(os.homedir(), '.config');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'llm-proxy-config.json');
+// Configuration file path in current working directory
+const CONFIG_FILE = path.join(process.cwd(), 'llm-proxy-config.json');
 
 // Helper function to generate models list from MODEL_DEFINITIONS
 function generateModelsForProvider(provider) {
@@ -506,7 +505,11 @@ const DEFAULT_CONFIG = {
       apiKey: '',
       models: generateModelsForProvider('google').slice(0, 10) // Include a subset for initial config
     }
-  }
+  },
+  mcpServers: [
+    // Example MCP server configuration
+    // { id: 'local_netdata', name: 'Local Netdata', url: 'ws://localhost:19999/mcp?api_key=YOUR_API_KEY' }
+  ]
 };
 
 // LLM Provider configurations
@@ -529,14 +532,7 @@ const LLM_PROVIDERS = {
 // Load or create configuration
 function loadConfig() {
   console.log('\n📁 Configuration:');
-  console.log(`   Config directory: ${CONFIG_DIR}`);
   console.log(`   Config file: ${CONFIG_FILE}`);
-  
-  // Ensure .config directory exists
-  if (!fs.existsSync(CONFIG_DIR)) {
-    console.log(`   Creating config directory...`);
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  }
 
   if (!fs.existsSync(CONFIG_FILE)) {
     console.log('\n🆕 First time setup detected!');
@@ -549,12 +545,16 @@ function loadConfig() {
     console.log('      - OpenAI: Add your API key starting with "sk-"');
     console.log('      - Anthropic: Add your API key starting with "sk-ant-"');
     console.log('      - Google: Add your API key for Gemini');
-    console.log('   3. Customize pricing if needed (prices are per million tokens):');
+    console.log('   3. (Optional) Add MCP servers to the mcpServers array:');
+    console.log('      - id: Unique identifier for the server');
+    console.log('      - name: Display name for the server');
+    console.log('      - url: WebSocket URL (e.g., ws://localhost:19999/mcp?api_key=...)');
+    console.log('   4. Customize pricing if needed (prices are per million tokens):');
     console.log('      - input: Regular input token cost');
     console.log('      - cacheRead: Cached input token cost (discounted)');
     console.log('      - cacheWrite: Cache creation cost (Anthropic only, 25% surcharge)');
     console.log('      - output: Output token cost');
-    console.log('   4. Save the file and restart this server');
+    console.log('   5. Save the file and restart this server');
     console.log('\n💡 Tip: You can use any text editor to edit the configuration file');
     console.log('   Example: nano ' + CONFIG_FILE);
     console.log('\n');
@@ -753,8 +753,6 @@ if (!fs.existsSync(ACCOUNTING_DIR)) {
   } catch (error) {
     console.error(`\n❌ Failed to create accounting directory: ${ACCOUNTING_DIR}`);
     console.error(`   Error: ${error.message}`);
-    console.error(`   You may need to run with sudo or create the directory manually:`);
-    console.error(`   sudo mkdir -p ${ACCOUNTING_DIR} && sudo chown $USER ${ACCOUNTING_DIR}`);
     process.exit(1);
   }
 }
@@ -1037,37 +1035,77 @@ const MIME_TYPES = {
 
 // Serve static files
 function serveStaticFile(req, res) {
-  let filePath = req.url === '/' ? '/index.html' : req.url;
-  filePath = path.join(__dirname, filePath);
+  // Parse URL to get pathname only (ignore query strings)
+  const parsedUrl = url.parse(req.url);
+  let requestPath = parsedUrl.pathname || '/';
   
-  // Security: prevent directory traversal
-  if (!filePath.startsWith(__dirname)) {
+  // Default to index.html for root
+  if (requestPath === '/') {
+    requestPath = '/index.html';
+  }
+  
+  // Remove leading slash for path.join to work correctly
+  if (requestPath.startsWith('/')) {
+    requestPath = requestPath.substring(1);
+  }
+  
+  // Normalize the path and remove any directory traversal attempts
+  requestPath = path.normalize(requestPath).replace(/^(\.\.[\/\\])+/, '');
+  
+  // Define the web root directory
+  const webRoot = path.join(__dirname, 'web');
+  
+  // Resolve the full file path
+  const filePath = path.resolve(webRoot, requestPath);
+  
+  // Debug logging for troubleshooting
+  if (req.url !== '/favicon.ico') {  // Skip favicon requests in logs
+    console.log(`[${new Date().toISOString()}] 📁 Static file request:`, {
+      url: req.url,
+      requestPath: requestPath,
+      __dirname: __dirname,
+      webRoot: webRoot,
+      filePath: filePath,
+      resolvedWebRoot: path.resolve(webRoot),
+      startsWith: filePath.startsWith(path.resolve(webRoot))
+    });
+  }
+  
+  // Security: ensure the resolved path is within the web directory
+  // This prevents directory traversal attacks like ../../etc/passwd
+  if (!filePath.startsWith(path.resolve(webRoot))) {
+    console.error(`[${new Date().toISOString()}] ❌ Security check failed: ${filePath} not in ${path.resolve(webRoot)}`);
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end('Forbidden');
     return;
   }
   
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not Found');
-      } else {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Internal Server Error');
-      }
+  // Additional security: ensure the file exists and is a file (not a directory)
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not Found');
       return;
     }
     
-    const ext = path.extname(filePath);
-    const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
-    
-    res.writeHead(200, {
-      'Content-Type': mimeType,
-      'Access-Control-Allow-Origin': ALLOWED_ORIGINS,
-      'Cache-Control': 'no-cache'
+    // Read and serve the file
+    fs.readFile(filePath, (err, content) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Internal Server Error');
+        return;
+      }
+      
+      const ext = path.extname(filePath);
+      const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
+      
+      res.writeHead(200, {
+        'Content-Type': mimeType,
+        'Access-Control-Allow-Origin': ALLOWED_ORIGINS,
+        'Cache-Control': 'no-cache'
+      });
+      res.end(content);
     });
-    res.end(content);
   });
 }
 
@@ -1089,9 +1127,10 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('   • Automatic model discovery and context window information');
   console.log('   • Cost accounting and usage tracking');
   console.log('\n🌐 Endpoints:');
-  console.log('   • Web UI:      http://localhost:' + (config.port || 8081) + '/');
-  console.log('   • Models API:  http://localhost:' + (config.port || 8081) + '/models');
-  console.log('   • Proxy API:   http://localhost:' + (config.port || 8081) + '/proxy/<provider>/<path>');
+  console.log('   • Web UI:         http://localhost:' + (config.port || 8081) + '/');
+  console.log('   • Models API:     http://localhost:' + (config.port || 8081) + '/models');
+  console.log('   • MCP Servers:    http://localhost:' + (config.port || 8081) + '/mcp-servers');
+  console.log('   • Proxy API:      http://localhost:' + (config.port || 8081) + '/proxy/<provider>/<path>');
   console.log('\n📊 Accounting:');
   console.log('   • Log files:   ' + ACCOUNTING_DIR);
   console.log('   • Format:      JSON Lines (one JSON object per line)');
@@ -1386,12 +1425,18 @@ if (process.argv.includes('--update-config')) {
       if (existingConfig.port) updatedConfig.port = existingConfig.port;
       if (existingConfig.allowedOrigins) updatedConfig.allowedOrigins = existingConfig.allowedOrigins;
       
+      // Preserve MCP servers
+      if (existingConfig.mcpServers) {
+        updatedConfig.mcpServers = existingConfig.mcpServers;
+      }
+      
       // Write updated config
       fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedConfig, null, 2));
       
       console.log('   ✅ Configuration updated successfully!');
       console.log('\n📊 Update Summary:');
       console.log('   • API keys: Preserved');
+      console.log('   • MCP servers: Preserved');
       console.log('   • Custom models: Preserved');
       console.log('   • Latest model definitions: Added');
       console.log('   • Context window sizes: Updated');
@@ -1439,7 +1484,9 @@ const server = http.createServer(async (req, res) => {
   const pathParts = parsedUrl.pathname.split('/').filter(p => p);
 
   // Serve static files for the web client
-  if (!parsedUrl.pathname.startsWith('/proxy/') && !parsedUrl.pathname.startsWith('/models')) {
+  if (!parsedUrl.pathname.startsWith('/proxy/') && 
+      !parsedUrl.pathname.startsWith('/models') && 
+      !parsedUrl.pathname.startsWith('/mcp-servers')) {
     // Log static file requests only for main pages
     if (req.url === '/' || req.url.endsWith('.html')) {
       console.log(`[${new Date().toISOString()}] 📄 Web UI request: ${req.url}`);
@@ -1485,6 +1532,31 @@ const server = http.createServer(async (req, res) => {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS
     });
     res.end(JSON.stringify({ providers: availableProviders }));
+    return;
+  }
+  
+  // Handle /mcp-servers endpoint
+  if (pathParts.length === 1 && pathParts[0] === 'mcp-servers') {
+    console.log(`[${new Date().toISOString()}] 🔍 MCP Servers API request`);
+    
+    // Get configured MCP servers or provide default
+    let mcpServers = config.mcpServers || [];
+    
+    // If no servers configured, provide a default localhost server
+    if (mcpServers.length === 0) {
+      mcpServers = [{
+        id: 'local_netdata',
+        name: 'Local Netdata',
+        url: 'ws://localhost:19999/mcp'
+      }];
+      console.log('   ℹ️  No MCP servers configured, returning default localhost server');
+    }
+    
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': ALLOWED_ORIGINS
+    });
+    res.end(JSON.stringify({ servers: mcpServers }));
     return;
   }
   
@@ -1942,6 +2014,7 @@ server.listen(PROXY_PORT, () => {
   console.log('\n🌐 Available Services:');
   console.log(`   • Web UI:          http://localhost:${PROXY_PORT}/`);
   console.log(`   • Models API:      http://localhost:${PROXY_PORT}/models`);
+  console.log(`   • MCP Servers:     http://localhost:${PROXY_PORT}/mcp-servers`);
   console.log(`   • Proxy Endpoint:  http://localhost:${PROXY_PORT}/proxy/<provider>/<path>`);
   
   console.log('\n📊 Accounting:');
