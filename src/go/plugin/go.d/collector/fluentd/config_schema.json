@@ -122,6 +122,10 @@
       "method": {
         "title": "Method",
         "type": "string"
+      },
+      "permit_plugin": {
+        "title": "Permit Plugin",
+        "type": "string"
       }
     },
     "required": [
@@ -185,6 +189,9 @@
       "ui:widget": "hidden"
     },
     "method": {
+      "ui:widget": "hidden"
+    },
+    "permit_view": {
       "ui:widget": "hidden"
     },
     "bearer_token_file": {
