@@ -217,6 +217,11 @@
       "method": {
         "title": "Method",
         "type": "string"
+      },
+      "force_http2": {
+        "title": "Force HTTP2",
+        "description": "If set, forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).",
+        "type": "boolean"
       }
     },
     "required": [
@@ -329,6 +334,9 @@
       "ui:widget": "hidden"
     },
     "method": {
+      "ui:widget": "hidden"
+    },
+    "force_http2": {
       "ui:widget": "hidden"
     }
   }
