@@ -114,7 +114,8 @@ type MetricTagConfig struct {
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
-	Mapping ListMap[string] `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	MappingRef string          `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
+	Mapping    ListMap[string] `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 
 	// Regex
 	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead

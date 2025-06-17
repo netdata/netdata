@@ -13,8 +13,8 @@ metrics:
     table:
       OID: 1.3.6.1.2.1.2.2
       name: ifTable
-    metric_type: monotonic_count_and_rate
     symbols:
+      # Counters that will be inferred as rate type from PDU
       - OID: 1.3.6.1.2.1.2.2.1.14
         name: ifInErrors
         description: Number of inbound packets that contained errors preventing them from being deliverable to a higher-layer protocol
@@ -35,17 +35,7 @@ metrics:
         description: Number of outbound packets chosen to be discarded even though no errors had been detected to prevent their being transmitted
         family: Interfaces/Discards
         unit: "{discard}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        table: ifXTable
-        tag: interface
-  - MIB: IF-MIB
-    table:
-      OID: 1.3.6.1.2.1.2.2
-      name: ifTable
-    symbols:
+      # Gauges that will be inferred from PDU type
       - OID: 1.3.6.1.2.1.2.2.1.7
         name: ifAdminStatus
         description: Current administrative state of the interface
@@ -79,12 +69,27 @@ metrics:
           name: ifName
         table: ifXTable
         tag: interface
+      - tag: if_type
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
+        mapping_ref: ifType
   - MIB: IF-MIB
     table:
       OID: 1.3.6.1.2.1.31.1.1
       name: ifXTable
-    metric_type: monotonic_count
     symbols:
+      # Counters that will be inferred as rate type from PDU
+      - OID: 1.3.6.1.2.1.31.1.1.1.6
+        name: ifHCInOctets
+        description: Total number of octets received on the interface including framing characters
+        family: Interfaces/Traffic
+        unit: "By"
+      - OID: 1.3.6.1.2.1.31.1.1.1.10
+        name: ifHCOutOctets
+        description: Total number of octets transmitted out of the interface including framing characters
+        family: Interfaces/Traffic
+        unit: "By"
       - OID: 1.3.6.1.2.1.31.1.1.1.7
         name: ifHCInUcastPkts
         description: Number of packets delivered by this sub-layer to a higher layer which were not addressed to a multicast or broadcast address
@@ -115,44 +120,20 @@ metrics:
         description: Total number of packets that higher-level protocols requested be transmitted and which were addressed to a broadcast address
         family: Interfaces/Packets/Broadcast
         unit: "{packet}"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        tag: interface
-  - MIB: IF-MIB
-    table:
-      OID: 1.3.6.1.2.1.31.1.1
-      name: ifXTable
-    metric_type: monotonic_count_and_rate
-    symbols:
-      - OID: 1.3.6.1.2.1.31.1.1.1.6
-        name: ifHCInOctets
-        description: Total number of octets received on the interface including framing characters
-        family: Interfaces/Traffic
-        unit: "By"
-      - OID: 1.3.6.1.2.1.31.1.1.1.10
-        name: ifHCOutOctets
-        description: Total number of octets transmitted out of the interface including framing characters
-        family: Interfaces/Traffic
-        unit: "By"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        tag: interface
-  - MIB: IF-MIB
-    table:
-      OID: 1.3.6.1.2.1.31.1.1
-      name: ifXTable
-    symbols:
+      # Gauge that will be inferred from PDU type
       - OID: 1.3.6.1.2.1.31.1.1.1.15
         name: ifHighSpeed
         description: Estimate of the interface's current bandwidth in units of 1,000,000 bits per second
         family: Interfaces/Speed
         unit: "Mbit/s"
     metric_tags:
-      - symbol:
+      - tag: interface
+        symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
-        tag: interface
+      - tag: if_type
+        table: ifTable
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
+        mapping_ref: ifType

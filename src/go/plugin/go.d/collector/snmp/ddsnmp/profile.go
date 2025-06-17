@@ -64,6 +64,8 @@ func FindProfiles(sysObjId string) []*Profile {
 		}
 	}
 
+	enrichProfiles(profiles)
+
 	return profiles
 }
 
@@ -256,4 +258,28 @@ func getProfilesDir() string {
 		return filepath.Join(dir, "go.d/snmp.profiles/default")
 	}
 	return filepath.Join(executable.Directory, "../../../config/go.d/snmp.profiles/default")
+}
+
+func enrichProfiles(profiles []*Profile) {
+	for _, prof := range profiles {
+		if prof.Definition == nil {
+			continue
+		}
+
+		for i := range prof.Definition.Metrics {
+			metric := &prof.Definition.Metrics[i]
+
+			for j := range metric.MetricTags {
+				tagCfg := &metric.MetricTags[j]
+
+				if tagCfg.Mapping != nil {
+					continue
+				}
+
+				if tagCfg.MappingRef == "ifType" {
+					tagCfg.Mapping = sharedMappings.ifType
+				}
+			}
+		}
+	}
 }
