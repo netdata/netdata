@@ -342,19 +342,19 @@
             "dimensions"
           ]
         }
+      },
+      "enable_profiles": {
+        "title": "Enable SNMP Profile Collection",
+        "description": "Enable collection of metrics using SNMP profiles.",
+        "type": "boolean",
+        "default": true
+      },
+      "enable_profiles_table_metrics": {
+        "title": "Enable SNMP Table Metrics",
+        "description": "Enable collection of SNMP table metrics from profiles.",
+        "type": "boolean",
+        "default": false
       }
-    },
-    "enable_profiles": {
-      "title": "Enable SNMP Profile Collection",
-      "description": "Enable collection of metrics using SNMP profiles.",
-      "type": "boolean",
-      "default": true
-    },
-    "enable_profiles_table_metrics": {
-      "title": "Enable SNMP Table Metrics",
-      "description": "Enable collection of SNMP table metrics from profiles.",
-      "type": "boolean",
-      "default": false
     },
     "required": [
       "hostname",
