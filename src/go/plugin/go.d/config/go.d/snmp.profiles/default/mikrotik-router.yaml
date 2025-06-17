@@ -151,17 +151,21 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3
       name: hrStorageTable
     symbols:
+      # HOST-RESOURCES-MIB reports storage sizes in "allocation units" rather than bytes.
+      # The allocation unit size is defined in hrStorageAllocationUnits (1.3.6.1.2.1.25.2.3.1.4).
+      # MikroTik devices typically use 1024-byte allocation units for all storage types.
+      # The scale_factor multiplies the raw value by 1024 to convert to bytes.
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: memory.total
         description: Size of the storage represented by this entry in allocation units
         family: MikroTik/Memory
-        scale_factor: 1024  # Convert allocation units to bytes
+        scale_factor: 1024
         unit: "By"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: memory.used
         description: Amount of the storage represented by this entry that is allocated
         family: MikroTik/Memory
-        scale_factor: 1024  # Convert allocation units to bytes
+        scale_factor: 1024
         unit: "By"
     metric_tags:
       - tag: mem_index
