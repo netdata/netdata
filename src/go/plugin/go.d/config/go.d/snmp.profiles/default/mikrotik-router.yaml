@@ -157,13 +157,13 @@ metrics:
       # The scale_factor multiplies the raw value by 1024 to convert to bytes.
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: memory.total
-        description: Size of the storage represented by this entry in allocation units
+        description: Total size of the storage in bytes
         family: MikroTik/Memory
         scale_factor: 1024
         unit: "By"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: memory.used
-        description: Amount of the storage represented by this entry that is allocated
+        description: Amount of storage currently allocated in bytes
         family: MikroTik/Memory
         scale_factor: 1024
         unit: "By"
