@@ -107,6 +107,11 @@ static struct proc_module {
      .update_every = 30 * UPDATE_EVERY_MIN,
      .func = do_PerflibServices},
 
+    {.name = "PerflibExchange",
+        .dim = "PerflibADFS",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .update_every = UPDATE_EVERY_MIN,
+        .func = do_PerflibExchange},
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}};
 
