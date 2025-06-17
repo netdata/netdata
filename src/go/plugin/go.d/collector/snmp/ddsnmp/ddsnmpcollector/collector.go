@@ -47,7 +47,6 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
 		tableCache:  newTableCache(10*time.Minute, 1), // 5 min TTL with 100% jitter
-		//doTableMetrics: true,
 	}
 
 	for _, prof := range profiles {
@@ -66,7 +65,7 @@ type (
 		missingOIDs map[string]bool
 		tableCache  *tableCache
 
-		doTableMetrics bool
+		DoTableMetrics bool
 	}
 	profileState struct {
 		profile        *ddsnmp.Profile
@@ -130,7 +129,7 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 	}
 	metrics = append(metrics, scalarMetrics...)
 
-	if c.doTableMetrics {
+	if c.DoTableMetrics {
 		tableMetrics, err := c.collectTableMetrics(ps.profile)
 		if err != nil {
 			return nil, err

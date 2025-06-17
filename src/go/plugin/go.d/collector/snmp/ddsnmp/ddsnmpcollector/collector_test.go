@@ -3343,7 +3343,7 @@ func TestCollector_Collect(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			collector := New(mockHandler, tc.profiles, logger.New())
-			collector.doTableMetrics = true
+			collector.DoTableMetrics = true
 			collector.tableCache.setTTL(0, 0)
 
 			result, err := collector.Collect()
