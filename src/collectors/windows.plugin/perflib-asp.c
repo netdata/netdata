@@ -272,7 +272,7 @@ static void netdata_aspnet_compilations_total(struct aspnet_app *aa, char *app, 
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_compilations_total =
-            rrddim_add(aa->st_aspnet_compilations_total, "compilation", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_compilations_total, "compilation", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_compilations_total->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -338,7 +338,7 @@ static void netdata_aspnet_errors_during_compilation(struct aspnet_app *aa, char
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_errors_during_compilation =
-            rrddim_add(aa->st_aspnet_errors_during_compilation, "compilation", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_errors_during_compilation, "compilation", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_errors_during_compilation->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -371,7 +371,7 @@ static void netdata_aspnet_errors_during_execution(struct aspnet_app *aa, char *
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_errors_during_execution =
-            rrddim_add(aa->st_aspnet_errors_during_execution, "execution", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_errors_during_execution, "execution", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_errors_during_execution->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -404,7 +404,7 @@ static void netdata_aspnet_errors_during_unhandled_execution(struct aspnet_app *
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_errors_unhandled_execution_sec =
-            rrddim_add(aa->st_aspnet_errors_unhandled_execution_sec, "unhandled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_errors_unhandled_execution_sec, "unhandled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_errors_unhandled_execution_sec->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -563,7 +563,7 @@ static void netdata_aspnet_requests_not_found(struct aspnet_app *aa, char *app, 
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_requests_not_found =
-            rrddim_add(aa->st_aspnet_requests_not_found, "not found", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_requests_not_found, "not found", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_requests_not_found->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -826,7 +826,7 @@ static void netdata_aspnet_sessions_timedout(struct aspnet_app *aa, char *app, i
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_sessions_timed_out =
-            rrddim_add(aa->st_aspnet_sessions_timed_out, "timed out", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_sessions_timed_out, "timed out", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_sessions_timed_out->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -908,7 +908,7 @@ static void netdata_aspnet_transactions_committed(struct aspnet_app *aa, char *a
             RRDSET_TYPE_LINE);
 
         aa->rd_aspnet_transactions_committed =
-            rrddim_add(aa->st_aspnet_transactions_committed, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(aa->st_aspnet_transactions_committed, "committed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rrdlabels_add(aa->st_aspnet_transactions_committed->rrdlabels, "aspnet_app", app, RRDLABEL_SRC_AUTO);
     }
@@ -1318,7 +1318,7 @@ static void netdata_aspnet_apps_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
-        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+        if (strcasecmp(windows_shared_buffer, "__Total__") == 0)
             continue;
 
         struct aspnet_app *aa = dictionary_set(aspnet_apps, windows_shared_buffer, NULL, sizeof(*aa));
