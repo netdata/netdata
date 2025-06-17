@@ -334,8 +334,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_ssl_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
-    rrdlabels_aral_destroy();
-
     watcher_shutdown_end();
     watcher_thread_stop();
 
@@ -409,6 +407,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
                 strings_referenced);
 
+    rrdlabels_aral_destroy();
     fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
 
     fprintf(stderr, "All done, exiting...\n");
