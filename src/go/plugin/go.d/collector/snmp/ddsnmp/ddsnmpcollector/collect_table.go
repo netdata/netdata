@@ -209,6 +209,9 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 					continue
 				}
 
+				mergeTagsWithFallback(rowTags, tags)
+				mergeTagsWithFallback(tagCache[index], tags)
+
 				for k, v := range tags {
 					if existing, ok := rowTags[k]; !ok || existing == "" {
 						rowTags[k] = v
