@@ -1033,7 +1033,7 @@ static void netdata_aspnet_events_raised(struct aspnet_app *aa, char *app, int u
 
     rrddim_set_by_pointer(
         aa->st_aspnet_events_raised_per_sec,
-        aa->rd_aspnet_transactions_per_sec,
+        aa->rd_aspnet_events_raised_per_sec,
         (collected_number)aa->aspnetEventsRaisedPerSec.current.Data);
     rrdset_done(aa->st_aspnet_events_raised_per_sec);
 }
