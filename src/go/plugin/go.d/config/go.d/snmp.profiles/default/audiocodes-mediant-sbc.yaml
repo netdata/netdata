@@ -2,31 +2,35 @@ extends:
   - _base.yaml
   - _generic-if.yaml
 
+metadata:
+  device:
+    fields:
+      type:
+        value: SBC
+      vendor:
+        value: AudioCodes
+
 sysobjectid:
   - 1.3.6.1.4.1.5003.8.1.1.71
 
 metrics:
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.5.1
-    description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
-    unit: "{logical_storage_area}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.used
-      OID: 1.3.6.1.2.1.25.2.3.1.6.1
-    description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
-    unit: "{logical_storage_area}"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: cpu.usage
-      OID: 1.3.6.1.2.1.25.3.3.1.2.1
-    description: The average, over the last minute, of the percentage of time that this processor was not idle.
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     name: memory.total
+  #     OID: 1.3.6.1.2.1.25.2.3.1.5.1
+  #   description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
+  #   unit: "{logical_storage_area}"
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     name: memory.used
+  #     OID: 1.3.6.1.2.1.25.2.3.1.6.1
+  #   description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
+  #   unit: "{logical_storage_area}"
+  # - MIB: HOST-RESOURCES-MIB
+  # TODO, units defined by MIB
+  symbol:
+    name: cpu.usage
+    OID: 1.3.6.1.2.1.25.3.3.1.2.1
+    description: The average, over the last minute, of the percentage of time that the processor was not idle
+    family: CPU
     unit: "%"
-
-metadata:
-  device:
-    fields:
-      vendor:
-        value: "audiocodes"
