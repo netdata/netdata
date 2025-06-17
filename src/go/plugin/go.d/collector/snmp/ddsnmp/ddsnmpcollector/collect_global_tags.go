@@ -5,7 +5,6 @@ package ddsnmpcollector
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
@@ -40,30 +39,30 @@ func (c *Collector) collectGlobalTags(prof *ddsnmp.Profile) (map[string]string, 
 		return nil, err
 	}
 
-	tags := make(map[string]string)
+	globalTags := make(map[string]string)
 	var errs []error
 
 	for _, tag := range prof.Definition.StaticTags {
 		parts := strings.SplitN(tag, ":", 2)
 		if len(parts) == 2 {
-			tags[parts[0]] = parts[1]
+			globalTags[parts[0]] = parts[1]
 		}
 	}
 
 	for _, cfg := range prof.Definition.MetricTags {
-		v, err := processMetricTagValue(cfg, pdus)
+		tagValues, err := processMetricTagValue(cfg, pdus)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to process tag value for '%s/%s': %v", cfg.Tag, cfg.Symbol.Name, err))
 			continue
 		}
-		maps.Copy(tags, v)
+		mergeTagsWithEmptyFallback(globalTags, tagValues)
 	}
 
-	if len(errs) > 0 && len(tags) == 0 {
+	if len(errs) > 0 && len(globalTags) == 0 {
 		return nil, fmt.Errorf("failed to process any global tags: %v", errors.Join(errs...))
 	}
 
-	return tags, nil
+	return globalTags, nil
 }
 
 func processMetricTagValue(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU) (map[string]string, error) {

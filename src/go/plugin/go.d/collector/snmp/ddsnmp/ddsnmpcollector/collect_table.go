@@ -209,10 +209,8 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 					continue
 				}
 
-				for k, v := range tags {
-					rowTags[k] = v
-					tagCache[index][k] = v
-				}
+				mergeTagsWithEmptyFallback(rowTags, tags)
+				mergeTagsWithEmptyFallback(tagCache[index], tags)
 			}
 		}
 
@@ -268,10 +266,8 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
-			for k, v := range tags {
-				rowTags[k] = v
-				tagCache[index][k] = v
-			}
+			mergeTagsWithEmptyFallback(rowTags, tags)
+			mergeTagsWithEmptyFallback(tagCache[index], tags)
 		}
 
 		// Process index-based tags
