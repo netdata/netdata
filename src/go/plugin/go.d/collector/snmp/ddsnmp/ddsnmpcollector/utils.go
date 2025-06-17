@@ -252,23 +252,3 @@ func isMappingKeysNumeric(mapping map[string]string) bool {
 	}
 	return true
 }
-func cleanMetrics(pms []*ProfileMetrics) {
-	for _, pm := range pms {
-		for i := range pm.Metrics {
-			m := &pm.Metrics[i]
-			m.Description = metricMetaReplacer.Replace(m.Description)
-			m.Family = metricMetaReplacer.Replace(m.Family)
-			m.Unit = metricMetaReplacer.Replace(m.Unit)
-			for k, v := range m.Tags {
-				m.Tags[k] = metricMetaReplacer.Replace(v)
-			}
-		}
-	}
-}
-
-var metricMetaReplacer = strings.NewReplacer(
-	"'", "",
-	"\n", " ",
-	"\r", " ",
-	"\x00", "",
-)

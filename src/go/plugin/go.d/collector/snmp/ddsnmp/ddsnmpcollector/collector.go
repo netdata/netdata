@@ -98,8 +98,7 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 		c.log.Debugf("collecting metrics: %v", errors.Join(errs...))
 	}
 
-	c.updateMetricFamily(metrics)
-	cleanMetrics(metrics)
+	c.updateMetrics(metrics)
 
 	return metrics, nil
 }
@@ -150,7 +149,7 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 	return pm, nil
 }
 
-func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {
+func (c *Collector) updateMetrics(pms []*ProfileMetrics) {
 	// Find device vendor and type from any profile that has them.
 	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
 	// but only device-specific profiles contain vendor/type information.
@@ -174,7 +173,27 @@ func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {
 				m.Family = processMetricFamily(m.Family, dt, dv)
 			}
 		}
-		return
+		break
+	}
+
+	for _, pm := range pms {
+		for i := range pm.Metrics {
+			m := &pm.Metrics[i]
+			m.Description = metricMetaReplacer.Replace(m.Description)
+			m.Family = metricMetaReplacer.Replace(m.Family)
+			m.Unit = metricMetaReplacer.Replace(m.Unit)
+			for k, v := range m.Tags {
+				m.Tags[k] = metricMetaReplacer.Replace(v)
+			}
+			if v, ok := m.Tags["_unit"]; ok && v != "" {
+				delete(m.Tags, "_unit")
+				m.Unit = metricMetaReplacer.Replace(v)
+			}
+			if v, ok := m.Tags["_metric_suffix"]; ok && v != "" {
+				delete(m.Tags, "_metric_suffix")
+				m.Name += "_" + metricMetaReplacer.Replace(v)
+			}
+		}
 	}
 }
 
@@ -215,3 +234,10 @@ func processMetricFamily(family, devType, vendor string) string {
 
 	return strings.TrimSuffix(prefix+"/"+strings.Join(parts, "/"), "/")
 }
+
+var metricMetaReplacer = strings.NewReplacer(
+	"'", "",
+	"\n", " ",
+	"\r", " ",
+	"\x00", "",
+)
