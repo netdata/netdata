@@ -105,7 +105,6 @@ RRDLABELS *rrdlabels_create(void)
     spinlock_init(&labels->spinlock);
     labels->version = 0;
     labels->JudyL = NULL;
-    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, 0, sizeof(RRDLABELS));
     return labels;
 }
 
