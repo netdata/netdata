@@ -46,7 +46,7 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(10*time.Minute, 1), // 5 min TTL with 100% jitter
+		tableCache:  newTableCache(30*time.Minute, 1), // 100% jitter
 	}
 
 	for _, prof := range profiles {
