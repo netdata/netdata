@@ -266,4 +266,9 @@ func cleanMetrics(pms []*ProfileMetrics) {
 	}
 }
 
-var metricMetaReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ")
+var metricMetaReplacer = strings.NewReplacer(
+	"'", "",
+	"\n", " ",
+	"\r", " ",
+	"\x00", "",
+)
