@@ -253,7 +253,7 @@ func isMappingKeysNumeric(mapping map[string]string) bool {
 	return true
 }
 
-func mergeTagsWithFallback(dest, src map[string]string) {
+func mergeTagsWithEmptyFallback(dest, src map[string]string) {
 	for k, v := range src {
 		if existing, ok := dest[k]; !ok || existing == "" {
 			dest[k] = v

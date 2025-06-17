@@ -55,7 +55,7 @@ func (c *Collector) collectGlobalTags(prof *ddsnmp.Profile) (map[string]string, 
 			errs = append(errs, fmt.Errorf("failed to process tag value for '%s/%s': %v", cfg.Tag, cfg.Symbol.Name, err))
 			continue
 		}
-		mergeTagsWithFallback(globalTags, tagValues)
+		mergeTagsWithEmptyFallback(globalTags, tagValues)
 	}
 
 	if len(errs) > 0 && len(globalTags) == 0 {
