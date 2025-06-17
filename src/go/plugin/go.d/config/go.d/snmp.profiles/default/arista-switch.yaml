@@ -201,16 +201,16 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
           name: aristaBgp4V2PeerState
-        description: BGP peer connection state
-        family: Peers/BGP/Status
-        unit: "{status}"
-        mapping:
-          1: idle
-          2: connect
-          3: active
-          4: opensent
-          5: openconfirm
-          6: established
+          description: BGP peer connection state
+          family: Peers/BGP/Status
+          unit: "{status}"
+          mapping:
+            1: idle
+            2: connect
+            3: active
+            4: opensent
+            5: openconfirm
+            6: established
     metric_tags:
       - symbol:
           name: aristaBgp4V2PeerLocalPort
