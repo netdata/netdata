@@ -67,7 +67,9 @@ func (c *Collector) collectDeviceMetadata(prof *ddsnmp.Profile) (map[string]stri
 					errs = append(errs, fmt.Errorf("failed to process meta device tag value for '%s': %v", name, err))
 					continue
 				}
-				tags[name] = v
+				if existing, ok := tags[name]; !ok || existing == "" {
+					tags[name] = v
+				}
 			case len(field.Symbols) > 0:
 				for _, sym := range field.Symbols {
 					v, err := processSymbolTagValue(sym, pdus)
@@ -75,7 +77,9 @@ func (c *Collector) collectDeviceMetadata(prof *ddsnmp.Profile) (map[string]stri
 						errs = append(errs, fmt.Errorf("failed to process meta device tag value for '%s': %v", name, err))
 						continue
 					}
-					tags[name] = v
+					if existing, ok := tags[name]; !ok || existing == "" {
+						tags[name] = v
+					}
 				}
 			}
 		}

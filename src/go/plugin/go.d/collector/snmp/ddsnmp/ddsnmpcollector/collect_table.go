@@ -210,8 +210,10 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				}
 
 				for k, v := range tags {
-					rowTags[k] = v
-					tagCache[index][k] = v
+					if existing, ok := rowTags[k]; !ok || existing == "" {
+						rowTags[k] = v
+						tagCache[index][k] = v
+					}
 				}
 			}
 		}
@@ -269,8 +271,10 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 			}
 
 			for k, v := range tags {
-				rowTags[k] = v
-				tagCache[index][k] = v
+				if existing, ok := rowTags[k]; !ok || existing == "" {
+					rowTags[k] = v
+					tagCache[index][k] = v
+				}
 			}
 		}
 
