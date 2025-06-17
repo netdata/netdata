@@ -3454,12 +3454,21 @@ modules:
                 - name: serviced
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNUMA
       monitored_instance:
         name: NUMA Architecture
         link: "https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support"
+=======
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibASP
+      monitored_instance:
+        name: ASP.NET
+        link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
+>>>>>>> 695966b96 (asp: Fix rebases)
         categories:
           - data-collection.windows-systems
         icon_filename: "windows.svg"
@@ -3470,15 +3479,26 @@ modules:
         description: ""
       keywords:
         - windows
+<<<<<<< HEAD
         - NUMA
         - processor
+=======
+        - ASP
+        - webservice
+>>>>>>> 695966b96 (asp: Fix rebases)
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
+<<<<<<< HEAD
           This collector monitors NUMA Architecture on Windows.
         method_description: |
           It queries NUMA Node Memory from Perflib in order to gather the metrics.
+=======
+          This collector monitors ASP.NET applications.
+        method_description: |
+          It queries for the 'ASP.NET' and 'ASP.NET Applications' objects from Perflib in order to gather the metrics.
+>>>>>>> 695966b96 (asp: Fix rebases)
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -3507,7 +3527,11 @@ modules:
             title: "Config option"
             enabled: false
           list:
+<<<<<<< HEAD
             - name: PerflibNUMA
+=======
+            - name: PerflibASP
+>>>>>>> 695966b96 (asp: Fix rebases)
               description: An option to enable or disable the data collection.
               default_value: yes
               required: false
@@ -3527,6 +3551,7 @@ modules:
       description: ""
       availability: []
       scopes:
+<<<<<<< HEAD
         - name: NUMA
           description: "These metrics refer to memory utilization on NUMA systems."
           labels:
@@ -3547,21 +3572,210 @@ modules:
           labels: []
           metrics:
             - name: asp.application_restarts
+=======
+        - name: ASP.NET Global Data
+          description: "These metrics refer to ASP.NET global metrics."
+          labels: []
+          metrics:
+            - name: aspnet.application_restarts
+>>>>>>> 695966b96 (asp: Fix rebases)
               description: Number of times the application has been restarted.
               unit: restarts
               chart_type: line
               dimensions:
                 - name: restarts
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> d40509fa7 (asp: Add first global chart; Initialize the metadata)
 =======
             - name: asp.worker_process_restarts
+=======
+            - name: aspnet.worker_process_restarts
+>>>>>>> 695966b96 (asp: Fix rebases)
               description: Number of times a worker process has restarted on the machine.
               unit: restarts
               chart_type: line
               dimensions:
                 - name: restarts
+<<<<<<< HEAD
 >>>>>>> 9570ab69a (asp: Add worker process restart)
 =======
+=======
+        - name: ASP.NET Applications
+          description: "ASP.NET application performance counters"
+          labels:
+            - name: aspnet_app
+              description: The application name.
+          metrics:
+            - name: aspnet.anonymous_request
+              description: Number of requests utilizing anonymous authentication.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: aspnet.compilation_totals
+              description: Number of source files dynamically compiled.
+              unit: compilations
+              chart_type: line
+              dimensions:
+                - name: compilations
+            - name: aspnet.errors_during_preprocessing
+              description: Errors During Preprocessing.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: preprocessing
+            - name: aspnet.errors_during_compilation
+              description: Errors During Compilation.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: compilation
+            - name: aspnet.errors_during_execution
+              description: Errors During Execution.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: execution
+            - name: aspnet.errors_during_unhandled_execution
+              description: Errors Unhandled During Execution.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: unhandled
+            - name: aspnet.requests_byte_total
+              description: Size of responses and request.
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: aspnet.requests_executing
+              description: The number of requests currently executing.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: executing
+            - name: aspnet.requests_failed
+              description: Number of failed requests.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: executing
+            - name: aspnet.requests_not_found
+              description: Requests for resources that were not found.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: not found
+            - name: aspnet.requests_in_application_queue
+              description: Requests in the application queue.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: queue
+            - name: aspnet.requests_timeout
+              description: Requests that timed out.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: timeout
+            - name: aspnet.requests_succeeded
+              description: Requests that executed successfully.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.sessions_active
+              description: Sessions currently active.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: aspnet.sessions_abandoned
+              description: Sessions explicitly abandoned.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: abandoned
+            - name: aspnet.sessions_abandoned
+              description: Sessions explicitly abandoned.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: abandoned
+            - name: aspnet.sessions_timed_out
+              description: Sessions timed out.
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: timed out
+            - name: aspnet.transactions_aborted
+              description: Transactions Aborted.
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: aborted
+            - name: aspnet.transactions_committed
+              description: Transactions Committed.
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: aspnet.transactions_pending
+              description: Transactions Pending.
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: aspnet.events_raised_per_sec
+              description: Instrumentation events.
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: raised
+            - name: aspnet.error_events_raised_per_sec
+              description: Runtime error events raised.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: aspnet.events_audit_success
+              description: Audit successes in the application.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: aspnet.events_audit_failure
+              description: Audit Failure Events Raised
+              unit: failures
+              chart_type: line
+              dimensions:
+                - name: audit
+            - name: aspnet.membership_auth_success
+              description: Membership Authentication Success.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.form_authentication_success
+              description: Membership Authentication Failure.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.form_authentication_success
+              description: Forms Authentication Success.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: aspnet.form_authentication_failure
+              description: Forms Authentication Failure.
+              unit: auth
+              chart_type: line
+              dimensions:
+                - name: failure
+>>>>>>> 695966b96 (asp: Fix rebases)
 
 >>>>>>> fdc3b79be (asp: Add ASPNET Anonymous chart; Create a common standard)
