@@ -2885,7 +2885,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 FetchContent_MakeAvailable(Corrosion)
 
                 corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml)
-                corrosion_add_target_rustflags(journal_reader_ffi -Ctarget-feature=+crt-static)
+                corrosion_add_target_local_rustflags(journal_reader_ffi "-Ctarget-feature=+crt-static")
                 target_compile_definitions(systemd-journal.plugin PRIVATE HAVE_RUST_PROVIDER)
                 target_link_libraries(systemd-journal.plugin journal_reader_ffi)
 
