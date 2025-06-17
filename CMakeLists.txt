@@ -1792,7 +1792,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
-        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/collectors/systemd-journal.plugin/provider/netdata_provider.c
@@ -2869,6 +2868,11 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT SYSTEMD_FOUND)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+        if(NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
+                # enable fstat caching only when we do not use our journal file reader implementation
+                list(APPEND SYSTEMD_JOURNAL_PLUGIN_FILES src/collectors/systemd-journal.plugin/systemd-journal-fstat.c)
+        endif()
+
         add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
 
         if(ENABLE_NETDATA_JOURNAL_FILE_READER)
