@@ -155,12 +155,14 @@ metrics:
         name: memory.total
         description: Size of the storage represented by this entry in allocation units
         family: MikroTik/Memory
-        unit: "{memory_allocation_unit}"
+        scale_factor: 1024  # Convert allocation units to bytes
+        unit: "By"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: memory.used
         description: Amount of the storage represented by this entry that is allocated
         family: MikroTik/Memory
-        unit: "{memory_allocation_unit}"
+        scale_factor: 1024  # Convert allocation units to bytes
+        unit: "By"
     metric_tags:
       - tag: mem_index
         index: 1
