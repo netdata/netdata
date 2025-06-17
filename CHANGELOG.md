@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/ddsnmp\): fix table metrics again [\#20497](https://github.com/netdata/netdata/pull/20497) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#20496](https://github.com/netdata/netdata/pull/20496) ([netdatabot](https://github.com/netdatabot))
+- fix: mark import groups as not supported SCIM feature [\#20495](https://github.com/netdata/netdata/pull/20495) ([juacker](https://github.com/juacker))
+- chore\(go.d/ddsnmp\): fix table metrics collection [\#20492](https://github.com/netdata/netdata/pull/20492) ([ilyam8](https://github.com/ilyam8))
+- fix fluentd schema permit\_plugin [\#20490](https://github.com/netdata/netdata/pull/20490) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): add missing props to config schemas [\#20489](https://github.com/netdata/netdata/pull/20489) ([ilyam8](https://github.com/ilyam8))
+- anue [\#20488](https://github.com/netdata/netdata/pull/20488) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.2 to 1.9.3 in /src/go [\#20483](https://github.com/netdata/netdata/pull/20483) ([dependabot[bot]](https://github.com/apps/dependabot))
 - chore\(go.d/ddsnmp\):  add index-based tags and cross-table index transformation support [\#20482](https://github.com/netdata/netdata/pull/20482) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): collect cross-table metrics and tags [\#20481](https://github.com/netdata/netdata/pull/20481) ([ilyam8](https://github.com/ilyam8))
@@ -450,13 +457,6 @@
 - build\(deps\): bump github.com/miekg/dns from 1.1.63 to 1.1.64 in /src/go [\#19945](https://github.com/netdata/netdata/pull/19945) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.2 to 5.7.3 in /src/go [\#19944](https://github.com/netdata/netdata/pull/19944) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.0 to 1.9.1 in /src/go [\#19943](https://github.com/netdata/netdata/pull/19943) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 28.0.1+incompatible to 28.0.2+incompatible in /src/go [\#19942](https://github.com/netdata/netdata/pull/19942) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/DataDog/datadog-agent/pkg/networkdevice/profile from 0.65.0-devel.0.20250317105920-ce55f088ab29 to 0.66.0-devel in /src/go [\#19941](https://github.com/netdata/netdata/pull/19941) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Update src/aclk/aclk-schemas to latest version. [\#19940](https://github.com/netdata/netdata/pull/19940) ([Ferroin](https://github.com/Ferroin))
-- Don't build libunwind in static builds when it's not needed. [\#19939](https://github.com/netdata/netdata/pull/19939) ([Ferroin](https://github.com/Ferroin))
-- detect low ram conditions more aggresively [\#19938](https://github.com/netdata/netdata/pull/19938) ([ktsaou](https://github.com/ktsaou))
-- status file 21b [\#19937](https://github.com/netdata/netdata/pull/19937) ([ktsaou](https://github.com/ktsaou))
-- Fix logic for libbacktrace enablement in CMakeLists,txt [\#19936](https://github.com/netdata/netdata/pull/19936) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
