@@ -204,11 +204,6 @@ func (c *Collector) addSysUptimeChart() {
 	}
 }
 
-func cleanIfaceName(name string) string {
-	r := strings.NewReplacer(".", "_", " ", "_")
-	return r.Replace(name)
-}
-
 func newUserInputCharts(configs []ChartConfig) (*module.Charts, error) {
 	charts := &module.Charts{}
 	for _, cfg := range configs {
@@ -425,4 +420,9 @@ func dimAlgoFromDdSnmpType(m ddsnmpcollector.Metric) module.DimAlgo {
 		return module.Absolute
 	}
 	return module.Incremental
+}
+
+func cleanIfaceName(name string) string {
+	r := strings.NewReplacer(".", "_", " ", "_")
+	return r.Replace(name)
 }
