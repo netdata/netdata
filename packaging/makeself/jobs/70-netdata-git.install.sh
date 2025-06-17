@@ -30,6 +30,8 @@ case "${BUILDARCH}" in
     *) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
 esac
 
+export RUSTFLAGS="-C target-feature=+crt-static"
+
 run ./netdata-installer.sh \
   --install-prefix "${NETDATA_INSTALL_PARENT}" \
   --dont-wait \
