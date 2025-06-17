@@ -951,6 +951,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/storage-point.h
         src/libnetdata/parsers/parsers.h
         src/libnetdata/parsers/duration.c
+        src/libnetdata/parsers/duration-unittest.c
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c

@@ -15,15 +15,21 @@ static MCP_RETURN_CODE execute_weights_request(
     const char *default_time_group
 ) {
     // Extract time parameters using common parsing functions
-    time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
-    time_t before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
+    time_t after, before;
+    if (!mcp_params_parse_time_window(params, &after, &before, 
+                                      MCP_DEFAULT_AFTER_TIME, MCP_DEFAULT_BEFORE_TIME, 
+                                      false, mcpc->error)) {
+        return MCP_RC_BAD_REQUEST;
+    }
     time_t baseline_after = 0;
     time_t baseline_before = 0;
     
     // For correlation methods (KS2, VOLUME), parse baseline times
     if (method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
-        baseline_after = mcp_params_parse_time(params, "baseline_after", 0);
-        baseline_before = mcp_params_parse_time(params, "baseline_before", 0);
+        if (!mcp_params_parse_time_window(params, &baseline_after, &baseline_before, 
+                                           0, 0, true, mcpc->error)) {
+            return MCP_RC_BAD_REQUEST;
+        }
         
         // If baseline not specified, auto-calculate as 4x the query window before the query window
         if (baseline_after == 0 && baseline_before == 0) {
