@@ -211,13 +211,6 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 
 				mergeTagsWithFallback(rowTags, tags)
 				mergeTagsWithFallback(tagCache[index], tags)
-
-				for k, v := range tags {
-					if existing, ok := rowTags[k]; !ok || existing == "" {
-						rowTags[k] = v
-						tagCache[index][k] = v
-					}
-				}
 			}
 		}
 
@@ -273,12 +266,8 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
-			for k, v := range tags {
-				if existing, ok := rowTags[k]; !ok || existing == "" {
-					rowTags[k] = v
-					tagCache[index][k] = v
-				}
-			}
+			mergeTagsWithFallback(rowTags, tags)
+			mergeTagsWithFallback(tagCache[index], tags)
 		}
 
 		// Process index-based tags
