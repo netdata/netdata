@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "systemd-internals.h"
 
 // ----------------------------------------------------------------------------
