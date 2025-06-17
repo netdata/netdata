@@ -22,18 +22,16 @@ type tableWalkResult struct {
 }
 
 func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
-	// Phase 1: Walk all tables and collect raw data
-	walkResults, err := c.walkAllTables(prof)
+	walkResults, err := c.walkTablesAsNeeded(prof)
 	if err != nil {
 		return nil, err
 	}
 
-	// Phase 2: Process walked data into metrics
 	return c.processTableWalkResults(walkResults)
 }
 
-// Phase 1: Walk all tables
-func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
+// Phase 1: Walk only tables that aren't fully cached
+func (c *Collector) walkTablesAsNeeded(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
 	var results []tableWalkResult
 	var errs []error
 	var missingOIDs []string
@@ -44,7 +42,10 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 	// Map to track which tables need to be walked
 	tablesToWalk := make(map[string]bool)
 
-	// First pass: identify unique tables to walk
+	// Map configs by table OID
+	tableConfigs := make(map[string][]ddprofiledefinition.MetricsConfig)
+
+	// First pass: identify tables and check cache status
 	for _, cfg := range prof.Definition.Metrics {
 		if cfg.IsScalar() || cfg.Table.OID == "" {
 			continue
@@ -56,10 +57,16 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 			continue
 		}
 
-		tablesToWalk[tableOID] = true
+		tableConfigs[tableOID] = append(tableConfigs[tableOID], cfg)
+
+		if !c.tableCache.isConfigCached(cfg) {
+			tablesToWalk[tableOID] = true
+		}
 	}
 
-	// Walk each unique table once
+	// Walk each table that needs it (only once per table)
+	c.log.Debugf("Tables walking %d cached %d (%d total)",
+		len(tablesToWalk), len(tableConfigs)-len(tablesToWalk), len(tableConfigs))
 	for tableOID := range tablesToWalk {
 		pdus, err := c.snmpWalk(tableOID)
 		if err != nil {
@@ -72,22 +79,31 @@ func (c *Collector) walkAllTables(prof *ddsnmp.Profile) ([]tableWalkResult, erro
 		}
 	}
 
-	// Second pass: create results for ALL metric configs
+	// Second pass: create results for ALL configs
 	for _, cfg := range prof.Definition.Metrics {
 		if cfg.IsScalar() || cfg.Table.OID == "" {
 			continue
 		}
 
-		pdus, ok := walkedTables[cfg.Table.OID]
-		if !ok {
+		if c.missingOIDs[trimOID(cfg.Table.OID)] {
 			continue
 		}
 
-		results = append(results, tableWalkResult{
-			tableOID: cfg.Table.OID,
-			pdus:     pdus,
-			config:   cfg,
-		})
+		// Add to results if we have walked data OR if it's cached
+		if pdus, ok := walkedTables[cfg.Table.OID]; ok {
+			results = append(results, tableWalkResult{
+				tableOID: cfg.Table.OID,
+				pdus:     pdus,
+				config:   cfg,
+			})
+		} else if c.tableCache.isConfigCached(cfg) {
+			// Add config without PDUs - will use cache in processing
+			results = append(results, tableWalkResult{
+				tableOID: cfg.Table.OID,
+				pdus:     nil,
+				config:   cfg,
+			})
+		}
 	}
 
 	if len(missingOIDs) > 0 {
@@ -109,7 +125,9 @@ func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Me
 	// Build a map for quick lookup of walked data by table OID
 	walkedData := make(map[string]map[string]gosnmp.SnmpPDU)
 	for _, result := range walkResults {
-		walkedData[result.tableOID] = result.pdus
+		if result.pdus != nil {
+			walkedData[result.tableOID] = result.pdus
+		}
 	}
 
 	// Build a map of table name to OID for cross-table lookups
@@ -122,12 +140,27 @@ func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Me
 
 	// Process each table's walked data
 	for _, result := range walkResults {
-		tableMetrics, err := c.processTableData(result.config, result.pdus, walkedData, tableNameToOID)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("table '%s': %w", result.config.Table.Name, err))
-			continue
+		// Try cache first
+		if cachedOIDs, cachedTags, ok := c.tableCache.getCachedData(result.config); ok {
+			columnOIDs := buildColumnOIDs(result.config)
+			cacheMetrics, err := c.collectTableWithCache(result.config, cachedOIDs, cachedTags, columnOIDs)
+			if err == nil {
+				c.log.Debugf("Successfully collected table %s using cache", result.config.Table.Name)
+				metrics = append(metrics, cacheMetrics...)
+				continue
+			}
+			c.log.Debugf("Cached collection failed for table %s, falling back to process walked data: %v", result.config.Table.Name, err)
 		}
-		metrics = append(metrics, tableMetrics...)
+
+		// Process walked data if available
+		if result.pdus != nil {
+			tableMetrics, err := c.processTableData(result.config, result.pdus, walkedData, tableNameToOID)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("table '%s': %w", result.config.Table.Name, err))
+				continue
+			}
+			metrics = append(metrics, tableMetrics...)
+		}
 	}
 
 	if len(metrics) == 0 && len(errs) > 0 {
@@ -139,17 +172,6 @@ func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Me
 
 // Process a single table's data
 func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, allWalkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string) ([]Metric, error) {
-	// Try to use cache if available
-	if cachedOIDs, cachedTags, ok := c.tableCache.getCachedData(cfg); ok {
-		metrics, err := c.collectTableWithCache(cfg, cachedOIDs, cachedTags, buildColumnOIDs(cfg))
-		if err == nil {
-			c.log.Debugf("Successfully collected table %s using cache", cfg.Table.Name)
-			return metrics, nil
-		}
-		c.log.Debugf("Cached collection failed for table %s, falling back to process walked data: %v", cfg.Table.Name, err)
-	}
-
-	// Process without cache
 	columnOIDs := buildColumnOIDs(cfg)
 	tagColumnOIDs := buildTagColumnOIDs(cfg)
 
