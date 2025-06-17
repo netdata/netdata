@@ -984,12 +984,12 @@ size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused)
     return count;
 }
 
-size_t rrdlabels_version(RRDLABELS *labels __maybe_unused)
+uint32_t rrdlabels_version(RRDLABELS *labels __maybe_unused)
 {
     if (unlikely(!labels))
         return 0;
 
-    return (size_t) labels->version;
+    return labels->version;
 }
 
 void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
