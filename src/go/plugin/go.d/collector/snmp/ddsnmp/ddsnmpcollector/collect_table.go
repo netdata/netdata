@@ -196,21 +196,23 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 		rowTags := make(map[string]string)
 
 		// Process tags for this row
-		for columnOID, tagCfg := range tagColumnOIDs {
+		for columnOID, tagCfgs := range tagColumnOIDs {
 			pdu, ok := rowPDUs[columnOID]
 			if !ok {
 				continue
 			}
 
-			tags, err := processTableMetricTagValue(tagCfg, pdu)
-			if err != nil {
-				c.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
-				continue
-			}
+			for _, tagCfg := range tagCfgs {
+				tags, err := processTableMetricTagValue(tagCfg, pdu)
+				if err != nil {
+					c.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
+					continue
+				}
 
-			for k, v := range tags {
-				rowTags[k] = v
-				tagCache[index][k] = v
+				for k, v := range tags {
+					rowTags[k] = v
+					tagCache[index][k] = v
+				}
 			}
 		}
 
@@ -342,11 +344,12 @@ func buildColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string]ddprofile
 	return columnOIDs
 }
 
-func buildTagColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string]ddprofiledefinition.MetricTagConfig {
-	tagColumnOIDs := make(map[string]ddprofiledefinition.MetricTagConfig)
+func buildTagColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string][]ddprofiledefinition.MetricTagConfig {
+	tagColumnOIDs := make(map[string][]ddprofiledefinition.MetricTagConfig)
 	for _, tagCfg := range cfg.MetricTags {
 		if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-			tagColumnOIDs[trimOID(tagCfg.Symbol.OID)] = tagCfg
+			oid := trimOID(tagCfg.Symbol.OID)
+			tagColumnOIDs[oid] = append(tagColumnOIDs[oid], tagCfg)
 		}
 	}
 	return tagColumnOIDs
