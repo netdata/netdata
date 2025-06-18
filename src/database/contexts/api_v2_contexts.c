@@ -307,7 +307,6 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
             .matched_labels = search_results.matched_labels,
         };
 
-
         dictionary_set(ctl->contexts.dict, string2str(rc->id), &t, sizeof(struct context_v2_entry));
     }
 
@@ -584,8 +583,8 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         // interrupted
         return -1; // stop the query
 
-    bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS));
-    bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS));
+    bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS)) && !ctl->contexts.pattern && !ctl->contexts.scope_pattern && !ctl->window.enabled;
+    bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS)) || ctl->contexts.pattern || ctl->contexts.scope_pattern;
 
     if(do_contexts) {
         ssize_t added = query_scope_foreach_context(
@@ -597,6 +596,15 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             return -1; // stop the query
 
         if(added)
+            host_matched = true;
+    }
+    else if(!host_matched && ctl->window.enabled) {
+        time_t first_time_s = host->retention.first_time_s;
+        time_t last_time_s = host->retention.last_time_s;
+        if(rrdhost_is_online(host))
+            last_time_s = ctl->now; // if the host is online, use the current time as the last time
+
+        if(query_matches_retention(ctl->window.after, ctl->window.before, first_time_s, last_time_s, 0))
             host_matched = true;
     }
 
