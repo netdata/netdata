@@ -92,7 +92,7 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 	hostnames := []string{c.Vnode.Hostname, si.Name, "snmp-device"}
 	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
 
-	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
+	c.Vnode.Hostname = fmt.Sprintf("SNMP-%s(%s)", hostnames[i], c.Hostname)
 
 	labels := make(map[string]string)
 
