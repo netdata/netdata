@@ -2,7 +2,7 @@
 
 :::info
 
-The Netdata MCP Server preview is live. [Get early access](b6yi53u6qjm.typeform.com/to/DQi5ibhE?typeform-source=www.netdata.cloud) or visit our GitHub repository for the latest nd-mcp tools and setup instructions.
+The Netdata MCP Server preview is live. [Get early access](https://b6yi53u6qjm.typeform.com/to/DQi5ibhE?typeform-source=www.netdata.cloud) or visit our GitHub repository for the latest nd-mcp tools and setup instructions.
 
 :::
 
