@@ -81,18 +81,20 @@ static ARAL *labels_aral;
 
 static struct aral_statistics label_aral_statistics = { 0 };
 
-void rrdlabels_aral_init(void)
+void rrdlabels_aral_init(bool with_stats)
 {
     labels_aral =
         aral_create("label_stat", sizeof(RRDLABELS), 1, 0, &label_aral_statistics, NULL, NULL, false, false, false);
 
-    pulse_aral_register_statistics(&label_aral_statistics, "labels");
+    if (with_stats)
+        pulse_aral_register_statistics(&label_aral_statistics, "labels");
 }
 
-void rrdlabels_aral_destroy(void)
+void rrdlabels_aral_destroy(bool with_stats)
 {
     aral_destroy(labels_aral);
-    pulse_aral_unregister_statistics(&label_aral_statistics);
+    if (with_stats)
+        pulse_aral_unregister_statistics(&label_aral_statistics);
 }
 
 
@@ -1612,7 +1614,6 @@ int rrdlabels_unittest_sanitization() {
 int rrdlabels_unittest(void) {
     int errors = 0;
 
-    rrdlabels_aral_init();
     errors += rrdlabels_unittest_sanitization();
     errors += rrdlabels_unittest_add_pairs();
     errors += rrdlabels_unittest_simple_pattern();
@@ -1622,7 +1623,6 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);
-    rrdlabels_aral_destroy();
 
     // string_destroy();
     return errors;

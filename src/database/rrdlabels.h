@@ -26,8 +26,8 @@ typedef enum __attribute__ ((__packed__)) rrdlabel_source {
 struct rrdlabels;
 typedef struct rrdlabels RRDLABELS;
 
-void rrdlabels_aral_init(void);
-void rrdlabels_aral_destroy(void);
+void rrdlabels_aral_init(bool with_stats);
+void rrdlabels_aral_destroy(bool with_stats);
 RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);
 void rrdlabels_flush(RRDLABELS *labels);
