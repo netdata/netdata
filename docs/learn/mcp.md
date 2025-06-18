@@ -1,5 +1,11 @@
 # Netdata MCP Integration: AI-Powered Infrastructure Analysis
 
+:::info
+
+The Netdata MCP Server preview is live. [Get early access](b6yi53u6qjm.typeform.com/to/DQi5ibhE?typeform-source=www.netdata.cloud) or visit our GitHub repository for the latest nd-mcp tools and setup instructions.
+
+:::
+
 ## What is MCP?
 
 **Model Context Protocol (MCP)** is a new open standard that allows AI assistants to connect directly to your data sources and tools. Think of it as a bridge that lets AI systems access and analyze your real-time infrastructure data instead of just providing generic advice.
@@ -125,9 +131,3 @@ With Netdata MCP, we're moving toward a future where:
 - **Your monitoring system becomes a team member** that helps solve problems
 
 **Join us in pioneering the next generation of intelligent infrastructure monitoring.**
-
-:::tip
-
-**Ready to try it?** Contact us to get early access to MCP integration, or check our GitHub repository for the latest nd-mcp tools and setup instructions.
-
-:::
