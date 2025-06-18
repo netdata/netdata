@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/ddsnmp\): fix table collection with caching [\#20509](https://github.com/netdata/netdata/pull/20509) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/snmp profile\): add fallback support for duplicate metric tags [\#20508](https://github.com/netdata/netdata/pull/20508) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/snmp profile\): add sensors to mikrotik-router.yaml [\#20507](https://github.com/netdata/netdata/pull/20507) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp profiles\): simplify \_generic-if.yaml and add interface type tags [\#20505](https://github.com/netdata/netdata/pull/20505) ([ilyam8](https://github.com/ilyam8))
+- fix snmp prof mikrotik mem tagging [\#20504](https://github.com/netdata/netdata/pull/20504) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/ddsnmp\): make SNMP profile collection configurable [\#20503](https://github.com/netdata/netdata/pull/20503) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsnmp\): better label values sanitization [\#20500](https://github.com/netdata/netdata/pull/20500) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): fix table metrics again [\#20497](https://github.com/netdata/netdata/pull/20497) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20496](https://github.com/netdata/netdata/pull/20496) ([netdatabot](https://github.com/netdatabot))
 - fix: mark import groups as not supported SCIM feature [\#20495](https://github.com/netdata/netdata/pull/20495) ([juacker](https://github.com/juacker))
@@ -36,6 +43,8 @@
 - improve database indexing and rotation handling in event loop [\#20459](https://github.com/netdata/netdata/pull/20459) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/sijms/go-ora/v2 from 2.8.24 to 2.9.0 in /src/go [\#20457](https://github.com/netdata/netdata/pull/20457) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improvement\(go.d/ddsnmp\): dedup metrics when merging profiles [\#20456](https://github.com/netdata/netdata/pull/20456) ([ilyam8](https://github.com/ilyam8))
+- Additional checks on metasync thread shutdown [\#20455](https://github.com/netdata/netdata/pull/20455) ([stelfrag](https://github.com/stelfrag))
+- Monitor Exchange Server \(Window.plugin\) [\#20454](https://github.com/netdata/netdata/pull/20454) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#20453](https://github.com/netdata/netdata/pull/20453) ([netdatabot](https://github.com/netdatabot))
 - docs: improve SCIM documentation [\#20451](https://github.com/netdata/netdata/pull/20451) ([juacker](https://github.com/juacker))
 - build\(deps\): bump github.com/gosnmp/gosnmp from 1.40.0 to 1.41.0 in /src/go [\#20449](https://github.com/netdata/netdata/pull/20449) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -449,14 +458,6 @@
 - fix rrdcalc\_unlink\_from\_rrdset\(\) [\#19956](https://github.com/netdata/netdata/pull/19956) ([ktsaou](https://github.com/ktsaou))
 - Fix claiming on startup [\#19954](https://github.com/netdata/netdata/pull/19954) ([stelfrag](https://github.com/stelfrag))
 - daemon status 22 [\#19953](https://github.com/netdata/netdata/pull/19953) ([ktsaou](https://github.com/ktsaou))
-- Enable interface to release sqlite memory [\#19952](https://github.com/netdata/netdata/pull/19952) ([stelfrag](https://github.com/stelfrag))
-- Improve event loop thread creation [\#19951](https://github.com/netdata/netdata/pull/19951) ([stelfrag](https://github.com/stelfrag))
-- IIS Application Pool \(Windows.plugin\) [\#19950](https://github.com/netdata/netdata/pull/19950) ([thiagoftsm](https://github.com/thiagoftsm))
-- Disable generation of debuginfo packages for DEB distros. [\#19948](https://github.com/netdata/netdata/pull/19948) ([Ferroin](https://github.com/Ferroin))
-- Set default CMake build type to include debug info. [\#19946](https://github.com/netdata/netdata/pull/19946) ([Ferroin](https://github.com/Ferroin))
-- build\(deps\): bump github.com/miekg/dns from 1.1.63 to 1.1.64 in /src/go [\#19945](https://github.com/netdata/netdata/pull/19945) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.2 to 5.7.3 in /src/go [\#19944](https://github.com/netdata/netdata/pull/19944) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/go-sql-driver/mysql from 1.9.0 to 1.9.1 in /src/go [\#19943](https://github.com/netdata/netdata/pull/19943) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
