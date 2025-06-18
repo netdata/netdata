@@ -1612,6 +1612,7 @@ int rrdlabels_unittest_sanitization() {
 int rrdlabels_unittest(void) {
     int errors = 0;
 
+    rrdlabels_aral_init();
     errors += rrdlabels_unittest_sanitization();
     errors += rrdlabels_unittest_add_pairs();
     errors += rrdlabels_unittest_simple_pattern();
@@ -1621,6 +1622,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);
+    rrdlabels_aral_destroy();
 
     // string_destroy();
     return errors;
