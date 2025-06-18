@@ -16,7 +16,7 @@ metrics:
       description: Time since the system was last rebooted or powered on.
       scale_factor: 0.01
       family: Uptime
-      unit: seconds
+      unit: s
 
 metadata:
   device:
