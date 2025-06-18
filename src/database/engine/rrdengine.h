@@ -386,11 +386,11 @@ struct rrdengine_instance {
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
-        uv_rwlock_t rwlock;                         // the linked list of datafiles is protected by this lock
+        uv_rwlock_t rwlock;                         // the JudyL of datafiles is protected by this lock
         bool disk_time;                             // true: delete for disk quota, false: delete for retention
         bool pending_rotate;                        // Change from event loop
         bool pending_index;                         // Change from event loop
-        struct rrdengine_datafile *first;           // oldest - the newest with ->first->prev
+        Pvoid_t JudyL;                              // the datafiles, indexed by fileno
     } datafiles;
 
     struct {
@@ -570,5 +570,11 @@ uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_
 void rrdeng_calculate_tier_disk_space_percentage(void);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 void dbengine_shutdown();
+size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
+struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
+struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
+struct rrdengine_datafile *
+get_next_datafile(struct rrdengine_datafile *this_datafile, struct rrdengine_instance *ctx, bool with_lock);
+
 
 #endif /* NETDATA_RRDENGINE_H */

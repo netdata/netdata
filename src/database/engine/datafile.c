@@ -6,7 +6,12 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
     if(!having_lock)
         uv_rwlock_wrlock(&ctx->datafiles.rwlock);
 
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+    Pvoid_t *Pvalue = JudyLIns(&ctx->datafiles.JudyL, (Word_t ) datafile->fileno, PJE0);
+    if(!Pvalue || Pvalue == PJERR)
+        fatal("DBENGINE: cannot insert datafile %u of tier %d into the datafiles list",
+              datafile->fileno, ctx->config.tier);
+
+    *Pvalue = datafile;
 
     if(!having_lock)
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
@@ -14,7 +19,7 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+    (void) JudyLDel(&ctx->datafiles.JudyL, (Word_t)datafile->fileno, PJE0);
 }
 
 
@@ -625,8 +630,14 @@ int init_data_files(struct rrdengine_instance *ctx)
         if (ctx->loading.create_new_datafile_pair)
             create_new_datafile_pair(ctx, false);
 
-        while(rrdeng_ctx_tier_cap_exceeded(ctx))
-            datafile_delete(ctx, ctx->datafiles.first, false, true, false);
+        while(rrdeng_ctx_tier_cap_exceeded(ctx)) {
+            Word_t Index = 0;
+            Pvoid_t *PValue = JudyLFirst(ctx->datafiles.JudyL, &Index, PJE0);
+            if (PValue && *PValue) {
+                struct rrdengine_datafile *datafile = *PValue;
+                datafile_delete(ctx, datafile, false, true, false);
+            }
+        }
     }
 
     pgc_reset_hot_max(open_cache);
@@ -654,7 +665,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 {
     bool logged = false;
 
-    if (!ctx->datafiles.first)
+    if (!ctx->datafiles.JudyL)
         return;
 
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
@@ -665,13 +676,17 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         sleep_usec(100 * USEC_PER_MS);
     }
 
-    do {
-        struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    bool first_then_next = true;
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+
+    while ((PValue = JudyLFirstThenNext(ctx->datafiles.JudyL, &Index, &first_then_next))) {
+        struct rrdengine_datafile *datafile = *PValue;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
         logged = false;
         size_t iterations = 10;
-        while(!datafile_acquire_for_deletion(datafile, true) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
+        while(!datafile_acquire_for_deletion(datafile, true) && --iterations > 0) {
             if(!logged) {
                 netdata_log_info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;
@@ -711,6 +726,5 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 
         freez(journalfile);
         freez(datafile);
-
-    } while(ctx->datafiles.first);
+    }
 }
