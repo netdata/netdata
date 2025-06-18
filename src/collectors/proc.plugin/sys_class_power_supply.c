@@ -5,6 +5,10 @@
 #define PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME "/sys/class/power_supply"
 #define PROP_VALUE_LENGTH_MAX 30
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
+#include "../common-contexts/common-contexts.h"
+
 const char *ps_property_names[]  = {        "charge",         "energy",              "voltage"};
 const char *ps_property_titles[] = {"Battery charge", "Battery energy", "Power supply voltage"};
 const char *ps_property_units[]  = {            "Ah",             "Wh",                    "V"};
@@ -19,54 +23,6 @@ const long ps_property_priorities[] = {
 const char *ps_property_dim_names[] = {"empty_design", "empty", "now", "full", "full_design",
                                        "empty_design", "empty", "now", "full", "full_design",
                                          "min_design",   "min", "now",  "max",  "max_design"};
-
-struct ps_property_dim {
-    char *name;
-    char *filename;
-    int fd;
-
-    RRDDIM *rd;
-    unsigned long long value;
-    int always_zero;
-
-    struct ps_property_dim *next;
-};
-
-struct ps_property {
-    char *name;
-    char *title;
-    char *units;
-
-    long priority;
-
-    RRDSET *st;
-
-    struct ps_property_dim *property_dim_root;
-
-    struct ps_property *next;
-};
-
-struct simple_property {
-    char *filename;
-    int fd;
-
-    RRDSET *st;
-    RRDDIM *rd;
-    bool ok;
-    unsigned long long value;
-};
-
-struct power_supply {
-    char *name;
-    uint32_t hash;
-    int found;
-
-    struct simple_property *capacity, *power;
-
-    struct ps_property *property_root;
-
-    struct power_supply *next;
-};
 
 static struct power_supply *power_supply_root = NULL;
 static int files_num = 0;
