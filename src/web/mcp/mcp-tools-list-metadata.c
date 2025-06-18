@@ -485,8 +485,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     struct api_v2_contexts_request req = {
         .scope_contexts = metrics_pattern,
         .scope_nodes = nodes_pattern,
-        .contexts = metrics_pattern,
-        .nodes = nodes_pattern,
+        .contexts = NULL,
+        .nodes = NULL,
         .q = q,
         .after = after,
         .before = before,

@@ -22,8 +22,9 @@
 #define MCP_TOOL_LIST_ALL_ALERTS "list_running_alerts"
 #define MCP_TOOL_LIST_ALERT_TRANSITIONS "list_alert_transitions"
 
-#define MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES                                                               \
-    "Next Steps: provide a better pattern to match less contexts, " \
+#define MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES                                                                \
+    "The response has been grouped into categories to minimize size.\n"                                                 \
+    "Next Steps: repeat the '"MCP_TOOL_LIST_METRICS"' call with a pattern to match what is interesting, "               \
     "or run '" MCP_TOOL_GET_METRICS_DETAILS "' to get more information for the contexts of interest."
 
 #define MCP_INFO_CONTEXT_ARRAY_RESPONSE \
