@@ -881,15 +881,7 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
         0, 0, SIZE_MAX, false);
     
     // Time-based parameters for functions with history
-    mcp_schema_add_time_param(
-        buffer, "after", "Start time",
-        "Start time for query window (timestamp in seconds or RFC3339 datetime string)",
-        "now", 0, false);
-    
-    mcp_schema_add_time_param(
-        buffer, "before", "End time",
-        "End time for query window (timestamp in seconds or RFC3339 datetime string)",
-        "now", 0, false);
+    mcp_schema_add_time_params(buffer, "query window", false);
     
     mcp_schema_add_string_param(
         buffer, "cursor", "Pagination cursor",
@@ -2047,8 +2039,10 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
     // Parse optional filtering parameters
     
     // Parse time-based parameters
-    data->request.after = mcp_params_parse_time(params, "after", 0);
-    data->request.before = mcp_params_parse_time(params, "before", 0);
+    if (!mcp_params_parse_time_window(params, &data->request.after, &data->request.before, 
+                                      0, 0, true, mcpc->error)) {
+        return MCP_RC_BAD_REQUEST;
+    }
     
     // Check if timeframe parameters are required but missing (will be validated later with registry entry)
     

@@ -217,6 +217,7 @@ int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
 int eval_unittest(void);
+int duration_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -404,6 +405,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
+                            if (duration_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
                             if (stacktrace_unittest()) return 1;
@@ -514,6 +516,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "evaltest") == 0) {
                             unittest_running = true;
                             return eval_unittest();
+                        }
+                        else if(strcmp(optarg, "durationtest") == 0) {
+                            unittest_running = true;
+                            return duration_unittest();
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
