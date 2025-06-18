@@ -405,6 +405,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
                 strings_referenced);
 
+    rrdlabels_aral_destroy(true);
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
