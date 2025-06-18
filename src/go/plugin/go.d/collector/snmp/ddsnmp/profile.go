@@ -171,6 +171,26 @@ func (p *Profile) validate() error {
 	return nil
 }
 
+func (p *Profile) removeConstantMetrics() {
+	if p.Definition == nil {
+		return
+	}
+
+	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
+		if m.IsScalar() && m.Symbol.ConstantValueOne {
+			return true
+		}
+
+		if m.IsColumn() {
+			m.Symbols = slices.DeleteFunc(m.Symbols, func(s ddprofiledefinition.SymbolConfig) bool {
+				return s.ConstantValueOne
+			})
+		}
+
+		return m.IsColumn() && len(m.Symbols) == 0
+	})
+}
+
 func loadProfiles(dirpath string) ([]*Profile, error) {
 	var profiles []*Profile
 
@@ -192,6 +212,8 @@ func loadProfiles(dirpath string) ([]*Profile, error) {
 			log.Warningf("invalid profile '%s': %v", path, err)
 			return nil
 		}
+
+		profile.removeConstantMetrics()
 
 		profiles = append(profiles, profile)
 		return nil
