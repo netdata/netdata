@@ -219,7 +219,7 @@ func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 }
 
 func processMetricFamily(family, devType, vendor string) string {
-	prefix := strings.TrimPrefix(devType+"s/"+vendor, "s/")
+	prefix := strings.TrimPrefix(devType+"/"+vendor, "/")
 	if prefix == "" {
 		return family
 	}
@@ -229,7 +229,10 @@ func processMetricFamily(family, devType, vendor string) string {
 
 	parts := strings.Split(family, "/")
 	parts = slices.DeleteFunc(parts, func(s string) bool {
-		return strings.EqualFold(s, devType) || strings.EqualFold(s, devType+"s") || strings.EqualFold(s, vendor)
+		return strings.EqualFold(s, devType) ||
+			strings.EqualFold(s, devType+"s") ||
+			strings.EqualFold(s, devType+"es") ||
+			strings.EqualFold(s, vendor)
 	})
 
 	return strings.TrimSuffix(prefix+"/"+strings.Join(parts, "/"), "/")
