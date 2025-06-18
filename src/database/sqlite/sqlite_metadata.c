@@ -840,8 +840,8 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
 
 static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
 {
-    size_t old_version = st->rrdlabels_last_saved_version;
-    size_t new_version = rrdlabels_version(st->rrdlabels);
+    uint32_t old_version = st->rrdlabels_last_saved_version;
+    uint32_t new_version = rrdlabels_version(st->rrdlabels);
 
     if (new_version == old_version)
         return 0;
