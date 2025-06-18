@@ -72,12 +72,22 @@ static void rrdcontext_categorize_and_output(BUFFER *wb, DICTIONARY *contexts_di
     dfe_start_read(contexts_dict, z) {
         const char *context_name = string2str(z->id);
         char category[256];
-        const char *dot = strchr(context_name, '.');
-        if (dot) {
-            size_t prefix_len = dot - context_name;
-            if (prefix_len > sizeof(category) - 1) prefix_len = sizeof(category) - 1;
-            memcpy(category, context_name, prefix_len);
-            category[prefix_len] = '\0';
+        const char *first_dot = strchr(context_name, '.');
+        if (first_dot) {
+            const char *second_dot = strchr(first_dot + 1, '.');
+            if (second_dot) {
+                // Use up to second dot as category
+                size_t prefix_len = second_dot - context_name;
+                if (prefix_len > sizeof(category) - 1) prefix_len = sizeof(category) - 1;
+                memcpy(category, context_name, prefix_len);
+                category[prefix_len] = '\0';
+            } else {
+                // Only one dot, use up to first dot
+                size_t prefix_len = first_dot - context_name;
+                if (prefix_len > sizeof(category) - 1) prefix_len = sizeof(category) - 1;
+                memcpy(category, context_name, prefix_len);
+                category[prefix_len] = '\0';
+            }
         } else {
             strncpyz(category, context_name, sizeof(category) - 1);
         }
