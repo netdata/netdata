@@ -296,7 +296,16 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
         if(uv_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)
             continue;
 
-        for (datafile = ctx->datafiles.first; datafile; datafile = datafile->next) {
+        bool first_then_next = true;
+        Pvoid_t *Pvalue =  NULL;
+        Word_t Index = 0;
+
+        while((Pvalue = JudyLFirstThenNext(ctx->datafiles.JudyL, &Index, &first_then_next))) {
+
+            datafile = *Pvalue;
+            if (!datafile)
+                continue;
+
             struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
             if(!spinlock_trylock(&journalfile->data_spinlock))
