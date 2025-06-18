@@ -1108,11 +1108,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
 
 static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
 {
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    size_t datafiles = 0;
-    for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next)
-        datafiles++;
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    size_t datafiles = datafile_count(ctx, false);
 
     ssize_t cpus = (ssize_t)netdata_conf_cpus();
     if(cpus < 1)
@@ -1353,7 +1349,9 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     RRDENG_SIZE_STATS stats = { 0 };
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
+    struct rrdengine_datafile *df = NULL;
+
+    while ((df = get_next_datafile(df, ctx, true))) {
         stats.datafiles++;
         populate_v2_statistics(df, &stats);
     }
