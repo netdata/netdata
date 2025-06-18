@@ -380,6 +380,7 @@ int netdata_main(int argc, char **argv) {
 
                             if (sqlite_library_init())
                                 return 1;
+                            rrdlabels_aral_init(false);
 
                             if (pluginsd_parser_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
@@ -410,6 +411,7 @@ int netdata_main(int argc, char **argv) {
                             if (perflibnamestest_main()) return 1;
 #endif
                             sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -446,7 +448,10 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
                             unittest_running = true;
-                            return rrdlabels_unittest();
+                            rrdlabels_aral_init(true);
+                            int rc = rrdlabels_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
                         }
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
@@ -868,6 +873,7 @@ int netdata_main(int argc, char **argv) {
 
     analytics_reset();
     get_system_timezone();
+    rrdlabels_aral_init(true);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("pulse");
