@@ -26,7 +26,6 @@ fetch_git "${build_dir}" "${LIBUCONTEXT_SOURCE}" "${LIBUCONTEXT_VERSION}" "${cac
 
 case "${BUILDARCH}" in
     armv6l|armv7l) arch=arm ;;
-    ppc64le) arch=ppc64 ;;
     *) arch="${BUILDARCH}" ;;
 esac
 
