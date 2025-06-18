@@ -9,7 +9,6 @@ platform_map:  # map packaging architectures to docker platforms
   armv6l: linux/arm/v6
   armv7l: linux/arm/v7
   i386: linux/386
-  ppc64le: linux/ppc64le
   x86_64: linux/amd64
 arch_order:  # sort order for per-architecture jobs in CI
   - amd64
@@ -21,7 +20,6 @@ arch_order:  # sort order for per-architecture jobs in CI
   - armv7l
   - arm64
   - aarch64
-  - ppc64le
 arch_data:  # Mapping of per-architecture matrix behavior.
   amd64: &amd64
     qemu: false
@@ -38,21 +36,16 @@ arch_data:  # Mapping of per-architecture matrix behavior.
     qemu: false
     runner: *arm-runner
   aarch64: *arm64
-  ppc64le:
-    qemu: true
-    runner: *x86-runner
 static_arches:  # Static build architectures
   - x86_64
   - armv6l
   - armv7l
   - aarch64
-  - ppc64le
 docker_arches:  # Docker build archtiectures
   - amd64
   - i386
   - armv7l
   - arm64
-  - ppc64le
 default_sentry: &default_sentry # Default configuration for Sentry usage
   amd64: false
   x86_64: false
@@ -413,7 +406,6 @@ no_include: # Info for platforms not covered in CI
         - linux/amd64
         - linux/arm/v7
         - linux/arm64
-        - linux/ppc64le
 
   - distro: clearlinux
     version: latest
