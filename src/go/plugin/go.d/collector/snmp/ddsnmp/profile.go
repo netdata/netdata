@@ -4,10 +4,12 @@ package ddsnmp
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 
@@ -65,6 +67,7 @@ func FindProfiles(sysObjId string) []*Profile {
 	}
 
 	enrichProfiles(profiles)
+	deduplicateMetricsAcrossProfiles(profiles)
 
 	return profiles
 }
@@ -272,6 +275,7 @@ func loadProfileExtensions(profile *Profile, dir string, processedExtends map[st
 }
 
 func getProfilesDir() string {
+	//return "/Users/ilyam/Projects/github/ilyam8/netdata/src/go/plugin/go.d/config/go.d/snmp.profiles/default"
 	if executable.Name == "test" {
 		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
 		return dir
@@ -304,4 +308,84 @@ func enrichProfiles(profiles []*Profile) {
 			}
 		}
 	}
+}
+
+func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
+	if len(profiles) < 2 {
+		return
+	}
+
+	// Create a slice of indices sorted by priority (non-generic first)
+	type indexedProfile struct {
+		idx       int
+		isGeneric bool
+	}
+
+	indexed := make([]indexedProfile, len(profiles))
+	for i, prof := range profiles {
+		indexed[i] = indexedProfile{
+			idx:       i,
+			isGeneric: strings.Contains(strings.ToLower(prof.SourceFile), "generic-"),
+		}
+	}
+
+	slices.SortFunc(indexed, func(a, b indexedProfile) int {
+		if a.isGeneric && !b.isGeneric {
+			return 1 // a comes after b
+		}
+		if !a.isGeneric && b.isGeneric {
+			return -1 // a comes before b
+		}
+		// If both are generic or both are non-generic, maintain original order
+		return a.idx - b.idx
+	})
+
+	// Reorder profiles slice according to deduplication priority
+	sortedProfiles := make([]*Profile, len(profiles))
+	for i, ip := range indexed {
+		sortedProfiles[i] = profiles[ip.idx]
+	}
+	copy(profiles, sortedProfiles)
+
+	seenMetrics := make(map[string]bool)
+
+	for _, prof := range profiles {
+		if prof.Definition == nil {
+			continue
+		}
+
+		prof.Definition.Metrics = slices.DeleteFunc(prof.Definition.Metrics, func(metric ddprofiledefinition.MetricsConfig) bool {
+			key := generateMetricKey(metric)
+			if seenMetrics[key] {
+				return true
+			}
+			seenMetrics[key] = true
+			return false
+		})
+	}
+}
+
+func generateMetricKey(metric ddprofiledefinition.MetricsConfig) string {
+	var parts []string
+
+	if metric.IsScalar() {
+		parts = append(parts, "scalar")
+		parts = append(parts, metric.Symbol.OID)
+		parts = append(parts, metric.Symbol.Name)
+		return strings.Join(parts, "|")
+	}
+
+	parts = append(parts, "table")
+	parts = append(parts, metric.Table.OID)
+	parts = append(parts, metric.Table.Name)
+
+	symbolKeys := make([]string, 0, len(metric.Symbols))
+	for _, sym := range metric.Symbols {
+		symbolKey := fmt.Sprintf("%s:%s", sym.OID, sym.Name)
+		symbolKeys = append(symbolKeys, symbolKey)
+	}
+	sort.Strings(symbolKeys)
+	parts = append(parts, symbolKeys...)
+
+	return strings.Join(parts, "|")
 }

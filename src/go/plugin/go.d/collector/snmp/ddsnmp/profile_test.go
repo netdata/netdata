@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func Test_loadDDSnmpProfiles(t *testing.T) {
@@ -70,5 +72,774 @@ func Test_Profile_merge(t *testing.T) {
 				assert.NotEqual(t, "memory.used", s.Name)
 			}
 		}
+	}
+}
+
+func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
+	tests := map[string]struct {
+		profiles []*Profile
+		expected []*Profile
+	}{
+		"no profiles": {
+			profiles: []*Profile{},
+			expected: []*Profile{},
+		},
+		"single profile no duplicates": {
+			profiles: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.5.0",
+									Name: "sysName",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.5.0",
+									Name: "sysName",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"duplicate scalar metrics across profiles": {
+			profiles: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.5.0",
+									Name: "sysName",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.5.0",
+									Name: "sysName",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"duplicate table metrics - exact same symbols": {
+			profiles: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "interface",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.2.2.1.2",
+											Name: "ifDescr",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "if_name", // Different tag, but ignored in key
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.31.1.1.1.1",
+											Name: "ifName",
+										},
+										Table: "ifXTable",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "interface",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.2.2.1.2",
+											Name: "ifDescr",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{}, // Empty because it's a duplicate
+					},
+				},
+			},
+		},
+		"same table different symbols - keep both": {
+			profiles: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"symbols in different order - still duplicate": {
+			profiles: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{}, // Empty because symbols are sorted in key
+					},
+				},
+			},
+		},
+		"multiple duplicates across three profiles": {
+			profiles: []*Profile{
+				{
+					SourceFile: "generic-device.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "vendor-specific.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.7",
+									Name: "cpmCPUTotal5minRev",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "extended.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "vendor-specific.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.7",
+									Name: "cpmCPUTotal5minRev",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "extended.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "generic-device.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{}, // All removed as duplicates
+					},
+				},
+			},
+		},
+		"empty metrics in some profiles": {
+			profiles: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{},
+					},
+				},
+				{
+					SourceFile: "profile3.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "profile1.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "profile2.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{},
+					},
+				},
+				{
+					SourceFile: "profile3.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{},
+					},
+				},
+			},
+		},
+		"generic vs non-generic priority": {
+			profiles: []*Profile{
+				{
+					SourceFile: "generic-device.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.1.0",
+									Name: "sysDescr",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "mikrotik-router.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.14988.1.1.1.3.0",
+									Name: "mtxrHlCpuTemperature",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "generic-if.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.1.0",
+									Name: "sysDescr",
+								},
+							},
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.31.1.1",
+									Name: "ifXTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.31.1.1.1.6",
+										Name: "ifHCInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []*Profile{
+				{
+					SourceFile: "mikrotik-router.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.3.0",
+									Name: "sysUpTime",
+								},
+							},
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+									},
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.16",
+										Name: "ifOutOctets",
+									},
+								},
+							},
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.14988.1.1.1.3.0",
+									Name: "mtxrHlCpuTemperature",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "generic-device.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.1.1.0",
+									Name: "sysDescr",
+								},
+							},
+						},
+					},
+				},
+				{
+					SourceFile: "generic-if.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.31.1.1",
+									Name: "ifXTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.31.1.1.1.6",
+										Name: "ifHCInOctets",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Make a deep copy of profiles to avoid modifying test data
+			profiles := make([]*Profile, len(tc.profiles))
+			for i, p := range tc.profiles {
+				profiles[i] = p.clone()
+			}
+
+			deduplicateMetricsAcrossProfiles(profiles)
+
+			require.Equal(t, len(tc.expected), len(profiles))
+
+			for i, expectedProf := range tc.expected {
+				assert.Equal(t, expectedProf.SourceFile, profiles[i].SourceFile)
+				assert.Equal(t, len(expectedProf.Definition.Metrics), len(profiles[i].Definition.Metrics))
+
+				// Compare metrics
+				for j, expectedMetric := range expectedProf.Definition.Metrics {
+					actualMetric := profiles[i].Definition.Metrics[j]
+
+					if expectedMetric.IsScalar() {
+						assert.Equal(t, expectedMetric.Symbol.OID, actualMetric.Symbol.OID)
+						assert.Equal(t, expectedMetric.Symbol.Name, actualMetric.Symbol.Name)
+					} else {
+						assert.Equal(t, expectedMetric.Table.OID, actualMetric.Table.OID)
+						assert.Equal(t, expectedMetric.Table.Name, actualMetric.Table.Name)
+						assert.Equal(t, len(expectedMetric.Symbols), len(actualMetric.Symbols))
+					}
+				}
+			}
+		})
 	}
 }
