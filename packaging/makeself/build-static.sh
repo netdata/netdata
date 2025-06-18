@@ -49,12 +49,6 @@ case "${BUILDARCH}" in
         TUNING_FLAGS="-march=armv8-a"
         GOARM64="v8.0"
         ;;
-    ppc64le) # Baseline POWER8+ CPU
-        QEMU_ARCH="ppc64le"
-        QEMU_CPU="power8nvl"
-        TUNING_FLAGS="-mcpu=power8 -mtune=power9"
-        GOPPC64="power8"
-        ;;
 esac
 
 [ -f "/proc/sys/fs/binfmt_misc/qemu-${QEMU_ARCH}" ] && SKIP_EMULATION=1
