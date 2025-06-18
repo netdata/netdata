@@ -10,6 +10,9 @@ import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js
 
 class NetdataMCPChat {
     constructor() {
+        // Log version on startup
+        console.log('🚀 Netdata MCP Web Client v1.0.9 - Simplified resume using sendMessage');
+        
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
         this.llmProviders = new Map(); // Multiple LLM providers
@@ -443,7 +446,7 @@ class NetdataMCPChat {
         
         // Only save chat-specific config if the chat is saved
         if (chat.isSaved !== false && chat.messages.length > 0) {
-            this.saveChatConfigSmart(chatId, config);
+            ChatConfig.saveChatConfig(chatId, config);
         }
     }
     
@@ -1152,7 +1155,7 @@ class NetdataMCPChat {
         
         // Tool Summarization Option (DISABLED - Not Implemented)
         const toolSumDiv = document.createElement('div');
-        const isEnabled = false; // Force disabled - not implemented
+        const _isEnabled = false; // Force disabled - not implemented
         toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
         
         const currentThreshold = config.optimisation.toolSummarisation.thresholdKiB || 20; // Default 20KB
@@ -1198,7 +1201,7 @@ class NetdataMCPChat {
         
         // Auto-summarization Option (DISABLED - Not Implemented)
         const autoSumDiv = document.createElement('div');
-        const autoSumEnabled = false; // Force disabled - not implemented
+        const _autoSumEnabled = false; // Force disabled - not implemented
         autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
         
         const currentPercent = config.optimisation.autoSummarisation.triggerPercent || 50;
@@ -3396,6 +3399,10 @@ class NetdataMCPChat {
         // Clear processing states
         chat.isProcessing = false;
         
+        // Clear stop-related flags to ensure they're ready for next time
+        this.shouldStopProcessing = false;
+        chat.processingWasStoppedByUser = false;
+        
         // Clear error state on successful conclusion
         this.clearError(chatId);
         
@@ -3458,6 +3465,10 @@ class NetdataMCPChat {
         
         // Clear processing states
         chat.isProcessing = false;
+        
+        // Clear stop-related flags when failure is handled
+        this.shouldStopProcessing = false;
+        chat.processingWasStoppedByUser = false;
         
         // Clear current assistant group
         this.clearCurrentAssistantGroup(chatId);
@@ -4844,10 +4855,22 @@ class NetdataMCPChat {
         
         // Send button
         elements.sendBtn.addEventListener('click', () => {
-            this.sendMessage(chatId).catch(error => {
-                console.error('Failed to send message:', error);
-                this.showError('Failed to send message', chatId);
-            });
+            if (this.isProcessing) {
+                // Stop processing
+                console.log('[Stop Button] Setting shouldStopProcessing = true');
+                this.shouldStopProcessing = true;
+                this.isProcessing = false;
+                this.updateSendButton();
+                this.chatInput.disabled = false;
+                // Don't add a system message as it breaks message sequencing
+                // The assistantFailed handler will take care of the UI feedback
+            } else {
+                // Send message
+                this.sendMessage(chatId).catch(error => {
+                    console.error('Failed to send message:', error);
+                    this.showError('Failed to send message', chatId);
+                });
+            }
         });
         
         // Input field
@@ -5538,6 +5561,9 @@ class NetdataMCPChat {
         // Reset global state when switching chats to prevent state leakage
         this.resetGlobalChatState();
         
+        // Also clear chat-specific stop flag when loading a chat
+        chat.processingWasStoppedByUser = false;
+        
         // If user has already selected a chat and this is the auto-created new chat trying to load, ignore it
         if (this.userHasSelectedChat && this.pendingNewChatId === chatId && this.getActiveChatId() !== chatId) {
             console.log('Blocking auto-load of new chat because user already selected a different chat');
@@ -6085,7 +6111,13 @@ class NetdataMCPChat {
                 break;
                 
             case 'error':
-                events.push({ type: 'error-message', content: msg.content, errorMessageIndex: msg.errorMessageIndex });
+                events.push({ 
+                    type: 'error-message', 
+                    content: msg.content, 
+                    errorMessageIndex: msg.errorMessageIndex,
+                    isRetryable: msg.isRetryable,
+                    retryButtonLabel: msg.retryButtonLabel
+                });
                 break;
                 
             default:
@@ -6211,8 +6243,34 @@ class NetdataMCPChat {
                 // Show the error message
                 messageDiv.innerHTML = `<div><i class="fas fa-times-circle"></i> ${event.content}</div>`;
                 
-                // Only show retry/redo buttons for retryable errors (not safety limit errors)
-                if (event.errorType !== 'safety_limit' && (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0)) {
+                // Handle different button types based on the error
+                if (event.isRetryable && event.retryButtonLabel) {
+                    // Custom retry button (e.g., Continue for user stop)
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'btn btn-warning btn-small';
+                    retryBtn.style.marginTop = '8px';
+                    const buttonIcon = event.retryButtonLabel === 'Continue' ? 'fa-play' : 'fa-redo';
+                    retryBtn.innerHTML = `<i class="fas ${buttonIcon}"></i> ${event.retryButtonLabel}`;
+                    
+                    retryBtn.onclick = async () => {
+                        retryBtn.disabled = true;
+                        retryBtn.textContent = 'Processing...';
+                        
+                        // Find and remove the pause message
+                        const errorIndex = chat.messages.findIndex(m => m.role === 'error' && m.content === event.content);
+                        if (errorIndex !== -1) {
+                            this.removeMessage(chatId, errorIndex, 1);
+                            
+                            // Reload chat to remove the error from display
+                            this.loadChat(chatId, true);
+                        }
+                        
+                        // Resume the interrupted processing without adding a new user message
+                        await this.resumeProcessing(chatId);
+                    };
+                    
+                    messageDiv.appendChild(retryBtn);
+                } else if (event.errorType !== 'safety_limit' && (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0)) {
                     // This error has context - use redo button
                     const redoBtn = document.createElement('button');
                     redoBtn.className = 'redo-button';
@@ -6428,9 +6486,13 @@ class NetdataMCPChat {
     }
     
     // Messaging
-    async sendMessage(chatId) {
-        const message = this.chatInput.value.trim();
-        if (!message) {return;}
+    async sendMessage(chatId, messageParam = null, isResume = false) {
+        // If no message provided, get it from the input
+        let message = messageParam;
+        if (message === null) {
+            message = this.chatInput.value.trim();
+            if (!message && !isResume) {return;}
+        }
         
         const chat = this.chats.get(chatId);
         if (!chat) {return;}
@@ -6473,19 +6535,24 @@ class NetdataMCPChat {
         this.updateChatSessions(); // Update UI to remove draft indicator
         
         // Disable input and update button to Stop
-        this.chatInput.value = '';
+        if (!isResume) {
+            this.chatInput.value = '';
+        }
         this.chatInput.disabled = true;
         this.isProcessing = true;
         this.shouldStopProcessing = false;
         this.updateSendButton();
         
-        // Increment turn counter for new user message
-        chat.currentTurn = (chat.currentTurn || 0) + 1;
-        
-        // CRITICAL: Add and display the user's message immediately for better UX
-        this.addMessage(chat.id, { role: 'user', content: message, turn: chat.currentTurn });
-        const userMessageIndex = chat.messages.length - 1;
-        this.processRenderEvent({ type: 'user-message', content: message, messageIndex: userMessageIndex }, chat.id);
+        // Only add user message if this is not a resume (resume continues from existing messages)
+        if (!isResume) {
+            // Increment turn counter for new user message
+            chat.currentTurn = (chat.currentTurn || 0) + 1;
+            
+            // CRITICAL: Add and display the user's message immediately for better UX
+            this.addMessage(chat.id, { role: 'user', content: message, turn: chat.currentTurn });
+            const userMessageIndex = chat.messages.length - 1;
+            this.processRenderEvent({ type: 'user-message', content: message, messageIndex: userMessageIndex }, chat.id);
+        }
         
         // Force scroll to bottom after DOM update
         requestAnimationFrame(() => {
@@ -6527,7 +6594,7 @@ class NetdataMCPChat {
         this.showAssistantThinking(chat.id);
         
         try {
-            const result = await this.processMessageWithTools(chat, mcpConnection, provider, message);
+            const result = await this.processMessageWithTools(chat, mcpConnection, provider, isResume ? null : message);
             
             // Check if rate limit was handled - don't conclude if so
             if (result && result.rateLimitHandled) {
@@ -6535,7 +6602,13 @@ class NetdataMCPChat {
             }
             
             // Check if we should generate a title automatically
-            if (this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
+            // Skip title generation if:
+            // 1. Processing was stopped by user
+            // 2. The last message sequence is incomplete (no assistant response)
+            const lastMessage = chat.messages[chat.messages.length - 1];
+            const hasCompleteSequence = lastMessage && lastMessage.role === 'assistant';
+            
+            if (!this.shouldStopProcessing && hasCompleteSequence && this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
                 const llmProxy = this.llmProviders.get(chat.llmProviderId);
                 if (llmProxy) {
                     const titleProvider = TitleGenerator.getTitleGenerationProvider(
@@ -6580,29 +6653,47 @@ class NetdataMCPChat {
             }
         } catch (error) {
             // Check if the user stopped processing
-            if (this.shouldStopProcessing) {
+            if (this.shouldStopProcessing || chat.processingWasStoppedByUser || error.isUserStop) {
+                console.log('[Stop Detection] Flags:', {
+                    shouldStopProcessing: this.shouldStopProcessing,
+                    processingWasStoppedByUser: chat.processingWasStoppedByUser,
+                    isUserStop: error.isUserStop
+                });
+                
+                // Clear the flag for next time
+                chat.processingWasStoppedByUser = false;
+                
+                // Clear the spinner immediately
+                this.clearSpinnerState(chat.id);
+                
                 // User clicked Stop - show a friendly message with Continue option
                 const continueMessage = '⏸️ Processing paused. You can continue the conversation by sending a new message or clicking Continue.';
-                this.showErrorWithRetry(continueMessage, async () => {
-                    // Find and remove the pause message
-                    const errorIndex = chat.messages.findIndex(m => m.role === 'error' && m.content === continueMessage);
-                    if (errorIndex !== -1) {
-                        this.removeMessage(chat.id, errorIndex, 1);
-                        
-                        // Reload chat to remove the error from display (force render to refresh UI)
-                        this.loadChat(chat.id, true);
-                    }
-                    
-                    // Continue with a simple continuation prompt
-                    this.chatInput.value = 'Please continue';
-                    await this.sendMessage(chat.id);
-                }, 'Continue', chat.id);
-                // Find the last user message index for retry functionality
-                const lastUserMsgIdx = chat.messages.findLastIndex(m => m.role === 'user');
-                this.addMessage(chat.id, { role: 'error', content: continueMessage, errorMessageIndex: lastUserMsgIdx });
                 
-                // Display the continue message
-                this.processRenderEvent({ type: 'error-message', content: continueMessage, errorMessageIndex: lastUserMsgIdx }, chat.id);
+                // Find the last user message index for error tracking
+                const lastUserMsgIdx = chat.messages.findLastIndex(m => m.role === 'user');
+                
+                // Add the error message with retry info to chat history
+                const errorMsg = {
+                    role: 'error',
+                    content: continueMessage,
+                    errorMessageIndex: lastUserMsgIdx,
+                    isRetryable: true,
+                    retryButtonLabel: 'Continue'
+                };
+                
+                this.addMessage(chat.id, errorMsg);
+                
+                // Process the render event to display it (only once)
+                this.processRenderEvent({ 
+                    type: 'error-message', 
+                    content: continueMessage, 
+                    errorMessageIndex: lastUserMsgIdx,
+                    isRetryable: true,
+                    retryButtonLabel: 'Continue'
+                }, chat.id);
+                
+                // Clean up states
+                this.assistantFailed(chat.id, error);
             } else {
                 // Check for rate limit error (429)
                 const isRateLimitError = error.message.includes('Rate limit') || error.message.includes('429');
@@ -6647,11 +6738,6 @@ class NetdataMCPChat {
                     
                     // Clean up on error
                     this.assistantFailed(chat.id, error);
-                }
-                
-                // Clean up for stop case
-                if (this.shouldStopProcessing) {
-                    this.assistantFailed(chat.id, { message: 'User stopped processing' });
                 }
             }
             
@@ -6761,6 +6847,22 @@ class NetdataMCPChat {
         }
     }
 
+    async resumeProcessing(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error('Chat not found:', chatId);
+            return;
+        }
+
+        // Clear any stop flags
+        this.shouldStopProcessing = false;
+        chat.processingWasStoppedByUser = false;
+        
+        // Simply call sendMessage without adding a new user message
+        // The last message in the chat should still be the user message that was interrupted
+        await this.sendMessage(chatId, null, true); // Pass true to indicate this is a resume
+    }
+
     async processMessageWithTools(chat, mcpConnection, provider, userMessage) {
         // Set processing state for this chat
         chat.isProcessing = true;
@@ -6797,8 +6899,12 @@ class NetdataMCPChat {
             
             // Check if we should stop processing
             if (this.shouldStopProcessing) {
-                // Don't show a system message here - we'll handle it in the catch block
-                break;
+                // Mark that processing was stopped in the chat object
+                chat.processingWasStoppedByUser = true;
+                // Throw an error to trigger the catch block in sendMessage
+                const stopError = new Error('Processing stopped by user');
+                stopError.isUserStop = true;
+                throw stopError;
             }
             
             
@@ -6857,9 +6963,12 @@ class NetdataMCPChat {
             }
             }
         } catch (error) {
-            // Set error state
-            chat.hasError = true;
-            chat.lastError = error.message;
+            // Don't set error state for user stop
+            if (!error.isUserStop) {
+                // Set error state
+                chat.hasError = true;
+                chat.lastError = error.message;
+            }
             throw error;
         } finally {
             // Note: Full cleanup is handled by the caller (sendMessage) via assistantConcluded()
