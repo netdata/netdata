@@ -2203,10 +2203,13 @@ static void store_ctx_cleanup_list(struct meta_config_s *config, struct judy_lis
     worker_is_idle();
 }
 
-static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool is_worker)
+static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool is_worker, bool cleanup_only)
 {
     if (!pending_alert_list)
         return;
+
+    if (cleanup_only)
+        goto done;
 
     if (is_worker)
         worker_is_busy(UV_EVENT_STORE_ALERT_TRANSITIONS);
@@ -2228,8 +2231,6 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
         __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
         __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
     }
-    (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
-    freez(pending_alert_list);
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
     nd_log(
@@ -2241,23 +2242,33 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
 
     if (is_worker)
         worker_is_idle();
+
+done:
+    (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
+    freez(pending_alert_list);
 }
 
-static int execute_statement(sqlite3_stmt *stmt)
+static int execute_statement(sqlite3_stmt *stmt, bool only_finalize)
 {
     if (!stmt)
         return SQLITE_OK;
 
-    int rc = sqlite3_step_monitored(stmt);
+    int rc = SQLITE_OK;
+
+    if (unlikely(only_finalize))
+        goto done;
+
+    rc = sqlite3_step_monitored(stmt);
     if (unlikely(rc != SQLITE_DONE))
         nd_log_daemon(NDLP_ERR, "Failed to execute sql statement, rc = %d", rc);
 
+done:
     SQLITE_FINALIZE(stmt);
 
-    return rc;
+    return rc == SQLITE_DONE ? SQLITE_OK : rc;
 }
 
-static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool is_worker)
+static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool is_worker, bool only_finalize)
 {
     if (!pending_sql_statement)
         return;
@@ -2273,7 +2284,7 @@ static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(pending_sql_statement->JudyL, &Index, &first))) {
         sqlite3_stmt *stmt = *Pvalue;
-        execute_statement(stmt);
+        execute_statement(stmt, only_finalize);
     }
     (void) JudyLFreeArray(&pending_sql_statement->JudyL, PJE0);
     freez(pending_sql_statement);
@@ -2400,9 +2411,9 @@ static void start_metadata_hosts(uv_work_t *req)
     BUFFER *work_buffer = worker->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
-    store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true);
+    store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true, false);
 
-    store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true);
+    store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true, false);
 
     if (!SHUTDOWN_REQUESTED(config))
         store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
@@ -2609,7 +2620,7 @@ static void *metadata_event_loop(void *arg)
                         *Pvalue = (void *)stmt;
                     else {
                         // Fallback execute immediately
-                        execute_statement(stmt);
+                        execute_statement(stmt, false);
                     }
                     break;
                 case METADATA_SYNC_SHUTDOWN:
@@ -2648,12 +2659,12 @@ static void *metadata_event_loop(void *arg)
 
     (void)uv_loop_close(loop);
 
-    // If we are still waitinng for callbacks we timed out, don't run these
-    if (!callbacks_pending) {
+    // If we are still waiting for callbacks we timed out, don't run these
+    if (!callbacks_pending)
         store_hosts_metadata(work_buffer, false);
-        store_alert_transitions(pending_alert_list, false);
-        store_sql_statements(pending_sql_statement, false);
-    }
+
+    store_alert_transitions(pending_alert_list, false, callbacks_pending);
+    store_sql_statements(pending_sql_statement, false, callbacks_pending);
 
     if (pending_ctx_cleanup_list) {
         Word_t Index = 0;
