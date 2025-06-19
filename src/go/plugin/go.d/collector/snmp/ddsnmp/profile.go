@@ -325,7 +325,7 @@ func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
 	for i, prof := range profiles {
 		indexed[i] = indexedProfile{
 			idx:       i,
-			isGeneric: strings.Contains(strings.ToLower(prof.SourceFile), "generic-"),
+			isGeneric: strings.Contains(strings.ToLower(prof.SourceFile), "generic"),
 		}
 	}
 
