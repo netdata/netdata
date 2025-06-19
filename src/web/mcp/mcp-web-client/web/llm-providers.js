@@ -488,7 +488,7 @@ class LLMProvider {
      * @param {number|null} _cachePosition - Cache position for Anthropic
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(_messages, _tools = [], _temperature = 0.7, _mode = 'cached', _cachePosition = null) {
+    async sendMessage(_messages, _tools = [], _temperature = 0.7, _mode = 'cached', _cachePosition = null, _chat = null) {
         const error = 'sendMessage must be implemented by subclass';
         console.error('[LLMProvider]', error);
         throw new Error(error);
@@ -508,6 +508,88 @@ class LLMProvider {
         if (this.onLog) {
             this.onLog(logEntry);
         }
+    }
+
+    /**
+     * Check if tool metadata should be injected
+     * @returns {boolean}
+     */
+    shouldInjectToolMetadata(chat) {
+        console.log('[shouldInjectToolMetadata] Checking chat:', chat ? {
+            id: chat.id,
+            isSubChat: chat.isSubChat,
+            toolSummarisationEnabled: chat.config?.optimisation?.toolSummarisation?.enabled
+        } : 'No chat provided');
+        
+        // If no chat provided, can't inject metadata
+        if (!chat) {
+            return false;
+        }
+        
+        // Don't inject metadata in sub-chats to prevent recursion
+        if (chat.isSubChat) {
+            return false;
+        }
+        
+        // Check if tool summarization is enabled
+        return chat.config?.optimisation?.toolSummarisation?.enabled === true;
+    }
+
+    /**
+     * Inject metadata fields into tool schema
+     * @param {Object} tool - The tool object
+     * @param {Object} chat - The chat context
+     * @returns {Object} - Tool with injected metadata fields
+     */
+    injectToolMetadata(tool, chat) {
+        if (!this.shouldInjectToolMetadata(chat)) {
+            console.log('[injectToolMetadata] Not injecting - disabled or sub-chat');
+            return tool;
+        }
+        
+        console.log('[injectToolMetadata] Injecting metadata into tool:', tool.name);
+        
+        // Clone the tool to avoid modifying the original
+        const modifiedTool = JSON.parse(JSON.stringify(tool));
+        
+        // Ensure inputSchema exists
+        if (!modifiedTool.inputSchema) {
+            modifiedTool.inputSchema = { type: 'object', properties: {} };
+        }
+        if (!modifiedTool.inputSchema.properties) {
+            modifiedTool.inputSchema.properties = {};
+        }
+        
+        // Inject metadata fields
+        const metadataFields = {
+            tool_purpose: {
+                type: 'string',
+                description: 'Why this tool is being used in the context of the user query'
+            },
+            expected_format: {
+                type: 'string',
+                description: 'Expected structure or format of the data you want from this tool'
+            },
+            key_information: {
+                type: 'string',
+                description: 'Specific values, patterns, or information to extract from the response'
+            },
+            success_indicators: {
+                type: 'string',
+                description: 'How to determine if the tool response is useful'
+            },
+            context_for_interpretation: {
+                type: 'string',
+                description: 'Context needed to interpret the tool results'
+            }
+        };
+        
+        // Add metadata fields to the tool schema
+        Object.assign(modifiedTool.inputSchema.properties, metadataFields);
+        
+        console.log('[injectToolMetadata] Modified tool schema:', modifiedTool.inputSchema.properties);
+        
+        return modifiedTool;
     }
 
     /**
@@ -599,7 +681,7 @@ class OpenAIProvider extends LLMProvider {
      * @param {number|null} _cachePosition - Cache position (unused for OpenAI)
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null) {
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null, chat = null) {
         // Check model configuration for endpoint and tool support
         const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
         const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
@@ -612,22 +694,28 @@ class OpenAIProvider extends LLMProvider {
         const openaiMessages = this.convertMessages(messages, mode);
         
         // Convert tools to OpenAI completions format (with nested function)
-        const openaiCompletionsTools = tools.map(tool => ({
-            type: 'function',
-            function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.inputSchema || {}
-            }
-        }));
+        const openaiCompletionsTools = tools.map(tool => {
+            const injectedTool = this.injectToolMetadata(tool, chat);
+            return {
+                type: 'function',
+                function: {
+                    name: injectedTool.name,
+                    description: injectedTool.description,
+                    parameters: injectedTool.inputSchema || {}
+                }
+            };
+        });
         
         // Convert tools to OpenAI responses format (requires type and name fields)
-        const openaiResponsesTools = tools.map(tool => ({
-            type: 'function',
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.inputSchema || {}
-        }));
+        const openaiResponsesTools = tools.map(tool => {
+            const injectedTool = this.injectToolMetadata(tool, chat);
+            return {
+                type: 'function',
+                name: injectedTool.name,
+                description: injectedTool.description,
+                parameters: injectedTool.inputSchema || {}
+            };
+        });
         
         let requestBody;
         
@@ -1328,7 +1416,7 @@ class AnthropicProvider extends LLMProvider {
      * @param {number|null} cachePosition - Cache position for Anthropic
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null) {
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null, chat = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
@@ -1358,11 +1446,14 @@ class AnthropicProvider extends LLMProvider {
         }
         
         // Convert tools to Anthropic format (no cache control on tools)
-        const anthropicTools = tools.map(tool => ({
-            name: tool.name,
-            description: tool.description,
-            input_schema: tool.inputSchema || {}
-        }));
+        const anthropicTools = tools.map(tool => {
+            const injectedTool = this.injectToolMetadata(tool, chat);
+            return {
+                name: injectedTool.name,
+                description: injectedTool.description,
+                input_schema: injectedTool.inputSchema || {}
+            };
+        });
 
         const requestBody = {
             model: this.model,
@@ -1396,6 +1487,16 @@ class AnthropicProvider extends LLMProvider {
 
         // Check request size before sending
         this.checkRequestSize(requestBody);
+
+        // Log the full request
+        console.log(`[LLM SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, {
+            model: this.model,
+            messages: requestBody.messages,
+            tools: requestBody.tools,
+            temperature: requestBody.temperature,
+            max_tokens: requestBody.max_tokens,
+            system: requestBody.system
+        });
 
         let response;
         try {
@@ -1438,8 +1539,8 @@ class AnthropicProvider extends LLMProvider {
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'anthropic' });
         
-        
-        return { 
+        // Log the processed response
+        const processedResponse = { 
             content: data.content,
             toolCalls: [],
             usage: data.usage ? {
@@ -1450,6 +1551,14 @@ class AnthropicProvider extends LLMProvider {
                 cacheReadInputTokens: data.usage.cache_read_input_tokens
             } : null
         };
+        
+        console.log(`[LLM RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, {
+            content: processedResponse.content,
+            usage: processedResponse.usage,
+            model: this.model
+        });
+        
+        return processedResponse;
     }
 
     convertMessagesWithCaching(messages, cachePosition = null, mode = 'cached') {
@@ -1845,7 +1954,7 @@ class GoogleProvider extends LLMProvider {
      * @param {number|null} _cachePosition - Cache position (unused for Google)
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null) {
+    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null, chat = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
@@ -1853,11 +1962,14 @@ class GoogleProvider extends LLMProvider {
         const { contents, systemInstruction } = this.convertMessages(messages, mode);
         
         // Convert tools to Gemini format
-        const functionDeclarations = tools.map(tool => ({
-            name: tool.name,
-            description: tool.description,
-            parameters: this.cleanSchemaForGoogle(tool.inputSchema || {})
-        }));
+        const functionDeclarations = tools.map(tool => {
+            const injectedTool = this.injectToolMetadata(tool, chat);
+            return {
+                name: injectedTool.name,
+                description: injectedTool.description,
+                parameters: this.cleanSchemaForGoogle(injectedTool.inputSchema || {})
+            };
+        });
 
         const requestBody = {
             contents,

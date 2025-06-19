@@ -134,7 +134,9 @@ export class ToolSummarizer {
                 ],
                 [], // No tools for summarization
                 0.3, // Lower temperature for factual summarization
-                'all-off' // No tools
+                'all-off', // No tools
+                null, // No cache position
+                null // No chat context needed for summarization
             );
             
             // Parse and validate response

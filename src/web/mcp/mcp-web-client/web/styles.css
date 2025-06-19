@@ -3645,3 +3645,249 @@ body {
 .tool-response-content.error .fa-exclamation-circle {
     font-size: 18px;
 }
+
+/* Sub-chat expandable section */
+.sub-chat-section {
+    margin-top: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+
+.sub-chat-section:hover {
+    box-shadow: var(--shadow);
+}
+
+.sub-chat-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--bg-secondary);
+    transition: background-color 0.2s;
+}
+
+.sub-chat-header:hover {
+    background: var(--hover-color);
+}
+
+.sub-chat-toggle {
+    font-size: 12px;
+    margin-right: 8px;
+    transition: transform 0.3s ease;
+}
+
+.sub-chat-section.expanded .sub-chat-toggle {
+    transform: rotate(90deg);
+}
+
+.sub-chat-icon {
+    margin-right: 6px;
+}
+
+.sub-chat-label {
+    font-weight: 500;
+    flex: 1;
+}
+
+.sub-chat-stats {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-left: 12px;
+}
+
+.sub-chat-content {
+    border-top: 1px solid var(--border-color);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: var(--background-color);
+}
+
+.sub-chat-section.expanded .sub-chat-content {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+/* Sub-chat messages */
+.sub-chat-message {
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+}
+
+.sub-chat-system {
+    background: var(--bg-secondary);
+}
+
+.sub-chat-system-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.sub-chat-metadata {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.sub-chat-metadata div {
+    margin: 4px 0;
+}
+
+.sub-chat-user-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.sub-chat-user-content {
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.sub-chat-assistant-text {
+    margin: 8px 0;
+}
+
+.sub-chat-tool-call {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.sub-chat-tool-icon {
+    margin-right: 6px;
+}
+
+.sub-chat-tool-name {
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.sub-chat-tool-args {
+    color: var(--text-secondary);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+}
+
+.sub-chat-tool-result {
+    margin-top: 8px;
+}
+
+.sub-chat-tool-result-header {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.sub-chat-tool-result-content {
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.sub-chat-error {
+    color: var(--danger-color);
+    text-align: center;
+    padding: 20px;
+}
+
+/* Tool metadata display */
+.tool-metadata {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    position: relative;
+    overflow: hidden;
+}
+
+.tool-metadata::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary-color);
+}
+
+.tool-metadata-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.tool-metadata-header i {
+    color: var(--primary-color);
+    margin-right: 8px;
+}
+
+.tool-metadata-header span {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tool-metadata-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 8px 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.tool-metadata-icon {
+    margin-right: 10px;
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+    color: var(--primary-color);
+}
+
+.tool-metadata-label {
+    font-weight: 500;
+    margin-right: 8px;
+    flex-shrink: 0;
+    color: var(--text-primary);
+}
+
+.tool-metadata-value {
+    flex: 1;
+    word-break: break-word;
+}
+
+.tool-metadata-value code {
+    background: var(--code-bg);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+}
