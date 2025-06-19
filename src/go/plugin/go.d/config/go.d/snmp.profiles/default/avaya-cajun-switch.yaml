@@ -32,64 +32,63 @@ metrics:
       name: genPortTable
       OID: 1.3.6.1.4.1.81.9.1
     symbols:
-      - symbol:
-          name: avaya.genPortFunctionality
-          OID: 1.3.6.1.4.1.81.9.1.1.3
-          description: Port functionality
-          family: Ports/Functionality
-          mapping:
-            1: private
-            2: repeater_aui
-            3: repeater_thin
-            4: repeater10_base_t
-            5: ten_base_f_sync_act
-            6: foirl
-            7: xcvr
-            8: lobe
-            9: ri
-            10: ro
-            11: serial
-            12: local_talk
-            13: fddi
-            14: clock
-            15: gen_token_ring
-            16: dte
-            17: active_lobe
-            18: gen_active_token_ring
-            19: ten_base_fb
-            20: eth10_base_t
-            21: fiber
-            22: wan
-            23: star
-            24: active_ri
-            25: active_ro
-            26: fl
-            27: sonet-oc3
-            28: a100_base_tx
-            29: a100_base_fx
-            30: oc3
-            31: an_atm_main
-            32: an_atm_secondary
-            33: a1000_base_fx
-            40: sonet
-            41: fim_voice
-            42: sdh-stm1
-            43: eth1000_base_sx
-            44: eth1000_base_lx
-            45: eth10_base_fl
-            46: eth_lag
-            47: lag100
-            48: lag1000
-            49: eth1000_base_tx
-            50: eth1000_base_cx
-            51: g_bic_not_present
-            52: g_bic_not_supported
-            53: eth1000_base_x_proprietary
-            54: oc12
-            55: s_fp_not_present
-            56: s_fp_not_supported
-            57: eth10_base_tw_in_pwr
-            58: eth100_base_t_xw_in_pwr
+      - name: avaya.genPortFunctionality
+        OID: 1.3.6.1.4.1.81.9.1.1.3
+        description: Port functionality
+        family: Ports/Functionality
+        mapping:
+          1: private
+          2: repeater_aui
+          3: repeater_thin
+          4: repeater10_base_t
+          5: ten_base_f_sync_act
+          6: foirl
+          7: xcvr
+          8: lobe
+          9: ri
+          10: ro
+          11: serial
+          12: local_talk
+          13: fddi
+          14: clock
+          15: gen_token_ring
+          16: dte
+          17: active_lobe
+          18: gen_active_token_ring
+          19: ten_base_fb
+          20: eth10_base_t
+          21: fiber
+          22: wan
+          23: star
+          24: active_ri
+          25: active_ro
+          26: fl
+          27: sonet-oc3
+          28: a100_base_tx
+          29: a100_base_fx
+          30: oc3
+          31: an_atm_main
+          32: an_atm_secondary
+          33: a1000_base_fx
+          40: sonet
+          41: fim_voice
+          42: sdh-stm1
+          43: eth1000_base_sx
+          44: eth1000_base_lx
+          45: eth10_base_fl
+          46: eth_lag
+          47: lag100
+          48: lag1000
+          49: eth1000_base_tx
+          50: eth1000_base_cx
+          51: g_bic_not_present
+          52: g_bic_not_supported
+          53: eth1000_base_x_proprietary
+          54: oc12
+          55: s_fp_not_present
+          56: s_fp_not_supported
+          57: eth10_base_tw_in_pwr
+          58: eth100_base_t_xw_in_pwr
     metric_tags:
       - symbol:
           name: avaya.genPortId
