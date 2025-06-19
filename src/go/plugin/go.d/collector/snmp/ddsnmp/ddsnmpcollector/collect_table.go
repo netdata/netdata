@@ -21,7 +21,7 @@ type tableWalkResult struct {
 	config   ddprofiledefinition.MetricsConfig
 }
 
-func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
+func (c *Collector) collectTableMetrics(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
 	walkResults, err := c.walkTablesAsNeeded(prof)
 	if err != nil {
 		return nil, err
@@ -118,8 +118,8 @@ func (c *Collector) walkTablesAsNeeded(prof *ddsnmp.Profile) ([]tableWalkResult,
 }
 
 // Phase 2: Process walked data
-func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Metric, error) {
-	var metrics []Metric
+func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]ddsnmp.Metric, error) {
+	var metrics []ddsnmp.Metric
 	var errs []error
 
 	// Build a map for quick lookup of walked data by table OID
@@ -171,7 +171,11 @@ func (c *Collector) processTableWalkResults(walkResults []tableWalkResult) ([]Me
 }
 
 // Process a single table's data
-func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, allWalkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string) ([]Metric, error) {
+func (c *Collector) processTableData(
+	cfg ddprofiledefinition.MetricsConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	allWalkedData map[string]map[string]gosnmp.SnmpPDU,
+	tableNameToOID map[string]string) ([]ddsnmp.Metric, error) {
 	columnOIDs := buildColumnOIDs(cfg)
 	tagColumnOIDs := buildTagColumnOIDs(cfg)
 
@@ -212,7 +216,8 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 		}
 	}
 
-	var metrics []Metric
+	var metrics []ddsnmp.Metric
+	var errs []error
 
 	for index, rowPDUs := range rows {
 		rowTags := make(map[string]string)
@@ -328,7 +333,7 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				continue
 			}
 
-			metric := Metric{
+			metric := ddsnmp.Metric{
 				Name:        sym.Name,
 				Value:       value,
 				StaticTags:  ternary(len(rowStaticTags) > 0, rowStaticTags, nil),
@@ -341,8 +346,20 @@ func (c *Collector) processTableData(cfg ddprofiledefinition.MetricsConfig, pdus
 				IsTable:     true,
 			}
 
+			if sym.TransformCompiled != nil {
+				if err := applyTransform(&metric, sym); err != nil {
+					errs = append(errs, fmt.Errorf("failed to apply transform for table metric '%s:%s': %w",
+						cfg.Table.Name, sym.Name, err))
+					continue
+				}
+			}
+
 			metrics = append(metrics, metric)
 		}
+	}
+
+	if len(errs) > 0 {
+		c.log.Warningf("failed to collect table metrics: %v", errors.Join(errs...))
 	}
 
 	deps := extractTableDependencies(cfg, tableNameToOID)
@@ -378,7 +395,7 @@ func (c *Collector) collectTableWithCache(
 	cachedOIDs map[string]map[string]string,
 	cachedTags map[string]map[string]string,
 	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
-) ([]Metric, error) {
+) ([]ddsnmp.Metric, error) {
 	var oidsToGet []string
 
 	for _, columns := range cachedOIDs {
@@ -411,7 +428,8 @@ func (c *Collector) collectTableWithCache(
 		}
 	}
 
-	var metrics []Metric
+	var metrics []ddsnmp.Metric
+	var errs []error
 
 	for index, columns := range cachedOIDs {
 		rowTags := make(map[string]string)
@@ -440,7 +458,7 @@ func (c *Collector) collectTableWithCache(
 				continue
 			}
 
-			metric := Metric{
+			metric := ddsnmp.Metric{
 				Name:        sym.Name,
 				Value:       value,
 				StaticTags:  ternary(len(rowStaticTags) > 0, rowStaticTags, nil),
@@ -453,8 +471,20 @@ func (c *Collector) collectTableWithCache(
 				IsTable:     true,
 			}
 
+			if sym.TransformCompiled != nil {
+				if err := applyTransform(&metric, sym); err != nil {
+					errs = append(errs, fmt.Errorf("failed to apply transform for metric '%s:%s': %w",
+						cfg.Table.Name, sym.Name, err))
+					continue
+				}
+			}
+
 			metrics = append(metrics, metric)
 		}
+	}
+
+	if len(errs) > 0 {
+		c.log.Warningf("failed to collect table metrics: %v", errors.Join(errs...))
 	}
 
 	return metrics, nil
