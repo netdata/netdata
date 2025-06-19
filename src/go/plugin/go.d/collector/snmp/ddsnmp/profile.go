@@ -275,7 +275,6 @@ func loadProfileExtensions(profile *Profile, dir string, processedExtends map[st
 }
 
 func getProfilesDir() string {
-	//return "/Users/ilyam/Projects/github/ilyam8/netdata/src/go/plugin/go.d/config/go.d/snmp.profiles/default"
 	if executable.Name == "test" {
 		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
 		return dir
