@@ -5,7 +5,9 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
@@ -30,7 +32,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		if c.EnableProfiles {
-			c.snmpProfiles = ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
+			c.snmpProfiles = c.setupProfiles()
 		}
 	}
 
@@ -116,6 +118,18 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 		Hostname: c.Vnode.Hostname,
 		Labels:   labels,
 	}
+}
+
+func (c *Collector) setupProfiles() []*ddsnmp.Profile {
+	snmpProfiles := ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
+	var names []string
+	for _, prof := range snmpProfiles {
+		name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
+		names = append(names, name)
+	}
+	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)",
+		len(snmpProfiles), strings.Join(names, ", "), c.sysInfo.SysObjectID)
+	return snmpProfiles
 }
 
 func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {
