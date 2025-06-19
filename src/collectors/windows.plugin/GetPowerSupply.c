@@ -33,8 +33,8 @@ static void netdata_allocate_power_supply(char *path)
 static inline void netdata_update_power_supply_values(struct simple_property *voltage, BATTERY_STATUS *bs, BATTERY_INFORMATION *bi)
 {
     if (bs->Capacity != BATTERY_UNKNOWN_CAPACITY) {
-        collected_number num = bs->Capacity;
-        collected_number den = bi->FullChargedCapacity;
+        NETDATA_DOUBLE num = bs->Capacity;
+        NETDATA_DOUBLE den = bi->FullChargedCapacity;
         num /= den;
 
         power_supply_root->capacity->value = (unsigned long long)(num * 100.0);
