@@ -124,8 +124,7 @@ func (c *Collector) setupProfiles() []*ddsnmp.Profile {
 	snmpProfiles := ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
 	var names []string
 	for _, prof := range snmpProfiles {
-		_, name := filepath.Split(prof.SourceFile)
-		name = strings.TrimSuffix(name, filepath.Ext(name))
+		name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
 		names = append(names, name)
 	}
 	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)",
