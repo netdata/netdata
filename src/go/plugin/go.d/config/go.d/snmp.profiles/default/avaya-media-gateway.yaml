@@ -35,32 +35,30 @@ metrics:
       name: avEntPhyChFruTable
       OID: 1.3.6.1.4.1.6889.2.1.99.5.1
     symbols:
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
-          name: avaya.avEntPhyChFruFault
-          description: Description of FRU fault
-          family: FRU/Faults
-          unit: "{status}"
-          mapping:
-            1: none
-            2: mulfunction
-            3: ac_fault
-            4: malfunction_and_ac_fault
-            5: single_fan_fault
-            6: multiple_fan_fault
-            7: bad_expansion_cable
-            255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
-          name: avaya.avEntPhyChFruOperStat
-          description: Operational status of the chassis FRU unit
-          family: FRU/Status
-          unit: "{status}"
-          mapping:
-            1: ok
-            2: fault
-            3: not_present
-            255: unknown
+      - OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
+        name: avaya.avEntPhyChFruFault
+        description: Description of FRU fault
+        family: FRU/Faults
+        unit: "{status}"
+        mapping:
+          1: none
+          2: mulfunction
+          3: ac_fault
+          4: malfunction_and_ac_fault
+          5: single_fan_fault
+          6: multiple_fan_fault
+          7: bad_expansion_cable
+          255: unknown
+      - OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
+        name: avaya.avEntPhyChFruOperStat
+        description: Operational status of the chassis FRU unit
+        family: FRU/Status
+        unit: "{status}"
+        mapping:
+          1: ok
+          2: fault
+          3: not_present
+          255: unknown
     metric_tags:
       - index: 1
         tag: avaya_ent_physical_index
