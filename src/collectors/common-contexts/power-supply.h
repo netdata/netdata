@@ -53,5 +53,47 @@ struct power_supply {
     struct power_supply *next;
 };
 
+static inline void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
+    rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
+}
+
+static inline void rrdset_create_simple_prop(
+    struct power_supply *ps,
+    struct simple_property *prop,
+    char *title,
+    char *dim,
+    collected_number divisor,
+    char *units,
+    long priority,
+    int update_every)
+{
+    if (unlikely(!prop->st)) {
+        char id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", dim);
+        snprintfz(context, RRD_ID_LENGTH_MAX, "powersupply.%s", dim);
+
+        prop->st = rrdset_create_localhost(
+            id,
+            ps->name,
+            NULL,
+            dim,
+            context,
+            title,
+            units,
+            _COMMON_PLUGIN_NAME,
+            _COMMON_PLUGIN_MODULE_NAME,
+            priority,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        add_labels_to_power_supply(ps, prop->st);
+    }
+
+    if (unlikely(!prop->rd))
+        prop->rd = rrddim_add(prop->st, dim, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_set_by_pointer(prop->st, prop->rd, prop->value);
+
+    rrdset_done(prop->st);
+}
 
 #endif //NETDATA_POWER_SUPPLY_H

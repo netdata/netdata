@@ -84,10 +84,6 @@ void power_supply_free(struct power_supply *ps) {
     }
 }
 
-static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
-    rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
-}
-
 static void read_simple_property(struct simple_property *prop, bool keep_fds_open) {
     char buffer[PROP_VALUE_LENGTH_MAX + 1];
 
@@ -119,36 +115,6 @@ static void read_simple_property(struct simple_property *prop, bool keep_fds_ope
         prop->fd = -1;
     }
     return;
-}
-
-static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_property *prop, char *title, char *dim, collected_number divisor, char *units, long priority, int update_every) {
-    if(unlikely(!prop->st)) {
-        char id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", dim);
-        snprintfz(context, RRD_ID_LENGTH_MAX, "powersupply.%s", dim);
-
-        prop->st = rrdset_create_localhost(
-                id
-                , ps->name
-                , NULL
-                , dim
-                , context
-                , title
-                , units
-                , PLUGIN_PROC_NAME
-                , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
-                , priority
-                , update_every
-                , RRDSET_TYPE_LINE
-        );
-
-        add_labels_to_power_supply(ps, prop->st);
-    }
-
-    if(unlikely(!prop->rd)) prop->rd = rrddim_add(prop->st, dim, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
-    rrddim_set_by_pointer(prop->st, prop->rd, prop->value);
-
-    rrdset_done(prop->st);
 }
 
 int do_sys_class_power_supply(int update_every, usec_t dt) {
