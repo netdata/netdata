@@ -30,7 +30,7 @@ static void netdata_allocate_power_supply(char *path)
     power_supply_root->capacity->filename = power_supply_root->name;
 }
 
-static void netdata_update_power_supply_values(BATTERY_STATUS *bs, BATTERY_INFORMATION *bi)
+static inline void netdata_update_power_supply_values(struct simple_property *voltage, BATTERY_STATUS *bs, BATTERY_INFORMATION *bi)
 {
     if (bs->Capacity != BATTERY_UNKNOWN_CAPACITY) {
         collected_number num = bs->Capacity;
@@ -39,10 +39,15 @@ static void netdata_update_power_supply_values(BATTERY_STATUS *bs, BATTERY_INFOR
 
         power_supply_root->capacity->value = (unsigned long long)(num * 100.0);
     }
+
+    if (bs->Voltage != BATTERY_UNKNOWN_VOLTAGE) {
+        voltage->value = bs->Voltage;
+    }
 }
 
 int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
 {
+    static struct simple_property voltage;
     PSP_DEVICE_INTERFACE_DETAIL_DATA pdidd = NULL;
     HANDLE hBattery = NULL;
 
@@ -115,7 +120,7 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
     if (!power_supply_root)
         netdata_allocate_power_supply(pdidd->DevicePath);
 
-    netdata_update_power_supply_values(&bs, &bi);
+    netdata_update_power_supply_values(&voltage, &bs, &bi);
 
     rrdset_create_simple_prop(
         power_supply_root,
@@ -126,6 +131,16 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
         "percentage",
         NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY,
         update_every);
+
+    rrdset_create_simple_prop(
+            power_supply_root,
+            &voltage,
+            "Power supply voltage",
+            "voltage",
+            1000,
+            "v",
+            NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE,
+            update_every);
 
 endPowerSupply:
     if (hBattery)
