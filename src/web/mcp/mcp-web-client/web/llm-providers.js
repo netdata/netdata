@@ -515,12 +515,6 @@ class LLMProvider {
      * @returns {boolean}
      */
     shouldInjectToolMetadata(chat) {
-        console.log('[shouldInjectToolMetadata] Checking chat:', chat ? {
-            id: chat.id,
-            isSubChat: chat.isSubChat,
-            toolSummarisationEnabled: chat.config?.optimisation?.toolSummarisation?.enabled
-        } : 'No chat provided');
-        
         // If no chat provided, can't inject metadata
         if (!chat) {
             return false;
@@ -543,11 +537,8 @@ class LLMProvider {
      */
     injectToolMetadata(tool, chat) {
         if (!this.shouldInjectToolMetadata(chat)) {
-            console.log('[injectToolMetadata] Not injecting - disabled or sub-chat');
             return tool;
         }
-        
-        console.log('[injectToolMetadata] Injecting metadata into tool:', tool.name);
         
         // Clone the tool to avoid modifying the original
         const modifiedTool = JSON.parse(JSON.stringify(tool));
@@ -580,14 +571,12 @@ class LLMProvider {
             },
             context_for_interpretation: {
                 type: 'string',
-                description: 'Context needed to interpret the tool results'
+                description: 'Additional context from the user discussion that may needed to interpret the tool results'
             }
         };
         
         // Add metadata fields to the tool schema
         Object.assign(modifiedTool.inputSchema.properties, metadataFields);
-        
-        console.log('[injectToolMetadata] Modified tool schema:', modifiedTool.inputSchema.properties);
         
         return modifiedTool;
     }
@@ -621,6 +610,27 @@ class LLMProvider {
             sizeBytes: sizeInBytes,
             maxBytes: maxSizeBytes
         });
+    }
+    
+    shouldIncludeTool(msg, mode) {
+        // Determine if tools should be included based on mode
+        if (mode === 'all-off') return false;
+        if (mode === 'all-on') return true;
+        if (mode === 'manual') {
+            // Check individual tool inclusion state (would need to be passed in)
+            return true; // Default to include for now
+        }
+        // For 'auto' and 'cached' modes, include by default
+        return true;
+    }
+
+    shouldIncludeToolCalls(msg, mode) {
+        return this.shouldIncludeTool(msg, mode);
+    }
+
+    shouldIncludeToolResults(msg, mode) {
+        // Tool results should only be included if their corresponding calls were included
+        return this.shouldIncludeTool(msg, mode);
     }
 }
 
@@ -759,17 +769,14 @@ class OpenAIProvider extends LLMProvider {
             }
             
             // Build request for v1/responses endpoint
-            requestBody = {
-                model: this.model,
-                input: inputMessages,
-                max_output_tokens: 4096,
-                stream: false,
-                store: true
-            };
+            // Order fields consistently: tools → instructions (system) → input (messages) → model
+            requestBody = {};
             
-            // O3/O1 models don't support temperature parameter
-            if (!this.model.startsWith('o3') && !this.model.startsWith('o1')) {
-                requestBody.temperature = temperature;
+            // Add tools first if supported
+            if (supportsTools && openaiResponsesTools.length > 0) {
+                requestBody.tools = openaiResponsesTools;
+                requestBody.tool_choice = 'auto';
+                requestBody.parallel_tool_calls = true;
             }
             
             // Add system prompt as instructions
@@ -777,11 +784,18 @@ class OpenAIProvider extends LLMProvider {
                 requestBody.instructions = systemPrompt;
             }
             
-            // Add tools if supported - responses endpoint format
-            if (supportsTools && openaiResponsesTools.length > 0) {
-                requestBody.tools = openaiResponsesTools;
-                requestBody.tool_choice = 'auto';
-                requestBody.parallel_tool_calls = true;
+            // Add messages
+            requestBody.input = inputMessages;
+            
+            // Add model and other parameters
+            requestBody.model = this.model;
+            requestBody.max_output_tokens = 4096;
+            requestBody.stream = false;
+            requestBody.store = true;
+            
+            // O3/O1 models don't support temperature parameter
+            if (!this.model.startsWith('o3') && !this.model.startsWith('o1')) {
+                requestBody.temperature = temperature;
             }
             
             // Optional: Add reasoning configuration for o3/o1 models
@@ -793,11 +807,12 @@ class OpenAIProvider extends LLMProvider {
             }
         } else {
             // Regular models use standard v1/chat/completions structure
+            // Order fields consistently: tools → messages → model
             requestBody = {
-                model: this.model,
-                messages: openaiMessages,
                 tools: openaiCompletionsTools.length > 0 ? openaiCompletionsTools : undefined,
                 tool_choice: openaiCompletionsTools.length > 0 ? 'auto' : undefined,
+                messages: openaiMessages,
+                model: this.model,
                 temperature,
                 max_tokens: 4096
             };
@@ -811,6 +826,9 @@ class OpenAIProvider extends LLMProvider {
 
         // Check request size before sending
         this.checkRequestSize(requestBody);
+
+        // Log the full request
+        console.log(`[OPENAI SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, requestBody);
 
         let response;
         try {
@@ -850,6 +868,9 @@ class OpenAIProvider extends LLMProvider {
         /** @type {OpenAIResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'openai' });
+        
+        // Log the full response
+        console.log(`[OPENAI RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
         
         let choice;
         
@@ -1455,11 +1476,14 @@ class AnthropicProvider extends LLMProvider {
             };
         });
 
+        // Order fields according to Anthropic's cache hierarchy: tools → system → messages → model
+        // This ensures efficient caching as tools change least frequently, then system, then messages
+        // Model comes after messages so cache can be reused across different models
         const requestBody = {
-            model: this.model,
-            messages: anthropicMessages,
-            system,
             tools: anthropicTools.length > 0 ? anthropicTools : undefined,
+            system,
+            messages: anthropicMessages,
+            model: this.model,
             max_tokens: 4096,
             temperature
         };
@@ -1489,14 +1513,7 @@ class AnthropicProvider extends LLMProvider {
         this.checkRequestSize(requestBody);
 
         // Log the full request
-        console.log(`[LLM SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, {
-            model: this.model,
-            messages: requestBody.messages,
-            tools: requestBody.tools,
-            temperature: requestBody.temperature,
-            max_tokens: requestBody.max_tokens,
-            system: requestBody.system
-        });
+        console.log(`[ANTHROPIC SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, requestBody);
 
         let response;
         try {
@@ -1552,11 +1569,7 @@ class AnthropicProvider extends LLMProvider {
             } : null
         };
         
-        console.log(`[LLM RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, {
-            content: processedResponse.content,
-            usage: processedResponse.usage,
-            model: this.model
-        });
+        console.log(`[ANTHROPIC RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
         
         return processedResponse;
     }
@@ -1636,8 +1649,6 @@ class AnthropicProvider extends LLMProvider {
                 } else if (msg.content && typeof msg.content === 'object') {
                     // Single object - extract text
                     if (msg.content.text) {
-                        textContent = msg.content.text;
-                    } else if (msg.content.type === 'text' && msg.content.text) {
                         textContent = msg.content.text;
                     } else {
                         console.warn('Unknown user message object format, using fallback:', msg.content);
@@ -1861,30 +1872,6 @@ class AnthropicProvider extends LLMProvider {
         return { messages: converted, system: systemPrompt };
     }
 
-    shouldIncludeToolCalls(msg, mode) {
-        // Determine if tool calls should be included based on mode
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
-        }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
-    }
-
-    shouldIncludeToolResults(msg, mode) {
-        // Tool results should only be included if their corresponding calls were included
-        // This logic matches the tool call inclusion logic
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
-        }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
-    }
 
     formatToolResultForAnthropic(toolCallId, result, _toolName) {
         // Format MCP tool results for Anthropic's tool_result blocks
@@ -1971,13 +1958,15 @@ class GoogleProvider extends LLMProvider {
             };
         });
 
-        const requestBody = {
-            contents,
-            generationConfig: {
-                temperature,
-                maxOutputTokens: 4096
-            }
-        };
+        // Order fields consistently: tools → systemInstruction (system) → contents (messages) → generationConfig
+        const requestBody = {};
+        
+        // Add tools first if present
+        if (functionDeclarations.length > 0) {
+            requestBody.tools = [{
+                function_declarations: functionDeclarations
+            }];
+        }
         
         // Add system instruction if present
         if (systemInstruction) {
@@ -1985,12 +1974,15 @@ class GoogleProvider extends LLMProvider {
                 parts: [{ text: systemInstruction }]
             };
         }
-
-        if (functionDeclarations.length > 0) {
-            requestBody.tools = [{
-                function_declarations: functionDeclarations
-            }];
-        }
+        
+        // Add messages
+        requestBody.contents = contents;
+        
+        // Add generation config (includes model info implicitly via this.model in the URL)
+        requestBody.generationConfig = {
+            temperature,
+            maxOutputTokens: 4096
+        };
 
         this.log('sent', JSON.stringify(requestBody, null, 2), { 
             provider: 'google', 
@@ -2000,6 +1992,9 @@ class GoogleProvider extends LLMProvider {
 
         // Check request size before sending
         this.checkRequestSize(requestBody);
+
+        // Log the full request
+        console.log(`[GOOGLE SEND] (${mode}, subchat: ${chat?.isSubChat || false}):`, requestBody);
 
         let response;
         try {
@@ -2039,6 +2034,9 @@ class GoogleProvider extends LLMProvider {
         /** @type {GoogleResponse} */
         const data = await response.json();
         this.log('received', JSON.stringify(data, null, 2), { provider: 'google' });
+        
+        // Log the full response
+        console.log(`[GOOGLE RECEIVED] (${mode}, subchat: ${chat?.isSubChat || false}):`, data);
         const candidate = data.candidates[0];
         
         // Check finish reason for potential issues
@@ -2370,30 +2368,6 @@ class GoogleProvider extends LLMProvider {
         return { contents, systemInstruction };
     }
 
-    shouldIncludeToolCalls(msg, mode) {
-        // Determine if tool calls should be included based on mode
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
-        }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
-    }
-
-    shouldIncludeToolResults(msg, mode) {
-        // Tool results should only be included if their corresponding calls were included
-        // This logic matches the tool call inclusion logic
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
-        }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
-    }
 
     formatToolResultContent(result) {
         // Handle different types of results for Google format
