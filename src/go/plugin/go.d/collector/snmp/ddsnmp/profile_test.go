@@ -11,7 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
@@ -20,9 +22,9 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 
 	f, err := os.Open(dir)
 	require.NoError(t, err)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	profiles, err := loadProfiles(dir)
+	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
 	require.NoError(t, err)
 
 	require.NotEmpty(t, profiles)
@@ -842,4 +844,212 @@ func TestDeduplicateMetricsAcrossProfiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_ProfileExtends_CircularReference(t *testing.T) {
+	tmp := t.TempDir()
+
+	a := filepath.Join(tmp, "a.yaml")
+	b := filepath.Join(tmp, "b.yaml")
+
+	writeYAML(t, a, map[string]any{
+		"extends": []string{"b.yaml"},
+	})
+	writeYAML(t, b, map[string]any{
+		"extends": []string{"a.yaml"},
+	})
+
+	paths := multipath.New(tmp)
+	_, err := loadProfile(a, paths)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "circular extends")
+}
+
+func Test_ProfileExtends_RecursiveChain(t *testing.T) {
+	tmp := t.TempDir()
+
+	base := filepath.Join(tmp, "base.yaml")
+	mid := filepath.Join(tmp, "mid.yaml")
+	top := filepath.Join(tmp, "top.yaml")
+
+	writeYAML(t, base, ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{
+				Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.6.1.2.1.1.3.0",
+					Name: "sysUpTime",
+				},
+			},
+		},
+	})
+	writeYAML(t, mid, map[string]any{
+		"extends": []string{"base.yaml"},
+	})
+	writeYAML(t, top, map[string]any{
+		"extends": []string{"mid.yaml"},
+	})
+
+	paths := multipath.New(tmp)
+	prof, err := loadProfile(top, paths)
+	require.NoError(t, err)
+	require.Len(t, prof.Definition.Metrics, 1)
+	require.Equal(t, "sysUpTime", prof.Definition.Metrics[0].Symbol.Name)
+}
+
+func Test_ProfileExtends_MultipleBases(t *testing.T) {
+	tmp := t.TempDir()
+
+	base1 := filepath.Join(tmp, "base1.yaml")
+	base2 := filepath.Join(tmp, "base2.yaml")
+	main := filepath.Join(tmp, "main.yaml")
+
+	writeYAML(t, base1, ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.1.0", Name: "sysDescr",
+			}},
+		},
+	})
+	writeYAML(t, base2, ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.5.0", Name: "sysName",
+			}},
+		},
+	})
+	writeYAML(t, main, map[string]any{
+		"extends": []string{"base1.yaml", "base2.yaml"},
+	})
+
+	paths := multipath.New(tmp)
+	prof, err := loadProfile(main, paths)
+	require.NoError(t, err)
+	require.Len(t, prof.Definition.Metrics, 2)
+}
+
+func Test_ProfileExtends_NonexistentFile(t *testing.T) {
+	tmp := t.TempDir()
+	main := filepath.Join(tmp, "main.yaml")
+
+	writeYAML(t, main, map[string]any{
+		"extends": []string{"missing.yaml"},
+	})
+
+	paths := multipath.New(tmp)
+	_, err := loadProfile(main, paths)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "missing.yaml")
+}
+
+func Test_ProfileExtends_SharedBase(t *testing.T) {
+	tmp := t.TempDir()
+
+	base := filepath.Join(tmp, "base.yaml")
+	a := filepath.Join(tmp, "a.yaml")
+	b := filepath.Join(tmp, "b.yaml")
+
+	writeYAML(t, base, ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.1.0", Name: "sysDescr",
+			}},
+		},
+	})
+	writeYAML(t, a, map[string]any{"extends": []string{"base.yaml"}})
+	writeYAML(t, b, map[string]any{"extends": []string{"base.yaml"}})
+
+	paths := multipath.New(tmp)
+
+	profA, err := loadProfile(a, paths)
+	require.NoError(t, err)
+	require.Len(t, profA.Definition.Metrics, 1)
+
+	profB, err := loadProfile(b, paths)
+	require.NoError(t, err)
+	require.Len(t, profB.Definition.Metrics, 1)
+}
+
+func Test_ProfileExtends_OverrideIgnored(t *testing.T) {
+	tmp := t.TempDir()
+
+	base := filepath.Join(tmp, "base.yaml")
+	main := filepath.Join(tmp, "main.yaml")
+
+	writeYAML(t, base, ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.3.0", Name: "sysUpTime",
+			}},
+		},
+	})
+	writeYAML(t, main, map[string]any{
+		"extends": []string{"base.yaml"},
+		"metrics": []map[string]any{
+			{
+				"symbol": map[string]string{
+					"OID":  "1.3.6.1.2.1.1.3.0",
+					"name": "sysUpTime",
+				},
+			},
+		},
+	})
+
+	paths := multipath.New(tmp)
+	prof, err := loadProfile(main, paths)
+	require.NoError(t, err)
+
+	deduplicateMetricsAcrossProfiles([]*Profile{prof})
+
+	// Should not duplicate
+	require.Len(t, prof.Definition.Metrics, 1)
+}
+
+func Test_ProfileExtends_UserOverride(t *testing.T) {
+	stockDir := filepath.Join(t.TempDir(), "stock")
+	userDir := filepath.Join(t.TempDir(), "user")
+
+	require.NoError(t, os.MkdirAll(stockDir, 0755))
+	require.NoError(t, os.MkdirAll(userDir, 0755))
+
+	// Stock base profile
+	writeYAML(t, filepath.Join(stockDir, "_base.yaml"), ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.3.0", Name: "sysUpTime",
+			}},
+		},
+	})
+
+	// User override of base profile
+	writeYAML(t, filepath.Join(userDir, "_base.yaml"), ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.3.0", Name: "sysUpTime",
+			}},
+			{Symbol: ddprofiledefinition.SymbolConfig{
+				OID: "1.3.6.1.2.1.1.5.0", Name: "sysName",
+			}},
+		},
+	})
+
+	// Main profile in stock
+	writeYAML(t, filepath.Join(stockDir, "device.yaml"), map[string]any{
+		"extends": []string{"_base.yaml"},
+	})
+
+	paths := multipath.New(userDir, stockDir)
+	prof, err := loadProfile(filepath.Join(stockDir, "device.yaml"), paths)
+	require.NoError(t, err)
+
+	// Should use user's _base.yaml, so should have 2 metrics
+	require.Len(t, prof.Definition.Metrics, 2)
+	assert.Equal(t, "sysName", prof.Definition.Metrics[1].Symbol.Name)
+}
+
+func writeYAML(t *testing.T, path string, data any) {
+	t.Helper()
+
+	content, err := yaml.Marshal(data)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, content, 0600))
 }
