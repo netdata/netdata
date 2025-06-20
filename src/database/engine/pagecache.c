@@ -591,7 +591,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                     // add this page to open cache
                     bool added = false;
                     struct extent_io_data ei = {0};
-                    ei.block = (extent_list[page_entry_in_journal->extent_index].datafile_offset) >> 12;
+                    ei.block = OFFSET_TO_BLOCK(extent_list[page_entry_in_journal->extent_index].datafile_offset);
                     ei.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
                     ei.fileno = datafile->fileno;
 
@@ -1052,7 +1052,7 @@ void pgc_open_add_hot_page(
 
     struct extent_io_data ext_io_data = {
             .fileno = datafile->fileno,
-            .block = extent_offset >> 12,
+            .block = OFFSET_TO_BLOCK(extent_offset),
             .bytes = extent_size,
     };
 

@@ -1184,7 +1184,7 @@ void *journalfile_v2_write_extent_list(Pvoid_t JudyL_extents_pos, void *data)
         ext_info = *PValue;
         size_t index = ext_info->index;
         j2_extent_base[index].file_index = 0;
-        j2_extent_base[index].datafile_offset = ((uint64_t) ext_info->block) << 12;
+        j2_extent_base[index].datafile_offset = BLOCK_TO_OFFSET(ext_info->block);
         j2_extent_base[index].datafile_size = ext_info->bytes;
         j2_extent_base[index].pages = ext_info->number_of_pages;
         count++;
