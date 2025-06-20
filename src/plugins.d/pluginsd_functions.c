@@ -437,7 +437,7 @@ PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *par
         size_t all = all_str && *all_str ? str2u(all_str) : 0;
 
         if(pf->progress.cb)
-            pf->progress.cb(pf->progress.data, done, all);
+            pf->progress.cb(&pf->transaction, pf->progress.data, done, all);
     }
 
     return PARSER_RC_OK;

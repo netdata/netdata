@@ -175,9 +175,12 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 
     int max_keys = stmt_list->count;
     for (int i = 0; i < max_keys; i++) {
+        if (!stmt_list->stmt[i])
+            continue;
         int rc = sqlite3_finalize((sqlite3_stmt *)stmt_list->stmt[i]);
         if (unlikely(rc != SQLITE_OK))
             error_report("Failed to finalize statement, rc = %d", rc);
+        stmt_list->stmt[i] = NULL;
     }
     freez(stmt_list->name);
     freez(stmt_list);
@@ -188,11 +191,10 @@ void finalize_self_prepared_sql_statements()
 {
     if (!thread_stmt_pool)
         return;
-
+    spinlock_lock(&JudyL_thread_stmt_lock);
     Word_t thread_id = thread_stmt_pool->thread_id;
     finalize_and_free_stmt_list(thread_stmt_pool);
     thread_stmt_pool = NULL;
-    spinlock_lock(&JudyL_thread_stmt_lock);
     (void) JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
