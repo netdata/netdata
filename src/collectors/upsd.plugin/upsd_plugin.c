@@ -13,7 +13,7 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#define NETDATA_PLUGIN_NAME "upsd"
+#define PLUGIN_UPSD_NAME "upsd.plugin"
 
 // https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins#operation
 #define NETDATA_PLUGIN_EXIT_AND_RESTART 0
@@ -330,7 +330,7 @@ const struct nd_chart nd_charts[] = {
 
 void print_version()
 {
-    fputs("netdata " NETDATA_PLUGIN_NAME ".plugin " NETDATA_VERSION "\n"
+    fputs("netdata " PLUGIN_UPSD_NAME " " NETDATA_VERSION "\n"
           "\n"
           "Copyright 2025 Netdata Inc.\n"
           "Original Author: Mario Campos <mario.andres.campos@gmail.com>\n"
@@ -342,9 +342,9 @@ void print_version()
 }
 
 void print_help() {
-    fputs("usage: upsd.plugin [-d] COLLECTION_FREQUENCY\n"
-          "       upsd.plugin -v\n"
-          "       upsd.plugin -h\n"
+    fputs("usage: " PLUGIN_UPSD_NAME " [-d] COLLECTION_FREQUENCY\n"
+          "       " PLUGIN_UPSD_NAME " -v\n"
+          "       " PLUGIN_UPSD_NAME " -h\n"
           "\n"
           "options:\n"
           "  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
@@ -541,7 +541,7 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
         }
     }
 
-    printf("BEGIN %s_%s.status\n"
+    printf("BEGIN upsd_%s.status\n"
            "SET 'on_line' = %u\n"
            "SET 'on_battery' = %u\n"
            "SET 'low_battery' = %u\n"
@@ -558,7 +558,7 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
            "SET 'forced_shutdown' = %u\n"
            "SET 'other' = %u\n"
            "END\n",
-           NETDATA_PLUGIN_NAME, ups_name,
+           ups_name,
            status.OL,
            status.OB,
            status.LB,
@@ -583,7 +583,7 @@ int main(int argc, char *argv[]) {
     char buf[BUFLEN];
     unsigned int first_ups_count = 0;
 
-    nd_log_initialize_for_external_plugins("upsd.plugin");
+    nd_log_initialize_for_external_plugins(PLUGIN_UPSD_NAME);
     netdata_threads_init_for_external_plugins(0);
 
     parse_command_line(argc, argv);
@@ -631,8 +631,8 @@ int main(int argc, char *argv[]) {
                 continue;
 
             // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
-            printf("CHART '%s_%s.%s' '%s' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '%s' '%s'\n",
-                   NETDATA_PLUGIN_NAME, clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
+            printf("CHART 'upsd_%s.%s' '%s' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
+                   clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
                    "",                    // name
                    chart->chart_title,    // title
                    chart->chart_units,    // units
@@ -640,9 +640,7 @@ int main(int argc, char *argv[]) {
                    chart->chart_context,  // context
                    chart->chart_type,     // charttype
                    chart->chart_priority, // priority
-                   netdata_update_every,  // update_every
-                   "",                    // options
-                   NETDATA_PLUGIN_NAME);  // plugin
+                   netdata_update_every); // update_every
 
             if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
                 printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
@@ -656,7 +654,7 @@ int main(int argc, char *argv[]) {
                 printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
 
             printf("CLABEL 'ups_name' '%s' '%u'\n", ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
-            printf("CLABEL '_collect_plugin' '%s' '%u'\n", NETDATA_PLUGIN_NAME, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+            printf("CLABEL '_collect_plugin' '" PLUGIN_UPSD_NAME "' '%u'\n", NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
             puts("CLABEL_COMMIT");
 
             for (size_t j = 0; j < chart->chart_dimlength; j++)
@@ -707,10 +705,10 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                printf("BEGIN '%s_%s.%s'\n"
+                printf("BEGIN 'upsd_%s.%s'\n"
                        "SET '%s' = %s\n"
                        "END\n",
-                       NETDATA_PLUGIN_NAME, clean_ups_name, chart->chart_id,
+                       clean_ups_name, chart->chart_id,
                        chart->chart_dimension[0], nut_value);
             }
         }
