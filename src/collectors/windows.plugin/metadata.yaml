@@ -1073,7 +1073,7 @@ modules:
               unit: "V"
               chart_type: line
               dimensions:
-                - name: voltage
+                - name: now
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibWebService

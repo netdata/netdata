@@ -136,7 +136,7 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
             power_supply_root,
             &voltage,
             "Power supply voltage",
-            "voltage",
+            "now",
             1000,
             "v",
             NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE,
