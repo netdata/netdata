@@ -18,18 +18,17 @@ metrics:
       OID: 1.3.6.1.4.1.10704.1.0
       name: boxServices
     symbols:
-      - symbol:
-          OID: 1.3.6.1.4.1.10704.1.0.1.2
-          name: boxServiceState
-          description: "Box service state"
-          family: Box Services/State
-          unit: "{status}"
-          mapping:
-            -1: unknown
-            0: stopped
-            1: started
-            2: blocked
-            4: removed
+      - OID: 1.3.6.1.4.1.10704.1.0.1.2
+        name: boxServiceState
+        description: "Box service state"
+        family: Box Services/State
+        unit: "{status}"
+        mapping:
+          -1: unknown
+          0: stopped
+          1: started
+          2: blocked
+          4: removed
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.0.1.1
