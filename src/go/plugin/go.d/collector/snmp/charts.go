@@ -397,7 +397,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	maps.Copy(tags, m.Profile.Tags)
 	for k, v := range m.Tags {
 		newKey := strings.TrimPrefix(k, "_")
-		tags[newKey] = strings.TrimPrefix(v, "_")
+		tags[newKey] = v
 	}
 
 	for k, v := range tags {
