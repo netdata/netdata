@@ -11,7 +11,7 @@ import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js
 class NetdataMCPChat {
     constructor() {
         // Log version on startup
-        console.log('🚀 Netdata MCP Web Client v1.0.65 - Paste HTML as Markdown for Easy Editing');
+        console.log('🚀 Netdata MCP Web Client v1.0.66 - Professional Confirmation Modals with Keyboard Support');
         
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
@@ -3763,6 +3763,88 @@ class NetdataMCPChat {
         }
     }
     
+    /**
+     * Shows a professional confirmation dialog modal
+     * @param {string} title - Dialog title
+     * @param {string} message - Confirmation message
+     * @param {string} confirmText - Text for confirm button (default: 'OK')
+     * @param {string} cancelText - Text for cancel button (default: 'Cancel')
+     * @param {boolean} isDanger - Whether this is a dangerous action (shows red confirm button)
+     * @returns {Promise<boolean>} - Resolves to true if confirmed, false if cancelled
+     */
+    showConfirmDialog(title, message, confirmText = 'OK', cancelText = 'Cancel', isDanger = false) {
+        return new Promise((resolve) => {
+            // Create modal container
+            const modal = document.createElement('div');
+            modal.className = 'confirm-modal-container';
+            modal.innerHTML = `
+                <div class="confirm-modal-backdrop"></div>
+                <div class="confirm-modal">
+                    <div class="confirm-modal-header">
+                        <h3>${this.escapeHtml(title)}</h3>
+                    </div>
+                    <div class="confirm-modal-body">
+                        <p>${this.escapeHtml(message)}</p>
+                    </div>
+                    <div class="confirm-modal-footer">
+                        <button class="btn btn-secondary confirm-cancel">${this.escapeHtml(cancelText)}</button>
+                        <button class="btn ${isDanger ? 'btn-danger' : 'btn-primary'} confirm-ok">${this.escapeHtml(confirmText)}</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Focus the confirm button
+            const confirmBtn = modal.querySelector('.confirm-ok');
+            const cancelBtn = modal.querySelector('.confirm-cancel');
+            confirmBtn.focus();
+            
+            // Handle button clicks
+            const handleConfirm = () => {
+                cleanup();
+                resolve(true);
+            };
+            
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+            
+            // Cleanup function
+            const cleanup = () => {
+                modal.remove();
+                document.removeEventListener('keydown', handleKeydown);
+            };
+            
+            // Handle keyboard events
+            const handleKeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleConfirm();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    handleCancel();
+                }
+            };
+            
+            // Add event listeners
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+            modal.querySelector('.confirm-modal-backdrop').addEventListener('click', handleCancel);
+            document.addEventListener('keydown', handleKeydown);
+        });
+    }
+    
+    /**
+     * Escapes HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
     showError(message, chatId, saveToMessages = true, errorType = 'general') {
         // Log to console
         console.error('MCP Client Error:', message, chatId ? `(Chat ID: ${chatId})` : '(Global)');
@@ -4240,10 +4322,17 @@ class NetdataMCPChat {
     }
 
     clearLog() {
-        if (confirm('Clear all communication logs?')) {
-            this.communicationLog = [];
-            this.logContent.innerHTML = '';
-        }
+        this.showConfirmDialog(
+            'Clear Communication Log',
+            'Are you sure you want to clear all communication logs?',
+            'Clear',
+            'Cancel'
+        ).then(confirmed => {
+            if (confirmed) {
+                this.communicationLog = [];
+                this.logContent.innerHTML = '';
+            }
+        });
     }
 
     downloadLog() {
@@ -4832,7 +4921,18 @@ class NetdataMCPChat {
     }
 
     async removeMcpServer(serverId) {
-        if (confirm('Remove this MCP server?')) {
+        const server = this.mcpServers.get(serverId);
+        const serverName = server ? server.name : 'this MCP server';
+        
+        const confirmed = await this.showConfirmDialog(
+            'Remove MCP Server',
+            `Are you sure you want to remove "${serverName}"?`,
+            'Remove',
+            'Cancel',
+            true // danger style
+        );
+        
+        if (confirmed) {
             // Disconnect if connected
             const connection = this.mcpConnections.get(serverId);
             if (connection) {
@@ -6759,13 +6859,21 @@ class NetdataMCPChat {
         this.moveSpinnerToBottom(chatId);
     }
 
-    deleteChat(chatId) {
+    async deleteChat(chatId) {
         if (!chatId) {return;}
         
         const chat = this.chats.get(chatId);
         if (!chat) {return;}
         
-        if (confirm(`Delete chat "${chat.title}"?`)) {
+        const confirmed = await this.showConfirmDialog(
+            'Delete Chat',
+            `Are you sure you want to delete "${chat.title}"?`,
+            'Delete',
+            'Cancel',
+            true // danger style
+        );
+        
+        if (confirmed) {
             // Delete sub-chats first (cascade delete)
             for (const [subChatId, subChat] of this.chats) {
                 if (subChat.parentChatId === chatId) {
@@ -7613,9 +7721,17 @@ class NetdataMCPChat {
                             // Find the most recent summary message
                             for (let i = summaryChat.messages.length - 1; i >= 0; i--) {
                                 if (summaryChat.messages[i]?.role === 'summary') {
-                                    if (confirm('Delete this summary and replace with accounting record?')) {
-                                        this.deleteSummaryMessages(i, chatId);
-                                    }
+                                    this.showConfirmDialog(
+                                        'Delete Summary',
+                                        'Delete this summary and replace with accounting record?',
+                                        'Delete',
+                                        'Cancel',
+                                        true // danger style
+                                    ).then(confirmed => {
+                                        if (confirmed) {
+                                            this.deleteSummaryMessages(i, chatId);
+                                        }
+                                    });
                                     break;
                                 }
                             }

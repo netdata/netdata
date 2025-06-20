@@ -4021,3 +4021,115 @@ body {
     font-size: 12px;
     font-family: 'IBM Plex Mono', monospace;
 }
+
+/* Confirmation Modal Styles */
+.confirm-modal-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.confirm-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--modal-backdrop);
+    backdrop-filter: blur(4px);
+}
+
+.confirm-modal {
+    position: relative;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    min-width: 400px;
+    max-width: 500px;
+    margin: 20px;
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.confirm-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.confirm-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.confirm-modal-body {
+    padding: 20px 24px;
+}
+
+.confirm-modal-body p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.confirm-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.confirm-modal .btn {
+    min-width: 80px;
+    font-weight: 500;
+}
+
+/* Focus styles for keyboard navigation */
+.confirm-modal .btn:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Ensure proper button colors in modal */
+.confirm-modal .btn-danger {
+    background: var(--danger-color);
+    color: white;
+}
+
+.confirm-modal .btn-danger:hover {
+    background: #ff5757;
+}
+
+.confirm-modal .btn-danger:focus {
+    outline-color: var(--danger-color);
+}
