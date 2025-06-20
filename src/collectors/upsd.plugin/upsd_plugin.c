@@ -63,9 +63,8 @@ struct nd_chart {
     const char *chart_family;
     const char *chart_context;
     const char *chart_type;
-    unsigned int chart_priority;
-    const size_t chart_dimlength;
-    const char *chart_dimension[15];
+    const unsigned int chart_priority;
+    const char *chart_dimension;
 };
 
 const struct nd_chart nd_charts[] = {
@@ -78,8 +77,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_load",
         .chart_type = "area",
         .chart_priority = 70000,
-        .chart_dimlength = 1,
-        .chart_dimension = { "load" },
+        .chart_dimension = "load",
     },
     {
         .nut_variable = "ups.realpower",
@@ -90,36 +88,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_load_usage",
         .chart_type = "line",
         .chart_priority = 70001,
-        .chart_dimlength = 1,
-        .chart_dimension = { "load_usage" },
-    },
-    {
-        .nut_variable = "ups.status",
-        .chart_id = "status",
-        .chart_title = "UPS status",
-        .chart_units = "status",
-        .chart_family = "ups",
-        .chart_context = "upsd.ups_status",
-        .chart_type = "line",
-        .chart_priority = 70002,
-        .chart_dimlength = 15,
-        .chart_dimension = {
-            "on_line",
-            "on_battery",
-            "low_battery",
-            "high_battery",
-            "replace_battery",
-            "charging",
-            "discharging",
-            "bypass",
-            "calibration",
-            "offline",
-            "overloaded",
-            "trim_input_voltage",
-            "boost_input_voltage",
-            "forced_shutdown",
-            "other",
-        },
+        .chart_dimension = "load_usage",
     },
     {
         .nut_variable = "ups.temperature",
@@ -130,8 +99,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_temperature",
         .chart_type = "line",
         .chart_priority = 70003,
-        .chart_dimlength = 1,
-        .chart_dimension = { "temperature" },
+        .chart_dimension = "temperature",
     },
     {
         .nut_variable = "battery.charge",
@@ -142,8 +110,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_battery_charge",
         .chart_type = "area",
         .chart_priority = 70004,
-        .chart_dimlength = 1,
-        .chart_dimension = { "charge" },
+        .chart_dimension = "charge",
     },
     {
         .nut_variable = "battery.runtime",
@@ -154,8 +121,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_battery_estimated_runtime",
         .chart_type = "line",
         .chart_priority = 70005,
-        .chart_dimlength = 1,
-        .chart_dimension = { "runtime" },
+        .chart_dimension = "runtime",
     },
     {
         .nut_variable = "battery.voltage",
@@ -166,8 +132,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_battery_voltage",
         .chart_type = "line",
         .chart_priority = 70006,
-        .chart_dimlength = 1,
-        .chart_dimension = { "voltage" },
+        .chart_dimension = "voltage",
     },
     {
         .nut_variable = "battery.voltage.nominal",
@@ -178,8 +143,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_battery_voltage_nominal",
         .chart_type = "line",
         .chart_priority = 70007,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_voltage" },
+        .chart_dimension = "nominal_voltage",
     },
     {
         .nut_variable = "input.voltage",
@@ -190,8 +154,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_input_voltage",
         .chart_type = "line",
         .chart_priority = 70008,
-        .chart_dimlength = 1,
-        .chart_dimension = { "voltage" },
+        .chart_dimension = "voltage",
     },
     {
         .nut_variable = "input.voltage.nominal",
@@ -202,8 +165,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_input_voltage_nominal",
         .chart_type = "line",
         .chart_priority = 70009,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_voltage" },
+        .chart_dimension = "nominal_voltage",
     },
     {
         .nut_variable = "input.current",
@@ -214,8 +176,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_input_current",
         .chart_type = "line",
         .chart_priority = 70010,
-        .chart_dimlength = 1,
-        .chart_dimension = { "current" },
+        .chart_dimension = "current",
     },
     {
         .nut_variable = "input.current.nominal",
@@ -226,8 +187,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_input_current_nominal",
         .chart_type = "line",
         .chart_priority = 70011,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_current" },
+        .chart_dimension = "nominal_current",
     },
     {
         .nut_variable = "input.frequency",
@@ -238,8 +198,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_input_frequency",
         .chart_type = "line",
         .chart_priority = 70012,
-        .chart_dimlength = 1,
-        .chart_dimension = { "frequency" },
+        .chart_dimension = "frequency",
     },
     {
         .nut_variable = "input.frequency.nominal",
@@ -250,8 +209,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_input_frequency_nominal",
         .chart_type = "line",
         .chart_priority = 70013,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_frequency" },
+        .chart_dimension = "nominal_frequency",
     },
     {
         .nut_variable = "output.voltage",
@@ -262,8 +220,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_output_voltage",
         .chart_type = "line",
         .chart_priority = 70014,
-        .chart_dimlength = 1,
-        .chart_dimension = { "voltage" },
+        .chart_dimension = "voltage",
     },
     {
         .nut_variable = "output.voltage.nominal",
@@ -274,8 +231,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_output_voltage_nominal",
         .chart_type = "line",
         .chart_priority = 70015,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_voltage" },
+        .chart_dimension = "nominal_voltage",
     },
     {
         .nut_variable = "output.current",
@@ -286,8 +242,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_output_current",
         .chart_type = "line",
         .chart_priority = 70016,
-        .chart_dimlength = 1,
-        .chart_dimension = { "current" },
+        .chart_dimension = "current",
     },
     {
         .nut_variable = "output.current.nominal",
@@ -298,8 +253,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_output_current_nominal",
         .chart_type = "line",
         .chart_priority = 70017,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_current" },
+        .chart_dimension = "nominal_current",
     },
     {
         .nut_variable = "output.frequency",
@@ -310,8 +264,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_output_frequency",
         .chart_type = "line",
         .chart_priority = 70018,
-        .chart_dimlength = 1,
-        .chart_dimension = { "frequency" },
+        .chart_dimension = "frequency",
     },
     {
         .nut_variable = "output.frequency.nominal",
@@ -322,8 +275,7 @@ const struct nd_chart nd_charts[] = {
         .chart_context = "upsd.ups_output_frequency_nominal",
         .chart_type = "line",
         .chart_priority = 70019,
-        .chart_dimlength = 1,
-        .chart_dimension = { "nominal_frequency" },
+        .chart_dimension = "nominal_frequency",
     },
     { 0 },
 };
@@ -384,6 +336,7 @@ void parse_command_line(int argc, char *argv[]) {
     }
 
     netdata_update_every = str2i(argv[optind]);
+    // TODO: what happens if argv[optind]="1abc" ?
     if (netdata_update_every <= 0 || netdata_update_every >= 86400) {
         fputs("COLLECTION_FREQUENCY argument must be between [1,86400)", stderr);
         exit(EXIT_FAILURE);
@@ -444,6 +397,7 @@ int nut_list_ups(UPSCONN_t *ups, size_t *numa, char ***answer) {
     // Unfortunately, list_ups_next() will emit the list delimiter
     // "END LIST UPS" as its last iteration before returning 0. We don't
     // need it, so let's skip processing on that item.
+    // TODO: use streq() instead of strcmp().
     if (!strcmp("END", answer[0][0])) {
         started = false;
         return 0;
@@ -616,16 +570,51 @@ int main(int argc, char *argv[]) {
         //  { { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> } }
         const char *ups_name = answer[0][1];
 
+        // Print charts and dimensions for ups.status variable.
+        // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
+        printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' '70002' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
+               clean_name(buf, sizeof(buf), ups_name), netdata_update_every);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
+            printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
+            printf("CLABEL 'device_model' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.serial")))
+            printf("CLABEL 'device_serial' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.mfr")))
+            printf("CLABEL 'device_manufacturer' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        if ((nut_value = nut_get_var(&ups2, ups_name, "device.type")))
+            printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        printf("CLABEL 'ups_name' '%s' '%u'\n", ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        printf("CLABEL '_collect_plugin' '" PLUGIN_UPSD_NAME "' '%u'\n", NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+        printf("CLABEL_COMMIT\n"
+               "DIMENSION on_line\n"
+               "DIMENSION on_battery\n"
+               "DIMENSION low_battery\n"
+               "DIMENSION high_battery\n"
+               "DIMENSION replace_battery\n"
+               "DIMENSION charging\n"
+               "DIMENSION discharging\n"
+               "DIMENSION bypass\n"
+               "DIMENSION calibration\n"
+               "DIMENSION offline\n"
+               "DIMENSION overloaded\n"
+               "DIMENSION trim_input_voltage\n"
+               "DIMENSION boost_input_voltage\n"
+               "DIMENSION forced_shutdown\n"
+               "DIMENSION other\n");
+
         for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
             const char *nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
 
             // Skip metrics that are not available from the UPS.
+            // TODO: use streq() instead of strcmp().
             if (!nut_value && strcmp(chart->nut_variable, "ups.realpower"))
                 continue;
 
             // If the UPS does not support the 'ups.realpower' variable, then
             // we can still calculate the load_usage if the 'ups.load' and
             // 'ups.realpower.nominal' variables are available.
+            // TODO: use streq() instead of strcmp().
             if (!nut_value && !strcmp(chart->nut_variable, "ups.realpower") &&
                 (!nut_get_var(&ups2, ups_name, "ups.load") || !nut_get_var(&ups2, ups_name, "ups.realpower.nominal")))
                 continue;
@@ -633,7 +622,6 @@ int main(int argc, char *argv[]) {
             // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
             printf("CHART 'upsd_%s.%s' '%s' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
                    clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
-                   "",                    // name
                    chart->chart_title,    // title
                    chart->chart_units,    // units
                    chart->chart_family,   // family
@@ -657,8 +645,9 @@ int main(int argc, char *argv[]) {
             printf("CLABEL '_collect_plugin' '" PLUGIN_UPSD_NAME "' '%u'\n", NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
             puts("CLABEL_COMMIT");
 
-            for (size_t j = 0; j < chart->chart_dimlength; j++)
-                printf("DIMENSION '%s'\n", chart->chart_dimension[j]);
+            // TODO: should name be empty? Check Go UPSd module.
+            // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
+            printf("DIMENSION '%s' '' absolute 1 %u\n", chart->chart_dimension, NETDATA_PLUGIN_PRECISION);
         }
     }
 
@@ -679,42 +668,44 @@ int main(int argc, char *argv[]) {
             const char *ups_name = answer[0][1];
             const char *clean_ups_name = clean_name(buf, sizeof(buf), ups_name);
 
+            print_ups_status_metrics(clean_ups_name, nut_get_var(&ups2, ups_name, "ups.status"));
+
             for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
+                unsigned int nd_value;
                 const char *nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
 
-                // Skip metrics that are not available from the UPS.
+                // Skip metrics that are not available from the UPS...
+                // TODO: use streq() instead of strcmp().
                 if (!nut_value && strcmp(chart->nut_variable, "ups.realpower"))
                     continue;
-
+                // ...unless it is ups.realpower, which we can maybe calculate.
+                // TODO: use streq() instead of strcmp().
                 if (!nut_value && !strcmp(chart->nut_variable, "ups.realpower")) {
-                    if (nut_get_var(&ups2, ups_name, "ups.load") &&
-                        nut_get_var(&ups2, ups_name, "ups.realpower.nominal")) {
-                        double load = atof(nut_get_var(&ups2, ups_name, "ups.load"));
-                        double nominal = atof(nut_get_var(&ups2, ups_name, "ups.realpower.nominal"));
-                        double load_usage = (load / 100) * nominal * NETDATA_PLUGIN_PRECISION;
-                        snprintf(buf, sizeof(buf), "%d", (int)load_usage);
-                        nut_value = buf;
+                    const char *ups_load = nut_get_var(&ups2, ups_name, "ups.load");
+                    const char *ups_realpower_nominal = nut_get_var(&ups2, ups_name, "ups.realpower.nominal");
+                    if (ups_load && ups_realpower_nominal) {
+                        const double load = atof(ups_load);
+                        const double nominal = atof(ups_realpower_nominal);
+                        nd_value = (unsigned int)((load / 100 * nominal) * NETDATA_PLUGIN_PRECISION);
                     }
                     else continue;
                 }
 
-                // The 'ups.status' variable is a special case, because its chart has more
-                // than one dimension. So, we can't simply print one data point.
-                if (!strcmp(chart->nut_variable, "ups.status")) {
-                    print_ups_status_metrics(clean_ups_name, nut_value);
-                    continue;
-                }
+                // TODO: use strtondd() or str2ndd() instead of atof().
+                nd_value = (unsigned int)(atof(nut_value) * NETDATA_PLUGIN_PRECISION);
 
+                // BEGIN type.id [microseconds]
+                // SET id = value
+                // END
                 printf("BEGIN 'upsd_%s.%s'\n"
-                       "SET '%s' = %s\n"
+                       "SET '%s' = %u\n"
                        "END\n",
                        clean_ups_name, chart->chart_id,
-                       chart->chart_dimension[0], nut_value);
+                       chart->chart_dimension[0], nd_value);
             }
         }
 
         // Flush the data out of the stream buffer to ensure netdata gets it immediately.
-        // https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins#the-output-of-the-plugin
         fflush(stdout);
 
         // stdout, stderr are connected to pipes.
