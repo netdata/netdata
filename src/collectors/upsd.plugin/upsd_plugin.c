@@ -574,6 +574,8 @@ int main(int argc, char *argv[]) {
         // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
         printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' '70002' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
                clean_name(buf, sizeof(buf), ups_name), netdata_update_every);
+
+        char *nut_value;
         if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
             printf("CLABEL 'battery_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
         if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
@@ -604,7 +606,7 @@ int main(int argc, char *argv[]) {
                "DIMENSION other\n");
 
         for (const struct nd_chart *chart = nd_charts; chart->nut_variable; chart++) {
-            const char *nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
+            nut_value = nut_get_var(&ups2, ups_name, chart->nut_variable);
 
             // Skip metrics that are not available from the UPS.
             // TODO: use streq() instead of strcmp().
