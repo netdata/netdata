@@ -32,6 +32,7 @@ class NetdataMCPChat {
         
         // Per-chat DOM management
         this.chatContainers = new Map(); // Map of chatId -> DOM container
+        this.subChatContainers = new Map(); // Map of subChatId -> temporary DOM container for rendering
 
         // Models will be loaded dynamically from the proxy server
         // No hardcoded model list needed
@@ -1271,7 +1272,7 @@ class NetdataMCPChat {
         const _isEnabled = true; // Feature is now implemented
         toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px;`;
         
-        const currentThreshold = chat.config.optimisation.toolSummarisation.thresholdKiB || 20; // Default 20KB
+        const currentThreshold = chat.config.optimisation.toolSummarisation.thresholdKiB ?? 20; // Default 20KB, allow 0
         const toolSumModel = ChatConfig.modelConfigToString(chat.config.optimisation.toolSummarisation.model) || ChatConfig.getChatModelString(chat);
         
         toolSumDiv.innerHTML = `
@@ -1525,8 +1526,9 @@ class NetdataMCPChat {
         
         thresholdSelect.addEventListener('change', (e) => {
             e.stopPropagation();
-            const kbValue = parseInt(e.target.value, 10) || 20;
-            const byteValue = kbValue * 1024;
+            const kbValue = parseInt(e.target.value, 10);
+            const validKbValue = isNaN(kbValue) ? 20 : kbValue; // Default 20KB only if invalid, allow 0
+            const byteValue = validKbValue * 1024;
             this.updateToolThreshold(chatId, byteValue);
         });
         
@@ -4868,6 +4870,12 @@ class NetdataMCPChat {
     
     // Per-chat DOM management
     getChatContainer(chatId) {
+        // Check sub-chat containers first (temporary containers for rendering)
+        if (this.subChatContainers && this.subChatContainers.has(chatId)) {
+            return this.subChatContainers.get(chatId);
+        }
+        
+        // Regular chat containers
         if (!this.chatContainers.has(chatId)) {
             const container = this.createChatDOM(chatId);
             if (container) {
@@ -5187,7 +5195,9 @@ class NetdataMCPChat {
         
         // Hide all chat containers
         this.chatContainers.forEach((container, id) => {
-            container.classList.remove('active');
+            if (container && container.classList) {
+                container.classList.remove('active');
+            }
             const chat = this.chats.get(id);
             if (chat) {
                 chat.isActive = false;
@@ -8446,7 +8456,7 @@ class NetdataMCPChat {
         }
         
         // Get threshold in bytes (convert from KiB)
-        const thresholdKiB = chat.config.optimisation.toolSummarisation.thresholdKiB || 20;
+        const thresholdKiB = chat.config.optimisation.toolSummarisation.thresholdKiB ?? 20;
         const thresholdBytes = thresholdKiB * 1024;
         
         // If threshold is 0, process all tools
@@ -9010,7 +9020,11 @@ class NetdataMCPChat {
         };
         
         // Temporarily store the sub-chat container for rendering
-        this.chatContainers.set(subChatId, tempContainer);
+        // Use a separate map for sub-chat containers to avoid conflicts
+        if (!this.subChatContainers) {
+            this.subChatContainers = new Map();
+        }
+        this.subChatContainers.set(subChatId, tempContainer);
         
         // Initialize rendering state for sub-chat if needed
         if (!subChat.renderingState) {
@@ -9073,9 +9087,9 @@ class NetdataMCPChat {
         // Clean up the temporary container reference ONLY if sub-chat is not actively processing
         const isParentProcessing = parentChat && parentChat.isProcessing;
         
-        if (!isParentProcessing) {
+        if (!isParentProcessing && this.subChatContainers) {
             // Safe to clean up - sub-chat is complete
-            this.chatContainers.delete(subChatId);
+            this.subChatContainers.delete(subChatId);
         }
         // If parent is still processing, keep the container mapping so live messages can be rendered
         
