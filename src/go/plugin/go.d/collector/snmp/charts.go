@@ -395,7 +395,9 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 		"sysName": c.sysInfo.Name,
 	}
 	maps.Copy(tags, m.Profile.Tags)
-	maps.Copy(tags, m.Tags)
+	for k, v := range m.Tags {
+		tags[k] = strings.TrimPrefix(v, "_")
+	}
 
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})

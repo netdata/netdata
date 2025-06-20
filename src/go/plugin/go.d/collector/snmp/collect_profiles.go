@@ -67,6 +67,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 			}
 
 			key := tableMetricKey(m)
+
 			seen[key] = true
 
 			if !c.seenTableMetrics[key] {
@@ -103,8 +104,9 @@ func tableMetricKey(m ddsnmp.Metric) string {
 	var sb strings.Builder
 
 	sb.WriteString(m.Name)
+
 	for _, k := range keys {
-		if v := m.Tags[k]; v != "" {
+		if v := m.Tags[k]; v != "" && !strings.HasPrefix(v, "_") {
 			sb.WriteString("_")
 			sb.WriteString(m.Tags[k])
 		}
