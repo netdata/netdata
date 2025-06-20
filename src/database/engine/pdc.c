@@ -610,16 +610,12 @@ ALWAYS_INLINE_HOT void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *p
             if (PValue2 && !*PValue2) {
                 *PValue2 = epdl = epdl_get();
                 epdl->page_details_by_metric_id_JudyL = NULL;
-//                epdl->number_of_pages_in_JudyL = 0;
-//                epdl->file = pd->datafile.ptr->file;
                 epdl->extent_block = pd->datafile.block;
                 epdl->extent_size = pd->datafile.bytes;
                 epdl->datafile = pd->datafile.ptr;
             }
             else
                 epdl = *PValue2;
-
-//            epdl->number_of_pages_in_JudyL++;
 
             Pvoid_t *pd_by_first_time_s_judyL = PDCJudyLIns(&epdl->page_details_by_metric_id_JudyL, pd->metric_id, PJE0);
             Pvoid_t *pd_pptr = PDCJudyLIns(pd_by_first_time_s_judyL, pd->first_time_s, PJE0);
