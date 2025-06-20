@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- improve\(go.d/snmp-profiles\): allow users to add custom SNMP profiles [\#20526](https://github.com/netdata/netdata/pull/20526) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): log device profiles matched by sysObjectID [\#20524](https://github.com/netdata/netdata/pull/20524) ([ilyam8](https://github.com/ilyam8))
+- update units in \_generic-if.yaml [\#20523](https://github.com/netdata/netdata/pull/20523) ([ilyam8](https://github.com/ilyam8))
+- upd generic check in snmp prof metrics deduplication [\#20521](https://github.com/netdata/netdata/pull/20521) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp-profiles\): metrics deduplication [\#20520](https://github.com/netdata/netdata/pull/20520) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp-profiles\): remove unsupported constant\_value\_one metrics [\#20519](https://github.com/netdata/netdata/pull/20519) ([ilyam8](https://github.com/ilyam8))
 - Drop POWER8+ builds. [\#20518](https://github.com/netdata/netdata/pull/20518) ([Ferroin](https://github.com/Ferroin))
@@ -455,10 +459,6 @@
 - set max datafile size to 1GiB [\#19977](https://github.com/netdata/netdata/pull/19977) ([ktsaou](https://github.com/ktsaou))
 - Doc Linux improved order in kickstart [\#19975](https://github.com/netdata/netdata/pull/19975) ([kanelatechnical](https://github.com/kanelatechnical))
 - fix crash in variable\_lookup\_add\_result\_with\_score\(\) [\#19972](https://github.com/netdata/netdata/pull/19972) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#19970](https://github.com/netdata/netdata/pull/19970) ([netdatabot](https://github.com/netdatabot))
-- Update SCIM docs with Groups support [\#19969](https://github.com/netdata/netdata/pull/19969) ([juacker](https://github.com/juacker))
-- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.3 to 5.7.4 in /src/go [\#19968](https://github.com/netdata/netdata/pull/19968) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 28.0.2+incompatible to 28.0.4+incompatible in /src/go [\#19967](https://github.com/netdata/netdata/pull/19967) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
