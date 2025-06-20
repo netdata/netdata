@@ -24,6 +24,9 @@
 
 extern unsigned rrdeng_pages_per_extent;
 
+#define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
+#define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
+
 #define UNLINK_FILE(ctx, path, ret_var)                                                                                \
     do {                                                                                                               \
         uv_fs_t _req;                                                                                                  \
