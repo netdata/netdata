@@ -11,7 +11,7 @@ import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js
 class NetdataMCPChat {
     constructor() {
         // Log version on startup
-        console.log('🚀 Netdata MCP Web Client v1.0.51 - Simplified Sub-chat Cost Tracking');
+        console.log('🚀 Netdata MCP Web Client v1.0.52 - Live Sub-chat UI Updates');
         
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
@@ -1410,20 +1410,27 @@ class NetdataMCPChat {
         
         section.appendChild(toolMemoryDiv);
         
-        // Cache Control Option (only for Anthropic provider)
+        // Cache Control Option (for Anthropic provider)
         const isAnthropicProvider = chat.config.model && chat.config.model.provider === 'anthropic';
         const cacheControlDiv = document.createElement('div');
-        const cacheControlEnabled = chat.config.optimisation.cacheControl.enabled;
-        const cacheControlDisabled = !isAnthropicProvider || toolMemoryEnabled;
+        const cacheControlMode = chat.config.optimisation.cacheControl;
+        const cacheControlDisabled = !isAnthropicProvider;
         cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${cacheControlDisabled ? 'opacity: 0.5;' : ''}`;
         
         cacheControlDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: ${cacheControlDisabled ? 'default' : 'pointer'};">
-                <input type="checkbox" id="cacheControl_${chatId}" ${cacheControlEnabled ? 'checked' : ''}
-                       style="margin-right: 6px;"
-                       ${cacheControlDisabled ? 'disabled' : ''}>
-                <span>Enable Anthropic's cache control${toolMemoryEnabled ? ' (disabled: tool memory is on)' : ''}</span>
+            <label style="display: flex; align-items: center;">
+                <span>Cache control:</span>
             </label>
+            <select id="cacheControl_${chatId}" 
+                    style="width: 100px; padding: 2px 4px; border: 1px solid var(--border-color); 
+                           border-radius: 4px; background: var(--background-color); color: var(--text-primary);
+                           cursor: pointer;"
+                    ${cacheControlDisabled ? 'disabled' : ''}>
+                <option value="all-off" ${cacheControlMode === 'all-off' ? 'selected' : ''}>Off</option>
+                <option value="system" ${cacheControlMode === 'system' ? 'selected' : ''}>System</option>
+                <option value="cached" ${cacheControlMode === 'cached' ? 'selected' : ''}>Cached</option>
+            </select>
+            ${!isAnthropicProvider ? '<span style="color: var(--text-secondary); font-size: 12px;">Anthropic only</span>' : ''}
         `;
         
         section.appendChild(cacheControlDiv);
@@ -1565,28 +1572,7 @@ class NetdataMCPChat {
             toolMemorySelect.disabled = !enabled;
             toolMemoryDiv.style.opacity = enabled ? '1' : '0.5';
             
-            // Update cache control state for Anthropic (mutually exclusive with tool memory)
-            if (isAnthropicProvider) {
-                const cacheControlCheckbox = section.querySelector(`#cacheControl_${chatId}`);
-                const cacheControlLabel = cacheControlCheckbox.closest('label');
-                const cacheControlSpan = cacheControlLabel.querySelector('span');
-                
-                if (enabled) {
-                    // Disable cache control when tool memory is enabled
-                    cacheControlCheckbox.disabled = true;
-                    cacheControlCheckbox.closest('div').style.opacity = '0.5';
-                    cacheControlSpan.textContent = 'Enable Anthropic\'s cache control (disabled: tool memory is on)';
-                    if (cacheControlCheckbox.checked) {
-                        cacheControlCheckbox.checked = false;
-                        this.updateOptimizationSetting(chatId, 'cacheControl', false);
-                    }
-                } else {
-                    // Re-enable cache control when tool memory is disabled
-                    cacheControlCheckbox.disabled = false;
-                    cacheControlCheckbox.closest('div').style.opacity = '1';
-                    cacheControlSpan.textContent = 'Enable Anthropic\'s cache control';
-                }
-            }
+            // Cache control is no longer mutually exclusive with tool memory
             
             this.updateOptimizationSetting(chatId, 'toolMemory', enabled);
         });
@@ -1596,6 +1582,16 @@ class NetdataMCPChat {
             const newForgetAfterConclusions = parseInt(e.target.value, 10);
             this.updateToolMemoryThreshold(chatId, newForgetAfterConclusions);
         });
+        
+        // Cache control dropdown event listener
+        const cacheControlSelect = section.querySelector(`#cacheControl_${chatId}`);
+        if (cacheControlSelect) {
+            cacheControlSelect.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const newCacheMode = e.target.value;
+                this.updateCacheControlMode(chatId, newCacheMode);
+            });
+        }
         
         // Other checkboxes (smart filtering, cache control)
         section.querySelectorAll('input[type="checkbox"]:not(#toolSummarization_' + chatId + '):not(#autoSummarization_' + chatId + ')').forEach(checkbox => {
@@ -1732,8 +1728,9 @@ class NetdataMCPChat {
                     <tr>
                         <td style="padding: 4px 6px; color: var(--text-secondary);">Cache Control:</td>
                         <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
-                            ${status(config.optimisation.cacheControl.enabled)} 
-                            ${config.optimisation.cacheControl.enabled ? `Strategy: ${config.optimisation.cacheControl.strategy}` : 'Disabled'}
+                            ${config.optimisation.cacheControl === 'all-off' ? 'Off' : 
+                              config.optimisation.cacheControl === 'system' ? 'System only' : 
+                              config.optimisation.cacheControl === 'cached' ? 'Cached' : config.optimisation.cacheControl}
                         </td>
                     </tr>
                     <tr>
@@ -2329,9 +2326,6 @@ class NetdataMCPChat {
             case 'toolMemory':
                 config.optimisation.toolMemory.enabled = enabled;
                 break;
-            case 'cacheControl':
-                config.optimisation.cacheControl.enabled = enabled;
-                break;
             case 'autoSummarization':
                 config.optimisation.autoSummarisation.enabled = enabled;
                 break;
@@ -2365,6 +2359,37 @@ class NetdataMCPChat {
         this.autoSave(chatId);
     }
 
+    updateCacheControlMode(chatId, cacheMode) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+
+        // Get current config or create defaults
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        
+        // Update cache control mode
+        config.optimisation.cacheControl = cacheMode;
+
+        // Update chat config
+        chat.config = config;
+
+        // Recreate MessageOptimizer with new settings
+        const optimizerSettings = {
+            ...config,
+            llmProviderFactory: config.optimisation.toolSummarisation.enabled ? window.createLLMProvider : undefined
+        };
+        
+        try {
+            chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+        } catch (error) {
+            console.error('[updateCacheControlMode] Failed to create MessageOptimizer:', error);
+        }
+
+        // Save config
+        this.saveChatConfigSmart(chatId, config);
+        
+        // Auto-save chat
+        this.autoSave(chatId);
+    }
     
     updateChatModel(chatId, model) {
         const chat = this.chats.get(chatId);
@@ -3287,6 +3312,7 @@ class NetdataMCPChat {
                                 this.renderSubChatAsItem(chat.id, toolResult.subChatId, toolResult.toolCallId, 'processing');
                                 
                                 // Process the sub-chat synchronously - wait for completion
+                                // eslint-disable-next-line no-await-in-loop
                                 const summarizedResult = await this.processSubChat(toolResult.subChatId, chat.id, toolResult.toolCallId);
                                 
                                 // Update the tool result in messages array regardless of success/failure
@@ -3301,7 +3327,9 @@ class NetdataMCPChat {
                                     if (trIndex !== -1) {
                                         if (summarizedResult) {
                                             // Use summarized result if successful
+                                            console.log(`[Sub-chat Processing] Replacing tool result for ${toolResult.toolCallId} with summarized content (${summarizedResult.length} chars)`);
                                             messages[msgIndex].toolResults[trIndex].result = summarizedResult;
+                                            messages[msgIndex].toolResults[trIndex].wasProcessedBySubChat = true;
                                         } else {
                                             // Keep original result if sub-chat failed, but mark as processed
                                             console.warn('[Sub-chat Processing] No summarized result returned, keeping original');
@@ -3313,6 +3341,9 @@ class NetdataMCPChat {
                                         
                                         // Update the DOM display to remove "Processing" text
                                         this.updateToolResultDisplay(chat.id, toolResult.toolCallId, messages[msgIndex].toolResults[trIndex]);
+                                        
+                                        // CRITICAL: Save the updated parent chat with summarized results
+                                        this.autoSave(chat.id);
                                     }
                                 }
                             } catch (error) {
@@ -3376,6 +3407,7 @@ class NetdataMCPChat {
                     : JSON.stringify(result).length;
                 
                 // Check if we should create a sub-chat for this tool response
+                // eslint-disable-next-line no-await-in-loop
                 const shouldCreateSubChat = await this.shouldCreateSubChat(chat, responseSize, toolCall);
 
                 // Show result only if we're not creating a sub-chat
@@ -3393,6 +3425,7 @@ class NetdataMCPChat {
                 
                 if (shouldCreateSubChat) {
                     // Create sub-chat for processing this tool response
+                    // eslint-disable-next-line no-await-in-loop
                     const subChatId = await this.createSubChatForTool(chat, toolCall, result);
                     
                     // Sub-chat will be processed synchronously, so no placeholder needed
@@ -3477,7 +3510,7 @@ class NetdataMCPChat {
         try {
             // Track timing
             const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, tools, temperature, 'cached', cacheControlIndex, chat);
+            const response = await provider.sendMessage(messages, tools, temperature, chat.config.optimisation.cacheControl || 'all-off', cacheControlIndex, chat);
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Store response time
@@ -6727,7 +6760,13 @@ class NetdataMCPChat {
             chat.currentTurn = (chat.currentTurn || 0) + 1;
             
             // CRITICAL: Add and display the user's message immediately for better UX
-            this.addMessage(chat.id, { role: 'user', content: message, turn: chat.currentTurn });
+            // Add stable timestamp to ensure cache control works properly
+            this.addMessage(chat.id, { 
+                role: 'user', 
+                content: message, 
+                turn: chat.currentTurn,
+                timestamp: new Date().toISOString()
+            });
             const userMessageIndex = chat.messages.length - 1;
             this.processRenderEvent({ type: 'user-message', content: message, messageIndex: userMessageIndex }, chat.id);
         }
@@ -8438,7 +8477,7 @@ class NetdataMCPChat {
         
         // Debug: check all tool divs in current chat
         if (chatContainer) {
-            const allToolDivs = chatContainer.querySelectorAll('[data-tool-id]');
+            const _allToolDivs = chatContainer.querySelectorAll('[data-tool-id]');
         }
         
         const metadata = toolDiv ? JSON.parse(toolDiv.dataset.metadata || '{}') : {};
@@ -8531,7 +8570,7 @@ class NetdataMCPChat {
             console.error(`[updateSubChatVisibility] Sub-chat section not found for toolCallId: ${toolCallId}`);
             // List all existing sub-chat sections for debugging
             const allSubChatSections = container.querySelectorAll('.sub-chat-section');
-            allSubChatSections.forEach((section, index) => { ; });
+            allSubChatSections.forEach((_section, _index) => {  });
         }
     }
     
@@ -8656,6 +8695,25 @@ class NetdataMCPChat {
             }
             
             if (assistantMessage) {
+                
+                // CRITICAL FIX: Render the assistant message in the sub-chat UI
+                // Find the assistant message index
+                let assistantMessageIndex = -1;
+                for (let i = subChat.messages.length - 1; i >= 0; i--) {
+                    if (subChat.messages[i].role === 'assistant') {
+                        assistantMessageIndex = i;
+                        break;
+                    }
+                }
+                
+                if (assistantMessageIndex !== -1) {
+                    this.processRenderEvent({ 
+                        type: 'assistant-message', 
+                        content: assistantMessage.content,
+                        messageIndex: assistantMessageIndex
+                    }, subChatId);
+                }
+                
                 // Extract text content from assistant response
                 let textContent = '';
                 if (typeof assistantMessage.content === 'string') {
@@ -8701,7 +8759,7 @@ class NetdataMCPChat {
         
         // Get sub-chat costs by finding the sub-chat and using its existing totals
         let subChatCosts = null;
-        for (const [chatId, chat] of this.chats.entries()) {
+        for (const [_chatId, chat] of this.chats.entries()) {
             if (chat.isSubChat && chat.parentToolCallId === toolCallId) {
                 // Ensure the sub-chat has up-to-date pricing
                 this.updateChatTokenPricing(chat);
@@ -8749,9 +8807,33 @@ class NetdataMCPChat {
             if (toolDiv) {
                 const responseSection = toolDiv.querySelector('.tool-response-section');
                 if (responseSection) {
-                    const resultDiv = responseSection.querySelector('div:last-child');
-                    if (resultDiv) {
-                        resultDiv.innerHTML = `<div class="tool-summarized-result">${this.escapeHtml(summarizedResult)}</div>`;
+                    // Find the actual result content div (not the controls or indicator)
+                    const resultDivs = responseSection.querySelectorAll('div');
+                    let actualResultDiv = null;
+                    
+                    for (const div of resultDivs) {
+                        // Skip controls div and sub-chat indicator
+                        if (!div.classList.contains('tool-section-controls') && 
+                            !div.classList.contains('sub-chat-indicator') &&
+                            !div.querySelector('.sub-chat-indicator')) {
+                            actualResultDiv = div;
+                            break;
+                        }
+                    }
+                    
+                    if (actualResultDiv) {
+                        // Format as markdown if the content looks like markdown
+                        let formattedContent;
+                        if (this.isMarkdownContent(summarizedResult)) {
+                            formattedContent = marked.parse(summarizedResult, {
+                                breaks: true,
+                                gfm: true,
+                                sanitize: false
+                            });
+                        } else {
+                            formattedContent = this.escapeHtml(summarizedResult);
+                        }
+                        actualResultDiv.innerHTML = `<div class="tool-summarized-result message-content">${formattedContent}</div>`;
                     }
                 }
             }
@@ -8988,8 +9070,14 @@ class NetdataMCPChat {
             }
         }
         
-        // Clean up the temporary container reference
-        this.chatContainers.delete(subChatId);
+        // Clean up the temporary container reference ONLY if sub-chat is not actively processing
+        const isParentProcessing = parentChat && parentChat.isProcessing;
+        
+        if (!isParentProcessing) {
+            // Safe to clean up - sub-chat is complete
+            this.chatContainers.delete(subChatId);
+        }
+        // If parent is still processing, keep the container mapping so live messages can be rendered
         
         // Add the messages div to the content container
         contentContainer.appendChild(messagesDiv);
@@ -9003,7 +9091,6 @@ class NetdataMCPChat {
         if (!parentChat) return;
         
         // Find all sub-chats for this parent
-        let subChatCount = 0;
         this.chats.forEach((chat, chatId) => {
             if (chat.isSubChat && chat.parentChatId === parentChatId) {
                 // Determine status based on whether sub-chat has valid assistant response
@@ -9015,7 +9102,6 @@ class NetdataMCPChat {
                 
                 // Render the sub-chat item
                 this.renderSubChatAsItem(parentChatId, chatId, chat.parentToolCallId, status);
-                subChatCount++;
             }
         });
     }
@@ -9024,6 +9110,12 @@ class NetdataMCPChat {
      * Update the tool result display in the DOM to show actual results instead of "Processing"
      */
     updateToolResultDisplay(chatId, toolCallId, toolResult) {
+        // Skip updating DOM if this tool result was already processed by sub-chat
+        // The sub-chat processing already updated the DOM with summarized content
+        if (toolResult.wasProcessedBySubChat) {
+            return;
+        }
+        
         const container = this.getChatContainer(chatId);
         if (!container) {
             console.error('[updateToolResultDisplay] Chat container not found');
@@ -10199,6 +10291,12 @@ class NetdataMCPChat {
     updateCumulativeTokenDisplay(chatId) {
         if (!chatId) {
             console.error('updateCumulativeTokenDisplay called without chatId');
+            return;
+        }
+        
+        // Skip token display updates for sub-chats - they don't have token counter UI
+        const chat = this.chats.get(chatId);
+        if (chat && chat.isSubChat) {
             return;
         }
         

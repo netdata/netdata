@@ -126,7 +126,7 @@ DO NOT DISCUSS OTHER MONITORING SOLUTIONS OR MAKE COMPARISONS.
  * Get timezone information including name and UTC offset
  * @returns {Object} Object with timezone name and offset string
  */
-function getTimezoneInfo() {
+function _getTimezoneInfo() {
     const date = new Date();
     
     // Get UTC offset in minutes
@@ -157,22 +157,12 @@ function getTimezoneInfo() {
  * @returns {string} Formatted date/time context
  */
 function buildDateTimeContext() {
-    const currentTimestamp = new Date().toISOString();
-    const timezoneInfo = getTimezoneInfo();
-    const currentDate = new Date();
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDayName = dayNames[currentDate.getDay()];
-    
     return `## CRITICAL DATE/TIME CONTEXT
-Current date and time: ${currentTimestamp}
-Current day: ${currentDayName}
-Current timezone: ${timezoneInfo.name} (${timezoneInfo.offset})
-Current year: ${currentDate.getFullYear()}
 
 IMPORTANT DATE/TIME INTERPRETATION RULES FOR MONITORING DATA:
 
-1. When the user mentions dates without a year (e.g., "January 15", "last month"), use ${currentDate.getFullYear()} as the current year
-2. When the user mentions times without a timezone (e.g., "10pm", "14:30"), assume ${timezoneInfo.name} timezone
+1. When the user mentions dates without a year (e.g., "January 15", "last month"), use the current year
+2. When the user mentions times without a timezone (e.g., "10pm", "14:30"), assume the user's local timezone
 3. ALL relative references refer to the PAST (this is a monitoring system analyzing historical data):
    - "this morning" = earlier today, before noon
    - "this afternoon" = earlier today, after noon

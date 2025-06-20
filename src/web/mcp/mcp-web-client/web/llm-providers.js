@@ -488,7 +488,7 @@ class LLMProvider {
      * @param {number|null} _cachePosition - Cache position for Anthropic
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(_messages, _tools = [], _temperature = 0.7, _mode = 'cached', _cachePosition = null, _chat = null) {
+    async sendMessage(_messages, _tools, _temperature, _mode, _cachePosition = null, _chat = null) {
         const error = 'sendMessage must be implemented by subclass';
         console.error('[LLMProvider]', error);
         throw new Error(error);
@@ -612,25 +612,48 @@ class LLMProvider {
         });
     }
     
-    shouldIncludeTool(msg, mode) {
-        // Determine if tools should be included based on mode
-        if (mode === 'all-off') return false;
-        if (mode === 'all-on') return true;
-        if (mode === 'manual') {
-            // Check individual tool inclusion state (would need to be passed in)
-            return true; // Default to include for now
+    // Tool filtering removed - now handled entirely by message optimizer
+    // The mode parameter now controls cache control behavior only
+    
+    /**
+     * Get timezone info
+     * @returns {{name: string, offset: string}}
+     */
+    getTimezoneInfo() {
+        const date = new Date();
+        const offset = date.getTimezoneOffset();
+        const absOffset = Math.abs(offset);
+        const hours = Math.floor(absOffset / 60);
+        const minutes = absOffset % 60;
+        const sign = offset <= 0 ? '+' : '-';
+        const offsetString = `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        
+        let timezoneName;
+        try {
+            // This returns something like "America/New_York"
+            timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+            // Fallback to basic timezone string
+            timezoneName = date.toString().match(/\(([^)]+)\)/)?.[1] || offsetString;
         }
-        // For 'auto' and 'cached' modes, include by default
-        return true;
+        
+        return {
+            name: timezoneName,
+            offset: offsetString
+        };
     }
-
-    shouldIncludeToolCalls(msg, mode) {
-        return this.shouldIncludeTool(msg, mode);
-    }
-
-    shouldIncludeToolResults(msg, mode) {
-        // Tool results should only be included if their corresponding calls were included
-        return this.shouldIncludeTool(msg, mode);
+    
+    /**
+     * Add datetime prefix to user message content
+     * @param {string} content - The original user message content
+     * @param {string} timestamp - The message timestamp (ISO string)
+     * @returns {string} The content with datetime prefix
+     */
+    addDateTimePrefix(content, timestamp) {
+        // Use the message's timestamp, fallback to current time if not provided
+        const messageDateTime = timestamp || new Date().toISOString();
+        const timezoneInfo = this.getTimezoneInfo();
+        return `Current datetime in rfc3339: ${messageDateTime}, timezone: ${timezoneInfo.name}\n\n${content}`;
     }
 }
 
@@ -691,7 +714,7 @@ class OpenAIProvider extends LLMProvider {
      * @param {number|null} _cachePosition - Cache position (unused for OpenAI)
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null, chat = null) {
+    async sendMessage(messages, tools, temperature, mode, _cachePosition = null, chat = null) {
         // Check model configuration for endpoint and tool support
         const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
         const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
@@ -1286,7 +1309,7 @@ class OpenAIProvider extends LLMProvider {
         return 'call_' + Math.random().toString(36).substring(2, 11);
     }
 
-    convertMessages(messages, _mode = 'cached') {
+    convertMessages(messages, _mode) {
         // Check if we're using the responses endpoint
         const modelConfig = MODEL_ENDPOINT_CONFIG[this.model];
         const useResponsesEndpoint = modelConfig && modelConfig.endpoint === 'responses';
@@ -1318,7 +1341,7 @@ class OpenAIProvider extends LLMProvider {
             if (msgRole === 'user') {
                 converted.push({
                     role: 'user',
-                    content: msg.content
+                    content: this.addDateTimePrefix(msg.content, msg.timestamp)
                 });
             } else if (msgRole === 'assistant') {
                 // Extract text content and tool calls from message
@@ -1437,7 +1460,7 @@ class AnthropicProvider extends LLMProvider {
      * @param {number|null} cachePosition - Cache position for Anthropic
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', cachePosition = null, chat = null) {
+    async sendMessage(messages, tools, temperature, mode, cachePosition = null, chat = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
@@ -1446,24 +1469,31 @@ class AnthropicProvider extends LLMProvider {
         
         if (mode === 'cached') {
             // Use the caching version which returns different format
-            const result = this.convertMessagesWithCaching(messages, cachePosition, mode);
+            const result = this.convertMessagesWithCaching(messages, mode, cachePosition);
             anthropicMessages = result.converted;
             // Extract system from original messages for cached mode
             const systemMsg = messages.find(m => m.role === 'system');
             if (systemMsg) {
                 system = [{
                     type: 'text',
-                    text: systemMsg.content
+                    text: systemMsg.content,
+                    cache_control: { type: 'ephemeral' }  // Cache system prompt for 'cached' mode
                 }];
             }
         } else {
             // Use regular conversion which handles system properly
             const result = this.convertMessages(messages, mode);
             anthropicMessages = result.messages;
-            system = result.system ? [{
-                type: 'text',
-                text: result.system
-            }] : undefined;
+            if (result.system) {
+                system = [{
+                    type: 'text',
+                    text: result.system
+                }];
+                // Add cache control to system prompt for 'system' mode
+                if (mode === 'system') {
+                    system[0].cache_control = { type: 'ephemeral' };
+                }
+            }
         }
         
         // Convert tools to Anthropic format (no cache control on tools)
@@ -1574,7 +1604,7 @@ class AnthropicProvider extends LLMProvider {
         return processedResponse;
     }
 
-    convertMessagesWithCaching(messages, cachePosition = null, mode = 'cached') {
+    convertMessagesWithCaching(messages, mode, cachePosition = null) {
         // Convert messages WITHOUT adding cache control yet
         const converted = [];
         // let lastRole = null; // Removed - variable was never read
@@ -1665,7 +1695,7 @@ class AnthropicProvider extends LLMProvider {
                 
                 converted.push({
                     role: 'user',
-                    content: [{ type: 'text', text: String(textContent) }]
+                    content: [{ type: 'text', text: this.addDateTimePrefix(String(textContent), msg.timestamp) }]
                 });
                 // lastRole = 'user';
             } else if (msgRole === 'assistant') {
@@ -1718,66 +1748,70 @@ class AnthropicProvider extends LLMProvider {
                 }
             } else if (msgRole === 'tool-results') {
                 // Convert tool results to Anthropic format
-                // Only include if corresponding tool calls were included
-                if (this.shouldIncludeToolResults(msg, mode)) {
-                    const content = [];
-                    // STRICT: Only accept toolResults property
-                    const toolResults = msg.toolResults || [];
-                    
-                    for (const result of toolResults) {
-                        // Tool results for Anthropic need to be tool_result blocks
-                        const formattedResult = this.formatToolResultForAnthropic(
-                            result.toolCallId || result.id,
-                            result.result,
-                            result.toolName || result.name
-                        );
-                        content.push(formattedResult);
-                    }
-                    
-                    if (content.length > 0) {
-                        // Tool results must be in user messages
-                        converted.push({
-                            role: 'user',
-                            content
-                        });
-                        // lastRole = 'user'; // Not needed - last assignment
-                    }
+                // Tool filtering now handled by optimizer - include all tools sent to provider
+                const content = [];
+                // STRICT: Only accept toolResults property
+                const toolResults = msg.toolResults || [];
+                
+                for (const result of toolResults) {
+                    // Tool results for Anthropic need to be tool_result blocks
+                    const formattedResult = this.formatToolResultForAnthropic(
+                        result.toolCallId || result.id,
+                        result.result,
+                        result.toolName || result.name
+                    );
+                    content.push(formattedResult);
+                }
+                
+                if (content.length > 0) {
+                    // Tool results must be in user messages
+                    converted.push({
+                        role: 'user',
+                        content
+                    });
+                    // lastRole = 'user'; // Not needed - last assignment
                 }
             }
         }
         
-        // Apply cache control based on cachePosition parameter
-        if (cachePosition !== null && cachePosition >= 0 && cachePosition < converted.length) {
-            // Apply cache control to specific position
-            const targetMsg = converted[cachePosition];
-            if (targetMsg && Array.isArray(targetMsg.content) && targetMsg.content.length > 0) {
-                // Add cache control to last content block of the specified message
-                targetMsg.content[targetMsg.content.length - 1].cache_control = { type: 'ephemeral' };
-            }
-        } else {
-            // Default behavior - find the absolute last content block across all messages
-            let lastContentBlock = null;
-            
-            // Iterate backwards through messages to find the last content block
-            for (let i = converted.length - 1; i >= 0; i--) {
-                const msg = converted[i];
-                if (Array.isArray(msg.content) && msg.content.length > 0) {
-                    // Found a message with content, get its last block
-                    lastContentBlock = msg.content[msg.content.length - 1];
-                    break;
+        // Apply cache control based on mode and cachePosition parameter
+        // Note: System prompt cache control is handled separately above
+        if (mode === 'cached') {
+            // For 'cached' mode, apply cache control to the strategy-determined position
+            if (cachePosition !== null && cachePosition >= 0 && cachePosition < converted.length) {
+                // Apply cache control to specific position
+                const targetMsg = converted[cachePosition];
+                if (targetMsg && Array.isArray(targetMsg.content) && targetMsg.content.length > 0) {
+                    // Add cache control to last content block of the specified message
+                    targetMsg.content[targetMsg.content.length - 1].cache_control = { type: 'ephemeral' };
+                }
+            } else {
+                // Default behavior - find the absolute last content block across all messages
+                let lastContentBlock = null;
+                
+                // Iterate backwards through messages to find the last content block
+                for (let i = converted.length - 1; i >= 0; i--) {
+                    const msg = converted[i];
+                    if (Array.isArray(msg.content) && msg.content.length > 0) {
+                        // Found a message with content, get its last block
+                        lastContentBlock = msg.content[msg.content.length - 1];
+                        break;
+                    }
+                }
+                
+                // Add cache_control to only the very last content block
+                if (lastContentBlock) {
+                    lastContentBlock.cache_control = { type: 'ephemeral' };
                 }
             }
-            
-            // Add cache_control to only the very last content block
-            if (lastContentBlock) {
-                lastContentBlock.cache_control = { type: 'ephemeral' };
-            }
         }
+        // For 'system' mode: only system prompt is cached (handled above)
+        // For 'all-off' mode: no cache control applied
         
         return { converted, summaryContent };
     }
 
-    convertMessages(messages, _mode = 'cached') {
+    convertMessages(messages, _mode) {
         // Convert messages for Anthropic format
         const converted = [];
         
@@ -1793,7 +1827,7 @@ class AnthropicProvider extends LLMProvider {
                 // Convert user message to Anthropic format with content blocks
                 converted.push({
                     role: 'user',
-                    content: [{ type: 'text', text: msg.content }]
+                    content: [{ type: 'text', text: this.addDateTimePrefix(msg.content, msg.timestamp) }]
                 });
             } else if (msgRole === 'assistant') {
                 // Convert assistant message to Anthropic format
@@ -1941,7 +1975,7 @@ class GoogleProvider extends LLMProvider {
      * @param {number|null} _cachePosition - Cache position (unused for Google)
      * @returns {Promise<LLMResponse>}
      */
-    async sendMessage(messages, tools = [], temperature = 0.7, mode = 'cached', _cachePosition = null, chat = null) {
+    async sendMessage(messages, tools, temperature, mode, _cachePosition = null, chat = null) {
         // Validate messages before processing
         validateMessagesForAPI(messages);
         
@@ -2127,7 +2161,7 @@ class GoogleProvider extends LLMProvider {
         };
     }
 
-    convertMessages(messages, mode = 'cached') {
+    convertMessages(messages, _mode) {
         // Convert messages for Google format
         /*
         messages.map((m, i) => ({
@@ -2150,14 +2184,14 @@ class GoogleProvider extends LLMProvider {
             
             // Check for tool calls in assistant messages
             const toolCalls = extractToolCallsFromContent(msg.content);
-            if (msgRole === 'assistant' && toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
+            if (msgRole === 'assistant' && toolCalls.length > 0) {
                 for (const tc of toolCalls) {
                     if (!allToolCalls.has(tc.name)) {
                         allToolCalls.set(tc.name, []);
                     }
                     allToolCalls.get(tc.name).push(i);
                 }
-            } else if (msgRole === 'tool-results' && this.shouldIncludeToolResults(msg, mode)) {
+            } else if (msgRole === 'tool-results') {
                 // Handle internal tool-results format
                 // STRICT: Only accept toolResults property
                 const toolResults = msg.toolResults || [];
@@ -2224,10 +2258,7 @@ class GoogleProvider extends LLMProvider {
                 const toolResults = msg.toolResults || [];
                 // Process tool results
                 
-                // Only include if should be included
-                if (!this.shouldIncludeToolResults(msg, mode)) {
-                    continue;
-                }
+                // Tool filtering now handled by optimizer - include all tools sent to provider
                 
                 // Check if these tool responses have corresponding function calls
                 if (!lastAssistantHadFunctionCalls) {
@@ -2258,8 +2289,7 @@ class GoogleProvider extends LLMProvider {
             // Reset the function call tracking when we encounter a new assistant message
             if (msgRole === 'assistant') {
                 const toolCalls = extractToolCallsFromContent(msg.content);
-                lastAssistantHadFunctionCalls = toolCalls.length > 0 && 
-                                               this.shouldIncludeToolCalls(msg, mode);
+                lastAssistantHadFunctionCalls = toolCalls.length > 0;
                 // Track if assistant message has function calls
             }
             
@@ -2289,7 +2319,7 @@ class GoogleProvider extends LLMProvider {
                 }
                 
                 if (textContent || textContent === '') {
-                    parts.push({ text: textContent });
+                    parts.push({ text: this.addDateTimePrefix(textContent, msg.timestamp) });
                 }
             } else if (msgRole === 'assistant') {
                 // Assistant messages - include text and optionally tool calls
@@ -2311,7 +2341,7 @@ class GoogleProvider extends LLMProvider {
                 
                 // Extract and add tool calls
                 const toolCalls = extractToolCallsFromContent(msg.content);
-                if (toolCalls.length > 0 && this.shouldIncludeToolCalls(msg, mode)) {
+                if (toolCalls.length > 0) {
                     for (const tc of toolCalls) {
                         // Use destructuring to avoid direct 'arguments' reference
                         const { arguments: tcArgs } = tc || {};
