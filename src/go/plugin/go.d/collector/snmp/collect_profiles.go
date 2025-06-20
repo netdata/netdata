@@ -106,9 +106,9 @@ func tableMetricKey(m ddsnmp.Metric) string {
 	sb.WriteString(m.Name)
 
 	for _, k := range keys {
-		if v := m.Tags[k]; v != "" && !strings.HasPrefix(v, "_") {
+		if v := m.Tags[k]; v != "" && !strings.HasPrefix(k, "_") {
 			sb.WriteString("_")
-			sb.WriteString(m.Tags[k])
+			sb.WriteString(v)
 		}
 	}
 
