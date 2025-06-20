@@ -199,7 +199,7 @@ metrics:
 
           {{- if $config -}}
             {{- setName .Metric (printf "%s_%s" .Metric.Name (get $config "name")) -}}
-            {{- setFamily .Metric (printf "Health/Sensors/%s" (get $config "family")) -}}
+            {{- setFamily .Metric (printf "Sensors/%s" (get $config "family")) -}}
             {{- with get $config "desc" -}}{{- setDesc $.Metric . -}}{{- end -}}
             {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
             {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Value) .)) -}}{{- end -}}
