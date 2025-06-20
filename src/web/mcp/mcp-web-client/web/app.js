@@ -4625,9 +4625,6 @@ class NetdataMCPChat {
             let proxyUrl;
             
             const defaultProvider = [...this.llmProviders.values()].find(p => p.url);
-            if (!defaultProvider) {
-                console.error('[initializeDefaultMCPServers] No LLM provider with URL found for MCP server initialization');
-            }
             if (defaultProvider && defaultProvider.url) {
                 proxyUrl = defaultProvider.url;
             } else {
@@ -8142,6 +8139,38 @@ class NetdataMCPChat {
     
     
     
+    /**
+     * Extracts content from a contentEditable div while preserving formatting
+     * Converts HTML back to markdown-like plain text format
+     */
+    getEditableContent(contentDiv) {
+        // Get the HTML content
+        const htmlContent = contentDiv.innerHTML;
+        
+        // Convert common HTML back to text with preserved formatting
+        return htmlContent
+            // Replace <br> tags with actual newlines
+            .replace(/<br\s*\/?>/gi, '\n')
+            // Replace <div> tags with newlines (contentEditable creates these on Enter)
+            .replace(/<div>/gi, '\n')
+            .replace(/<\/div>/gi, '')
+            // Replace paragraph tags with newlines
+            .replace(/<p>/gi, '')
+            .replace(/<\/p>/gi, '\n')
+            // Replace non-breaking spaces with regular spaces
+            .replace(/&nbsp;/gi, ' ')
+            // Remove any other HTML tags (preserving the text content)
+            .replace(/<[^>]*>/g, '')
+            // Decode HTML entities
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            // Clean up multiple newlines
+            .replace(/\n\s*\n\s*\n/g, '\n\n')
+            // Trim trailing whitespace from each line
+            .replace(/[ \t]+$/gm, '');
+    }
+
     editUserMessage(contentDiv, originalContent, chatId) {
         if (!chatId) {return;}
         
@@ -8179,10 +8208,22 @@ class NetdataMCPChat {
             return;
         }
         
-        // Make content editable
+        // Get the original raw content from chat history
+        const originalMessage = chat.messages[messageIndex];
+        const originalRawContent = originalMessage ? originalMessage.content : '';
+        
+        // Make content editable and populate with original text for editing
         contentDiv.contentEditable = true;
         contentDiv.classList.add('editing');
-        const originalText = contentDiv.textContent;
+        
+        // CRITICAL FIX: Convert newlines to <br> tags so they display properly in contentEditable
+        const editableContent = originalRawContent
+            .replace(/&/g, '&amp;')    // Escape ampersands first
+            .replace(/</g, '&lt;')     // Escape less-than
+            .replace(/>/g, '&gt;')     // Escape greater-than
+            .replace(/\n/g, '<br>');   // Convert newlines to <br> tags
+        
+        contentDiv.innerHTML = editableContent;
         
         // Just focus, don't select all - let user position cursor
         contentDiv.focus();
@@ -8226,17 +8267,21 @@ class NetdataMCPChat {
         cancel = () => {
             contentDiv.contentEditable = false;
             contentDiv.classList.remove('editing');
-            contentDiv.textContent = originalText;
+            // Restore the original rendered HTML content (markdown processed)
+            contentDiv.innerHTML = marked.parse(originalRawContent, {
+                breaks: true, gfm: true, sanitize: false
+            });
             buttonsDiv.remove();
             // Clean up event listeners
             contentDiv.removeEventListener('keydown', keyHandler);
             document.removeEventListener('click', clickOutside);
             // Restore the edit trigger
-            this.addEditTrigger(contentDiv, originalText, 'user', chatId);
+            this.addEditTrigger(contentDiv, originalRawContent, 'user', chatId);
         };
         
         save = async () => {
-            const newContent = contentDiv.textContent.trim();
+            // CRITICAL FIX: Get edited content while preserving formatting
+            const newContent = this.getEditableContent(contentDiv).trim();
             if (!newContent) {
                 this.showError('Message cannot be empty', chatId);
                 return;
@@ -8745,7 +8790,8 @@ class NetdataMCPChat {
 
         userMessage += `\n\nThis is usually done by executing the ${toolCall.name} tool. `;
         userMessage += `\n\nHere are the arguments I would use:\n\`\`\`json\n${JSON.stringify(cleanedArgs, null, 2)}\n\`\`\``;
-        userMessage += `\n\nIn case these parameters are wrong, find the right parameters to help me complete this task. `;
+        userMessage += `\n\nMy assumption that this tool and parameters will provide the desired result, may be wrong. `;
+        userMessage += `In that case, come up with your own plan to answer the question.`;
 
         if (metadata.key_information) {
             userMessage += `\n\nFocus on: ${metadata.key_information}`;
@@ -8770,7 +8816,7 @@ class NetdataMCPChat {
             userMessage += '\n\nPlease use any of your tools, and adapt to provide the answer I seek. ';
         }
         userMessage += '\n\nImportant: Do not ask me any question back, or provide explanations on tool usage, or give up on the first try. ';
-        userMessage += 'Check your tools available, adapt to the issues you face (wrong parameters, empty responses, etc), ';
+        userMessage += 'Check your tools available, adapt to the issues you face (wrong parameters, empty responses, wrong tool chosen, etc), ';
         userMessage += 'and provide an authoritative answer. ';
 
         // Add the formatted user request
