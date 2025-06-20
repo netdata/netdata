@@ -2487,7 +2487,7 @@ void pgc_open_cache_to_journal_v2(
         Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->block, PJE0);
         if(!PValue || PValue == PJERR)
             fatal("CACHE: JudyLIns(JudyL_extents_pos, %" PRIu64 ") failed, JudyL_extents_pos = %p, result = %p",
-                  (uint64_t) xio->block << 12, JudyL_extents_pos, PValue);
+                  BLOCK_TO_OFFSET(xio->block), JudyL_extents_pos, PValue);
 
         struct jv2_extents_info *ei;
         if(!*PValue) {
