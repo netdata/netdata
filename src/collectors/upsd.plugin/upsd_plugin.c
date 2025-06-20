@@ -378,7 +378,7 @@ void parse_command_line(int argc, char *argv[]) {
         }
     }
 
-    if (optind >= argc || !isdigit(argv[optind])) {
+    if (optind == argc || !isdigit(*argv[optind])) {
         print_help();
         exit(EXIT_FAILURE);
     }
