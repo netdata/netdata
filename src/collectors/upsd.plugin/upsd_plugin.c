@@ -686,10 +686,11 @@ int main(int argc, char *argv[]) {
                     continue;
 
                 if (!nut_value && streq(chart->nut_variable, "ups.realpower")) {
-                    if (nut_get_var(&ups2, ups_name, "ups.load") &&
-                        nut_get_var(&ups2, ups_name, "ups.realpower.nominal")) {
-                        double load = atof(nut_get_var(&ups2, ups_name, "ups.load"));
-                        double nominal = atof(nut_get_var(&ups2, ups_name, "ups.realpower.nominal"));
+                    const char *ups_load = nut_get_var(&ups2, ups_name, "ups.load");
+                    const char *ups_realpower_nominal = nut_get_var(&ups2, ups_name, "ups.realpower.nominal");
+                    if (ups_load && ups_realpower_nominal) {
+                        double load = atof(ups_load);
+                        double nominal = atof(ups_realpower_nominal);
                         double load_usage = (load / 100) * nominal * NETDATA_PLUGIN_PRECISION;
                         snprintf(buf, sizeof(buf), "%d", (int)load_usage);
                         nut_value = buf;
