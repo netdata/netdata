@@ -1020,7 +1020,7 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
                 "%s from %ld (%s) to %ld (%s) %s%s: "
                 "%s",
                 epdl->datafile->fileno, ctx->config.tier,
-                (uint64_t) epdl->extent_block << 12, epdl->extent_size,
+                BLOCK_TO_OFFSET(epdl->extent_block), epdl->extent_size,
                 used_epdl ? "to extract page (PD)" : used_descr ? "expected page (DESCR)" : "part of a query (PDC)",
                 start_time_s, start_time_str, end_time_s, end_time_str,
                 used_epdl || used_descr ? " of metric " : "",
@@ -1284,7 +1284,7 @@ static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file
     (void)posix_memalignz(&buffer, RRDFILE_ALIGNMENT, real_io_size);
 
     uv_buf_t iov = uv_buf_init(buffer, real_io_size);
-    int ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t)block << 12, NULL);
+    int ret = uv_fs_read(NULL, &request, file, &iov, 1, (int64_t) BLOCK_TO_OFFSET(block), NULL);
     if (unlikely(-1 == ret)) {
         ctx_io_error(ctx);
         posix_memalign_freez(buffer);
