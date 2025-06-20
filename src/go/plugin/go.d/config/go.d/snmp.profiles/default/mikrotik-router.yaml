@@ -158,7 +158,7 @@ metrics:
         scale_factor: 1024
         unit: "By"
     metric_tags:
-      - tag: mem_index
+      - tag: _mem_index
         index: 1
       - tag: mem
         symbol:
