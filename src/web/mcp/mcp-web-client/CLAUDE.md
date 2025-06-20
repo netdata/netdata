@@ -1,5 +1,35 @@
 # ASSISTANTS **MUST** FOLLOW THESE RULES
 
+## 🚨 PRINCIPLE-001: ERROR VISIBILITY AND FAILURE HANDLING 🚨
+
+**CRITICAL RULE: WHEN WRITING CODE WE REVEAL UNEXPECTED ERRORS. WE DON'T WORK AROUND THEM.**
+
+- **UNEXPECTED ERRORS MUST BE PROMINENT** - Make them visible so developers can see and fix them
+- **SILENT ERROR HANDLING IS NEVER PERMITTED** - Unless it's expected behavior in normal processing flow
+- **UNEXPECTED ERRORS MUST BE LOGGED** - For developers to see (console.error)
+- **ERRORS AFFECTING USER FLOW MUST BE SHOWN ON UI** - Users must be informed when something fails
+- **ANY CODE NOT COMPLYING IS INCORRECT AND MUST BE FIXED IMMEDIATELY**
+
+**JavaScript developers have the BAD habit of providing fallbacks and default values on UNEXPECTED things. This is a SEVERE FLAW and IS NOT ACCEPTED in this project.**
+
+**Every fallback, default, and workaround MUST HAVE SPECIFIC BUSINESS LOGIC REASONING, otherwise it MUST be immediately fixed to log and FAIL.**
+
+**Examples of INCORRECT patterns:**
+```javascript
+// WRONG - Silent failure
+const chat = this.chats.get(chatId) || {};
+
+// WRONG - Fallback without reasoning
+const result = data?.property || 'default';
+
+// CORRECT - Explicit error handling
+const chat = this.chats.get(chatId);
+if (!chat) {
+    console.error(`[functionName] Chat not found for chatId: ${chatId}`);
+    return; // or throw, or show UI error
+}
+```
+
 1. This is a new application. No need for backward compatibility.
 2. When a task is concluded, existing `eslint` configuration MUST show zero errors and zero warnings.
 3. Do not use any deprecated or legacy code. This is a new application, so everything should be up-to-date.

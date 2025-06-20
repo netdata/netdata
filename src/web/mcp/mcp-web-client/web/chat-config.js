@@ -205,7 +205,7 @@ export function normalizeConfig(config) {
     
     // Cache Control normalization
     if (!opt.cacheControl || typeof opt.cacheControl !== 'string') {
-        console.warn('[normalizeConfig] cacheControl missing or invalid, creating default');
+        // Don't warn for missing cacheControl - it's expected for old chats
         opt.cacheControl = 'all-off';
     } else if (!['all-off', 'system', 'cached'].includes(opt.cacheControl)) {
         console.warn('[normalizeConfig] Invalid cacheControl value:', opt.cacheControl, '- using default');
