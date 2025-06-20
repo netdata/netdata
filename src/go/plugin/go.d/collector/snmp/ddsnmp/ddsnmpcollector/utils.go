@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
@@ -259,4 +261,21 @@ func mergeTagsWithEmptyFallback(dest, src map[string]string) {
 			dest[k] = v
 		}
 	}
+}
+
+func applyTransform(metric *ddsnmp.Metric, sym ddprofiledefinition.SymbolConfig) error {
+	if sym.TransformCompiled == nil {
+		return nil
+	}
+
+	type transformCtx struct{ Metric *ddsnmp.Metric }
+
+	ctx := &transformCtx{Metric: metric}
+
+	var buf bytes.Buffer
+	if err := sym.TransformCompiled.Execute(&buf, ctx); err != nil {
+		return fmt.Errorf("failed to execute transform template: %w", err)
+	}
+
+	return nil
 }

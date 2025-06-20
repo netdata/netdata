@@ -15,7 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error) {
+func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
 	var oids []string
 	var missingOIDs []string
 
@@ -46,7 +46,7 @@ func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error)
 		return nil, err
 	}
 
-	metrics := make([]Metric, 0, len(prof.Definition.Metrics))
+	metrics := make([]ddsnmp.Metric, 0, len(prof.Definition.Metrics))
 	var errs []error
 
 	for _, cfg := range prof.Definition.Metrics {
@@ -73,7 +73,7 @@ func (c *Collector) collectScalarMetrics(prof *ddsnmp.Profile) ([]Metric, error)
 	return metrics, nil
 }
 
-func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*Metric, error) {
+func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*ddsnmp.Metric, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		return nil, nil
@@ -92,7 +92,7 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		}
 	}
 
-	return &Metric{
+	m := &ddsnmp.Metric{
 		Name:        cfg.Symbol.Name,
 		Value:       value,
 		StaticTags:  ternary(len(staticTags) > 0, staticTags, nil),
@@ -101,7 +101,15 @@ func (c *Collector) collectScalarMetric(cfg ddprofiledefinition.MetricsConfig, p
 		Family:      cfg.Symbol.Family,
 		Mappings:    convSymMappingToNumeric(cfg.Symbol),
 		MetricType:  getMetricType(cfg.Symbol, pdu),
-	}, nil
+	}
+
+	if cfg.Symbol.TransformCompiled != nil {
+		if err := applyTransform(m, cfg.Symbol); err != nil {
+			return nil, fmt.Errorf("failed to apply transform for scalar metric '%s': %w", cfg.Symbol.Name, err)
+		}
+	}
+
+	return m, nil
 }
 
 func processSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {

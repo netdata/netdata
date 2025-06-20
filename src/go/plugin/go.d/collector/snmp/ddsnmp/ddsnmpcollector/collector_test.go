@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 		enableCache    bool // Whether to enable cache for this test
@@ -70,11 +71,11 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
@@ -138,12 +139,12 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Tags:           map[string]string{"device_vendor": "Cisco IOS"},
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
@@ -212,14 +213,14 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source: "test-profile.yaml",
 					DeviceMetadata: map[string]string{
 						"vendor":        "dell",
 						"serial_number": "ABC123",
 					},
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
@@ -261,11 +262,11 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "memoryKilobytes",
 							Value:      1024000, // 1024 * 1000
@@ -307,11 +308,11 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "temperature",
 							Value:      25,
@@ -378,12 +379,12 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
 					Tags:           map[string]string{"device_type": "router"},
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
@@ -424,10 +425,10 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					DeviceMetadata: nil,
-					Metrics:        []Metric{},
+					Metrics:        []ddsnmp.Metric{},
 				},
 			},
 			expectedError: false,
@@ -471,10 +472,10 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 			setupMock: func(m *snmpmock.MockHandler) {
 				m.EXPECT().MaxOids().Return(10).AnyTimes()
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					DeviceMetadata: nil,
-					Metrics:        []Metric{},
+					Metrics:        []ddsnmp.Metric{},
 				},
 			},
 			expectedError: false,
@@ -528,11 +529,11 @@ func TestCollector_Collect_ScalarMetrics(t *testing.T) {
 					errors.New("connection refused"),
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "profile1.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
@@ -599,7 +600,7 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 	}{
@@ -638,11 +639,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "clusterHealth",
 							Value:      1,
@@ -695,11 +696,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifOperStatus",
 							Value:      2,
@@ -753,11 +754,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "fanStatus",
 							Value:      2,
@@ -808,11 +809,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifAdminStatus",
 							Value:      0, // mapped from 2 -> 0
@@ -936,11 +937,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "sysUpTime",
 							Value:      123456,
@@ -987,11 +988,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifAdminStatus",
 							Value:      1,
@@ -1043,11 +1044,11 @@ func TestCollector_Collect_ValueMappings(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "upsBasicBatteryStatus",
 							Value:      1,
@@ -1114,7 +1115,7 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 		enableCache    bool
@@ -1178,11 +1179,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1000,
@@ -1291,11 +1292,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						// Row 1
 						{
 							Name:       "ifInOctets",
@@ -1426,11 +1427,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInErrors",
 							Value:      10,
@@ -1531,11 +1532,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						// Row 1 - complete
 						{
 							Name:       "ifInOctets",
@@ -1632,11 +1633,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:  "ifInOctets",
 							Value: 1000,
@@ -1713,11 +1714,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInErrors",
 							Value:      10,
@@ -1815,11 +1816,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:  "ifInOctets",
 							Value: 1000,
@@ -1874,11 +1875,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					[]gosnmp.SnmpPDU{}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics:        []Metric{},
+					Metrics:        []ddsnmp.Metric{},
 				},
 			},
 			expectedError: false,
@@ -1967,11 +1968,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "cpmCPUMemoryUsed",
 							Value:      2097152, // 2048 * 1024
@@ -2033,11 +2034,11 @@ func TestCollector_Collect_TableMetricsBasic(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1000,
@@ -2106,7 +2107,7 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 		enableCache    bool
@@ -2190,11 +2191,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInErrors",
 							Value:      10,
@@ -2298,11 +2299,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInErrors",
 							Value:      10,
@@ -2427,11 +2428,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:  "ifInErrors",
 							Value: 10,
@@ -2568,11 +2569,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:  "cieIfResetCount",
 							Value: 5,
@@ -2662,11 +2663,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInErrors",
 							Value:      10,
@@ -2756,11 +2757,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1000,
@@ -2872,11 +2873,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:  "ifInErrors",
 							Value: 10,
@@ -2962,11 +2963,11 @@ func TestCollector_Collect_CrossTableTags(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInErrors",
 							Value:      10,
@@ -3036,7 +3037,7 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 		enableCache    bool
@@ -3088,11 +3089,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ipSystemStatsHCInReceives",
 							Value:      1000,
@@ -3167,11 +3168,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "cfwConnectionStatValue",
 							Value:      100,
@@ -3256,11 +3257,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ipSystemStatsHCInReceives",
 							Value:      1000,
@@ -3337,11 +3338,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1000,
@@ -3435,11 +3436,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "cpiPduBranchCurrent",
 							Value:      150,
@@ -3525,11 +3526,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "customMetric",
 							Value:      500,
@@ -3619,11 +3620,11 @@ func TestCollector_Collect_IndexBasedAndTransforms(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1000,
@@ -3699,7 +3700,7 @@ func TestCollector_Collect_OpaqueTypes(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 		enableCache    bool
@@ -3760,11 +3761,11 @@ func TestCollector_Collect_OpaqueTypes(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "cpmCPULoadAvg1min",
 							Value:      0, // 0.75 truncated to int64
@@ -3841,11 +3842,11 @@ func TestCollector_Collect_OpaqueTypes(t *testing.T) {
 					}, nil,
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "cpqHeSysBatteryVoltage",
 							Value:      12, // 12.6 truncated to int64
@@ -3922,7 +3923,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 	tests := map[string]struct {
 		profiles       []*ddsnmp.Profile
 		setupMock      func(m *snmpmock.MockHandler)
-		expectedResult []*ProfileMetrics
+		expectedResult []*ddsnmp.ProfileMetrics
 		expectedError  bool
 		errorContains  string
 		enableCache    bool
@@ -4071,11 +4072,11 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					}, nil,
 				).Times(1)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1200, // Latest value
@@ -4205,11 +4206,11 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					),
 				)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						{
 							Name:       "ifInOctets",
 							Value:      1200,
@@ -4372,11 +4373,11 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 					}, nil,
 				).Times(1)
 			},
-			expectedResult: []*ProfileMetrics{
+			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
 					Source:         "test-profile.yaml",
 					DeviceMetadata: nil,
-					Metrics: []Metric{
+					Metrics: []ddsnmp.Metric{
 						// From first config
 						{
 							Name:       "ifInOctets",
@@ -4436,7 +4437,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 				collector.tableCache.setTTL(0, 0) // Disable cache
 			}
 
-			var result []*ProfileMetrics
+			var result []*ddsnmp.ProfileMetrics
 			var err error
 
 			// Perform multiple collections to test caching behavior
@@ -4454,6 +4455,559 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			}
 
 			// Clear circular references in final result
+			for _, profile := range result {
+				for i := range profile.Metrics {
+					profile.Metrics[i].Profile = nil
+				}
+			}
+
+			if tc.expectedError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if tc.expectedResult != nil {
+				require.Equal(t, len(tc.expectedResult), len(result))
+				for i := range tc.expectedResult {
+					assert.Equal(t, tc.expectedResult[i].DeviceMetadata, result[i].DeviceMetadata)
+					assert.Equal(t, tc.expectedResult[i].Tags, result[i].Tags)
+					assert.ElementsMatch(t, tc.expectedResult[i].Metrics, result[i].Metrics)
+				}
+			} else {
+				assert.Nil(t, result)
+			}
+		})
+	}
+}
+
+func TestCollector_Collect_MetricTransforms(t *testing.T) {
+	tests := map[string]struct {
+		profiles       []*ddsnmp.Profile
+		setupMock      func(m *snmpmock.MockHandler)
+		expectedResult []*ddsnmp.ProfileMetrics
+		expectedError  bool
+		errorContains  string
+	}{
+		"basic metric name transformation": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:       "1.3.6.1.4.1.12345.1.1",
+									Name:      "sensorValue",
+									Transform: `{{- setName .Metric "customName" -}}`,
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12345.1.1"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12345.1.1",
+								Type:  gosnmp.Gauge32,
+								Value: uint(100),
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:       "customName",
+							Value:      100,
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"table metric with sensor type transformation": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.14988.1.1.3.100",
+									Name: "mtxrHlTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.3",
+										Name: "mtxrHlSensorValue",
+										Transform: `
+{{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
+{{- if eq $sensorType "1" -}}
+  {{- setName .Metric (printf "%s_temperature" .Metric.Name) -}}
+  {{- setUnit .Metric "celsius" -}}
+  {{- setFamily .Metric "Health/Temperature" -}}
+{{- else if eq $sensorType "3" -}}
+  {{- setName .Metric (printf "%s_voltage" .Metric.Name) -}}
+  {{- setUnit .Metric "volts" -}}
+  {{- setValue .Metric (int64 (div (float64 .Metric.Value) 10.0)) -}}
+  {{- setFamily .Metric "Health/Power" -}}
+{{- end -}}
+{{- deleteTag .Metric "sensor_type" -}}`,
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "sensor_name",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.2",
+											Name: "mtxrHlSensorName",
+										},
+									},
+									{
+										Tag: "sensor_type",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.4",
+											Name: "mtxrHlSensorType",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.14988.1.1.3.100").Return(
+					[]gosnmp.SnmpPDU{
+						// Temperature sensor (type 1)
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.3.1",
+							Type:  gosnmp.Integer,
+							Value: 25,
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("cpu-temperature"),
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.4.1",
+							Type:  gosnmp.Integer,
+							Value: 1,
+						},
+						// Voltage sensor (type 3)
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.3.2",
+							Type:  gosnmp.Integer,
+							Value: 120, // 12.0V in decivolts
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.2.2",
+							Type:  gosnmp.OctetString,
+							Value: []byte("input-voltage"),
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.4.2",
+							Type:  gosnmp.Integer,
+							Value: 3,
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:       "mtxrHlSensorValue_temperature",
+							Value:      25,
+							Tags:       map[string]string{"sensor_name": "cpu-temperature"},
+							Unit:       "celsius",
+							Family:     "Health/Temperature",
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+						{
+							Name:       "mtxrHlSensorValue_voltage",
+							Value:      12, // Converted from decivolts
+							Tags:       map[string]string{"sensor_name": "input-voltage"},
+							Unit:       "volts",
+							Family:     "Health/Power",
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"transformation with value mappings": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.12345.1.1",
+									Name: "deviceStatus",
+									Transform: `
+{{- setMappings .Metric (i64map 0 "down" 1 "up" 2 "testing") -}}`,
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.12345.1.1"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							{
+								Name:  "1.3.6.1.4.1.12345.1.1",
+								Type:  gosnmp.Integer,
+								Value: 1,
+							},
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:  "deviceStatus",
+							Value: 1,
+							Mappings: map[int64]string{
+								0: "down",
+								1: "up",
+								2: "testing",
+							},
+							MetricType: "gauge",
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"complex transformation with sprig functions": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.2.2",
+									Name: "ifTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.2.1.2.2.1.10",
+										Name: "ifInOctets",
+										Transform: `
+{{- $ifName := index .Metric.Tags "interface" | lower -}}
+{{- if contains "eth" $ifName -}}
+  {{- setFamily .Metric "Interfaces/Ethernet" -}}
+{{- else if contains "lo" $ifName -}}
+  {{- setFamily .Metric "Interfaces/Loopback" -}}
+{{- end -}}
+{{- setDesc .Metric (printf "Traffic on %s interface" (index .Metric.Tags "interface")) -}}`,
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "interface",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.2.2.1.2",
+											Name: "ifDescr",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c)
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.2.2").Return(
+					[]gosnmp.SnmpPDU{
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.1",
+							Type:  gosnmp.Counter32,
+							Value: uint(1000),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("eth0"),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.10.2",
+							Type:  gosnmp.Counter32,
+							Value: uint(2000),
+						},
+						{
+							Name:  "1.3.6.1.2.1.2.2.1.2.2",
+							Type:  gosnmp.OctetString,
+							Value: []byte("lo0"),
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:        "ifInOctets",
+							Value:       1000,
+							Tags:        map[string]string{"interface": "eth0"},
+							Family:      "Interfaces/Ethernet",
+							Description: "Traffic on eth0 interface",
+							MetricType:  "rate",
+							IsTable:     true,
+						},
+						{
+							Name:        "ifInOctets",
+							Value:       2000,
+							Tags:        map[string]string{"interface": "lo0"},
+							Family:      "Interfaces/Loopback",
+							Description: "Traffic on lo0 interface",
+							MetricType:  "rate",
+							IsTable:     true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"transformation with invalid template": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:               "1.3.6.1.4.1.12345.1.1",
+									Name:              "testMetric",
+									Transform:         `{{- invalid template syntax {{`,
+									TransformCompiled: nil, // Will fail compilation
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// This test should fail during profile validation, not during collection
+			},
+			expectedResult: nil,
+			expectedError:  true,
+			errorContains:  "template",
+		},
+		"mikrotik sensor table real-world example": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "mikrotik-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.14988.1.1.3.100",
+									Name: "mtxrHlTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.3",
+										Name: "mtxrHlSensorValue",
+										Transform: `
+{{- $config := get (dict 
+    "1" (dict "name" "temperature" "unit" "celsius" "family" "Health/Temperature")
+    "2" (dict "name" "fan_speed" "unit" "rpm" "family" "Health/Cooling")
+    "3" (dict "name" "voltage" "unit" "volts" "family" "Health/Power" "divisor" 10.0)
+    "6" (dict "name" "sensor_status" "family" "Health/Status" 
+         "mapping" (i64map 0 "not_ok" 1 "ok"))
+) (index .Metric.Tags "sensor_type" | default "") -}}
+
+{{- if $config -}}
+  {{- setName .Metric (printf "%s_%s" .Metric.Name (get $config "name")) -}}
+  {{- setFamily .Metric (get $config "family") -}}
+  {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
+  {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Metric.Value) .)) -}}{{- end -}}
+  {{- with get $config "mapping" -}}{{- setMappings $.Metric . -}}{{- end -}}
+{{- end -}}
+
+{{- deleteTag .Metric "sensor_type" -}}`,
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "sensor_name",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.2",
+											Name: "mtxrHlSensorName",
+										},
+									},
+									{
+										Tag: "sensor_type",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.4",
+											Name: "mtxrHlSensorType",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.14988.1.1.3.100").Return(
+					[]gosnmp.SnmpPDU{
+						// Temperature sensor
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.3.1",
+							Type:  gosnmp.Integer,
+							Value: 45,
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.2.1",
+							Type:  gosnmp.OctetString,
+							Value: []byte("cpu-temperature"),
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.4.1",
+							Type:  gosnmp.Integer,
+							Value: 1,
+						},
+						// PSU status sensor
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.3.2",
+							Type:  gosnmp.Integer,
+							Value: 1,
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.2.2",
+							Type:  gosnmp.OctetString,
+							Value: []byte("psu1-state"),
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.4.2",
+							Type:  gosnmp.Integer,
+							Value: 6,
+						},
+						// Voltage sensor
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.3.3",
+							Type:  gosnmp.Integer,
+							Value: 240, // 24.0V
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.2.3",
+							Type:  gosnmp.OctetString,
+							Value: []byte("psu-voltage"),
+						},
+						{
+							Name:  "1.3.6.1.4.1.14988.1.1.3.100.1.4.3",
+							Type:  gosnmp.Integer,
+							Value: 3,
+						},
+					}, nil,
+				)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "mikrotik-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:       "mtxrHlSensorValue_temperature",
+							Value:      45,
+							Tags:       map[string]string{"sensor_name": "cpu-temperature"},
+							Unit:       "celsius",
+							Family:     "Health/Temperature",
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+						{
+							Name:   "mtxrHlSensorValue_sensor_status",
+							Value:  1,
+							Tags:   map[string]string{"sensor_name": "psu1-state"},
+							Family: "Health/Status",
+							Mappings: map[int64]string{
+								0: "not_ok",
+								1: "ok",
+							},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+						{
+							Name:       "mtxrHlSensorValue_voltage",
+							Value:      24,
+							Tags:       map[string]string{"sensor_name": "psu-voltage"},
+							Unit:       "volts",
+							Family:     "Health/Power",
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockHandler := snmpmock.NewMockHandler(ctrl)
+			tc.setupMock(mockHandler)
+
+			// Compile transforms for profiles
+			for _, profile := range tc.profiles {
+				if err := ddsnmp.CompileTransforms(profile); err != nil {
+					if tc.expectedError && tc.errorContains != "" && strings.Contains(err.Error(), tc.errorContains) {
+						return // Expected error during compilation
+					}
+					t.Fatalf("Failed to compile transforms: %v", err)
+				}
+			}
+
+			collector := New(mockHandler, tc.profiles, logger.New())
+			collector.DoTableMetrics = true
+			collector.tableCache.setTTL(0, 0) // Disable cache
+
+			result, err := collector.Collect()
+
+			// Clear circular references
 			for _, profile := range result {
 				for i := range profile.Metrics {
 					profile.Metrics[i].Profile = nil
