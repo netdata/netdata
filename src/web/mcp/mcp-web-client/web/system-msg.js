@@ -303,7 +303,7 @@ Your tools are designed to be interactive. When they return errors, or empty
 data, you most likely called them in a wrong way. Change the parameters and retry.
 
 **CRITICAL**:
-Focus on providing data, without blurring the lines between insights.
+Focus on providing EXACT DATA POINTS not summaries!
 If you need to provide multiple insights, it is BEST to use a markdown
 table, or describe them separately and in detail, instead of summarizing
 and aggregating them.
@@ -313,8 +313,8 @@ PAY ATTENTION TO THE TOOL PARAMETERS! THE MOST COMMON MISTAKE IS CALLING
 TOOLS WITHOUT PROPER PARAMETERS, RESULTING IN ERRORS OR INCOMPLETE DATA.
 
 **CRITICAL**:
-Provide SPECIFIC insights that can be correlated with other data that may
-be available. and you are not aware of.
+Provide SPECIFIC DATA POINTS that can be correlated with other data that may
+be available to your user, but not you.
 
 Examples:
 
@@ -324,7 +324,7 @@ Examples:
  BAD: "Found significant anomalies across multiple metrics"
  GOOD: "Found anomalies: 50% on metric1 at 2025-10-01T12:00:00Z, 30% on metric2 at 2025-10-01T12:05:00Z" 
 
-BE PRECISE, CONCISE, COMPLETE AND ACCURATE.
+BE PRECISE, CONCISE, COMPLETE AND ACCURATE. PROVIDE DATA, NOT SUMMARIES.
 
 ${buildDateTimeContext()}
 

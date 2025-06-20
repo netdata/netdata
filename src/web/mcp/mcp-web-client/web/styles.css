@@ -1147,6 +1147,15 @@ body {
     border-left: 3px solid var(--border-color);
 }
 
+/* Blockquotes in user messages */
+:root[data-theme="light"] .message.user .message-content blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5);  /* White border with transparency */
+}
+
+:root[data-theme="dark"] .message.user .message-content blockquote {
+    border-left-color: rgba(30, 30, 30, 0.5);  /* Dark border with transparency */
+}
+
 .message-content table {
     border-collapse: collapse;
     width: 100%;
@@ -1165,6 +1174,35 @@ body {
     font-weight: 600;
 }
 
+/* Special styling for tables in user messages to ensure readability */
+/* Light theme: user bg is #00ab44 (green), make table headers darker green */
+:root[data-theme="light"] .message.user .message-content th {
+    background-color: rgba(0, 140, 60, 0.25);  /* Darker green */
+    color: var(--chat-user-text);  /* White text */
+}
+
+:root[data-theme="light"] .message.user .message-content td {
+    border-color: rgba(255, 255, 255, 0.3);  /* White borders with transparency */
+}
+
+:root[data-theme="light"] .message.user .message-content th {
+    border-color: rgba(255, 255, 255, 0.3);  /* White borders with transparency */
+}
+
+/* Dark theme: user bg is #00d952 (bright green), make table headers darker */
+:root[data-theme="dark"] .message.user .message-content th {
+    background-color: rgba(0, 180, 70, 0.4);  /* Much darker green */
+    color: var(--chat-user-text);  /* Dark text on bright background */
+}
+
+:root[data-theme="dark"] .message.user .message-content td {
+    border-color: rgba(30, 30, 30, 0.3);  /* Dark borders with transparency */
+}
+
+:root[data-theme="dark"] .message.user .message-content th {
+    border-color: rgba(30, 30, 30, 0.3);  /* Dark borders with transparency */
+}
+
 .message-content a {
     color: var(--primary-color);
     text-decoration: none;
@@ -1174,10 +1212,39 @@ body {
     text-decoration: underline;
 }
 
+/* Special styling for links in user messages to ensure readability */
+:root[data-theme="light"] .message.user .message-content a {
+    color: white;  /* White links on green background */
+    text-decoration: underline;  /* Always underlined to show it's a link */
+}
+
+:root[data-theme="light"] .message.user .message-content a:hover {
+    opacity: 0.8;
+}
+
+:root[data-theme="dark"] .message.user .message-content a {
+    color: var(--chat-user-text);  /* Dark text on bright green */
+    text-decoration: underline;
+    font-weight: 500;  /* Slightly bolder to stand out */
+}
+
+:root[data-theme="dark"] .message.user .message-content a:hover {
+    opacity: 0.7;
+}
+
 .message-content hr {
     border: none;
     border-top: 1px solid var(--border-color);
     margin: 1em 0;
+}
+
+/* Horizontal rules in user messages */
+:root[data-theme="light"] .message.user .message-content hr {
+    border-top-color: rgba(255, 255, 255, 0.3);  /* White border with transparency */
+}
+
+:root[data-theme="dark"] .message.user .message-content hr {
+    border-top-color: rgba(30, 30, 30, 0.3);  /* Dark border with transparency */
 }
 
 /* Ensure markdown content doesn't overflow */
@@ -1610,6 +1677,18 @@ body {
 
 .chat-input::placeholder {
     color: var(--text-tertiary);
+}
+
+/* ContentEditable placeholder support */
+.chat-input[contenteditable]:empty:before {
+    content: attr(data-placeholder);
+    color: var(--text-tertiary);
+    pointer-events: none;
+    position: absolute;
+}
+
+.chat-input[contenteditable]:focus:empty:before {
+    opacity: 0.7;
 }
 
 /* Log Panel */

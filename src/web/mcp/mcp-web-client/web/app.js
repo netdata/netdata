@@ -11,7 +11,7 @@ import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js
 class NetdataMCPChat {
     constructor() {
         // Log version on startup
-        console.log('🚀 Netdata MCP Web Client v1.0.62 - Fix Sub-chat Container Race Conditions');
+        console.log('🚀 Netdata MCP Web Client v1.0.65 - Paste HTML as Markdown for Easy Editing');
         
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
@@ -3359,6 +3359,10 @@ class NetdataMCPChat {
                     }
                 }
                 
+                // CRITICAL FIX: Update parent chat token pricing to include all sub-chat costs
+                this.updateChatTokenPricing(chat);
+                this.updateAllTokenDisplays(chat.id);
+                
                 // Add to messages for API
                 const includedResults = toolResults.filter(tr => tr.includeInContext !== false);
                 if (includedResults.length > 0) {
@@ -3680,14 +3684,21 @@ class NetdataMCPChat {
             if (container && container._elements) {
                 const input = container._elements.input;
                 if (input) {
-                    input.disabled = false;
+                    // For contentEditable
+                    input.contentEditable = true;
                     input.focus();
                 }
                 
                 // Update send button state
                 const sendBtn = container._elements.sendBtn;
                 if (sendBtn && input) {
-                    sendBtn.disabled = !input.value.trim();
+                    try {
+                        const content = this.getEditableContent(input).trim();
+                        sendBtn.disabled = !content;
+                    } catch (error) {
+                        console.error('[assistantConcluded] ERROR getting editable content:', error);
+                        sendBtn.disabled = true;
+                    }
                 }
             }
         }
@@ -3744,7 +3755,8 @@ class NetdataMCPChat {
             if (container && container._elements) {
                 const input = container._elements.input;
                 if (input) {
-                    input.disabled = false;
+                    // For contentEditable
+                    input.contentEditable = true;
                     input.focus();
                 }
             }
@@ -5076,11 +5088,12 @@ class NetdataMCPChat {
                 <div class="chat-input-container">
                     <button class="reconnect-mcp-btn btn btn-primary" style="display: none;">Reconnect MCP Server</button>
                     <div class="chat-input-wrapper">
-                        <textarea 
+                        <div 
                             class="chat-input" 
-                            placeholder="Ask about your Netdata metrics..."
-                            rows="3"
-                        ></textarea>
+                            contenteditable="true"
+                            data-placeholder="Ask about your Netdata metrics..."
+                            style="min-height: 4.5em; max-height: 200px; overflow-y: auto; white-space: pre-wrap;"
+                        ></div>
                         <button class="send-message-btn btn btn-send">Send</button>
                     </div>
                 </div>
@@ -5145,7 +5158,12 @@ class NetdataMCPChat {
                 this.shouldStopProcessing = true;
                 this.isProcessing = false;
                 this.updateSendButton();
-                this.chatInput.disabled = false;
+                // CRITICAL: Check if chatInput exists before modifying it
+                if (this.chatInput) {
+                    this.chatInput.contentEditable = true;
+                } else {
+                    console.error('[sendBtn.click] ERROR: this.chatInput is undefined when stopping processing');
+                }
                 // Don't add a system message as it breaks message sequencing
                 // The assistantFailed handler will take care of the UI feedback
             } else {
@@ -5159,11 +5177,12 @@ class NetdataMCPChat {
         
         // Input field
         elements.input.addEventListener('input', (e) => {
-            // Save draft in memory only - don't update UI or save to storage on every keystroke
-            chat.draftMessage = e.target.value;
+            // For contentEditable, get content while preserving formatting
+            const content = this.getEditableContent(e.target);
+            chat.draftMessage = content;
             
             // Update send button state
-            elements.sendBtn.disabled = !e.target.value.trim();
+            elements.sendBtn.disabled = !content.trim();
             
             // Debounce saving to storage - save after 2 seconds of no typing
             if (this.draftSaveTimeout) {
@@ -5173,6 +5192,37 @@ class NetdataMCPChat {
                 this.autoSave(chatId);
                 // Still don't update UI here - just save to storage
             }, 2000);
+        });
+        
+        // Handle paste events to convert HTML to markdown immediately
+        elements.input.addEventListener('paste', (e) => {
+            e.preventDefault(); // Prevent default paste
+            
+            // Get clipboard data
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+            
+            // Try to get HTML content first, fall back to plain text
+            let content = clipboardData.getData('text/html');
+            const hasHtml = content && content.trim() !== '';
+            
+            if (!hasHtml) {
+                // No HTML, just use plain text
+                content = clipboardData.getData('text/plain');
+                if (content) {
+                    // Insert plain text at cursor position
+                    document.execCommand('insertText', false, content);
+                }
+                return;
+            }
+            
+            // Convert HTML to markdown
+            const markdown = this.convertHtmlToMarkdown(content);
+            
+            // Insert markdown as plain text
+            if (markdown) {
+                document.execCommand('insertText', false, markdown);
+            }
         });
         
         // Enter to send
@@ -5433,9 +5483,9 @@ class NetdataMCPChat {
             if (mcpConnection && mcpConnection.isReady()) {
                 // Only enable if connection ready AND chat not busy
                 if (!chat.isProcessing && !chat.spinnerState) {
-                    elements.input.disabled = false;
+                    elements.input.contentEditable = true;
                     elements.sendBtn.disabled = false;
-                    elements.input.placeholder = 'Ask about your Netdata metrics...';
+                    elements.input.setAttribute('data-placeholder', 'Ask about your Netdata metrics...');
                     elements.reconnectBtn.style.display = 'none';
                     
                     // Focus input if this is the active chat
@@ -5444,9 +5494,9 @@ class NetdataMCPChat {
                     }
                 } else {
                     // Chat is busy - keep input disabled but hide reconnect button
-                    elements.input.disabled = true;
+                    elements.input.contentEditable = false;
                     elements.sendBtn.disabled = true;
-                    elements.input.placeholder = 'Processing...';
+                    elements.input.setAttribute('data-placeholder', 'Processing...');
                     elements.reconnectBtn.style.display = 'none';
                 }
                 
@@ -5969,23 +6019,23 @@ class NetdataMCPChat {
                 if (mcpConnection && mcpConnection.isReady()) {
                     // Only enable if connection ready AND chat not busy
                     if (!chat.isProcessing && !chat.spinnerState) {
-                        elements.input.disabled = false;
+                        elements.input.contentEditable = true;
                         elements.sendBtn.disabled = false;
-                        elements.input.placeholder = 'Ask about your Netdata metrics...';
+                        elements.input.setAttribute('data-placeholder', 'Ask about your Netdata metrics...');
                         elements.reconnectBtn.style.display = 'none';
                     } else {
                         // Chat is busy - keep input disabled
-                        elements.input.disabled = true;
+                        elements.input.contentEditable = false;
                         elements.sendBtn.disabled = true;
-                        elements.input.placeholder = 'Processing...';
+                        elements.input.setAttribute('data-placeholder', 'Processing...');
                         elements.reconnectBtn.style.display = 'none';
                     }
                     
                 } else {
                     // Connection exists but not ready yet
-                    elements.input.disabled = true;
+                    elements.input.contentEditable = false;
                     elements.sendBtn.disabled = true;
-                    elements.input.placeholder = 'Connecting to MCP server...';
+                    elements.input.setAttribute('data-placeholder', 'Connecting to MCP server...');
                     elements.reconnectBtn.style.display = 'none';
                     
                     // Check again in a moment
@@ -5997,9 +6047,9 @@ class NetdataMCPChat {
                 }
             } else {
                 // No connection yet - try to establish it
-                elements.input.disabled = true;
+                elements.input.contentEditable = false;
                 elements.sendBtn.disabled = true;
-                elements.input.placeholder = 'Connecting to MCP server...';
+                elements.input.setAttribute('data-placeholder', 'Connecting to MCP server...');
                 elements.reconnectBtn.style.display = 'none';
                 
                 // Try to establish connection
@@ -6014,21 +6064,21 @@ class NetdataMCPChat {
                         // Connection failed
                         console.error('Failed to connect to MCP server:', error);
                         if (this.getActiveChatId() === chatId) {
-                            elements.input.placeholder = 'MCP server connection failed - click Reconnect';
+                            elements.input.setAttribute('data-placeholder', 'MCP server connection failed - click Reconnect');
                             elements.reconnectBtn.style.display = 'block';
                         }
                     });
             }
         } else {
-            elements.input.disabled = true;
+            elements.input.contentEditable = false;
             elements.sendBtn.disabled = true;
             
             if (!server) {
-                elements.input.placeholder = 'MCP server not found';
+                elements.input.setAttribute('data-placeholder', 'MCP server not found');
             } else if (!provider) {
-                elements.input.placeholder = 'LLM provider not found';
+                elements.input.setAttribute('data-placeholder', 'LLM provider not found');
             } else {
-                elements.input.placeholder = 'MCP server or LLM provider not available';
+                elements.input.setAttribute('data-placeholder', 'MCP server or LLM provider not available');
             }
         }
         
@@ -6240,13 +6290,20 @@ class NetdataMCPChat {
                     
                     // Focus the chat input after scrolling
                     const chatInput = container && container._elements && container._elements.input;
-                    if (chatInput && !chatInput.disabled) {
+                    if (chatInput && chatInput.contentEditable === 'true') {
                         chatInput.focus();
                     }
                     
                     // Restore draft message if exists
                     if (chatInput && chat.draftMessage) {
-                        chatInput.value = chat.draftMessage;
+                        // Convert markdown to HTML for contentEditable display
+                        const htmlContent = chat.draftMessage
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/\n/g, '<br>');
+                        chatInput.innerHTML = htmlContent;
+                        
                         // Update send button state
                         const sendBtn = container._elements.sendBtn;
                         if (sendBtn) {
@@ -6812,7 +6869,19 @@ class NetdataMCPChat {
             this.sendMessageBtn.textContent = 'Send';
             this.sendMessageBtn.classList.remove('btn-danger');
             this.sendMessageBtn.classList.add('btn-send');
-            this.sendMessageBtn.disabled = !this.chatInput.value.trim();
+            // CRITICAL: Add error checking for undefined chatInput
+            if (!this.chatInput) {
+                console.error('[updateSendButton] ERROR: this.chatInput is undefined');
+                this.sendMessageBtn.disabled = true;
+            } else {
+                try {
+                    const content = this.getEditableContent(this.chatInput);
+                    this.sendMessageBtn.disabled = !content.trim();
+                } catch (error) {
+                    console.error('[updateSendButton] ERROR getting editable content:', error);
+                    this.sendMessageBtn.disabled = true;
+                }
+            }
         }
     }
     
@@ -6821,8 +6890,22 @@ class NetdataMCPChat {
         // If no message provided, get it from the input
         let message = messageParam;
         if (message === null) {
-            message = this.chatInput.value.trim();
-            if (!message && !isResume) {return;}
+            // CRITICAL: Check if chatInput exists before using it
+            if (!this.chatInput) {
+                console.error('[sendMessage] ERROR: this.chatInput is undefined');
+                this.showError('Chat input not found', chatId);
+                return;
+            }
+            
+            // For contentEditable input, extract formatted content
+            try {
+                message = this.getEditableContent(this.chatInput).trim();
+                if (!message && !isResume) {return;}
+            } catch (error) {
+                console.error('[sendMessage] ERROR extracting message content:', error);
+                this.showError('Failed to get message content', chatId);
+                return;
+            }
         }
         
         const chat = this.chats.get(chatId);
@@ -6866,10 +6949,15 @@ class NetdataMCPChat {
         this.updateChatSessions(); // Update UI to remove draft indicator
         
         // Disable input and update button to Stop
-        if (!isResume) {
-            this.chatInput.value = '';
+        // CRITICAL: Check if chatInput exists before using it
+        if (this.chatInput) {
+            if (!isResume) {
+                this.chatInput.innerHTML = '';
+            }
+            this.chatInput.contentEditable = false;
+        } else {
+            console.error('[sendMessage] ERROR: this.chatInput is undefined after sending message');
         }
-        this.chatInput.disabled = true;
         this.isProcessing = true;
         this.shouldStopProcessing = false;
         this.updateSendButton();
@@ -6913,7 +7001,12 @@ class NetdataMCPChat {
         } catch (error) {
             this.showError(`Failed to connect to MCP server: ${error.message}`, chat.id);
             // Re-enable input so user can try again
-            this.chatInput.disabled = false;
+            // CRITICAL: Check if chatInput exists before using it
+            if (this.chatInput) {
+                this.chatInput.contentEditable = true;
+            } else {
+                console.error('[sendMessage] ERROR: this.chatInput is undefined when re-enabling after MCP error');
+            }
             this.isProcessing = false;
             this.updateSendButton();
             return;
@@ -6985,8 +7078,17 @@ class NetdataMCPChat {
             this.shouldStopProcessing = false;
             
             // Re-enable send button if the input has text
-            if (this.chatInput && this.chatInput.value.trim()) {
-                this.sendBtn.disabled = false;
+            if (this.chatInput) {
+                try {
+                    const content = this.getEditableContent(this.chatInput).trim();
+                    if (content && this.sendBtn) {
+                        this.sendBtn.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('[sendMessage] ERROR checking input content:', error);
+                }
+            } else {
+                console.error('[sendMessage] WARNING: chatInput is undefined when trying to re-enable send button');
             }
         } catch (error) {
             // Check if the user stopped processing
@@ -8141,34 +8243,293 @@ class NetdataMCPChat {
     
     /**
      * Extracts content from a contentEditable div while preserving formatting
-     * Converts HTML back to markdown-like plain text format
+     * Converts HTML to markdown format to preserve visual formatting
      */
     getEditableContent(contentDiv) {
-        // Get the HTML content
-        const htmlContent = contentDiv.innerHTML;
+        // CRITICAL: Add error checking for undefined contentDiv
+        if (!contentDiv) {
+            console.error('[getEditableContent] ERROR: contentDiv is undefined or null');
+            return '';
+        }
         
-        // Convert common HTML back to text with preserved formatting
-        return htmlContent
-            // Replace <br> tags with actual newlines
+        // Get the HTML content
+        let htmlContent = contentDiv.innerHTML || '';
+        
+        // Convert HTML tables to markdown tables before other processing
+        htmlContent = this.convertHtmlTablesToMarkdown(htmlContent);
+        
+        // Convert HTML to markdown-like format to preserve formatting
+        const markdown = htmlContent
+            // Convert headers (h1-h6)
+            .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '\n# $1\n')
+            .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '\n## $1\n')
+            .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '\n### $1\n')
+            .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '\n#### $1\n')
+            .replace(/<h5[^>]*>(.*?)<\/h5>/gi, '\n##### $1\n')
+            .replace(/<h6[^>]*>(.*?)<\/h6>/gi, '\n###### $1\n')
+            
+            // Convert bold and strong
+            .replace(/<(b|strong)[^>]*>(.*?)<\/(b|strong)>/gi, '**$2**')
+            
+            // Convert italic and emphasis
+            .replace(/<(i|em)[^>]*>(.*?)<\/(i|em)>/gi, '*$2*')
+            
+            // Convert underline to emphasis (markdown doesn't have underline)
+            .replace(/<u[^>]*>(.*?)<\/u>/gi, '*$1*')
+            
+            // Convert strikethrough
+            .replace(/<(s|strike|del)[^>]*>(.*?)<\/(s|strike|del)>/gi, '~~$2~~')
+            
+            // Convert code blocks
+            .replace(/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/gi, '\n```\n$1\n```\n')
+            
+            // Convert inline code
+            .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+            
+            // Convert ordered lists
+            .replace(/<ol[^>]*>/gi, '\n')
+            .replace(/<\/ol>/gi, '\n')
+            
+            // Convert unordered lists
+            .replace(/<ul[^>]*>/gi, '\n')
+            .replace(/<\/ul>/gi, '\n')
+            
+            // Convert list items
+            .replace(/<li[^>]*>(.*?)<\/li>/gi, (match, content) => {
+                // Check if it's within an ordered list by looking at context
+                // For now, use bullet points for all lists
+                return '- ' + content.trim() + '\n';
+            })
+            
+            // Convert blockquotes
+            .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '\n> $1\n')
+            
+            // Convert horizontal rules
+            .replace(/<hr[^>]*>/gi, '\n---\n')
+            
+            // Convert line breaks
             .replace(/<br\s*\/?>/gi, '\n')
-            // Replace <div> tags with newlines (contentEditable creates these on Enter)
-            .replace(/<div>/gi, '\n')
-            .replace(/<\/div>/gi, '')
-            // Replace paragraph tags with newlines
-            .replace(/<p>/gi, '')
+            
+            // Convert paragraphs
+            .replace(/<p[^>]*>/gi, '\n')
             .replace(/<\/p>/gi, '\n')
-            // Replace non-breaking spaces with regular spaces
+            
+            // Convert divs (contentEditable creates these)
+            .replace(/<div[^>]*>/gi, '\n')
+            .replace(/<\/div>/gi, '')
+            
+            // Convert links
+            .replace(/<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+            
+            // Replace non-breaking spaces
             .replace(/&nbsp;/gi, ' ')
-            // Remove any other HTML tags (preserving the text content)
+            
+            // Remove any remaining HTML tags
             .replace(/<[^>]*>/g, '')
+            
             // Decode HTML entities
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&amp;/g, '&')
-            // Clean up multiple newlines
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&apos;/g, "'")
+            .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+            .replace(/&#x([a-f0-9]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+            
+            // Clean up excessive whitespace
             .replace(/\n\s*\n\s*\n/g, '\n\n')
-            // Trim trailing whitespace from each line
-            .replace(/[ \t]+$/gm, '');
+            .replace(/[ \t]+$/gm, '')
+            .trim();
+        
+        return markdown;
+    }
+    
+    /**
+     * Converts HTML tables to markdown tables
+     */
+    convertHtmlTablesToMarkdown(html) {
+        // Find all tables and convert them
+        return html.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (match, tableContent) => {
+            try {
+                // Parse the table content
+                const rows = [];
+                const tableRows = tableContent.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+                
+                tableRows.forEach((tr, rowIndex) => {
+                    const cells = [];
+                    // Match both th and td tags
+                    const cellMatches = tr.match(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gi) || [];
+                    
+                    cellMatches.forEach(cell => {
+                        // Extract cell content
+                        const cellContent = cell
+                            .replace(/<(th|td)[^>]*>/gi, '')
+                            .replace(/<\/(th|td)>/gi, '')
+                            .replace(/<br\s*\/?>/gi, ' ')
+                            .replace(/<[^>]*>/g, '')
+                            .replace(/&nbsp;/gi, ' ')
+                            .trim();
+                        cells.push(cellContent);
+                    });
+                    
+                    if (cells.length > 0) {
+                        rows.push(cells);
+                    }
+                });
+                
+                if (rows.length === 0) {
+                    return '';
+                }
+                
+                // Build markdown table
+                let markdownTable = '\n\n';
+                
+                // Add header row
+                markdownTable += '| ' + rows[0].join(' | ') + ' |\n';
+                
+                // Add separator row
+                markdownTable += '|' + rows[0].map(() => ' --- ').join('|') + '|\n';
+                
+                // Add data rows
+                for (let i = 1; i < rows.length; i++) {
+                    // Ensure the row has the same number of columns as the header
+                    while (rows[i].length < rows[0].length) {
+                        rows[i].push('');
+                    }
+                    markdownTable += '| ' + rows[i].join(' | ') + ' |\n';
+                }
+                
+                markdownTable += '\n';
+                
+                return markdownTable;
+            } catch (error) {
+                console.error('[convertHtmlTablesToMarkdown] Error converting table:', error);
+                // Return the original table HTML if conversion fails
+                return match;
+            }
+        });
+    }
+    
+    /**
+     * Comprehensive HTML to Markdown converter
+     * Handles full HTML documents from clipboard
+     */
+    convertHtmlToMarkdown(html) {
+        // Remove any style tags and their content
+        html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        
+        // Remove any script tags and their content
+        html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        
+        // Remove HTML comments
+        html = html.replace(/<!--[\s\S]*?-->/g, '');
+        
+        // Extract body content if it's a full HTML document
+        const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        if (bodyMatch) {
+            html = bodyMatch[1];
+        }
+        
+        // Convert tables first (before other processing)
+        html = this.convertHtmlTablesToMarkdown(html);
+        
+        // Process nested elements properly by converting from innermost to outermost
+        // Convert links with proper text extraction
+        html = html.replace(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, text) => {
+            // Clean up the link text
+            const cleanText = text.replace(/<[^>]*>/g, '').trim();
+            return `[${cleanText}](${url})`;
+        });
+        
+        // Convert images
+        html = html.replace(/<img[^>]+src=["']([^"']+)["'](?:[^>]+alt=["']([^"']+)["'])?[^>]*>/gi, (match, src, alt) => {
+            return alt ? `![${alt}](${src})` : `![](${src})`;
+        });
+        
+        // Convert headers
+        html = html.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n');
+        html = html.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n');
+        html = html.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n');
+        html = html.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n#### $1\n');
+        html = html.replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, '\n##### $1\n');
+        html = html.replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, '\n###### $1\n');
+        
+        // Convert lists - handle nested lists
+        // Process lists from innermost to outermost
+        let previousHtml;
+        do {
+            previousHtml = html;
+            
+            // Convert unordered lists
+            html = html.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
+                const items = content.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+                const converted = items.map(item => {
+                    const itemContent = item.replace(/<li[^>]*>/i, '').replace(/<\/li>/i, '').trim();
+                    return '- ' + itemContent;
+                }).join('\n');
+                return '\n' + converted + '\n';
+            });
+            
+            // Convert ordered lists  
+            html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
+                const items = content.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+                const converted = items.map((item, index) => {
+                    const itemContent = item.replace(/<li[^>]*>/i, '').replace(/<\/li>/i, '').trim();
+                    return `${index + 1}. ${itemContent}`;
+                }).join('\n');
+                return '\n' + converted + '\n';
+            });
+        } while (html !== previousHtml);
+        
+        // Convert code blocks
+        html = html.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '\n```\n$1\n```\n');
+        html = html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '\n```\n$1\n```\n');
+        
+        // Convert inline code
+        html = html.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
+        
+        // Convert formatting
+        html = html.replace(/<(b|strong)[^>]*>([\s\S]*?)<\/(b|strong)>/gi, '**$2**');
+        html = html.replace(/<(i|em)[^>]*>([\s\S]*?)<\/(i|em)>/gi, '*$2*');
+        html = html.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '*$1*');
+        html = html.replace(/<(s|strike|del)[^>]*>([\s\S]*?)<\/(s|strike|del)>/gi, '~~$2~~');
+        
+        // Convert blockquotes
+        html = html.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '\n> $1\n');
+        
+        // Convert horizontal rules
+        html = html.replace(/<hr[^>]*>/gi, '\n---\n');
+        
+        // Convert line breaks
+        html = html.replace(/<br\s*\/?>/gi, '\n');
+        
+        // Convert paragraphs
+        html = html.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '\n$1\n');
+        
+        // Convert divs
+        html = html.replace(/<div[^>]*>([\s\S]*?)<\/div>/gi, '\n$1\n');
+        
+        // Remove any remaining HTML tags
+        html = html.replace(/<[^>]*>/g, '');
+        
+        // Decode HTML entities
+        html = html.replace(/&nbsp;/gi, ' ');
+        html = html.replace(/&lt;/g, '<');
+        html = html.replace(/&gt;/g, '>');
+        html = html.replace(/&amp;/g, '&');
+        html = html.replace(/&quot;/g, '"');
+        html = html.replace(/&#39;/g, "'");
+        html = html.replace(/&apos;/g, "'");
+        html = html.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+        html = html.replace(/&#x([a-f0-9]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+        
+        // Clean up excessive whitespace
+        html = html.replace(/\n\s*\n\s*\n/g, '\n\n');
+        html = html.replace(/[ \t]+$/gm, '');
+        html = html.trim();
+        
+        return html;
     }
 
     editUserMessage(contentDiv, originalContent, chatId) {
@@ -8296,8 +8657,21 @@ class NetdataMCPChat {
             this.loadChat(chatId, true);
             
             // Send the new message
-            this.chatInput.value = newContent;
-            await this.sendMessage(chatId);
+            // CRITICAL: Check if chatInput exists before using it
+            if (this.chatInput) {
+                // Convert markdown to HTML for contentEditable
+                const htmlContent = newContent
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>');
+                this.chatInput.innerHTML = htmlContent;
+                await this.sendMessage(chatId);
+            } else {
+                console.error('[editUserMessage.save] ERROR: this.chatInput is undefined');
+                // Fall back to sending message directly with the new content
+                await this.sendMessage(chatId, newContent);
+            }
         };
         
         buttonsDiv.querySelector('.btn-primary').onclick = save;
