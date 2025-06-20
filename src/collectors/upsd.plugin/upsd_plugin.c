@@ -631,9 +631,8 @@ int main(int argc, char *argv[]) {
                 continue;
 
             // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
-            printf("CHART 'upsd_%s.%s' '%s' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
+            printf("CHART 'upsd_%s.%s' '' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '' '" PLUGIN_UPSD_NAME "'\n",
                    clean_name(buf, sizeof(buf), ups_name), chart->chart_id, // type.id
-                   "",                    // name
                    chart->chart_title,    // title
                    chart->chart_units,    // units
                    chart->chart_family,   // family
