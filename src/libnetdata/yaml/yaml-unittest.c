@@ -15,7 +15,7 @@ static int test_yaml_parse_null(void) {
     
     for (int i = 0; yaml_inputs[i]; i++) {
         BUFFER *error = buffer_create(0, NULL);
-        struct json_object *json = yaml_parse_string(yaml_inputs[i], error);
+        struct json_object *json = yaml_parse_string(yaml_inputs[i], error, YAML2JSON_DEFAULT);
         
         if (json != NULL) {
             fprintf(stderr, "FAILED: test_yaml_parse_null case %d: expected NULL, got %p\n", 
@@ -52,7 +52,7 @@ static int test_yaml_parse_boolean(void) {
     
     for (int i = 0; test_cases[i].yaml; i++) {
         BUFFER *error = buffer_create(0, NULL);
-        struct json_object *json = yaml_parse_string(test_cases[i].yaml, error);
+        struct json_object *json = yaml_parse_string(test_cases[i].yaml, error, YAML2JSON_DEFAULT);
         
         if (!json || !json_object_is_type(json, json_type_boolean)) {
             fprintf(stderr, "FAILED: test_yaml_parse_boolean case %d: expected boolean for '%s'\n", 
@@ -92,7 +92,7 @@ static int test_yaml_parse_numbers(void) {
     
     for (int i = 0; test_cases[i].yaml; i++) {
         BUFFER *error = buffer_create(0, NULL);
-        struct json_object *json = yaml_parse_string(test_cases[i].yaml, error);
+        struct json_object *json = yaml_parse_string(test_cases[i].yaml, error, YAML2JSON_DEFAULT);
         
         if (!json || !json_object_is_type(json, test_cases[i].expected_type)) {
             fprintf(stderr, "FAILED: test_yaml_parse_numbers case %d: wrong type for '%s'\n", 
@@ -143,7 +143,7 @@ static int test_yaml_parse_strings(void) {
     
     for (int i = 0; test_cases[i].yaml; i++) {
         BUFFER *error = buffer_create(0, NULL);
-        struct json_object *json = yaml_parse_string(test_cases[i].yaml, error);
+        struct json_object *json = yaml_parse_string(test_cases[i].yaml, error, YAML2JSON_DEFAULT);
         
         if (!json || !json_object_is_type(json, json_type_string)) {
             fprintf(stderr, "FAILED: test_yaml_parse_strings case %d: expected string for '%s'\n", 
@@ -169,7 +169,7 @@ static int test_yaml_parse_arrays(void) {
     const char *yaml = "- 1\n- 2\n- three\n- true\n- null\n- 4.5";
     
     BUFFER *error = buffer_create(0, NULL);
-    struct json_object *json = yaml_parse_string(yaml, error);
+    struct json_object *json = yaml_parse_string(yaml, error, YAML2JSON_DEFAULT);
     
     if (!json) {
         fprintf(stderr, "FAILED: test_yaml_parse_arrays: json is NULL, error: %s\n", buffer_tostring(error));
@@ -241,7 +241,7 @@ static int test_yaml_parse_objects(void) {
         "  - team-lead\n";
     
     BUFFER *error = buffer_create(0, NULL);
-    struct json_object *json = yaml_parse_string(yaml, error);
+    struct json_object *json = yaml_parse_string(yaml, error, YAML2JSON_DEFAULT);
     
     if (!json || !json_object_is_type(json, json_type_object)) {
         fprintf(stderr, "FAILED: test_yaml_parse_objects: expected object\n");
@@ -344,7 +344,7 @@ static int test_yaml_generation(void) {
     
     // Parse the generated YAML back  
     buffer_flush(error);
-    struct json_object *parsed = yaml_parse_string(yaml_str, error);
+    struct json_object *parsed = yaml_parse_string(yaml_str, error, YAML2JSON_DEFAULT);
     if (!parsed) {
         const char *err_msg = buffer_tostring(error);
         if (!err_msg || strlen(err_msg) == 0) {
@@ -433,7 +433,7 @@ static int test_yaml_parse_errors(void) {
     
     for (int i = 0; invalid_yaml[i]; i++) {
         BUFFER *error = buffer_create(0, NULL);
-        struct json_object *json = yaml_parse_string(invalid_yaml[i], error);
+        struct json_object *json = yaml_parse_string(invalid_yaml[i], error, YAML2JSON_DEFAULT);
         
         if (json != NULL || buffer_strlen(error) == 0) {
             fprintf(stderr, "FAILED: test_yaml_parse_errors case %d: expected parse error\n", i);
@@ -468,7 +468,7 @@ static int test_yaml_file_operations(void) {
     }
     
     // Read from file
-    struct json_object *parsed = yaml_parse_filename(test_file, error);
+    struct json_object *parsed = yaml_parse_filename(test_file, error, YAML2JSON_DEFAULT);
     if (!parsed) {
         fprintf(stderr, "FAILED: test_yaml_file_operations: failed to read file: %s\n", 
                 buffer_tostring(error));
@@ -507,7 +507,7 @@ static int test_yaml_edge_cases(void) {
     BUFFER *error = buffer_create(0, NULL);
     
     // Empty string
-    struct json_object *json = yaml_parse_string("", error);
+    struct json_object *json = yaml_parse_string("", error, YAML2JSON_DEFAULT);
     if (json != NULL) {
         fprintf(stderr, "FAILED: test_yaml_edge_cases: empty string should return NULL\n");
         failed++;
@@ -516,7 +516,7 @@ static int test_yaml_edge_cases(void) {
     
     // NULL input
     buffer_flush(error);
-    json = yaml_parse_string(NULL, error);
+    json = yaml_parse_string(NULL, error, YAML2JSON_DEFAULT);
     if (json != NULL || buffer_strlen(error) == 0) {
         fprintf(stderr, "FAILED: test_yaml_edge_cases: NULL input should fail\n");
         failed++;
@@ -525,7 +525,7 @@ static int test_yaml_edge_cases(void) {
     
     // Empty object
     buffer_flush(error);
-    json = yaml_parse_string("{}", error);
+    json = yaml_parse_string("{}", error, YAML2JSON_DEFAULT);
     if (!json || !json_object_is_type(json, json_type_object) || 
         json_object_object_length(json) != 0) {
         fprintf(stderr, "FAILED: test_yaml_edge_cases: empty object parse failed\n");
@@ -535,7 +535,7 @@ static int test_yaml_edge_cases(void) {
     
     // Empty array
     buffer_flush(error);
-    json = yaml_parse_string("[]", error);
+    json = yaml_parse_string("[]", error, YAML2JSON_DEFAULT);
     if (!json || !json_object_is_type(json, json_type_array) || 
         json_object_array_length(json) != 0) {
         fprintf(stderr, "FAILED: test_yaml_edge_cases: empty array parse failed\n");
@@ -576,7 +576,7 @@ static int test_yaml_special_strings(void) {
     }
     
     // Parse back
-    struct json_object *parsed = yaml_parse_string(buffer_tostring(output), error);
+    struct json_object *parsed = yaml_parse_string(buffer_tostring(output), error, YAML2JSON_DEFAULT);
     if (!parsed) {
         fprintf(stderr, "FAILED: test_yaml_special_strings: failed to parse YAML: %s\n", 
                 buffer_tostring(error));

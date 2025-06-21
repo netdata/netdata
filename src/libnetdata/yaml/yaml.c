@@ -19,9 +19,9 @@
 
 #include "yaml.h"
 
-static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error);
+static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags);
 
-static struct json_object *yaml_sequence_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error) {
+static struct json_object *yaml_sequence_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     struct json_object *array = json_object_new_array();
     if (!array) {
         buffer_strcat(error, "Failed to create JSON array");
@@ -37,7 +37,7 @@ static struct json_object *yaml_sequence_to_json(yaml_document_t *document, yaml
             return NULL;
         }
 
-        struct json_object *child_obj = yaml_node_to_json(document, child, error);
+        struct json_object *child_obj = yaml_node_to_json(document, child, error, flags);
         
         // Check for error (error buffer not empty)
         if (buffer_strlen(error) > 0) {
@@ -58,7 +58,7 @@ static struct json_object *yaml_sequence_to_json(yaml_document_t *document, yaml
     return array;
 }
 
-static struct json_object *yaml_mapping_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error) {
+static struct json_object *yaml_mapping_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     struct json_object *object = json_object_new_object();
     if (!object) {
         buffer_strcat(error, "Failed to create JSON object");
@@ -83,7 +83,7 @@ static struct json_object *yaml_mapping_to_json(yaml_document_t *document, yaml_
         }
 
         const char *key = (const char *)key_node->data.scalar.value;
-        struct json_object *value_obj = yaml_node_to_json(document, value_node, error);
+        struct json_object *value_obj = yaml_node_to_json(document, value_node, error, flags);
         
         // Check for error (error buffer not empty)
         if (buffer_strlen(error) > 0) {
@@ -139,9 +139,14 @@ static bool parse_number_with_underscores(const char *str, size_t len, long long
     return false;
 }
 
-static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error) {
+static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     const char *value = (const char *)node->data.scalar.value;
     size_t length = node->data.scalar.length;
+
+    // If YAML2JSON_ALL_VALUES_AS_STRINGS flag is set, always return as string
+    if (flags & YAML2JSON_ALL_VALUES_AS_STRINGS) {
+        return json_object_new_string_len(value, (int)length);
+    }
 
     // Check if this is a quoted or plain scalar
     bool is_quoted = (node->data.scalar.style == YAML_SINGLE_QUOTED_SCALAR_STYLE ||
@@ -295,7 +300,7 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error)
     return json_object_new_string_len(value, (int)length);
 }
 
-static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error) {
+static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     if (!node) {
         buffer_strcat(error, "NULL node");
         return NULL;
@@ -303,13 +308,13 @@ static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_nod
 
     switch (node->type) {
         case YAML_SCALAR_NODE:
-            return yaml_scalar_to_json(node, error);
+            return yaml_scalar_to_json(node, error, flags);
 
         case YAML_SEQUENCE_NODE:
-            return yaml_sequence_to_json(document, node, error);
+            return yaml_sequence_to_json(document, node, error, flags);
 
         case YAML_MAPPING_NODE:
-            return yaml_mapping_to_json(document, node, error);
+            return yaml_mapping_to_json(document, node, error, flags);
 
         default:
             buffer_sprintf(error, "Unsupported YAML node type: %d", node->type);
@@ -324,10 +329,20 @@ struct json_object *yaml_document_to_json(yaml_document_t *document, BUFFER *err
         return NULL;
     }
 
-    return yaml_node_to_json(document, root, error);
+    return yaml_node_to_json(document, root, error, YAML2JSON_DEFAULT);
 }
 
-static struct json_object *yaml_parse_common(yaml_parser_t *parser, BUFFER *error) {
+static struct json_object *yaml_document_to_json_with_flags(yaml_document_t *document, BUFFER *error, YAML2JSON_FLAGS flags) {
+    yaml_node_t *root = yaml_document_get_root_node(document);
+    if (!root) {
+        // Empty document - this is valid YAML but we return NULL
+        return NULL;
+    }
+
+    return yaml_node_to_json(document, root, error, flags);
+}
+
+static struct json_object *yaml_parse_common(yaml_parser_t *parser, BUFFER *error, YAML2JSON_FLAGS flags) {
     yaml_document_t document;
     struct json_object *result = NULL;
 
@@ -344,7 +359,7 @@ static struct json_object *yaml_parse_common(yaml_parser_t *parser, BUFFER *erro
     }
     
 
-    result = yaml_document_to_json(&document, error);
+    result = yaml_document_to_json_with_flags(&document, error, flags);
     yaml_document_delete(&document);
 
 cleanup:
@@ -352,7 +367,7 @@ cleanup:
     return result;
 }
 
-struct json_object *yaml_parse_string(const char *yaml_string, BUFFER *error) {
+struct json_object *yaml_parse_string(const char *yaml_string, BUFFER *error, YAML2JSON_FLAGS flags) {
     if (!yaml_string) {
         buffer_strcat(error, "NULL YAML string");
         return NULL;
@@ -365,10 +380,10 @@ struct json_object *yaml_parse_string(const char *yaml_string, BUFFER *error) {
     }
 
     yaml_parser_set_input_string(&parser, (const unsigned char *)yaml_string, strlen(yaml_string));
-    return yaml_parse_common(&parser, error);
+    return yaml_parse_common(&parser, error, flags);
 }
 
-struct json_object *yaml_parse_filename(const char *filename, BUFFER *error) {
+struct json_object *yaml_parse_filename(const char *filename, BUFFER *error, YAML2JSON_FLAGS flags) {
     if (!filename) {
         buffer_strcat(error, "NULL filename");
         return NULL;
@@ -388,12 +403,12 @@ struct json_object *yaml_parse_filename(const char *filename, BUFFER *error) {
     }
 
     yaml_parser_set_input_file(&parser, file);
-    struct json_object *result = yaml_parse_common(&parser, error);
+    struct json_object *result = yaml_parse_common(&parser, error, flags);
     fclose(file);
     return result;
 }
 
-struct json_object *yaml_parse_fd(int fd, BUFFER *error) {
+struct json_object *yaml_parse_fd(int fd, BUFFER *error, YAML2JSON_FLAGS flags) {
     if (fd < 0) {
         buffer_strcat(error, "Invalid file descriptor");
         return NULL;
@@ -413,7 +428,7 @@ struct json_object *yaml_parse_fd(int fd, BUFFER *error) {
     }
 
     yaml_parser_set_input_file(&parser, file);
-    struct json_object *result = yaml_parse_common(&parser, error);
+    struct json_object *result = yaml_parse_common(&parser, error, flags);
     fclose(file);
     return result;
 }

@@ -39,10 +39,16 @@ done
 
 TEST_DIR="tests.d"
 RESULTS_DIR="/tmp/log2journal_test_results"
+
 # Use installed log2journal by default, allow override via environment variable
+if [ -z "${TESTED_LOG2JOURNAL_BIN}"  -a ! -z "${LOG2JOURNAL}" ]; then
+    export TESTED_LOG2JOURNAL_BIN="${LOG2JOURNAL}"
+fi
 if [ -z "$TESTED_LOG2JOURNAL_BIN" ]; then
     export TESTED_LOG2JOURNAL_BIN="log2journal"
 fi
+
+echo "log2journal cmd: ${TESTED_LOG2JOURNAL_BIN}"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -128,9 +134,12 @@ run_test() {
         if [ -f "$expected_output" ]; then
             local actual_output="$RESULTS_DIR/${test_name}.out"
             
-            eval "$cmd $input_args" > "$actual_output" 2> "$RESULTS_DIR/${test_name}.err" || true
-            
-            # For help/error output tests, ignore version lines to avoid build-dependent failures
+            if ! eval "$cmd $input_args" > "$actual_output" 2> "$RESULTS_DIR/${test_name}.err"; then
+                test_passed=false
+                error_msg="Command failed with non-zero exit code - see $RESULTS_DIR/${test_name}.err"
+            else
+                # Only check output if command succeeded
+                # For help/error output tests, ignore version lines to avoid build-dependent failures
             if [[ "$test_name" =~ ^error- ]] && grep -q "^Netdata log2journal v" "$expected_output"; then
                 # Version-agnostic comparison for error tests
                 grep -v "^Netdata log2journal v" "$expected_output" > "$RESULTS_DIR/${test_name}.expected_no_version"
@@ -159,6 +168,7 @@ run_test() {
                         error_msg="Output mismatch - see $RESULTS_DIR/${test_name}.diff"
                     fi
                 fi
+            fi
             fi
         fi
         
