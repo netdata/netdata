@@ -265,7 +265,7 @@ func (tc *tableCollector) processTableData(
 	staticTags := parseStaticTags(cfg.StaticTags)
 
 	// Process each row
-	crossTableCtx := &CrossTableContext{
+	crossTableCtx := &crossTableContext{
 		walkedData:     walkedData,
 		tableNameToOID: tableNameToOID,
 	}
@@ -326,7 +326,7 @@ func (tc *tableCollector) processRows(
 	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
 	tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig,
 	staticTags map[string]string,
-	crossTableCtx *CrossTableContext,
+	crossTableCtx *crossTableContext,
 	tagCache map[string]map[string]string,
 ) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric

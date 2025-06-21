@@ -3,8 +3,6 @@
 package ddsnmpcollector
 
 import (
-	"fmt"
-
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -20,12 +18,12 @@ func newGlobalTagProcessor() *globalTagProcessor {
 	}
 }
 
-func (gtp *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU) (map[string]string, error) {
+func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU) (map[string]string, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		return nil, nil
 	}
-	return gtp.tp.processTag(cfg, pdu)
+	return p.tp.processTag(cfg, pdu)
 }
 
 // tagProcessorFactory selects the appropriate processor
@@ -47,7 +45,7 @@ func newTableTagProcessor() *tableTagProcessor {
 	}
 }
 
-func (tp *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU) (map[string]string, error) {
+func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU) (map[string]string, error) {
 	tagName := ternary(cfg.Tag != "", cfg.Tag, cfg.Symbol.Name)
 	if tagName == "" {
 		return nil, nil
@@ -60,15 +58,15 @@ func (tp *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig,
 
 	switch {
 	case len(cfg.Mapping) > 0:
-		return tp.mappingProcessor.processTag(tagName, val, cfg)
+		return p.mappingProcessor.processTag(tagName, val, cfg)
 	case cfg.Pattern != nil:
-		return tp.patternProcessor.processTag(val, cfg)
+		return p.patternProcessor.processTag(val, cfg)
 	case cfg.Symbol.ExtractValueCompiled != nil:
-		return tp.extractProcessor.processTag(tagName, val, cfg)
+		return p.extractProcessor.processTag(tagName, val, cfg)
 	case cfg.Symbol.MatchPatternCompiled != nil:
-		return tp.matchProcessor.processTag(tagName, val, cfg)
+		return p.matchProcessor.processTag(tagName, val, cfg)
 	default:
-		return tp.defaultProcessor.processTag(tagName, val)
+		return p.defaultProcessor.processTag(tagName, val)
 	}
 }
 
@@ -132,20 +130,4 @@ type defaultTagProcessor struct{}
 
 func (p *defaultTagProcessor) processTag(tagName, value string) (map[string]string, error) {
 	return map[string]string{tagName: value}, nil
-}
-
-// processIndexTag processes index-based tags
-func processIndexTag(cfg ddprofiledefinition.MetricTagConfig, index string) (string, string, bool) {
-	indexValue, ok := getIndexPosition(index, cfg.Index)
-	if !ok {
-		return "", "", false
-	}
-
-	tagName := ternary(cfg.Tag != "", cfg.Tag, fmt.Sprintf("index%d", cfg.Index))
-
-	if v, ok := cfg.Mapping[indexValue]; ok {
-		indexValue = v
-	}
-
-	return tagName, indexValue, true
 }

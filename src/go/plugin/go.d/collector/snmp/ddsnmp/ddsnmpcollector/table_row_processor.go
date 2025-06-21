@@ -15,8 +15,7 @@ import (
 type (
 	tableRowProcessor struct {
 		log                *logger.Logger
-		crossTableResolver *CrossTableResolver
-		indexTransformer   *IndexTransformer
+		crossTableResolver *crossTableResolver
 		valProc            *valueProcessor
 		tagProc            *tableTagProcessor
 	}
@@ -32,7 +31,7 @@ type (
 		Config        ddprofiledefinition.MetricsConfig
 		ColumnOIDs    map[string]ddprofiledefinition.SymbolConfig
 		TagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig
-		CrossTableCtx *CrossTableContext
+		CrossTableCtx *crossTableContext
 	}
 )
 
@@ -40,10 +39,9 @@ type (
 func newTableRowProcessor(log *logger.Logger) *tableRowProcessor {
 	return &tableRowProcessor{
 		log:                log,
-		crossTableResolver: NewCrossTableResolver(log),
-		indexTransformer:   NewIndexTransformer(),
 		valProc:            newValueProcessor(),
 		tagProc:            newTableTagProcessor(),
+		crossTableResolver: newCrossTableResolver(log),
 	}
 }
 
@@ -94,11 +92,11 @@ func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOID
 // processCrossTableTags processes tags from other tables
 func (p *tableRowProcessor) processCrossTableTags(row *tableRowData, ctx *tableRowProcessingContext) {
 	for _, tagCfg := range ctx.Config.MetricTags {
-		if !p.crossTableResolver.IsApplicable(tagCfg, ctx.Config.Table.Name) {
+		if !p.crossTableResolver.isApplicable(tagCfg, ctx.Config.Table.Name) {
 			continue
 		}
 
-		tags, err := p.crossTableResolver.ResolveCrossTableTag(tagCfg, row.Index, ctx.CrossTableCtx)
+		tags, err := p.crossTableResolver.resolveCrossTableTag(tagCfg, row.Index, ctx.CrossTableCtx)
 		if err != nil {
 			p.log.Debugf("Error resolving cross-table tag %s: %v", tagCfg.Tag, err)
 			continue
@@ -115,7 +113,7 @@ func (p *tableRowProcessor) processIndexBasedTags(row *tableRowData, metricTags 
 			continue
 		}
 
-		tagName, indexValue, ok := processIndexTag(tagCfg, row.Index)
+		tagName, indexValue, ok := p.processIndexTag(tagCfg, row.Index)
 		if !ok {
 			p.log.Debugf("Cannot extract position %d from index %s", tagCfg.Index, row.Index)
 			continue
@@ -123,6 +121,45 @@ func (p *tableRowProcessor) processIndexBasedTags(row *tableRowData, metricTags 
 
 		row.Tags[tagName] = indexValue
 	}
+}
+
+func (p *tableRowProcessor) processIndexTag(cfg ddprofiledefinition.MetricTagConfig, index string) (string, string, bool) {
+	indexValue, ok := p.extractIndexPosition(index, cfg.Index)
+	if !ok {
+		return "", "", false
+	}
+
+	tagName := ternary(cfg.Tag != "", cfg.Tag, fmt.Sprintf("index%d", cfg.Index))
+
+	if v, ok := cfg.Mapping[indexValue]; ok {
+		indexValue = v
+	}
+
+	return tagName, indexValue, true
+}
+
+// extractPosition extracts a specific position from an index
+// Position uses 1-based indexing as per the profile format
+// Example: index "7.8.9", position 2 → "8"
+func (p *tableRowProcessor) extractIndexPosition(index string, position uint) (string, bool) {
+	if position == 0 {
+		return "", false
+	}
+
+	var n uint
+	for {
+		n++
+		i := strings.IndexByte(index, '.')
+		if i == -1 {
+			break
+		}
+		if n == position {
+			return index[:i], true
+		}
+		index = index[i+1:]
+	}
+
+	return index, n == position && index != ""
 }
 
 // processRowMetrics processes metrics for a row
@@ -159,65 +196,54 @@ func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, p
 	return buildTableMetric(sym, pdu, value, row.Tags, row.StaticTags)
 }
 
-// CrossTableResolver handles resolving tags from other tables
+// crossTableResolver handles resolving tags from other tables
 type (
-	CrossTableResolver struct {
-		log              *logger.Logger
-		indexTransformer *IndexTransformer
-		tagProcessor     *tableTagProcessor
+	crossTableResolver struct {
+		log          *logger.Logger
+		tagProcessor *tableTagProcessor
 	}
-	// CrossTableContext contains all data needed for cross-table resolution
-	CrossTableContext struct {
+	// crossTableContext contains all data needed for cross-table resolution
+	crossTableContext struct {
 		walkedData     map[string]map[string]gosnmp.SnmpPDU // tableOID -> PDUs
 		tableNameToOID map[string]string                    // tableName -> tableOID
 	}
 )
 
-// NewCrossTableResolver creates a new cross-table resolver
-func NewCrossTableResolver(log *logger.Logger) *CrossTableResolver {
-	return &CrossTableResolver{
-		log:              log,
-		indexTransformer: NewIndexTransformer(),
-		tagProcessor:     newTableTagProcessor(),
+// newCrossTableResolver creates a new cross-table resolver
+func newCrossTableResolver(log *logger.Logger) *crossTableResolver {
+	return &crossTableResolver{
+		log:          log,
+		tagProcessor: newTableTagProcessor(),
 	}
 }
 
-// ResolveCrossTableTag resolves a tag value from another table
-func (r *CrossTableResolver) ResolveCrossTableTag(
-	tagCfg ddprofiledefinition.MetricTagConfig,
-	index string,
-	ctx *CrossTableContext,
-) (map[string]string, error) {
-	// Find the referenced table's OID
+// resolveCrossTableTag resolves a tag value from another table
+func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext) (map[string]string, error) {
 	refTableOID, err := r.findReferencedTableOID(tagCfg.Table, ctx.tableNameToOID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the walked data for the referenced table
 	refTablePDUs, err := r.getReferencedTableData(tagCfg.Table, refTableOID, ctx.walkedData)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply index transformation if needed
 	lookupIndex, err := r.transformIndex(index, tagCfg.IndexTransform)
 	if err != nil {
 		return nil, err
 	}
 
-	// Look up the value from the referenced table
 	pdu, err := r.lookupValue(tagCfg, lookupIndex, refTablePDUs)
 	if err != nil {
 		return nil, err
 	}
 
-	// Process the tag value
 	return r.tagProcessor.processTag(tagCfg, pdu)
 }
 
 // findReferencedTableOID finds the OID for a referenced table
-func (r *CrossTableResolver) findReferencedTableOID(tableName string, tableNameToOID map[string]string) (string, error) {
+func (r *crossTableResolver) findReferencedTableOID(tableName string, tableNameToOID map[string]string) (string, error) {
 	tableOID, ok := tableNameToOID[tableName]
 	if !ok {
 		r.log.Debugf("Cannot find table OID for referenced table %s", tableName)
@@ -227,11 +253,7 @@ func (r *CrossTableResolver) findReferencedTableOID(tableName string, tableNameT
 }
 
 // getReferencedTableData gets the walked data for a referenced table
-func (r *CrossTableResolver) getReferencedTableData(
-	tableName string,
-	tableOID string,
-	walkedData map[string]map[string]gosnmp.SnmpPDU,
-) (map[string]gosnmp.SnmpPDU, error) {
+func (r *crossTableResolver) getReferencedTableData(tableName string, tableOID string, walkedData map[string]map[string]gosnmp.SnmpPDU) (map[string]gosnmp.SnmpPDU, error) {
 	pdus, ok := walkedData[tableOID]
 	if !ok {
 		r.log.Debugf("No walked data for referenced table %s (OID: %s)", tableName, tableOID)
@@ -241,12 +263,12 @@ func (r *CrossTableResolver) getReferencedTableData(
 }
 
 // transformIndex applies index transformation if configured
-func (r *CrossTableResolver) transformIndex(index string, transforms []ddprofiledefinition.MetricIndexTransform) (string, error) {
+func (r *crossTableResolver) transformIndex(index string, transforms []ddprofiledefinition.MetricIndexTransform) (string, error) {
 	if len(transforms) == 0 {
 		return index, nil
 	}
 
-	transformedIndex := r.indexTransformer.ApplyTransform(index, transforms)
+	transformedIndex := r.applyIndexTransform(index, transforms)
 	if transformedIndex == "" {
 		r.log.Debugf("Index transformation failed for index %s with transforms %v", index, transforms)
 		return "", fmt.Errorf("index transformation failed")
@@ -256,11 +278,7 @@ func (r *CrossTableResolver) transformIndex(index string, transforms []ddprofile
 }
 
 // lookupValue looks up the value in the referenced table
-func (r *CrossTableResolver) lookupValue(
-	tagCfg ddprofiledefinition.MetricTagConfig,
-	lookupIndex string,
-	refTablePDUs map[string]gosnmp.SnmpPDU,
-) (gosnmp.SnmpPDU, error) {
+func (r *crossTableResolver) lookupValue(tagCfg ddprofiledefinition.MetricTagConfig, lookupIndex string, refTablePDUs map[string]gosnmp.SnmpPDU) (gosnmp.SnmpPDU, error) {
 	refColumnOID := trimOID(tagCfg.Symbol.OID)
 	refFullOID := refColumnOID + "." + lookupIndex
 
@@ -274,46 +292,9 @@ func (r *CrossTableResolver) lookupValue(
 	return pdu, nil
 }
 
-// IsApplicable checks if this tag configuration is for cross-table resolution
-func (r *CrossTableResolver) IsApplicable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
-	return tagCfg.Table != "" && tagCfg.Table != currentTableName && tagCfg.Index == 0
-}
-
-// IndexTransformer handles index manipulation operations
-type IndexTransformer struct{}
-
-// NewIndexTransformer creates a new IndexTransformer
-func NewIndexTransformer() *IndexTransformer {
-	return &IndexTransformer{}
-}
-
-// ExtractPosition extracts a specific position from an index
-// Position uses 1-based indexing as per the profile format
-// Example: index "7.8.9", position 2 → "8"
-func (t *IndexTransformer) ExtractPosition(index string, position uint) (string, bool) {
-	if position == 0 {
-		return "", false
-	}
-
-	var n uint
-	for {
-		n++
-		i := strings.IndexByte(index, '.')
-		if i == -1 {
-			break
-		}
-		if n == position {
-			return index[:i], true
-		}
-		index = index[i+1:]
-	}
-
-	return index, n == position && index != ""
-}
-
-// ApplyTransform applies index transformation rules to extract a subset of the index
+// applyTransform applies index transformation rules to extract a subset of the index
 // Example: index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}] → "6.0.36.155.53.3.246"
-func (t *IndexTransformer) ApplyTransform(index string, transforms []ddprofiledefinition.MetricIndexTransform) string {
+func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIndexTransform) string {
 	if len(transforms) == 0 {
 		return index
 	}
@@ -322,47 +303,21 @@ func (t *IndexTransformer) ApplyTransform(index string, transforms []ddprofilede
 	var result []string
 
 	for _, transform := range transforms {
-		extracted := t.extractRange(parts, transform.Start, transform.End)
+		start, end := transform.Start, transform.End
+
+		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
+			return ""
+		}
+
+		// Extract the range (inclusive)
+		extracted := parts[start : end+1]
 		result = append(result, extracted...)
 	}
 
 	return strings.Join(result, ".")
 }
 
-// extractRange extracts a range of parts from the index
-func (t *IndexTransformer) extractRange(parts []string, start, end uint) []string {
-	// Validate bounds
-	if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
-		return nil
-	}
-
-	// Extract the range (inclusive)
-	return parts[start : end+1]
-}
-
-// ValidateTransform checks if a transform is valid for a given index
-func (t *IndexTransformer) ValidateTransform(index string, transform ddprofiledefinition.MetricIndexTransform) error {
-	parts := strings.Split(index, ".")
-
-	if int(transform.Start) >= len(parts) {
-		return fmt.Errorf("start position %d is out of bounds for index with %d parts", transform.Start, len(parts))
-	}
-
-	if transform.End < transform.Start {
-		return fmt.Errorf("end position %d is before start position %d", transform.End, transform.Start)
-	}
-
-	if int(transform.End) >= len(parts) {
-		return fmt.Errorf("end position %d is out of bounds for index with %d parts", transform.End, len(parts))
-	}
-
-	return nil
-}
-
-// Global instance for backward compatibility
-var indexTransformer = NewIndexTransformer()
-
-// getIndexPosition wraps ExtractPosition for backward compatibility
-func getIndexPosition(index string, position uint) (string, bool) {
-	return indexTransformer.ExtractPosition(index, position)
+// isApplicable checks if this tag configuration is for cross-table resolution
+func (r *crossTableResolver) isApplicable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
+	return tagCfg.Table != "" && tagCfg.Table != currentTableName && tagCfg.Index == 0
 }
