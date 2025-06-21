@@ -71,10 +71,10 @@ func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOID
 			continue
 		}
 
-		tc := mapTagAdder{tags: row.tags}
+		ta := tagAdder{tags: row.tags}
 
 		for _, tagCfg := range tagConfigs {
-			if err := p.tagProc.processTag(tagCfg, pdu, tc); err != nil {
+			if err := p.tagProc.processTag(tagCfg, pdu, ta); err != nil {
 				p.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
 				continue
 			}
@@ -223,9 +223,9 @@ func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.Met
 		return err
 	}
 
-	tc := mapTagAdder{tags: ctx.rowTags}
+	ta := tagAdder{tags: ctx.rowTags}
 
-	return r.tagProcessor.processTag(tagCfg, pdu, tc)
+	return r.tagProcessor.processTag(tagCfg, pdu, ta)
 }
 
 func (r *crossTableResolver) findReferencedTableOID(tableName string, tableNameToOID map[string]string) (string, error) {
