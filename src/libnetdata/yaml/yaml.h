@@ -10,10 +10,16 @@
 extern "C" {
 #endif
 
+// Flags for YAML parsing behavior
+typedef enum yaml_to_json_flags {
+    YAML2JSON_DEFAULT = 0,
+    YAML2JSON_ALL_VALUES_AS_STRINGS = (1 << 0),  // Parse all scalar values as strings (no type conversion)
+} YAML2JSON_FLAGS;
+
 // Parse YAML from various sources and convert to json-c object
-struct json_object *yaml_parse_string(const char *yaml_string, BUFFER *error);
-struct json_object *yaml_parse_filename(const char *filename, BUFFER *error);
-struct json_object *yaml_parse_fd(int fd, BUFFER *error);
+struct json_object *yaml_parse_string(const char *yaml_string, BUFFER *error, YAML2JSON_FLAGS flags);
+struct json_object *yaml_parse_filename(const char *filename, BUFFER *error, YAML2JSON_FLAGS flags);
+struct json_object *yaml_parse_fd(int fd, BUFFER *error, YAML2JSON_FLAGS flags);
 
 // Generate YAML from json-c object to various destinations
 bool yaml_generate_to_buffer(BUFFER *dst, struct json_object *json, BUFFER *error);

@@ -1,11 +1,6 @@
 # Test error recovery - mix valid and problematic sections
 pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
 
-# Valid section first
-inject:
-  - key: VALID_BEFORE_ERROR
-    value: "should work"
-
 # This section should work
 rewrite:
   - key: WORKING_REWRITE
@@ -29,7 +24,9 @@ unmatched:
     - key: ERROR_HANDLED
       value: "Parser recovered successfully"
       
-# Test complex variable references
+# Combined inject section (fixed duplicate key issue)
 inject:
+  - key: VALID_BEFORE_ERROR
+    value: "should work"
   - key: COMPLEX_VAR_TEST
     value: "Message: ${message}, Level: ${LOG_LEVEL}, Working: ${WORKING_REWRITE}"

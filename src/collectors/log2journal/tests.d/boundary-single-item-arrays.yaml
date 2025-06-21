@@ -5,6 +5,8 @@ pattern: "(?P<msg>.*)"
 inject:
   - key: SINGLE_INJECTION
     value: "only one"
+  - key: INLINE_SINGLE
+    value: "inline"
 
 rewrite:
   - key: SINGLE_REWRITE
@@ -14,8 +16,5 @@ rewrite:
 rename:
   - old_key: OLD_SINGLE
     new_key: NEW_SINGLE
-
-# Also test inline array syntax
-inject: [{key: INLINE_SINGLE, value: "inline"}]
 
 # Test that order is preserved when there's only one item

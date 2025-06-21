@@ -5,35 +5,108 @@
 
 #define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                     \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_boolean))             \
-        dst = json_object_get_boolean(_j);                                                                      \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
+        if (json_object_is_type(_j, json_type_boolean)) {                                                       \
+            dst = json_object_get_boolean(_j);                                                                  \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_string)) {                                                   \
+            const char *_str = json_object_get_string(_j);                                                      \
+            if (strcasecmp(_str, "true") == 0 || strcasecmp(_str, "yes") == 0 || strcasecmp(_str, "on") == 0) { \
+                dst = true;                                                                                     \
+            }                                                                                                   \
+            else if (strcasecmp(_str, "false") == 0 || strcasecmp(_str, "no") == 0 || strcasecmp(_str, "off") == 0) { \
+                dst = false;                                                                                    \
+            }                                                                                                   \
+            else {                                                                                              \
+                buffer_sprintf(error, "invalid boolean string '%s' for '%s.%s'", _str, path, member);           \
+                return false;                                                                                   \
+            }                                                                                                   \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            dst = json_object_get_int64(_j) != 0;                                                               \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            dst = json_object_get_double(_j) != 0.0;                                                            \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
+            dst = false;                                                                                        \
+        }                                                                                                       \
+        else {                                                                                                  \
+            buffer_sprintf(error, "cannot convert to boolean for '%s.%s'", path, member);                       \
+            return false;                                                                                       \
+        }                                                                                                       \
+    }                                                                                                           \
     else if(required) {                                                                                         \
-        buffer_sprintf(error, "missing or invalid type for '%s.%s' boolean", path, member);                     \
+        buffer_sprintf(error, "missing '%s.%s' boolean", path, member);                                         \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
 #define JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {               \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         string_freez(dst);                                                                                      \
-        dst = string_strdupz(json_object_get_string(_j));                                                       \
+        if (json_object_is_type(_j, json_type_string)) {                                                        \
+            dst = string_strdupz(json_object_get_string(_j));                                                   \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            char _buf[UINT64_MAX_LENGTH];                                                                       \
+            print_int64(_buf, json_object_get_int64(_j));                                                       \
+            dst = string_strdupz(_buf);                                                                         \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            char _buf[DOUBLE_MAX_LENGTH];                                                                       \
+            print_netdata_double(_buf, json_object_get_double(_j));                                             \
+            dst = string_strdupz(_buf);                                                                         \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            dst = string_strdupz(json_object_get_boolean(_j) ? "true" : "false");                               \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
+            dst = NULL;                                                                                         \
+        }                                                                                                       \
+        else {                                                                                                  \
+            buffer_sprintf(error, "cannot convert to string for '%s.%s'", path, member);                        \
+            return false;                                                                                       \
+        }                                                                                                       \
     }                                                                                                           \
     else if(required) {                                                                                         \
-        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
+        buffer_sprintf(error, "missing '%s.%s'", path, member);                                                 \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
 #define JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                 \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
-        strncpyz(dst, json_object_get_string(_j), sizeof(dst) - 1);                                             \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
+        if (json_object_is_type(_j, json_type_string)) {                                                        \
+            strncpyz(dst, json_object_get_string(_j), sizeof(dst) - 1);                                         \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            char _buf[UINT64_MAX_LENGTH];                                                                       \
+            print_int64(_buf, json_object_get_int64(_j));                                                       \
+            strncpyz(dst, _buf, sizeof(dst) - 1);                                                               \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            char _buf[DOUBLE_MAX_LENGTH];                                                                       \
+            print_netdata_double(_buf, json_object_get_double(_j));                                             \
+            strncpyz(dst, _buf, sizeof(dst) - 1);                                                               \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            strncpyz(dst, json_object_get_boolean(_j) ? "true" : "false", sizeof(dst) - 1);                     \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
+            dst[0] = '\0';                                                                                      \
+        }                                                                                                       \
+        else {                                                                                                  \
+            buffer_sprintf(error, "cannot convert to string for '%s.%s'", path, member);                        \
+            return false;                                                                                       \
+        }                                                                                                       \
     }                                                                                                           \
     else {                                                                                                      \
         dst[0] = '\0';                                                                                          \
         if (required) {                                                                                         \
-            buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                  \
+            buffer_sprintf(error, "missing '%s.%s'", path, member);                                             \
             return false;                                                                                       \
         }                                                                                                       \
     }                                                                                                           \
@@ -57,12 +130,68 @@
 
 #define JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {              \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         freez((void *)dst);                                                                                     \
-        dst = strdupz(json_object_get_string(_j));                                                              \
+        if (json_object_is_type(_j, json_type_string)) {                                                        \
+            dst = strdupz(json_object_get_string(_j));                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            char _buf[UINT64_MAX_LENGTH];                                                                       \
+            print_int64(_buf, json_object_get_int64(_j));                                                       \
+            dst = strdupz(_buf);                                                                                \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            char _buf[DOUBLE_MAX_LENGTH];                                                                       \
+            print_netdata_double(_buf, json_object_get_double(_j));                                             \
+            dst = strdupz(_buf);                                                                                \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            dst = strdupz(json_object_get_boolean(_j) ? "true" : "false");                                      \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
+            dst = NULL;                                                                                         \
+        }                                                                                                       \
+        else {                                                                                                  \
+            buffer_sprintf(error, "cannot convert to string for '%s.%s'", path, member);                        \
+            return false;                                                                                       \
+        }                                                                                                       \
     }                                                                                                           \
     else if(required) {                                                                                         \
-        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
+        buffer_sprintf(error, "missing '%s.%s'", path, member);                                                 \
+        return false;                                                                                           \
+    }                                                                                                           \
+} while(0)
+
+#define JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {           \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
+        freez((void *)dst);                                                                                     \
+        if (json_object_is_type(_j, json_type_string)) {                                                        \
+            dst = strdupz(json_object_get_string(_j));                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            char _buf[UINT64_MAX_LENGTH];                                                                       \
+            print_int64(_buf, json_object_get_int64(_j));                                                       \
+            dst = strdupz(_buf);                                                                                \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            char _buf[DOUBLE_MAX_LENGTH];                                                                       \
+            print_netdata_double(_buf, json_object_get_double(_j));                                             \
+            dst = strdupz(_buf);                                                                                \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            dst = strdupz(json_object_get_boolean(_j) ? "true" : "false");                                      \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
+            dst = NULL;                                                                                         \
+        }                                                                                                       \
+        else {                                                                                                  \
+            buffer_sprintf(error, "non-scalar type for '%s.%s' (arrays and objects not supported)", path, member); \
+            return false;                                                                                       \
+        }                                                                                                       \
+    }                                                                                                           \
+    else if(required) {                                                                                         \
+        buffer_sprintf(error, "missing '%s.%s'", path, member);                                                 \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
@@ -96,8 +225,30 @@
 
 #define JSONC_PARSE_TXT2BUFFER_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {               \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
-        const char *_s = json_object_get_string(_j);                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
+        const char *_s = NULL;                                                                                  \
+        char _buf[DOUBLE_MAX_LENGTH];                                                                           \
+        if (json_object_is_type(_j, json_type_string)) {                                                        \
+            _s = json_object_get_string(_j);                                                                    \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            print_int64(_buf, json_object_get_int64(_j));                                                       \
+            _s = _buf;                                                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            print_netdata_double(_buf, json_object_get_double(_j));                                             \
+            _s = _buf;                                                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            _s = json_object_get_boolean(_j) ? "true" : "false";                                                \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_null)) {                                                     \
+            _s = NULL;                                                                                          \
+        }                                                                                                       \
+        else {                                                                                                  \
+            buffer_sprintf(error, "cannot convert to string for '%s.%s'", path, member);                        \
+            return false;                                                                                       \
+        }                                                                                                       \
         if(!_s || !*_s) {                                                                                       \
             buffer_free(dst);                                                                                   \
             dst = NULL;                                                                                         \
@@ -107,12 +258,11 @@
                 buffer_flush(dst);                                                                              \
             else                                                                                                \
                 dst = buffer_create(0, NULL);                                                                   \
-            if (_s && *_s)                                                                                      \
-                buffer_strcat(dst, _s);                                                                         \
+            buffer_strcat(dst, _s);                                                                             \
         }                                                                                                       \
     }                                                                                                           \
     else if(required) {                                                                                         \
-        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
+        buffer_sprintf(error, "missing '%s.%s'", path, member);                                                 \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
@@ -193,18 +343,35 @@
 #define JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                    \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
-        if (_j != NULL && json_object_is_type(_j, json_type_int))                                               \
-            dst = json_object_get_int64(_j);                                                                    \
-        else if (_j != NULL && json_object_is_type(_j, json_type_double))                                       \
-            dst = (typeof(dst))json_object_get_double(_j);                                                      \
-        else if (_j == NULL)                                                                                    \
+        if (_j == NULL) {                                                                                       \
             dst = 0;                                                                                            \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            dst = json_object_get_int64(_j);                                                                    \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
+            dst = (typeof(dst))json_object_get_double(_j);                                                      \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            dst = json_object_get_boolean(_j) ? 1 : 0;                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_string)) {                                                   \
+            const char *_str = json_object_get_string(_j);                                                      \
+            char *_endptr;                                                                                      \
+            errno = 0;                                                                                          \
+            long long _val = strtoll(_str, &_endptr, 10);                                                       \
+            if (errno != 0 || *_endptr != '\0' || _endptr == _str) {                                            \
+                buffer_sprintf(error, "cannot convert string '%s' to int64 for '%s.%s'", _str, path, member);   \
+                return false;                                                                                   \
+            }                                                                                                   \
+            dst = (typeof(dst))_val;                                                                            \
+        }                                                                                                       \
         else {                                                                                                  \
-            buffer_sprintf(error, "not supported type (expected int) for '%s.%s'", path, member);               \
+            buffer_sprintf(error, "cannot convert to int64 for '%s.%s'", path, member);                         \
             return false;                                                                                       \
         }                                                                                                       \
     } else if(required) {                                                                                       \
-        buffer_sprintf(error, "missing or invalid type (expected int value or null) for '%s.%s'", path, member);\
+        buffer_sprintf(error, "missing '%s.%s'", path, member);                                                 \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
@@ -231,18 +398,35 @@
 #define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {                   \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
-        if (_j != NULL && json_object_is_type(_j, json_type_double))                                            \
+        if (_j == NULL) {                                                                                       \
+            dst = 0.0;                                                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_double)) {                                                   \
             dst = json_object_get_double(_j);                                                                   \
-        else if (_j != NULL && json_object_is_type(_j, json_type_int))                                          \
-            dst = (typeof(dst))json_object_get_int(_j);                                                         \
-        else if (_j == NULL)                                                                                    \
-            dst = NAN;                                                                                          \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_int)) {                                                      \
+            dst = (typeof(dst))json_object_get_int64(_j);                                                       \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
+            dst = json_object_get_boolean(_j) ? 1.0 : 0.0;                                                      \
+        }                                                                                                       \
+        else if (json_object_is_type(_j, json_type_string)) {                                                   \
+            const char *_str = json_object_get_string(_j);                                                      \
+            char *_endptr;                                                                                      \
+            errno = 0;                                                                                          \
+            double _val = strtod(_str, &_endptr);                                                               \
+            if (errno != 0 || *_endptr != '\0' || _endptr == _str) {                                            \
+                buffer_sprintf(error, "cannot convert string '%s' to double for '%s.%s'", _str, path, member);  \
+                return false;                                                                                   \
+            }                                                                                                   \
+            dst = (typeof(dst))_val;                                                                            \
+        }                                                                                                       \
         else {                                                                                                  \
-            buffer_sprintf(error, "not supported type (expected double) for '%s.%s'", path, member);            \
+            buffer_sprintf(error, "cannot convert to double for '%s.%s'", path, member);                        \
             return false;                                                                                       \
         }                                                                                                       \
     } else if(required) {                                                                                       \
-        buffer_sprintf(error, "missing or invalid type (expected double value or null) for '%s.%s'", path, member); \
+        buffer_sprintf(error, "missing '%s.%s'", path, member);                                                 \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
@@ -303,10 +487,8 @@
     }                                                                                                           \
     else {                                                                                                      \
         if (!json_object_is_type(JSONC_TEMP_VAR(_j, __LINE__), json_type_object)) {                             \
-            if(required) {                                                                                      \
-                buffer_sprintf(error, "not an object '%s.%s'", *path ? path : "", member);                      \
-                return false;                                                                                   \
-            }                                                                                                   \
+            buffer_sprintf(error, "not an object '%s.%s'", *path ? path : "", member);                      \
+            return false;                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
@@ -334,10 +516,8 @@
     }                                                                                                           \
     else {                                                                                                      \
         if (!json_object_is_type(JSONC_TEMP_VAR(_jarray, __LINE__), json_type_array)) {                         \
-            if (required) {                                                                                     \
-                buffer_sprintf(error, "not an array '%s.%s'", *path ? path : "", member);                       \
-                return false;                                                                                   \
-            }                                                                                                   \
+            buffer_sprintf(error, "not an array '%s.%s'", *path ? path : "", member);                       \
+            return false;                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
