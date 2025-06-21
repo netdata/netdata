@@ -151,7 +151,7 @@ func (p *tableRowProcessor) extractIndexPosition(index string, position uint) (s
 }
 
 func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
-	var metrics []ddsnmp.Metric
+	metrics := make([]ddsnmp.Metric, 0, len(ctx.columnOIDs))
 
 	for columnOID, sym := range ctx.columnOIDs {
 		pdu, ok := row.pdus[columnOID]
