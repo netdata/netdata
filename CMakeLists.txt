@@ -882,6 +882,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/json/json-keys.h
         src/libnetdata/json/vendored/jsmn.c
         src/libnetdata/json/vendored/jsmn.h
+        src/libnetdata/yaml/yaml.c
+        src/libnetdata/yaml/yaml.h
+        src/libnetdata/yaml/yaml-unittest.c
+        src/libnetdata/yaml/yaml-comprehensive-unittest.c
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/line_splitter/line_splitter.c
@@ -3284,6 +3288,10 @@ target_link_libraries(netdatacli libnetdata)
 install(TARGETS netdatacli
         COMPONENT netdata
         DESTINATION "${BINDIR}")
+
+# YAML comprehensive test
+add_executable(yaml-comprehensive-test build-claude/yaml-comprehensive-test.c)
+target_link_libraries(yaml-comprehensive-test libnetdata)
 
 #
 # Build go.d.plugin
