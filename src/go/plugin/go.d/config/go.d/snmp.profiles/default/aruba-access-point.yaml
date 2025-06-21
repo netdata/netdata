@@ -17,7 +17,7 @@ extends:
 sysobjectid: 1.3.6.1.4.1.14823.1.2.*
 
 device:
-  vendor: "aruba"
+  vendor: "Aruba"
 
 metadata:
   device:
@@ -30,14 +30,14 @@ metadata:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           match_pattern: '\bVersion\s+([\d.-]+)'
-          match_value: '$1'
+          match_value: "$1"
           # Example: Version 6.5.1.0-4.3.1.2
       model:
         symbol:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           match_pattern: '\bMODEL:\s+([\w-]+)'
-          match_value: '$1'
+          match_value: "$1"
           # Examples:
           #  - ArubaOS (MODEL: 205), Version 6.5.1.0-4.3.1.2
       os_name:
@@ -45,13 +45,13 @@ metadata:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           match_pattern: '\bArubaOS\b'
-          match_value: 'ArubaOS'
+          match_value: "ArubaOS"
       os_version:
         symbol:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           match_pattern: '\bVersion\s+([\d.]+)'
-          match_value: '$1'
+          match_value: "$1"
           # Example: `6.5.1.0` part of `Version 6.5.1.0-4.3.1.2`
       type:
-        value: "access_point"
+        value: "Access Point"
