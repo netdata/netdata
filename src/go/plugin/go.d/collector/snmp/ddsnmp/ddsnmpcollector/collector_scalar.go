@@ -14,25 +14,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// ScalarCollector handles collection of scalar (non-table) metrics
-type ScalarCollector struct {
+// scalarCollector handles collection of scalar (non-table) metrics
+type scalarCollector struct {
 	snmpClient  gosnmp.Handler
 	missingOIDs map[string]bool
 	log         *logger.Logger
+	valProc     *valueProcessor
 }
 
-// NewScalarCollector creates a new scalar collector
-func NewScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *ScalarCollector {
-	return &ScalarCollector{
+// newScalarCollector creates a new scalar collector
+func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *scalarCollector {
+	return &scalarCollector{
 		snmpClient:  snmpClient,
 		missingOIDs: missingOIDs,
 		log:         log,
+		valProc:     newValueProcessor(),
 	}
 }
 
 // Collect gathers all scalar metrics from the profile
-func (sc *ScalarCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
-	// Identify scalar OIDs to collect
+func (sc *scalarCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
 	oids, missingOIDs := sc.identifyScalarOIDs(prof.Definition.Metrics)
 
 	if len(missingOIDs) > 0 {
@@ -54,7 +55,7 @@ func (sc *ScalarCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error
 }
 
 // identifyScalarOIDs returns OIDs to collect and OIDs that are known to be missing
-func (sc *ScalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.MetricsConfig) ([]string, []string) {
+func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.MetricsConfig) ([]string, []string) {
 	var oids []string
 	var missingOIDs []string
 
@@ -80,7 +81,7 @@ func (sc *ScalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 }
 
 // getScalarValues retrieves values for the given OIDs
-func (sc *ScalarCollector) getScalarValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
+func (sc *scalarCollector) getScalarValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 	maxOids := sc.snmpClient.MaxOids()
 
@@ -103,7 +104,7 @@ func (sc *ScalarCollector) getScalarValues(oids []string) (map[string]gosnmp.Snm
 }
 
 // processScalarMetrics converts PDUs into metrics
-func (sc *ScalarCollector) processScalarMetrics(configs []ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) ([]ddsnmp.Metric, error) {
+func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 	var errs []error
 
@@ -132,21 +133,18 @@ func (sc *ScalarCollector) processScalarMetrics(configs []ddprofiledefinition.Me
 }
 
 // processScalarMetric processes a single scalar metric configuration
-func (sc *ScalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*ddsnmp.Metric, error) {
+func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) (*ddsnmp.Metric, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		return nil, nil
 	}
 
-	// Process the value
-	value, err := processSymbolValue(cfg.Symbol, pdu)
+	value, err := sc.valProc.processValue(cfg.Symbol, pdu)
 	if err != nil {
 		return nil, fmt.Errorf("error processing value for OID %s (%s): %w", cfg.Symbol.Name, cfg.Symbol.OID, err)
 	}
 
-	// Parse static tags
 	staticTags := parseStaticTags(cfg.StaticTags)
 
-	// Build the metric
 	return buildScalarMetric(cfg.Symbol, pdu, value, staticTags)
 }

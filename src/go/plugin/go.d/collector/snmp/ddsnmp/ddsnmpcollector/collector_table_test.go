@@ -3245,7 +3245,7 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			missingOIDs := make(map[string]bool)
 			tableCache := newTableCache(0, 0) // Cache disabled
-			collector := NewTableCollector(mockHandler, missingOIDs, tableCache, logger.New())
+			collector := newTableCollector(mockHandler, missingOIDs, tableCache, logger.New())
 
 			result, err := collector.Collect(tc.profile)
 

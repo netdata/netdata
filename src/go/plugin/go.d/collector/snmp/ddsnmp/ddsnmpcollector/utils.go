@@ -17,36 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
-	if len(cfg.Mapping) == 0 {
-		return nil
-	}
-
-	mappings := make(map[int64]string)
-
-	if isMappingKeysNumeric(cfg.Mapping) {
-		for k, v := range cfg.Mapping {
-			intKey, _ := strconv.ParseInt(k, 10, 64)
-			mappings[intKey] = v
-		}
-	} else {
-		for k, v := range cfg.Mapping {
-			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
-				mappings[intVal] = k
-			}
-		}
-	}
-
-	return mappings
-}
-
-func getMetricType(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
-	if sym.MetricType != "" {
-		return sym.MetricType
-	}
-	return getMetricTypeFromPDUType(pdu)
-}
-
 func getMetricTypeFromPDUType(pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
 	switch pdu.Type {
 	case gosnmp.Counter32, gosnmp.Counter64:
@@ -268,9 +238,7 @@ func applyTransform(metric *ddsnmp.Metric, sym ddprofiledefinition.SymbolConfig)
 		return nil
 	}
 
-	type transformCtx struct{ Metric *ddsnmp.Metric }
-
-	ctx := &transformCtx{Metric: metric}
+	ctx := struct{ Metric *ddsnmp.Metric }{Metric: metric}
 
 	var buf bytes.Buffer
 	if err := sym.TransformCompiled.Execute(&buf, ctx); err != nil {

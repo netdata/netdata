@@ -17,19 +17,19 @@ import (
 
 // GlobalTagsCollector handles collection of profile-wide tags
 type GlobalTagsCollector struct {
-	snmpClient   gosnmp.Handler
-	missingOIDs  map[string]bool
-	log          *logger.Logger
-	tagProcessor *TagProcessorFactory
+	snmpClient  gosnmp.Handler
+	missingOIDs map[string]bool
+	log         *logger.Logger
+	tagProc     *globalTagProcessor
 }
 
 // NewGlobalTagsCollector creates a new global tags collector
 func NewGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *GlobalTagsCollector {
 	return &GlobalTagsCollector{
-		snmpClient:   snmpClient,
-		missingOIDs:  missingOIDs,
-		log:          log,
-		tagProcessor: NewTagProcessorFactory(),
+		snmpClient:  snmpClient,
+		missingOIDs: missingOIDs,
+		log:         log,
+		tagProc:     newGlobalTagProcessor(),
 	}
 }
 
@@ -87,7 +87,7 @@ func (gc *GlobalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 			continue
 		}
 
-		tagValues, err := gc.processTagValue(tagCfg, pdus)
+		tagValues, err := gc.tagProc.processTag(tagCfg, pdus)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to process tag value for '%s/%s': %w",
 				tagCfg.Tag, tagCfg.Symbol.Name, err))
@@ -151,11 +151,6 @@ func (gc *GlobalTagsCollector) fetchTagValues(oids []string) (map[string]gosnmp.
 	}
 
 	return pdus, nil
-}
-
-// processTagValue processes a single tag configuration
-func (gc *GlobalTagsCollector) processTagValue(tagCfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU) (map[string]string, error) {
-	return processMetricTagValue(tagCfg, pdus)
 }
 
 // DeviceMetadataCollector handles collection of device metadata

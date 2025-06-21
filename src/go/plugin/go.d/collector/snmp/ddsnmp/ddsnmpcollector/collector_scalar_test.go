@@ -712,7 +712,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := NewScalarCollector(mockHandler, missingOIDs, logger.New())
+			collector := newScalarCollector(mockHandler, missingOIDs, logger.New())
 
 			result, err := collector.Collect(tc.profile)
 

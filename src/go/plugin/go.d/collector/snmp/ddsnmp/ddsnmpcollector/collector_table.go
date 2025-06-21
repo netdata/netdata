@@ -15,23 +15,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// TableCollector handles collection of SNMP table metrics
-type TableCollector struct {
+// tableCollector handles collection of SNMP table metrics
+type tableCollector struct {
 	snmpClient   gosnmp.Handler
 	missingOIDs  map[string]bool
 	tableCache   *tableCache
 	log          *logger.Logger
-	rowProcessor *TableRowProcessor
+	valProc      *valueProcessor
+	rowProcessor *tableRowProcessor
 }
 
-// NewTableCollector creates a new table collector
-func NewTableCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, tableCache *tableCache, log *logger.Logger) *TableCollector {
-	return &TableCollector{
+// newTableCollector creates a new table collector
+func newTableCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, tableCache *tableCache, log *logger.Logger) *tableCollector {
+	return &tableCollector{
 		snmpClient:   snmpClient,
 		missingOIDs:  missingOIDs,
 		tableCache:   tableCache,
 		log:          log,
-		rowProcessor: NewTableRowProcessor(log),
+		valProc:      newValueProcessor(),
+		rowProcessor: newTableRowProcessor(log),
 	}
 }
 
@@ -43,7 +45,7 @@ type tableWalkResult struct {
 }
 
 // Collect gathers all table metrics from the profile
-func (tc *TableCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error) {
 	walkResults, err := tc.walkTablesAsNeeded(prof)
 	if err != nil {
 		return nil, err
@@ -53,7 +55,7 @@ func (tc *TableCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error)
 }
 
 // walkTablesAsNeeded walks only tables that aren't fully cached
-func (tc *TableCollector) walkTablesAsNeeded(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
+func (tc *tableCollector) walkTablesAsNeeded(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
 	// Identify tables to walk
 	toWalk := tc.identifyTablesToWalk(prof)
 
@@ -78,7 +80,7 @@ type tablesToWalkInfo struct {
 }
 
 // identifyTablesToWalk determines which tables need to be walked
-func (tc *TableCollector) identifyTablesToWalk(prof *ddsnmp.Profile) *tablesToWalkInfo {
+func (tc *tableCollector) identifyTablesToWalk(prof *ddsnmp.Profile) *tablesToWalkInfo {
 	info := &tablesToWalkInfo{
 		tablesToWalk: make(map[string]bool),
 		tableConfigs: make(map[string][]ddprofiledefinition.MetricsConfig),
@@ -113,7 +115,7 @@ func (tc *TableCollector) identifyTablesToWalk(prof *ddsnmp.Profile) *tablesToWa
 }
 
 // walkTables performs SNMP walks for the specified tables
-func (tc *TableCollector) walkTables(tablesToWalk map[string]bool) (map[string]map[string]gosnmp.SnmpPDU, []error) {
+func (tc *tableCollector) walkTables(tablesToWalk map[string]bool) (map[string]map[string]gosnmp.SnmpPDU, []error) {
 	walkedData := make(map[string]map[string]gosnmp.SnmpPDU)
 	var errs []error
 
@@ -133,7 +135,7 @@ func (tc *TableCollector) walkTables(tablesToWalk map[string]bool) (map[string]m
 }
 
 // buildWalkResults creates results for all configurations
-func (tc *TableCollector) buildWalkResults(prof *ddsnmp.Profile, walkedData map[string]map[string]gosnmp.SnmpPDU, info *tablesToWalkInfo) []tableWalkResult {
+func (tc *tableCollector) buildWalkResults(prof *ddsnmp.Profile, walkedData map[string]map[string]gosnmp.SnmpPDU, info *tablesToWalkInfo) []tableWalkResult {
 	var results []tableWalkResult
 
 	for _, cfg := range prof.Definition.Metrics {
@@ -166,7 +168,7 @@ func (tc *TableCollector) buildWalkResults(prof *ddsnmp.Profile, walkedData map[
 }
 
 // processWalkResults processes all table walk results
-func (tc *TableCollector) processWalkResults(walkResults []tableWalkResult) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processWalkResults(walkResults []tableWalkResult) ([]ddsnmp.Metric, error) {
 	// Build lookup maps
 	walkedData := tc.buildWalkedDataMap(walkResults)
 	tableNameToOID := tc.buildTableNameMap(walkResults)
@@ -191,7 +193,7 @@ func (tc *TableCollector) processWalkResults(walkResults []tableWalkResult) ([]d
 }
 
 // buildWalkedDataMap creates a map of table OID to PDUs
-func (tc *TableCollector) buildWalkedDataMap(walkResults []tableWalkResult) map[string]map[string]gosnmp.SnmpPDU {
+func (tc *tableCollector) buildWalkedDataMap(walkResults []tableWalkResult) map[string]map[string]gosnmp.SnmpPDU {
 	walkedData := make(map[string]map[string]gosnmp.SnmpPDU)
 	for _, result := range walkResults {
 		if result.pdus != nil {
@@ -202,7 +204,7 @@ func (tc *TableCollector) buildWalkedDataMap(walkResults []tableWalkResult) map[
 }
 
 // buildTableNameMap creates a map of table name to OID
-func (tc *TableCollector) buildTableNameMap(walkResults []tableWalkResult) map[string]string {
+func (tc *tableCollector) buildTableNameMap(walkResults []tableWalkResult) map[string]string {
 	tableNameToOID := make(map[string]string)
 	for _, result := range walkResults {
 		if result.config.Table.Name != "" {
@@ -213,7 +215,7 @@ func (tc *TableCollector) buildTableNameMap(walkResults []tableWalkResult) map[s
 }
 
 // processTableResult processes a single table result
-func (tc *TableCollector) processTableResult(result tableWalkResult, walkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string) ([]ddsnmp.Metric, error) {
 	// Try cache first
 	if metrics := tc.tryCollectFromCache(result.config); metrics != nil {
 		return metrics, nil
@@ -228,7 +230,7 @@ func (tc *TableCollector) processTableResult(result tableWalkResult, walkedData 
 }
 
 // tryCollectFromCache attempts to collect metrics using cached data
-func (tc *TableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsConfig) []ddsnmp.Metric {
+func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsConfig) []ddsnmp.Metric {
 	cachedOIDs, cachedTags, ok := tc.tableCache.getCachedData(cfg)
 	if !ok {
 		return nil
@@ -246,7 +248,7 @@ func (tc *TableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 }
 
 // processTableData processes walked table data
-func (tc *TableCollector) processTableData(
+func (tc *tableCollector) processTableData(
 	cfg ddprofiledefinition.MetricsConfig,
 	pdus map[string]gosnmp.SnmpPDU,
 	walkedData map[string]map[string]gosnmp.SnmpPDU,
@@ -279,11 +281,11 @@ func (tc *TableCollector) processTableData(
 }
 
 // organizePDUsByRow groups PDUs by their row index
-func (tc *TableCollector) organizePDUsByRow(
+func (tc *tableCollector) organizePDUsByRow(
 	pdus map[string]gosnmp.SnmpPDU,
 	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
 	tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig,
-) (map[string]map[string]gosnmp.SnmpPDU, map[string]map[string]string, map[string]map[string]string) {
+) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
 	// Combine all column OIDs
 	allColumnOIDs := make([]string, 0, len(columnOIDs)+len(tagColumnOIDs))
 	for oid := range columnOIDs {
@@ -293,9 +295,9 @@ func (tc *TableCollector) organizePDUsByRow(
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
 
-	rows := make(map[string]map[string]gosnmp.SnmpPDU)
-	oidCache := make(map[string]map[string]string)
-	tagCache := make(map[string]map[string]string)
+	rows = make(map[string]map[string]gosnmp.SnmpPDU)
+	oidCache = make(map[string]map[string]string)
+	tagCache = make(map[string]map[string]string)
 
 	for oid, pdu := range pdus {
 		for _, columnOID := range allColumnOIDs {
@@ -318,7 +320,7 @@ func (tc *TableCollector) organizePDUsByRow(
 }
 
 // processRows processes all rows and returns metrics
-func (tc *TableCollector) processRows(
+func (tc *tableCollector) processRows(
 	rows map[string]map[string]gosnmp.SnmpPDU,
 	cfg ddprofiledefinition.MetricsConfig,
 	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
@@ -331,20 +333,19 @@ func (tc *TableCollector) processRows(
 	var errs []error
 
 	for index, rowPDUs := range rows {
-		row := &RowData{
+		row := &tableRowData{
 			Index:      index,
 			PDUs:       rowPDUs,
 			Tags:       make(map[string]string),
 			StaticTags: staticTags,
 		}
 
-		ctx := &RowProcessingContext{
+		ctx := &tableRowProcessingContext{
 			Config:        cfg,
 			ColumnOIDs:    columnOIDs,
 			TagColumnOIDs: tagColumnOIDs,
 			CrossTableCtx: crossTableCtx,
 		}
-
 		rowMetrics, err := tc.rowProcessor.ProcessRow(row, ctx)
 		if err != nil {
 			errs = append(errs, err)
@@ -367,7 +368,7 @@ func (tc *TableCollector) processRows(
 }
 
 // collectWithCache collects metrics using cached structure
-func (tc *TableCollector) collectWithCache(
+func (tc *tableCollector) collectWithCache(
 	cfg ddprofiledefinition.MetricsConfig,
 	cachedOIDs map[string]map[string]string,
 	cachedTags map[string]map[string]string,
@@ -403,7 +404,7 @@ func (tc *TableCollector) collectWithCache(
 }
 
 // buildMetricsFromCache builds metrics from cached structure and current values
-func (tc *TableCollector) buildMetricsFromCache(
+func (tc *tableCollector) buildMetricsFromCache(
 	cfg ddprofiledefinition.MetricsConfig,
 	cachedOIDs map[string]map[string]string,
 	cachedTags map[string]map[string]string,
@@ -436,7 +437,7 @@ func (tc *TableCollector) buildMetricsFromCache(
 				continue
 			}
 
-			value, err := processSymbolValue(sym, pdu)
+			value, err := tc.valProc.processValue(sym, pdu)
 			if err != nil {
 				tc.log.Debugf("Error processing value for %s: %v", sym.Name, err)
 				continue
@@ -461,7 +462,7 @@ func (tc *TableCollector) buildMetricsFromCache(
 
 // SNMP operations
 
-func (tc *TableCollector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error) {
+func (tc *tableCollector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 
 	var resp []gosnmp.SnmpPDU
@@ -489,7 +490,7 @@ func (tc *TableCollector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error
 	return pdus, nil
 }
 
-func (tc *TableCollector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
+func (tc *tableCollector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 
 	for chunk := range slices.Chunk(oids, tc.snmpClient.MaxOids()) {

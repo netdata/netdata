@@ -33,8 +33,8 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 
 	coll.globalTagsCollector = NewGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
 	coll.deviceMetadataCollector = NewDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
-	coll.scalarCollector = NewScalarCollector(snmpClient, coll.missingOIDs, coll.log)
-	coll.tableCollector = NewTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
+	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 
 	return coll
 }
@@ -49,8 +49,8 @@ type (
 
 		globalTagsCollector     *GlobalTagsCollector
 		deviceMetadataCollector *DeviceMetadataCollector
-		scalarCollector         *ScalarCollector
-		tableCollector          *TableCollector
+		scalarCollector         *scalarCollector
+		tableCollector          *tableCollector
 
 		DoTableMetrics bool
 	}

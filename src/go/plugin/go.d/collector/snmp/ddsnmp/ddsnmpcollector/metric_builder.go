@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"maps"
+	"strconv"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -11,14 +12,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// MetricBuilder provides a fluent interface for building metrics
-type MetricBuilder struct {
+// metricBuilder provides a fluent interface for building metrics
+type metricBuilder struct {
 	metric ddsnmp.Metric
 }
 
-// NewMetricBuilder creates a new MetricBuilder with basic metric info
-func NewMetricBuilder(name string, value int64) *MetricBuilder {
-	return &MetricBuilder{
+// newMetricBuilder creates a new metricBuilder with basic metric info
+func newMetricBuilder(name string, value int64) *metricBuilder {
+	return &metricBuilder{
 		metric: ddsnmp.Metric{
 			Name:  name,
 			Value: value,
@@ -26,80 +27,48 @@ func NewMetricBuilder(name string, value int64) *MetricBuilder {
 	}
 }
 
-// WithTags sets the metric tags
-func (mb *MetricBuilder) WithTags(tags map[string]string) *MetricBuilder {
+// withTags sets the metric tags
+func (mb *metricBuilder) withTags(tags map[string]string) *metricBuilder {
 	if len(tags) > 0 {
 		mb.metric.Tags = maps.Clone(tags)
 	}
 	return mb
 }
 
-// WithStaticTags sets the static tags
-func (mb *MetricBuilder) WithStaticTags(tags map[string]string) *MetricBuilder {
+// withStaticTags sets the static tags
+func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	if len(tags) > 0 {
 		mb.metric.StaticTags = maps.Clone(tags)
 	}
 	return mb
 }
 
-// WithUnit sets the metric unit
-func (mb *MetricBuilder) WithUnit(unit string) *MetricBuilder {
-	mb.metric.Unit = unit
-	return mb
-}
-
-// WithDescription sets the metric description
-func (mb *MetricBuilder) WithDescription(desc string) *MetricBuilder {
-	mb.metric.Description = desc
-	return mb
-}
-
-// WithFamily sets the metric family
-func (mb *MetricBuilder) WithFamily(family string) *MetricBuilder {
-	mb.metric.Family = family
-	return mb
-}
-
-// WithMetricType sets the metric type
-func (mb *MetricBuilder) WithMetricType(metricType ddprofiledefinition.ProfileMetricType) *MetricBuilder {
-	mb.metric.MetricType = metricType
-	return mb
-}
-
-// WithMappings sets the value mappings
-func (mb *MetricBuilder) WithMappings(mappings map[int64]string) *MetricBuilder {
-	if len(mappings) > 0 {
-		mb.metric.Mappings = mappings
-	}
-	return mb
-}
-
-// AsTableMetric marks the metric as coming from a table
-func (mb *MetricBuilder) AsTableMetric() *MetricBuilder {
+// asTableMetric marks the metric as coming from a table
+func (mb *metricBuilder) asTableMetric() *metricBuilder {
 	mb.metric.IsTable = true
 	return mb
 }
 
-// FromSymbol applies symbol configuration to the metric
-func (mb *MetricBuilder) FromSymbol(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) *MetricBuilder {
+// fromSymbol applies symbol configuration to the metric
+func (mb *metricBuilder) fromSymbol(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) *metricBuilder {
 	mb.metric.Unit = sym.Unit
 	mb.metric.Description = sym.Description
 	mb.metric.Family = sym.Family
-	mb.metric.MetricType = getMetricType(sym, pdu)
+	mb.metric.MetricType = ternary(sym.MetricType != "", sym.MetricType, getMetricTypeFromPDUType(pdu))
 	mb.metric.Mappings = convSymMappingToNumeric(sym)
 	return mb
 }
 
 // Build returns the built metric
-func (mb *MetricBuilder) Build() ddsnmp.Metric {
+func (mb *metricBuilder) Build() ddsnmp.Metric {
 	return mb.metric
 }
 
 // buildScalarMetric builds a scalar metric using the builder
 func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, staticTags map[string]string) (*ddsnmp.Metric, error) {
-	metric := NewMetricBuilder(cfg.Name, value).
-		WithStaticTags(staticTags).
-		FromSymbol(cfg, pdu).
+	metric := newMetricBuilder(cfg.Name, value).
+		withStaticTags(staticTags).
+		fromSymbol(cfg, pdu).
 		Build()
 
 	if cfg.TransformCompiled != nil {
@@ -113,11 +82,11 @@ func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU,
 
 // buildTableMetric builds a table metric using the builder
 func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
-	metric := NewMetricBuilder(cfg.Name, value).
-		WithTags(tags).
-		WithStaticTags(staticTags).
-		FromSymbol(cfg, pdu).
-		AsTableMetric().
+	metric := newMetricBuilder(cfg.Name, value).
+		withTags(tags).
+		withStaticTags(staticTags).
+		fromSymbol(cfg, pdu).
+		asTableMetric().
 		Build()
 
 	if cfg.TransformCompiled != nil {
@@ -127,4 +96,27 @@ func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, 
 	}
 
 	return &metric, nil
+}
+
+func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
+	if len(cfg.Mapping) == 0 {
+		return nil
+	}
+
+	mappings := make(map[int64]string)
+
+	if isMappingKeysNumeric(cfg.Mapping) {
+		for k, v := range cfg.Mapping {
+			intKey, _ := strconv.ParseInt(k, 10, 64)
+			mappings[intKey] = v
+		}
+	} else {
+		for k, v := range cfg.Mapping {
+			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
+				mappings[intVal] = k
+			}
+		}
+	}
+
+	return mappings
 }
