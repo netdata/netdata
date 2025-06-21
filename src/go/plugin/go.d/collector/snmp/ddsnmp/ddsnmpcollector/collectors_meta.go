@@ -77,14 +77,13 @@ func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 			continue
 		}
 
-		tagValues, err := gc.tagProc.processTag(tagCfg, pdus)
-		if err != nil {
+		tc := mapTagCollector{tags: globalTags}
+
+		if err := gc.tagProc.processTag(tagCfg, pdus, tc); err != nil {
 			errs = append(errs, fmt.Errorf("failed to process tag value for '%s/%s': %w",
 				tagCfg.Tag, tagCfg.Symbol.Name, err))
 			continue
 		}
-
-		mergeTagsWithEmptyFallback(globalTags, tagValues)
 	}
 
 	if len(errs) > 0 && len(globalTags) == 0 {

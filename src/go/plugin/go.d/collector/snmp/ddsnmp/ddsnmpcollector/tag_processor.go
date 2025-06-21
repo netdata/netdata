@@ -8,6 +8,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+type mapTagCollector struct {
+	tags map[string]string
+}
+
+func (c *mapTagCollector) addTag(key, value string) {
+	if existing, ok := c.tags[key]; ok || existing == "" {
+		c.tags[key] = value
+	}
+}
+
 type globalTagProcessor struct {
 	tp *tableTagProcessor
 }
@@ -18,115 +28,54 @@ func newGlobalTagProcessor() *globalTagProcessor {
 	}
 }
 
-func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU) (map[string]string, error) {
+func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU, tc mapTagCollector) error {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
-		return nil, nil
+		return nil
 	}
-	return p.tp.processTag(cfg, pdu)
+	return p.tp.processTag(cfg, pdu, tc)
 }
 
-type tableTagProcessor struct {
-	mappingProcessor *mappingTagProcessor
-	patternProcessor *patternTagProcessor
-	extractProcessor *extractValueTagProcessor
-	matchProcessor   *matchPatternTagProcessor
-	defaultProcessor *defaultTagProcessor
-}
+type tableTagProcessor struct{}
 
 func newTableTagProcessor() *tableTagProcessor {
-	return &tableTagProcessor{
-		mappingProcessor: &mappingTagProcessor{},
-		patternProcessor: &patternTagProcessor{},
-		extractProcessor: &extractValueTagProcessor{},
-		matchProcessor:   &matchPatternTagProcessor{},
-		defaultProcessor: &defaultTagProcessor{},
-	}
+	return &tableTagProcessor{}
 }
 
-func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU) (map[string]string, error) {
+func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU, tc mapTagCollector) error {
 	tagName := ternary(cfg.Tag != "", cfg.Tag, cfg.Symbol.Name)
 	if tagName == "" {
-		return nil, nil
+		return nil
 	}
 
 	val, err := convPduToStringf(pdu, cfg.Symbol.Format)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	switch {
 	case len(cfg.Mapping) > 0:
-		return p.mappingProcessor.processTag(tagName, val, cfg)
-	case cfg.Pattern != nil:
-		return p.patternProcessor.processTag(val, cfg)
-	case cfg.Symbol.ExtractValueCompiled != nil:
-		return p.extractProcessor.processTag(tagName, val, cfg)
-	case cfg.Symbol.MatchPatternCompiled != nil:
-		return p.matchProcessor.processTag(tagName, val, cfg)
-	default:
-		return p.defaultProcessor.processTag(tagName, val)
-	}
-}
-
-// mappingTagProcessor handles simple value mapping
-type mappingTagProcessor struct{}
-
-func (p *mappingTagProcessor) processTag(tagName, value string, cfg ddprofiledefinition.MetricTagConfig) (map[string]string, error) {
-	tags := make(map[string]string)
-
-	if v, ok := cfg.Mapping[value]; ok {
-		value = v
-	}
-	tags[tagName] = value
-
-	return tags, nil
-}
-
-// patternTagProcessor handles regex pattern matching with multiple tags
-type patternTagProcessor struct{}
-
-func (p *patternTagProcessor) processTag(value string, cfg ddprofiledefinition.MetricTagConfig) (map[string]string, error) {
-	tags := make(map[string]string)
-
-	if sm := cfg.Pattern.FindStringSubmatch(value); len(sm) > 0 {
-		for name, tmpl := range cfg.Tags {
-			tags[name] = replaceSubmatches(tmpl, sm)
+		if v, ok := cfg.Mapping[val]; ok {
+			val = v
 		}
+		tc.addTag(tagName, val)
+	case cfg.Pattern != nil:
+		if sm := cfg.Pattern.FindStringSubmatch(val); len(sm) > 0 {
+			for name, tmpl := range cfg.Tags {
+				tc.addTag(name, replaceSubmatches(tmpl, sm))
+			}
+		}
+	case cfg.Symbol.ExtractValueCompiled != nil:
+		if sm := cfg.Symbol.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
+			tc.addTag(tagName, sm[1])
+		}
+	case cfg.Symbol.MatchPatternCompiled != nil:
+		if sm := cfg.Symbol.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
+			tc.addTag(tagName, replaceSubmatches(cfg.Symbol.MatchValue, sm))
+		}
+	default:
+		tc.addTag(tagName, val)
 	}
 
-	return tags, nil
-}
-
-// extractValueTagProcessor handles extract_value pattern
-type extractValueTagProcessor struct{}
-
-func (p *extractValueTagProcessor) processTag(tagName, value string, cfg ddprofiledefinition.MetricTagConfig) (map[string]string, error) {
-	tags := make(map[string]string)
-
-	if sm := cfg.Symbol.ExtractValueCompiled.FindStringSubmatch(value); len(sm) > 1 {
-		tags[tagName] = sm[1]
-	}
-
-	return tags, nil
-}
-
-// matchPatternTagProcessor handles match_pattern and match_value
-type matchPatternTagProcessor struct{}
-
-func (p *matchPatternTagProcessor) processTag(tagName, value string, cfg ddprofiledefinition.MetricTagConfig) (map[string]string, error) {
-	tags := make(map[string]string)
-
-	if sm := cfg.Symbol.MatchPatternCompiled.FindStringSubmatch(value); len(sm) > 0 {
-		tags[tagName] = replaceSubmatches(cfg.Symbol.MatchValue, sm)
-	}
-
-	return tags, nil
-}
-
-// defaultTagProcessor handles tags with no transformation
-type defaultTagProcessor struct{}
-
-func (p *defaultTagProcessor) processTag(tagName, value string) (map[string]string, error) {
-	return map[string]string{tagName: value}, nil
+	return nil
 }

@@ -411,6 +411,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext) ([]ddsnmp.Met
 			tags:       make(map[string]string),
 			staticTags: ctx.staticTags,
 		}
+		crossTableCtx.rowTags = row.tags
 
 		rowCtx := &tableRowProcessingContext{
 			config:           ctx.config,

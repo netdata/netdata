@@ -71,14 +71,13 @@ func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOID
 			continue
 		}
 
+		tc := mapTagCollector{tags: row.tags}
+
 		for _, tagCfg := range tagConfigs {
-			tags, err := p.tagProc.processTag(tagCfg, pdu)
-			if err != nil {
+			if err := p.tagProc.processTag(tagCfg, pdu, tc); err != nil {
 				p.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
 				continue
 			}
-
-			mergeTagsWithEmptyFallback(row.tags, tags)
 		}
 	}
 }
@@ -89,13 +88,10 @@ func (p *tableRowProcessor) processCrossTableTags(row *tableRowData, ctx *tableR
 			continue
 		}
 
-		tags, err := p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx)
-		if err != nil {
+		if err := p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx); err != nil {
 			p.log.Debugf("Error resolving cross-table tag %s: %v", tagCfg.Tag, err)
 			continue
 		}
-
-		mergeTagsWithEmptyFallback(row.tags, tags)
 	}
 }
 
@@ -194,6 +190,7 @@ type (
 	crossTableContext struct {
 		walkedData     map[string]map[string]gosnmp.SnmpPDU // tableOID -> PDUs
 		tableNameToOID map[string]string                    // tableName -> tableOID
+		rowTags        map[string]string
 	}
 )
 
@@ -205,28 +202,30 @@ func newCrossTableResolver(log *logger.Logger) *crossTableResolver {
 }
 
 // resolveCrossTableTag resolves a tag value from another table
-func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext) (map[string]string, error) {
+func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext) error {
 	refTableOID, err := r.findReferencedTableOID(tagCfg.Table, ctx.tableNameToOID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	refTablePDUs, err := r.getReferencedTableData(tagCfg.Table, refTableOID, ctx.walkedData)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	lookupIndex, err := r.transformIndex(index, tagCfg.IndexTransform)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	pdu, err := r.lookupValue(tagCfg, lookupIndex, refTablePDUs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return r.tagProcessor.processTag(tagCfg, pdu)
+	tc := mapTagCollector{tags: ctx.rowTags}
+
+	return r.tagProcessor.processTag(tagCfg, pdu, tc)
 }
 
 func (r *crossTableResolver) findReferencedTableOID(tableName string, tableNameToOID map[string]string) (string, error) {
