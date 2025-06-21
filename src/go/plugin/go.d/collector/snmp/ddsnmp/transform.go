@@ -89,6 +89,13 @@ func newMetricTransformFuncMap() template.FuncMap {
 			m.Value = value
 			return ""
 		},
+		"setTag": func(m *Metric, key, value string) string {
+			if m.Tags == nil {
+				m.Tags = make(map[string]string)
+			}
+			m.Tags[key] = value
+			return ""
+		},
 		"setMappings": func(m *Metric, mappings map[int64]string) string {
 			m.Mappings = mappings
 			return ""

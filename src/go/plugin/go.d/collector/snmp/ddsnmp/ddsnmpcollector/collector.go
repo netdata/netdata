@@ -23,13 +23,18 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(30*time.Minute, 1), // 100% jitter
+		tableCache:  newTableCache(30*time.Minute, 1),
 	}
 
 	for _, prof := range profiles {
 		prof := prof
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
+
+	coll.globalTagsCollector = newGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 
 	return coll
 }
@@ -41,6 +46,11 @@ type (
 		profiles    map[string]*profileState
 		missingOIDs map[string]bool
 		tableCache  *tableCache
+
+		globalTagsCollector     *globalTagsCollector
+		deviceMetadataCollector *deviceMetadataCollector
+		scalarCollector         *scalarCollector
+		tableCollector          *tableCollector
 
 		DoTableMetrics bool
 	}
@@ -82,12 +92,12 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 
 func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, error) {
 	if !ps.initialized {
-		globalTag, err := c.collectGlobalTags(ps.profile)
+		globalTag, err := c.globalTagsCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect global tags: %w", err)
 		}
 
-		deviceMeta, err := c.collectDeviceMetadata(ps.profile)
+		deviceMeta, err := c.deviceMetadataCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect device metadata: %w", err)
 		}
@@ -99,14 +109,14 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 
 	var metrics []ddsnmp.Metric
 
-	scalarMetrics, err := c.collectScalarMetrics(ps.profile)
+	scalarMetrics, err := c.scalarCollector.Collect(ps.profile)
 	if err != nil {
 		return nil, err
 	}
 	metrics = append(metrics, scalarMetrics...)
 
 	if c.DoTableMetrics {
-		tableMetrics, err := c.collectTableMetrics(ps.profile)
+		tableMetrics, err := c.tableCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, err
 		}
@@ -134,6 +144,9 @@ func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
 	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
 	for _, ps := range c.profiles {
 		if !ps.initialized {
+			continue
+		}
+		if ps.profile.Definition == nil {
 			continue
 		}
 		res, ok := ps.profile.Definition.Metadata["device"]

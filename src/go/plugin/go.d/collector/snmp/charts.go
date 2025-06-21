@@ -333,7 +333,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	if chart.Fam == "" {
 		chart.Fam = m.Name
 	}
-	if chart.Units == "bits/s" {
+	if chart.Units == "bit/s" {
 		chart.Type = module.Area
 	}
 
@@ -388,6 +388,9 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	}
 	if chart.Fam == "" {
 		chart.Fam = m.Name
+	}
+	if chart.Units == "bit/s" {
+		chart.Type = module.Area
 	}
 
 	tags := map[string]string{
