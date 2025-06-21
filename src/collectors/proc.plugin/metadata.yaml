@@ -5008,8 +5008,8 @@ modules:
       problems:
         list: []
     alerts:
-      - name: linux_power_supply_capacity
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/linux_power_supply.conf
+      - name: power_supply_capacity
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf
         metric: powersupply.capacity
         info: percentage of remaining power supply capacity
     metrics:
