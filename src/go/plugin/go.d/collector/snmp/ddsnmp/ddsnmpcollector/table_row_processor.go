@@ -71,7 +71,7 @@ func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOID
 			continue
 		}
 
-		tc := mapTagCollector{tags: row.tags}
+		tc := mapTagAdder{tags: row.tags}
 
 		for _, tagCfg := range tagConfigs {
 			if err := p.tagProc.processTag(tagCfg, pdu, tc); err != nil {
@@ -223,7 +223,7 @@ func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.Met
 		return err
 	}
 
-	tc := mapTagCollector{tags: ctx.rowTags}
+	tc := mapTagAdder{tags: ctx.rowTags}
 
 	return r.tagProcessor.processTag(tagCfg, pdu, tc)
 }

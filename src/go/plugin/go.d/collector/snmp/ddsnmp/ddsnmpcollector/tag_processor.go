@@ -8,12 +8,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-type mapTagCollector struct {
+type mapTagAdder struct {
 	tags map[string]string
 }
 
-func (c *mapTagCollector) addTag(key, value string) {
-	if existing, ok := c.tags[key]; ok || existing == "" {
+func (c *mapTagAdder) addTag(key, value string) {
+	if existing, ok := c.tags[key]; !ok || existing == "" {
 		c.tags[key] = value
 	}
 }
@@ -28,7 +28,7 @@ func newGlobalTagProcessor() *globalTagProcessor {
 	}
 }
 
-func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU, tc mapTagCollector) error {
+func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU, tc mapTagAdder) error {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		return nil
@@ -42,7 +42,7 @@ func newTableTagProcessor() *tableTagProcessor {
 	return &tableTagProcessor{}
 }
 
-func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU, tc mapTagCollector) error {
+func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU, tc mapTagAdder) error {
 	tagName := ternary(cfg.Tag != "", cfg.Tag, cfg.Symbol.Name)
 	if tagName == "" {
 		return nil
