@@ -1,0 +1,50 @@
+# Test PCRE2 named capture groups
+pattern: "(?P<date>\\d{4}-\\d{2}-\\d{2})\\s+(?P<time>\\d{2}:\\d{2}:\\d{2})\\s+\\[(?P<thread>\\w+)\\]\\s+(?P<class>[\\w\\.]+)\\s+-\\s+(?P<message>.*)"
+
+rewrite:
+  # Test referencing named groups in replacements
+  - key: TIMESTAMP
+    value: "${date}T${time}Z"
+    inject: yes
+    
+  - key: THREAD_INFO
+    value: "Thread ${thread} at ${time}"
+    inject: yes
+    
+  # Test nested group references
+  - key: message
+    match: "(?P<action>\\w+)\\s+(?P<object>\\w+)\\s+(?P<id>\\d+)"
+    value: "Action=${action}, Object=${object}, ID=${id}"
+    
+  # Test numeric group references alongside named
+  - key: SUMMARY
+    match: "(\\w+)\\s+(?P<target>\\w+)"
+    value: "${1} performed on ${target}"
+    inject: yes
+    
+  # Test conditional matching with groups
+  - key: ERROR_CODE
+    match: "error\\s+(?P<code>E\\d{4})"
+    value: "${code}"
+    inject: yes
+    
+  - key: WARNING_CODE  
+    match: "warning\\s+(?P<code>W\\d{4})"
+    value: "${code}"
+    inject: yes
+    
+  # Test group in match but not in replacement
+  - key: HAS_ERROR
+    match: "(?P<err>error|exception|fail)"
+    value: "true"
+    inject: yes
+    
+  # Test invalid group reference
+  - key: INVALID_GROUP
+    value: "${nonexistent_group}"
+    inject: yes
+
+filter:
+  # Can we use groups in filters? Test it
+  include: ".*(?P<important>CRITICAL|ERROR|WARNING).*"
+  exclude: ".*(?P<debug>DEBUG|TRACE).*"

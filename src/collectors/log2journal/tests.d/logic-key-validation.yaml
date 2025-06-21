@@ -1,0 +1,35 @@
+# Test key validation and transformation
+pattern: "(?P<valid_key>\\w+)\\s+(?P<invalid_key>\\w+)\\s+(?P<message>.*)"
+
+inject:
+  # Test long key (should warn)
+  - key: THIS_IS_A_VERY_LONG_KEY_NAME_THAT_EXCEEDS_SIXTY_FOUR_CHARACTERS_LIMIT
+    value: "long key test"
+    
+  # Test key with invalid characters (should be converted)
+  - key: key-with-dashes
+    value: "dashes"
+    
+  - key: key.with.dots
+    value: "dots"
+    
+  - key: key@with#special$chars
+    value: "special"
+    
+  # Test key starting with digit (should warn)
+  - key: 123_STARTS_WITH_DIGIT
+    value: "digit start"
+    
+  # Test key starting with underscore (should warn)
+  - key: _UNDERSCORE_START
+    value: "underscore start"
+    
+  # Test valid key
+  - key: VALID_KEY_NAME
+    value: "valid"
+
+# Expected transformations:
+# - invalid-key -> INVALID_KEY (dashes to underscores, lowercase to uppercase)
+# - Long keys should generate warnings but still work
+# - Invalid chars should be converted to underscores
+# - Keys starting with digits or underscores should generate warnings

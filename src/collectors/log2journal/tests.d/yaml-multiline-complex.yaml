@@ -1,0 +1,32 @@
+---
+# Complex multiline YAML constructs test
+# Tests folded scalars, literal scalars, complex quoting
+
+pattern: "(?P<data>.*)"
+
+inject:
+  - key: MULTILINE_FOLDED
+    value: >
+      This is a folded scalar that
+      should be joined into a single
+      line with spaces replacing newlines.
+      
+  - key: MULTILINE_LITERAL
+    value: |
+      This is a literal scalar
+      that preserves exact formatting
+      including newlines and spacing.
+      
+  - key: COMPLEX_QUOTES
+    value: "Single quotes with 'embedded singles' and \"escaped doubles\""
+    
+  - key: YAML_SPECIAL
+    value: "Contains: colons, [brackets], {braces}, and | pipes"
+
+filename:
+  key: FILENAME
+  
+rewrite:
+  - key: MESSAGE
+    value: 'Processed: ${data}'
+    inject: yes

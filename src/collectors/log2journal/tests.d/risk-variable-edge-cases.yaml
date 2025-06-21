@@ -1,0 +1,71 @@
+# Test advanced variable substitution edge cases
+pattern: "(?P<user>\\w+)\\s+(?P<action>\\w+)\\s+(?P<resource>\\S+)"
+
+inject:
+  # Test circular references (should not crash)
+  - key: CIRCULAR_A
+    value: "A references ${CIRCULAR_B}"
+    
+  - key: CIRCULAR_B
+    value: "B references ${CIRCULAR_A}"
+    
+  # Test self-references
+  - key: SELF_REF
+    value: "Self: ${SELF_REF}"
+    
+  # Test deeply nested references
+  - key: DEEP_1
+    value: "${DEEP_2}"
+    
+  - key: DEEP_2
+    value: "${DEEP_3}"
+    
+  - key: DEEP_3
+    value: "${DEEP_4}"
+    
+  - key: DEEP_4
+    value: "Final: ${user}"
+    
+  # Test variables with special characters
+  - key: SPECIAL_VARS
+    value: "User: ${user}, Action: ${action}, Resource: ${resource}"
+    
+  # Test undefined variable handling
+  - key: UNDEFINED_TEST
+    value: "Before ${UNDEFINED_VAR} After"
+    
+  # Test empty variable values
+  - key: EMPTY_VAR
+    value: ""
+    
+  - key: EMPTY_TEST
+    value: "Value: '${EMPTY_VAR}' (should be empty)"
+
+rewrite:
+  # Test variables in different contexts
+  - key: VAR_IN_MATCH
+    match: "${action}"
+    value: "Matched action: ${action}"
+    
+  # Test variables in key names (if supported)
+  - key: DYNAMIC_KEY_TEST
+    value: "Dynamic key based on action: ${action}"
+    inject: yes
+    
+  # Test complex variable combinations
+  - key: COMPLEX_SUBSTITUTION
+    value: "${user} performed ${action} on ${resource} at ${UNDEFINED_TIME:-unknown_time}"
+    inject: yes
+    
+  # Test variables with default values (if supported)
+  - key: DEFAULT_VALUE_TEST
+    value: "${MISSING_VAR:-default_value}"
+    inject: yes
+
+# Test variables in rename operations  
+rename:
+  - old_key: user
+    new_key: USERNAME
+    
+  - old_key: action
+    new_key: USER_ACTION

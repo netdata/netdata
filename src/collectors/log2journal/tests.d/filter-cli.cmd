@@ -1,0 +1,1 @@
+${TESTED_LOG2JOURNAL_BIN} -f tests.d/filter-cli.yaml --include 'TEST.*' --exclude '.*TEMP'

@@ -1,0 +1,23 @@
+---
+# Base config for command line interaction tests
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+prefix: CONFIG_
+
+inject:
+  - key: SOURCE
+    value: "config_file"
+  - key: VERSION
+    value: "1.0"
+
+rewrite:
+  - key: CONFIG_level
+    match: "ERROR"
+    value: "CRITICAL"
+    
+  - key: COMPUTED
+    value: "from_config"
+    inject: yes
+
+filename:
+  key: CONFIG_FILENAME

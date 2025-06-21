@@ -1,0 +1,23 @@
+# Test unmatched line handling
+pattern: "^VALID:\\s+(?P<data>.*)"
+
+inject:
+  - key: NORMAL_INJECT
+    value: "always present"
+
+unmatched:
+  key: PARSE_ERROR
+  inject:
+    - key: ERROR_TYPE
+      value: "INVALID_FORMAT"
+    - key: TIMESTAMP
+      value: "2024-01-01T00:00:00Z"
+    - key: HOSTNAME
+      value: "localhost"
+
+# Test with valid line: "VALID: some data"
+# Expected: NORMAL_INJECT, DATA should appear
+
+# Test with invalid line: "INVALID: some data"  
+# Expected: PARSE_ERROR, ERROR_TYPE, TIMESTAMP, HOSTNAME should appear
+# But NOT NORMAL_INJECT (only unmatched injections for unmatched lines)

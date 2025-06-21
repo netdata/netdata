@@ -1,0 +1,4 @@
+PARSE_ERROR=Parsing error on: test message
+FORMATTED_MSG=[] /log2journal-test/ (): 
+SEVERITY=0
+

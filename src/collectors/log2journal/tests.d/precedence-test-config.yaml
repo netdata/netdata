@@ -1,0 +1,41 @@
+---
+# Comprehensive precedence test config
+# Tests how CLI arguments interact with config file settings
+
+pattern: "(?P<level>\\w+)\\s+(?P<user>\\w+)\\s+(?P<action>\\w+)\\s+(?P<message>.*)"
+
+prefix: CONFIG_
+
+inject:
+  - key: ORDER_1
+    value: "config_inject_1"
+  - key: DUPLICATE_KEY
+    value: "config_value"
+  - key: ORDER_2
+    value: "config_inject_2"
+
+rename:
+  - old_key: CONFIG_level
+    new_key: SEVERITY
+  - old_key: CONFIG_user
+    new_key: USERNAME
+
+rewrite:
+  - key: SEVERITY
+    match: "ERROR"
+    value: "CONFIG_CRITICAL"
+  - key: DUPLICATE_REWRITE
+    match: "test"
+    value: "config_rewritten"
+    inject: yes
+  - key: CONFIG_action
+    match: "delete"
+    value: "CONFIG_DELETE_ACTION"
+
+# Temporarily disable filter to test rewrite/rename
+# filter:
+#   include: ".*"
+#   exclude: "CONFIG_message"
+
+filename:
+  key: CONFIG_FILENAME

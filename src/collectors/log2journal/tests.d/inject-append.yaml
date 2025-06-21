@@ -1,0 +1,9 @@
+---
+# Config with inject rules that will be appended by CLI
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+inject:
+  - key: CONFIG_KEY1
+    value: "config_value1"
+  - key: CONFIG_KEY2  
+    value: "config_value2"

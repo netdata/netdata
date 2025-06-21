@@ -1,0 +1,9 @@
+ACTION=delete
+BASE_MSG=User  performed 
+FULL_MSG=User  performed  on 
+LINE_VAR=Original: admin delete /file
+RESOURCE=/file
+SUMMARY=::
+UNDEFINED_VAR= should be empty
+USER=admin
+

@@ -1,0 +1,8 @@
+---
+# Simple test to prove rename is broken
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+rename:
+  - old_key: level
+    new_key: SEVERITY
+    # This should rename 'level' to 'SEVERITY' but doesn't work

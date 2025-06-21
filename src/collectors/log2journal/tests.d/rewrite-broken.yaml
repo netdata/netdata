@@ -1,0 +1,9 @@
+---
+# Simple test to prove rewrite is broken
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+rewrite:
+  - key: level
+    match: "ERROR"
+    value: "CRITICAL"
+    # This should change ERROR to CRITICAL but doesn't work

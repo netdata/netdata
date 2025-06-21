@@ -1,0 +1,11 @@
+123_STARTS_WITH_DIGIT=digit start
+INVALID_KEY=invalidkey
+MESSAGE=test message
+THIS_IS_A_VERY_LONG_KEY_NAME_THAT_EXCEEDS_SIXTY_FOUR_CHARACTERS_LIMIT=long key test
+VALID_KEY=validkey
+VALID_KEY_NAME=valid
+_UNDERSCORE_START=underscore start
+key-with-dashes=dashes
+key.with.dots=dots
+key@with#special$chars=special
+

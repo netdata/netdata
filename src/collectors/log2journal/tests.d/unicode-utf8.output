@@ -1,0 +1,5 @@
+DATA=Test message with émojis
+MESSAGE= - UTF8_VALIDATED
+UNICODE_TEST=Test with émojis 🎉 and üñíçödé
+UTF8_CHARS=Japanese: こんにちは, Arabic: مرحبا, Russian: Привет
+

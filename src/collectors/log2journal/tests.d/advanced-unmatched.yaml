@@ -1,0 +1,28 @@
+---
+# Advanced unmatched handling test
+# Tests unmatched log lines with injections
+
+pattern: "MATCHED: (?P<data>.*)"
+
+inject:
+  - key: ALWAYS_PRESENT
+    value: "always here"
+
+rewrite:
+  - key: PROCESSED_DATA
+    value: "Processed: ${data}"
+    inject: yes
+
+# Handle unmatched lines
+unmatched:
+  key: RAW_MESSAGE
+  inject:
+    - key: PARSE_ERROR
+      value: "failed to match pattern"
+    - key: ERROR_TYPE
+      value: "unmatched_log_line"
+    - key: SEVERITY
+      value: "warning"
+
+filename:
+  key: FILENAME

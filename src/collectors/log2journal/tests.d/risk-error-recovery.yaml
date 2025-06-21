@@ -1,0 +1,35 @@
+# Test error recovery - mix valid and problematic sections
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+# Valid section first
+inject:
+  - key: VALID_BEFORE_ERROR
+    value: "should work"
+
+# This section should work
+rewrite:
+  - key: WORKING_REWRITE
+    value: "Level: ${level}"
+    inject: yes
+
+# Valid section after potential issues
+rename:
+  - old_key: level
+    new_key: LOG_LEVEL
+    
+# Test with edge case values that might cause issues
+filter:
+  include: ".*"  # Very permissive
+  exclude: "^$"  # Empty strings only
+
+# Test unmatched section
+unmatched:
+  key: PARSE_ERROR
+  inject:
+    - key: ERROR_HANDLED
+      value: "Parser recovered successfully"
+      
+# Test complex variable references
+inject:
+  - key: COMPLEX_VAR_TEST
+    value: "Message: ${message}, Level: ${LOG_LEVEL}, Working: ${WORKING_REWRITE}"
