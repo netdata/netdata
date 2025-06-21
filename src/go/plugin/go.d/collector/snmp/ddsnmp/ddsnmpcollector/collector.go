@@ -31,8 +31,8 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
 
-	coll.globalTagsCollector = NewGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
-	coll.deviceMetadataCollector = NewDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.globalTagsCollector = newGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
 	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 
@@ -47,8 +47,8 @@ type (
 		missingOIDs map[string]bool
 		tableCache  *tableCache
 
-		globalTagsCollector     *GlobalTagsCollector
-		deviceMetadataCollector *DeviceMetadataCollector
+		globalTagsCollector     *globalTagsCollector
+		deviceMetadataCollector *deviceMetadataCollector
 		scalarCollector         *scalarCollector
 		tableCollector          *tableCollector
 

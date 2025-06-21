@@ -3,6 +3,8 @@
 package ddsnmpcollector
 
 import (
+	"bytes"
+	"fmt"
 	"maps"
 	"strconv"
 
@@ -12,12 +14,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// metricBuilder provides a fluent interface for building metrics
 type metricBuilder struct {
 	metric ddsnmp.Metric
 }
 
-// newMetricBuilder creates a new metricBuilder with basic metric info
 func newMetricBuilder(name string, value int64) *metricBuilder {
 	return &metricBuilder{
 		metric: ddsnmp.Metric{
@@ -27,7 +27,6 @@ func newMetricBuilder(name string, value int64) *metricBuilder {
 	}
 }
 
-// withTags sets the metric tags
 func (mb *metricBuilder) withTags(tags map[string]string) *metricBuilder {
 	if len(tags) > 0 {
 		mb.metric.Tags = maps.Clone(tags)
@@ -35,7 +34,6 @@ func (mb *metricBuilder) withTags(tags map[string]string) *metricBuilder {
 	return mb
 }
 
-// withStaticTags sets the static tags
 func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	if len(tags) > 0 {
 		mb.metric.StaticTags = maps.Clone(tags)
@@ -43,33 +41,29 @@ func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	return mb
 }
 
-// asTableMetric marks the metric as coming from a table
 func (mb *metricBuilder) asTableMetric() *metricBuilder {
 	mb.metric.IsTable = true
 	return mb
 }
 
-// fromSymbol applies symbol configuration to the metric
 func (mb *metricBuilder) fromSymbol(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) *metricBuilder {
 	mb.metric.Unit = sym.Unit
 	mb.metric.Description = sym.Description
 	mb.metric.Family = sym.Family
 	mb.metric.MetricType = ternary(sym.MetricType != "", sym.MetricType, getMetricTypeFromPDUType(pdu))
-	mb.metric.Mappings = convSymMappingToNumeric(sym)
+	mb.metric.Mappings = convMappingToNumeric(sym)
 	return mb
 }
 
-// Build returns the built metric
-func (mb *metricBuilder) Build() ddsnmp.Metric {
+func (mb *metricBuilder) build() ddsnmp.Metric {
 	return mb.metric
 }
 
-// buildScalarMetric builds a scalar metric using the builder
 func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, staticTags map[string]string) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
 		withStaticTags(staticTags).
 		fromSymbol(cfg, pdu).
-		Build()
+		build()
 
 	if cfg.TransformCompiled != nil {
 		if err := applyTransform(&metric, cfg); err != nil {
@@ -80,14 +74,13 @@ func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU,
 	return &metric, nil
 }
 
-// buildTableMetric builds a table metric using the builder
 func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
 		withTags(tags).
 		withStaticTags(staticTags).
 		fromSymbol(cfg, pdu).
 		asTableMetric().
-		Build()
+		build()
 
 	if cfg.TransformCompiled != nil {
 		if err := applyTransform(&metric, cfg); err != nil {
@@ -98,14 +91,23 @@ func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, 
 	return &metric, nil
 }
 
-func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
+func convMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
 	if len(cfg.Mapping) == 0 {
 		return nil
 	}
 
+	isMappingKeysNumeric := func() bool {
+		for k := range cfg.Mapping {
+			if !isInt(k) {
+				return false
+			}
+		}
+		return true
+	}()
+
 	mappings := make(map[int64]string)
 
-	if isMappingKeysNumeric(cfg.Mapping) {
+	if isMappingKeysNumeric {
 		for k, v := range cfg.Mapping {
 			intKey, _ := strconv.ParseInt(k, 10, 64)
 			mappings[intKey] = v
@@ -119,4 +121,19 @@ func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]str
 	}
 
 	return mappings
+}
+
+func applyTransform(metric *ddsnmp.Metric, sym ddprofiledefinition.SymbolConfig) error {
+	if sym.TransformCompiled == nil {
+		return nil
+	}
+
+	ctx := struct{ Metric *ddsnmp.Metric }{Metric: metric}
+
+	var buf bytes.Buffer
+	if err := sym.TransformCompiled.Execute(&buf, ctx); err != nil {
+		return fmt.Errorf("failed to execute transform template: %w", err)
+	}
+
+	return nil
 }

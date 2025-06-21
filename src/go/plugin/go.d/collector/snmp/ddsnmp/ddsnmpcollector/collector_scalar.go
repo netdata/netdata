@@ -22,7 +22,6 @@ type scalarCollector struct {
 	valProc     *valueProcessor
 }
 
-// newScalarCollector creates a new scalar collector
 func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *scalarCollector {
 	return &scalarCollector{
 		snmpClient:  snmpClient,
@@ -44,13 +43,11 @@ func (sc *scalarCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error
 		return nil, nil
 	}
 
-	// Get all scalar values in batches
 	pdus, err := sc.getScalarValues(oids)
 	if err != nil {
 		return nil, err
 	}
 
-	// Process each metric configuration
 	return sc.processScalarMetrics(prof.Definition.Metrics, pdus)
 }
 
@@ -80,7 +77,6 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 	return oids, missingOIDs
 }
 
-// getScalarValues retrieves values for the given OIDs
 func (sc *scalarCollector) getScalarValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 	maxOids := sc.snmpClient.MaxOids()

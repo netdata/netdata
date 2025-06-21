@@ -418,7 +418,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext) ([]ddsnmp.Met
 			sameTableTagOIDs: ctx.sameTableTagOIDs,
 			crossTableCtx:    crossTableCtx,
 		}
-		rowMetrics, err := tc.rowProcessor.ProcessRow(row, rowCtx)
+		rowMetrics, err := tc.rowProcessor.processRow(row, rowCtx)
 		if err != nil {
 			errs = append(errs, err)
 			continue

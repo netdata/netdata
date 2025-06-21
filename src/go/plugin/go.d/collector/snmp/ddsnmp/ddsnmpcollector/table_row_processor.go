@@ -11,8 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// tableRowProcessor processes individual rows from SNMP tables
 type (
+	// tableRowProcessor processes individual rows from SNMP tables
 	tableRowProcessor struct {
 		log                *logger.Logger
 		crossTableResolver *crossTableResolver
@@ -35,7 +35,6 @@ type (
 	}
 )
 
-// newTableRowProcessor creates a new table row processor
 func newTableRowProcessor(log *logger.Logger) *tableRowProcessor {
 	return &tableRowProcessor{
 		log:                log,
@@ -45,18 +44,14 @@ func newTableRowProcessor(log *logger.Logger) *tableRowProcessor {
 	}
 }
 
-// ProcessRow processes a single table row and returns metrics
-func (p *tableRowProcessor) ProcessRow(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
-	// Process all tags for this row
+func (p *tableRowProcessor) processRow(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
 	if err := p.processRowTags(row, ctx); err != nil {
 		p.log.Debugf("Error processing tags for row %s: %v", row.index, err)
 	}
 
-	// Process metrics for this row
 	return p.processRowMetrics(row, ctx)
 }
 
-// processRowTags processes all types of tags for a row
 func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) error {
 	p.processSameTableTags(row, ctx.sameTableTagOIDs)
 
@@ -69,7 +64,6 @@ func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProce
 	return nil
 }
 
-// processSameTableTags processes tags from the same table
 func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig) {
 	for columnOID, tagConfigs := range tagColumnOIDs {
 		pdu, ok := row.pdus[columnOID]
@@ -89,10 +83,9 @@ func (p *tableRowProcessor) processSameTableTags(row *tableRowData, tagColumnOID
 	}
 }
 
-// processCrossTableTags processes tags from other tables
 func (p *tableRowProcessor) processCrossTableTags(row *tableRowData, ctx *tableRowProcessingContext) {
 	for _, tagCfg := range ctx.config.MetricTags {
-		if !p.crossTableResolver.isApplicable(tagCfg, ctx.config.Table.Name) {
+		if !p.crossTableResolver.isCrossTable(tagCfg, ctx.config.Table.Name) {
 			continue
 		}
 
@@ -106,7 +99,6 @@ func (p *tableRowProcessor) processCrossTableTags(row *tableRowData, ctx *tableR
 	}
 }
 
-// processIndexBasedTags processes index-based tags
 func (p *tableRowProcessor) processIndexBasedTags(row *tableRowData, metricTags []ddprofiledefinition.MetricTagConfig) {
 	for _, tagCfg := range metricTags {
 		if tagCfg.Index == 0 {
@@ -162,7 +154,6 @@ func (p *tableRowProcessor) extractIndexPosition(index string, position uint) (s
 	return index, n == position && index != ""
 }
 
-// processRowMetrics processes metrics for a row
 func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 
@@ -184,20 +175,17 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 	return metrics, nil
 }
 
-// createMetric creates a metric from symbol config and PDU
 func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData) (*ddsnmp.Metric, error) {
-	// Process the value
 	value, err := p.valProc.processValue(sym, pdu)
 	if err != nil {
 		return nil, fmt.Errorf("error processing value: %w", err)
 	}
 
-	// Build the metric
 	return buildTableMetric(sym, pdu, value, row.tags, row.staticTags)
 }
 
-// crossTableResolver handles resolving tags from other tables
 type (
+	// crossTableResolver handles resolving tags from other tables
 	crossTableResolver struct {
 		log          *logger.Logger
 		tagProcessor *tableTagProcessor
@@ -209,7 +197,6 @@ type (
 	}
 )
 
-// newCrossTableResolver creates a new cross-table resolver
 func newCrossTableResolver(log *logger.Logger) *crossTableResolver {
 	return &crossTableResolver{
 		log:          log,
@@ -242,7 +229,6 @@ func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.Met
 	return r.tagProcessor.processTag(tagCfg, pdu)
 }
 
-// findReferencedTableOID finds the OID for a referenced table
 func (r *crossTableResolver) findReferencedTableOID(tableName string, tableNameToOID map[string]string) (string, error) {
 	tableOID, ok := tableNameToOID[tableName]
 	if !ok {
@@ -252,7 +238,6 @@ func (r *crossTableResolver) findReferencedTableOID(tableName string, tableNameT
 	return tableOID, nil
 }
 
-// getReferencedTableData gets the walked data for a referenced table
 func (r *crossTableResolver) getReferencedTableData(tableName string, tableOID string, walkedData map[string]map[string]gosnmp.SnmpPDU) (map[string]gosnmp.SnmpPDU, error) {
 	pdus, ok := walkedData[tableOID]
 	if !ok {
@@ -277,7 +262,6 @@ func (r *crossTableResolver) transformIndex(index string, transforms []ddprofile
 	return transformedIndex, nil
 }
 
-// lookupValue looks up the value in the referenced table
 func (r *crossTableResolver) lookupValue(tagCfg ddprofiledefinition.MetricTagConfig, lookupIndex string, refTablePDUs map[string]gosnmp.SnmpPDU) (gosnmp.SnmpPDU, error) {
 	refColumnOID := trimOID(tagCfg.Symbol.OID)
 	refFullOID := refColumnOID + "." + lookupIndex
@@ -317,7 +301,6 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 	return strings.Join(result, ".")
 }
 
-// isApplicable checks if this tag configuration is for cross-table resolution
-func (r *crossTableResolver) isApplicable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
+func (r *crossTableResolver) isCrossTable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
 	return tagCfg.Table != "" && tagCfg.Table != currentTableName && tagCfg.Index == 0
 }

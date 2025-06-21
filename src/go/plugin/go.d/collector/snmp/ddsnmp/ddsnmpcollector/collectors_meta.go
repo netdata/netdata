@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -15,17 +14,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-// GlobalTagsCollector handles collection of profile-wide tags
-type GlobalTagsCollector struct {
+// globalTagsCollector handles collection of profile-wide tags
+type globalTagsCollector struct {
 	snmpClient  gosnmp.Handler
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	tagProc     *globalTagProcessor
 }
 
-// NewGlobalTagsCollector creates a new global tags collector
-func NewGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *GlobalTagsCollector {
-	return &GlobalTagsCollector{
+func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *globalTagsCollector {
+	return &globalTagsCollector{
 		snmpClient:  snmpClient,
 		missingOIDs: missingOIDs,
 		log:         log,
@@ -34,17 +32,15 @@ func NewGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bo
 }
 
 // Collect gathers all global tags from the profile
-func (gc *GlobalTagsCollector) Collect(prof *ddsnmp.Profile) (map[string]string, error) {
+func (gc *globalTagsCollector) Collect(prof *ddsnmp.Profile) (map[string]string, error) {
 	if len(prof.Definition.MetricTags) == 0 && len(prof.Definition.StaticTags) == 0 {
 		return nil, nil
 	}
 
 	tags := make(map[string]string)
 
-	// Process static tags first
 	gc.processStaticTags(prof.Definition.StaticTags, tags)
 
-	// Process dynamic tags
 	if err := gc.processDynamicTags(prof.Definition.MetricTags, tags); err != nil {
 		return ternary(len(tags) > 0, tags, nil), err
 	}
@@ -52,17 +48,12 @@ func (gc *GlobalTagsCollector) Collect(prof *ddsnmp.Profile) (map[string]string,
 	return tags, nil
 }
 
-// processStaticTags processes static tags from the profile
-func (gc *GlobalTagsCollector) processStaticTags(staticTags []string, globalTags map[string]string) {
-	for _, tag := range staticTags {
-		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
-			globalTags[n] = v
-		}
-	}
+func (gc *globalTagsCollector) processStaticTags(staticTags []string, globalTags map[string]string) {
+	mergeTagsWithEmptyFallback(globalTags, parseStaticTags(staticTags))
 }
 
 // processDynamicTags processes tags that require SNMP fetching
-func (gc *GlobalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.MetricTagConfig, globalTags map[string]string) error {
+func (gc *globalTagsCollector) processDynamicTags(metricTags []ddprofiledefinition.MetricTagConfig, globalTags map[string]string) error {
 	// Identify OIDs to collect
 	oids, missingOIDs := gc.identifyTagOIDs(metricTags)
 
@@ -74,7 +65,6 @@ func (gc *GlobalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 		return nil
 	}
 
-	// Fetch tag values
 	pdus, err := gc.fetchTagValues(oids)
 	if err != nil {
 		return fmt.Errorf("failed to fetch global tag values: %w", err)
@@ -104,8 +94,7 @@ func (gc *GlobalTagsCollector) processDynamicTags(metricTags []ddprofiledefiniti
 	return nil
 }
 
-// identifyTagOIDs returns OIDs to collect and OIDs that are known to be missing
-func (gc *GlobalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.MetricTagConfig) ([]string, []string) {
+func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.MetricTagConfig) ([]string, []string) {
 	var oids []string
 	var missingOIDs []string
 
@@ -130,8 +119,7 @@ func (gc *GlobalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.
 	return oids, missingOIDs
 }
 
-// fetchTagValues retrieves values for the given OIDs
-func (gc *GlobalTagsCollector) fetchTagValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
+func (gc *globalTagsCollector) fetchTagValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 	maxOids := gc.snmpClient.MaxOids()
 
@@ -153,31 +141,28 @@ func (gc *GlobalTagsCollector) fetchTagValues(oids []string) (map[string]gosnmp.
 	return pdus, nil
 }
 
-// DeviceMetadataCollector handles collection of device metadata
-type DeviceMetadataCollector struct {
+// deviceMetadataCollector handles collection of device metadata
+type deviceMetadataCollector struct {
 	snmpClient  gosnmp.Handler
 	missingOIDs map[string]bool
 	log         *logger.Logger
 }
 
-// NewDeviceMetadataCollector creates a new device metadata collector
-func NewDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *DeviceMetadataCollector {
-	return &DeviceMetadataCollector{
+func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *deviceMetadataCollector {
+	return &deviceMetadataCollector{
 		snmpClient:  snmpClient,
 		missingOIDs: missingOIDs,
 		log:         log,
 	}
 }
 
-// Collect gathers device metadata from the profile
-func (dc *DeviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]string, error) {
+func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]string, error) {
 	if len(prof.Definition.Metadata) == 0 {
 		return nil, nil
 	}
 
 	meta := make(map[string]string)
 
-	// Process each metadata resource
 	for resName, cfg := range prof.Definition.Metadata {
 		if !ddprofiledefinition.IsMetadataResourceWithScalarOids(resName) {
 			continue
@@ -192,8 +177,7 @@ func (dc *DeviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 }
 
 // processResource processes a single metadata resource
-func (dc *DeviceMetadataCollector) processResource(cfg ddprofiledefinition.MetadataResourceConfig, metadata map[string]string) error {
-	// First pass: collect static values and identify OIDs
+func (dc *deviceMetadataCollector) processResource(cfg ddprofiledefinition.MetadataResourceConfig, metadata map[string]string) error {
 	staticValues := make(map[string]string)
 	oids := dc.collectStaticAndIdentifyOIDs(cfg, staticValues)
 
@@ -214,7 +198,7 @@ func (dc *DeviceMetadataCollector) processResource(cfg ddprofiledefinition.Metad
 }
 
 // collectStaticAndIdentifyOIDs collects static values and returns OIDs to fetch
-func (dc *DeviceMetadataCollector) collectStaticAndIdentifyOIDs(cfg ddprofiledefinition.MetadataResourceConfig, staticValues map[string]string) []string {
+func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(cfg ddprofiledefinition.MetadataResourceConfig, staticValues map[string]string) []string {
 	var oids []string
 
 	for name, field := range cfg.Fields {
@@ -241,8 +225,7 @@ func (dc *DeviceMetadataCollector) collectStaticAndIdentifyOIDs(cfg ddprofiledef
 	return oids
 }
 
-// fetchMetadataValues retrieves values for the given OIDs
-func (dc *DeviceMetadataCollector) fetchMetadataValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
+func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 	maxOids := dc.snmpClient.MaxOids()
 
@@ -264,8 +247,7 @@ func (dc *DeviceMetadataCollector) fetchMetadataValues(oids []string) (map[strin
 	return pdus, nil
 }
 
-// processDynamicFields processes fields that require SNMP values
-func (dc *DeviceMetadataCollector) processDynamicFields(cfg ddprofiledefinition.MetadataResourceConfig, pdus map[string]gosnmp.SnmpPDU, metadata map[string]string) error {
+func (dc *deviceMetadataCollector) processDynamicFields(cfg ddprofiledefinition.MetadataResourceConfig, pdus map[string]gosnmp.SnmpPDU, metadata map[string]string) error {
 	var errs []error
 
 	for name, field := range cfg.Fields {
@@ -304,8 +286,7 @@ func (dc *DeviceMetadataCollector) processDynamicFields(cfg ddprofiledefinition.
 	return nil
 }
 
-// processSymbolValue processes a single symbol configuration
-func (dc *DeviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU) (string, error) {
+func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU) (string, error) {
 	pdu, ok := pdus[trimOID(cfg.OID)]
 	if !ok {
 		return "", nil

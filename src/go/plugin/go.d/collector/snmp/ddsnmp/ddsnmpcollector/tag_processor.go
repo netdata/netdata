@@ -26,7 +26,6 @@ func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig,
 	return p.tp.processTag(cfg, pdu)
 }
 
-// tagProcessorFactory selects the appropriate processor
 type tableTagProcessor struct {
 	mappingProcessor *mappingTagProcessor
 	patternProcessor *patternTagProcessor

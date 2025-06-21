@@ -387,7 +387,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := NewGlobalTagsCollector(mockHandler, missingOIDs, logger.New())
+			collector := newGlobalTagsCollector(mockHandler, missingOIDs, logger.New())
 
 			result, err := collector.Collect(tc.profile)
 
@@ -900,7 +900,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := NewDeviceMetadataCollector(mockHandler, missingOIDs, logger.New())
+			collector := newDeviceMetadataCollector(mockHandler, missingOIDs, logger.New())
 
 			result, err := collector.Collect(tc.profile)
 
