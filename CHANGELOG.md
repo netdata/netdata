@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Lock before checking the statement pool [\#20536](https://github.com/netdata/netdata/pull/20536) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump k8s.io/client-go from 0.33.1 to 0.33.2 in /src/go [\#20532](https://github.com/netdata/netdata/pull/20532) ([dependabot[bot]](https://github.com/apps/dependabot))
+- improve\(go.d/snmp\): dd support for non-identifying tags in table metrics [\#20530](https://github.com/netdata/netdata/pull/20530) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/snmp\): add Go template-based metric transformations for SNMP profiles [\#20528](https://github.com/netdata/netdata/pull/20528) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp-profiles\): allow users to add custom SNMP profiles [\#20526](https://github.com/netdata/netdata/pull/20526) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): log device profiles matched by sysObjectID [\#20524](https://github.com/netdata/netdata/pull/20524) ([ilyam8](https://github.com/ilyam8))
 - update units in \_generic-if.yaml [\#20523](https://github.com/netdata/netdata/pull/20523) ([ilyam8](https://github.com/ilyam8))
@@ -457,8 +461,6 @@
 - Release memory when calculating metric correlations [\#19979](https://github.com/netdata/netdata/pull/19979) ([stelfrag](https://github.com/stelfrag))
 - Fix random crash during shutdown [\#19978](https://github.com/netdata/netdata/pull/19978) ([stelfrag](https://github.com/stelfrag))
 - set max datafile size to 1GiB [\#19977](https://github.com/netdata/netdata/pull/19977) ([ktsaou](https://github.com/ktsaou))
-- Doc Linux improved order in kickstart [\#19975](https://github.com/netdata/netdata/pull/19975) ([kanelatechnical](https://github.com/kanelatechnical))
-- fix crash in variable\_lookup\_add\_result\_with\_score\(\) [\#19972](https://github.com/netdata/netdata/pull/19972) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
