@@ -221,6 +221,7 @@ int eval_unittest(void);
 int duration_unittest(void);
 int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
+int yaml_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -373,6 +374,13 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
 
+                        if(strcmp(optarg, "yamltest") == 0) {
+                            unittest_running = true;
+                            if (yaml_unittest()) return 1;
+                            fprintf(stderr, "\n\nYAML TESTS PASSED\n\n");
+                            return 0;
+                        }
+                        
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
@@ -412,6 +420,7 @@ int netdata_main(int argc, char **argv) {
                             if (duration_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
+                            if (yaml_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
