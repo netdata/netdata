@@ -112,7 +112,13 @@ static struct proc_module {
         .enabled = CONFIG_BOOLEAN_YES,
         .update_every = UPDATE_EVERY_MIN,
         .func = do_PerflibExchange},
-    // the terminator of this array
+    {.name = "PerflibASP",
+            .dim = "PerflibASP",
+            .enabled = CONFIG_BOOLEAN_YES,
+            .update_every = UPDATE_EVERY_MIN,
+            .func = do_PerflibASP},
+
+        // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}};
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
