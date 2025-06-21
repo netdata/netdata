@@ -56,14 +56,11 @@ func (tc *tableCollector) Collect(prof *ddsnmp.Profile) ([]ddsnmp.Metric, error)
 
 // walkTablesAsNeeded walks only tables that aren't fully cached
 func (tc *tableCollector) walkTablesAsNeeded(prof *ddsnmp.Profile) ([]tableWalkResult, error) {
-	// Identify tables to walk
 	toWalk := tc.identifyTablesToWalk(prof)
 
-	// Walk the tables
 	walkedData, errs := tc.walkTables(toWalk.tablesToWalk)
 
-	// Build results
-	results := tc.buildWalkResults(prof, walkedData, toWalk)
+	results := tc.buildWalkResults(walkedData, toWalk)
 
 	if len(results) == 0 && len(errs) > 0 {
 		return nil, errors.Join(errs...)
@@ -135,32 +132,26 @@ func (tc *tableCollector) walkTables(tablesToWalk map[string]bool) (map[string]m
 }
 
 // buildWalkResults creates results for all configurations
-func (tc *tableCollector) buildWalkResults(prof *ddsnmp.Profile, walkedData map[string]map[string]gosnmp.SnmpPDU, info *tablesToWalkInfo) []tableWalkResult {
+func (tc *tableCollector) buildWalkResults(walkedData map[string]map[string]gosnmp.SnmpPDU, info *tablesToWalkInfo) []tableWalkResult {
 	var results []tableWalkResult
 
-	for _, cfg := range prof.Definition.Metrics {
-		if cfg.IsScalar() || cfg.Table.OID == "" {
-			continue
-		}
-
-		if tc.missingOIDs[trimOID(cfg.Table.OID)] {
-			continue
-		}
-
-		// Add to results if we have walked data OR if it's cached
-		if pdus, ok := walkedData[cfg.Table.OID]; ok {
-			results = append(results, tableWalkResult{
-				tableOID: cfg.Table.OID,
-				pdus:     pdus,
-				config:   cfg,
-			})
-		} else if tc.tableCache.isConfigCached(cfg) {
-			// Add config without PDUs - will use cache in processing
-			results = append(results, tableWalkResult{
-				tableOID: cfg.Table.OID,
-				pdus:     nil,
-				config:   cfg,
-			})
+	for tableOID, configs := range info.tableConfigs {
+		for _, cfg := range configs {
+			// Add to results if we have walked data OR if it's cached
+			if pdus, ok := walkedData[tableOID]; ok {
+				results = append(results, tableWalkResult{
+					tableOID: tableOID,
+					pdus:     pdus,
+					config:   cfg,
+				})
+			} else if tc.tableCache.isConfigCached(cfg) {
+				// Add config without PDUs - will use cache in processing
+				results = append(results, tableWalkResult{
+					tableOID: tableOID,
+					pdus:     nil,
+					config:   cfg,
+				})
+			}
 		}
 	}
 
@@ -223,7 +214,13 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 
 	// Process walked data if available
 	if result.pdus != nil {
-		return tc.processTableData(result.config, result.pdus, walkedData, tableNameToOID)
+		ctx := &tableProcessingContext{
+			config:         result.config,
+			pdus:           result.pdus,
+			walkedData:     walkedData,
+			tableNameToOID: tableNameToOID,
+		}
+		return tc.processTableData(ctx)
 	}
 
 	return nil, nil
@@ -237,7 +234,15 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 	}
 
 	columnOIDs := buildColumnOIDs(cfg)
-	metrics, err := tc.collectWithCache(cfg, cachedOIDs, cachedTags, columnOIDs)
+
+	ctx := &cacheProcessingContext{
+		config:     cfg,
+		cachedOIDs: cachedOIDs,
+		cachedTags: cachedTags,
+		columnOIDs: columnOIDs,
+	}
+
+	metrics, err := tc.collectWithCache(ctx)
 	if err == nil {
 		tc.log.Debugf("Successfully collected table %s using cache", cfg.Table.Name)
 		return metrics
@@ -247,51 +252,47 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 	return nil
 }
 
+type tableProcessingContext struct {
+	config         ddprofiledefinition.MetricsConfig
+	pdus           map[string]gosnmp.SnmpPDU
+	walkedData     map[string]map[string]gosnmp.SnmpPDU
+	tableNameToOID map[string]string
+
+	columnOIDs    map[string]ddprofiledefinition.SymbolConfig
+	tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig
+	staticTags    map[string]string
+	rows          map[string]map[string]gosnmp.SnmpPDU
+	oidCache      map[string]map[string]string
+	tagCache      map[string]map[string]string
+}
+
 // processTableData processes walked table data
-func (tc *tableCollector) processTableData(
-	cfg ddprofiledefinition.MetricsConfig,
-	pdus map[string]gosnmp.SnmpPDU,
-	walkedData map[string]map[string]gosnmp.SnmpPDU,
-	tableNameToOID map[string]string,
-) ([]ddsnmp.Metric, error) {
-	// Prepare column information
-	columnOIDs := buildColumnOIDs(cfg)
-	tagColumnOIDs := buildTagColumnOIDs(cfg)
+func (tc *tableCollector) processTableData(ctx *tableProcessingContext) ([]ddsnmp.Metric, error) {
+	ctx.columnOIDs = buildColumnOIDs(ctx.config)
+	ctx.tagColumnOIDs = buildTagColumnOIDs(ctx.config)
 
-	// Group PDUs by row
-	rows, oidCache, tagCache := tc.organizePDUsByRow(pdus, columnOIDs, tagColumnOIDs)
+	ctx.rows, ctx.oidCache, ctx.tagCache = tc.organizePDUsByRow(ctx)
 
-	// Parse static tags
-	staticTags := parseStaticTags(cfg.StaticTags)
+	ctx.staticTags = parseStaticTags(ctx.config.StaticTags)
 
-	// Process each row
-	crossTableCtx := &crossTableContext{
-		walkedData:     walkedData,
-		tableNameToOID: tableNameToOID,
-	}
-
-	metrics, err := tc.processRows(rows, cfg, columnOIDs, tagColumnOIDs, staticTags, crossTableCtx, tagCache)
+	metrics, err := tc.processRows(ctx)
 
 	// Cache the processed data
-	deps := extractTableDependencies(cfg, tableNameToOID)
-	tc.tableCache.cacheData(cfg, oidCache, tagCache, deps)
-	tc.log.Debugf("Cached table %s structure with %d rows", cfg.Table.Name, len(oidCache))
+	deps := extractTableDependencies(ctx.config, ctx.tableNameToOID)
+	tc.tableCache.cacheData(ctx.config, ctx.oidCache, ctx.tagCache, deps)
+	tc.log.Debugf("Cached table %s structure with %d rows", ctx.config.Table.Name, len(ctx.oidCache))
 
 	return metrics, err
 }
 
 // organizePDUsByRow groups PDUs by their row index
-func (tc *tableCollector) organizePDUsByRow(
-	pdus map[string]gosnmp.SnmpPDU,
-	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
-	tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig,
-) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
+func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
 	// Combine all column OIDs
-	allColumnOIDs := make([]string, 0, len(columnOIDs)+len(tagColumnOIDs))
-	for oid := range columnOIDs {
+	allColumnOIDs := make([]string, 0, len(ctx.columnOIDs)+len(ctx.tagColumnOIDs))
+	for oid := range ctx.columnOIDs {
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
-	for oid := range tagColumnOIDs {
+	for oid := range ctx.tagColumnOIDs {
 		allColumnOIDs = append(allColumnOIDs, oid)
 	}
 
@@ -299,7 +300,7 @@ func (tc *tableCollector) organizePDUsByRow(
 	oidCache = make(map[string]map[string]string)
 	tagCache = make(map[string]map[string]string)
 
-	for oid, pdu := range pdus {
+	for oid, pdu := range ctx.pdus {
 		for _, columnOID := range allColumnOIDs {
 			if strings.HasPrefix(oid, columnOID+".") {
 				index := strings.TrimPrefix(oid, columnOID+".")
@@ -320,33 +321,30 @@ func (tc *tableCollector) organizePDUsByRow(
 }
 
 // processRows processes all rows and returns metrics
-func (tc *tableCollector) processRows(
-	rows map[string]map[string]gosnmp.SnmpPDU,
-	cfg ddprofiledefinition.MetricsConfig,
-	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
-	tagColumnOIDs map[string][]ddprofiledefinition.MetricTagConfig,
-	staticTags map[string]string,
-	crossTableCtx *crossTableContext,
-	tagCache map[string]map[string]string,
-) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processRows(ctx *tableProcessingContext) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 	var errs []error
 
-	for index, rowPDUs := range rows {
+	crossTableCtx := &crossTableContext{
+		walkedData:     ctx.walkedData,
+		tableNameToOID: ctx.tableNameToOID,
+	}
+
+	for index, rowPDUs := range ctx.rows {
 		row := &tableRowData{
 			Index:      index,
 			PDUs:       rowPDUs,
 			Tags:       make(map[string]string),
-			StaticTags: staticTags,
+			StaticTags: ctx.staticTags,
 		}
 
-		ctx := &tableRowProcessingContext{
-			Config:        cfg,
-			ColumnOIDs:    columnOIDs,
-			TagColumnOIDs: tagColumnOIDs,
+		rowCtx := &tableRowProcessingContext{
+			Config:        ctx.config,
+			ColumnOIDs:    ctx.columnOIDs,
+			TagColumnOIDs: ctx.tagColumnOIDs,
 			CrossTableCtx: crossTableCtx,
 		}
-		rowMetrics, err := tc.rowProcessor.ProcessRow(row, ctx)
+		rowMetrics, err := tc.rowProcessor.ProcessRow(row, rowCtx)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -354,7 +352,7 @@ func (tc *tableCollector) processRows(
 
 		// Copy processed tags to cache
 		for k, v := range row.Tags {
-			tagCache[index][k] = v
+			ctx.tagCache[index][k] = v
 		}
 
 		metrics = append(metrics, rowMetrics...)
@@ -367,18 +365,21 @@ func (tc *tableCollector) processRows(
 	return metrics, nil
 }
 
+type cacheProcessingContext struct {
+	config     ddprofiledefinition.MetricsConfig
+	cachedOIDs map[string]map[string]string
+	cachedTags map[string]map[string]string
+	columnOIDs map[string]ddprofiledefinition.SymbolConfig
+	pdus       map[string]gosnmp.SnmpPDU // Current values fetched via GET
+}
+
 // collectWithCache collects metrics using cached structure
-func (tc *tableCollector) collectWithCache(
-	cfg ddprofiledefinition.MetricsConfig,
-	cachedOIDs map[string]map[string]string,
-	cachedTags map[string]map[string]string,
-	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
-) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext) ([]ddsnmp.Metric, error) {
 	// Build list of OIDs to GET
 	var oidsToGet []string
-	for _, columns := range cachedOIDs {
+	for _, columns := range ctx.cachedOIDs {
 		for columnOID, fullOID := range columns {
-			if _, isMetric := columnOIDs[columnOID]; isMetric {
+			if _, isMetric := ctx.columnOIDs[columnOID]; isMetric {
 				oidsToGet = append(oidsToGet, fullOID)
 			}
 		}
@@ -399,26 +400,21 @@ func (tc *tableCollector) collectWithCache(
 		return nil, fmt.Errorf("table structure may have changed, got %d/%d PDUs", len(pdus), len(oidsToGet))
 	}
 
-	// Build metrics
-	return tc.buildMetricsFromCache(cfg, cachedOIDs, cachedTags, columnOIDs, pdus)
+	// Add PDUs to context and build metrics
+	ctx.pdus = pdus
+	return tc.buildMetricsFromCache(ctx)
 }
 
 // buildMetricsFromCache builds metrics from cached structure and current values
-func (tc *tableCollector) buildMetricsFromCache(
-	cfg ddprofiledefinition.MetricsConfig,
-	cachedOIDs map[string]map[string]string,
-	cachedTags map[string]map[string]string,
-	columnOIDs map[string]ddprofiledefinition.SymbolConfig,
-	pdus map[string]gosnmp.SnmpPDU,
-) ([]ddsnmp.Metric, error) {
-	staticTags := parseStaticTags(cfg.StaticTags)
+func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext) ([]ddsnmp.Metric, error) {
+	staticTags := parseStaticTags(ctx.config.StaticTags)
 	var metrics []ddsnmp.Metric
 	var errs []error
 
-	for index, columns := range cachedOIDs {
+	for index, columns := range ctx.cachedOIDs {
 		// Get cached tags for this row
 		rowTags := make(map[string]string)
-		if tags, ok := cachedTags[index]; ok {
+		if tags, ok := ctx.cachedTags[index]; ok {
 			for k, v := range tags {
 				rowTags[k] = v
 			}
@@ -426,12 +422,12 @@ func (tc *tableCollector) buildMetricsFromCache(
 
 		// Process each metric column
 		for columnOID, fullOID := range columns {
-			sym, isMetric := columnOIDs[columnOID]
+			sym, isMetric := ctx.columnOIDs[columnOID]
 			if !isMetric {
 				continue
 			}
 
-			pdu, ok := pdus[trimOID(fullOID)]
+			pdu, ok := ctx.pdus[trimOID(fullOID)]
 			if !ok {
 				tc.log.Debugf("Missing PDU for cached OID %s", fullOID)
 				continue

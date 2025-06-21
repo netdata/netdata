@@ -183,7 +183,7 @@ func (dc *DeviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 			continue
 		}
 
-		if err := dc.processResource(resName, cfg, meta); err != nil {
+		if err := dc.processResource(cfg, meta); err != nil {
 			return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
 		}
 	}
@@ -192,12 +192,11 @@ func (dc *DeviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]str
 }
 
 // processResource processes a single metadata resource
-func (dc *DeviceMetadataCollector) processResource(resName string, cfg ddprofiledefinition.MetadataResourceConfig, metadata map[string]string) error {
+func (dc *DeviceMetadataCollector) processResource(cfg ddprofiledefinition.MetadataResourceConfig, metadata map[string]string) error {
 	// First pass: collect static values and identify OIDs
 	staticValues := make(map[string]string)
 	oids := dc.collectStaticAndIdentifyOIDs(cfg, staticValues)
 
-	// Add static values to metadata
 	for k, v := range staticValues {
 		metadata[k] = v
 	}
@@ -206,13 +205,11 @@ func (dc *DeviceMetadataCollector) processResource(resName string, cfg ddprofile
 		return nil
 	}
 
-	// Fetch dynamic values
 	pdus, err := dc.fetchMetadataValues(oids)
 	if err != nil {
 		return fmt.Errorf("failed to fetch metadata values: %w", err)
 	}
 
-	// Process dynamic fields
 	return dc.processDynamicFields(cfg, pdus, metadata)
 }
 
@@ -223,15 +220,12 @@ func (dc *DeviceMetadataCollector) collectStaticAndIdentifyOIDs(cfg ddprofiledef
 	for name, field := range cfg.Fields {
 		switch {
 		case field.Value != "":
-			// Static value
 			staticValues[name] = field.Value
 		case field.Symbol.OID != "":
-			// Single symbol
 			if !dc.missingOIDs[trimOID(field.Symbol.OID)] {
 				oids = append(oids, field.Symbol.OID)
 			}
 		case len(field.Symbols) > 0:
-			// Multiple symbols
 			for _, sym := range field.Symbols {
 				if sym.OID != "" && !dc.missingOIDs[trimOID(sym.OID)] {
 					oids = append(oids, sym.OID)
@@ -322,21 +316,18 @@ func (dc *DeviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.Sy
 		return "", err
 	}
 
-	// Apply extract_value pattern
 	if cfg.ExtractValueCompiled != nil {
 		if sm := cfg.ExtractValueCompiled.FindStringSubmatch(val); len(sm) > 1 {
 			val = sm[1]
 		}
 	}
 
-	// Apply match_pattern and match_value
 	if cfg.MatchPatternCompiled != nil {
 		if sm := cfg.MatchPatternCompiled.FindStringSubmatch(val); len(sm) > 0 {
 			val = replaceSubmatches(cfg.MatchValue, sm)
 		}
 	}
 
-	// Apply mapping
 	if v, ok := cfg.Mapping[val]; ok {
 		val = v
 	}
