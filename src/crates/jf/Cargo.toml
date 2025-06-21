@@ -2,13 +2,13 @@
 resolver = "2"
 members = [
     "error",
-    "main",
+    # "main",
     "journal_file",
-    "journal_writer",
+    # "journal_writer",
     "journal_reader",
     "journal_reader_ffi",
-    "journal_logger",
-    "journal_forwarder",
+    # "journal_logger",
+    # "journal_forwarder",
     "window_manager",
     "sigbus",
 ]
@@ -29,7 +29,7 @@ duct = "0.13"
 serde_json = "1.0"
 walkdir = "2"
 ruzstd = "0.8"
-systemd = { path = "/home/vk/repos/crates/rust-systemd"}
+# systemd = { path = "/home/vk/repos/crates/rust-systemd"}
 libc = "0.2"
 
 [profile.release]

@@ -2,6 +2,8 @@
 
 #include "systemd-internals.h"
 
+#if !defined(HAVE_RUST_PROVIDER)
+
 // ----------------------------------------------------------------------------
 // fstat64 overloading to speed up libsystemd
 // https://github.com/systemd/systemd/pull/29261
@@ -76,3 +78,16 @@ int fstat64(int fd, struct stat64 *buf)
 
     return ret;
 }
+
+#else // HAVE_RUST_PROVIDER
+
+// When using Rust provider, disable fstat caching entirely since
+// we will not rely on libsystemd.
+
+__thread size_t fstat_thread_calls = 0;
+__thread size_t fstat_thread_cached_responses = 0;
+
+void fstat_cache_enable_on_thread(void) { }
+void fstat_cache_disable_on_thread(void) { }
+
+#endif
