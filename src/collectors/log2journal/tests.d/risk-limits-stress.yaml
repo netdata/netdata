@@ -1,0 +1,104 @@
+# Test array limits and structure stress cases
+pattern: "(?P<msg>.*)"
+
+# Test arrays at different sizes
+inject:
+  # Small array
+  - key: SMALL_ARRAY_1
+    value: "value1"
+  - key: SMALL_ARRAY_2  
+    value: "value2"
+    
+  # Medium array (around 50 items)
+  - key: MED_ARRAY_01
+    value: "med_value_01"
+  - key: MED_ARRAY_02
+    value: "med_value_02"
+  - key: MED_ARRAY_03
+    value: "med_value_03"
+  - key: MED_ARRAY_04
+    value: "med_value_04"
+  - key: MED_ARRAY_05
+    value: "med_value_05"
+  - key: MED_ARRAY_06
+    value: "med_value_06"
+  - key: MED_ARRAY_07
+    value: "med_value_07"
+  - key: MED_ARRAY_08
+    value: "med_value_08"
+  - key: MED_ARRAY_09
+    value: "med_value_09"
+  - key: MED_ARRAY_10
+    value: "med_value_10"
+  - key: MED_ARRAY_11
+    value: "med_value_11"
+  - key: MED_ARRAY_12
+    value: "med_value_12"
+  - key: MED_ARRAY_13
+    value: "med_value_13"
+  - key: MED_ARRAY_14
+    value: "med_value_14"
+  - key: MED_ARRAY_15
+    value: "med_value_15"
+  - key: MED_ARRAY_16
+    value: "med_value_16"
+  - key: MED_ARRAY_17
+    value: "med_value_17"
+  - key: MED_ARRAY_18
+    value: "med_value_18"
+  - key: MED_ARRAY_19
+    value: "med_value_19"
+  - key: MED_ARRAY_20
+    value: "med_value_20"
+
+# Test complex rewrite chains
+rewrite:
+  - key: CHAIN_1
+    value: "${msg}"
+    inject: yes
+    stop: no
+    
+  - key: CHAIN_2
+    value: "Modified: ${CHAIN_1}"
+    inject: yes
+    stop: no
+    
+  - key: CHAIN_3
+    value: "Further modified: ${CHAIN_2}"
+    inject: yes
+    stop: no
+    
+  - key: CHAIN_4
+    value: "Final: ${CHAIN_3}"
+    inject: yes
+    
+  # Test multiple rewrites on same key
+  - key: MULTI_REWRITE
+    value: "First"
+    inject: yes
+    stop: no
+    
+  - key: MULTI_REWRITE
+    value: "${MULTI_REWRITE} Second"
+    stop: no
+    
+  - key: MULTI_REWRITE
+    value: "${MULTI_REWRITE} Third"
+    stop: no
+    
+  - key: MULTI_REWRITE
+    value: "${MULTI_REWRITE} Final"
+
+# Test multiple renames
+rename:
+  - old_key: msg
+    new_key: MESSAGE_V1
+  - old_key: MESSAGE_V1
+    new_key: MESSAGE_V2
+  - old_key: MESSAGE_V2
+    new_key: FINAL_MESSAGE
+    
+# Test complex filters
+filter:
+  include: "SMALL_ARRAY_.*|MED_ARRAY_.*|CHAIN_.*|MULTI_REWRITE|FINAL_MESSAGE"
+  exclude: "CHAIN_1$"  # Exclude only exact match

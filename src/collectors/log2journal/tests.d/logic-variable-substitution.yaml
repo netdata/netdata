@@ -1,0 +1,34 @@
+# Test variable substitution logic
+pattern: "(?P<user>\\w+)\\s+(?P<action>\\w+)\\s+(?P<resource>\\S+)"
+
+inject:
+  - key: BASE_MSG
+    value: "User ${user} performed ${action}"
+    
+  - key: FULL_MSG
+    value: "${BASE_MSG} on ${resource}"
+    
+  - key: UNDEFINED_VAR
+    value: "${NONEXISTENT} should be empty"
+    
+  - key: CIRCULAR_TEST
+    value: "${CIRCULAR_TEST}"  # Self-reference
+    
+  - key: LINE_VAR
+    value: "Original: ${LINE}"
+
+rewrite:
+  # Test variable in match pattern
+  - key: action
+    match: "delete"
+    value: "DANGEROUS_${action}"
+    
+  # Test using rewritten value
+  - key: ACTION_LEVEL
+    value: "${action}"
+    inject: yes
+    
+  # Test multiple variables
+  - key: SUMMARY
+    value: "${user}:${action}:${resource}"
+    inject: yes

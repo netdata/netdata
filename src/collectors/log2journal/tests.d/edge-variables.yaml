@@ -1,0 +1,76 @@
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+# Test variable substitution edge cases
+
+inject:
+  - key: SIMPLE_VAR
+    value: "${LINE}"
+    
+  - key: MULTIPLE_VARS
+    value: "Level: ${level}, Message: ${message}"
+    
+  - key: NESTED_VARS
+    value: "${${level}_PREFIX}_${message}"
+    
+  - key: UNDEFINED_VAR
+    value: "This ${UNDEFINED_VARIABLE} does not exist"
+    
+  - key: ESCAPED_VAR
+    value: "\\${NOT_A_VARIABLE}"
+    
+  # Commented out - causes parse error as expected
+  # - key: MALFORMED_VAR1
+  #   value: "Start ${UNCLOSED end"  # Missing closing brace
+    
+  - key: MALFORMED_VAR2  
+    value: "$NO_BRACES"
+    
+  - key: EMPTY_VAR_NAME
+    value: "${}"
+    
+  - key: NUMERIC_VAR
+    value: "${123}"
+    
+  - key: SPECIAL_VAR_NAME
+    value: "${VAR-WITH-DASHES}"
+    
+  - key: WHITESPACE_VAR
+    value: "${ PADDED }"
+
+rewrite:
+  - key: VAR_IN_MATCH
+    match: "${level}"  # Variable in match pattern
+    value: "Matched level"
+    
+  - key: RECURSIVE_VAR
+    value: "${VAR_IN_MATCH}"
+    inject: yes
+    
+  - key: CONDITIONAL_VAR
+    match: "ERROR"
+    value: "Error: ${message}"
+    
+  - key: DEFAULT_VALUE
+    value: "${MISSING:-default value}"
+    inject: yes
+    
+  - key: CHAINED_VARS
+    value: "${A}${B}${C}${D}${E}"
+    inject: yes
+
+rename:
+  - old_key: "${level}_KEY"  # Variable in key name
+    new_key: "LEVEL_KEY"
+    
+  - old_key: "OLD_${UNDEFINED}"
+    new_key: "NEW_KEY"
+
+filter:
+  include: ".*${level}.*"  # Variable in filter
+  exclude: ".*${UNDEFINED}.*"
+
+unmatched:
+  key: "UNMATCHED_${level}"
+  inject:
+    - key: "ERROR_${level}"
+      value: "Failed to parse ${LINE}"

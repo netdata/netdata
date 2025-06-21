@@ -1,0 +1,10 @@
+---
+# Simple prefix test
+
+pattern: "(?P<level>\\w+)\\s+(?P<code>\\d+)\\s+(?P<message>.*)"
+
+prefix: TEST_
+
+inject:
+  - key: VERSION
+    value: "1.0"

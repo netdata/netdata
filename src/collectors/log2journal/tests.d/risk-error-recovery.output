@@ -1,0 +1,6 @@
+COMPLEX_VAR_TEST=Message: , Level: , Working: 
+LEVEL=INFO
+MESSAGE=Recovery test
+VALID_BEFORE_ERROR=should work
+WORKING_REWRITE=Level: 
+

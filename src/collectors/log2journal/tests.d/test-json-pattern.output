@@ -1,0 +1,9 @@
+LEVEL=info
+MESSAGE=User login
+SOURCE=json-parser
+TAGS_0=authentication
+TAGS_1=security
+TAGS_2=login
+_TIMESTAMP=2024-01-15 10:30:25
+_VERSION=1.0
+

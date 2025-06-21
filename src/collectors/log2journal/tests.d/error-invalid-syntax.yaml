@@ -1,0 +1,9 @@
+# This file contains invalid YAML syntax to test error handling
+pattern: "test
+  unclosed string
+  
+inject:
+  - key: TEST
+  value: missing colon here
+  
+this is not valid yaml at all

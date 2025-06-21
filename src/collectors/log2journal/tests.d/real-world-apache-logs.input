@@ -1,0 +1,1 @@
+192.168.1.100 - - [15/Jan/2024:10:30:25 +0000] "GET /index.html HTTP/1.1" 200 1234 "https://example.com/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"

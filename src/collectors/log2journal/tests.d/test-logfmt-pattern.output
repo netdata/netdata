@@ -1,0 +1,6 @@
+DURATION=150ms
+LEVEL=info
+METHOD=GET
+PATH=/api/users
+STATUS=200
+

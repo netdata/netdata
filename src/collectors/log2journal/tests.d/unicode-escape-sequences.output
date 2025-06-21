@@ -1,0 +1,3 @@
+LEVEL=info
+MESSAGE=Unicode test: Hello U0001F44B emoji and αβγ Greek
+

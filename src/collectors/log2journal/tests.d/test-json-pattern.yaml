@@ -1,0 +1,32 @@
+# Test JSON pattern parsing
+pattern: json
+
+inject:
+  - key: SOURCE
+    value: "json-parser"
+
+rewrite:
+  # Normalize timestamp formats
+  - key: timestamp
+    match: "(\\d{4})-(\\d{2})-(\\d{2})\\s+(\\d{2}):(\\d{2}):(\\d{2})"
+    value: "${1}${2}${3}T${4}${5}${6}Z"
+    
+  # Extract nested fields using variables
+  - key: USER_ID
+    value: "${user.id}"
+    inject: yes
+    
+  - key: USER_NAME  
+    value: "${user.name}"
+    inject: yes
+    
+  # Handle arrays
+  - key: FIRST_TAG
+    value: "${tags[0]}"
+    inject: yes
+
+rename:
+  - old_key: "@timestamp"
+    new_key: TIMESTAMP
+  - old_key: "@version"
+    new_key: VERSION

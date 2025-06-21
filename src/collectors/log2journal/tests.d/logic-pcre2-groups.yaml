@@ -1,0 +1,28 @@
+# Test PCRE2 named and numbered group logic
+pattern: "(?P<timestamp>\\d{4}-\\d{2}-\\d{2})\\s+(?P<time>\\d{2}:\\d{2}:\\d{2})\\s+(?P<level>\\w+)\\s+(?P<component>\\w+):\\s+(?P<message>.*)"
+
+rewrite:
+  # Test named group reference
+  - key: FORMATTED_TIME
+    value: "${timestamp} ${time}"  # Use named groups
+    inject: yes
+    
+  # Test component extraction
+  - key: COMPONENT_NAME
+    value: "${component}"
+    inject: yes
+    
+  # Test group in match pattern
+  - key: message
+    match: "error\\s+(\\d+)"
+    value: "Error code: ${1}"
+    
+  # Test invalid group reference
+  - key: INVALID_GROUP
+    value: "${99} ${nonexistent}"
+    inject: yes
+    
+  # Test group with complex replacement
+  - key: message
+    match: "user\\s+(?P<username>\\w+)\\s+failed\\s+(?P<attempts>\\d+)\\s+times"
+    value: "User ${username} had ${attempts} failed attempts"
