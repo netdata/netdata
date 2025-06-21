@@ -146,6 +146,9 @@ func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
 		if !ps.initialized {
 			continue
 		}
+		if ps.profile.Definition == nil {
+			continue
+		}
 		res, ok := ps.profile.Definition.Metadata["device"]
 		if !ok {
 			continue
