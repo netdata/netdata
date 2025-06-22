@@ -3224,10 +3224,6 @@ install(TARGETS netdatacli
         COMPONENT netdata
         DESTINATION "${BINDIR}")
 
-# YAML comprehensive test
-add_executable(yaml-comprehensive-test build-claude/yaml-comprehensive-test.c)
-target_link_libraries(yaml-comprehensive-test libnetdata)
-
 #
 # Build go.d.plugin
 #
