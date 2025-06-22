@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- refactor\(go.d/ddsnmpcollector\): restructure into components [\#20543](https://github.com/netdata/netdata/pull/20543) ([ilyam8](https://github.com/ilyam8))
 - Lock before checking the statement pool [\#20536](https://github.com/netdata/netdata/pull/20536) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump k8s.io/client-go from 0.33.1 to 0.33.2 in /src/go [\#20532](https://github.com/netdata/netdata/pull/20532) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improve\(go.d/snmp\): dd support for non-identifying tags in table metrics [\#20530](https://github.com/netdata/netdata/pull/20530) ([ilyam8](https://github.com/ilyam8))
@@ -460,7 +461,6 @@
 - Improve agent shutdown [\#19980](https://github.com/netdata/netdata/pull/19980) ([stelfrag](https://github.com/stelfrag))
 - Release memory when calculating metric correlations [\#19979](https://github.com/netdata/netdata/pull/19979) ([stelfrag](https://github.com/stelfrag))
 - Fix random crash during shutdown [\#19978](https://github.com/netdata/netdata/pull/19978) ([stelfrag](https://github.com/stelfrag))
-- set max datafile size to 1GiB [\#19977](https://github.com/netdata/netdata/pull/19977) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
