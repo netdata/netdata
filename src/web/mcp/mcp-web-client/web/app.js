@@ -9308,6 +9308,12 @@ class NetdataMCPChat {
         userMessage += '\n\nImportant: Do not ask me any question back, or provide explanations on tool usage, or give up on the first try. ';
         userMessage += 'Check your tools available, adapt to the issues you face (wrong parameters, empty responses, wrong tool chosen, etc), ';
         userMessage += 'and provide an authoritative answer. ';
+        userMessage += '\n\n**CRITICAL**: If you encounter large datasets or lists, process EVERY single item. ';
+        userMessage += 'Never sample, never use "..." or "among others". Process all items and explicitly state how many you analyzed. ';
+        userMessage += 'Your thoroughness is essential for accurate analysis.';
+        userMessage += '\n\n**CRITICAL**: If tools return errors or empty data, DO NOT give up! ';
+        userMessage += 'Try different parameters, broader time ranges, different filters, or alternative approaches. ';
+        userMessage += 'Make multiple attempts before concluding no data exists. The primary assistant is counting on you to be persistent and thorough.';
 
         // Add the formatted user request
         subChat.messages.push({
