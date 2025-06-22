@@ -9314,6 +9314,8 @@ class NetdataMCPChat {
         userMessage += '\n\n**CRITICAL**: If tools return errors or empty data, DO NOT give up! ';
         userMessage += 'Try different parameters, broader time ranges, different filters, or alternative approaches. ';
         userMessage += 'Make multiple attempts before concluding no data exists. The primary assistant is counting on you to be persistent and thorough.';
+        userMessage += '\n\n**IF TASK CANNOT BE COMPLETED**: Use the ESCALATION protocol to document your attempts, ';
+        userMessage += 'provide any partial data you found, and suggest specific alternatives for the primary assistant to try.';
 
         // Add the formatted user request
         subChat.messages.push({

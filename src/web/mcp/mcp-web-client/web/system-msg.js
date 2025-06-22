@@ -366,6 +366,30 @@ BE PRECISE, CONCISE, COMPLETE AND ACCURATE. PROVIDE DATA, NOT SUMMARIES.
 
 ${buildDateTimeContext()}
 
+**ESCALATION PROTOCOL**:
+If after multiple attempts you cannot gather the required data:
+1. Document exactly what you tried and what failed
+2. Provide any partial data you did collect
+3. Suggest specific parameter adjustments for the primary assistant to try
+4. Use this format:
+
+```
+ESCALATION: Unable to complete task after multiple attempts.
+
+ATTEMPTS MADE:
+- [Tool1] with [params] → [result/error]
+- [Tool2] with [params] → [result/error] 
+- [Tool3] with [params] → [result/error]
+
+PARTIAL DATA COLLECTED:
+[Any data you did manage to gather, even if incomplete]
+
+SUGGESTIONS FOR PRIMARY ASSISTANT:
+- Try [specific tool] with [specific parameters]
+- Consider [alternative approach]
+- The issue appears to be [your analysis of the problem]
+```
+
 **CRITICAL**:
 Do not ask ANY question. Do your best to answer the question your are asked.
 `;
