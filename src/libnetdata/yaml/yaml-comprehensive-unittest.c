@@ -137,7 +137,7 @@ static int test_yaml_string_styles_comprehensive(void) {
                     i, test_cases[i].description, test_cases[i].yaml, buffer_tostring(error));
             failed++;
         } else if (!json_object_is_type(json, json_type_string)) {
-            fprintf(stderr, "FAILED: test_yaml_string_styles case %d (%s): expected string for '%s', got type %d\n", 
+            fprintf(stderr, "FAILED: test_yaml_string_styles case %d (%s): expected string for '%s', got type %u\n", 
                     i, test_cases[i].description, test_cases[i].yaml, json_object_get_type(json));
             failed++;
         } else {
@@ -199,7 +199,7 @@ static int test_yaml_multiline_strings(void) {
                     i, test_cases[i].description, buffer_tostring(error));
             failed++;
         } else if (!json_object_is_type(json, json_type_string)) {
-            fprintf(stderr, "FAILED: test_yaml_multiline case %d (%s): expected string, got type %d\n", 
+            fprintf(stderr, "FAILED: test_yaml_multiline case %d (%s): expected string, got type %u\n", 
                     i, test_cases[i].description, json_object_get_type(json));
             failed++;
         } else if (strcmp(json_object_get_string(json), test_cases[i].expected) != 0) {
@@ -301,7 +301,7 @@ static int test_yaml_numbers_comprehensive(void) {
                     i, test_cases[i].description, test_cases[i].yaml, buffer_tostring(error));
             failed++;
         } else if (!json_object_is_type(json, test_cases[i].expected_type)) {
-            fprintf(stderr, "FAILED: test_yaml_numbers case %d (%s): expected type %d for '%s', got type %d\n", 
+            fprintf(stderr, "FAILED: test_yaml_numbers case %d (%s): expected type %u for '%s', got type %u\n", 
                     i, test_cases[i].description, test_cases[i].expected_type, test_cases[i].yaml, json_object_get_type(json));
             failed++;
         } else {
@@ -391,7 +391,7 @@ static int test_yaml_special_values(void) {
                         i, test_cases[i].description, test_cases[i].yaml, buffer_tostring(error));
                 failed++;
             } else if (!json_object_is_type(json, test_cases[i].expected_type)) {
-                fprintf(stderr, "FAILED: test_yaml_special_values case %d (%s): expected type %d for '%s', got type %d\n", 
+                fprintf(stderr, "FAILED: test_yaml_special_values case %d (%s): expected type %u for '%s', got type %u\n", 
                         i, test_cases[i].description, test_cases[i].expected_type, test_cases[i].yaml, json_object_get_type(json));
                 failed++;
             } else if (test_cases[i].expected_type == json_type_boolean) {
