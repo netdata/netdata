@@ -558,13 +558,10 @@ export class MessageOptimizer {
                 return null;
             }
             
-            const filteredMsg = {
+            return {
                 ...msg,
                 content: filteredContent
             };
-            
-            
-            return filteredMsg;
         }
         
         return msg;

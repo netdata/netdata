@@ -3800,25 +3800,23 @@ class NetdataMCPChat {
             const cancelBtn = modal.querySelector('.confirm-cancel');
             confirmBtn.focus();
             
-            // Handle button clicks
-            const handleConfirm = () => {
-                cleanup();
-                resolve(true);
-            };
-            
-            const handleCancel = () => {
-                cleanup();
-                resolve(false);
-            };
-            
-            // Cleanup function
-            const cleanup = () => {
+            // Define all functions using function declarations to avoid hoisting issues
+            function cleanup() {
                 modal.remove();
                 document.removeEventListener('keydown', handleKeydown);
-            };
+            }
             
-            // Handle keyboard events
-            const handleKeydown = (e) => {
+            function handleConfirm() {
+                cleanup();
+                resolve(true);
+            }
+            
+            function handleCancel() {
+                cleanup();
+                resolve(false);
+            }
+            
+            function handleKeydown(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     handleConfirm();
@@ -3826,7 +3824,7 @@ class NetdataMCPChat {
                     e.preventDefault();
                     handleCancel();
                 }
-            };
+            }
             
             // Add event listeners
             confirmBtn.addEventListener('click', handleConfirm);
@@ -5399,10 +5397,10 @@ class NetdataMCPChat {
         this.chatContainers.forEach(container => {
             const elements = container._elements;
             if (elements) {
-                if (elements.llmModelDropdown !== dropdownEl) {
+                if (elements.llmModelDropdown && elements.llmModelDropdown !== dropdownEl) {
                     elements.llmModelDropdown.style.display = 'none';
                 }
-                if (elements.mcpServerDropdown !== dropdownEl) {
+                if (elements.mcpServerDropdown && elements.mcpServerDropdown !== dropdownEl) {
                     elements.mcpServerDropdown.style.display = 'none';
                 }
             }
@@ -8375,7 +8373,7 @@ class NetdataMCPChat {
         htmlContent = this.convertHtmlTablesToMarkdown(htmlContent);
         
         // Convert HTML to markdown-like format to preserve formatting
-        const markdown = htmlContent
+        return htmlContent
             // Convert headers (h1-h6)
             .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '\n# $1\n')
             .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '\n## $1\n')
@@ -8457,8 +8455,6 @@ class NetdataMCPChat {
             .replace(/\n\s*\n\s*\n/g, '\n\n')
             .replace(/[ \t]+$/gm, '')
             .trim();
-        
-        return markdown;
     }
     
     /**
@@ -8472,7 +8468,7 @@ class NetdataMCPChat {
                 const rows = [];
                 const tableRows = tableContent.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
                 
-                tableRows.forEach((tr, rowIndex) => {
+                tableRows.forEach((tr, _rowIndex) => {
                     const cells = [];
                     // Match both th and td tags
                     const cellMatches = tr.match(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gi) || [];
@@ -8532,53 +8528,55 @@ class NetdataMCPChat {
      * Handles full HTML documents from clipboard
      */
     convertHtmlToMarkdown(html) {
+        let result = html;
+        
         // Remove any style tags and their content
-        html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        result = result.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         
         // Remove any script tags and their content
-        html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        result = result.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
         
         // Remove HTML comments
-        html = html.replace(/<!--[\s\S]*?-->/g, '');
+        result = result.replace(/<!--[\s\S]*?-->/g, '');
         
         // Extract body content if it's a full HTML document
-        const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        const bodyMatch = result.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
         if (bodyMatch) {
-            html = bodyMatch[1];
+            result = bodyMatch[1];
         }
         
         // Convert tables first (before other processing)
-        html = this.convertHtmlTablesToMarkdown(html);
+        result = this.convertHtmlTablesToMarkdown(result);
         
         // Process nested elements properly by converting from innermost to outermost
         // Convert links with proper text extraction
-        html = html.replace(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, text) => {
+        result = result.replace(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, text) => {
             // Clean up the link text
             const cleanText = text.replace(/<[^>]*>/g, '').trim();
             return `[${cleanText}](${url})`;
         });
         
         // Convert images
-        html = html.replace(/<img[^>]+src=["']([^"']+)["'](?:[^>]+alt=["']([^"']+)["'])?[^>]*>/gi, (match, src, alt) => {
+        result = result.replace(/<img[^>]+src=["']([^"']+)["'](?:[^>]+alt=["']([^"']+)["'])?[^>]*>/gi, (match, src, alt) => {
             return alt ? `![${alt}](${src})` : `![](${src})`;
         });
         
         // Convert headers
-        html = html.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n');
-        html = html.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n');
-        html = html.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n');
-        html = html.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n#### $1\n');
-        html = html.replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, '\n##### $1\n');
-        html = html.replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, '\n###### $1\n');
+        result = result.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n');
+        result = result.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n');
+        result = result.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n');
+        result = result.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n#### $1\n');
+        result = result.replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, '\n##### $1\n');
+        result = result.replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, '\n###### $1\n');
         
         // Convert lists - handle nested lists
         // Process lists from innermost to outermost
         let previousHtml;
         do {
-            previousHtml = html;
+            previousHtml = result;
             
             // Convert unordered lists
-            html = html.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
+            result = result.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
                 const items = content.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
                 const converted = items.map(item => {
                     const itemContent = item.replace(/<li[^>]*>/i, '').replace(/<\/li>/i, '').trim();
@@ -8588,7 +8586,7 @@ class NetdataMCPChat {
             });
             
             // Convert ordered lists  
-            html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
+            result = result.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
                 const items = content.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
                 const converted = items.map((item, index) => {
                     const itemContent = item.replace(/<li[^>]*>/i, '').replace(/<\/li>/i, '').trim();
@@ -8596,56 +8594,56 @@ class NetdataMCPChat {
                 }).join('\n');
                 return '\n' + converted + '\n';
             });
-        } while (html !== previousHtml);
+        } while (result !== previousHtml);
         
         // Convert code blocks
-        html = html.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '\n```\n$1\n```\n');
-        html = html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '\n```\n$1\n```\n');
+        result = result.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '\n```\n$1\n```\n');
+        result = result.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '\n```\n$1\n```\n');
         
         // Convert inline code
-        html = html.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
+        result = result.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
         
         // Convert formatting
-        html = html.replace(/<(b|strong)[^>]*>([\s\S]*?)<\/(b|strong)>/gi, '**$2**');
-        html = html.replace(/<(i|em)[^>]*>([\s\S]*?)<\/(i|em)>/gi, '*$2*');
-        html = html.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '*$1*');
-        html = html.replace(/<(s|strike|del)[^>]*>([\s\S]*?)<\/(s|strike|del)>/gi, '~~$2~~');
+        result = result.replace(/<(b|strong)[^>]*>([\s\S]*?)<\/(b|strong)>/gi, '**$2**');
+        result = result.replace(/<(i|em)[^>]*>([\s\S]*?)<\/(i|em)>/gi, '*$2*');
+        result = result.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '*$1*');
+        result = result.replace(/<(s|strike|del)[^>]*>([\s\S]*?)<\/(s|strike|del)>/gi, '~~$2~~');
         
         // Convert blockquotes
-        html = html.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '\n> $1\n');
+        result = result.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '\n> $1\n');
         
         // Convert horizontal rules
-        html = html.replace(/<hr[^>]*>/gi, '\n---\n');
+        result = result.replace(/<hr[^>]*>/gi, '\n---\n');
         
         // Convert line breaks
-        html = html.replace(/<br\s*\/?>/gi, '\n');
+        result = result.replace(/<br\s*\/?>/gi, '\n');
         
         // Convert paragraphs
-        html = html.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '\n$1\n');
+        result = result.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '\n$1\n');
         
         // Convert divs
-        html = html.replace(/<div[^>]*>([\s\S]*?)<\/div>/gi, '\n$1\n');
+        result = result.replace(/<div[^>]*>([\s\S]*?)<\/div>/gi, '\n$1\n');
         
         // Remove any remaining HTML tags
-        html = html.replace(/<[^>]*>/g, '');
+        result = result.replace(/<[^>]*>/g, '');
         
         // Decode HTML entities
-        html = html.replace(/&nbsp;/gi, ' ');
-        html = html.replace(/&lt;/g, '<');
-        html = html.replace(/&gt;/g, '>');
-        html = html.replace(/&amp;/g, '&');
-        html = html.replace(/&quot;/g, '"');
-        html = html.replace(/&#39;/g, "'");
-        html = html.replace(/&apos;/g, "'");
-        html = html.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
-        html = html.replace(/&#x([a-f0-9]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+        result = result.replace(/&nbsp;/gi, ' ');
+        result = result.replace(/&lt;/g, '<');
+        result = result.replace(/&gt;/g, '>');
+        result = result.replace(/&amp;/g, '&');
+        result = result.replace(/&quot;/g, '"');
+        result = result.replace(/&#39;/g, "'");
+        result = result.replace(/&apos;/g, "'");
+        result = result.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+        result = result.replace(/&#x([a-f0-9]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
         
         // Clean up excessive whitespace
-        html = html.replace(/\n\s*\n\s*\n/g, '\n\n');
-        html = html.replace(/[ \t]+$/gm, '');
-        html = html.trim();
+        result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
+        result = result.replace(/[ \t]+$/gm, '');
+        result = result.trim();
         
-        return html;
+        return result;
     }
 
     editUserMessage(contentDiv, originalContent, chatId) {
@@ -9080,12 +9078,6 @@ class NetdataMCPChat {
         
         this.scrollToBottom(chatId);
         this.moveSpinnerToBottom(chatId);
-    }
-    
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
     
     /**
