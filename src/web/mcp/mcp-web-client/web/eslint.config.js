@@ -1,6 +1,11 @@
- export default [
+ import sonarjs from 'eslint-plugin-sonarjs';
+
+export default [
   {
     files: ['**/*.js'],
+    plugins: {
+      sonarjs
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -109,8 +114,10 @@
       'no-unused-vars': ['error', { 
         'argsIgnorePattern': '^_',
         'varsIgnorePattern': '^_',
-        'caughtErrorsIgnorePattern': '^_'
+        'caughtErrorsIgnorePattern': '^_',
+        'ignoreRestSiblings': true
       }],
+      'no-unused-private-class-members': 'error',
       'no-console': 'off',
       'no-constant-condition': ['error', { 'checkLoops': false }],
       'no-empty': ['error', { 'allowEmptyCatch': true }],
@@ -122,6 +129,7 @@
       'no-duplicate-case': 'error',
       'no-dupe-keys': 'error',
       'no-dupe-args': 'error',
+      'no-dupe-class-members': 'error',
       'no-sparse-arrays': 'error',
       'no-func-assign': 'error',
       'no-invalid-regexp': 'error',
@@ -181,7 +189,26 @@
       'prefer-rest-params': 'error',
       'prefer-spread': 'error',
       'rest-spread-spacing': ['error', 'never'],
-      'template-curly-spacing': ['error', 'never']
+      'template-curly-spacing': ['error', 'never'],
+      
+      // SonarJS duplicate detection rules
+      'sonarjs/no-identical-functions': 'error',
+      'sonarjs/no-duplicated-branches': 'error',
+      'sonarjs/no-identical-conditions': 'error',
+      'sonarjs/no-identical-expressions': 'error',
+      
+      // SonarJS code quality rules
+      'sonarjs/no-redundant-assignments': 'error',
+      'sonarjs/no-unused-collection': 'error',
+      'sonarjs/no-useless-catch': 'error',
+      'sonarjs/prefer-immediate-return': 'warn',
+      'sonarjs/no-all-duplicated-branches': 'error',
+      'sonarjs/no-element-overwrite': 'error',
+      'sonarjs/no-empty-collection': 'warn',
+      'sonarjs/no-one-iteration-loop': 'error',
+      'sonarjs/no-redundant-jump': 'error',
+      'sonarjs/prefer-object-literal': 'warn',
+      'sonarjs/prefer-single-boolean-return': 'warn'
     }
   }
 ];

@@ -325,8 +325,8 @@ const { OpenAIProvider, AnthropicProvider, GoogleProvider } = context;
         deepEqual(toolCalls[0].arguments, {});
         assert.equal(toolCalls[1].name, 'list_alert_transitions');
         deepEqual(toolCalls[1].arguments, {
-            after: "-604800",
-            status: ["CRITICAL", "WARNING", "CLEAR"],
+            after: '-604800',
+            status: ['CRITICAL', 'WARNING', 'CLEAR'],
             cardinality_limit: 300
         });
         
@@ -356,7 +356,7 @@ const { OpenAIProvider, AnthropicProvider, GoogleProvider } = context;
     });
     
     test('OpenAI: o3 tool call format processing', () => {
-        const provider = new OpenAIProvider('http://localhost', 'gpt-4');
+        const _provider = new OpenAIProvider('http://localhost', 'gpt-4');
         
         // Simulate o3 response processing
         const o3Response = {
@@ -439,7 +439,7 @@ const { OpenAIProvider, AnthropicProvider, GoogleProvider } = context;
         ];
         
         // Mock the sendMessage method to capture the request
-        let capturedRequest;
+        let _capturedRequest;
         const originalFetch = global.fetch;
         global.fetch = async (url, options) => {
             capturedRequest = JSON.parse(options.body);
