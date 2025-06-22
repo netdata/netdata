@@ -373,7 +373,7 @@ If after multiple attempts you cannot gather the required data:
 3. Suggest specific parameter adjustments for the primary assistant to try
 4. Use this format:
 
-```
+\`\`\`
 ESCALATION: Unable to complete task after multiple attempts.
 
 ATTEMPTS MADE:
@@ -388,7 +388,7 @@ SUGGESTIONS FOR PRIMARY ASSISTANT:
 - Try [specific tool] with [specific parameters]
 - Consider [alternative approach]
 - The issue appears to be [your analysis of the problem]
-```
+\`\`\`
 
 **CRITICAL**:
 Do not ask ANY question. Do your best to answer the question your are asked.
