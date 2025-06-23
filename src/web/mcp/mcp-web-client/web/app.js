@@ -1356,24 +1356,24 @@ class NetdataMCPChat {
         
         section.appendChild(toolSumDiv);
         
-        // Auto-summarization Option (DISABLED - Not Implemented)
+        // Auto-summarization Option
         const autoSumDiv = document.createElement('div');
-        const _autoSumEnabled = false; // Force disabled - not implemented
-        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
+        const _autoSumEnabled = true; // Auto-summarization is now implemented
+        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px;`;
         
         const currentPercent = chat.config.optimisation.autoSummarisation.triggerPercent || 50;
         const autoSumModel = ChatConfig.modelConfigToString(chat.config.optimisation.autoSummarisation.model) || ChatConfig.getChatModelString(chat);
         
         autoSumDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: not-allowed;">
-                <input type="checkbox" id="autoSummarization_${chatId}" disabled
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="autoSummarization_${chatId}" ${chat.config.optimisation.autoSummarisation.enabled ? 'checked' : ''}
                        style="margin-right: 6px;">
-                <span style="text-decoration: line-through;">Summarize conversation when context window above</span>
+                <span>Summarize conversation when context window above</span>
             </label>
-            <select id="autoSumThreshold_${chatId}" disabled
+            <select id="autoSumThreshold_${chatId}"
                     style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
                            border-radius: 4px; background: var(--background-color); color: var(--text-primary);
-                           cursor: not-allowed; text-decoration: line-through;">
+                           cursor: pointer;">
                 <option value="30">30%</option>
                 <option value="40">40%</option>
                 <option value="50" ${currentPercent === 50 ? 'selected' : ''}>50%</option>
@@ -1382,13 +1382,13 @@ class NetdataMCPChat {
                 <option value="80">80%</option>
                 <option value="90">90%</option>
             </select>
-            <span style="text-decoration: line-through;">with</span>
+            <span>with</span>
             <div class="model-select-wrapper" style="position: relative; display: inline-block;">
-                <button class="model-select-btn" id="autoSumModel_${chatId}" disabled
+                <button class="model-select-btn" id="autoSumModel_${chatId}"
                         style="padding: 2px 8px; border: 1px solid var(--border-color); 
                                border-radius: 4px; background: var(--background-color); 
-                               color: var(--text-primary); cursor: not-allowed;
-                               display: flex; align-items: center; gap: 4px; text-decoration: line-through;">
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;">
                     <span class="model-name">${autoSumModel || 'Select model'}</span>
                     <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                 </button>
@@ -11763,42 +11763,48 @@ class NetdataMCPChat {
     }
     
     // Check if automatic summary should be generated
-    shouldGenerateSummary(_chat) {
-        // Placeholder implementation - customize conditions as needed
-        // Examples of conditions you might want:
-        // - After X messages
-        // - After Y tokens used
-        // - After Z time elapsed
-        // - When context window is X% full
-        // - Every N user messages
-        
-        // For now, return false - no automatic summaries
-        return false;
-        
-        // Example implementation (uncomment and customize):
-        /*
-        // Don't summarize if already has a summary
-        if (chat.summaryGenerated) return false;
-        
-        // Check message count (e.g., after 20 exchanges)
-        const userMessages = chat.messages.filter(m => m.role === 'user' && !['system-title', 'system-summary'].includes(m.role));
-        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
-        if (userMessages.length < 10 || assistantMessages.length < 10) return false;
-        
-        // Check context window usage (e.g., when 80% full)
-        const contextTokens = this.calculateContextWindowTokens(chat.id);
-        const modelLimit = this.getModelContextLimit(ChatConfig.getChatModelString(chat));
-        if (contextTokens < modelLimit * 0.8) return false;
-        
-        // Check time elapsed (e.g., after 30 minutes)
-        const firstMessage = chat.messages.find(m => m.timestamp);
-        if (firstMessage) {
-            const elapsed = Date.now() - new Date(firstMessage.timestamp).getTime();
-            if (elapsed < 30 * 60 * 1000) return false;
+    shouldGenerateSummary(chat) {
+        // Check if auto-summarization is enabled
+        if (!chat.config?.optimisation?.autoSummarisation?.enabled) {
+            return false;
         }
         
-        return true;
-        */
+        // Don't summarize if we recently created a summary (within 10 minutes)
+        const recentSummary = chat.messages.findLast(m => m.role === 'system-summary');
+        if (recentSummary) {
+            const summaryAge = Date.now() - new Date(recentSummary.timestamp).getTime();
+            if (summaryAge < 10 * 60 * 1000) {
+                console.log('[Auto-summarize] Skipping - recent summary exists', {
+                    summaryAge: Math.round(summaryAge / 1000 / 60) + ' minutes'
+                });
+                return false;
+            }
+        }
+        
+        // Need at least a few exchanges before summarizing
+        const userMessages = chat.messages.filter(m => m.role === 'user');
+        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
+        if (userMessages.length < 3 || assistantMessages.length < 3) {
+            return false;
+        }
+        
+        // Calculate current context window usage
+        const contextTokens = this.calculateContextWindowTokens(chat.id);
+        const modelString = ChatConfig.getChatModelString(chat);
+        const modelLimit = this.modelLimits?.get(modelString) || 128000; // fallback to 128k
+        
+        const percentUsed = Math.round((contextTokens / modelLimit) * 100);
+        const triggerPercent = chat.config.optimisation.autoSummarisation.triggerPercent || 50;
+        
+        console.log('[Auto-summarize] Context check', {
+            contextTokens,
+            modelLimit,
+            percentUsed: percentUsed + '%',
+            triggerPercent: triggerPercent + '%',
+            willTrigger: percentUsed >= triggerPercent
+        });
+        
+        return percentUsed >= triggerPercent;
     }
     
     
