@@ -17,7 +17,6 @@
 #define SQLSERVER_MAX_NAME_LENGTH NETDATA_MAX_INSTANCE_OBJECT
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
-BOOL has_mssql_installed = TRUE;
 ND_THREAD *mssql_query_thread = NULL;
 
 struct netdata_mssql_conn {
@@ -1169,7 +1168,6 @@ endMSSQLFillDict:
         RegCloseKey(hKey);
 
     if (ret != ERROR_SUCCESS) {
-        has_mssql_installed = FALSE;
         return -1;
     }
 
@@ -1205,8 +1203,6 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
         }
 
         collecting = dict_mssql_fill_waits(mi);
-    } else {
-        dictionary_sorted_walkthrough_read(mi->databases, netdata_mssql_reset_value, NULL);
     }
 
     return 1;
@@ -1224,7 +1220,7 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
-     //   dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_query_cb, &update_every);
+        dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_query_cb, &update_every);
     }
 
     return NULL;
