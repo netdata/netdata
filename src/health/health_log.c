@@ -44,10 +44,9 @@ extern __thread bool is_health_thread;
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
-    bool saved = false;
     if (async) {
-        saved = metadata_queue_ae_save(host, ae);
-        if (!saved && is_health_thread && service_running(SERVICE_HEALTH))
+        bool queued = metadata_queue_ae_save(host, ae);
+        if (!queued && is_health_thread && service_running(SERVICE_HEALTH))
             sql_health_alarm_log_save(host, ae);
     } else
         sql_health_alarm_log_save(host, ae);
