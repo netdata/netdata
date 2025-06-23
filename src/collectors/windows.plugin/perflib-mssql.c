@@ -56,8 +56,6 @@ static struct netdata_mssql_conn *mssql_conn_list = NULL;
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
     NETDATA_MSSQL_SQL_ERRORS,
-    NETDATA_MSSQL_LOCKS,
-    NETDATA_MSSQL_WAITS,
     NETDATA_MSSQL_MEMORY,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_SQL_STATS,
@@ -65,6 +63,8 @@ enum netdata_mssql_metrics {
 
     // Data get with queries
     NETDATA_MSSQL_DATABASE,
+    NETDATA_MSSQL_LOCKS,
+    NETDATA_MSSQL_WAITS,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -353,7 +353,7 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 #define NETDATA_MSSQL_LOCK_TIMEOUTS_METRIC "Lock Timeouts/sec"
 #define NETDATA_MSSQL_LOCK_REQUESTS_METRIC "Lock Requests/sec"
 
-void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
+static void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbname)
 {
     if (!mdi->parent->conn)
         return;
@@ -447,7 +447,7 @@ endtransactions:
     netdata_MSSQL_release_results(mdi->parent->conn->dbTransactionSTMT);
 }
 
-void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
+static void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 {
     if (!mdi->parent->conn)
         return;
@@ -515,8 +515,11 @@ endlocks:
     netdata_MSSQL_release_results(mdi->parent->conn->dbLocksSTMT);
 }
 
-int dict_mssql_fill_waits(struct mssql_instance *mi)
+static int dict_mssql_fill_waits(struct mssql_instance *mi)
 {
+    if (!mi->conn)
+        return 0;
+
     char wait_type[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char wait_category[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     SQLBIGINT total_wait = 0;
@@ -613,14 +616,13 @@ endwait:
     return success;
 }
 
-int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
-    if (!mdi->parent->conn || !mdi->collecting_data) {
+    if (!mdi->parent->conn || !mdi->collecting_data)
         goto enddrunquery;
-    }
 
     // We failed to collect this for the database, so we are not going to try again
     if (mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)
@@ -638,7 +640,7 @@ enddrunquery:
     return 1;
 }
 
-long metdata_mssql_check_permission(struct mssql_instance *mi)
+static long metdata_mssql_check_permission(struct mssql_instance *mi)
 {
     static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
     long perm = 0;
@@ -678,7 +680,7 @@ endperm:
     return perm;
 }
 
-void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
+static void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     if (!mi->conn)
         return;
@@ -1188,7 +1190,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     struct mssql_instance *mi = value;
     static long collecting = 1;
 
-    if (mi->conn->is_connected && collecting) {
+    if(mi->conn && mi->conn->is_connected && collecting) {
         collecting = metdata_mssql_check_permission(mi);
         if (!collecting) {
             nd_log(
@@ -1222,7 +1224,7 @@ void *netdata_mssql_queries(void *ptr __maybe_unused)
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
-        dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_query_cb, &update_every);
+     //   dictionary_sorted_walkthrough_read(mssql_instances, dict_mssql_query_cb, &update_every);
     }
 
     return NULL;
@@ -2611,21 +2613,25 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     static void (*doMSSQL[])(PERF_DATA_BLOCK *, struct mssql_instance *, int) = {
         do_mssql_general_stats,
         do_mssql_errors,
-        do_mssql_locks,
-        do_mssql_waits,
         do_mssql_memory_mgr,
         do_mssql_buffer_management,
         do_mssql_sql_statistics,
         do_mssql_access_methods,
 
-        // Data Get with queries
-        do_mssql_databases
+            /*
+            // Data Get with queries
+            do_mssql_databases,
+            do_mssql_locks,
+            do_mssql_waits,
+             */
+
+        NULL
     };
 
     if (has_mssql_installed) {
         static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
 
-        for (i = 0; i < NETDATA_MSSQL_DATABASE; i++) {
+        for (i = 0; doMSSQL[i]; i++) {
             if (!collect_perflib[i])
                 continue;
 
@@ -2645,9 +2651,11 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         }
     }
 
+    /*
     for (i = NETDATA_MSSQL_DATABASE; i < NETDATA_MSSQL_METRICS_END; i++) {
         doMSSQL[i](NULL, mi, *update_every);
     }
+     */
 
     return 1;
 }
