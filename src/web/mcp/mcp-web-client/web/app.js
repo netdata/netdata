@@ -11539,6 +11539,9 @@ class NetdataMCPChat {
                 return { rateLimitHandled: true };
             }
             
+            // Extract response time from the response object
+            const llmResponseTime = response._responseTime || 0;
+            
             // Update metrics
             if (response.usage) {
                 this.updateTokenUsage(chat.id, response.usage, ChatConfig.getChatModelString(chat) || provider.model);
