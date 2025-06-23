@@ -4,13 +4,9 @@
 #include "windows-internals.h"
 
 struct netdata_numa {
-    RRDSET *st_standby;
+    RRDSET *st_numa;
     RRDDIM *rd_standby;
-
-    RRDSET *st_available;
     RRDDIM *rd_available;
-
-    RRDSET *st_free_zero;
     RRDDIM *rd_free_zero;
 
     COUNTER_DATA standby;
@@ -20,14 +16,13 @@ struct netdata_numa {
 
 static DICTIONARY *numa_dict = NULL;
 
-static void
-numa_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static void numa_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct netdata_numa *d = value;
 
-    d->standby.key = "";
-    d->available.key = "";
-    d->free_zero.key = "";
+    d->standby.key = "Standby List MBytes";
+    d->available.key = "Available MBytes";
+    d->free_zero.key = "Free & Zero Page List MBytes";
 }
 
 static void initialize(void)
@@ -36,6 +31,44 @@ static void initialize(void)
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct netdata_numa));
 
     dictionary_register_insert_callback(numa_dict, numa_insert_cb, NULL);
+}
+
+static void netdata_numa_chart(struct netdata_numa *nn, int update_every)
+{
+    if (unlikely(!nn->st_numa)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "numae_node_%s_mem_usage", windows_shared_buffer);
+
+        nn->st_numa = rrdset_create_localhost(
+            "numa_node_mem_usage",
+            id,
+            NULL,
+            "numa",
+            "mem.numa_node_mem_usage",
+            "NUMA Node Memory Usage",
+            "bytes",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibNUMA",
+            NETDATA_CHART_PRIO_MEM_NUMA_NODES_MEMINFO,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(nn->st_numa->rrdlabels, "node", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+        nn->rd_free_zero = rrddim_add(nn->st_numa, "free", NULL, MEGA_FACTOR, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        nn->rd_standby = rrddim_add(nn->st_numa, "standby", NULL, MEGA_FACTOR, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        nn->rd_available = rrddim_add(nn->st_numa, "available", NULL, MEGA_FACTOR, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(nn->st_numa, nn->rd_free_zero, (collected_number)nn->free_zero.current.Data);
+
+    rrddim_set_by_pointer(nn->st_numa, nn->rd_available, (collected_number)nn->available.current.Data);
+
+    rrddim_set_by_pointer(nn->st_numa, nn->rd_standby, (collected_number)nn->standby.current.Data);
+
+    rrdset_done(nn->st_numa);
 }
 
 static bool do_numa(PERF_DATA_BLOCK *pDataBlock, int update_every)
@@ -56,9 +89,12 @@ static bool do_numa(PERF_DATA_BLOCK *pDataBlock, int update_every)
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct netdata_numa *nn = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
-        if (!nn)
-            continue;
+        struct netdata_numa *nn = dictionary_set(numa_dict, windows_shared_buffer, NULL, sizeof(*nn));
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->standby) ||
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->available) ||
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->free_zero))
+            netdata_numa_chart(nn, update_every);
     }
 
     return true;

@@ -11,6 +11,10 @@
 // 2^24
 #define WINDOWS_MAX_KERNEL_OBJECT 16777216
 
+#ifndef MEGA_FACTOR
+#define MEGA_FACTOR (1048576)
+#endif
+
 void *win_plugin_main(void *ptr);
 
 extern char windows_shared_buffer[8192];
