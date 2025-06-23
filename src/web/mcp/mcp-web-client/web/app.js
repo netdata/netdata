@@ -3231,9 +3231,9 @@ class NetdataMCPChat {
                 
                 // Clean and add to messages for API
                 const cleanedContent = this.cleanContentForAPI(response.content);
-                if (cleanedContent && cleanedContent.trim()) {
-                    messages.push({ role: 'assistant', content: cleanedContent });
-                }
+                // Always add assistant message when no tool calls, even if content is empty
+                // This prevents infinite loops when LLM responds with only thinking tags
+                messages.push({ role: 'assistant', content: cleanedContent || '' });
             }
             return;
         }
