@@ -5,6 +5,8 @@ package ddsnmp
 import (
 	"errors"
 	"fmt"
+	"net"
+	"strconv"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -118,6 +120,21 @@ func newMetricTransformFuncMap() template.FuncMap {
 				}
 			}
 			return m
+		},
+		"mask2cidr": func(mask string) string {
+			ip := net.ParseIP(mask)
+			if ip == nil {
+				return ""
+			}
+			ip = ip.To4()
+			if ip == nil {
+				return ""
+			}
+			prefixLen, bits := net.IPv4Mask(ip[0], ip[1], ip[2], ip[3]).Size()
+			if bits == 0 {
+				return ""
+			}
+			return strconv.Itoa(prefixLen)
 		},
 	}
 
