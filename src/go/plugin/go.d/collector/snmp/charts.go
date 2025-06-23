@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 const (
@@ -310,7 +310,7 @@ func newUserInputChart(cfg ChartConfig) (*module.Chart, error) {
 	return chart, nil
 }
 
-func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
+func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	if m.Name == "" {
 		return
 	}
@@ -332,6 +332,9 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
 	}
 	if chart.Fam == "" {
 		chart.Fam = m.Name
+	}
+	if chart.Units == "bit/s" {
+		chart.Type = module.Area
 	}
 
 	tags := map[string]string{
@@ -361,7 +364,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmpcollector.Metric) {
 	}
 }
 
-func (c *Collector) addProfileTableMetricChart(m ddsnmpcollector.Metric) {
+func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	if m.Name == "" {
 		return
 	}
@@ -386,13 +389,19 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmpcollector.Metric) {
 	if chart.Fam == "" {
 		chart.Fam = m.Name
 	}
+	if chart.Units == "bit/s" {
+		chart.Type = module.Area
+	}
 
 	tags := map[string]string{
 		"vendor":  c.sysInfo.Organization,
 		"sysName": c.sysInfo.Name,
 	}
 	maps.Copy(tags, m.Profile.Tags)
-	maps.Copy(tags, m.Tags)
+	for k, v := range m.Tags {
+		newKey := strings.TrimPrefix(k, "_")
+		tags[newKey] = v
+	}
 
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
@@ -415,7 +424,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmpcollector.Metric) {
 	}
 }
 
-func dimAlgoFromDdSnmpType(m ddsnmpcollector.Metric) module.DimAlgo {
+func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {
 	if m.MetricType == ddprofiledefinition.ProfileMetricTypeGauge {
 		return module.Absolute
 	}

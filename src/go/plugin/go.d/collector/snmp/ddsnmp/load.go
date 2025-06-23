@@ -93,6 +93,10 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]*P
 			log.Warningf("invalid profile '%s': %v", path, err)
 			return nil
 		}
+		if err := CompileTransforms(profile); err != nil {
+			log.Warningf("invalid profile '%s': %v", path, err)
+			return nil
+		}
 
 		profile.removeConstantMetrics()
 

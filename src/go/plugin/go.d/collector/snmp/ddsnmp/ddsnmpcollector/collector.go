@@ -15,29 +15,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-)
-
-type (
-	ProfileMetrics struct {
-		Source         string
-		DeviceMetadata map[string]string
-		Tags           map[string]string
-		Metrics        []Metric
-	}
-	Metric struct {
-		Profile     *ProfileMetrics
-		Name        string
-		Description string
-		Family      string
-		Unit        string
-		MetricType  ddprofiledefinition.ProfileMetricType
-		StaticTags  map[string]string
-		Tags        map[string]string
-		Mappings    map[int64]string
-		IsTable     bool
-		Value       int64
-	}
 )
 
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
@@ -46,13 +23,18 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(30*time.Minute, 1), // 100% jitter
+		tableCache:  newTableCache(30*time.Minute, 1),
 	}
 
 	for _, prof := range profiles {
 		prof := prof
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
+
+	coll.globalTagsCollector = newGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 
 	return coll
 }
@@ -65,6 +47,11 @@ type (
 		missingOIDs map[string]bool
 		tableCache  *tableCache
 
+		globalTagsCollector     *globalTagsCollector
+		deviceMetadataCollector *deviceMetadataCollector
+		scalarCollector         *scalarCollector
+		tableCollector          *tableCollector
+
 		DoTableMetrics bool
 	}
 	profileState struct {
@@ -75,8 +62,8 @@ type (
 	}
 )
 
-func (c *Collector) Collect() ([]*ProfileMetrics, error) {
-	var metrics []*ProfileMetrics
+func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	var metrics []*ddsnmp.ProfileMetrics
 	var errs []error
 
 	if expired := c.tableCache.clearExpired(); len(expired) > 0 {
@@ -103,14 +90,14 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 	return metrics, nil
 }
 
-func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
+func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, error) {
 	if !ps.initialized {
-		globalTag, err := c.collectGlobalTags(ps.profile)
+		globalTag, err := c.globalTagsCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect global tags: %w", err)
 		}
 
-		deviceMeta, err := c.collectDeviceMetadata(ps.profile)
+		deviceMeta, err := c.deviceMetadataCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect device metadata: %w", err)
 		}
@@ -120,23 +107,23 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		ps.initialized = true
 	}
 
-	var metrics []Metric
+	var metrics []ddsnmp.Metric
 
-	scalarMetrics, err := c.collectScalarMetrics(ps.profile)
+	scalarMetrics, err := c.scalarCollector.Collect(ps.profile)
 	if err != nil {
 		return nil, err
 	}
 	metrics = append(metrics, scalarMetrics...)
 
 	if c.DoTableMetrics {
-		tableMetrics, err := c.collectTableMetrics(ps.profile)
+		tableMetrics, err := c.tableCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, err
 		}
 		metrics = append(metrics, tableMetrics...)
 	}
 
-	pm := &ProfileMetrics{
+	pm := &ddsnmp.ProfileMetrics{
 		Source:         ps.profile.SourceFile,
 		DeviceMetadata: maps.Clone(ps.deviceMetadata),
 		Tags:           maps.Clone(ps.globalTags),
@@ -149,7 +136,7 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 	return pm, nil
 }
 
-func (c *Collector) updateMetrics(pms []*ProfileMetrics) {
+func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
 	// Find device vendor and type from any profile that has them.
 	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
 	// but only device-specific profiles contain vendor/type information.
@@ -157,6 +144,9 @@ func (c *Collector) updateMetrics(pms []*ProfileMetrics) {
 	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
 	for _, ps := range c.profiles {
 		if !ps.initialized {
+			continue
+		}
+		if ps.profile.Definition == nil {
 			continue
 		}
 		res, ok := ps.profile.Definition.Metadata["device"]
@@ -184,14 +174,6 @@ func (c *Collector) updateMetrics(pms []*ProfileMetrics) {
 			m.Unit = metricMetaReplacer.Replace(m.Unit)
 			for k, v := range m.Tags {
 				m.Tags[k] = metricMetaReplacer.Replace(v)
-			}
-			if v, ok := m.Tags["_unit"]; ok && v != "" {
-				delete(m.Tags, "_unit")
-				m.Unit = metricMetaReplacer.Replace(v)
-			}
-			if v, ok := m.Tags["_metric_suffix"]; ok && v != "" {
-				delete(m.Tags, "_metric_suffix")
-				m.Name += "_" + metricMetaReplacer.Replace(v)
 			}
 		}
 	}

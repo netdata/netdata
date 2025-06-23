@@ -187,10 +187,23 @@ func (tc *tableCache) clearExpired() []string {
 	}
 
 	// Second pass: cascade expiration to dependent tables
-	for tableOID := range expiredTables {
-		for dep := range tc.tableDeps[tableOID] {
-			expiredTables[dep] = true
+	visited := make(map[string]bool)
+	var cascadeExpiration func(tableOID string)
+	cascadeExpiration = func(tableOID string) {
+		if visited[tableOID] {
+			return
 		}
+		visited[tableOID] = true
+		expiredTables[tableOID] = true
+
+		for dep := range tc.tableDeps[tableOID] {
+			cascadeExpiration(dep)
+		}
+	}
+
+	// Start cascade from naturally expired tables
+	for tableOID := range expiredTables {
+		cascadeExpiration(tableOID)
 	}
 
 	// Clear all expired tables

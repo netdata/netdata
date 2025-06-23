@@ -189,13 +189,13 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 // This must be called when the thread terminates
 void finalize_self_prepared_sql_statements()
 {
-    if (!thread_stmt_pool)
-        return;
     spinlock_lock(&JudyL_thread_stmt_lock);
-    Word_t thread_id = thread_stmt_pool->thread_id;
-    finalize_and_free_stmt_list(thread_stmt_pool);
-    thread_stmt_pool = NULL;
-    (void) JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
+    if (thread_stmt_pool) {
+        Word_t thread_id = thread_stmt_pool->thread_id;
+        finalize_and_free_stmt_list(thread_stmt_pool);
+        thread_stmt_pool = NULL;
+        (void)JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
+    }
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
 

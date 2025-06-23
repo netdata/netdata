@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
@@ -31,7 +32,7 @@ func (c *Collector) collectProfiles(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsnmpcollector.ProfileMetrics) {
+func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
 	for _, pm := range pms {
 		for _, m := range pm.Metrics {
 			if m.IsTable || m.Name == "" {
@@ -56,7 +57,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsn
 	}
 }
 
-func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnmpcollector.ProfileMetrics) {
+func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms {
@@ -66,6 +67,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 			}
 
 			key := tableMetricKey(m)
+
 			seen[key] = true
 
 			if !c.seenTableMetrics[key] {
@@ -92,7 +94,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 	}
 }
 
-func tableMetricKey(m ddsnmpcollector.Metric) string {
+func tableMetricKey(m ddsnmp.Metric) string {
 	keys := make([]string, 0, len(m.Tags))
 	for k := range m.Tags {
 		keys = append(keys, k)
@@ -102,10 +104,11 @@ func tableMetricKey(m ddsnmpcollector.Metric) string {
 	var sb strings.Builder
 
 	sb.WriteString(m.Name)
+
 	for _, k := range keys {
-		if v := m.Tags[k]; v != "" {
+		if v := m.Tags[k]; v != "" && !strings.HasPrefix(k, "_") {
 			sb.WriteString("_")
-			sb.WriteString(m.Tags[k])
+			sb.WriteString(v)
 		}
 	}
 
