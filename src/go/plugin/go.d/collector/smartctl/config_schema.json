@@ -51,6 +51,13 @@
         "minimum": 1,
         "default": "*"
       },
+      "concurrent_scans": {
+        "title": "Concurrent scans",
+        "description": "Number of devices to scan concurrently. Set to 0 for sequential scanning (default), or a positive number for concurrent scanning.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
       "extra_devices": {
         "title": "Extra devices",
         "description": "Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type.",
@@ -100,7 +107,8 @@
             "timeout",
             "scan_every",
             "poll_devices_every",
-            "no_check_power_mode"
+            "no_check_power_mode",
+            "concurrent_scans"
           ]
         },
         {
@@ -124,6 +132,9 @@
     },
     "device_selector": {
       "ui:help": "Leave blank or use `*` to collect data for all devices."
+    },
+    "concurrent_scans": {
+      "ui:help": "Improves performance when monitoring many devices. Set to the number of devices to scan simultaneously, or 0 to disable concurrent scanning."
     },
     "extra_devices": {
       "items": {

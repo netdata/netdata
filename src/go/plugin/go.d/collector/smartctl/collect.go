@@ -8,8 +8,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/sourcegraph/conc/pool"
 	"github.com/tidwall/gjson"
 )
 
@@ -39,13 +41,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if c.forceDevicePoll || c.isTimeToPollDevices(now) {
 		mx := make(map[string]int64)
 
-		// TODO: make it concurrent
-		for _, d := range c.scannedDevices {
-			if err := c.collectScannedDevice(mx, d); err != nil {
-				c.Warning(err)
-				continue
-			}
-		}
+		c.collectDevices(mx)
 
 		c.forceDevicePoll = false
 		c.lastDevicePollTime = now
@@ -53,6 +49,50 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 
 	return c.mx, nil
+}
+func (c *Collector) collectDevices(mx map[string]int64) {
+	if c.ConcurrentScans > 0 && len(c.scannedDevices) > 1 {
+		if err := c.collectDevicesConcurrently(mx); err != nil {
+			c.Warning(err)
+		}
+		return
+	}
+
+	for _, d := range c.scannedDevices {
+		if err := c.collectScannedDevice(mx, d); err != nil {
+			c.Warning(err)
+			continue
+		}
+	}
+}
+
+func (c *Collector) collectDevicesConcurrently(mx map[string]int64) error {
+	p := pool.New().WithMaxGoroutines(c.ConcurrentScans).WithErrors()
+	var mu sync.Mutex
+
+	for _, dev := range c.scannedDevices {
+		dev := dev
+		p.Go(func() error {
+			tempMx := make(map[string]int64)
+
+			if err := c.collectScannedDevice(tempMx, dev); err != nil {
+				c.Warning(err)
+				return err
+			}
+
+			mu.Lock()
+			maps.Copy(mx, tempMx)
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	if err := p.Wait(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
