@@ -992,7 +992,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     int op_no = 1;
 
     // begin transaction
-    int rc = db_execute(ml_db, "BEGIN TRANSACTION;");
+    int rc = db_execute(ml_db, "BEGIN TRANSACTION;", NULL);
 
     // add/delete models
     if (!rc) {
@@ -1019,14 +1019,14 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // commit transaction
     if (!rc) {
         op_no++;
-        rc = db_execute(ml_db, "COMMIT TRANSACTION;");
+        rc = db_execute(ml_db, "COMMIT TRANSACTION;", NULL);
     }
 
     // rollback transaction on failure
     if (rc) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
-        rc = db_execute(ml_db, "ROLLBACK;");
+        rc = db_execute(ml_db, "ROLLBACK;", NULL);
         if (rc)
             netdata_log_error("ML transaction rollback failed with rc=%d", rc);
     }

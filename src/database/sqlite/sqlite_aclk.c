@@ -207,7 +207,7 @@ static void sql_delete_aclk_table_list(void)
 
     SQLITE_FINALIZE(res);
 
-    int rc = db_execute(db_meta, buffer_tostring(sql));
+    int rc = db_execute(db_meta, buffer_tostring(sql), NULL);
     if (unlikely(rc))
         netdata_log_error("Failed to drop unused ACLK tables");
 

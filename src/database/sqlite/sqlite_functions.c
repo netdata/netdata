@@ -297,10 +297,14 @@ int init_database_batch(sqlite3 *database, const char *batch[], const char *desc
 
 // Return 0 OK
 // Return 1 Failed
-int db_execute(sqlite3 *db, const char *cmd)
+// sqlite_rc - if not NULL, it will be set to the return code of the sqlite3_exec_monitored call
+int db_execute(sqlite3 *db, const char *cmd, int *sqlite_rc)
 {
     int rc;
     int cnt = 0;
+
+    if (unlikely(!db))
+        return 1;
 
     while (cnt < SQL_MAX_RETRY) {
         char *err_msg = NULL;
@@ -323,6 +327,9 @@ int db_execute(sqlite3 *db, const char *cmd)
             mark_database_to_recover(NULL, db, rc);
         break;
     }
+    if (sqlite_rc)
+        *sqlite_rc = rc;
+
     return (rc != SQLITE_OK);
 }
 
@@ -395,7 +402,7 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     if (unlikely(!database))
         return;
 
-    (void) db_execute(database, "PRAGMA optimize");
+    (void)db_execute(database, "PRAGMA optimize", NULL);
 
     netdata_log_info("%s: Closing sqlite database", database_name);
 
