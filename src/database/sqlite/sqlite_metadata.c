@@ -1509,9 +1509,9 @@ static void cleanup_health_log(struct meta_config_s *config)
         return;
     }
 
-    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG);
-    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL);
-    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
     worker_is_idle();
 }
 
@@ -2881,7 +2881,7 @@ done:
 
 void cleanup_agent_event_log(void)
 {
-    (void) db_execute(db_meta, SQL_CLEANUP_AGENT_EVENT_LOG);
+    (void) db_execute(db_meta, SQL_CLEANUP_AGENT_EVENT_LOG, NULL);
 }
 
 #define SQL_GET_AGENT_EVENT_TYPE_MEDIAN                                                                                \
