@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Build script for as400-db2.plugin
+# Build script for ibm.d.plugin
 # This plugin requires CGO and IBM DB2 client libraries
 
 set -euo pipefail
@@ -21,7 +21,7 @@ if [ ! -d "$IBM_DB_HOME/lib" ] || [ ! -d "$IBM_DB_HOME/include" ]; then
     exit 1
 fi
 
-echo "Building as400-db2.plugin with CGO enabled..."
+echo "Building ibm.d.plugin with CGO enabled..."
 echo "IBM_DB_HOME: $IBM_DB_HOME"
 
 # Set build environment
@@ -36,15 +36,15 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR/../../../.."
 
 # Build the plugin
-echo "Building as400-db2.plugin..."
-go build -v -o as400-db2.plugin ./cmd/as400db2plugin
+echo "Building ibm.d.plugin..."
+go build -v -o ibm.d.plugin ./cmd/ibmdplugin
 
-if [ -f "as400-db2.plugin" ]; then
+if [ -f "ibm.d.plugin" ]; then
     echo "Build successful!"
     echo ""
     echo "To install the plugin:"
-    echo "  sudo cp as400-db2.plugin /usr/libexec/netdata/plugins.d/"
-    echo "  sudo chmod +x /usr/libexec/netdata/plugins.d/as400-db2.plugin"
+    echo "  sudo cp ibm.d.plugin /usr/libexec/netdata/plugins.d/"
+    echo "  sudo chmod +x /usr/libexec/netdata/plugins.d/ibm.d.plugin"
     echo ""
     echo "To run the plugin, ensure LD_LIBRARY_PATH includes DB2 libraries:"
     echo "  export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:\$LD_LIBRARY_PATH"

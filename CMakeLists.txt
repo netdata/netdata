@@ -3784,6 +3784,12 @@ if(ENABLE_PLUGIN_GO)
 endif()
 
 #
+# ibm.d.plugin (requires CGO)
+#
+
+include(src/go/plugin/ibm.d/CMakeLists.txt)
+
+#
 # dashboard
 #
 

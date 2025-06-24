@@ -27,7 +27,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
-	github.com/ibmdb/go_ibm_db v0.4.5 // Used by as400-db2.plugin (requires CGO)
+	github.com/ibmdb/go_ibm_db v0.4.5 // Used by ibm.d.plugin (requires CGO)
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.5

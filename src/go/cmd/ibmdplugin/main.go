@@ -19,11 +19,11 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	// Register AS/400 and DB2 collectors that require CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400"
-	// _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/db2" // Future DB2 collector
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"
 )
 
-const pluginName = "as400-db2.plugin"
+const pluginName = "ibm.d.plugin"
 
 func init() {
 	// https://github.com/netdata/netdata/issues/8949#issuecomment-638294959
@@ -38,7 +38,7 @@ func main() {
 	opts := parseCLI()
 
 	if opts.Version {
-		fmt.Printf("as400-db2.plugin, version: %s\n", buildinfo.Version)
+		fmt.Printf("ibm.d.plugin, version: %s\n", buildinfo.Version)
 		return
 	}
 
