@@ -76,8 +76,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.9.1.0
       name: humidityProbe1
-      family: Humidity
       description: Probe 1 humidity
+      family: Humidity
       unit: "%/100"
       # TODO I am not sure for this
 
@@ -120,8 +120,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.1.0
       name: currentxy1
-      family: Current
       description: XY1 current draw
+      family: Current
       unit: "A/100"
 
   - MIB: CPI-UNITY-MIB
@@ -311,7 +311,9 @@ metrics:
       metric_type: monotonic_count
       description: XY1 branch energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
+      # This and the following metrics were da*W*s, but because they are accumulated, it should be /s. s/s = 1 so removing the seconds.
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -320,7 +322,8 @@ metrics:
       metric_type: monotonic_count
       description: YZ1 branch energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -329,7 +332,8 @@ metrics:
       metric_type: monotonic_count
       description: ZX1 branch energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -338,7 +342,8 @@ metrics:
       metric_type: monotonic_count
       description: XY2 branch energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -347,7 +352,8 @@ metrics:
       metric_type: monotonic_count
       description: YZ2 branch energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -356,7 +362,8 @@ metrics:
       metric_type: monotonic_count
       description: ZX2 branch energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
 
   ### [Legacy] Outlets
   - MIB: CPI-UNITY-MIB
@@ -557,9 +564,9 @@ metrics:
       name: receptacleEnergyoutlet1s
       metric_type: monotonic_count
       description: Outlet1 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -568,7 +575,8 @@ metrics:
       metric_type: monotonic_count
       description: Outlet2 receptacle energy accumulated
       family: Energy
-      unit: "da*W*s"
+      scaling_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -576,9 +584,9 @@ metrics:
       name: receptacleEnergyoutlet3s
       metric_type: monotonic_count
       description: Outlet3 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -586,9 +594,9 @@ metrics:
       name: receptacleEnergyoutlet4s
       metric_type: monotonic_count
       description: Outlet4 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -596,9 +604,9 @@ metrics:
       name: receptacleEnergyoutlet5s
       metric_type: monotonic_count
       description: Outlet5 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -606,9 +614,9 @@ metrics:
       name: receptacleEnergyoutlet6s
       metric_type: monotonic_count
       description: Outlet6 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -616,9 +624,9 @@ metrics:
       name: receptacleEnergyoutlet7s
       metric_type: monotonic_count
       description: Outlet7 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -626,9 +634,9 @@ metrics:
       name: receptacleEnergyoutlet8s
       metric_type: monotonic_count
       description: Outlet8 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -636,9 +644,9 @@ metrics:
       name: receptacleEnergyoutlet9s
       metric_type: monotonic_count
       description: Outlet9 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -646,9 +654,9 @@ metrics:
       name: receptacleEnergyoutlet10s
       metric_type: monotonic_count
       description: Outlet10 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -656,9 +664,9 @@ metrics:
       name: receptacleEnergyoutlet11s
       metric_type: monotonic_count
       description: Outlet11 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -666,9 +674,9 @@ metrics:
       name: receptacleEnergyoutlet12s
       metric_type: monotonic_count
       description: Outlet12 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -676,9 +684,9 @@ metrics:
       name: receptacleEnergyoutlet13s
       metric_type: monotonic_count
       description: Outlet13 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -686,9 +694,9 @@ metrics:
       name: receptacleEnergyoutlet14s
       metric_type: monotonic_count
       description: Outlet14 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -696,9 +704,9 @@ metrics:
       name: receptacleEnergyoutlet15s
       metric_type: monotonic_count
       description: Outlet15 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -706,9 +714,9 @@ metrics:
       name: receptacleEnergyoutlet16s
       metric_type: monotonic_count
       description: Outlet16 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -716,9 +724,9 @@ metrics:
       name: receptacleEnergyoutlet17s
       metric_type: monotonic_count
       description: Outlet17 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -726,9 +734,9 @@ metrics:
       name: receptacleEnergyoutlet18s
       metric_type: monotonic_count
       description: Outlet18 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -736,9 +744,9 @@ metrics:
       name: receptacleEnergyoutlet19s
       metric_type: monotonic_count
       description: Outlet19 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -746,9 +754,9 @@ metrics:
       name: receptacleEnergyoutlet20s
       metric_type: monotonic_count
       description: Outlet20 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -756,9 +764,9 @@ metrics:
       name: receptacleEnergyoutlet21s
       metric_type: monotonic_count
       description: Outlet21 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -766,9 +774,9 @@ metrics:
       name: receptacleEnergyoutlet22s
       metric_type: monotonic_count
       description: Outlet22 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -776,9 +784,9 @@ metrics:
       name: receptacleEnergyoutlet23s
       metric_type: monotonic_count
       description: Outlet23 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -786,9 +794,9 @@ metrics:
       name: receptacleEnergyoutlet24s
       metric_type: monotonic_count
       description: Outlet24 receptacle energy accumulated
-      scale_factor: 1000
       family: Outlets/Energy
-      unit: "da*W*s"
+      scale_factor: 0.1
+      unit: "da*W"
 
   ### PDU
 
@@ -1042,7 +1050,9 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.9
         name: cpiPduBranchEnergy
         description: Branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr
-        unit: "Vs"
+        family: Branches/Energy
+        scale_factor: 0.1
+        unit: "V"
     metric_tags:
       - tag: branch_id
         symbol:
@@ -1112,7 +1122,8 @@ metrics:
         name: cpiPduOutletEnergy
         description: Outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr
         family: Outlets/Energy
-        unit: "Ws"
+        scale_factor: 0.1
+        unit: "W"
     metric_tags:
       - tag: outlet_id
         symbol:
