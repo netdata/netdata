@@ -1,0 +1,156 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DB2 collector configuration",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "IBM DB2 connection string. Format: DATABASE=dbname;HOSTNAME=host;PORT=port;PROTOCOL=TCPIP;UID=username;PWD=password",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Database query timeout.",
+        "type": "string",
+        "default": "2s"
+      },
+      "max_db_conns": {
+        "title": "Max DB connections",
+        "description": "Maximum number of open database connections.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "max_db_life_time": {
+        "title": "Max DB life time",
+        "description": "Maximum database connection lifetime.",
+        "type": "string",
+        "default": "10m"
+      },
+      "collect_database_metrics": {
+        "title": "Collect database metrics",
+        "description": "Enable collection of per-database metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_bufferpool_metrics": {
+        "title": "Collect bufferpool metrics",
+        "description": "Enable collection of per-bufferpool metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_tablespace_metrics": {
+        "title": "Collect tablespace metrics",
+        "description": "Enable collection of per-tablespace metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_connection_metrics": {
+        "title": "Collect connection metrics",
+        "description": "Enable collection of per-connection metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_lock_metrics": {
+        "title": "Collect lock metrics",
+        "description": "Enable collection of lock wait and deadlock metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "max_databases": {
+        "title": "Max databases",
+        "description": "Maximum number of databases to monitor.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 10
+      },
+      "max_bufferpools": {
+        "title": "Max bufferpools",
+        "description": "Maximum number of bufferpools to monitor.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 20
+      },
+      "max_tablespaces": {
+        "title": "Max tablespaces",
+        "description": "Maximum number of tablespaces to monitor.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 100
+      },
+      "max_connections": {
+        "title": "Max connections",
+        "description": "Maximum number of connections to monitor individually.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 200
+      }
+    },
+    "required": [
+      "dsn"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "dsn",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Connection",
+          "fields": [
+            "max_db_conns",
+            "max_db_life_time"
+          ]
+        },
+        {
+          "title": "Metrics Collection",
+          "fields": [
+            "collect_database_metrics",
+            "collect_bufferpool_metrics",
+            "collect_tablespace_metrics",
+            "collect_connection_metrics",
+            "collect_lock_metrics"
+          ]
+        },
+        {
+          "title": "Cardinality Limits",
+          "fields": [
+            "max_databases",
+            "max_bufferpools",
+            "max_tablespaces",
+            "max_connections"
+          ]
+        }
+      ]
+    },
+    "dsn": {
+      "ui:help": "IBM DB2 connection string",
+      "ui:placeholder": "DATABASE=sample;HOSTNAME=db2.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2user;PWD=password"
+    },
+    "timeout": {
+      "ui:help": "Accepts any duration syntax, e.g. '2s', '1m'"
+    },
+    "max_db_life_time": {
+      "ui:help": "Accepts any duration syntax, e.g. '10m', '1h'"
+    }
+  }
+}
