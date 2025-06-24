@@ -883,6 +883,22 @@ class OpenAIProvider extends LLMProvider {
                 status: response.status,
                 statusText: response.statusText
             });
+            
+            // Special handling for rate limit errors (429)
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-after');
+                const baseMessage = error.error?.message || 'Rate limit exceeded';
+                let rateLimitMessage = `Rate limit exceeded: ${baseMessage}`;
+                
+                if (retryAfter) {
+                    rateLimitMessage += ` (retry after ${retryAfter}s)`;
+                }
+                
+                const apiError = `OpenAI API error: ${rateLimitMessage} (429)`;
+                console.error('[OpenAIProvider] Rate limit error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+                throw new Error(apiError);
+            }
+            
             const apiError = `OpenAI API error: ${error.error?.message || response.statusText}`;
             console.error('[OpenAIProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
             throw new Error(apiError);
@@ -1577,6 +1593,22 @@ class AnthropicProvider extends LLMProvider {
                 status: response.status,
                 statusText: response.statusText
             });
+            
+            // Special handling for rate limit errors (429)
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-after');
+                const baseMessage = error.error?.message || 'Rate limit exceeded';
+                let rateLimitMessage = `Rate limit exceeded: ${baseMessage}`;
+                
+                if (retryAfter) {
+                    rateLimitMessage += ` (retry after ${retryAfter}s)`;
+                }
+                
+                const apiError = `Anthropic API error: ${rateLimitMessage} (429)`;
+                console.error('[AnthropicProvider] Rate limit error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+                throw new Error(apiError);
+            }
+            
             const apiError = `Anthropic API error: ${error.error?.message || response.statusText}`;
             console.error('[AnthropicProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
             throw new Error(apiError);
@@ -2060,6 +2092,22 @@ class GoogleProvider extends LLMProvider {
                 status: response.status,
                 statusText: response.statusText
             });
+            
+            // Special handling for rate limit errors (429)
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-after');
+                const baseMessage = error.error?.message || 'Rate limit exceeded';
+                let rateLimitMessage = `Rate limit exceeded: ${baseMessage}`;
+                
+                if (retryAfter) {
+                    rateLimitMessage += ` (retry after ${retryAfter}s)`;
+                }
+                
+                const apiError = `Google API error: ${rateLimitMessage} (429)`;
+                console.error('[GoogleProvider] Rate limit error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
+                throw new Error(apiError);
+            }
+            
             const apiError = `Google API error: ${error.error?.message || response.statusText}`;
             console.error('[GoogleProvider] API error:', apiError, '\nStatus:', response.status, '\nResponse:', error);
             throw new Error(apiError);

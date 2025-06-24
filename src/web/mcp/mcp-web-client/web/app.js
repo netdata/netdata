@@ -11,7 +11,7 @@ import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js
 class NetdataMCPChat {
     constructor() {
         // Log version on startup
-        console.log('🚀 Netdata MCP Web Client v1.0.66 - Professional Confirmation Modals with Keyboard Support');
+        console.log('🚀 Netdata MCP Web Client v1.0.67 - Multi-Chat Input Management Fixes');
         
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
@@ -20,9 +20,9 @@ class NetdataMCPChat {
         this.communicationLog = []; // Universal log (not saved)
         this.tokenUsageHistory = new Map(); // Track token usage per chat
         this.toolInclusionStates = new Map(); // Track which tools are included/excluded per chat
-        this.currentContextWindow = 0; // Running total for delta calculation during rendering
-        this.shouldStopProcessing = false; // Flag to stop processing between requests
-        this.isProcessing = false; // Track if we're currently processing messages
+        // Removed global currentContextWindow - now stored per chat
+        // Removed global shouldStopProcessing - now stored per chat
+        // Removed global isProcessing - now stored per chat
         this.modelPricing = {}; // Initialize model pricing storage
         this.modelLimits = {}; // Initialize model context limits storage
         this.copiedModel = null; // Track copied model for paste functionality
@@ -797,7 +797,6 @@ class NetdataMCPChat {
         
         // These will be set when switching chats for backward compatibility
         this.chatTitle = null;
-        this.chatInput = null;
         this.sendMessageBtn = null;
         this.reconnectMcpBtn = null;
         this.copyMetricsBtn = null;
@@ -3115,8 +3114,8 @@ class NetdataMCPChat {
         
         // Continue the loop
         while (true) {
-            // Check if we should stop processing
-            if (this.shouldStopProcessing) {
+            // Check if we should stop processing for this chat
+            if (chat.shouldStopProcessing) {
                 break;
             }
             
@@ -3659,7 +3658,7 @@ class NetdataMCPChat {
         chat.isProcessing = false;
         
         // Clear stop-related flags to ensure they're ready for next time
-        this.shouldStopProcessing = false;
+        chat.shouldStopProcessing = false;
         chat.processingWasStoppedByUser = false;
         
         // Clear error state on successful conclusion
@@ -3678,27 +3677,29 @@ class NetdataMCPChat {
         chat.updatedAt = new Date().toISOString();
         this.autoSave(chatId);
         
-        // Re-enable input if it's the active chat
-        if (chatId === this.getActiveChatId()) {
-            const container = this.getChatContainer(chatId);
-            if (container && container._elements) {
-                const input = container._elements.input;
-                if (input) {
-                    // For contentEditable
-                    input.contentEditable = true;
+        // Always re-enable input for the chat that concluded
+        const container = this.getChatContainer(chatId);
+        if (container && container._elements) {
+            const input = container._elements.input;
+            if (input) {
+                // Always re-enable contentEditable
+                input.contentEditable = true;
+                
+                // Only focus if this is the active chat
+                if (chatId === this.getActiveChatId()) {
                     input.focus();
                 }
-                
-                // Update send button state
-                const sendBtn = container._elements.sendBtn;
-                if (sendBtn && input) {
-                    try {
-                        const content = this.getEditableContent(input).trim();
-                        sendBtn.disabled = !content;
-                    } catch (error) {
-                        console.error('[assistantConcluded] ERROR getting editable content:', error);
-                        sendBtn.disabled = true;
-                    }
+            }
+            
+            // Update send button state
+            const sendBtn = container._elements.sendBtn;
+            if (sendBtn && input) {
+                try {
+                    const content = this.getEditableContent(input).trim();
+                    sendBtn.disabled = !content;
+                } catch (error) {
+                    console.error('[assistantConcluded] ERROR getting editable content:', error);
+                    sendBtn.disabled = true;
                 }
             }
         }
@@ -3733,7 +3734,7 @@ class NetdataMCPChat {
         chat.isProcessing = false;
         
         // Clear stop-related flags when failure is handled
-        this.shouldStopProcessing = false;
+        chat.shouldStopProcessing = false;
         chat.processingWasStoppedByUser = false;
         
         // Clear current assistant group
@@ -3749,15 +3750,19 @@ class NetdataMCPChat {
         chat.updatedAt = new Date().toISOString();
         this.autoSave(chatId);
         
-        // Re-enable input if it's the active chat and not rate limited
-        if (!isRateLimitHandled && chatId === this.getActiveChatId()) {
+        // Re-enable input if not rate limited (always for the chat that failed)
+        if (!isRateLimitHandled) {
             const container = this.getChatContainer(chatId);
             if (container && container._elements) {
                 const input = container._elements.input;
                 if (input) {
-                    // For contentEditable
+                    // Always re-enable contentEditable
                     input.contentEditable = true;
-                    input.focus();
+                    
+                    // Only focus if this is the active chat
+                    if (chatId === this.getActiveChatId()) {
+                        input.focus();
+                    }
                 }
             }
         }
@@ -5086,6 +5091,15 @@ class NetdataMCPChat {
         return container;
     }
     
+    // Helper method to get the input element for a specific chat
+    getChatInput(chatId) {
+        const container = this.getChatContainer(chatId);
+        if (container && container._elements && container._elements.input) {
+            return container._elements.input;
+        }
+        return null;
+    }
+    
     createChatDOM(chatId) {
         const chat = this.chats.get(chatId);
         if (!chat) {return null;}
@@ -5251,16 +5265,16 @@ class NetdataMCPChat {
         
         // Send button
         elements.sendBtn.addEventListener('click', () => {
-            if (this.isProcessing) {
-                // Stop processing
-                this.shouldStopProcessing = true;
-                this.isProcessing = false;
-                this.updateSendButton();
-                // CRITICAL: Check if chatInput exists before modifying it
-                if (this.chatInput) {
-                    this.chatInput.contentEditable = true;
+            if (chat && chat.isProcessing) {
+                // Stop processing for this specific chat
+                chat.shouldStopProcessing = true;
+                chat.isProcessing = false;
+                this.updateSendButton(chatId);
+                // Re-enable chat-specific input
+                if (elements.input) {
+                    elements.input.contentEditable = true;
                 } else {
-                    console.error('[sendBtn.click] ERROR: this.chatInput is undefined when stopping processing');
+                    console.error('[sendBtn.click] ERROR: Could not find input element when stopping processing for chat', chatId);
                 }
                 // Don't add a system message as it breaks message sequencing
                 // The assistantFailed handler will take care of the UI feedback
@@ -5445,8 +5459,7 @@ class NetdataMCPChat {
             if (chat) {
                 chat.isActive = true;
                 
-                // Update global references for compatibility
-                this.chatInput = container._elements.input;
+                // No longer need to update global chatInput reference
                 this.sendMessageBtn = container._elements.sendBtn;
                 this.reconnectMcpBtn = container._elements.reconnectBtn;
                 this.chatTitle = container._elements.title;
@@ -6192,7 +6205,8 @@ class NetdataMCPChat {
                 currentStepInTurn: 1
             };
         }
-        this.currentContextWindow = 0; // Reset context window counter for delta calculation
+        // Reset context window counter for delta calculation (stored per chat)
+        chat.currentContextWindow = 0;
         
         // Check if we need to re-render messages
         // Re-render if: 1) Never rendered before, 2) DOM is empty (switched from another chat), 3) Force render requested
@@ -6965,8 +6979,9 @@ class NetdataMCPChat {
     }
 
     // Update send button appearance based on processing state
-    updateSendButton() {
-        if (this.isProcessing) {
+    updateSendButton(chatId) {
+        const chat = this.chats.get(chatId);
+        if (chat && chat.isProcessing) {
             this.sendMessageBtn.textContent = 'Stop';
             this.sendMessageBtn.classList.remove('btn-send');
             this.sendMessageBtn.classList.add('btn-danger');
@@ -6975,13 +6990,14 @@ class NetdataMCPChat {
             this.sendMessageBtn.textContent = 'Send';
             this.sendMessageBtn.classList.remove('btn-danger');
             this.sendMessageBtn.classList.add('btn-send');
-            // CRITICAL: Add error checking for undefined chatInput
-            if (!this.chatInput) {
-                console.error('[updateSendButton] ERROR: this.chatInput is undefined');
+            // Get chat-specific input
+            const chatInput = this.getChatInput(chatId);
+            if (!chatInput) {
+                console.error('[updateSendButton] ERROR: Could not find input for chat', chatId);
                 this.sendMessageBtn.disabled = true;
             } else {
                 try {
-                    const content = this.getEditableContent(this.chatInput);
+                    const content = this.getEditableContent(chatInput);
                     this.sendMessageBtn.disabled = !content.trim();
                 } catch (error) {
                     console.error('[updateSendButton] ERROR getting editable content:', error);
@@ -6996,16 +7012,17 @@ class NetdataMCPChat {
         // If no message provided, get it from the input
         let message = messageParam;
         if (message === null) {
-            // CRITICAL: Check if chatInput exists before using it
-            if (!this.chatInput) {
-                console.error('[sendMessage] ERROR: this.chatInput is undefined');
+            // Get chat-specific input
+            const chatInput = this.getChatInput(chatId);
+            if (!chatInput) {
+                console.error('[sendMessage] ERROR: Could not find input for chat', chatId);
                 this.showError('Chat input not found', chatId);
                 return;
             }
             
             // For contentEditable input, extract formatted content
             try {
-                message = this.getEditableContent(this.chatInput).trim();
+                message = this.getEditableContent(chatInput).trim();
                 if (!message && !isResume) {return;}
             } catch (error) {
                 console.error('[sendMessage] ERROR extracting message content:', error);
@@ -7055,18 +7072,20 @@ class NetdataMCPChat {
         this.updateChatSessions(); // Update UI to remove draft indicator
         
         // Disable input and update button to Stop
-        // CRITICAL: Check if chatInput exists before using it
-        if (this.chatInput) {
+        // Get chat-specific input element
+        const container = this.getChatContainer(chatId);
+        if (container && container._elements && container._elements.input) {
+            const input = container._elements.input;
             if (!isResume) {
-                this.chatInput.innerHTML = '';
+                input.innerHTML = '';
             }
-            this.chatInput.contentEditable = false;
+            input.contentEditable = false;
         } else {
-            console.error('[sendMessage] ERROR: this.chatInput is undefined after sending message');
+            console.error('[sendMessage] ERROR: Could not find chat input element for chat', chatId);
         }
-        this.isProcessing = true;
-        this.shouldStopProcessing = false;
-        this.updateSendButton();
+        chat.isProcessing = true;
+        chat.shouldStopProcessing = false;
+        this.updateSendButton(chatId);
         
         // Only add user message if this is not a resume (resume continues from existing messages)
         if (!isResume) {
@@ -7107,14 +7126,14 @@ class NetdataMCPChat {
         } catch (error) {
             this.showError(`Failed to connect to MCP server: ${error.message}`, chat.id);
             // Re-enable input so user can try again
-            // CRITICAL: Check if chatInput exists before using it
-            if (this.chatInput) {
-                this.chatInput.contentEditable = true;
+            const errorContainer = this.getChatContainer(chatId);
+            if (errorContainer && errorContainer._elements && errorContainer._elements.input) {
+                errorContainer._elements.input.contentEditable = true;
             } else {
-                console.error('[sendMessage] ERROR: this.chatInput is undefined when re-enabling after MCP error');
+                console.error('[sendMessage] ERROR: Could not find chat input element when re-enabling after MCP error for chat', chatId);
             }
-            this.isProcessing = false;
-            this.updateSendButton();
+            chat.isProcessing = false;
+            this.updateSendButton(chatId);
             return;
         }
         
@@ -7144,7 +7163,7 @@ class NetdataMCPChat {
             const lastMessage = chat.messages[chat.messages.length - 1];
             const hasCompleteSequence = lastMessage && lastMessage.role === 'assistant';
             
-            if (!this.shouldStopProcessing && hasCompleteSequence && this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
+            if (!chat.shouldStopProcessing && hasCompleteSequence && this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
                 const llmProxy = this.llmProviders.get(chat.llmProviderId);
                 if (llmProxy) {
                     const titleProvider = TitleGenerator.getTitleGenerationProvider(
@@ -7179,14 +7198,15 @@ class NetdataMCPChat {
             // Success - assistant has concluded
             this.assistantConcluded(chat.id);
             
-            // Reset global processing state
-            this.isProcessing = false;
-            this.shouldStopProcessing = false;
+            // Reset processing state for this chat
+            chat.isProcessing = false;
+            chat.shouldStopProcessing = false;
             
             // Re-enable send button if the input has text
-            if (this.chatInput) {
+            const chatInput = this.getChatInput(chatId);
+            if (chatInput) {
                 try {
-                    const content = this.getEditableContent(this.chatInput).trim();
+                    const content = this.getEditableContent(chatInput).trim();
                     if (content && this.sendBtn) {
                         this.sendBtn.disabled = false;
                     }
@@ -7194,11 +7214,11 @@ class NetdataMCPChat {
                     console.error('[sendMessage] ERROR checking input content:', error);
                 }
             } else {
-                console.error('[sendMessage] WARNING: chatInput is undefined when trying to re-enable send button');
+                console.error('[sendMessage] WARNING: Could not find input for chat when trying to re-enable send button', chatId);
             }
         } catch (error) {
             // Check if the user stopped processing
-            if (this.shouldStopProcessing || chat.processingWasStoppedByUser || error.isUserStop) {
+            if (chat.shouldStopProcessing || chat.processingWasStoppedByUser || error.isUserStop) {
                 // Clear the flag for next time
                 chat.processingWasStoppedByUser = false;
                 
@@ -7280,10 +7300,10 @@ class NetdataMCPChat {
                 }
             }
             
-            // Reset global processing state (for all cases)
-            this.isProcessing = false;
-            this.shouldStopProcessing = false;
-            this.updateSendButton();
+            // Reset processing state for this chat (for all cases)
+            chat.isProcessing = false;
+            chat.shouldStopProcessing = false;
+            this.updateSendButton(chatId);
         }
     }
 
@@ -7387,7 +7407,7 @@ class NetdataMCPChat {
         }
 
         // Clear any stop flags
-        this.shouldStopProcessing = false;
+        chat.shouldStopProcessing = false;
         chat.processingWasStoppedByUser = false;
         
         // Simply call sendMessage without adding a new user message
@@ -7429,8 +7449,8 @@ class NetdataMCPChat {
             while (true) {
             // attempts++;
             
-            // Check if we should stop processing
-            if (this.shouldStopProcessing) {
+            // Check if we should stop processing for this chat
+            if (chat.shouldStopProcessing) {
                 // Mark that processing was stopped in the chat object
                 chat.processingWasStoppedByUser = true;
                 // Throw an error to trigger the catch block in sendMessage
@@ -8271,6 +8291,12 @@ class NetdataMCPChat {
         const container = this.getChatContainer(chatId);
         if (!container || !container._elements) {return;}
         
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error('appendMetricsToChat: chat not found for chatId', chatId);
+            return;
+        }
+        
         const chatMessages = container._elements.messages;
         
         const metricsFooter = document.createElement('div');
@@ -8326,14 +8352,14 @@ class NetdataMCPChat {
                 // Don't update currentContextWindow
             } else if (messageType === 'summary') {
                 // Summaries reset context to just their output tokens
-                deltaTokens = (usage.completionTokens || 0) - this.currentContextWindow;
+                deltaTokens = (usage.completionTokens || 0) - (chat.currentContextWindow || 0);
                 // Reset context window to just the summary's output
-                this.currentContextWindow = usage.completionTokens || 0;
+                chat.currentContextWindow = usage.completionTokens || 0;
             } else {
                 // Regular assistant messages
-                deltaTokens = totalTokens - this.currentContextWindow;
+                deltaTokens = totalTokens - (chat.currentContextWindow || 0);
                 // Update the running total
-                this.currentContextWindow = totalTokens;
+                chat.currentContextWindow = totalTokens;
             }
             
             // Always show delta, even if zero
@@ -8771,18 +8797,18 @@ class NetdataMCPChat {
             this.loadChat(chatId, true);
             
             // Send the new message
-            // CRITICAL: Check if chatInput exists before using it
-            if (this.chatInput) {
+            const chatInput = this.getChatInput(chatId);
+            if (chatInput) {
                 // Convert markdown to HTML for contentEditable
                 const htmlContent = newContent
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;')
                     .replace(/\n/g, '<br>');
-                this.chatInput.innerHTML = htmlContent;
+                chatInput.innerHTML = htmlContent;
                 await this.sendMessage(chatId);
             } else {
-                console.error('[editUserMessage.save] ERROR: this.chatInput is undefined');
+                console.error('[editUserMessage.save] ERROR: Could not find input for chat', chatId);
                 // Fall back to sending message directly with the new content
                 await this.sendMessage(chatId, newContent);
             }
@@ -11851,12 +11877,10 @@ class NetdataMCPChat {
     
     // Reset global state when switching chats
     resetGlobalChatState() {
-        // Clear processing state
-        this.isProcessing = false;
-        this.shouldStopProcessing = false;
+        // isProcessing is now per-chat, no need to reset globally
+        // shouldStopProcessing is now per-chat, no need to reset globally
         
-        // Clear token display state
-        this.currentContextWindow = 0;
+        // currentContextWindow is now per-chat, no need to reset globally
         
         // Clear UI state
         if (this.spinnerInterval) {
