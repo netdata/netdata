@@ -827,8 +827,8 @@ metrics:
         family: PDUs/Service
         unit: "{status}"
         mapping:
-          - 0: in service
-          - 1: out of service
+          0: in service
+          1: out of service
 
         # An indicator if the PDU firmware is being upgraded: no(0), yes(1)
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.12
@@ -837,8 +837,8 @@ metrics:
         family: PDUs/Upgrade
         unit: "{status}"
         mapping:
-          - 0: no
-          - 1: yes
+          0: no
+          1: yes
 
         # Get the role of the PDU in a daisy chain: secondary(0), primary(1), alternate(2)
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.13
@@ -847,8 +847,8 @@ metrics:
         family: PDUs/Upgrade
         unit: "{status}"
         mapping:
-          - 1: primary
-          - 2: secondary
+          1: primary
+          2: secondary
 
         # Get the power in volt-amps for the entire PDU.
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.16
