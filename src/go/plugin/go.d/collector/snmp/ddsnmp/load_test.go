@@ -17,8 +17,10 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	profiles, err := load(dir)
+	profiles, err := loadProfiles(dir)
 	require.NoError(t, err)
+
+	require.NotEmpty(t, profiles)
 
 	names, err := f.Readdirnames(-1)
 	require.NoError(t, err)

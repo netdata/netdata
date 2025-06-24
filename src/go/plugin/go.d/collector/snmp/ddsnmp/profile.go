@@ -10,6 +10,8 @@ import (
 )
 
 func Find(sysObjId string) []*Profile {
+	load()
+
 	var profiles []*Profile
 
 	for _, prof := range ddProfiles {
