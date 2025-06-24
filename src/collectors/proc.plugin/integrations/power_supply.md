@@ -82,7 +82,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ linux_power_supply_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/linux_power_supply.conf) | powersupply.capacity | percentage of remaining power supply capacity |
+| [ power_supply_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf) | powersupply.capacity | percentage of remaining power supply capacity |
 
 
 ## Setup
