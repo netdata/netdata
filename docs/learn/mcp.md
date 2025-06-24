@@ -6,9 +6,9 @@ The Netdata MCP Server preview is live. [Get early access](https://b6yi53u6qjm.t
 
 :::
 
-:::important
+:::note
 
-This integration leverages new and evolving AI technologies. While Netdata provides comprehensive infrastructure monitoring capabilities, the AI analysis features depend on external AI services and their inherent limitations. The quality and accuracy of AI-generated insights are subject to the capabilities and constraints of the underlying AI models, not Netdata's monitoring functionality.
+This integration leverages new and evolving AI technologies. While Netdata provides comprehensive infrastructure monitoring capabilities, the AI analysis features **depend on external AI services** and their inherent limitations. The quality and accuracy of AI-generated insights are **subject to the capabilities and constraints of the underlying AI models, not Netdata's monitoring functionality**.
 
 :::
 
