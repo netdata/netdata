@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux || freebsd || openbsd || netbsd || dragonfly
-
 package smartctl
 
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -43,13 +43,31 @@ func (c *Collector) initDeviceSelector() (matcher.Matcher, error) {
 }
 
 func (c *Collector) initSmartctlCli() (smartctlCli, error) {
+	if runtime.GOOS == "linux" {
+		return c.initNdsudoSmartctlCli()
+	}
+	return c.initDirectSmartctlCli()
+}
+
+func (c *Collector) initNdsudoSmartctlCli() (smartctlCli, error) {
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 	if _, err := os.Stat(ndsudoPath); err != nil {
 		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
-
 	}
 
-	smartctlExec := newSmartctlCliExec(ndsudoPath, c.Timeout.Duration(), c.Logger)
+	smartctlExec := newNdsudoSmartctlCli(ndsudoPath, c.Timeout.Duration(), c.Logger)
+	return smartctlExec, nil
+}
 
+func (c *Collector) initDirectSmartctlCli() (smartctlCli, error) {
+	// Check if smartctl is available in PATH
+	smartctlPath, err := exec.LookPath("smartctl")
+	if err != nil {
+		return nil, fmt.Errorf("smartctl executable not found in PATH: %v", err)
+	}
+
+	c.Debugf("found smartctl at: %s", smartctlPath)
+
+	smartctlExec := newDirectSmartctlCli(c.Timeout.Duration(), c.Logger)
 	return smartctlExec, nil
 }
