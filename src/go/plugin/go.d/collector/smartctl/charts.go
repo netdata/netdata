@@ -126,7 +126,7 @@ var (
 		Priority: prioDeviceScsiWriteErrors,
 		Dims: module.Dims{
 			{ID: "device_%s_type_%s_scsi_error_log_write_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
-			{ID: "device_%s_type_%s_scsi_error_log_read_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_write_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
 		},
 	}
 	deviceScsiVerifyErrorsChartTmpl = module.Chart{
@@ -217,7 +217,7 @@ func (c *Collector) newDeviceCharts(dev *smartDevice) *module.Charts {
 		_ = charts.Remove(deviceTemperatureChartTmpl.ID)
 	}
 	if _, ok := dev.powerCycleCount(); !ok {
-		_ = charts.Remove(devicePowerOnTimeChartTmpl.ID)
+		_ = charts.Remove(devicePowerCycleCountChartTmpl.ID)
 	}
 	if _, ok := dev.smartStatusPassed(); !ok {
 		_ = charts.Remove(deviceSmartStatusChartTmpl.ID)
