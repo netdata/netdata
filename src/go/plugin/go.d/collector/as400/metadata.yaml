@@ -1,0 +1,423 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-as400
+      plugin_name: go.d.plugin
+      module_name: as400
+      monitored_instance:
+        name: IBM AS/400 (IBM i)
+        link: "https://www.ibm.com/power/operating-systems/ibm-i"
+        icon_filename: "ibm.svg"
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - as400
+        - ibm i
+        - iseries
+        - system i
+        - power systems
+        - db2
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors IBM AS/400 (IBM i) system performance metrics via IBM DB2 connection.
+          It collects system-wide metrics and optionally per-instance metrics for disks, subsystems, and job queues.
+          
+          System-wide metrics include:
+          - CPU utilization
+          - Memory pool usage
+          - System ASP usage
+          - Aggregate disk and job statistics
+          
+          Per-instance metrics (when enabled) include:
+          - Individual disk performance (I/O, throughput, response time)
+          - Subsystem job counts and storage usage
+          - Job queue lengths and status
+        method_description: |
+          The collector uses IBM DB2 driver to connect to the IBM i system and queries system catalog tables
+          in QSYS2 schema to gather performance metrics.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The user account used for ODBC connection needs SELECT permission on QSYS2 system tables.
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector doesn't perform auto-detection of IBM AS/400 instances.
+            You need to manually configure the ODBC DSN connection string.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            The performance impact is minimal, as the collector uses efficient SQL queries
+            against system catalog views.
+    setup:
+      prerequisites:
+        list:
+          - title: Install IBM DB2 Driver
+            description: |
+              The go_ibm_db driver will be automatically downloaded when building the collector.
+              However, you need the IBM DB2 client libraries installed:
+              
+              For Linux systems:
+              ```bash
+              # Download IBM DB2 client from IBM website
+              # Extract and install the client libraries
+              # Set environment variables:
+              export IBM_DB_HOME=/path/to/db2/client
+              export CGO_CFLAGS="-I$IBM_DB_HOME/include"
+              export CGO_LDFLAGS="-L$IBM_DB_HOME/lib"
+              export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
+              ```
+              
+          - title: Configure Database Connection
+            description: |
+              Ensure your IBM i system is configured to accept DB2 connections:
+              
+              1. Verify DB2 Connect (or equivalent) is licensed and configured on your IBM i
+              2. Check that the QZDASOINIT prestart jobs are running
+              3. Verify TCP/IP connectivity to your IBM i system on the DB2 port (usually 446 or 8471)
+              4. Ensure the user has necessary authorities to query QSYS2 tables
+      configuration:
+        file:
+          name: go.d/as400.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: dsn
+              description: IBM DB2 connection string.
+              default_value: ""
+              required: true
+              detailed_description: |
+                The connection string format for IBM DB2:
+                `DATABASE=dbname;HOSTNAME=host;PORT=port;PROTOCOL=TCPIP;UID=username;PWD=password`
+                
+                For SSL connections, add:
+                `;SECURITY=SSL;SSLServerCertificate=/path/to/certificate.crt`
+                
+                Parameters:
+                - DATABASE: Database name (can be 'bludb' for IBM Cloud or blank for AS/400)
+                - HOSTNAME: Your IBM i system hostname or IP
+                - PORT: Usually 446, 8471, 50000, or custom port for cloud instances
+                - PROTOCOL: Usually TCPIP
+                - UID: Your user profile
+                - PWD: Your password
+                - SECURITY: SSL (optional, for encrypted connections)
+                - SSLServerCertificate: Path to SSL certificate file (required when using SSL)
+            - name: timeout
+              description: Query timeout in seconds.
+              default_value: 2
+              required: false
+            - name: max_db_conns
+              description: Maximum number of open database connections.
+              default_value: 1
+              required: false
+            - name: max_db_life_time
+              description: Maximum connection lifetime in seconds.
+              default_value: 600
+              required: false
+            - name: collect_disk_metrics
+              description: Enable collection of per-disk metrics.
+              default_value: true
+              required: false
+            - name: collect_subsystem_metrics
+              description: Enable collection of per-subsystem metrics.
+              default_value: true
+              required: false
+            - name: collect_job_queue_metrics
+              description: Enable collection of per-job-queue metrics.
+              default_value: true
+              required: false
+            - name: max_disks
+              description: Maximum number of disks to monitor. Set to 0 for unlimited.
+              default_value: 50
+              required: false
+            - name: max_subsystems
+              description: Maximum number of subsystems to monitor. Set to 0 for unlimited.
+              default_value: 20
+              required: false
+            - name: max_job_queues
+              description: Maximum number of job queues to monitor. Set to 0 for unlimited.
+              default_value: 50
+              required: false
+            - name: collect_disks_matching
+              description: SQL LIKE pattern to filter disks.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which disks to monitor.
+                Examples:
+                - 'DD%' - Only disks starting with DD
+                - '%SSD%' - Only disks containing SSD
+                - Leave empty to collect all disks
+            - name: collect_subsystems_matching
+              description: SQL LIKE pattern to filter subsystems.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which subsystems to monitor.
+                Examples:
+                - 'QINTER' - Only the interactive subsystem
+                - 'Q%' - All IBM-supplied subsystems
+                - Leave empty to collect all subsystems
+            - name: collect_job_queues_matching
+              description: SQL LIKE pattern to filter job queues.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which job queues to monitor.
+                Examples:
+                - 'QBATCH%' - Batch job queues
+                - '%NIGHT%' - Queues containing NIGHT
+                - Leave empty to collect all queues
+        examples:
+          folding:
+            title: Config examples
+            enabled: true
+          list:
+            - name: Basic configuration
+              description: Using IBM DB2 connection string.
+              config: |
+                jobs:
+                  - name: as400_prod
+                    dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
+            - name: SSL connection (IBM Cloud)
+              description: Using SSL connection with certificate.
+              config: |
+                jobs:
+                  - name: as400_cloud
+                    dsn: 'DATABASE=bludb;HOSTNAME=4a9f39cb-73d0-47d8-8b73-ff846788858d.bs2ipa7w0uv9tsomi9ig.private.databases.appdomain.cloud;PORT=32211;PROTOCOL=TCPIP;UID=a46ee8b7;PWD=yourpassword;SECURITY=SSL;SSLServerCertificate=/tmp/db2-cert/db2cloud.crt'
+                    timeout: 5
+            - name: Multiple instances
+              description: Monitoring multiple AS/400 systems.
+              config: |
+                jobs:
+                  - name: as400_prod
+                    dsn: 'DATABASE=;HOSTNAME=prod.as400.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret1'
+                  - name: as400_cloud
+                    dsn: 'DATABASE=bludb;HOSTNAME=cloud.databases.appdomain.cloud;PORT=32211;PROTOCOL=TCPIP;UID=monitor;PWD=secret2;SECURITY=SSL;SSLServerCertificate=/path/to/cert.crt'
+                  - name: as400_test
+                    dsn: 'DATABASE=;HOSTNAME=test.as400.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret3'
+            - name: Cardinality control
+              description: Limiting the number of instances to prevent resource exhaustion.
+              config: |
+                jobs:
+                  - name: as400_large
+                    dsn: 'DATABASE=;HOSTNAME=large.as400.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
+                    # Limit to top 20 disks and 10 subsystems
+                    max_disks: 20
+                    max_subsystems: 10
+                    # Disable job queue metrics
+                    collect_job_queue_metrics: false
+            - name: Filtered collection
+              description: Using selectors to monitor specific instances.
+              config: |
+                jobs:
+                  - name: as400_selective
+                    dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
+                    # Only monitor SSD disks
+                    collect_disks_matching: '%SSD%'
+                    # Only monitor interactive and batch subsystems
+                    collect_subsystems_matching: 'QINTER|QBATCH%'
+                    # Only monitor night batch queues
+                    collect_job_queues_matching: '%NIGHT%'
+    troubleshooting:
+      problems:
+        list:
+          - name: Connection refused
+            description: Unable to connect to the AS/400 system.
+            recommendations:
+              - Verify the AS/400 hostname/IP is correct and reachable
+              - Check if the DB2 port is open (telnet to port 446/8471/50000)
+              - Verify the user credentials are correct
+              - Check if the AS/400 system is configured to accept DB2 connections
+              - Ensure IBM DB2 client libraries are installed and LD_LIBRARY_PATH is set
+          - name: Permission denied
+            description: User doesn't have permission to query system tables.
+            recommendations:
+              - Grant SELECT permission on QSYS2 schema tables to the monitoring user
+              - Contact your AS/400 administrator to set up proper permissions
+          - name: DB2 client libraries not found
+            description: The IBM DB2 client libraries are not installed or not in the library path.
+            recommendations:
+              - Install IBM DB2 client from IBM website
+              - Set IBM_DB_HOME environment variable
+              - Add $IBM_DB_HOME/lib to LD_LIBRARY_PATH
+              - Ensure the netdata user has access to the DB2 client libraries
+    alerts:
+      - name: as400_cpu_utilization
+        metric: as400.cpu_utilization
+        info: CPU utilization is above 80% on AS/400 system
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_system_asp_usage
+        metric: as400.system_asp_usage
+        info: System ASP (disk) usage is above 80% on AS/400 system
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_disk_busy
+        metric: as400.disk_busy
+        info: Average disk busy percentage is above 70% on AS/400 system
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_job_queue_length
+        metric: as400.job_queue_length
+        info: Job queue length is above normal threshold on AS/400 system
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_memory_pool_usage
+        metric: as400.memory_pool_usage
+        info: Memory pool usage is critically high on AS/400 system
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_disk_response_time
+        metric: as400.disk_avg_time
+        info: Disk ${label:disk_unit} average response time is above 50ms
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_subsystem_jobs_held
+        metric: as400.subsystem_jobs
+        info: Subsystem ${label:subsystem} has held jobs above threshold
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_job_queue_backlog
+        metric: as400.jobqueue_length
+        info: Job queue ${label:job_queue} has excessive waiting jobs
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire AS/400 system.
+          labels: []
+          metrics:
+            - name: as400.cpu_utilization
+              description: CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: as400.active_jobs
+              description: Active Jobs
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: as400.system_asp_usage
+              description: System ASP Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: as400.memory_pool_usage
+              description: Memory Pool Usage
+              unit: megabytes
+              chart_type: stacked
+              dimensions:
+                - name: machine
+                - name: base
+                - name: interactive
+                - name: spool
+            - name: as400.disk_busy
+              description: Disk Busy Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: as400.job_queue_length
+              description: Job Queue Length
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: queued
+        - name: disk
+          description: These metrics refer to individual disk units.
+          labels:
+            - name: disk_unit
+              description: Disk unit number
+            - name: disk_type
+              description: Type of disk (HDD, SSD, etc.)
+            - name: disk_model
+              description: Disk model
+          metrics:
+            - name: as400.disk_busy
+              description: Disk Busy Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: as400.disk_io_requests
+              description: Disk I/O Requests
+              unit: requests/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: as400.disk_io_bytes
+              description: Disk I/O Throughput
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: as400.disk_avg_time
+              description: Disk Average Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: response_time
+        - name: subsystem
+          description: These metrics refer to individual subsystems.
+          labels:
+            - name: subsystem
+              description: Subsystem name
+            - name: library
+              description: Subsystem library
+            - name: status
+              description: Subsystem status
+          metrics:
+            - name: as400.subsystem_jobs
+              description: Subsystem Jobs
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: held
+            - name: as400.subsystem_storage
+              description: Subsystem Storage Usage
+              unit: megabytes
+              chart_type: line
+              dimensions:
+                - name: used
+        - name: jobqueue
+          description: These metrics refer to individual job queues.
+          labels:
+            - name: job_queue
+              description: Job queue name
+            - name: library
+              description: Job queue library
+            - name: status
+              description: Job queue status
+          metrics:
+            - name: as400.jobqueue_length
+              description: Job Queue Length
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: waiting
+                - name: held
+                - name: scheduled
