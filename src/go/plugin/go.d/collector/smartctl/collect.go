@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sourcegraph/conc/pool"
@@ -66,37 +65,46 @@ func (c *Collector) collectDevices(mx map[string]int64) {
 	}
 }
 
+type deviceInfoResult struct {
+	scanDevice *scanDevice
+	response   *gjson.Result
+	err        error
+}
+
 func (c *Collector) collectDevicesConcurrently(mx map[string]int64) error {
-	p := pool.New().WithMaxGoroutines(c.ConcurrentScans).WithErrors()
-	var mu sync.Mutex
+	p := pool.New().WithMaxGoroutines(c.ConcurrentScans)
+	resultsChan := make(chan deviceInfoResult, len(c.scannedDevices))
 
 	for _, dev := range c.scannedDevices {
 		dev := dev
-		p.Go(func() error {
-			tempMx := make(map[string]int64)
-
-			if err := c.collectScannedDevice(tempMx, dev); err != nil {
-				c.Warning(err)
-				return err
+		p.Go(func() {
+			resp, err := c.exec.deviceInfo(dev.name, dev.typ, c.NoCheckPowerMode)
+			resultsChan <- deviceInfoResult{
+				scanDevice: dev,
+				response:   resp,
+				err:        err,
 			}
-
-			mu.Lock()
-			maps.Copy(mx, tempMx)
-			mu.Unlock()
-
-			return nil
 		})
 	}
 
-	if err := p.Wait(); err != nil {
-		return err
+	p.Wait()
+	close(resultsChan)
+
+	for r := range resultsChan {
+		if err := c.processDeviceResult(mx, r); err != nil {
+			c.Warning(err)
+			continue
+		}
 	}
 
 	return nil
 }
 
-func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
-	resp, err := c.exec.deviceInfo(scanDev.name, scanDev.typ, c.NoCheckPowerMode)
+func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoResult) error {
+	scanDev := result.scanDevice
+	resp := result.response
+	err := result.err
+
 	if err != nil {
 		if resp != nil && isDeviceOpenFailedNoSuchDevice(resp) && !scanDev.extra {
 			c.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
@@ -124,6 +132,15 @@ func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevic
 	c.collectSmartDevice(mx, dev)
 
 	return nil
+}
+
+func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
+	resp, err := c.exec.deviceInfo(scanDev.name, scanDev.typ, c.NoCheckPowerMode)
+	return c.processDeviceResult(mx, deviceInfoResult{
+		scanDevice: scanDev,
+		response:   resp,
+		err:        err,
+	})
 }
 
 func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
