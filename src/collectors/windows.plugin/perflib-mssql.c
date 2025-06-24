@@ -998,8 +998,21 @@ static struct netdata_mssql_conn *netdata_read_config_options()
         snprintfz(&section_name[sizeof(NETDATA_DEFAULT_MSSQL_SECTION) - 1], (size_t)5, "%d", total_instances);
     }
 
-    dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
+    if (!total_instances)
+        dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
+
     dbconn->instance_name = inicfg_get(&netdata_config, section_name, "instance", NULL);
+    if (!dbconn->instance_name) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "No instance name found in section %s", section_name);
+
+        total_instances++;
+        return dbconn;
+    }
+
+    dbconn->driver = inicfg_get(&netdata_config, section_name, "driver", "SQL Server");
     dbconn->cmpinstance = netdata_mssql_to_lowerz(dbconn->instance_name);
 
     dbconn->server = inicfg_get(&netdata_config, section_name, "server", NULL);
@@ -1010,7 +1023,6 @@ static struct netdata_mssql_conn *netdata_read_config_options()
 
     dbconn->username = inicfg_get(&netdata_config, section_name, "uid", NULL);
     dbconn->password = inicfg_get(&netdata_config, section_name, "pwd", NULL);
-    dbconn->instances = (int)inicfg_get_number(&netdata_config, section_name, "additional instances", 0);
     dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
     dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
 
@@ -1025,32 +1037,18 @@ static struct netdata_mssql_conn *netdata_read_config_options()
 
 static struct netdata_mssql_conn *netdata_attach_connection(const char *instance)
 {
+    if (!instance)
+        return NULL;
     struct netdata_mssql_conn *list;
     char *cmpinstance = netdata_mssql_to_lowerz(instance);
     size_t len = strlen(instance);
     for (list = mssql_conn_list; list; list = list->next) {
-        nd_log(
-            NDLS_COLLECTORS,
-            NDLP_ERR,
-            "KILLME TEST %s %s %s | %s",
-            list->instance_name,
-            list->server,
-            list->address,
-            instance);
         if (list->cmpinstance && !strncmp(cmpinstance, list->cmpinstance, len) ||
             list->cmpserver && strstr(list->cmpserver, cmpinstance) ||
             list->cmpaddress && strstr(list->cmpaddress, cmpinstance)) {
             if (!list->instance_name)
                 list->instance_name = strdupz(instance);
-            nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "KILLME INTIALIZE %s %s %s | %s",
-                list->instance_name,
-                list->server,
-                list->address,
-                instance);
-            freez(cmpinstance);
+
             return list;
         }
     }
@@ -1190,6 +1188,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
 
     if(mi->conn && mi->conn->is_connected && collecting) {
         collecting = metdata_mssql_check_permission(mi);
+        /*
         if (!collecting) {
             nd_log(
                 NDLS_COLLECTORS,
@@ -1203,6 +1202,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
         }
 
         collecting = dict_mssql_fill_waits(mi);
+         */
     }
 
     return 1;
@@ -1233,15 +1233,24 @@ static int netdata_parse_mssql_options()
     int counter = 0;
 
     while ((curr = netdata_read_config_options())) {
-        if (last) {
-            curr->next = last;
+        if (curr->instance_name) {
+            if (last) {
+                curr->next = last;
+            } else {
+                mssql_conn_list = curr;
+            }
         } else {
-            mssql_conn_list = curr;
+            freez(curr);
+            continue;
         }
 
         last = curr;
         counter++;
     }
+    nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "KILLME COUNTER %d", counter);
     return counter;
 }
 
@@ -2614,38 +2623,39 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_sql_statistics,
         do_mssql_access_methods,
 
-            /*
-            // Data Get with queries
-            do_mssql_databases,
-            do_mssql_locks,
-            do_mssql_waits,
-             */
+        // Data Get with queries
+        /*
+        do_mssql_databases,
+        do_mssql_locks,
+        do_mssql_waits,
+         */
 
         NULL
     };
 
-    if (has_mssql_installed) {
-        static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
+    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
 
-        for (i = 0; doMSSQL[i]; i++) {
-            if (!collect_perflib[i])
-                continue;
+    for (i = 0; doMSSQL[i]; i++) {
+        if (!collect_perflib[i])
+            continue;
 
-            DWORD id = RegistryFindIDByName(mi->objectName[i]);
-            if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
-                collect_perflib[i] = false;
-                continue;
-            }
-
-            PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-            if (!pDataBlock) {
-                collect_perflib[i] = false;
-                continue;
-            }
-
-            doMSSQL[i](pDataBlock, mi, *update_every);
+        DWORD id = RegistryFindIDByName(mi->objectName[i]);
+        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+            collect_perflib[i] = false;
+            continue;
         }
+
+        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+        if (!pDataBlock) {
+            collect_perflib[i] = false;
+            continue;
+        }
+
+        doMSSQL[i](pDataBlock, mi, *update_every);
     }
+
+    if (!mi->conn)
+        return 1;
 
     /*
     for (i = NETDATA_MSSQL_DATABASE; i < NETDATA_MSSQL_METRICS_END; i++) {
