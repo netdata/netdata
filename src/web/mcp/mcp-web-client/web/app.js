@@ -5273,7 +5273,8 @@ class NetdataMCPChat {
                 // Re-enable chat-specific input
                 if (elements.input) {
                     elements.input.contentEditable = true;
-                } else {
+                } else if (!chat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
                     console.error('[sendBtn.click] ERROR: Could not find input element when stopping processing for chat', chatId);
                 }
                 // Don't add a system message as it breaks message sequencing
@@ -6993,7 +6994,11 @@ class NetdataMCPChat {
             // Get chat-specific input
             const chatInput = this.getChatInput(chatId);
             if (!chatInput) {
-                console.error('[updateSendButton] ERROR: Could not find input for chat', chatId);
+                const chat = this.chats.get(chatId);
+                if (!chat || !chat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[updateSendButton] ERROR: Could not find input for chat', chatId);
+                }
                 this.sendMessageBtn.disabled = true;
             } else {
                 try {
@@ -7015,9 +7020,13 @@ class NetdataMCPChat {
             // Get chat-specific input
             const chatInput = this.getChatInput(chatId);
             if (!chatInput) {
-                console.error('[sendMessage] ERROR: Could not find input for chat', chatId);
-                this.showError('Chat input not found', chatId);
-                return;
+                if (!chat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[sendMessage] ERROR: Could not find input for chat', chatId);
+                    this.showError('Chat input not found', chatId);
+                    return;
+                }
+                // For sub-chats, continue without input element
             }
             
             // For contentEditable input, extract formatted content
@@ -7072,7 +7081,7 @@ class NetdataMCPChat {
         this.updateChatSessions(); // Update UI to remove draft indicator
         
         // Disable input and update button to Stop
-        // Get chat-specific input element
+        // Get chat-specific input element (only for main chats, not sub-chats)
         const container = this.getChatContainer(chatId);
         if (container && container._elements && container._elements.input) {
             const input = container._elements.input;
@@ -7080,7 +7089,8 @@ class NetdataMCPChat {
                 input.innerHTML = '';
             }
             input.contentEditable = false;
-        } else {
+        } else if (!chat.isSubChat) {
+            // Only log error for main chats - sub-chats don't have input elements
             console.error('[sendMessage] ERROR: Could not find chat input element for chat', chatId);
         }
         chat.isProcessing = true;
@@ -7129,7 +7139,8 @@ class NetdataMCPChat {
             const errorContainer = this.getChatContainer(chatId);
             if (errorContainer && errorContainer._elements && errorContainer._elements.input) {
                 errorContainer._elements.input.contentEditable = true;
-            } else {
+            } else if (!chat.isSubChat) {
+                // Only log error for main chats - sub-chats don't have input elements
                 console.error('[sendMessage] ERROR: Could not find chat input element when re-enabling after MCP error for chat', chatId);
             }
             chat.isProcessing = false;
@@ -7213,7 +7224,8 @@ class NetdataMCPChat {
                 } catch (error) {
                     console.error('[sendMessage] ERROR checking input content:', error);
                 }
-            } else {
+            } else if (!chat.isSubChat) {
+                // Only log warning for main chats - sub-chats don't have input elements
                 console.error('[sendMessage] WARNING: Could not find input for chat when trying to re-enable send button', chatId);
             }
         } catch (error) {
@@ -8808,7 +8820,11 @@ class NetdataMCPChat {
                 chatInput.innerHTML = htmlContent;
                 await this.sendMessage(chatId);
             } else {
-                console.error('[editUserMessage.save] ERROR: Could not find input for chat', chatId);
+                const editChat = this.chats.get(chatId);
+                if (!editChat || !editChat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[editUserMessage.save] ERROR: Could not find input for chat', chatId);
+                }
                 // Fall back to sending message directly with the new content
                 await this.sendMessage(chatId, newContent);
             }
