@@ -11833,7 +11833,7 @@ class NetdataMCPChat {
         // Calculate current context window usage
         const contextTokens = this.calculateContextWindowTokens(chat.id);
         const modelString = ChatConfig.getChatModelString(chat);
-        const modelLimit = this.modelLimits?.get(modelString) || 128000; // fallback to 128k
+        const modelLimit = this.modelLimits[modelString] || 128000; // fallback to 128k
         
         const percentUsed = Math.round((contextTokens / modelLimit) * 100);
         const triggerPercent = chat.config.optimisation.autoSummarisation.triggerPercent || 50;
