@@ -1,8 +1,0 @@
-# Profile for Checkpoint devices kept for backward compatibility
-# Check the profile chatsworth.yaml
-
-extends:
-  - checkpoint.yaml
-
-device:
-  vendor: "checkpoint"
