@@ -1,0 +1,389 @@
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      id: collector-ibm.d.plugin-db2
+      plugin_name: ibm.d.plugin
+      module_name: db2
+      monitored_instance:
+        name: IBM DB2
+        link: "https://www.ibm.com/products/db2"
+        icon_filename: "ibm.svg"
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - db2
+        - database
+        - rdbms
+        - ibm
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors IBM DB2 database performance metrics.
+          
+          **IMPORTANT**: This collector is part of the ibm.d.plugin which requires CGO and is not included in the default Netdata build.
+          See the setup section for build instructions.
+          
+          It supports all DB2 editions:
+          - DB2 LUW (Linux, Unix, Windows)
+          - DB2 for z/OS
+          - DB2 for i (AS/400)
+          - Db2 on Cloud
+          
+          The collector automatically detects the DB2 edition and adapts its queries accordingly.
+        method_description: |
+          The collector uses IBM DB2 driver to connect to the database and queries system catalog tables
+          in SYSIBMADM schema to gather performance metrics.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The user account needs SELECT permission on SYSIBMADM system views.
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector doesn't perform auto-detection of DB2 instances.
+            You need to manually configure the connection string.
+        limits:
+          description: |
+            By default, the collector limits the number of monitored instances to prevent
+            excessive memory usage. These limits can be adjusted in configuration.
+        performance_impact:
+          description: |
+            The performance impact is minimal, as the collector uses efficient queries
+            against system monitoring views.
+    setup:
+      prerequisites:
+        list:
+          - title: Build ibm.d.plugin with CGO Support
+            description: |
+              This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
+              See the AS/400 collector documentation for build instructions.
+              
+          - title: Install IBM DB2 Client Libraries
+            description: |
+              The IBM DB2 client libraries must be installed on the system where Netdata runs.
+              These are proprietary libraries that must be obtained from IBM.
+              
+          - title: Database User Permissions
+            description: |
+              The database user needs SELECT permissions on SYSIBMADM views:
+              ```sql
+              GRANT SELECT ON SYSIBMADM.APPLICATIONS TO username;
+              GRANT SELECT ON SYSIBMADM.SNAPDB TO username;
+              GRANT SELECT ON SYSIBMADM.SNAPBP TO username;
+              GRANT SELECT ON SYSIBMADM.TBSP_UTILIZATION TO username;
+              GRANT SELECT ON SYSIBMADM.LOG_UTILIZATION TO username;
+              GRANT SELECT ON SYSIBMADM.ENV_INST_INFO TO username;
+              ```
+      configuration:
+        file:
+          name: ibm.d/db2.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: dsn
+              description: IBM DB2 connection string.
+              default_value: ""
+              required: true
+              detailed_description: |
+                The connection string format:
+                `DATABASE=dbname;HOSTNAME=host;PORT=port;PROTOCOL=TCPIP;UID=username;PWD=password`
+                
+                For SSL connections, add:
+                `;SECURITY=SSL;SSLServerCertificate=/path/to/certificate.crt`
+                
+                Common ports:
+                - 50000: Default for DB2 LUW
+                - 446: Default for DB2 for i
+                - 5023: Common for DB2 z/OS
+            - name: timeout
+              description: Query timeout in seconds.
+              default_value: 2
+              required: false
+            - name: max_db_conns
+              description: Maximum number of open database connections.
+              default_value: 1
+              required: false
+            - name: max_db_life_time
+              description: Maximum connection lifetime in seconds.
+              default_value: 600
+              required: false
+            - name: collect_database_metrics
+              description: Enable collection of per-database metrics.
+              default_value: true
+              required: false
+            - name: collect_bufferpool_metrics
+              description: Enable collection of per-bufferpool metrics.
+              default_value: true
+              required: false
+            - name: collect_tablespace_metrics
+              description: Enable collection of per-tablespace metrics.
+              default_value: true
+              required: false
+            - name: collect_connection_metrics
+              description: Enable collection of per-connection metrics.
+              default_value: true
+              required: false
+            - name: max_databases
+              description: Maximum number of databases to monitor.
+              default_value: 10
+              required: false
+            - name: max_bufferpools
+              description: Maximum number of bufferpools to monitor.
+              default_value: 20
+              required: false
+            - name: max_tablespaces
+              description: Maximum number of tablespaces to monitor.
+              default_value: 100
+              required: false
+            - name: max_connections
+              description: Maximum number of connections to monitor individually.
+              default_value: 200
+              required: false
+        examples:
+          folding:
+            title: Config examples
+            enabled: true
+          list:
+            - name: Basic DB2 LUW connection
+              description: Connect to DB2 on Linux/Unix/Windows.
+              config: |
+                jobs:
+                  - name: db2_prod
+                    dsn: 'DATABASE=sample;HOSTNAME=db2.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+            - name: DB2 on Cloud with SSL
+              description: Connect to IBM Db2 on Cloud.
+              config: |
+                jobs:
+                  - name: db2_cloud
+                    dsn: 'DATABASE=bludb;HOSTNAME=dashdb-txn-sbox-yp-dal09-14.services.dal.bluemix.net;PORT=50001;PROTOCOL=TCPIP;UID=username;PWD=password;SECURITY=SSL;SSLServerCertificate=/path/to/DigiCertGlobalRootCA.crt'
+                    timeout: 5
+            - name: Limited cardinality monitoring
+              description: Monitor with cardinality limits to prevent resource exhaustion.
+              config: |
+                jobs:
+                  - name: db2_limited
+                    dsn: 'DATABASE=sample;HOSTNAME=db2.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+                    max_databases: 5
+                    max_tablespaces: 50
+                    max_connections: 100
+                    collect_connection_metrics: false  # Disable connection tracking
+    troubleshooting:
+      problems:
+        list:
+          - name: Connection refused
+            description: Unable to connect to DB2 database.
+            recommendations:
+              - Verify the database hostname/IP is correct and reachable
+              - Check if the DB2 port is open (common ports: 50000, 446, 5023)
+              - Verify the database name and credentials are correct
+              - Ensure IBM DB2 client libraries are installed and accessible
+          - name: Permission denied on SYSIBMADM views
+            description: User doesn't have permission to query system views.
+            recommendations:
+              - Grant SELECT permission on SYSIBMADM schema views
+              - Contact your DBA to set up proper monitoring permissions
+          - name: SQL0204N "SYSIBMADM.ENV_INST_INFO" is an undefined name
+            description: The monitoring views are not available.
+            recommendations:
+              - Ensure you're connecting to a DB2 database (not other database types)
+              - Check if the DB2 version supports SYSIBMADM views (DB2 9.7+)
+              - For older versions, some metrics may not be available
+    alerts:
+      - name: db2_connection_usage
+        metric: db2.connections
+        info: Database connection usage is high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_lock_timeouts
+        metric: db2.locking
+        info: High number of lock timeouts
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_deadlocks
+        metric: db2.deadlocks
+        info: Deadlocks detected
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_tablespace_usage
+        metric: db2.tablespace_usage
+        info: Tablespace ${label:tablespace} usage is high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_log_space_usage
+        metric: db2.log_space
+        info: Database log space usage is high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire DB2 instance.
+          labels: []
+          metrics:
+            - name: db2.connections
+              description: Database Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: active
+                - name: executing
+                - name: idle
+            - name: db2.locking
+              description: Database Locking
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: waits
+                - name: timeouts
+                - name: escalations
+            - name: db2.deadlocks
+              description: Database Deadlocks
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: deadlocks
+            - name: db2.sorting
+              description: Database Sorting
+              unit: sorts/s
+              chart_type: stacked
+              dimensions:
+                - name: sorts
+                - name: overflows
+            - name: db2.row_activity
+              description: Row Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: modified
+            - name: db2.bufferpool_hit_ratio
+              description: Buffer Pool Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: db2.log_space
+              description: Log Space Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+        - name: database
+          description: These metrics refer to individual databases.
+          labels:
+            - name: database
+              description: Database name
+            - name: status
+              description: Database status
+          metrics:
+            - name: db2.database_status
+              description: Database Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: db2.database_applications
+              description: Database Applications
+              unit: applications
+              chart_type: line
+              dimensions:
+                - name: applications
+        - name: bufferpool
+          description: These metrics refer to individual buffer pools.
+          labels:
+            - name: bufferpool
+              description: Buffer pool name
+            - name: page_size
+              description: Page size in bytes
+          metrics:
+            - name: db2.bufferpool_hit_ratio
+              description: Buffer Pool Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: db2.bufferpool_io
+              description: Buffer Pool I/O
+              unit: operations/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: db2.bufferpool_pages
+              description: Buffer Pool Pages
+              unit: pages
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: total
+        - name: tablespace
+          description: These metrics refer to individual tablespaces.
+          labels:
+            - name: tablespace
+              description: Tablespace name
+            - name: type
+              description: Tablespace type (DMS/SMS)
+            - name: content_type
+              description: Content type (REGULAR/LARGE/TEMP)
+            - name: state
+              description: Tablespace state
+          metrics:
+            - name: db2.tablespace_usage
+              description: Tablespace Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: db2.tablespace_size
+              description: Tablespace Size
+              unit: KB
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+        - name: connection
+          description: These metrics refer to individual database connections.
+          labels:
+            - name: application_id
+              description: Application ID
+            - name: application_name
+              description: Application name
+            - name: client_hostname
+              description: Client hostname
+            - name: client_user
+              description: Client username
+            - name: state
+              description: Connection state
+          metrics:
+            - name: db2.connection_state
+              description: Connection State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state
+            - name: db2.connection_activity
+              description: Connection Row Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
