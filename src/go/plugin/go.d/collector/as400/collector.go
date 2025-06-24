@@ -1,0 +1,199 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package as400
+
+import (
+	"context"
+	"database/sql"
+	_ "embed"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+
+	_ "github.com/ibmdb/go_ibm_db"
+)
+
+//go:embed "config_schema.json"
+var configSchema string
+
+func init() {
+	module.Register("as400", module.Creator{
+		JobConfigSchema: configSchema,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
+	})
+}
+
+func New() *AS400 {
+	return &AS400{
+		Config: Config{
+			DSN:               "",
+			Timeout:           confopt.Duration(time.Second * 2),
+			UpdateEvery:       5,
+			MaxDbConns:        1,
+			MaxDbLifeTime:     confopt.Duration(time.Minute * 10),
+			
+			// Instance collection defaults
+			CollectDiskMetrics:      true,
+			CollectSubsystemMetrics: true,
+			CollectJobQueueMetrics:  true,
+			
+			// Cardinality limits
+			MaxDisks:      50,
+			MaxSubsystems: 20,
+			MaxJobQueues:  50,
+			
+			// Selectors (empty = collect all)
+			DiskSelector:      "",
+			SubsystemSelector: "",
+			JobQueueSelector:  "",
+		},
+
+		charts:     baseCharts.Copy(),
+		once:       &sync.Once{},
+		mx:         &metricsData{},
+		disks:      make(map[string]*diskMetrics),
+		subsystems: make(map[string]*subsystemMetrics),
+		jobQueues:  make(map[string]*jobQueueMetrics),
+	}
+}
+
+type Config struct {
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN                string           `yaml:"dsn" json:"dsn"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	MaxDbConns         int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`
+	MaxDbLifeTime      confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
+	
+	// Instance collection settings
+	CollectDiskMetrics       bool   `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
+	CollectSubsystemMetrics  bool   `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics"`
+	CollectJobQueueMetrics   bool   `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
+	
+	// Cardinality limits
+	MaxDisks                 int    `yaml:"max_disks,omitempty" json:"max_disks"`
+	MaxSubsystems            int    `yaml:"max_subsystems,omitempty" json:"max_subsystems"`
+	MaxJobQueues             int    `yaml:"max_job_queues,omitempty" json:"max_job_queues"`
+	
+	// Selectors for filtering
+	DiskSelector             string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching"`
+	SubsystemSelector        string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching"`
+	JobQueueSelector         string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching"`
+}
+
+type AS400 struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
+
+	db   *sql.DB
+	once *sync.Once
+	mx   *metricsData
+	
+	// Instance tracking
+	disks       map[string]*diskMetrics
+	subsystems  map[string]*subsystemMetrics
+	jobQueues   map[string]*jobQueueMetrics
+	
+	// System info for labels
+	systemName   string
+	serialNumber string
+	model        string
+}
+
+func (a *AS400) Configuration() any {
+	return a.Config
+}
+
+func (a *AS400) Init(context.Context) error {
+	if a.DSN == "" {
+		return errors.New("dsn required but not set")
+	}
+
+	return nil
+}
+
+func (a *AS400) Check(context.Context) error {
+	mx, err := a.collect()
+	if err != nil {
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
+}
+
+func (a *AS400) Charts() *module.Charts {
+	return a.charts
+}
+
+func (a *AS400) Collect(context.Context) map[string]int64 {
+	mx, err := a.collect()
+	if err != nil {
+		a.Error(err)
+	}
+
+	if len(mx) == 0 {
+		return nil
+	}
+	return mx
+}
+
+func (a *AS400) Cleanup(context.Context) {
+	if a.db == nil {
+		return
+	}
+	if err := a.db.Close(); err != nil {
+		a.Errorf("cleanup: error closing database: %v", err)
+	}
+	a.db = nil
+}
+
+func (a *AS400) verifyConfig() error {
+	if a.DSN == "" {
+		return errors.New("DSN is required but not set")
+	}
+	return nil
+}
+
+func (a *AS400) initDatabase() (*sql.DB, error) {
+	db, err := sql.Open("go_ibm_db", a.DSN)
+	if err != nil {
+		return nil, fmt.Errorf("error opening database: %v", err)
+	}
+
+	db.SetMaxOpenConns(a.MaxDbConns)
+	db.SetConnMaxLifetime(time.Duration(a.MaxDbLifeTime))
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(a.Timeout))
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("error pinging database: %v", err)
+	}
+
+	return db, nil
+}
+
+func (a *AS400) safeDSN() string {
+	// Mask password in DSN for logging
+	// IBM DB2 format: HOSTNAME=host;PORT=port;DATABASE=db;UID=user;PWD=pass
+	if strings.Contains(a.DSN, "PWD=") {
+		parts := strings.Split(a.DSN, ";")
+		for i, part := range parts {
+			if strings.HasPrefix(part, "PWD=") {
+				parts[i] = "PWD=******"
+			}
+		}
+		return strings.Join(parts, ";")
+	}
+	return a.DSN
+}

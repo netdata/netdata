@@ -8,6 +8,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ap"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apcupsd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/beanstalk"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/boinc"
