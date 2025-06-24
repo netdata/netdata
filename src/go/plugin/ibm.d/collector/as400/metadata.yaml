@@ -1,8 +1,8 @@
-plugin_name: as400-db2.plugin
+plugin_name: ibm.d.plugin
 modules:
   - meta:
-      id: collector-as400-db2.plugin-as400
-      plugin_name: as400-db2.plugin
+      id: collector-ibm.d.plugin-as400
+      plugin_name: ibm.d.plugin
       module_name: as400
       monitored_instance:
         name: IBM AS/400 (IBM i)
@@ -28,7 +28,7 @@ modules:
         metrics_description: |
           This collector monitors IBM AS/400 (IBM i) system performance metrics via IBM DB2 connection.
           
-          **IMPORTANT**: This collector requires CGO and is not included in the default Netdata build.
+          **IMPORTANT**: This collector is part of the ibm.d.plugin which requires CGO and is not included in the default Netdata build.
           See the setup section for build instructions.
           It collects system-wide metrics and optionally per-instance metrics for disks, subsystems, and job queues.
           
@@ -66,10 +66,10 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: Build Netdata with CGO Support
+          - title: Build ibm.d.plugin with CGO Support
             description: |
-              This collector requires CGO to be enabled and is not included in the default build.
-              You must build Netdata from source with CGO_ENABLED=1 and the AS/400 collector enabled.
+              This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
+              You must build the plugin from source with CGO_ENABLED=1.
               
           - title: Install IBM DB2 Client Libraries
             description: |
@@ -96,7 +96,7 @@ modules:
               4. Ensure the user has necessary authorities to query QSYS2 tables
       configuration:
         file:
-          name: go.d/as400.conf
+          name: ibm.d/as400.conf
         options:
           description: |
             The following options can be defined globally: update_every.

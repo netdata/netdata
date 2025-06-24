@@ -29,7 +29,7 @@ func newEnvConfig() *envConfig {
 		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
 		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
 		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
-		watchPath:  os.Getenv("NETDATA_PLUGINS_AS400_DB2_WATCH_PATH"),
+		watchPath:  os.Getenv("NETDATA_PLUGINS_IBM_D_WATCH_PATH"),
 		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
 	}
 
@@ -67,7 +67,7 @@ type config struct {
 
 func newConfig(opts *cli.Option, env *envConfig) *config {
 	cfg := &config{
-		name: "as400-db2",
+		name: "ibm.d",
 	}
 
 	cfg.pluginDir = cfg.initPluginDir(opts, env)
