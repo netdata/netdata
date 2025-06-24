@@ -40,15 +40,15 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 }
 
 // ----------------------------------------------------------------------------
+extern __thread bool is_health_thread;
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
-    bool saved = false;
-    if (async)
-        saved = metadata_queue_ae_save(host, ae);
-
-    // if not async or async failed to queue, do it now
-    if (false == saved)
+    if (async) {
+        bool queued = metadata_queue_ae_save(host, ae);
+        if (!queued && is_health_thread && service_running(SERVICE_HEALTH))
+            sql_health_alarm_log_save(host, ae);
+    } else
         sql_health_alarm_log_save(host, ae);
 }
 
