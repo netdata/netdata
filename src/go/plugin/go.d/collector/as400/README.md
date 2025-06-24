@@ -1,5 +1,32 @@
 # IBM AS/400 (IBM i) collector
 
+## Important: Build Requirements
+
+**This collector requires CGO** because the IBM DB2 driver needs to link with IBM DB2 client libraries.
+
+The collector is part of the **as400-db2.plugin** which is built separately from the main go.d.plugin.
+
+### Building as400-db2.plugin
+
+```bash
+# 1. Install IBM DB2 client libraries first
+# Download from IBM website and install
+
+# 2. Set environment variables
+export IBM_DB_HOME=/path/to/db2/client
+export CGO_CFLAGS="-I$IBM_DB_HOME/include"
+export CGO_LDFLAGS="-L$IBM_DB_HOME/lib"
+export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
+
+# 3. Build the plugin
+cd /path/to/netdata/src/go
+CGO_ENABLED=1 go build -o as400-db2.plugin ./cmd/as400db2plugin
+
+# 4. Install the plugin
+sudo cp as400-db2.plugin /usr/libexec/netdata/plugins.d/
+sudo chmod +x /usr/libexec/netdata/plugins.d/as400-db2.plugin
+```
+
 ## Overview
 
 This collector monitors IBM AS/400 (IBM i) system performance metrics via IBM DB2 connection.
