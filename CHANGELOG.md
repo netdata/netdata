@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- MSI parameter [\#20550](https://github.com/netdata/netdata/pull/20550) ([thiagoftsm](https://github.com/thiagoftsm))
+- improve\(go.d/snmp-profiles\): add DHCP tags transform to bluecat profile [\#20547](https://github.com/netdata/netdata/pull/20547) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/prometheus/common from 0.64.0 to 0.65.0 in /src/go [\#20545](https://github.com/netdata/netdata/pull/20545) ([dependabot[bot]](https://github.com/apps/dependabot))
 - refactor\(go.d/ddsnmpcollector\): restructure into components [\#20543](https://github.com/netdata/netdata/pull/20543) ([ilyam8](https://github.com/ilyam8))
+- Properly parse disconnect reason [\#20540](https://github.com/netdata/netdata/pull/20540) ([stelfrag](https://github.com/stelfrag))
+- Update SQLITE to version 3.50.1 [\#20539](https://github.com/netdata/netdata/pull/20539) ([stelfrag](https://github.com/stelfrag))
 - SNMP: bluecat profile [\#20538](https://github.com/netdata/netdata/pull/20538) ([Ancairon](https://github.com/Ancairon))
 - Lock before checking the statement pool [\#20536](https://github.com/netdata/netdata/pull/20536) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump k8s.io/client-go from 0.33.1 to 0.33.2 in /src/go [\#20532](https://github.com/netdata/netdata/pull/20532) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -15,6 +20,7 @@
 - improve\(go.d/snmp-profiles\): allow users to add custom SNMP profiles [\#20526](https://github.com/netdata/netdata/pull/20526) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): log device profiles matched by sysObjectID [\#20524](https://github.com/netdata/netdata/pull/20524) ([ilyam8](https://github.com/ilyam8))
 - update units in \_generic-if.yaml [\#20523](https://github.com/netdata/netdata/pull/20523) ([ilyam8](https://github.com/ilyam8))
+- Hardware \(Windows.plugin\) [\#20522](https://github.com/netdata/netdata/pull/20522) ([thiagoftsm](https://github.com/thiagoftsm))
 - upd generic check in snmp prof metrics deduplication [\#20521](https://github.com/netdata/netdata/pull/20521) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp-profiles\): metrics deduplication [\#20520](https://github.com/netdata/netdata/pull/20520) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp-profiles\): remove unsupported constant\_value\_one metrics [\#20519](https://github.com/netdata/netdata/pull/20519) ([ilyam8](https://github.com/ilyam8))
@@ -49,6 +55,7 @@
 - Correctly ignore patches that are already applied. [\#20480](https://github.com/netdata/netdata/pull/20480) ([Ferroin](https://github.com/Ferroin))
 - chore\(go.d/ddsnmp\): split table collection into walk and process phases [\#20479](https://github.com/netdata/netdata/pull/20479) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/redis\): don't clear tls for `rediss` [\#20478](https://github.com/netdata/netdata/pull/20478) ([ilyam8](https://github.com/ilyam8))
+- Enable Rust-based journal file reader in static builds. [\#20477](https://github.com/netdata/netdata/pull/20477) ([Ferroin](https://github.com/Ferroin))
 - improvement\(go.d\): add bearer\_token\_file to request cfg [\#20476](https://github.com/netdata/netdata/pull/20476) ([ilyam8](https://github.com/ilyam8))
 - Update mcp.md [\#20475](https://github.com/netdata/netdata/pull/20475) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): add dependency-based expiration to table cache [\#20474](https://github.com/netdata/netdata/pull/20474) ([ilyam8](https://github.com/ilyam8))
@@ -454,13 +461,6 @@
 - Regenerate integrations docs [\#19988](https://github.com/netdata/netdata/pull/19988) ([netdatabot](https://github.com/netdatabot))
 - Installation + docker, improvements [\#19987](https://github.com/netdata/netdata/pull/19987) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#19986](https://github.com/netdata/netdata/pull/19986) ([netdatabot](https://github.com/netdatabot))
-- perflib: do not dereference null pointer [\#19985](https://github.com/netdata/netdata/pull/19985) ([ktsaou](https://github.com/ktsaou))
-- keep errno in out of memory situations [\#19984](https://github.com/netdata/netdata/pull/19984) ([ktsaou](https://github.com/ktsaou))
-- do not allocate or access zero sized arrays [\#19983](https://github.com/netdata/netdata/pull/19983) ([ktsaou](https://github.com/ktsaou))
-- Revert "fix undefined" [\#19982](https://github.com/netdata/netdata/pull/19982) ([stelfrag](https://github.com/stelfrag))
-- Installation section Improvements [\#19981](https://github.com/netdata/netdata/pull/19981) ([kanelatechnical](https://github.com/kanelatechnical))
-- Improve agent shutdown [\#19980](https://github.com/netdata/netdata/pull/19980) ([stelfrag](https://github.com/stelfrag))
-- Release memory when calculating metric correlations [\#19979](https://github.com/netdata/netdata/pull/19979) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
