@@ -1022,6 +1022,9 @@ static inline bool queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
 
 void aclk_synchronization_shutdown(void)
 {
+    if (!aclk_sync_config.thread)
+        return;
+
     // Send shutdown command, not that the completion is initialized
     // on init and still valid
     aclk_mqtt_client_reset();
