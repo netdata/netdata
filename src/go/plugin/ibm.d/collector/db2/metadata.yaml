@@ -436,3 +436,37 @@ modules:
               dimensions:
                 - name: read
                 - name: written
+        - name: table
+          description: These metrics refer to individual tables.
+          labels:
+            - name: table
+              description: Table name (schema.table)
+          metrics:
+            - name: db2.table_size
+              description: Table Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: data
+                - name: index
+                - name: long_obj
+            - name: db2.table_activity
+              description: Table Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+        - name: index
+          description: These metrics refer to individual indexes.
+          labels:
+            - name: index
+              description: Index name (schema.index)
+          metrics:
+            - name: db2.index_usage
+              description: Index Usage
+              unit: scans/s
+              chart_type: area
+              dimensions:
+                - name: index
+                - name: full

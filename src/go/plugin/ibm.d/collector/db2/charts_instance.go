@@ -128,6 +128,51 @@ var (
 			{ID: "connection_%s_rows_written", Name: "written", Algo: module.Incremental, Mul: -1},
 		},
 	}
+
+	// Table charts
+	tableSizeChartTmpl = module.Chart{
+		ID:       "table_%s_size",
+		Title:    "Table %s Size",
+		Units:    "bytes",
+		Fam:      "table",
+		Ctx:      "db2.table_size",
+		Priority: module.Priority + 500,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "table_%s_data_size", Name: "data", Mul: 1024},
+			{ID: "table_%s_index_size", Name: "index", Mul: 1024},
+			{ID: "table_%s_long_obj_size", Name: "long_obj", Mul: 1024},
+		},
+	}
+
+	tableActivityChartTmpl = module.Chart{
+		ID:       "table_%s_activity",
+		Title:    "Table %s Activity",
+		Units:    "rows/s",
+		Fam:      "table",
+		Ctx:      "db2.table_activity",
+		Priority: module.Priority + 501,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "table_%s_rows_read", Name: "read", Algo: module.Incremental},
+			{ID: "table_%s_rows_written", Name: "written", Algo: module.Incremental, Mul: -1},
+		},
+	}
+
+	// Index charts
+	indexUsageChartTmpl = module.Chart{
+		ID:       "index_%s_usage",
+		Title:    "Index %s Usage",
+		Units:    "scans/s",
+		Fam:      "index",
+		Ctx:      "db2.index_usage",
+		Priority: module.Priority + 600,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "index_%s_index_scans", Name: "index", Algo: module.Incremental},
+			{ID: "index_%s_full_scans", Name: "full", Algo: module.Incremental, Mul: -1},
+		},
+	}
 )
 
 // Chart creation functions
@@ -215,6 +260,45 @@ func newConnectionCharts(conn *connectionMetrics) *module.Charts {
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanID)
+		}
+	}
+
+	return &charts
+}
+
+func newTableCharts(t *tableMetrics) *module.Charts {
+	charts := module.Charts{
+		tableSizeChartTmpl.Copy(),
+		tableActivityChartTmpl.Copy(),
+	}
+
+	cleanName := cleanName(t.name)
+	for _, chart := range charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName)
+		chart.Labels = []module.Label{
+			{Key: "table", Value: t.name},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName)
+		}
+	}
+
+	return &charts
+}
+
+func newIndexCharts(i *indexMetrics) *module.Charts {
+	charts := module.Charts{
+		indexUsageChartTmpl.Copy(),
+	}
+
+	cleanName := cleanName(i.name)
+	for _, chart := range charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName)
+		chart.Labels = []module.Label{
+			{Key: "index", Value: i.name},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}
 	}
 
