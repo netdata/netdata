@@ -3,6 +3,9 @@
 //go:build cgo
 // +build cgo
 
+// Package ibmdriver handles automatic download and setup of IBM DB2 CLI drivers.
+// The drivers are stored in the Netdata var lib directory (typically /var/lib/netdata/ibm-clidriver/)
+// where the netdata user has write permissions.
 package ibmdriver
 
 import (
@@ -24,14 +27,27 @@ const (
 
 // GetDriverPath returns the path to the clidriver directory
 func GetDriverPath() (string, error) {
-	// Get the directory where the plugin binary is located
-	exe, err := os.Executable()
-	if err != nil {
-		return "", err
+	// Get the Netdata var lib directory from environment
+	varLibDir := os.Getenv("NETDATA_LIB_DIR")
+	if varLibDir == "" {
+		// Fallback to common locations if env var not set
+		candidates := []string{
+			"/var/lib/netdata",
+			"/opt/netdata/var/lib/netdata",
+		}
+		for _, dir := range candidates {
+			if info, err := os.Stat(dir); err == nil && info.IsDir() {
+				varLibDir = dir
+				break
+			}
+		}
+		if varLibDir == "" {
+			return "", fmt.Errorf("cannot find Netdata var lib directory (NETDATA_LIB_DIR not set)")
+		}
 	}
 	
-	pluginDir := filepath.Dir(exe)
-	driverPath := filepath.Join(pluginDir, "clidriver")
+	// Create IBM driver directory under var lib
+	driverPath := filepath.Join(varLibDir, "ibm-clidriver")
 	
 	return driverPath, nil
 }
@@ -44,12 +60,18 @@ func EnsureDriver() error {
 	}
 	
 	// Check if driver already exists
-	libPath := filepath.Join(driverPath, "lib")
-	includePath := filepath.Join(driverPath, "include")
+	clidriverPath := filepath.Join(driverPath, "clidriver")
+	libPath := filepath.Join(clidriverPath, "lib")
+	includePath := filepath.Join(clidriverPath, "include")
 	
 	if dirExists(libPath) && dirExists(includePath) {
 		// Driver already installed
 		return nil
+	}
+	
+	// Ensure base directory exists
+	if err := os.MkdirAll(driverPath, 0755); err != nil {
+		return fmt.Errorf("failed to create driver directory: %w", err)
 	}
 	
 	// Download and install driver
@@ -60,7 +82,7 @@ func EnsureDriver() error {
 		return fmt.Errorf("unsupported platform: %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	
-	return downloadAndExtract(url, filepath.Dir(driverPath))
+	return downloadAndExtract(url, driverPath)
 }
 
 // SetupEnvironment sets the required environment variables
@@ -70,11 +92,12 @@ func SetupEnvironment() error {
 		return err
 	}
 	
-	// Set IBM_DB_HOME
-	os.Setenv("IBM_DB_HOME", driverPath)
+	// Set IBM_DB_HOME to the clidriver subdirectory
+	clidriverPath := filepath.Join(driverPath, "clidriver")
+	os.Setenv("IBM_DB_HOME", clidriverPath)
 	
 	// Update LD_LIBRARY_PATH (or equivalent on other platforms)
-	libPath := filepath.Join(driverPath, "lib")
+	libPath := filepath.Join(clidriverPath, "lib")
 	
 	switch runtime.GOOS {
 	case "linux", "freebsd":
