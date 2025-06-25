@@ -13,6 +13,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
+const precision = 1000 // Precision multiplier for floating-point values
+
 func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	if d.db == nil {
 		db, err := d.initDatabase(ctx)
@@ -273,7 +275,7 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 		FROM SYSIBMADM.SNAPBP
 	`
 
-	return d.doQuerySingleValue(ctx, query, &d.mx.BufferpoolHitRatio)
+	return d.doQuerySingleFloatValue(ctx, query, &d.mx.BufferpoolHitRatio)
 }
 
 func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
@@ -323,6 +325,21 @@ func (d *DB2) doQuerySingleValue(ctx context.Context, query string, target *int6
 	}
 	if value.Valid {
 		*target = value.Int64
+	}
+	return nil
+}
+
+func (d *DB2) doQuerySingleFloatValue(ctx context.Context, query string, target *int64) error {
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+
+	var value sql.NullFloat64
+	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
+	if err != nil {
+		return err
+	}
+	if value.Valid {
+		*target = int64(value.Float64 * precision)
 	}
 	return nil
 }
