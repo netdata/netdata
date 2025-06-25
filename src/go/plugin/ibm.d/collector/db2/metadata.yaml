@@ -36,6 +36,22 @@ modules:
           - Db2 on Cloud
 
           The collector automatically detects the DB2 edition and adapts its queries accordingly.
+          
+          System-wide metrics include:
+          - Database connections (total, active, executing, idle)
+          - Locking activity (waits, timeouts, deadlocks, escalations)
+          - Sorting activity and overflows
+          - Row activity (reads and modifications)
+          - Buffer pool hit ratio
+          - Log space usage
+          - Long-running queries (total, warning >5min, critical >15min)
+          - Backup status and age tracking
+
+          Per-instance metrics (when enabled) include:
+          - Database status and applications
+          - Individual buffer pool performance
+          - Tablespace usage and sizes
+          - Connection-level activity
         method_description: |
           The collector uses IBM DB2 driver to connect to the database and queries system catalog tables
           in SYSIBMADM schema to gather performance metrics.
@@ -226,6 +242,18 @@ modules:
         metric: db2.log_space
         info: Database log space usage is high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_long_running_queries
+        metric: db2.long_running_queries
+        info: Long-running queries detected (>5 minutes)
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_backup_age
+        metric: db2.backup_age
+        info: Database backup is older than 24 hours
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
+      - name: db2_backup_failed
+        metric: db2.backup_status
+        info: Last database backup failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf
     metrics:
       folding:
         title: Metrics
@@ -287,6 +315,27 @@ modules:
               dimensions:
                 - name: used
                 - name: available
+            - name: db2.long_running_queries
+              description: Long Running Queries
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: total
+                - name: warning
+                - name: critical
+            - name: db2.backup_status
+              description: Last Backup Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: db2.backup_age
+              description: Time Since Last Backup
+              unit: hours
+              chart_type: line
+              dimensions:
+                - name: full
+                - name: incremental
         - name: database
           description: These metrics refer to individual databases.
           labels:

@@ -219,6 +219,16 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 		d.Warningf("failed to collect log space metrics: %v", err)
 	}
 
+	// Long-running queries
+	if err := d.collectLongRunningQueries(ctx); err != nil {
+		d.Warningf("failed to collect long-running queries: %v", err)
+	}
+
+	// Backup status
+	if err := d.collectBackupStatus(ctx); err != nil {
+		d.Warningf("failed to collect backup status: %v", err)
+	}
+
 	return nil
 }
 
@@ -371,4 +381,129 @@ func (d *DB2) readRows(rows *sql.Rows, assign func(column, value string, lineEnd
 	}
 
 	return rows.Err()
+}
+
+func (d *DB2) collectLongRunningQueries(ctx context.Context) error {
+	// Query to find long-running queries from SYSIBMADM.LONG_RUNNING_SQL
+	// Warning threshold: 5 minutes, Critical threshold: 15 minutes
+	query := `
+		SELECT 
+			COUNT(*) as TOTAL_COUNT,
+			SUM(CASE WHEN ELAPSED_TIME_MIN >= 5 AND ELAPSED_TIME_MIN < 15 THEN 1 ELSE 0 END) as WARNING_COUNT,
+			SUM(CASE WHEN ELAPSED_TIME_MIN >= 15 THEN 1 ELSE 0 END) as CRITICAL_COUNT
+		FROM SYSIBMADM.LONG_RUNNING_SQL
+		WHERE ELAPSED_TIME_MIN > 0
+	`
+
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		v, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return
+		}
+
+		switch column {
+		case "TOTAL_COUNT":
+			d.mx.LongRunningQueries = v
+		case "WARNING_COUNT":
+			d.mx.LongRunningQueriesWarning = v
+		case "CRITICAL_COUNT":
+			d.mx.LongRunningQueriesCritical = v
+		}
+	})
+}
+
+func (d *DB2) collectBackupStatus(ctx context.Context) error {
+	// Query backup history from SYSIBMADM.DB_HISTORY
+	// Note: This table structure varies between DB2 versions
+	query := `
+		SELECT 
+			OPERATION,
+			START_TIME,
+			OPERATIONTYPE,
+			SQLCODE
+		FROM SYSIBMADM.DB_HISTORY
+		WHERE OPERATION = 'B'
+		ORDER BY START_TIME DESC
+		FETCH FIRST 10 ROWS ONLY
+	`
+
+	var (
+		lastFullBackupTime        time.Time
+		lastIncrementalBackupTime time.Time
+		lastBackupFailed          bool
+		currentStartTime          time.Time
+		currentOperationType      string
+	)
+
+	now := time.Now()
+
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "START_TIME":
+			// Parse backup time
+			if t, err := time.Parse("2006-01-02-15.04.05", value); err == nil {
+				currentStartTime = t
+			}
+		case "OPERATIONTYPE":
+			currentOperationType = value
+		case "SQLCODE":
+			// SQLCODE 0 = success, anything else = failure
+			if value == "0" && !currentStartTime.IsZero() {
+				// Successful backup
+				if currentOperationType == "F" && lastFullBackupTime.IsZero() {
+					lastFullBackupTime = currentStartTime
+				} else if (currentOperationType == "I" || currentOperationType == "O" || currentOperationType == "D") && lastIncrementalBackupTime.IsZero() {
+					lastIncrementalBackupTime = currentStartTime
+				}
+			} else if value != "0" && value != "" {
+				lastBackupFailed = true
+			}
+		}
+
+		if lineEnd {
+			// Reset for next row
+			currentStartTime = time.Time{}
+			currentOperationType = ""
+		}
+	})
+
+	if err != nil {
+		// Try simpler approach - just get the latest backup timestamp
+		simpleQuery := `
+			SELECT 
+				MAX(START_TIME) as LAST_BACKUP
+			FROM SYSIBMADM.DB_HISTORY
+			WHERE OPERATION = 'B' AND SQLCODE = 0
+		`
+		var lastBackup sql.NullString
+		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+		defer cancel()
+
+		if err := d.db.QueryRowContext(queryCtx, simpleQuery).Scan(&lastBackup); err == nil && lastBackup.Valid {
+			if t, err := time.Parse("2006-01-02-15.04.05", lastBackup.String); err == nil {
+				lastFullBackupTime = t
+			}
+		}
+	}
+
+	// Calculate age in hours
+	if !lastFullBackupTime.IsZero() {
+		d.mx.LastFullBackupAge = int64(now.Sub(lastFullBackupTime).Hours())
+	} else {
+		d.mx.LastFullBackupAge = 999999 // Very old/never
+	}
+
+	if !lastIncrementalBackupTime.IsZero() {
+		d.mx.LastIncrementalBackupAge = int64(now.Sub(lastIncrementalBackupTime).Hours())
+	} else {
+		d.mx.LastIncrementalBackupAge = 999999 // Very old/never
+	}
+
+	if lastBackupFailed {
+		d.mx.LastBackupStatus = 1
+	} else {
+		d.mx.LastBackupStatus = 0
+	}
+
+	return nil
 }

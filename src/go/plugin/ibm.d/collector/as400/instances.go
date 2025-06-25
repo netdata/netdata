@@ -49,6 +49,17 @@ type jobQueueMetrics struct {
 	hasCharts bool
 }
 
+// messageQueueMetrics holds metrics for an individual message queue
+type messageQueueMetrics struct {
+	name         string
+	library      string
+	messageCount int64
+	oldestHours  int64
+
+	updated   bool
+	hasCharts bool
+}
+
 // Per-instance metric methods
 func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
@@ -69,4 +80,11 @@ func (a *AS400) getJobQueueMetrics(key string) *jobQueueMetrics {
 		a.jobQueues[key] = &jobQueueMetrics{}
 	}
 	return a.jobQueues[key]
+}
+
+func (a *AS400) getMessageQueueMetrics(key string) *messageQueueMetrics {
+	if _, ok := a.messageQueues[key]; !ok {
+		a.messageQueues[key] = &messageQueueMetrics{}
+	}
+	return a.messageQueues[key]
 }
