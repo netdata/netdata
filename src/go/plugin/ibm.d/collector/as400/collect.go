@@ -251,7 +251,7 @@ func (a *AS400) readRows(rows *sql.Rows, assign func(column, value string, lineE
 func (a *AS400) collectDiskInstances(ctx context.Context) error {
 	// First check cardinality if we haven't yet
 	if len(a.disks) == 0 && a.MaxDisks > 0 {
-		count, err := a.countDisks()
+		count, err := a.countDisks(ctx)
 		if err != nil {
 			return err
 		}
@@ -308,6 +308,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 			}
 		case "PERCENT_BUSY":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
+				disk := a.disks[currentUnit]
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
 					disk.busyPercent = int64(v)
 					a.mx.disks[currentUnit] = diskInstanceMetrics{
@@ -374,7 +375,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) countDisks() (int, error) {
+func (a *AS400) countDisks(ctx context.Context) (int, error) {
 	query := "SELECT COUNT(DISTINCT UNIT_NUMBER) as COUNT FROM QSYS2.DISK_STATUS"
 	
 	var count int
@@ -392,7 +393,7 @@ func (a *AS400) countDisks() (int, error) {
 func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 	// Check cardinality
 	if len(a.subsystems) == 0 && a.MaxSubsystems > 0 {
-		count, err := a.countSubsystems()
+		count, err := a.countSubsystems(ctx)
 		if err != nil {
 			return err
 		}
@@ -496,7 +497,7 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) countSubsystems() (int, error) {
+func (a *AS400) countSubsystems(ctx context.Context) (int, error) {
 	query := "SELECT COUNT(*) as COUNT FROM QSYS2.SUBSYSTEM_INFO WHERE STATUS = 'ACTIVE'"
 	
 	var count int
@@ -514,7 +515,7 @@ func (a *AS400) countSubsystems() (int, error) {
 func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 	// Check cardinality
 	if len(a.jobQueues) == 0 && a.MaxJobQueues > 0 {
-		count, err := a.countJobQueues()
+		count, err := a.countJobQueues(ctx)
 		if err != nil {
 			return err
 		}
@@ -612,7 +613,7 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) countJobQueues() (int, error) {
+func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
 	query := "SELECT COUNT(*) as COUNT FROM QSYS2.JOB_QUEUE_INFO"
 	
 	var count int
