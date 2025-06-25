@@ -156,9 +156,9 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 
 		case "HIT_RATIO":
 			if currentBP != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
-					metrics.HitRatio = v
+					metrics.HitRatio = int64(v * precision)
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -294,9 +294,9 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 
 		case "USED_PERCENT":
 			if currentTbsp != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
 					metrics := d.mx.tablespaces[currentTbsp]
-					metrics.UsedPercent = v
+					metrics.UsedPercent = int64(v * precision)
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
