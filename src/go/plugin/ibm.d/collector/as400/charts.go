@@ -10,10 +10,14 @@ var (
 	baseCharts = module.Charts{
 		cpuUtilizationChart.Copy(),
 		activeJobsChart.Copy(),
+		jobTypeBreakdownChart.Copy(),
 		systemAspUsageChart.Copy(),
+		ifsUsageChart.Copy(),
+		ifsFilesChart.Copy(),
 		memoryPoolUsageChart.Copy(),
 		diskBusyChart.Copy(),
 		jobQueueLengthChart.Copy(),
+		messageQueueDepthChart.Copy(),
 	}
 )
 
@@ -42,6 +46,23 @@ var (
 		},
 	}
 
+	jobTypeBreakdownChart = module.Chart{
+		ID:       "job_type_breakdown",
+		Title:    "Jobs by Type",
+		Units:    "jobs",
+		Fam:      "jobs",
+		Ctx:      "as400.job_type_breakdown",
+		Priority: module.Priority + 15,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "batch_jobs", Name: "batch"},
+			{ID: "interactive_jobs", Name: "interactive"},
+			{ID: "system_jobs", Name: "system"},
+			{ID: "spooled_jobs", Name: "spooled"},
+			{ID: "other_jobs", Name: "other"},
+		},
+	}
+
 	systemAspUsageChart = module.Chart{
 		ID:       "system_asp_usage",
 		Title:    "System ASP Usage",
@@ -51,6 +72,32 @@ var (
 		Priority: module.Priority + 20,
 		Dims: module.Dims{
 			{ID: "system_asp_used", Name: "used", Div: precision},
+		},
+	}
+
+	ifsUsageChart = module.Chart{
+		ID:       "ifs_usage",
+		Title:    "IFS Usage",
+		Units:    "bytes",
+		Fam:      "storage",
+		Ctx:      "as400.ifs_usage",
+		Priority: module.Priority + 25,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "ifs_used_size", Name: "used"},
+			{ID: "ifs_total_size", Name: "total"},
+		},
+	}
+
+	ifsFilesChart = module.Chart{
+		ID:       "ifs_files",
+		Title:    "IFS File Count",
+		Units:    "files",
+		Fam:      "storage",
+		Ctx:      "as400.ifs_files",
+		Priority: module.Priority + 26,
+		Dims: module.Dims{
+			{ID: "ifs_file_count", Name: "files"},
 		},
 	}
 
@@ -91,6 +138,19 @@ var (
 		Priority: module.Priority + 50,
 		Dims: module.Dims{
 			{ID: "job_queue_length", Name: "queued"},
+		},
+	}
+
+	messageQueueDepthChart = module.Chart{
+		ID:       "message_queue_depth",
+		Title:    "System Message Queue Depth",
+		Units:    "messages",
+		Fam:      "system",
+		Ctx:      "as400.message_queue_depth",
+		Priority: module.Priority + 60,
+		Dims: module.Dims{
+			{ID: "system_message_queue_depth", Name: "system"},
+			{ID: "qsysopr_message_queue_depth", Name: "qsysopr"},
 		},
 	}
 )

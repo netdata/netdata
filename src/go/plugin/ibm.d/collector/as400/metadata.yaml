@@ -34,9 +34,12 @@ modules:
 
           System-wide metrics include:
           - CPU utilization
-          - Memory pool usage
+          - Memory pool usage (Machine, Base, Interactive, Spool)
           - System ASP usage
-          - Aggregate disk and job statistics
+          - Active jobs count and job type breakdown
+          - IFS (Integrated File System) usage and file count
+          - System message queue depths (QSYSMSG, QSYSOPR)
+          - Aggregate disk busy percentage
 
           Per-instance metrics (when enabled) include:
           - Individual disk performance (I/O, throughput, response time)
@@ -301,6 +304,14 @@ modules:
         metric: as400.jobqueue_length
         info: Job queue ${label:job_queue} has excessive waiting jobs
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_ifs_usage_high
+        metric: as400.ifs_usage
+        info: IFS (Integrated File System) usage is above 80%
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
+      - name: as400_message_queue_full
+        metric: as400.message_queue_depth
+        info: System message queue has more than 1000 messages
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/as400.conf
     metrics:
       folding:
         title: Metrics
@@ -351,6 +362,36 @@ modules:
               chart_type: line
               dimensions:
                 - name: queued
+            - name: as400.job_type_breakdown
+              description: Jobs by Type
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: batch
+                - name: interactive
+                - name: system
+                - name: spooled
+                - name: other
+            - name: as400.ifs_usage
+              description: IFS Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: total
+            - name: as400.ifs_files
+              description: IFS File Count
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: as400.message_queue_depth
+              description: System Message Queue Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: system
+                - name: qsysopr
         - name: disk
           description: These metrics refer to individual disk units.
           labels:
