@@ -11,6 +11,10 @@
 // 2^24
 #define WINDOWS_MAX_KERNEL_OBJECT 16777216
 
+#ifndef MEGA_FACTOR
+#define MEGA_FACTOR (1048576)
+#endif
+
 void *win_plugin_main(void *ptr);
 
 extern char windows_shared_buffer[8192];
@@ -38,6 +42,7 @@ int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibServices(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
+int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
