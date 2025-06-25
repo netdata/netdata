@@ -1,0 +1,242 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "IBM WebSphere MicroProfile Metrics collector configuration.",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "url": {
+        "title": "WebSphere server URL",
+        "description": "The base URL of the WebSphere Liberty server with MicroProfile Metrics.",
+        "type": "string",
+        "default": "https://localhost:9443",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "HTTP request timeout",
+        "description": "The timeout for HTTP requests in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 10
+      },
+      "username": {
+        "title": "Username",
+        "description": "The username for HTTP basic authentication.",
+        "type": "string"
+      },
+      "password": {
+        "title": "Password",
+        "description": "The password for HTTP basic authentication.",
+        "type": "string"
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "The URL of the proxy server.",
+        "type": "string"
+      },
+      "proxy_username": {
+        "title": "Proxy username",
+        "description": "The username for proxy authentication.",
+        "type": "string"
+      },
+      "proxy_password": {
+        "title": "Proxy password",
+        "description": "The password for proxy authentication.",
+        "type": "string"
+      },
+      "headers": {
+        "title": "HTTP headers",
+        "description": "Additional HTTP headers to include in requests.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "Skip verification of the server's certificate chain and host name.",
+        "type": "boolean",
+        "default": false
+      },
+      "tls_ca": {
+        "title": "TLS CA certificate file",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS client certificate file",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS client key file",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string"
+      },
+      "metrics_endpoint": {
+        "title": "MicroProfile metrics endpoint",
+        "description": "The endpoint path for MicroProfile Metrics in Prometheus format.",
+        "type": "string",
+        "default": "/metrics"
+      },
+      "collect_jvm_metrics": {
+        "title": "Collect JVM metrics",
+        "description": "Enable collection of JVM metrics (memory, GC, threads, classes).",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_rest_metrics": {
+        "title": "Collect REST metrics",
+        "description": "Enable collection of JAX-RS and REST endpoint metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_mp_metrics": {
+        "title": "Collect MicroProfile metrics",
+        "description": "Enable collection of MicroProfile-specific metrics (Health, Config, etc.).",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_custom_metrics": {
+        "title": "Collect custom application metrics",
+        "description": "Enable collection of custom application-defined metrics.",
+        "type": "boolean",
+        "default": false
+      },
+      "max_rest_endpoints": {
+        "title": "Maximum REST endpoints",
+        "description": "Maximum number of REST endpoints to monitor. Set to 0 for unlimited.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_custom_metrics": {
+        "title": "Maximum custom metrics",
+        "description": "Maximum number of custom metrics to monitor. Set to 0 for unlimited.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 100
+      },
+      "collect_rest_matching": {
+        "title": "REST endpoint filter",
+        "description": "Only collect REST metrics for endpoints matching this pattern. Supports wildcards (* and ?) and multiple patterns separated by |.",
+        "type": "string"
+      },
+      "collect_custom_matching": {
+        "title": "Custom metrics filter",
+        "description": "Only collect custom metrics matching this pattern. Supports wildcards (* and ?) and multiple patterns separated by |.",
+        "type": "string"
+      },
+      "cell_name": {
+        "title": "WebSphere cell name",
+        "description": "The WebSphere cell name for identification in clustered environments.",
+        "type": "string"
+      },
+      "node_name": {
+        "title": "WebSphere node name", 
+        "description": "The WebSphere node name for identification in clustered environments.",
+        "type": "string"
+      },
+      "server_name": {
+        "title": "WebSphere server name",
+        "description": "The WebSphere server name for identification in clustered environments.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Virtual node name for Netdata Cloud.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "url",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Authentication",
+          "fields": [
+            "username",
+            "password",
+            "tls_skip_verify",
+            "tls_ca", 
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "MicroProfile",
+          "fields": [
+            "metrics_endpoint",
+            "collect_jvm_metrics",
+            "collect_rest_metrics", 
+            "collect_mp_metrics",
+            "collect_custom_metrics"
+          ]
+        },
+        {
+          "title": "Limits & Filtering",
+          "fields": [
+            "max_rest_endpoints",
+            "max_custom_metrics",
+            "collect_rest_matching",
+            "collect_custom_matching"
+          ]
+        },
+        {
+          "title": "Advanced",
+          "fields": [
+            "proxy_url",
+            "proxy_username",
+            "proxy_password",
+            "headers",
+            "cell_name",
+            "node_name", 
+            "server_name",
+            "vnode"
+          ]
+        }
+      ]
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "proxy_password": {
+      "ui:widget": "password"
+    },
+    "headers": {
+      "ui:options": {
+        "addable": true,
+        "orderable": false,
+        "removable": true
+      }
+    },
+    "collect_rest_matching": {
+      "ui:help": "Examples: '*api*' (contains 'api'), '/users/*' (starts with /users/), '*admin*|*management*' (contains 'admin' or 'management')"
+    },
+    "collect_custom_matching": {
+      "ui:help": "Examples: 'myapp_*' (starts with 'myapp_'), '*counter*' (contains 'counter'), 'app1_*|app2_*' (starts with 'app1_' or 'app2_')"
+    }
+  }
+}
