@@ -36,6 +36,33 @@ The collector provides:
 
 ## Configuration
 
+### DSN Configuration
+
+The `dsn` (Data Source Name) string is used to connect to the DB2 database. Here are some common examples:
+
+**Standard TCP/IP Connection:**
+```yaml
+dsn: 'DATABASE=sample;HOSTNAME=localhost;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+```
+
+**Db2 on Cloud with SSL:**
+```yaml
+dsn: 'DATABASE=bludb;HOSTNAME=xxx.databases.appdomain.cloud;PORT=32733;PROTOCOL=TCPIP;UID=user;PWD=pass;SECURITY=SSL;SSLServerCertificate=/path/to/cert.crt'
+```
+
+**DSN Parameters:**
+
+*   `DATABASE`: The name of the database to connect to.
+*   `HOSTNAME`: The hostname or IP address of the DB2 server.
+*   `PORT`: The port number of the DB2 server.
+*   `PROTOCOL`: The connection protocol (usually `TCPIP`).
+*   `UID`: The username to connect with.
+*   `PWD`: The password for the specified user.
+*   `SECURITY`: Set to `SSL` to enable SSL/TLS encryption.
+*   `SSLServerCertificate`: The path to the SSL server certificate (if required).
+
+### Example Job Configuration
+
 ```yaml
 jobs:
   - name: db2_local
@@ -46,13 +73,16 @@ jobs:
     max_bufferpools: 20  
     max_tablespaces: 100
     max_connections: 200
-```
+    max_tables: 50
+    max_indexes: 100
 
-For Db2 on Cloud with SSL:
-```yaml
-jobs:
-  - name: db2_cloud
-    dsn: 'DATABASE=bludb;HOSTNAME=xxx.databases.appdomain.cloud;PORT=32733;PROTOCOL=TCPIP;UID=user;PWD=pass;SECURITY=SSL;SSLServerCertificate=/path/to/cert.crt'
+    # Enable table and index metrics
+    collect_table_metrics: true
+    collect_index_metrics: true
+
+    # Selectors for filtering
+    collect_tables_matching: 'USER.*'
+    collect_indexes_matching: 'USER.*'
 ```
 
 ## Permissions

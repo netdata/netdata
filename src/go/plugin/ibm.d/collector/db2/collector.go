@@ -48,12 +48,16 @@ func New() *DB2 {
 			CollectTablespaceMetrics: true,
 			CollectConnectionMetrics: true,
 			CollectLockMetrics:       true,
+			CollectTableMetrics:      false,
+			CollectIndexMetrics:      false,
 
 			// Cardinality limits
 			MaxDatabases:   10,
 			MaxBufferpools: 20,
 			MaxTablespaces: 100,
 			MaxConnections: 200,
+			MaxTables:      50,
+			MaxIndexes:     100,
 		},
 
 		charts:      baseCharts.Copy(),
@@ -63,6 +67,8 @@ func New() *DB2 {
 		bufferpools: make(map[string]*bufferpoolMetrics),
 		tablespaces: make(map[string]*tablespaceMetrics),
 		connections: make(map[string]*connectionMetrics),
+		tables:      make(map[string]*tableMetrics),
+		indexes:     make(map[string]*indexMetrics),
 	}
 }
 
@@ -80,18 +86,24 @@ type Config struct {
 	CollectTablespaceMetrics bool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics"`
 	CollectConnectionMetrics bool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics"`
 	CollectLockMetrics       bool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics"`
+	CollectTableMetrics      bool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics"`
+	CollectIndexMetrics      bool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics"`
 
 	// Cardinality limits
 	MaxDatabases   int `yaml:"max_databases,omitempty" json:"max_databases"`
 	MaxBufferpools int `yaml:"max_bufferpools,omitempty" json:"max_bufferpools"`
 	MaxTablespaces int `yaml:"max_tablespaces,omitempty" json:"max_tablespaces"`
 	MaxConnections int `yaml:"max_connections,omitempty" json:"max_connections"`
+	MaxTables      int `yaml:"max_tables,omitempty" json:"max_tables"`
+	MaxIndexes     int `yaml:"max_indexes,omitempty" json:"max_indexes"`
 
 	// Selectors for filtering
 	DatabaseSelector   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
 	BufferpoolSelector string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching"`
 	TablespaceSelector string `yaml:"collect_tablespaces_matching,omitempty" json:"collect_tablespaces_matching"`
 	ConnectionSelector string `yaml:"collect_connections_matching,omitempty" json:"collect_connections_matching"`
+	TableSelector      string `yaml:"collect_tables_matching,omitempty" json:"collect_tables_matching"`
+	IndexSelector      string `yaml:"collect_indexes_matching,omitempty" json:"collect_indexes_matching"`
 }
 
 type DB2 struct {
@@ -109,12 +121,16 @@ type DB2 struct {
 	bufferpools map[string]*bufferpoolMetrics
 	tablespaces map[string]*tablespaceMetrics
 	connections map[string]*connectionMetrics
+	tables      map[string]*tableMetrics
+	indexes     map[string]*indexMetrics
 
 	// Selectors
 	databaseSelector   matcher.Matcher
 	bufferpoolSelector matcher.Matcher
 	tablespaceSelector matcher.Matcher
 	connectionSelector matcher.Matcher
+	tableSelector      matcher.Matcher
+	indexSelector      matcher.Matcher
 
 	// DB2 version info
 	version    string
@@ -169,6 +185,22 @@ func (d *DB2) Init(ctx context.Context) error {
 			return fmt.Errorf("invalid connection selector pattern '%s': %v", d.ConnectionSelector, err)
 		}
 		d.connectionSelector = m
+	}
+
+	if d.TableSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.TableSelector)
+		if err != nil {
+			return fmt.Errorf("invalid table selector pattern '%s': %v", d.TableSelector, err)
+		}
+		d.tableSelector = m
+	}
+
+	if d.IndexSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.IndexSelector)
+		if err != nil {
+			return fmt.Errorf("invalid index selector pattern '%s': %v", d.IndexSelector, err)
+		}
+		d.indexSelector = m
 	}
 
 	return nil

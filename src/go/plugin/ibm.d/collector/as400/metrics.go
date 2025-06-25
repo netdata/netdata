@@ -39,10 +39,11 @@ type metricsData struct {
 	QSYSOPRMessageQueueDepth int64 `stm:"qsysopr_message_queue_depth"`
 
 	// Per-instance metrics (not included in stm)
-	disks         map[string]diskInstanceMetrics
-	subsystems    map[string]subsystemInstanceMetrics
-	jobQueues     map[string]jobQueueInstanceMetrics
-	messageQueues map[string]messageQueueInstanceMetrics
+	disks             map[string]diskInstanceMetrics
+	subsystems        map[string]subsystemInstanceMetrics
+	jobQueues         map[string]jobQueueInstanceMetrics
+	messageQueues     map[string]messageQueueInstanceMetrics
+	IFSDirectoryUsage map[string]int64
 }
 
 // Per-instance metric structures for stm conversion

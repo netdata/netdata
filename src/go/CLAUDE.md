@@ -701,6 +701,91 @@ type Config struct {
 }
 ```
 
+## Alert Best Practices
+
+### Threshold Selection
+
+Netdata follows specific patterns for alert thresholds:
+
+1. **Avoid fixed thresholds** except for:
+   - Error count metrics (e.g., deadlocks > 0)
+   - Status/state metrics (e.g., backup failed = 1)
+   - Long-running operations (e.g., queries > X seconds)
+
+2. **Preferred approaches**:
+   - **Rolling windows with predictions**: Compare current values to predicted normal ranges
+   - **Dynamic baselines**: Use historical data to establish normal behavior
+   - **Percentile-based thresholds**: Adapt to workload patterns
+   - **Rate of change detection**: Alert on sudden spikes or drops
+
+3. **Examples of good thresholds**:
+   ```
+   # Using predictions (preferred)
+   warn: $this > (($1h_min_value * 2) + ($1h_average * 2))
+   
+   # Using rolling averages
+   warn: $this > ($10m_average * 1.5)
+   
+   # Rate of change
+   warn: abs($this - $1m_average) > ($1h_average * 0.2)
+   ```
+
+4. **Examples of acceptable fixed thresholds**:
+   ```
+   # Errors/failures (should be zero)
+   warn: $this > 0
+   
+   # Binary status (0 = OK, 1 = failed)
+   warn: $this == 1
+   
+   # Time-based (queries taking too long)
+   warn: $this > 5000  # 5 seconds
+   ```
+
+### Alert Severity and Routing
+
+1. **Silent alerts**: Use `to: silent` for alerts that don't require immediate human action
+   - Performance degradation that's not critical
+   - Utilization approaching limits but not critical
+   - Informational alerts for capacity planning
+
+2. **Non-silent alerts**: Only for issues requiring immediate action
+   - Service failures
+   - Critical resource exhaustion
+   - Data corruption risks
+   - Security breaches
+
+3. **Alert routing example**:
+   ```yaml
+   # Silent alert - won't wake anyone at 3AM
+   template: db2_buffer_pool_hit_ratio_low
+   to: silent
+   
+   # Critical alert - requires immediate attention
+   template: db2_deadlock_critical
+   to: dba
+   ```
+
+### Alert Configuration Structure
+
+```yaml
+template: collector_metric_condition
+      on: collector.metric
+   class: Utilization|Errors|Latency|Workload|Availability
+    type: System|Database|Web Server|Application
+component: ServiceName
+    calc: $dimension * 100 / $total  # for calculated metrics
+  lookup: average -5m unaligned of dimension  # for time-based
+   units: %|ms|requests|errors
+   every: 10s
+    warn: # warning condition
+    crit: # critical condition
+   delay: down 5m multiplier 1.5 max 1h
+ summary: Short description
+    info: Detailed description with ${value} placeholder
+      to: role|silent
+```
+
 ## Best Practices Summary
 
 1. **Consider cardinality control** for dynamic instances - but not always required
@@ -717,3 +802,5 @@ type Config struct {
 12. **Reuse clients** when possible, reconnect on failure
 13. **Split complex collectors** into multiple collection files
 14. **Be consistent with precision** when converting floats
+15. **Use dynamic thresholds** in alerts instead of fixed values
+16. **Route alerts appropriately** - use silent for non-critical issues
