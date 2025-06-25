@@ -175,6 +175,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_IBM "Enable IBM ecosystem collectors (requires CGO)" False)
 option(ENABLE_PLUGIN_OTEL "Enable metrics collection via OpenTelemetry collector" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -3309,6 +3310,19 @@ if(ENABLE_PLUGIN_GO)
             ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
             COMPONENT plugin-go
             DESTINATION "${BINDIR}")
+endif()
+
+#
+# Build ibm.d.plugin
+#
+
+if(ENABLE_PLUGIN_IBM)
+    include(NetdataIBMPlugin)
+    add_ibm_plugin_target()
+    
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/ibm.d.plugin
+            COMPONENT plugin-ibm
+            DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
 #
