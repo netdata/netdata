@@ -332,7 +332,7 @@ modules:
                 - name: used
             - name: as400.memory_pool_usage
               description: Memory Pool Usage
-              unit: megabytes
+              unit: bytes
               chart_type: stacked
               dimensions:
                 - name: machine
@@ -406,7 +406,7 @@ modules:
                 - name: held
             - name: as400.subsystem_storage
               description: Subsystem Storage Usage
-              unit: megabytes
+              unit: bytes
               chart_type: line
               dimensions:
                 - name: used

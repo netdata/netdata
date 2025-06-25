@@ -43,7 +43,7 @@ var (
 		Ctx:      "db2.bufferpool_hit_ratio",
 		Priority: module.Priority + 200,
 		Dims: module.Dims{
-			{ID: "bufferpool_%s_hit_ratio", Name: "hit_ratio"},
+			{ID: "bufferpool_%s_hit_ratio", Name: "hit_ratio", Div: precision},
 		},
 	}
 
@@ -84,21 +84,21 @@ var (
 		Ctx:      "db2.tablespace_usage",
 		Priority: module.Priority + 300,
 		Dims: module.Dims{
-			{ID: "tablespace_%s_used_percent", Name: "used"},
+			{ID: "tablespace_%s_used_percent", Name: "used", Div: precision},
 		},
 	}
 
 	tablespaceSizeChartTmpl = module.Chart{
 		ID:       "tablespace_%s_size",
 		Title:    "Tablespace %s Size",
-		Units:    "KB",
+		Units:    "bytes",
 		Fam:      "tablespace",
 		Ctx:      "db2.tablespace_size",
 		Priority: module.Priority + 301,
 		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "tablespace_%s_used_size_kb", Name: "used"},
-			{ID: "tablespace_%s_free_size_kb", Name: "free"},
+			{ID: "tablespace_%s_used_size_kb", Name: "used", Mul: 1024},
+			{ID: "tablespace_%s_free_size_kb", Name: "free", Mul: 1024},
 		},
 	}
 

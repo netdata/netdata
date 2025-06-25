@@ -96,7 +96,7 @@ var (
 		Ctx:      "db2.bufferpool_hit_ratio",
 		Priority: module.Priority + 40,
 		Dims: module.Dims{
-			{ID: "bufferpool_hit_ratio", Name: "hit_ratio"},
+			{ID: "bufferpool_hit_ratio", Name: "hit_ratio", Div: precision},
 		},
 	}
 

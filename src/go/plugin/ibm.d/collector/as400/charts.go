@@ -26,7 +26,7 @@ var (
 		Ctx:      "as400.cpu_utilization",
 		Priority: module.Priority,
 		Dims: module.Dims{
-			{ID: "cpu_percentage", Name: "utilization"},
+			{ID: "cpu_percentage", Name: "utilization", Div: precision},
 		},
 	}
 
@@ -50,23 +50,23 @@ var (
 		Ctx:      "as400.system_asp_usage",
 		Priority: module.Priority + 20,
 		Dims: module.Dims{
-			{ID: "system_asp_used", Name: "used"},
+			{ID: "system_asp_used", Name: "used", Div: precision},
 		},
 	}
 
 	memoryPoolUsageChart = module.Chart{
 		ID:       "memory_pool_usage",
 		Title:    "Memory Pool Usage",
-		Units:    "megabytes",
+		Units:    "bytes",
 		Fam:      "memory",
 		Ctx:      "as400.memory_pool_usage",
 		Priority: module.Priority + 30,
 		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "machine_pool_size", Name: "machine", Div: 1048576}, // Convert to MB
-			{ID: "base_pool_size", Name: "base", Div: 1048576},
-			{ID: "interactive_pool_size", Name: "interactive", Div: 1048576},
-			{ID: "spool_pool_size", Name: "spool", Div: 1048576},
+			{ID: "machine_pool_size", Name: "machine"},
+			{ID: "base_pool_size", Name: "base"},
+			{ID: "interactive_pool_size", Name: "interactive"},
+			{ID: "spool_pool_size", Name: "spool"},
 		},
 	}
 
@@ -78,7 +78,7 @@ var (
 		Ctx:      "as400.disk_busy",
 		Priority: module.Priority + 40,
 		Dims: module.Dims{
-			{ID: "disk_busy_percentage", Name: "busy"},
+			{ID: "disk_busy_percentage", Name: "busy", Div: precision},
 		},
 	}
 

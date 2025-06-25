@@ -12,6 +12,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
+const precision = 1000 // Precision multiplier for floating-point values
+
 func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	if a.db == nil {
 		db, err := a.initDatabase(ctx)
@@ -126,11 +128,11 @@ func (a *AS400) collectSystemStatus(ctx context.Context) error {
 		switch column {
 		case "AVERAGE_CPU_UTILIZATION":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CPUPercentage = int64(v)
+				a.mx.CPUPercentage = int64(v * precision)
 			}
 		case "SYSTEM_ASP_USED":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.SystemASPUsed = int64(v)
+				a.mx.SystemASPUsed = int64(v * precision)
 			}
 		case "ACTIVE_JOBS_IN_SYSTEM":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -181,7 +183,7 @@ func (a *AS400) collectDiskStatus(ctx context.Context) error {
 	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		if column == "AVG_DISK_BUSY" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.DiskBusyPercentage = int64(v)
+				a.mx.DiskBusyPercentage = int64(v * precision)
 			}
 		}
 	})
@@ -310,7 +312,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 			if currentUnit != "" && a.disks[currentUnit] != nil {
 				disk := a.disks[currentUnit]
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					disk.busyPercent = int64(v)
+					disk.busyPercent = int64(v * precision)
 					a.mx.disks[currentUnit] = diskInstanceMetrics{
 						BusyPercent: disk.busyPercent,
 					}
