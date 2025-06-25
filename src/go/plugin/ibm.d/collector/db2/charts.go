@@ -15,6 +15,9 @@ var (
 		rowActivityChart.Copy(),
 		bufferpoolHitRatioChart.Copy(),
 		logSpaceChart.Copy(),
+		longRunningQueriesChart.Copy(),
+		backupStatusChart.Copy(),
+		backupAgeChart.Copy(),
 	}
 )
 
@@ -111,6 +114,46 @@ var (
 		Dims: module.Dims{
 			{ID: "log_used_space", Name: "used"},
 			{ID: "log_available_space", Name: "available"},
+		},
+	}
+
+	longRunningQueriesChart = module.Chart{
+		ID:       "long_running_queries",
+		Title:    "Long Running Queries",
+		Units:    "queries",
+		Fam:      "performance",
+		Ctx:      "db2.long_running_queries",
+		Priority: module.Priority + 60,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "long_running_queries", Name: "total"},
+			{ID: "long_running_queries_warning", Name: "warning"},
+			{ID: "long_running_queries_critical", Name: "critical"},
+		},
+	}
+
+	backupStatusChart = module.Chart{
+		ID:       "backup_status",
+		Title:    "Last Backup Status",
+		Units:    "status",
+		Fam:      "backup",
+		Ctx:      "db2.backup_status",
+		Priority: module.Priority + 70,
+		Dims: module.Dims{
+			{ID: "last_backup_status", Name: "status"},
+		},
+	}
+
+	backupAgeChart = module.Chart{
+		ID:       "backup_age",
+		Title:    "Time Since Last Backup",
+		Units:    "hours",
+		Fam:      "backup",
+		Ctx:      "db2.backup_age",
+		Priority: module.Priority + 71,
+		Dims: module.Dims{
+			{ID: "last_full_backup_age", Name: "full"},
+			{ID: "last_incremental_backup_age", Name: "incremental"},
 		},
 	}
 )

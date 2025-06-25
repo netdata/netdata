@@ -25,6 +25,16 @@ type metricsData struct {
 	LogUsedSpace      int64 `stm:"log_used_space"`
 	LogAvailableSpace int64 `stm:"log_available_space"`
 
+	// Long-running queries
+	LongRunningQueries        int64 `stm:"long_running_queries"`
+	LongRunningQueriesWarning int64 `stm:"long_running_queries_warning"`
+	LongRunningQueriesCritical int64 `stm:"long_running_queries_critical"`
+
+	// Backup status
+	LastFullBackupAge      int64 `stm:"last_full_backup_age"`      // hours
+	LastIncrementalBackupAge int64 `stm:"last_incremental_backup_age"` // hours
+	LastBackupStatus       int64 `stm:"last_backup_status"`       // 0=success, 1=failed
+
 	// Per-instance metrics
 	databases   map[string]databaseInstanceMetrics
 	bufferpools map[string]bufferpoolInstanceMetrics

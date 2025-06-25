@@ -65,6 +65,21 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		return nil, fmt.Errorf("failed to collect job info: %v", err)
 	}
 
+	// Collect job type breakdown
+	if err := a.collectJobTypeBreakdown(ctx); err != nil {
+		a.Warningf("failed to collect job type breakdown: %v", err)
+	}
+
+	// Collect IFS usage
+	if err := a.collectIFSUsage(ctx); err != nil {
+		a.Warningf("failed to collect IFS usage: %v", err)
+	}
+
+	// Collect message queue depths
+	if err := a.collectMessageQueues(ctx); err != nil {
+		a.Warningf("failed to collect message queues: %v", err)
+	}
+
 	// Collect per-instance metrics if enabled
 	if a.CollectDiskMetrics {
 		if err := a.collectDiskInstances(ctx); err != nil {
@@ -628,4 +643,109 @@ func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
 	})
 
 	return count, err
+}
+
+func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
+	query := `
+		SELECT 
+			JOB_TYPE,
+			COUNT(*) as COUNT
+		FROM TABLE(QSYS2.ACTIVE_JOB_INFO()) X
+		GROUP BY JOB_TYPE
+	`
+
+	// Reset job type counts
+	a.mx.BatchJobs = 0
+	a.mx.InteractiveJobs = 0
+	a.mx.SystemJobs = 0
+	a.mx.SpooledJobs = 0
+	a.mx.OtherJobs = 0
+
+	var currentJobType string
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "JOB_TYPE":
+			// Store current job type for next COUNT value
+			currentJobType = value
+		case "COUNT":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				switch currentJobType {
+				case "BAT":
+					a.mx.BatchJobs = v
+				case "INT":
+					a.mx.InteractiveJobs = v
+				case "SYS":
+					a.mx.SystemJobs = v
+				case "WTR", "RDR":
+					a.mx.SpooledJobs += v
+				default:
+					a.mx.OtherJobs += v
+				}
+			}
+		}
+	})
+}
+
+func (a *AS400) collectIFSUsage(ctx context.Context) error {
+	query := `
+		SELECT 
+			COUNT(*) as FILE_COUNT,
+			SUM(DATA_SIZE) as TOTAL_SIZE,
+			SUM(ALLOCATED_SIZE) as ALLOCATED_SIZE
+		FROM TABLE(QSYS2.IFS_OBJECT_STATISTICS(
+			START_PATH_NAME => '/',
+			SUBTREE_DIRECTORIES => 'YES',
+			OBJECT_TYPE_LIST => '*STMF'
+		)) X
+	`
+
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "FILE_COUNT":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.IFSFileCount = v
+			}
+		case "TOTAL_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.IFSTotalSize = v
+			}
+		case "ALLOCATED_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.IFSUsedSize = v
+			}
+		}
+	})
+}
+
+func (a *AS400) collectMessageQueues(ctx context.Context) error {
+	// Collect system message queue depth
+	query := `
+		SELECT 
+			MESSAGE_QUEUE_NAME,
+			MESSAGE_QUEUE_LIBRARY,
+			NUMBER_OF_MESSAGES
+		FROM QSYS2.MESSAGE_QUEUE_INFO
+		WHERE (MESSAGE_QUEUE_NAME = 'QSYSMSG' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
+		   OR (MESSAGE_QUEUE_NAME = 'QSYSOPR' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
+	`
+
+	var currentQueue string
+	var currentLib string
+	
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "MESSAGE_QUEUE_NAME":
+			currentQueue = value
+		case "MESSAGE_QUEUE_LIBRARY":
+			currentLib = value
+		case "NUMBER_OF_MESSAGES":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if currentQueue == "QSYSMSG" && currentLib == "QSYS" {
+					a.mx.SystemMessageQueueDepth = v
+				} else if currentQueue == "QSYSOPR" && currentLib == "QSYS" {
+					a.mx.QSYSOPRMessageQueueDepth = v
+				}
+			}
+		}
+	})
 }

@@ -58,12 +58,13 @@ func New() *AS400 {
 			JobQueueSelector:  "",
 		},
 
-		charts:     baseCharts.Copy(),
-		once:       &sync.Once{},
-		mx:         &metricsData{},
-		disks:      make(map[string]*diskMetrics),
-		subsystems: make(map[string]*subsystemMetrics),
-		jobQueues:  make(map[string]*jobQueueMetrics),
+		charts:        baseCharts.Copy(),
+		once:          &sync.Once{},
+		mx:            &metricsData{},
+		disks:         make(map[string]*diskMetrics),
+		subsystems:    make(map[string]*subsystemMetrics),
+		jobQueues:     make(map[string]*jobQueueMetrics),
+		messageQueues: make(map[string]*messageQueueMetrics),
 	}
 }
 
@@ -102,9 +103,10 @@ type AS400 struct {
 	mx   *metricsData
 
 	// Instance tracking
-	disks      map[string]*diskMetrics
-	subsystems map[string]*subsystemMetrics
-	jobQueues  map[string]*jobQueueMetrics
+	disks         map[string]*diskMetrics
+	subsystems    map[string]*subsystemMetrics
+	jobQueues     map[string]*jobQueueMetrics
+	messageQueues map[string]*messageQueueMetrics
 
 	// Selectors
 	diskSelector      matcher.Matcher
