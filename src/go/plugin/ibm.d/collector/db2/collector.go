@@ -187,7 +187,7 @@ func (d *DB2) Charts() *module.Charts {
 }
 
 func (d *DB2) Collect(ctx context.Context) map[string]int64 {
-	mx, err := d.collect()
+	mx, err := d.collect(ctx)
 	if err != nil {
 		d.Error(err)
 	}
