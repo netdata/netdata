@@ -681,9 +681,6 @@ endperm:
 
 static void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
-    if (!mi->conn)
-        return;
-
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     SQLLEN col_data_len = 0;
 
@@ -1188,7 +1185,6 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
 
     if(mi->conn && mi->conn->is_connected && collecting) {
         collecting = metdata_mssql_check_permission(mi);
-        /*
         if (!collecting) {
             nd_log(
                 NDLS_COLLECTORS,
@@ -1199,10 +1195,8 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
+            // collecting = dict_mssql_fill_waits(mi);
         }
-
-        collecting = dict_mssql_fill_waits(mi);
-         */
     }
 
     return 1;
@@ -1247,10 +1241,6 @@ static int netdata_parse_mssql_options()
         last = curr;
         counter++;
     }
-    nd_log(
-            NDLS_COLLECTORS,
-            NDLP_ERR,
-            "KILLME COUNTER %d", counter);
     return counter;
 }
 
@@ -2623,9 +2613,9 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_sql_statistics,
         do_mssql_access_methods,
 
+        do_mssql_databases,
         // Data Get with queries
         /*
-        do_mssql_databases,
         do_mssql_locks,
         do_mssql_waits,
          */
@@ -2635,7 +2625,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
 
     static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
 
-    for (i = 0; doMSSQL[i]; i++) {
+    for (i = 0; i < NETDATA_MSSQL_DATABASE; i++) {
         if (!collect_perflib[i])
             continue;
 
@@ -2657,11 +2647,9 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
     if (!mi->conn)
         return 1;
 
-    /*
-    for (i = NETDATA_MSSQL_DATABASE; i < NETDATA_MSSQL_METRICS_END; i++) {
+    for (i = NETDATA_MSSQL_DATABASE; doMSSQL[i]; i++) {
         doMSSQL[i](NULL, mi, *update_every);
     }
-     */
 
     return 1;
 }
