@@ -112,11 +112,78 @@
         "default": ""
       },
       "collect_connections_matching": {
-        "title": "Connection selector",
-        "description": "Pattern to filter connections by application name. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: '*jdbc*' for JDBC connections, '*java*|*python*' for Java or Python apps.",
-        "type": "string",
-        "default": ""
-      },
+          "type": "string",
+          "title": "Collect connections matching",
+          "description": "Pattern to filter connections by application name. Supports wildcards (*, ?) and multiple patterns separated by |."
+        },
+        "collect_table_metrics": {
+          "type": "boolean",
+          "title": "Collect table metrics",
+          "description": "Enable collection of per-table metrics.",
+          "default": false
+        },
+        "max_tables": {
+          "type": "integer",
+          "title": "Max tables",
+          "description": "Maximum number of tables to monitor.",
+          "default": 50
+        },
+        "collect_tables_matching": {
+          "type": "string",
+          "title": "Collect tables matching",
+          "description": "Pattern to filter tables (schema.table). Supports wildcards (*, ?) and multiple patterns."
+        },
+        "collect_index_metrics": {
+          "type": "boolean",
+          "title": "Collect index metrics",
+          "description": "Enable collection of per-index metrics.",
+          "default": false
+        },
+        "max_indexes": {
+          "type": "integer",
+          "title": "Max indexes",
+          "description": "Maximum number of indexes to monitor.",
+          "default": 100
+        },
+        "collect_indexes_matching": {
+          "type": "string",
+          "title": "Collect indexes matching",
+          "description": "Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns."
+        },
+        "collect_table_metrics": {
+          "type": "boolean",
+          "title": "Collect table metrics",
+          "description": "Enable collection of per-table metrics.",
+          "default": false
+        },
+        "max_tables": {
+          "type": "integer",
+          "title": "Max tables",
+          "description": "Maximum number of tables to monitor.",
+          "default": 50
+        },
+        "collect_tables_matching": {
+          "type": "string",
+          "title": "Collect tables matching",
+          "description": "Pattern to filter tables (schema.table). Supports wildcards (*, ?) and multiple patterns."
+        },
+        "collect_index_metrics": {
+          "type": "boolean",
+          "title": "Collect index metrics",
+          "description": "Enable collection of per-index metrics.",
+          "default": false
+        },
+        "max_indexes": {
+          "type": "integer",
+          "title": "Max indexes",
+          "description": "Maximum number of indexes to monitor.",
+          "default": 100
+        },
+        "collect_indexes_matching": {
+          "type": "string",
+          "title": "Collect indexes matching",
+          "description": "Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns."
+        },
       "vnode": {
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
