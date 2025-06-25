@@ -11,37 +11,51 @@ This plugin provides monitoring for:
 
 Unlike other Netdata collectors, this plugin requires CGO compilation and IBM DB2 client libraries because it uses the native IBM database drivers.
 
-## Quick Start
+## Installation
 
-### Prerequisites
+### Package Installation (Recommended)
 
-1. **Go 1.19 or later** with CGO support
-2. **GCC compiler** (for CGO compilation)
-3. **IBM DB2 client libraries** with development headers
+The IBM plugin is available as a separate package:
 
-### Building the Plugin
-
-The easiest way to build the plugin is using the provided build script:
-
+**DEB-based systems (Ubuntu, Debian):**
 ```bash
-cd /usr/src/netdata-ktsaou.git/src/go/plugin/ibm.d
-./build-ibm-plugin.sh
+sudo apt-get install netdata-plugin-ibm
 ```
 
-This script will:
-1. Download the IBM DB2 CLI driver with headers
-2. Set up the proper build environment
-3. Compile the plugin with CGO enabled
-4. Provide installation instructions
+**RPM-based systems (RHEL, CentOS, Fedora):**
+```bash
+sudo yum install netdata-plugin-ibm
+# or
+sudo dnf install netdata-plugin-ibm
+```
 
-### Installation
+The package installation will automatically download and install the required IBM DB2 client libraries.
 
-After building, install the plugin:
+### Static Installation
+
+For static Netdata installations:
 
 ```bash
-sudo cp ibm.d.plugin /usr/libexec/netdata/plugins.d/
-sudo chmod +x /usr/libexec/netdata/plugins.d/ibm.d.plugin
+# Download and install IBM libraries
+sudo /opt/netdata/usr/libexec/netdata/install-ibm-libs.sh
+
+# The plugin should already be installed with Netdata
 ```
+
+### Building from Source
+
+To build Netdata with IBM plugin support:
+
+```bash
+# Configure with IBM plugin enabled
+cmake -DENABLE_PLUGIN_IBM=On ..
+
+# Build and install
+make
+sudo make install
+```
+
+The build process will automatically download the required IBM headers.
 
 ### Configuration
 
@@ -111,28 +125,39 @@ go build -o ibm.d.plugin ./cmd/ibmdplugin
 
 ## Runtime Configuration
 
-### Environment Variables
+### Library Paths
 
-The plugin requires these environment variables at runtime:
+The plugin is built with RPATH to automatically find IBM libraries in these locations:
+- `/usr/lib/netdata/ibm-clidriver/lib` (system packages)
+- `/opt/netdata/lib/netdata/ibm-clidriver/lib` (static installations)
+- Relative to the plugin location (portable installations)
 
-```bash
-export IBM_DB_HOME=/path/to/clidriver
-export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
-```
+### Manual Library Installation
 
-### Systemd Configuration
-
-For systemd-managed Netdata, add to the service file:
+If automatic installation fails, you can manually install the libraries:
 
 ```bash
-sudo systemctl edit netdata
+# Determine the correct directory based on your installation
+INSTALL_DIR="/usr/lib/netdata/ibm-clidriver"  # For system packages
+# or
+INSTALL_DIR="/opt/netdata/lib/netdata/ibm-clidriver"  # For static installations
+
+# Download and extract
+sudo mkdir -p "$INSTALL_DIR"
+cd "$INSTALL_DIR"
+sudo wget https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz
+sudo tar -xzf linuxx64_odbc_cli.tar.gz
+sudo mv clidriver/* .
+sudo rmdir clidriver
+sudo rm linuxx64_odbc_cli.tar.gz
 ```
 
-Add:
-```ini
-[Service]
-Environment="IBM_DB_HOME=/path/to/clidriver"
-Environment="LD_LIBRARY_PATH=/path/to/clidriver/lib"
+### Environment Variables (Optional)
+
+If you need to override the built-in library paths:
+
+```bash
+export LD_LIBRARY_PATH=/custom/path/to/ibm-clidriver/lib:$LD_LIBRARY_PATH
 ```
 
 ### Docker Configuration
