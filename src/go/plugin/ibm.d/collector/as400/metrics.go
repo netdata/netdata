@@ -21,7 +21,7 @@ type metricsData struct {
 
 	// Aggregate disk metrics
 	DiskBusyPercentage int64 `stm:"disk_busy_percentage"`
-	
+
 	// Per-instance metrics (not included in stm)
 	disks      map[string]diskInstanceMetrics
 	subsystems map[string]subsystemInstanceMetrics
