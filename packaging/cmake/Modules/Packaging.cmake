@@ -82,6 +82,10 @@ if(ENABLE_PLUGIN_GO)
         list(APPEND _main_deps "netdata-plugin-go")
 endif()
 
+if(ENABLE_PLUGIN_IBM)
+        list(APPEND _main_deps "netdata-plugin-ibm")
+endif()
+
 if(ENABLE_PLUGIN_DEBUGFS)
         list(APPEND _main_deps "netdata-plugin-debugfs")
 endif()
@@ -308,6 +312,30 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
 #
+# ibm.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-IBM_DESCRIPTION
+		"The IBM ecosystem metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics from IBM
+ systems including AS/400 (IBM i), DB2 databases, and WebSphere
+ application servers. It requires IBM DB2 client libraries which
+ will be downloaded automatically on first run.")
+
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_NAME "netdata-plugin-ibm")
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONFLICTS "netdata (<< 1.40)")
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_PREDEPENDS "adduser")
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SUGGESTS "libxml2")
+
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-ibm/preinst;"
+	  "${PKG_FILES_PATH}/deb/plugin-ibm/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-IBM_DEBUGINFO_PACKAGE Off)
+
+#
 # network-viewer.plugin
 #
 
@@ -530,6 +558,9 @@ if(ENABLE_PLUGIN_FREEIPMI)
 endif()
 if(ENABLE_PLUGIN_GO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-go")
+endif()
+if(ENABLE_PLUGIN_IBM)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm")
 endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")
