@@ -18,9 +18,10 @@ func (d *DB2) addDatabaseCharts(db *databaseMetrics) {
 }
 
 func (d *DB2) removeDatabaseCharts(name string) {
+	cleanName := cleanName(name)
 	chartPrefixes := []string{
-		fmt.Sprintf("database_%s_status", name),
-		fmt.Sprintf("database_%s_applications", name),
+		fmt.Sprintf("database_%s_status", cleanName),
+		fmt.Sprintf("database_%s_applications", cleanName),
 	}
 	
 	for _, prefix := range chartPrefixes {
@@ -41,10 +42,11 @@ func (d *DB2) addBufferpoolCharts(bp *bufferpoolMetrics) {
 }
 
 func (d *DB2) removeBufferpoolCharts(name string) {
+	cleanName := cleanName(name)
 	chartPrefixes := []string{
-		fmt.Sprintf("bufferpool_%s_hit_ratio", name),
-		fmt.Sprintf("bufferpool_%s_io", name),
-		fmt.Sprintf("bufferpool_%s_pages", name),
+		fmt.Sprintf("bufferpool_%s_hit_ratio", cleanName),
+		fmt.Sprintf("bufferpool_%s_io", cleanName),
+		fmt.Sprintf("bufferpool_%s_pages", cleanName),
 	}
 	
 	for _, prefix := range chartPrefixes {
@@ -65,9 +67,10 @@ func (d *DB2) addTablespaceCharts(ts *tablespaceMetrics) {
 }
 
 func (d *DB2) removeTablespaceCharts(name string) {
+	cleanName := cleanName(name)
 	chartPrefixes := []string{
-		fmt.Sprintf("tablespace_%s_usage", name),
-		fmt.Sprintf("tablespace_%s_size", name),
+		fmt.Sprintf("tablespace_%s_usage", cleanName),
+		fmt.Sprintf("tablespace_%s_size", cleanName),
 	}
 	
 	for _, prefix := range chartPrefixes {
@@ -88,9 +91,10 @@ func (d *DB2) addConnectionCharts(conn *connectionMetrics) {
 }
 
 func (d *DB2) removeConnectionCharts(id string) {
+	cleanID := cleanName(id)
 	chartPrefixes := []string{
-		fmt.Sprintf("connection_%s_state", id),
-		fmt.Sprintf("connection_%s_activity", id),
+		fmt.Sprintf("connection_%s_state", cleanID),
+		fmt.Sprintf("connection_%s_activity", cleanID),
 	}
 	
 	for _, prefix := range chartPrefixes {
