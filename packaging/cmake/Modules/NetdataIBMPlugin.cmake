@@ -87,11 +87,11 @@ macro(add_ibm_plugin_target)
             GOROOT=${GO_ROOT} 
             CGO_ENABLED=1 
             CGO_CFLAGS="-I${IBM_CLIDRIVER_DIR}/include"
-            CGO_LDFLAGS="-L${IBM_CLIDRIVER_DIR}/lib -Wl,-rpath,'$ORIGIN/../../../lib/netdata/ibm-clidriver/lib' -Wl,-rpath,/opt/netdata/lib/netdata/ibm-clidriver/lib -Wl,-rpath,/usr/lib/netdata/ibm-clidriver/lib"
+            CGO_LDFLAGS="-L${IBM_CLIDRIVER_DIR}/lib"
             IBM_DB_HOME="${IBM_CLIDRIVER_DIR}"
             LD_LIBRARY_PATH="${IBM_CLIDRIVER_DIR}/lib:$LD_LIBRARY_PATH"
             GOPROXY=https://proxy.golang.org,direct 
-            "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS}" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
+            "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS} -extldflags '-Wl,-rpath,\$ORIGIN/../../../lib/netdata/ibm-clidriver/lib -Wl,-rpath,${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/ibm-clidriver/lib'" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
         DEPENDS ${IBM_PLUGIN_DEPS}
         COMMENT "Building ibm.d.plugin (with CGO)"
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
