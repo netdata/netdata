@@ -167,7 +167,7 @@ func (a *AS400) Charts() *module.Charts {
 }
 
 func (a *AS400) Collect(ctx context.Context) map[string]int64 {
-	mx, err := a.collect()
+	mx, err := a.collect(ctx)
 	if err != nil {
 		a.Error(err)
 	}
