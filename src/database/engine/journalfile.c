@@ -486,14 +486,10 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    uv_fs_t req;
-    ret = uv_fs_close(NULL, &req, file, NULL);
-    if (ret < 0) {
-        journalfile_v1_generate_path(datafile, path, sizeof(path));
-        netdata_log_error("DBENGINE: uv_fs_close(\"%s\"): %s", path, uv_strerror(ret));
-        ctx_fs_error(datafile_ctx(datafile));
-    }
-    uv_fs_req_cleanup(&req);
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    journalfile_v1_generate_path(datafile, path, sizeof(path));
+
+    CLOSE_FILE(ctx, path, file, ret);
     return ret;
 }
 
@@ -1533,7 +1529,6 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile)
 {
-    uv_fs_t req;
     uv_file file;
     int ret, fd, error;
     uint64_t file_size, max_id;
@@ -1609,11 +1604,6 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     return 0;
 
 cleanup:
-    ret = uv_fs_close(NULL, &req, file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(\"%s\"): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    CLOSE_FILE(ctx, path, file, ret);
     return error;
 }
