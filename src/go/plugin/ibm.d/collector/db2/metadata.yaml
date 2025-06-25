@@ -355,7 +355,7 @@ modules:
                 - name: used
             - name: db2.tablespace_size
               description: Tablespace Size
-              unit: KB
+              unit: bytes
               chart_type: stacked
               dimensions:
                 - name: used

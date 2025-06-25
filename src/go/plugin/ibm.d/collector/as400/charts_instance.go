@@ -18,7 +18,7 @@ var (
 		Ctx:      "as400.disk_busy",
 		Priority: module.Priority + 100,
 		Dims: module.Dims{
-			{ID: "disk_%s_busy_percent", Name: "busy"},
+			{ID: "disk_%s_busy_percent", Name: "busy", Div: precision},
 		},
 	}
 
@@ -80,12 +80,12 @@ var (
 	subsystemStorageChartTmpl = module.Chart{
 		ID:       "subsystem_%s_storage",
 		Title:    "Subsystem %s Storage Usage",
-		Units:    "MB",
+		Units:    "bytes",
 		Fam:      "subsystem",
 		Ctx:      "as400.subsystem_storage",
 		Priority: module.Priority + 201,
 		Dims: module.Dims{
-			{ID: "subsystem_%s_storage_used_kb", Name: "used", Div: 1024},
+			{ID: "subsystem_%s_storage_used_kb", Name: "used", Mul: 1024},
 		},
 	}
 
