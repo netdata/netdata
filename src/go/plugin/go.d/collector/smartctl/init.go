@@ -60,14 +60,19 @@ func (c *Collector) initNdsudoSmartctlCli() (smartctlCli, error) {
 }
 
 func (c *Collector) initDirectSmartctlCli() (smartctlCli, error) {
-	// Check if smartctl is available in PATH
 	smartctlPath, err := exec.LookPath("smartctl")
 	if err != nil {
-		return nil, fmt.Errorf("smartctl executable not found in PATH: %v", err)
+		if runtime.GOOS != "windows" {
+			return nil, fmt.Errorf("smartctl executable not found in PATH: %v", err)
+		}
+		defaultWinPath := filepath.Join("C:\\Program Files\\smartmontools\\bin", "smartctl.exe")
+		if _, err := os.Stat(defaultWinPath); err != nil {
+			return nil, fmt.Errorf("smartctl executable not found in PATH or default location: %v", err)
+		}
+		smartctlPath = defaultWinPath
 	}
 
 	c.Debugf("found smartctl at: %s", smartctlPath)
-
-	smartctlExec := newDirectSmartctlCli(c.Timeout.Duration(), c.Logger)
+	smartctlExec := newDirectSmartctlCli(smartctlPath, c.Timeout.Duration(), c.Logger)
 	return smartctlExec, nil
 }

@@ -74,13 +74,15 @@ func (e *ndsudoSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 type directSmartctlCli struct {
 	*logger.Logger
 
-	timeout time.Duration
+	smartctlPath string
+	timeout      time.Duration
 }
 
-func newDirectSmartctlCli(timeout time.Duration, log *logger.Logger) *directSmartctlCli {
+func newDirectSmartctlCli(smartctlPath string, timeout time.Duration, log *logger.Logger) *directSmartctlCli {
 	return &directSmartctlCli{
-		Logger:  log,
-		timeout: timeout,
+		Logger:       log,
+		smartctlPath: smartctlPath,
+		timeout:      timeout,
 	}
 }
 
@@ -107,7 +109,7 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "smartctl", args...)
+	cmd := exec.CommandContext(ctx, e.smartctlPath, args...)
 	e.Debugf("executing '%s'", cmd)
 
 	bs, err := cmd.Output()
