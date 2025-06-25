@@ -92,6 +92,35 @@
         "type": "integer",
         "minimum": 0,
         "default": 200
+      },
+      "collect_databases_matching": {
+        "title": "Database selector",
+        "description": "Pattern to filter databases. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'PROD*' for production databases, '*TEST*|*DEV*' for test or dev databases.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_bufferpools_matching": {
+        "title": "Bufferpool selector",
+        "description": "Pattern to filter buffer pools. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'IBMSYSTEM*' for system buffer pools.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_tablespaces_matching": {
+        "title": "Tablespace selector",
+        "description": "Pattern to filter tablespaces. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'USER*' for user tablespaces, '*TEMP*' for temporary tablespaces.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_connections_matching": {
+        "title": "Connection selector",
+        "description": "Pattern to filter connections by application name. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: '*jdbc*' for JDBC connections, '*java*|*python*' for Java or Python apps.",
+        "type": "string",
+        "default": ""
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -151,6 +180,9 @@
     },
     "max_db_life_time": {
       "ui:help": "Accepts any duration syntax, e.g. '10m', '1h'"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     }
   }
 }

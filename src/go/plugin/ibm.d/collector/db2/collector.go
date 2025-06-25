@@ -8,9 +8,11 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
@@ -62,6 +64,7 @@ func New() *DB2 {
 }
 
 type Config struct {
+	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
@@ -80,6 +83,12 @@ type Config struct {
 	MaxBufferpools int `yaml:"max_bufferpools,omitempty" json:"max_bufferpools"`
 	MaxTablespaces int `yaml:"max_tablespaces,omitempty" json:"max_tablespaces"`
 	MaxConnections int `yaml:"max_connections,omitempty" json:"max_connections"`
+	
+	// Selectors for filtering
+	DatabaseSelector   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
+	BufferpoolSelector string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching"`
+	TablespaceSelector string `yaml:"collect_tablespaces_matching,omitempty" json:"collect_tablespaces_matching"`
+	ConnectionSelector string `yaml:"collect_connections_matching,omitempty" json:"collect_connections_matching"`
 }
 
 type DB2 struct {
@@ -98,6 +107,12 @@ type DB2 struct {
 	tablespaces map[string]*tablespaceMetrics
 	connections map[string]*connectionMetrics
 	
+	// Selectors
+	databaseSelector   matcher.Matcher
+	bufferpoolSelector matcher.Matcher
+	tablespaceSelector matcher.Matcher
+	connectionSelector matcher.Matcher
+	
 	// DB2 version info
 	version    string
 	edition    string // LUW, z/OS, i
@@ -115,16 +130,49 @@ func (d *DB2) Configuration() any {
 	return d.Config
 }
 
-func (d *DB2) Init(context.Context) error {
+func (d *DB2) Init(ctx context.Context) error {
 	if d.DSN == "" {
 		return errors.New("dsn required but not set")
+	}
+
+	// Initialize selectors
+	if d.DatabaseSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.DatabaseSelector)
+		if err != nil {
+			return fmt.Errorf("invalid database selector pattern '%s': %v", d.DatabaseSelector, err)
+		}
+		d.databaseSelector = m
+	}
+	
+	if d.BufferpoolSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.BufferpoolSelector)
+		if err != nil {
+			return fmt.Errorf("invalid bufferpool selector pattern '%s': %v", d.BufferpoolSelector, err)
+		}
+		d.bufferpoolSelector = m
+	}
+	
+	if d.TablespaceSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.TablespaceSelector)
+		if err != nil {
+			return fmt.Errorf("invalid tablespace selector pattern '%s': %v", d.TablespaceSelector, err)
+		}
+		d.tablespaceSelector = m
+	}
+	
+	if d.ConnectionSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.ConnectionSelector)
+		if err != nil {
+			return fmt.Errorf("invalid connection selector pattern '%s': %v", d.ConnectionSelector, err)
+		}
+		d.connectionSelector = m
 	}
 
 	return nil
 }
 
-func (d *DB2) Check(context.Context) error {
-	mx, err := d.collect()
+func (d *DB2) Check(ctx context.Context) error {
+	mx, err := d.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -138,7 +186,7 @@ func (d *DB2) Charts() *module.Charts {
 	return d.charts
 }
 
-func (d *DB2) Collect(context.Context) map[string]int64 {
+func (d *DB2) Collect(ctx context.Context) map[string]int64 {
 	mx, err := d.collect()
 	if err != nil {
 		d.Error(err)
@@ -167,7 +215,7 @@ func (d *DB2) verifyConfig() error {
 	return nil
 }
 
-func (d *DB2) initDatabase() (*sql.DB, error) {
+func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 	db, err := sql.Open("go_ibm_db", d.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
@@ -176,13 +224,32 @@ func (d *DB2) initDatabase() (*sql.DB, error) {
 	db.SetMaxOpenConns(d.MaxDbConns)
 	db.SetConnMaxLifetime(time.Duration(d.MaxDbLifeTime))
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(d.Timeout))
+	pingCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := db.PingContext(pingCtx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("error pinging database: %v", err)
 	}
 
 	return db, nil
+}
+
+func (d *DB2) ping(ctx context.Context) error {
+	pingCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
+	return d.db.PingContext(pingCtx)
+}
+
+func cleanName(name string) string {
+	r := strings.NewReplacer(
+		" ", "_",
+		".", "_",
+		"-", "_",
+		"/", "_",
+		":", "_",
+		"=", "_",
+	)
+	return strings.ToLower(r.Replace(name))
 }

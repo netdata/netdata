@@ -79,21 +79,26 @@
       },
       "collect_disks_matching": {
         "title": "Disk selector",
-        "description": "SQL LIKE pattern to filter disks (e.g., 'DD%' for disks starting with DD).",
+        "description": "Pattern to filter disks. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'DD*' for disks starting with DD, '*SSD*|*NVMe*' for SSD or NVMe disks.",
         "type": "string",
         "default": ""
       },
       "collect_subsystems_matching": {
         "title": "Subsystem selector",
-        "description": "SQL LIKE pattern to filter subsystems (e.g., 'QINTER' for interactive subsystem).",
+        "description": "Pattern to filter subsystems. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'QINTER' for interactive subsystem, 'Q*' for all Q subsystems.",
         "type": "string",
         "default": ""
       },
       "collect_job_queues_matching": {
         "title": "Job queue selector",
-        "description": "SQL LIKE pattern to filter job queues (e.g., 'QBATCH%').",
+        "description": "Pattern to filter job queues. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: 'QBATCH*' for batch queues, '*PROD*|*TEST*' for prod or test queues.",
         "type": "string",
         "default": ""
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -146,6 +151,9 @@
     },
     "dsn": {
       "ui:widget": "password"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     }
   }
 }

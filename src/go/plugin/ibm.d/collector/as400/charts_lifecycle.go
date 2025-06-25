@@ -18,7 +18,7 @@ func (a *AS400) addDiskCharts(disk *diskMetrics) {
 }
 
 func (a *AS400) removeDiskCharts(disk *diskMetrics) {
-	prefix := fmt.Sprintf("disk_%s_", disk.unit)
+	prefix := fmt.Sprintf("disk_%s_", cleanName(disk.unit))
 	for _, chart := range *a.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
@@ -36,7 +36,7 @@ func (a *AS400) addSubsystemCharts(subsystem *subsystemMetrics) {
 }
 
 func (a *AS400) removeSubsystemCharts(subsystem *subsystemMetrics) {
-	prefix := fmt.Sprintf("subsystem_%s_", subsystem.name)
+	prefix := fmt.Sprintf("subsystem_%s_", cleanName(subsystem.name))
 	for _, chart := range *a.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
@@ -54,7 +54,7 @@ func (a *AS400) addJobQueueCharts(jobQueue *jobQueueMetrics, key string) {
 }
 
 func (a *AS400) removeJobQueueCharts(key string) {
-	prefix := fmt.Sprintf("jobqueue_%s_", key)
+	prefix := fmt.Sprintf("jobqueue_%s_", cleanName(key))
 	for _, chart := range *a.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()

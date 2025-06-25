@@ -13,16 +13,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-func (d *DB2) collect() (map[string]int64, error) {
+func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	if d.db == nil {
-		db, err := d.initDatabase()
+		db, err := d.initDatabase(ctx)
 		if err != nil {
 			return nil, err
 		}
 		d.db = db
 		
 		// Detect DB2 version on first connection
-		if err := d.detectVersion(); err != nil {
+		if err := d.detectVersion(ctx); err != nil {
 			d.Warningf("failed to detect DB2 version: %v", err)
 		} else {
 			d.Infof("detected DB2 version: %s edition: %s", d.version, d.edition)
@@ -37,32 +37,53 @@ func (d *DB2) collect() (map[string]int64, error) {
 		connections: make(map[string]connectionInstanceMetrics),
 	}
 
+	// Test connection with a ping before proceeding
+	if err := d.ping(ctx); err != nil {
+		// Try to reconnect once
+		d.Cleanup(ctx)
+		db, err := d.initDatabase(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reconnect to database: %v", err)
+		}
+		d.db = db
+		
+		// Retry ping
+		if err := d.ping(ctx); err != nil {
+			return nil, fmt.Errorf("database connection failed after reconnect: %v", err)
+		}
+		
+		// Re-detect version after reconnect
+		if err := d.detectVersion(ctx); err != nil {
+			d.Warningf("failed to detect DB2 version after reconnect: %v", err)
+		}
+	}
+	
 	// Collect global metrics
-	if err := d.collectGlobalMetrics(); err != nil {
+	if err := d.collectGlobalMetrics(ctx); err != nil {
 		return nil, fmt.Errorf("failed to collect global metrics: %v", err)
 	}
 
 	// Collect per-instance metrics if enabled
 	if d.CollectDatabaseMetrics {
-		if err := d.collectDatabaseInstances(); err != nil {
+		if err := d.collectDatabaseInstances(ctx); err != nil {
 			d.Errorf("failed to collect database instances: %v", err)
 		}
 	}
 
 	if d.CollectBufferpoolMetrics {
-		if err := d.collectBufferpoolInstances(); err != nil {
+		if err := d.collectBufferpoolInstances(ctx); err != nil {
 			d.Errorf("failed to collect bufferpool instances: %v", err)
 		}
 	}
 
 	if d.CollectTablespaceMetrics {
-		if err := d.collectTablespaceInstances(); err != nil {
+		if err := d.collectTablespaceInstances(ctx); err != nil {
 			d.Errorf("failed to collect tablespace instances: %v", err)
 		}
 	}
 
 	if d.CollectConnectionMetrics {
-		if err := d.collectConnectionInstances(); err != nil {
+		if err := d.collectConnectionInstances(ctx); err != nil {
 			d.Errorf("failed to collect connection instances: %v", err)
 		}
 	}
@@ -75,33 +96,37 @@ func (d *DB2) collect() (map[string]int64, error) {
 	
 	// Add per-instance metrics
 	for name, metrics := range d.mx.databases {
+		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("database_%s_%s", name, k)] = v
+			mx[fmt.Sprintf("database_%s_%s", cleanName, k)] = v
 		}
 	}
 	
 	for name, metrics := range d.mx.bufferpools {
+		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("bufferpool_%s_%s", name, k)] = v
+			mx[fmt.Sprintf("bufferpool_%s_%s", cleanName, k)] = v
 		}
 	}
 	
 	for name, metrics := range d.mx.tablespaces {
+		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("tablespace_%s_%s", name, k)] = v
+			mx[fmt.Sprintf("tablespace_%s_%s", cleanName, k)] = v
 		}
 	}
 	
 	for id, metrics := range d.mx.connections {
+		cleanID := cleanName(id)
 		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("connection_%s_%s", id, k)] = v
+			mx[fmt.Sprintf("connection_%s_%s", cleanID, k)] = v
 		}
 	}
 
 	return mx, nil
 }
 
-func (d *DB2) detectVersion() error {
+func (d *DB2) detectVersion(ctx context.Context) error {
 	// Try SYSIBMADM.ENV_INST_INFO (works on LUW)
 	query := `SELECT SERVICE_LEVEL, HOST_NAME, INST_NAME FROM SYSIBMADM.ENV_INST_INFO`
 	
@@ -139,7 +164,7 @@ func (d *DB2) detectVersion() error {
 	return fmt.Errorf("unable to detect DB2 version")
 }
 
-func (d *DB2) collectGlobalMetrics() error {
+func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	// Connection counts - works across all DB2 versions
 	query := `
 		SELECT 
@@ -149,7 +174,7 @@ func (d *DB2) collectGlobalMetrics() error {
 		FROM SYSIBMADM.APPLICATIONS
 	`
 	
-	err := d.doQuery(query, func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_CONNS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -172,7 +197,7 @@ func (d *DB2) collectGlobalMetrics() error {
 	if err != nil {
 		// Try simpler query for older versions
 		simpleQuery := `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS`
-		if err2 := d.doQuerySingleValue(simpleQuery, &d.mx.ConnTotal); err2 != nil {
+		if err2 := d.doQuerySingleValue(ctx, simpleQuery, &d.mx.ConnTotal); err2 != nil {
 			return fmt.Errorf("failed to get connection count: %v", err)
 		}
 	}
@@ -195,7 +220,7 @@ func (d *DB2) collectGlobalMetrics() error {
 	return nil
 }
 
-func (d *DB2) collectLockMetrics() error {
+func (d *DB2) collectLockMetrics(ctx context.Context) error {
 	query := `
 		SELECT 
 			LOCK_WAITS,
@@ -209,7 +234,7 @@ func (d *DB2) collectLockMetrics() error {
 		FROM SYSIBMADM.SNAPDB
 	`
 	
-	return d.doQuery(query, func(column, value string, lineEnd bool) {
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
@@ -236,7 +261,7 @@ func (d *DB2) collectLockMetrics() error {
 	})
 }
 
-func (d *DB2) collectBufferpoolAggregateMetrics() error {
+func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 	query := `
 		SELECT 
 			CASE 
@@ -248,10 +273,10 @@ func (d *DB2) collectBufferpoolAggregateMetrics() error {
 		FROM SYSIBMADM.SNAPBP
 	`
 	
-	return d.doQuerySingleValue(query, &d.mx.BufferpoolHitRatio)
+	return d.doQuerySingleValue(ctx, query, &d.mx.BufferpoolHitRatio)
 }
 
-func (d *DB2) collectLogSpaceMetrics() error {
+func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
 	query := `
 		SELECT 
 			TOTAL_LOG_USED,
@@ -259,7 +284,7 @@ func (d *DB2) collectLogSpaceMetrics() error {
 		FROM SYSIBMADM.LOG_UTILIZATION
 	`
 	
-	return d.doQuery(query, func(column, value string, lineEnd bool) {
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
@@ -274,11 +299,11 @@ func (d *DB2) collectLogSpaceMetrics() error {
 	})
 }
 
-func (d *DB2) doQuery(query string, assign func(column, value string, lineEnd bool)) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(d.Timeout))
+func (d *DB2) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
 
-	rows, err := d.db.QueryContext(ctx, query)
+	rows, err := d.db.QueryContext(queryCtx, query)
 	if err != nil {
 		return err
 	}
@@ -287,9 +312,12 @@ func (d *DB2) doQuery(query string, assign func(column, value string, lineEnd bo
 	return d.readRows(rows, assign)
 }
 
-func (d *DB2) doQuerySingleValue(query string, target *int64) error {
+func (d *DB2) doQuerySingleValue(ctx context.Context, query string, target *int64) error {
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
 	var value sql.NullInt64
-	err := d.db.QueryRow(query).Scan(&value)
+	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
 	if err != nil {
 		return err
 	}

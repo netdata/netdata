@@ -115,15 +115,16 @@ func newDiskCharts(disk *diskMetrics) *module.Charts {
 		diskAvgTimeChartTmpl.Copy(),
 	}
 
+	cleanUnit := cleanName(disk.unit)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, disk.unit)
+		chart.ID = fmt.Sprintf(chart.ID, cleanUnit)
 		chart.Labels = []module.Label{
 			{Key: "disk_unit", Value: disk.unit},
 			{Key: "disk_type", Value: disk.typeField},
 			{Key: "disk_model", Value: disk.model},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, disk.unit)
+			dim.ID = fmt.Sprintf(dim.ID, cleanUnit)
 		}
 	}
 
@@ -136,15 +137,16 @@ func newSubsystemCharts(subsystem *subsystemMetrics) *module.Charts {
 		subsystemStorageChartTmpl.Copy(),
 	}
 
+	cleanSubsystem := cleanName(subsystem.name)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, subsystem.name)
+		chart.ID = fmt.Sprintf(chart.ID, cleanSubsystem)
 		chart.Labels = []module.Label{
 			{Key: "subsystem", Value: subsystem.name},
 			{Key: "library", Value: subsystem.library},
 			{Key: "status", Value: subsystem.status},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, subsystem.name)
+			dim.ID = fmt.Sprintf(dim.ID, cleanSubsystem)
 		}
 	}
 
@@ -156,15 +158,16 @@ func newJobQueueCharts(jobQueue *jobQueueMetrics, key string) *module.Charts {
 		jobQueueLengthChartTmpl.Copy(),
 	}
 
+	cleanKey := cleanName(key)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, key)
+		chart.ID = fmt.Sprintf(chart.ID, cleanKey)
 		chart.Labels = []module.Label{
 			{Key: "job_queue", Value: jobQueue.name},
 			{Key: "library", Value: jobQueue.library},
 			{Key: "status", Value: jobQueue.status},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, key)
+			dim.ID = fmt.Sprintf(dim.ID, cleanKey)
 		}
 	}
 

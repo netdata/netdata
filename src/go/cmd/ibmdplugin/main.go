@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
-	"path/filepath"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -18,9 +17,10 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
-	// Register AS/400 and DB2 collectors that require CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"
+	// Register IBM ecosystem collectors
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"    // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"      // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere" // Pure Go
 )
 
 const pluginName = "ibm.d.plugin"

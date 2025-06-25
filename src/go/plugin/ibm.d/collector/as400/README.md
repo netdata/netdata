@@ -1,31 +1,10 @@
 # IBM AS/400 (IBM i) collector
 
-## Important: Build Requirements
+## Requirements
 
-**This collector requires CGO** because the IBM DB2 driver needs to link with IBM DB2 client libraries.
-
-The collector is part of the **ibm.d.plugin** which is built separately from the main go.d.plugin.
-
-### Building ibm.d.plugin
-
-```bash
-# 1. Install IBM DB2 client libraries first
-# Download from IBM website and install
-
-# 2. Set environment variables
-export IBM_DB_HOME=/path/to/db2/client
-export CGO_CFLAGS="-I$IBM_DB_HOME/include"
-export CGO_LDFLAGS="-L$IBM_DB_HOME/lib"
-export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
-
-# 3. Build the plugin
-cd /path/to/netdata/src/go
-CGO_ENABLED=1 go build -o ibm.d.plugin ./cmd/ibmdplugin
-
-# 4. Install the plugin
-sudo cp ibm.d.plugin /usr/libexec/netdata/plugins.d/
-sudo chmod +x /usr/libexec/netdata/plugins.d/ibm.d.plugin
-```
+- IBM DB2 client libraries installed (required for AS/400 connectivity)
+- Database user with SELECT permissions on QSYS2 schema tables
+- Network connectivity to AS/400 system on DB2 port (typically 446)
 
 ## Overview
 
@@ -82,14 +61,6 @@ It collects:
 
 ## Configuration
 
-Edit the `go.d/as400.conf` configuration file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata   # Replace this path with your Netdata config directory, if different
-sudo ./edit-config go.d/as400.conf
-```
-
 Example configurations:
 
 ### Basic connection
@@ -124,13 +95,12 @@ jobs:
 jobs:
   - name: as400_selective
     dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
-    # Use SQL LIKE patterns to filter instances
-    collect_disks_matching: '%SSD%'        # Only SSD disks
+    # Use pattern matching to filter instances (supports wildcards)
+    collect_disks_matching: '*SSD*'        # Only SSD disks
     collect_subsystems_matching: 'QINTER'  # Only interactive subsystem
-    collect_job_queues_matching: 'QBATCH%' # Only batch queues
+    collect_job_queues_matching: 'QBATCH*' # Only batch queues
 ```
 
-For all available options, see the [module configuration file](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/as400/config_schema.json).
 
 ## Prerequisites
 
@@ -220,40 +190,25 @@ GRANT SELECT ON QSYS2.JOB_QUEUE_INFO TO monitor_user;
 
 ### Debug Mode
 
-To troubleshoot issues with the `as400` collector, run the `go.d.plugin` with the debug option enabled.
+To troubleshoot connection and data collection issues:
 
-First, navigate to your plugins directory, usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case on
-your system, open `netdata.conf` and look for the setting `plugins directory`.
+1. Test the DB2 connection using the db2cli tool:
+   ```bash
+   $IBM_DB_HOME/bin/db2cli validate -dsn "DATABASE=;HOSTNAME=your-as400;PORT=446;PROTOCOL=TCPIP;UID=your-user;PWD=your-password"
+   ```
 
-```bash
-cd /usr/libexec/netdata/plugins.d/
-```
+2. Check if the monitoring user has proper permissions
 
-Switch to the `netdata` user with the proper environment:
+3. Verify network connectivity to the AS/400 system on port 446
 
-```bash
-sudo -u netdata -s
-export IBM_DB_HOME=/path/to/clidriver
-export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
-```
+### Verify DB2 Client Installation
 
-Run the `go.d.plugin` to debug the collector:
+Check if the IBM DB2 client libraries are properly installed:
 
 ```bash
-./go.d.plugin -d -m as400
-```
-
-### Verify Library Installation
-
-Check if the DB2 libraries are properly installed:
-
-```bash
-# Check if libraries are found
-ldd ./go.d.plugin | grep db2
-
 # List DB2 client libraries
 ls -la $IBM_DB_HOME/lib/
 
-# Test with db2cli
-$IBM_DB_HOME/bin/db2cli validate -database bludb -host your-host -port your-port -user your-user -passwd your-password
+# Test connectivity with db2cli
+$IBM_DB_HOME/bin/db2cli validate -database "" -host your-as400-host -port 446 -user your-user -passwd your-password
 ```
