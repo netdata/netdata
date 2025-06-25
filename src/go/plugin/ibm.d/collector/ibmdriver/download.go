@@ -54,12 +54,20 @@ func GetDriverPath() (string, error) {
 
 // EnsureDriver checks if the driver is installed and downloads it if necessary
 func EnsureDriver() error {
+	// First check if libraries are installed system-wide (by package manager)
+	systemDriverPath := "/usr/lib/netdata/ibm-clidriver"
+	if dirExists(filepath.Join(systemDriverPath, "lib")) {
+		// System-installed libraries found, use them
+		return nil
+	}
+	
+	// Fall back to user-writable location
 	driverPath, err := GetDriverPath()
 	if err != nil {
 		return err
 	}
 	
-	// Check if driver already exists
+	// Check if driver already exists in var lib
 	clidriverPath := filepath.Join(driverPath, "clidriver")
 	libPath := filepath.Join(clidriverPath, "lib")
 	includePath := filepath.Join(clidriverPath, "include")
@@ -87,13 +95,23 @@ func EnsureDriver() error {
 
 // SetupEnvironment sets the required environment variables
 func SetupEnvironment() error {
-	driverPath, err := GetDriverPath()
-	if err != nil {
-		return err
+	// First check if libraries are installed system-wide
+	systemDriverPath := "/usr/lib/netdata/ibm-clidriver"
+	var clidriverPath string
+	
+	if dirExists(filepath.Join(systemDriverPath, "lib")) {
+		// Use system-installed libraries
+		clidriverPath = systemDriverPath
+	} else {
+		// Use var lib location
+		driverPath, err := GetDriverPath()
+		if err != nil {
+			return err
+		}
+		clidriverPath = filepath.Join(driverPath, "clidriver")
 	}
 	
-	// Set IBM_DB_HOME to the clidriver subdirectory
-	clidriverPath := filepath.Join(driverPath, "clidriver")
+	// Set IBM_DB_HOME
 	os.Setenv("IBM_DB_HOME", clidriverPath)
 	
 	// Update LD_LIBRARY_PATH (or equivalent on other platforms)

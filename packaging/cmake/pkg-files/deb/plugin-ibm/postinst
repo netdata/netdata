@@ -2,11 +2,56 @@
 
 set -e
 
+download_ibm_libs() {
+    DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
+    DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
+    
+    # Check if already installed
+    if [ -f "$DRIVER_DIR/lib/libdb2.so" ]; then
+        return 0
+    fi
+    
+    echo "Downloading IBM DB2 client libraries..."
+    
+    # Create directory
+    mkdir -p "$DRIVER_DIR"
+    cd "$DRIVER_DIR"
+    
+    # Download
+    if command -v wget >/dev/null 2>&1; then
+        wget -q -O clidriver.tar.gz "$DRIVER_URL" || return 1
+    elif command -v curl >/dev/null 2>&1; then
+        curl -sL -o clidriver.tar.gz "$DRIVER_URL" || return 1
+    else
+        echo "ERROR: Neither wget nor curl found. Cannot download IBM libraries."
+        return 1
+    fi
+    
+    # Extract
+    tar -xzf clidriver.tar.gz || return 1
+    rm -f clidriver.tar.gz
+    
+    # Move clidriver contents to parent directory
+    if [ -d "clidriver" ]; then
+        mv clidriver/* .
+        rmdir clidriver
+    fi
+    
+    echo "IBM DB2 client libraries installed successfully."
+    return 0
+}
+
 case "$1" in
   configure|reconfigure)
     chown root:netdata /usr/libexec/netdata/plugins.d/ibm.d.plugin
     chmod 0750 /usr/libexec/netdata/plugins.d/ibm.d.plugin
-    # IBM plugin doesn't need special capabilities
+    
+    # Try to download IBM libraries
+    if ! download_ibm_libs; then
+        echo "WARNING: Failed to download IBM DB2 libraries."
+        echo "The ibm.d.plugin will not work until libraries are installed."
+        echo "You can manually download them to: /usr/lib/netdata/ibm-clidriver/"
+    fi
     ;;
 esac
 
