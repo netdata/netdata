@@ -23,7 +23,7 @@ func (d *DB2) removeDatabaseCharts(name string) {
 		fmt.Sprintf("database_%s_status", cleanName),
 		fmt.Sprintf("database_%s_applications", cleanName),
 	}
-	
+
 	for _, prefix := range chartPrefixes {
 		if chart := d.charts.Get(prefix); chart != nil {
 			chart.MarkRemove()
@@ -48,7 +48,7 @@ func (d *DB2) removeBufferpoolCharts(name string) {
 		fmt.Sprintf("bufferpool_%s_io", cleanName),
 		fmt.Sprintf("bufferpool_%s_pages", cleanName),
 	}
-	
+
 	for _, prefix := range chartPrefixes {
 		if chart := d.charts.Get(prefix); chart != nil {
 			chart.MarkRemove()
@@ -72,7 +72,7 @@ func (d *DB2) removeTablespaceCharts(name string) {
 		fmt.Sprintf("tablespace_%s_usage", cleanName),
 		fmt.Sprintf("tablespace_%s_size", cleanName),
 	}
-	
+
 	for _, prefix := range chartPrefixes {
 		if chart := d.charts.Get(prefix); chart != nil {
 			chart.MarkRemove()
@@ -96,7 +96,7 @@ func (d *DB2) removeConnectionCharts(id string) {
 		fmt.Sprintf("connection_%s_state", cleanID),
 		fmt.Sprintf("connection_%s_activity", cleanID),
 	}
-	
+
 	for _, prefix := range chartPrefixes {
 		if chart := d.charts.Get(prefix); chart != nil {
 			chart.MarkRemove()
@@ -120,7 +120,7 @@ var (
 func (d *DB2) cleanupStaleInstances() {
 	now := time.Now()
 	staleTimeout := time.Minute * 5
-	
+
 	// Mark current instances as seen
 	for name := range d.mx.databases {
 		if _, exists := databaseUpdates[name]; !exists {
@@ -128,28 +128,28 @@ func (d *DB2) cleanupStaleInstances() {
 		}
 		databaseUpdates[name].lastSeen = now
 	}
-	
+
 	for name := range d.mx.bufferpools {
 		if _, exists := bufferpoolUpdates[name]; !exists {
 			bufferpoolUpdates[name] = &instanceUpdate{}
 		}
 		bufferpoolUpdates[name].lastSeen = now
 	}
-	
+
 	for name := range d.mx.tablespaces {
 		if _, exists := tablespaceUpdates[name]; !exists {
 			tablespaceUpdates[name] = &instanceUpdate{}
 		}
 		tablespaceUpdates[name].lastSeen = now
 	}
-	
+
 	for id := range d.mx.connections {
 		if _, exists := connectionUpdates[id]; !exists {
 			connectionUpdates[id] = &instanceUpdate{}
 		}
 		connectionUpdates[id].lastSeen = now
 	}
-	
+
 	// Remove stale instances
 	for name, update := range databaseUpdates {
 		if now.Sub(update.lastSeen) > staleTimeout {
@@ -158,7 +158,7 @@ func (d *DB2) cleanupStaleInstances() {
 			delete(databaseUpdates, name)
 		}
 	}
-	
+
 	for name, update := range bufferpoolUpdates {
 		if now.Sub(update.lastSeen) > staleTimeout {
 			delete(d.bufferpools, name)
@@ -166,7 +166,7 @@ func (d *DB2) cleanupStaleInstances() {
 			delete(bufferpoolUpdates, name)
 		}
 	}
-	
+
 	for name, update := range tablespaceUpdates {
 		if now.Sub(update.lastSeen) > staleTimeout {
 			delete(d.tablespaces, name)
@@ -174,7 +174,7 @@ func (d *DB2) cleanupStaleInstances() {
 			delete(tablespaceUpdates, name)
 		}
 	}
-	
+
 	for id, update := range connectionUpdates {
 		if now.Sub(update.lastSeen) > staleTimeout {
 			delete(d.connections, id)
