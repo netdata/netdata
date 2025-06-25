@@ -3181,6 +3181,11 @@ if(ENABLE_PLUGIN_IBM)
             src/go/plugin/ibm.d/config/ibm.d/websphere.conf
             COMPONENT plugin-ibm
             DESTINATION ${NETDATA_CONFIG_PREFIX}/conf.d/ibm.d)
+    
+    # Install IBM library download script
+    install(PROGRAMS packaging/installer/install-ibm-libs.sh
+            COMPONENT plugin-ibm
+            DESTINATION ${NETDATA_LIBEXEC_PREFIX})
 endif()
 
 #

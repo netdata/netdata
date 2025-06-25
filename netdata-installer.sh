@@ -209,6 +209,8 @@ USAGE: ${PROGRAM} [options]
   --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
   --disable-plugin-go        Disable the Go plugin.
   --disable-go               Disable all Go components.
+  --enable-plugin-ibm        Enable the IBM ecosystem plugin (requires CGO). Default: Disabled.
+  --disable-plugin-ibm       Disable the IBM ecosystem plugin.
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
@@ -257,6 +259,7 @@ LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_GO=1
+ENABLE_IBM=0
 ENABLE_PYTHON=1
 ENABLE_CHARTS=1
 ENABLE_OTEL=0
@@ -288,6 +291,8 @@ while [ -n "${1}" ]; do
     "--enable-plugin-go") ENABLE_GO=1 ;;
     "--disable-plugin-go") ENABLE_GO=0 ;;
     "--disable-go") ENABLE_GO=0 ;;
+    "--enable-plugin-ibm") ENABLE_IBM=1 ;;
+    "--disable-plugin-ibm") ENABLE_IBM=0 ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
     "--enable-plugin-charts") ENABLE_CHARTS=1 ;;
@@ -552,6 +557,21 @@ if [ "${ENABLE_GO}" -eq 1 ]; then
   if ! ensure_go_toolchain; then
     warning "Go ${GOLANG_MIN_VERSION} needed to build Go plugin, but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}"
     ENABLE_GO=0
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# If we're installing the IBM plugin, ensure CGO is available
+if [ "${ENABLE_IBM}" -eq 1 ]; then
+  if [ "${ENABLE_GO}" -eq 0 ]; then
+    warning "IBM plugin requires Go plugin to be enabled. Disabling IBM plugin."
+    ENABLE_IBM=0
+  else
+    # Check for a C compiler for CGO
+    if ! command -v gcc >/dev/null 2>&1 && ! command -v clang >/dev/null 2>&1; then
+      warning "IBM plugin requires a C compiler (gcc or clang) for CGO. Disabling IBM plugin."
+      ENABLE_IBM=0
+    fi
   fi
 fi
 
@@ -1012,6 +1032,16 @@ if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
   echo >&2
 else
   install_netdata_service || run_failed "Cannot install netdata init service."
+fi
+
+# -----------------------------------------------------------------------------
+# If IBM plugin is enabled, try to download IBM libraries
+if [ ${ENABLE_IBM} -eq 1 ] && [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh" ]; then
+  progress "Downloading IBM DB2 client libraries for IBM plugin"
+  if ! NETDATA_PREFIX="${NETDATA_PREFIX}" run "${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh"; then
+    warning "Failed to download IBM DB2 client libraries. The IBM plugin will not work until libraries are installed."
+    warning "You can manually run: NETDATA_PREFIX=\"${NETDATA_PREFIX}\" ${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh"
+  fi
 fi
 
 # -----------------------------------------------------------------------------
