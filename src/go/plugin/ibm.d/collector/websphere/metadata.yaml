@@ -268,7 +268,7 @@ modules:
           metrics:
             - name: websphere.jvm_heap_usage
               description: JVM Heap Usage
-              unit: MiB
+              unit: bytes
               chart_type: stacked
               dimensions:
                 - name: used
@@ -315,13 +315,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: requests
-            - name: websphere.web_errors
-              description: Web Errors
-              unit: errors/s
-              chart_type: line
-              dimensions:
-                - name: 4xx
-                - name: 5xx
         - name: thread_pool
           description: These metrics refer to a specific thread pool.
           labels:
