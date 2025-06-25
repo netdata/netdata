@@ -1,0 +1,357 @@
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: websphere_mp
+      monitored_instance:
+        name: IBM WebSphere Liberty MicroProfile Metrics
+        link: https://www.ibm.com/docs/en/was-liberty/core?topic=liberty-microprofile-metrics
+        categories:
+          - data-collection.apm
+        icon_filename: "websphere.svg"
+      alternative_monitored_instances: []
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - websphere
+        - liberty
+        - microprofile
+        - metrics
+        - prometheus
+        - java
+        - jvm
+        - application server
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors IBM WebSphere Liberty servers with MicroProfile Metrics enabled.
+          It collects comprehensive metrics including JVM performance, REST endpoint statistics,
+          MicroProfile health and configuration metrics, and custom application-defined metrics.
+        method_description: |
+          The collector uses MicroProfile Metrics API to gather metrics in Prometheus format
+          from the `/metrics` endpoint. This provides detailed performance data including
+          JVM statistics, REST endpoint timing and throughput, and application-specific metrics.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector does not auto-detect WebSphere Liberty instances. Manual configuration is required.
+        limits:
+          description: |
+            The collector limits the number of monitored dynamic instances to prevent high cardinality:
+            - REST endpoints: 50 (configurable)
+            - Custom metrics: 100 (configurable)
+        performance_impact:
+          description: |
+            The collector makes HTTP requests to the MicroProfile Metrics endpoint. Impact depends on
+            the number of monitored metrics and collection frequency. REST and custom metrics
+            create dynamic charts which may impact dashboard performance.
+    setup:
+      prerequisites:
+        list:
+          - title: Enable MicroProfile Metrics
+            description: |
+              Ensure MicroProfile Metrics is enabled in your Liberty server.xml:
+              ```xml
+              <featureManager>
+                  <feature>mpMetrics-4.0</feature>
+              </featureManager>
+              ```
+          - title: Configure metrics endpoint access
+            description: |
+              Ensure the /metrics endpoint is accessible and properly secured:
+              ```xml
+              <mpMetrics authentication="false" />
+              ```
+              Or configure authentication for the monitoring user.
+          - title: Create monitoring user
+            description: |
+              Create a user with appropriate permissions to access metrics:
+              - Reader role is sufficient for metrics access
+              - Administrator role provides full access
+          - title: IBM DB2 libraries (for ibm.d.plugin)
+            description: |
+              Since this collector is part of ibm.d.plugin, IBM DB2 client libraries must be installed
+              and LD_LIBRARY_PATH must be configured.
+      configuration:
+        file:
+          name: ibm.d/websphere_mp.conf
+        options:
+          description: |
+            The following options can be defined globally, or per job in the `jobs` section.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: url
+              description: WebSphere Liberty server URL.
+              default_value: https://localhost:9443
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 10
+              required: false
+            - name: username
+              description: Username for basic authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic authentication.
+              default_value: ""
+              required: false
+            - name: metrics_endpoint
+              description: MicroProfile Metrics endpoint path.
+              default_value: /metrics
+              required: false
+            - name: collect_jvm_metrics
+              description: Enable JVM metrics collection.
+              default_value: true
+              required: false
+            - name: collect_rest_metrics
+              description: Enable REST endpoint metrics collection.
+              default_value: true
+              required: false
+            - name: collect_mp_metrics
+              description: Enable MicroProfile-specific metrics collection.
+              default_value: true
+              required: false
+            - name: collect_custom_metrics
+              description: Enable custom application metrics collection.
+              default_value: false
+              required: false
+            - name: max_rest_endpoints
+              description: Maximum number of REST endpoints to monitor.
+              default_value: 50
+              required: false
+            - name: max_custom_metrics
+              description: Maximum number of custom metrics to monitor.
+              default_value: 100
+              required: false
+            - name: collect_rest_matching
+              description: Filter REST endpoints by pattern (supports wildcards).
+              default_value: ""
+              required: false
+            - name: collect_custom_matching
+              description: Filter custom metrics by pattern (supports wildcards).
+              default_value: ""
+              required: false
+            - name: tls_skip_verify
+              description: Skip TLS certificate verification.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Path to CA certificate file.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Path to client certificate file.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Path to client key file.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic MicroProfile server
+              description: Monitor a WebSphere Liberty server with MicroProfile Metrics.
+              config: |
+                jobs:
+                  - name: liberty_mp_local
+                    url: https://localhost:9443
+                    username: admin
+                    password: adminpwd
+            - name: Multiple servers with filtering
+              description: Monitor multiple servers with selective metric collection.
+              config: |
+                jobs:
+                  - name: liberty_mp_prod
+                    url: https://prod.example.com:9443
+                    username: monitor
+                    password: secret
+                    collect_rest_matching: "/api/*"
+                    max_rest_endpoints: 20
+
+                  - name: liberty_mp_test
+                    url: https://test.example.com:9443
+                    username: monitor
+                    password: secret
+                    collect_custom_metrics: true
+                    collect_custom_matching: "myapp_*"
+            - name: With TLS client certificate
+              description: Connect using TLS client certificate authentication.
+              config: |
+                jobs:
+                  - name: liberty_mp_secure
+                    url: https://secure.example.com:9443
+                    tls_cert: /path/to/client.crt
+                    tls_key: /path/to/client.key
+                    tls_ca: /path/to/ca.crt
+            - name: Minimal JVM monitoring
+              description: Collect only JVM metrics without REST or custom metrics.
+              config: |
+                jobs:
+                  - name: liberty_mp_minimal
+                    url: https://localhost:9443
+                    username: admin
+                    password: adminpwd
+                    collect_rest_metrics: false
+                    collect_mp_metrics: false
+                    collect_custom_metrics: false
+      troubleshooting:
+        problems:
+          list:
+            - name: Connection refused
+              description: |
+                Unable to connect to WebSphere Liberty server.
+              resolution: |
+                1. Verify the URL and port are correct
+                2. Check if Liberty is running
+                3. Ensure MicroProfile Metrics feature is enabled
+                4. Check firewall rules
+            - name: 401 Unauthorized
+              description: |
+                Authentication failed when accessing metrics endpoint.
+              resolution: |
+                1. Verify username and password
+                2. Ensure user has reader or administrator role
+                3. Check if metrics endpoint requires authentication
+                4. Verify mpMetrics configuration in server.xml
+            - name: 404 Not Found
+              description: |
+                MicroProfile Metrics endpoint not found.
+              resolution: |
+                1. Verify metrics_endpoint path (default: /metrics)
+                2. Ensure mpMetrics feature is enabled in server.xml
+                3. Check Liberty version supports MicroProfile Metrics
+            - name: No custom metrics
+              description: |
+                Custom application metrics are not being collected.
+              resolution: |
+                1. Verify collect_custom_metrics is enabled
+                2. Check application is publishing metrics correctly
+                3. Verify custom metric names match collect_custom_matching pattern
+                4. Check max_custom_metrics limit
+            - name: Too many REST endpoints
+              description: |
+                REST endpoint metrics are being limited.
+              resolution: |
+                1. Increase max_rest_endpoints value
+                2. Use collect_rest_matching to filter specific endpoints
+                3. Consider if all REST endpoints need monitoring
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        The collector provides comprehensive metrics from MicroProfile Metrics including JVM statistics,
+        REST endpoint performance, MicroProfile component metrics, and custom application metrics.
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire WebSphere Liberty server instance.
+          labels: []
+          metrics:
+            - name: websphere_mp.jvm_memory_heap
+              description: JVM Heap Memory Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: committed
+            - name: websphere_mp.jvm_memory_heap_max
+              description: JVM Heap Memory Maximum
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: max
+            - name: websphere_mp.jvm_gc_collections
+              description: JVM Garbage Collection Count
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: collections
+            - name: websphere_mp.jvm_threads
+              description: JVM Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+                - name: daemon
+                - name: max
+            - name: websphere_mp.jvm_classes
+              description: JVM Loaded Classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: loaded
+                - name: unloaded
+        - name: rest_endpoint
+          description: These metrics refer to specific REST endpoints.
+          labels:
+            - name: method
+              description: HTTP method (GET, POST, etc.)
+            - name: endpoint
+              description: REST endpoint path
+          metrics:
+            - name: websphere_mp.rest_requests
+              description: REST Endpoint Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_mp.rest_timing
+              description: REST Endpoint Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: response_time
+        - name: microprofile_component
+          description: These metrics refer to MicroProfile components.
+          labels:
+            - name: component
+              description: MicroProfile component name
+          metrics:
+            - name: websphere_mp.mp_health
+              description: MicroProfile Health Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: websphere_mp.mp_metrics
+              description: MicroProfile Metrics Component
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: value
+        - name: application
+          description: These metrics refer to custom application metrics.
+          labels:
+            - name: application
+              description: Application name
+            - name: metric_name
+              description: Custom metric name
+          metrics:
+            - name: websphere_mp.application
+              description: Custom Application Metrics
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: value
