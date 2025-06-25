@@ -137,14 +137,15 @@ func newDatabaseCharts(db *databaseMetrics) *module.Charts {
 		databaseApplicationsChartTmpl.Copy(),
 	}
 
+	cleanName := cleanName(db.name)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, db.name)
+		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: "database", Value: db.name},
 			{Key: "status", Value: db.status},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, db.name)
+			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}
 	}
 
@@ -158,14 +159,15 @@ func newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 		bufferpoolPagesChartTmpl.Copy(),
 	}
 
+	cleanName := cleanName(bp.name)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, bp.name)
+		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: "bufferpool", Value: bp.name},
 			{Key: "page_size", Value: fmt.Sprintf("%d", bp.pageSize)},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, bp.name)
+			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}
 	}
 
@@ -178,8 +180,9 @@ func newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 		tablespaceSizeChartTmpl.Copy(),
 	}
 
+	cleanName := cleanName(ts.name)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, ts.name)
+		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: "tablespace", Value: ts.name},
 			{Key: "type", Value: ts.tbspType},
@@ -187,7 +190,7 @@ func newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 			{Key: "state", Value: ts.state},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, ts.name)
+			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}
 	}
 
@@ -200,8 +203,9 @@ func newConnectionCharts(conn *connectionMetrics) *module.Charts {
 		connectionActivityChartTmpl.Copy(),
 	}
 
+	cleanID := cleanName(conn.applicationID)
 	for _, chart := range charts {
-		chart.ID = fmt.Sprintf(chart.ID, conn.applicationID)
+		chart.ID = fmt.Sprintf(chart.ID, cleanID)
 		chart.Labels = []module.Label{
 			{Key: "application_id", Value: conn.applicationID},
 			{Key: "application_name", Value: conn.applicationName},
@@ -210,7 +214,7 @@ func newConnectionCharts(conn *connectionMetrics) *module.Charts {
 			{Key: "state", Value: conn.connectionState},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, conn.applicationID)
+			dim.ID = fmt.Sprintf(dim.ID, cleanID)
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
@@ -64,6 +65,7 @@ func New() *AS400 {
 }
 
 type Config struct {
+	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
@@ -101,6 +103,11 @@ type AS400 struct {
 	subsystems  map[string]*subsystemMetrics
 	jobQueues   map[string]*jobQueueMetrics
 	
+	// Selectors
+	diskSelector      matcher.Matcher
+	subsystemSelector matcher.Matcher
+	jobQueueSelector  matcher.Matcher
+	
 	// System info for labels
 	systemName   string
 	serialNumber string
@@ -111,16 +118,41 @@ func (a *AS400) Configuration() any {
 	return a.Config
 }
 
-func (a *AS400) Init(context.Context) error {
+func (a *AS400) Init(ctx context.Context) error {
 	if a.DSN == "" {
 		return errors.New("dsn required but not set")
+	}
+
+	// Initialize selectors
+	if a.DiskSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(a.DiskSelector)
+		if err != nil {
+			return fmt.Errorf("invalid disk selector pattern '%s': %v", a.DiskSelector, err)
+		}
+		a.diskSelector = m
+	}
+	
+	if a.SubsystemSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(a.SubsystemSelector)
+		if err != nil {
+			return fmt.Errorf("invalid subsystem selector pattern '%s': %v", a.SubsystemSelector, err)
+		}
+		a.subsystemSelector = m
+	}
+	
+	if a.JobQueueSelector != "" {
+		m, err := matcher.NewSimplePatternsMatcher(a.JobQueueSelector)
+		if err != nil {
+			return fmt.Errorf("invalid job queue selector pattern '%s': %v", a.JobQueueSelector, err)
+		}
+		a.jobQueueSelector = m
 	}
 
 	return nil
 }
 
-func (a *AS400) Check(context.Context) error {
-	mx, err := a.collect()
+func (a *AS400) Check(ctx context.Context) error {
+	mx, err := a.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -134,7 +166,7 @@ func (a *AS400) Charts() *module.Charts {
 	return a.charts
 }
 
-func (a *AS400) Collect(context.Context) map[string]int64 {
+func (a *AS400) Collect(ctx context.Context) map[string]int64 {
 	mx, err := a.collect()
 	if err != nil {
 		a.Error(err)
@@ -163,7 +195,7 @@ func (a *AS400) verifyConfig() error {
 	return nil
 }
 
-func (a *AS400) initDatabase() (*sql.DB, error) {
+func (a *AS400) initDatabase(ctx context.Context) (*sql.DB, error) {
 	db, err := sql.Open("go_ibm_db", a.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
@@ -172,10 +204,10 @@ func (a *AS400) initDatabase() (*sql.DB, error) {
 	db.SetMaxOpenConns(a.MaxDbConns)
 	db.SetConnMaxLifetime(time.Duration(a.MaxDbLifeTime))
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(a.Timeout))
+	pingCtx, cancel := context.WithTimeout(ctx, time.Duration(a.Timeout))
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := db.PingContext(pingCtx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("error pinging database: %v", err)
 	}
@@ -196,4 +228,23 @@ func (a *AS400) safeDSN() string {
 		return strings.Join(parts, ";")
 	}
 	return a.DSN
+}
+
+func (a *AS400) ping(ctx context.Context) error {
+	pingCtx, cancel := context.WithTimeout(ctx, time.Duration(a.Timeout))
+	defer cancel()
+	
+	return a.db.PingContext(pingCtx)
+}
+
+func cleanName(name string) string {
+	r := strings.NewReplacer(
+		" ", "_",
+		".", "_",
+		"-", "_",
+		"/", "_",
+		":", "_",
+		"=", "_",
+	)
+	return strings.ToLower(r.Replace(name))
 }

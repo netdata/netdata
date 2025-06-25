@@ -1,0 +1,231 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WebSphere collector configuration",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "url": {
+        "title": "URL",
+        "description": "WebSphere server URL.",
+        "type": "string",
+        "format": "uri",
+        "default": "https://localhost:9443"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "HTTP request timeout, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 5
+      },
+      "username": {
+        "title": "Username",
+        "description": "Username for basic authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password for basic authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "metrics_endpoint": {
+        "title": "Metrics endpoint",
+        "description": "Liberty metrics API endpoint path.",
+        "type": "string",
+        "default": "/ibm/api/metrics"
+      },
+      "cell_name": {
+        "title": "Cell name",
+        "description": "WebSphere cell name (for clustered environments).",
+        "type": "string"
+      },
+      "node_name": {
+        "title": "Node name",
+        "description": "WebSphere node name (for clustered environments).",
+        "type": "string"
+      },
+      "server_name": {
+        "title": "Server name",
+        "description": "WebSphere server name.",
+        "type": "string"
+      },
+      "collect_jvm_metrics": {
+        "title": "Collect JVM metrics",
+        "description": "Enable collection of JVM metrics (heap, GC, threads, classes).",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_threadpool_metrics": {
+        "title": "Collect thread pool metrics",
+        "description": "Enable collection of thread pool metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_connectionpool_metrics": {
+        "title": "Collect connection pool metrics",
+        "description": "Enable collection of connection pool metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_webapp_metrics": {
+        "title": "Collect web application metrics",
+        "description": "Enable collection of web application metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_session_metrics": {
+        "title": "Collect session metrics",
+        "description": "Enable collection of HTTP session metrics.",
+        "type": "boolean",
+        "default": true
+      },
+      "max_threadpools": {
+        "title": "Max thread pools",
+        "description": "Maximum number of thread pools to monitor (0 = unlimited).",
+        "type": "integer",
+        "minimum": 0,
+        "default": 20
+      },
+      "max_connectionpools": {
+        "title": "Max connection pools",
+        "description": "Maximum number of connection pools to monitor (0 = unlimited).",
+        "type": "integer",
+        "minimum": 0,
+        "default": 20
+      },
+      "max_applications": {
+        "title": "Max applications",
+        "description": "Maximum number of applications to monitor (0 = unlimited).",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "collect_apps_matching": {
+        "title": "Collect apps matching",
+        "description": "Pattern to filter applications by name. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: '*myapp*' for apps containing 'myapp', 'prod-*|staging-*' for prod or staging apps.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_pools_matching": {
+        "title": "Collect pools matching",
+        "description": "Pattern to filter pools by name. Supports wildcards (*, ?) and multiple patterns separated by |. Examples: '*jdbc*' for JDBC pools, '*Default*|*Custom*' for default or custom pools.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "Skip TLS certificate verification.",
+        "type": "boolean",
+        "default": false
+      },
+      "tls_ca": {
+        "title": "TLS CA certificate",
+        "description": "Path to CA certificate file.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS client certificate",
+        "description": "Path to client certificate file.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS client key",
+        "description": "Path to client key file.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "url",
+            "timeout",
+            "metrics_endpoint"
+          ]
+        },
+        {
+          "title": "Authentication",
+          "fields": [
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Metrics",
+          "fields": [
+            "collect_jvm_metrics",
+            "collect_threadpool_metrics",
+            "collect_connectionpool_metrics",
+            "collect_webapp_metrics",
+            "collect_session_metrics"
+          ]
+        },
+        {
+          "title": "Filtering",
+          "fields": [
+            "max_threadpools",
+            "max_connectionpools",
+            "max_applications",
+            "collect_apps_matching",
+            "collect_pools_matching"
+          ]
+        },
+        {
+          "title": "Clustering",
+          "fields": [
+            "cell_name",
+            "node_name",
+            "server_name"
+          ]
+        }
+      ]
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., 1.5 for 1.5 seconds)."
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    }
+  }
+}
