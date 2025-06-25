@@ -164,8 +164,12 @@ modules:
               default_value: 20
               required: false
             - name: max_job_queues
-              description: Maximum number of job queues to monitor. Set to 0 for unlimited.
+              description: Maximum number of job queues to monitor.
               default_value: 50
+              required: false
+            - name: ifs_top_n_directories
+              description: Monitor top N IFS directories by size.
+              default_value: 20
               required: false
             - name: collect_disks_matching
               description: SQL LIKE pattern to filter disks.
@@ -392,6 +396,10 @@ modules:
               dimensions:
                 - name: system
                 - name: qsysopr
+            - name: as400.ifs_directory_usage
+              description: IFS Directory Usage
+              unit: bytes
+              chart_type: stacked
         - name: disk
           description: These metrics refer to individual disk units.
           labels:

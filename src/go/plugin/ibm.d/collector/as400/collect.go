@@ -25,9 +25,10 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Reset metrics
 	a.mx = &metricsData{
-		disks:      make(map[string]diskInstanceMetrics),
-		subsystems: make(map[string]subsystemInstanceMetrics),
-		jobQueues:  make(map[string]jobQueueInstanceMetrics),
+		disks:             make(map[string]diskInstanceMetrics),
+		subsystems:        make(map[string]subsystemInstanceMetrics),
+		jobQueues:         make(map[string]jobQueueInstanceMetrics),
+		IFSDirectoryUsage: make(map[string]int64),
 	}
 
 	// Test connection with a ping before proceeding
@@ -73,6 +74,12 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	// Collect IFS usage
 	if err := a.collectIFSUsage(ctx); err != nil {
 		a.Warningf("failed to collect IFS usage: %v", err)
+	}
+
+	if a.IFSTopNDirectories > 0 {
+		if err := a.collectIFSTopNDirectories(ctx); err != nil {
+			a.Warningf("failed to collect IFS top N directories: %v", err)
+		}
 	}
 
 	// Collect message queue depths
@@ -227,6 +234,7 @@ func (a *AS400) doQuery(ctx context.Context, query string, assign func(column, v
 
 	rows, err := a.db.QueryContext(queryCtx, query)
 	if err != nil {
+		a.Errorf("failed to execute query: %s, error: %v", query, err)
 		return err
 	}
 	defer rows.Close()

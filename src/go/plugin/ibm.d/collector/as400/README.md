@@ -61,44 +61,51 @@ It collects:
 
 ## Configuration
 
-Example configurations:
+### DSN Configuration
 
-### Basic connection
+The `dsn` (Data Source Name) string is used to connect to the AS/400 system. Here are some common examples:
+
+**Standard TCP/IP Connection:**
+```yaml
+dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
+```
+
+**SSL Connection (IBM Cloud):**
+```yaml
+dsn: 'DATABASE=bludb;HOSTNAME=your-host.databases.appdomain.cloud;PORT=32211;PROTOCOL=TCPIP;UID=your-uid;PWD=your-pwd;SECURITY=SSL;SSLServerCertificate=/path/to/cert.crt'
+```
+
+**DSN Parameters:**
+
+*   `DATABASE`: The name of the database to connect to (usually blank for AS/400).
+*   `HOSTNAME`: The hostname or IP address of the AS/400 system.
+*   `PORT`: The port number of the DB2 server (usually 446).
+*   `PROTOCOL`: The connection protocol (usually `TCPIP`).
+*   `UID`: The username to connect with.
+*   `PWD`: The password for the specified user.
+*   `SECURITY`: Set to `SSL` to enable SSL/TLS encryption.
+*   `SSLServerCertificate`: The path to the SSL server certificate (if required).
+
+### Example Job Configuration
+
 ```yaml
 jobs:
   - name: as400_production
     dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
     timeout: 5
-```
 
-### SSL connection (IBM Cloud)
-```yaml
-jobs:
-  - name: as400_cloud
-    dsn: 'DATABASE=bludb;HOSTNAME=your-host.databases.appdomain.cloud;PORT=32211;PROTOCOL=TCPIP;UID=your-uid;PWD=your-pwd;SECURITY=SSL;SSLServerCertificate=/path/to/cert.crt'
-    timeout: 5
-```
+    # Monitor top 20 IFS directories by size
+    ifs_top_n_directories: 20
 
-### Cardinality control
-```yaml
-jobs:
-  - name: as400_large_system
-    dsn: 'DATABASE=;HOSTNAME=large.as400.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
-    # Limit per-instance metrics to prevent high cardinality
-    max_disks: 20              # Monitor only first 20 disks
-    max_subsystems: 10         # Monitor only first 10 subsystems
-    collect_job_queue_metrics: false  # Disable job queue metrics
-```
+    # Cardinality control
+    max_disks: 20
+    max_subsystems: 10
+    collect_job_queue_metrics: false
 
-### Filtered collection
-```yaml
-jobs:
-  - name: as400_selective
-    dsn: 'DATABASE=;HOSTNAME=as400.example.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
-    # Use pattern matching to filter instances (supports wildcards)
-    collect_disks_matching: '*SSD*'        # Only SSD disks
-    collect_subsystems_matching: 'QINTER'  # Only interactive subsystem
-    collect_job_queues_matching: 'QBATCH*' # Only batch queues
+    # Filtered collection
+    collect_disks_matching: '*SSD*'
+    collect_subsystems_matching: 'QINTER'
+    collect_job_queues_matching: 'QBATCH*'
 ```
 
 

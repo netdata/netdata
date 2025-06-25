@@ -3,43 +3,34 @@
 package db2
 
 type metricsData struct {
-	// Global metrics
-	ConnTotal     int64 `stm:"conn_total"`
-	ConnActive    int64 `stm:"conn_active"`
-	ConnExecuting int64 `stm:"conn_executing"`
-	ConnIdle      int64 `stm:"conn_idle"`
-
-	LockWaits       int64 `stm:"lock_waits"`
-	LockTimeouts    int64 `stm:"lock_timeouts"`
-	Deadlocks       int64 `stm:"deadlocks"`
+	ConnTotal      int64 `stm:"conn_total"`
+	ConnActive     int64 `stm:"conn_active"`
+	ConnExecuting  int64 `stm:"conn_executing"`
+	ConnIdle       int64 `stm:"conn_idle"`
+	LockWaits      int64 `stm:"lock_waits"`
+	LockTimeouts   int64 `stm:"lock_timeouts"`
+	Deadlocks      int64 `stm:"deadlocks"`
 	LockEscalations int64 `stm:"lock_escalations"`
-
-	TotalSorts    int64 `stm:"total_sorts"`
-	SortOverflows int64 `stm:"sort_overflows"`
-
-	RowsRead     int64 `stm:"rows_read"`
-	RowsModified int64 `stm:"rows_modified"`
-
+	TotalSorts     int64 `stm:"total_sorts"`
+	SortOverflows  int64 `stm:"sort_overflows"`
+	RowsRead       int64 `stm:"rows_read"`
+	RowsModified   int64 `stm:"rows_modified"`
 	BufferpoolHitRatio int64 `stm:"bufferpool_hit_ratio"`
-
 	LogUsedSpace      int64 `stm:"log_used_space"`
 	LogAvailableSpace int64 `stm:"log_available_space"`
-
-	// Long-running queries
-	LongRunningQueries        int64 `stm:"long_running_queries"`
-	LongRunningQueriesWarning int64 `stm:"long_running_queries_warning"`
+	LongRunningQueries         int64 `stm:"long_running_queries"`
+	LongRunningQueriesWarning  int64 `stm:"long_running_queries_warning"`
 	LongRunningQueriesCritical int64 `stm:"long_running_queries_critical"`
+	LastBackupStatus         int64 `stm:"last_backup_status"`
+	LastFullBackupAge        int64 `stm:"last_full_backup_age"`
+	LastIncrementalBackupAge int64 `stm:"last_incremental_backup_age"`
 
-	// Backup status
-	LastFullBackupAge      int64 `stm:"last_full_backup_age"`      // hours
-	LastIncrementalBackupAge int64 `stm:"last_incremental_backup_age"` // hours
-	LastBackupStatus       int64 `stm:"last_backup_status"`       // 0=success, 1=failed
-
-	// Per-instance metrics
 	databases   map[string]databaseInstanceMetrics
 	bufferpools map[string]bufferpoolInstanceMetrics
 	tablespaces map[string]tablespaceInstanceMetrics
 	connections map[string]connectionInstanceMetrics
+	tables      map[string]tableInstanceMetrics
+	indexes     map[string]indexInstanceMetrics
 }
 
 type databaseMetrics struct {
@@ -48,23 +39,9 @@ type databaseMetrics struct {
 	applications int64
 }
 
-type databaseInstanceMetrics struct {
-	Status       int64 `stm:"status"`
-	Applications int64 `stm:"applications"`
-}
-
 type bufferpoolMetrics struct {
 	name     string
 	pageSize int64
-}
-
-type bufferpoolInstanceMetrics struct {
-	HitRatio   int64 `stm:"hit_ratio"`
-	Reads      int64 `stm:"reads"`
-	Writes     int64 `stm:"writes"`
-	PageSize   int64 `stm:"page_size"`
-	TotalPages int64 `stm:"total_pages"`
-	UsedPages  int64 `stm:"used_pages"`
 }
 
 type tablespaceMetrics struct {
@@ -72,6 +49,50 @@ type tablespaceMetrics struct {
 	tbspType    string
 	contentType string
 	state       string
+}
+
+type connectionMetrics struct {
+	applicationID   string
+	applicationName string
+	clientHostname  string
+	clientUser      string
+	connectionState string
+}
+
+type tableMetrics struct {
+	name string
+}
+
+type indexMetrics struct {
+	name string
+}
+
+func (d *DB2) getTableMetrics(name string) *tableMetrics {
+	if _, ok := d.tables[name]; !ok {
+		d.tables[name] = &tableMetrics{name: name}
+	}
+	return d.tables[name]
+}
+
+func (d *DB2) getIndexMetrics(name string) *indexMetrics {
+	if _, ok := d.indexes[name]; !ok {
+		d.indexes[name] = &indexMetrics{name: name}
+	}
+	return d.indexes[name]
+}
+
+type databaseInstanceMetrics struct {
+	Status       int64 `stm:"status"`
+	Applications int64 `stm:"applications"`
+}
+
+type bufferpoolInstanceMetrics struct {
+	Reads      int64 `stm:"reads"`
+	Writes     int64 `stm:"writes"`
+	HitRatio   int64 `stm:"hit_ratio"`
+	PageSize   int64 `stm:"page_size"`
+	TotalPages int64 `stm:"total_pages"`
+	UsedPages  int64 `stm:"used_pages"`
 }
 
 type tablespaceInstanceMetrics struct {
@@ -83,18 +104,24 @@ type tablespaceInstanceMetrics struct {
 	PageSize    int64 `stm:"page_size"`
 }
 
-type connectionMetrics struct {
-	applicationID   string
-	applicationName string
-	clientHostname  string
-	clientUser      string
-	connectionState string
-}
-
 type connectionInstanceMetrics struct {
 	State            int64 `stm:"state"`
 	ExecutingQueries int64 `stm:"executing_queries"`
 	RowsRead         int64 `stm:"rows_read"`
 	RowsWritten      int64 `stm:"rows_written"`
 	TotalCPUTime     int64 `stm:"total_cpu_time"`
+}
+
+type tableInstanceMetrics struct {
+	DataSize    int64 `stm:"data_size"`
+	IndexSize   int64 `stm:"index_size"`
+	LongObjSize int64 `stm:"long_obj_size"`
+	RowsRead    int64 `stm:"rows_read"`
+	RowsWritten int64 `stm:"rows_written"`
+}
+
+type indexInstanceMetrics struct {
+	LeafNodes   int64 `stm:"leaf_nodes"`
+	IndexScans  int64 `stm:"index_scans"`
+	FullScans   int64 `stm:"full_scans"`
 }

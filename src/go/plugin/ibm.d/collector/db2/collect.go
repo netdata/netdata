@@ -37,6 +37,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		bufferpools: make(map[string]bufferpoolInstanceMetrics),
 		tablespaces: make(map[string]tablespaceInstanceMetrics),
 		connections: make(map[string]connectionInstanceMetrics),
+		tables:      make(map[string]tableInstanceMetrics),
+		indexes:     make(map[string]indexInstanceMetrics),
 	}
 
 	// Test connection with a ping before proceeding
@@ -90,6 +92,18 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	if d.CollectTableMetrics {
+		if err := d.collectTableInstances(ctx); err != nil {
+			d.Errorf("failed to collect table instances: %v", err)
+		}
+	}
+
+	if d.CollectIndexMetrics {
+		if err := d.collectIndexInstances(ctx); err != nil {
+			d.Errorf("failed to collect index instances: %v", err)
+		}
+	}
+
 	// Cleanup stale instances
 	d.cleanupStaleInstances()
 
@@ -122,6 +136,20 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		cleanID := cleanName(id)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("connection_%s_%s", cleanID, k)] = v
+		}
+	}
+
+	for name, metrics := range d.mx.tables {
+		cleanName := cleanName(name)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("table_%s_%s", cleanName, k)] = v
+		}
+	}
+
+	for name, metrics := range d.mx.indexes {
+		cleanName := cleanName(name)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("index_%s_%s", cleanName, k)] = v
 		}
 	}
 
@@ -317,6 +345,7 @@ func (d *DB2) doQuery(ctx context.Context, query string, assign func(column, val
 
 	rows, err := d.db.QueryContext(queryCtx, query)
 	if err != nil {
+		d.Errorf("failed to execute query: %s, error: %v", query, err)
 		return err
 	}
 	defer rows.Close()

@@ -18,6 +18,7 @@ var (
 		diskBusyChart.Copy(),
 		jobQueueLengthChart.Copy(),
 		messageQueueDepthChart.Copy(),
+		ifsDirectoryUsageChart.Copy(),
 	}
 )
 
@@ -99,6 +100,16 @@ var (
 		Dims: module.Dims{
 			{ID: "ifs_file_count", Name: "files"},
 		},
+	}
+
+	ifsDirectoryUsageChart = module.Chart{
+		ID:       "ifs_directory_usage",
+		Title:    "IFS Directory Usage",
+		Units:    "bytes",
+		Fam:      "storage",
+		Ctx:      "as400.ifs_directory_usage",
+		Priority: module.Priority + 27,
+		Type:     module.Stacked,
 	}
 
 	memoryPoolUsageChart = module.Chart{

@@ -56,6 +56,9 @@ func New() *AS400 {
 			DiskSelector:      "",
 			SubsystemSelector: "",
 			JobQueueSelector:  "",
+
+			// IFS monitoring
+			IFSTopNDirectories: 20,
 		},
 
 		charts:        baseCharts.Copy(),
@@ -90,6 +93,9 @@ type Config struct {
 	DiskSelector      string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching"`
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching"`
 	JobQueueSelector  string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching"`
+
+	// IFS monitoring
+	IFSTopNDirectories int `yaml:"ifs_top_n_directories,omitempty" json:"ifs_top_n_directories"`
 }
 
 type AS400 struct {
