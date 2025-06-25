@@ -63,14 +63,14 @@ macro(add_ibm_plugin_target)
         "${CMAKE_SOURCE_DIR}/src/go/go.sum"
     )
     
-    # Build with CGO enabled
+    # Build with CGO enabled and rpath for runtime library loading
     add_custom_command(
         OUTPUT ibm.d.plugin
         COMMAND "${CMAKE_COMMAND}" -E env 
             GOROOT=${GO_ROOT} 
             CGO_ENABLED=1 
             CGO_CFLAGS="-I${IBM_HEADERS_DIR}/clidriver/include"
-            CGO_LDFLAGS="-L${IBM_HEADERS_DIR}/clidriver/lib"
+            CGO_LDFLAGS="-L${IBM_HEADERS_DIR}/clidriver/lib -Wl,-rpath,/usr/lib/netdata/ibm-clidriver/lib"
             IBM_DB_HOME="${IBM_HEADERS_DIR}/clidriver"
             GOPROXY=https://proxy.golang.org,direct 
             "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS}" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
