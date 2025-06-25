@@ -3168,7 +3168,19 @@ if(ENABLE_PLUGIN_IBM)
     
     install(PROGRAMS ${CMAKE_BINARY_DIR}/ibm.d.plugin
             COMPONENT plugin-ibm
-            DESTINATION usr/libexec/netdata/plugins.d)
+            DESTINATION ${NETDATA_LIBEXEC_PREFIX}/plugins.d)
+    
+    # Install IBM plugin configuration files
+    install(FILES src/go/plugin/ibm.d/config/ibm.d.conf
+            COMPONENT plugin-ibm
+            DESTINATION ${NETDATA_CONFIG_PREFIX}/conf.d)
+    
+    install(FILES 
+            src/go/plugin/ibm.d/config/ibm.d/as400.conf
+            src/go/plugin/ibm.d/config/ibm.d/db2.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere.conf
+            COMPONENT plugin-ibm
+            DESTINATION ${NETDATA_CONFIG_PREFIX}/conf.d/ibm.d)
 endif()
 
 #

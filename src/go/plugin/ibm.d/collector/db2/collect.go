@@ -20,7 +20,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 			return nil, err
 		}
 		d.db = db
-		
+
 		// Detect DB2 version on first connection
 		if err := d.detectVersion(ctx); err != nil {
 			d.Warningf("failed to detect DB2 version: %v", err)
@@ -46,18 +46,18 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 			return nil, fmt.Errorf("failed to reconnect to database: %v", err)
 		}
 		d.db = db
-		
+
 		// Retry ping
 		if err := d.ping(ctx); err != nil {
 			return nil, fmt.Errorf("database connection failed after reconnect: %v", err)
 		}
-		
+
 		// Re-detect version after reconnect
 		if err := d.detectVersion(ctx); err != nil {
 			d.Warningf("failed to detect DB2 version after reconnect: %v", err)
 		}
 	}
-	
+
 	// Collect global metrics
 	if err := d.collectGlobalMetrics(ctx); err != nil {
 		return nil, fmt.Errorf("failed to collect global metrics: %v", err)
@@ -93,7 +93,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Build final metrics map
 	mx := stm.ToMap(d.mx)
-	
+
 	// Add per-instance metrics
 	for name, metrics := range d.mx.databases {
 		cleanName := cleanName(name)
@@ -101,21 +101,21 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 			mx[fmt.Sprintf("database_%s_%s", cleanName, k)] = v
 		}
 	}
-	
+
 	for name, metrics := range d.mx.bufferpools {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("bufferpool_%s_%s", cleanName, k)] = v
 		}
 	}
-	
+
 	for name, metrics := range d.mx.tablespaces {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("tablespace_%s_%s", cleanName, k)] = v
 		}
 	}
-	
+
 	for id, metrics := range d.mx.connections {
 		cleanID := cleanName(id)
 		for k, v := range stm.ToMap(metrics) {
@@ -129,14 +129,14 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 func (d *DB2) detectVersion(ctx context.Context) error {
 	// Try SYSIBMADM.ENV_INST_INFO (works on LUW)
 	query := `SELECT SERVICE_LEVEL, HOST_NAME, INST_NAME FROM SYSIBMADM.ENV_INST_INFO`
-	
+
 	var serviceLevel, hostName, instName sql.NullString
 	err := d.db.QueryRow(query).Scan(&serviceLevel, &hostName, &instName)
 	if err == nil {
 		d.serverInfo.version = serviceLevel.String
 		d.serverInfo.hostName = hostName.String
 		d.serverInfo.instanceName = instName.String
-		
+
 		// Parse version to determine edition
 		if strings.Contains(serviceLevel.String, "DB2") {
 			if strings.Contains(serviceLevel.String, "LUW") || strings.Contains(serviceLevel.String, "Linux") || strings.Contains(serviceLevel.String, "Windows") {
@@ -150,7 +150,7 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 		d.version = serviceLevel.String
 		return nil
 	}
-	
+
 	// If that fails, might be AS/400 (DB2 for i)
 	query = `SELECT 'DB2 for i' FROM SYSIBM.SYSDUMMY1`
 	var dummy string
@@ -160,7 +160,7 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 		d.version = "DB2 for i"
 		return nil
 	}
-	
+
 	return fmt.Errorf("unable to detect DB2 version")
 }
 
@@ -173,7 +173,7 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 			SUM(CASE WHEN APPL_STATUS = 'UOWEXEC' THEN 1 ELSE 0 END) as EXECUTING_CONNS
 		FROM SYSIBMADM.APPLICATIONS
 	`
-	
+
 	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_CONNS":
@@ -190,10 +190,10 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 			}
 		}
 	})
-	
+
 	// Calculate idle connections
 	d.mx.ConnIdle = d.mx.ConnActive - d.mx.ConnExecuting
-	
+
 	if err != nil {
 		// Try simpler query for older versions
 		simpleQuery := `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS`
@@ -201,22 +201,22 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 			return fmt.Errorf("failed to get connection count: %v", err)
 		}
 	}
-	
+
 	// Lock metrics
 	if err := d.collectLockMetrics(ctx); err != nil {
 		d.Warningf("failed to collect lock metrics: %v", err)
 	}
-	
+
 	// Buffer pool aggregate hit ratio
 	if err := d.collectBufferpoolAggregateMetrics(ctx); err != nil {
 		d.Warningf("failed to collect bufferpool metrics: %v", err)
 	}
-	
+
 	// Log space metrics
 	if err := d.collectLogSpaceMetrics(ctx); err != nil {
 		d.Warningf("failed to collect log space metrics: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -233,13 +233,13 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 			ROWS_MODIFIED
 		FROM SYSIBMADM.SNAPDB
 	`
-	
+
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
 		}
-		
+
 		switch column {
 		case "LOCK_WAITS":
 			d.mx.LockWaits = v
@@ -272,7 +272,7 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 			END as HIT_RATIO
 		FROM SYSIBMADM.SNAPBP
 	`
-	
+
 	return d.doQuerySingleValue(ctx, query, &d.mx.BufferpoolHitRatio)
 }
 
@@ -283,13 +283,13 @@ func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
 			TOTAL_LOG_AVAILABLE
 		FROM SYSIBMADM.LOG_UTILIZATION
 	`
-	
+
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
 		}
-		
+
 		switch column {
 		case "TOTAL_LOG_USED":
 			d.mx.LogUsedSpace = v
@@ -315,7 +315,7 @@ func (d *DB2) doQuery(ctx context.Context, query string, assign func(column, val
 func (d *DB2) doQuerySingleValue(ctx context.Context, query string, target *int64) error {
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-	
+
 	var value sql.NullInt64
 	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
 	if err != nil {

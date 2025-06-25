@@ -26,25 +26,25 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 	count := 0
 	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxDatabases), func(column, value string, lineEnd bool) {
 		var dbName string
-		
+
 		switch column {
 		case "DB_NAME":
 			dbName = strings.TrimSpace(value)
 			if dbName == "" {
 				return
 			}
-			
+
 			// Apply selector if configured
 			if d.databaseSelector != nil && !d.databaseSelector.MatchString(dbName) {
 				return // Skip this database
 			}
-			
+
 			if _, exists := d.databases[dbName]; !exists {
 				d.databases[dbName] = &databaseMetrics{name: dbName}
 				d.addDatabaseCharts(d.databases[dbName])
 			}
 			count++
-			
+
 		case "DB_STATUS":
 			if count > 0 && len(d.databases) > 0 {
 				// Map status to numeric value
@@ -57,7 +57,7 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 				default:
 					statusValue = -1
 				}
-				
+
 				// Find the current database
 				for name, db := range d.databases {
 					if db.status == "" { // Not yet set
@@ -69,7 +69,7 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 					}
 				}
 			}
-			
+
 		case "APPLS_CUR_CONS":
 			if count > 0 && len(d.databases) > 0 {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -123,19 +123,19 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			if currentBP == "" {
 				return
 			}
-			
+
 			// Apply selector if configured
 			if d.bufferpoolSelector != nil && !d.bufferpoolSelector.MatchString(currentBP) {
 				currentBP = "" // Skip this bufferpool
 				return
 			}
-			
+
 			if _, exists := d.bufferpools[currentBP]; !exists {
 				d.bufferpools[currentBP] = &bufferpoolMetrics{name: currentBP}
 				d.addBufferpoolCharts(d.bufferpools[currentBP])
 			}
 			d.mx.bufferpools[currentBP] = bufferpoolInstanceMetrics{}
-			
+
 		case "TOTAL_READS":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -144,7 +144,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
-			
+
 		case "TOTAL_WRITES":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -153,7 +153,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
-			
+
 		case "HIT_RATIO":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -162,7 +162,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
-			
+
 		case "PAGESIZE":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -172,7 +172,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
-			
+
 		case "NPAGES":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -181,7 +181,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
-			
+
 		case "USED_PAGES":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -230,23 +230,23 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 			if currentTbsp == "" {
 				return
 			}
-			
+
 			if _, exists := d.tablespaces[currentTbsp]; !exists {
 				d.tablespaces[currentTbsp] = &tablespaceMetrics{name: currentTbsp}
 				d.addTablespaceCharts(d.tablespaces[currentTbsp])
 			}
 			d.mx.tablespaces[currentTbsp] = tablespaceInstanceMetrics{}
-			
+
 		case "TBSP_TYPE":
 			if currentTbsp != "" {
 				d.tablespaces[currentTbsp].tbspType = value
 			}
-			
+
 		case "TBSP_CONTENT_TYPE":
 			if currentTbsp != "" {
 				d.tablespaces[currentTbsp].contentType = value
 			}
-			
+
 		case "TBSP_STATE":
 			if currentTbsp != "" {
 				d.tablespaces[currentTbsp].state = value
@@ -264,7 +264,7 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 				metrics.State = stateValue
 				d.mx.tablespaces[currentTbsp] = metrics
 			}
-			
+
 		case "TBSP_TOTAL_SIZE_KB":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -273,7 +273,7 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
-			
+
 		case "TBSP_USED_SIZE_KB":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -282,7 +282,7 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
-			
+
 		case "TBSP_FREE_SIZE_KB":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -291,7 +291,7 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
-			
+
 		case "USED_PERCENT":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -300,7 +300,7 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
-			
+
 		case "TBSP_PAGE_SIZE":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -345,28 +345,28 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 			if currentAppID == "" {
 				return
 			}
-			
+
 			if _, exists := d.connections[currentAppID]; !exists {
 				d.connections[currentAppID] = &connectionMetrics{applicationID: currentAppID}
 				d.addConnectionCharts(d.connections[currentAppID])
 			}
 			d.mx.connections[currentAppID] = connectionInstanceMetrics{}
-			
+
 		case "APPLICATION_NAME":
 			if currentAppID != "" {
 				d.connections[currentAppID].applicationName = value
 			}
-			
+
 		case "CLIENT_HOSTNAME":
 			if currentAppID != "" {
 				d.connections[currentAppID].clientHostname = value
 			}
-			
+
 		case "SESSION_AUTH_ID":
 			if currentAppID != "" {
 				d.connections[currentAppID].clientUser = value
 			}
-			
+
 		case "APPL_STATUS":
 			if currentAppID != "" {
 				d.connections[currentAppID].connectionState = value
@@ -385,7 +385,7 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 				metrics.ExecutingQueries = execQueries
 				d.mx.connections[currentAppID] = metrics
 			}
-			
+
 		case "ROWS_READ":
 			if currentAppID != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -394,7 +394,7 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 					d.mx.connections[currentAppID] = metrics
 				}
 			}
-			
+
 		case "ROWS_WRITTEN":
 			if currentAppID != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -403,7 +403,7 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 					d.mx.connections[currentAppID] = metrics
 				}
 			}
-			
+
 		case "TOTAL_CPU_TIME":
 			if currentAppID != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {

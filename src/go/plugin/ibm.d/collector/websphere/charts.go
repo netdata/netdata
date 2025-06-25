@@ -17,21 +17,21 @@ const (
 	prioJVMGC
 	prioJVMThreads
 	prioJVMClasses
-	
+
 	prioThreadPools
 	prioThreadPoolSize
 	prioThreadPoolActive
 	prioThreadPoolHung
-	
+
 	prioConnectionPools
 	prioConnectionPoolSize
 	prioConnectionPoolWait
-	
+
 	prioWebContainer
 	prioSessions
 	prioRequests
 	prioResponseTime
-	
+
 	prioApplications
 	prioAppRequests
 	prioAppErrors
@@ -100,7 +100,7 @@ var baseCharts = module.Charts{
 			{ID: "jvm_classes_unloaded", Name: "unloaded"},
 		},
 	},
-	
+
 	// Web Container Metrics
 	{
 		ID:       "web_sessions",
@@ -260,7 +260,7 @@ func (w *WebSphere) initCharts() {
 
 func newThreadPoolCharts(pool string) *module.Charts {
 	charts := threadPoolChartsTmpl.Copy()
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
 		chart.Labels = []module.Label{
@@ -270,13 +270,13 @@ func newThreadPoolCharts(pool string) *module.Charts {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(pool))
 		}
 	}
-	
+
 	return charts
 }
 
 func newConnectionPoolCharts(pool string) *module.Charts {
 	charts := connectionPoolChartsTmpl.Copy()
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
 		chart.Labels = []module.Label{
@@ -286,13 +286,13 @@ func newConnectionPoolCharts(pool string) *module.Charts {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(pool))
 		}
 	}
-	
+
 	return charts
 }
 
 func newApplicationCharts(app string) *module.Charts {
 	charts := applicationChartsTmpl.Copy()
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(app))
 		chart.Labels = []module.Label{
@@ -302,7 +302,7 @@ func newApplicationCharts(app string) *module.Charts {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(app))
 		}
 	}
-	
+
 	return charts
 }
 

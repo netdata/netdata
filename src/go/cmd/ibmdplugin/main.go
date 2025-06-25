@@ -21,12 +21,9 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	// Register IBM ecosystem collectors
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"    // Requires CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"      // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"     // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"       // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere" // Pure Go
-	
-	// IBM driver management
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/ibmdriver"
 )
 
 const pluginName = "ibm.d.plugin"
@@ -40,18 +37,6 @@ func init() {
 
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
-
-	// Ensure IBM DB2 driver is available
-	if err := ibmdriver.EnsureDriver(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize IBM DB2 driver: %v\n", err)
-		os.Exit(1)
-	}
-	
-	// Setup environment variables
-	if err := ibmdriver.SetupEnvironment(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to setup IBM DB2 environment: %v\n", err)
-		os.Exit(1)
-	}
 
 	opts := parseCLI()
 
@@ -104,3 +89,4 @@ func parseCLI() *cli.Option {
 
 	return opt
 }
+

@@ -412,6 +412,7 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 	-DENABLE_PLUGIN_DEBUGFS=On \
 	-DENABLE_PLUGIN_GO=On \
+	-DENABLE_PLUGIN_IBM=Off \
 	-DENABLE_PLUGIN_PYTHON=On \
 	-DENABLE_PLUGIN_CHARTS=On \
 	-DENABLE_PLUGIN_LOCAL_LISTENERS=On \
@@ -864,6 +865,77 @@ fi
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d
+
+%package plugin-ibm
+Summary: The IBM ecosystem metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+
+%description plugin-ibm
+This plugin adds IBM ecosystem collectors (AS/400, DB2, WebSphere) to the Netdata Agent.
+It requires IBM DB2 client libraries to be installed separately.
+
+%pre plugin-ibm
+
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%post plugin-ibm
+
+download_ibm_libs() {
+    DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
+    DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
+    
+    # Check if already installed
+    if [ -f "$DRIVER_DIR/lib/libdb2.so" ]; then
+        return 0
+    fi
+    
+    echo "Downloading IBM DB2 client libraries..."
+    
+    # Create directory
+    mkdir -p "$DRIVER_DIR"
+    cd "$DRIVER_DIR"
+    
+    # Download
+    if command -v wget >/dev/null 2>&1; then
+        wget -q -O clidriver.tar.gz "$DRIVER_URL" || return 1
+    elif command -v curl >/dev/null 2>&1; then
+        curl -sL -o clidriver.tar.gz "$DRIVER_URL" || return 1
+    else
+        echo "ERROR: Neither wget nor curl found. Cannot download IBM libraries."
+        return 1
+    fi
+    
+    # Extract
+    tar -xzf clidriver.tar.gz || return 1
+    rm -f clidriver.tar.gz
+    
+    # Move clidriver contents to parent directory
+    if [ -d "clidriver" ]; then
+        mv clidriver/* .
+        rmdir clidriver
+    fi
+    
+    echo "IBM DB2 client libraries installed successfully."
+    return 0
+}
+
+# Try to download IBM libraries
+if ! download_ibm_libs; then
+    echo "WARNING: Failed to download IBM DB2 libraries."
+    echo "The ibm.d.plugin will not work until libraries are installed."
+    echo "You can manually download them to: /usr/lib/netdata/ibm-clidriver/"
+fi
+
+%files plugin-ibm
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/ibm.d.plugin
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/ibm.d.conf
+%{_libdir}/%{name}/conf.d/ibm.d
 
 %package plugin-apps
 Summary: The per-application metrics collection plugin for the Netdata Agent

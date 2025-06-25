@@ -36,22 +36,22 @@ func init() {
 func New() *AS400 {
 	return &AS400{
 		Config: Config{
-			DSN:               "",
-			Timeout:           confopt.Duration(time.Second * 2),
-			UpdateEvery:       5,
-			MaxDbConns:        1,
-			MaxDbLifeTime:     confopt.Duration(time.Minute * 10),
-			
+			DSN:           "",
+			Timeout:       confopt.Duration(time.Second * 2),
+			UpdateEvery:   5,
+			MaxDbConns:    1,
+			MaxDbLifeTime: confopt.Duration(time.Minute * 10),
+
 			// Instance collection defaults
 			CollectDiskMetrics:      true,
 			CollectSubsystemMetrics: true,
 			CollectJobQueueMetrics:  true,
-			
+
 			// Cardinality limits
 			MaxDisks:      50,
 			MaxSubsystems: 20,
 			MaxJobQueues:  50,
-			
+
 			// Selectors (empty = collect all)
 			DiskSelector:      "",
 			SubsystemSelector: "",
@@ -68,27 +68,27 @@ func New() *AS400 {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
-	DSN                string           `yaml:"dsn" json:"dsn"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	MaxDbConns         int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`
-	MaxDbLifeTime      confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
-	
+	Vnode         string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery   int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN           string           `yaml:"dsn" json:"dsn"`
+	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	MaxDbConns    int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`
+	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
+
 	// Instance collection settings
-	CollectDiskMetrics       bool   `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
-	CollectSubsystemMetrics  bool   `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics"`
-	CollectJobQueueMetrics   bool   `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
-	
+	CollectDiskMetrics      bool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
+	CollectSubsystemMetrics bool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics"`
+	CollectJobQueueMetrics  bool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
+
 	// Cardinality limits
-	MaxDisks                 int    `yaml:"max_disks,omitempty" json:"max_disks"`
-	MaxSubsystems            int    `yaml:"max_subsystems,omitempty" json:"max_subsystems"`
-	MaxJobQueues             int    `yaml:"max_job_queues,omitempty" json:"max_job_queues"`
-	
+	MaxDisks      int `yaml:"max_disks,omitempty" json:"max_disks"`
+	MaxSubsystems int `yaml:"max_subsystems,omitempty" json:"max_subsystems"`
+	MaxJobQueues  int `yaml:"max_job_queues,omitempty" json:"max_job_queues"`
+
 	// Selectors for filtering
-	DiskSelector             string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching"`
-	SubsystemSelector        string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching"`
-	JobQueueSelector         string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching"`
+	DiskSelector      string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching"`
+	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching"`
+	JobQueueSelector  string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching"`
 }
 
 type AS400 struct {
@@ -100,17 +100,17 @@ type AS400 struct {
 	db   *sql.DB
 	once *sync.Once
 	mx   *metricsData
-	
+
 	// Instance tracking
-	disks       map[string]*diskMetrics
-	subsystems  map[string]*subsystemMetrics
-	jobQueues   map[string]*jobQueueMetrics
-	
+	disks      map[string]*diskMetrics
+	subsystems map[string]*subsystemMetrics
+	jobQueues  map[string]*jobQueueMetrics
+
 	// Selectors
 	diskSelector      matcher.Matcher
 	subsystemSelector matcher.Matcher
 	jobQueueSelector  matcher.Matcher
-	
+
 	// System info for labels
 	systemName   string
 	serialNumber string
@@ -134,7 +134,7 @@ func (a *AS400) Init(ctx context.Context) error {
 		}
 		a.diskSelector = m
 	}
-	
+
 	if a.SubsystemSelector != "" {
 		m, err := matcher.NewSimplePatternsMatcher(a.SubsystemSelector)
 		if err != nil {
@@ -142,7 +142,7 @@ func (a *AS400) Init(ctx context.Context) error {
 		}
 		a.subsystemSelector = m
 	}
-	
+
 	if a.JobQueueSelector != "" {
 		m, err := matcher.NewSimplePatternsMatcher(a.JobQueueSelector)
 		if err != nil {
@@ -236,7 +236,7 @@ func (a *AS400) safeDSN() string {
 func (a *AS400) ping(ctx context.Context) error {
 	pingCtx, cancel := context.WithTimeout(ctx, time.Duration(a.Timeout))
 	defer cancel()
-	
+
 	return a.db.PingContext(pingCtx)
 }
 

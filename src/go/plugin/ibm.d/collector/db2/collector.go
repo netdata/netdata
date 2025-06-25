@@ -36,19 +36,19 @@ func init() {
 func New() *DB2 {
 	return &DB2{
 		Config: Config{
-			DSN:               "",
-			Timeout:           confopt.Duration(time.Second * 2),
-			UpdateEvery:       5,
-			MaxDbConns:        1,
-			MaxDbLifeTime:     confopt.Duration(time.Minute * 10),
-			
+			DSN:           "",
+			Timeout:       confopt.Duration(time.Second * 2),
+			UpdateEvery:   5,
+			MaxDbConns:    1,
+			MaxDbLifeTime: confopt.Duration(time.Minute * 10),
+
 			// Instance collection defaults
 			CollectDatabaseMetrics:   true,
 			CollectBufferpoolMetrics: true,
 			CollectTablespaceMetrics: true,
 			CollectConnectionMetrics: true,
 			CollectLockMetrics:       true,
-			
+
 			// Cardinality limits
 			MaxDatabases:   10,
 			MaxBufferpools: 20,
@@ -67,26 +67,26 @@ func New() *DB2 {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
-	DSN                string           `yaml:"dsn" json:"dsn"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	MaxDbConns         int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`
-	MaxDbLifeTime      confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
-	
+	Vnode         string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery   int              `yaml:"update_every,omitempty" json:"update_every"`
+	DSN           string           `yaml:"dsn" json:"dsn"`
+	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	MaxDbConns    int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`
+	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
+
 	// Instance collection settings
 	CollectDatabaseMetrics   bool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics"`
 	CollectBufferpoolMetrics bool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics"`
 	CollectTablespaceMetrics bool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics"`
 	CollectConnectionMetrics bool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics"`
 	CollectLockMetrics       bool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics"`
-	
+
 	// Cardinality limits
 	MaxDatabases   int `yaml:"max_databases,omitempty" json:"max_databases"`
 	MaxBufferpools int `yaml:"max_bufferpools,omitempty" json:"max_bufferpools"`
 	MaxTablespaces int `yaml:"max_tablespaces,omitempty" json:"max_tablespaces"`
 	MaxConnections int `yaml:"max_connections,omitempty" json:"max_connections"`
-	
+
 	// Selectors for filtering
 	DatabaseSelector   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
 	BufferpoolSelector string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching"`
@@ -103,19 +103,19 @@ type DB2 struct {
 	db   *sql.DB
 	once *sync.Once
 	mx   *metricsData
-	
+
 	// Instance tracking
 	databases   map[string]*databaseMetrics
 	bufferpools map[string]*bufferpoolMetrics
 	tablespaces map[string]*tablespaceMetrics
 	connections map[string]*connectionMetrics
-	
+
 	// Selectors
 	databaseSelector   matcher.Matcher
 	bufferpoolSelector matcher.Matcher
 	tablespaceSelector matcher.Matcher
 	connectionSelector matcher.Matcher
-	
+
 	// DB2 version info
 	version    string
 	edition    string // LUW, z/OS, i
@@ -146,7 +146,7 @@ func (d *DB2) Init(ctx context.Context) error {
 		}
 		d.databaseSelector = m
 	}
-	
+
 	if d.BufferpoolSelector != "" {
 		m, err := matcher.NewSimplePatternsMatcher(d.BufferpoolSelector)
 		if err != nil {
@@ -154,7 +154,7 @@ func (d *DB2) Init(ctx context.Context) error {
 		}
 		d.bufferpoolSelector = m
 	}
-	
+
 	if d.TablespaceSelector != "" {
 		m, err := matcher.NewSimplePatternsMatcher(d.TablespaceSelector)
 		if err != nil {
@@ -162,7 +162,7 @@ func (d *DB2) Init(ctx context.Context) error {
 		}
 		d.tablespaceSelector = m
 	}
-	
+
 	if d.ConnectionSelector != "" {
 		m, err := matcher.NewSimplePatternsMatcher(d.ConnectionSelector)
 		if err != nil {
@@ -241,7 +241,7 @@ func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 func (d *DB2) ping(ctx context.Context) error {
 	pingCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-	
+
 	return d.db.PingContext(pingCtx)
 }
 
