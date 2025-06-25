@@ -179,19 +179,10 @@ void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_
 int close_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
-
     generate_datafilepath(datafile, path, sizeof(path));
-
-    ret = uv_fs_close(NULL, &req, datafile->file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
+    CLOSE_FILE(ctx, path, datafile->file, ret);
     return ret;
 }
 
@@ -213,34 +204,13 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     int ret;
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
 
-    ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    ret = uv_fs_close(NULL, &req, datafile->file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
-
-    __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
+    CLOSE_FILE(ctx, path,  datafile->file, ret);
+    ret = unlink_data_file(datafile);
 
     return ret;
 }
@@ -285,7 +255,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     posix_memalign_freez(superblock);
     if (ret < 0) {
-        destroy_data_file_unsafe(datafile);
+        (void) destroy_data_file_unsafe(datafile);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
         nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create datafile %s", path);
@@ -334,7 +304,6 @@ static int check_data_file_superblock(uv_file file)
 static int load_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    uv_fs_t req;
     uv_file file;
     int ret, fd, error;
     uint64_t file_size;
@@ -351,12 +320,12 @@ static int load_data_file(struct rrdengine_datafile *datafile)
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
-        goto error;
+        goto err_exit;
     file_size = ALIGN_BYTES_CEILING(file_size);
 
     ret = check_data_file_superblock(file);
     if (ret)
-        goto error;
+        goto err_exit;
 
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_df_sb));
 
@@ -367,14 +336,9 @@ static int load_data_file(struct rrdengine_datafile *datafile)
 
     return 0;
 
-    error:
+err_exit:
     error = ret;
-    ret = uv_fs_close(NULL, &req, file, NULL);
-    if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req);
+    CLOSE_FILE(ctx, path, file, ret);
     return error;
 }
 
@@ -598,7 +562,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, bool having_lock)
     return 0;
 
 error_after_journalfile:
-    destroy_data_file_unsafe(datafile);
+    (void) destroy_data_file_unsafe(datafile);
     freez(journalfile);
 
 error_after_datafile:
