@@ -42,7 +42,7 @@ var baseCharts = module.Charts{
 	{
 		ID:       "jvm_heap_usage",
 		Title:    "JVM Heap Usage",
-		Units:    "MiB",
+		Units:    "bytes",
 		Fam:      "jvm",
 		Ctx:      "websphere.jvm_heap_usage",
 		Priority: prioJVMHeap,
@@ -126,18 +126,6 @@ var baseCharts = module.Charts{
 			{ID: "web_requests_total", Name: "requests", Algo: module.Incremental},
 		},
 	},
-	{
-		ID:       "web_errors",
-		Title:    "Web Errors",
-		Units:    "errors/s",
-		Fam:      "web",
-		Ctx:      "websphere.web_errors",
-		Priority: prioRequests,
-		Dims: module.Dims{
-			{ID: "web_errors_400", Name: "4xx", Algo: module.Incremental},
-			{ID: "web_errors_500", Name: "5xx", Algo: module.Incremental},
-		},
-	},
 }
 
 // Thread pool chart template
@@ -201,7 +189,7 @@ var connectionPoolChartsTmpl = module.Charts{
 		Ctx:      "websphere.connpool_wait_time",
 		Priority: prioConnectionPoolWait,
 		Dims: module.Dims{
-			{ID: "connpool_%s_wait_time_avg", Name: "avg_wait"},
+			{ID: "connpool_%s_wait_time_avg", Name: "avg_wait", Div: precision},
 		},
 	},
 	{
@@ -238,7 +226,7 @@ var applicationChartsTmpl = module.Charts{
 		Ctx:      "websphere.app_response_time",
 		Priority: prioResponseTime,
 		Dims: module.Dims{
-			{ID: "app_%s_response_time_avg", Name: "avg_response"},
+			{ID: "app_%s_response_time_avg", Name: "avg_response", Div: precision},
 		},
 	},
 	{

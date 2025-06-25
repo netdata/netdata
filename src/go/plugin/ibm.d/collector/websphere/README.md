@@ -50,14 +50,13 @@ All metrics have "websphere." prefix.
 
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
-| jvm_heap_usage | used, committed, max | MiB |
+| jvm_heap_usage | used, committed, max | bytes |
 | jvm_gc_time | gc_time | milliseconds |
 | jvm_gc_count | collections | collections/s |
 | jvm_threads | threads, daemon, peak | threads |
 | jvm_classes | loaded, unloaded | classes |
 | web_sessions | active, live, invalidated | sessions |
 | web_requests | requests | requests/s |
-| web_errors | 4xx, 5xx | errors/s |
 
 Per thread pool:
 

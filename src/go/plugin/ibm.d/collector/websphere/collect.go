@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+const precision = 1000 // Precision multiplier for floating-point values
+
 // Liberty metrics structure based on /ibm/api/metrics endpoint
 type libertyMetrics struct {
 	Heap struct {
@@ -165,10 +167,10 @@ func (w *WebSphere) collectLibertyMetrics(ctx context.Context) (*libertyMetrics,
 }
 
 func (w *WebSphere) collectJVM(mx map[string]int64, m *libertyMetrics) {
-	// Heap metrics (convert bytes to MiB)
-	mx["jvm_heap_used"] = m.Heap.Used / 1024 / 1024
-	mx["jvm_heap_committed"] = m.Heap.Committed / 1024 / 1024
-	mx["jvm_heap_max"] = m.Heap.Max / 1024 / 1024
+	// Heap metrics in bytes
+	mx["jvm_heap_used"] = m.Heap.Used
+	mx["jvm_heap_committed"] = m.Heap.Committed
+	mx["jvm_heap_max"] = m.Heap.Max
 
 	// GC metrics
 	mx["jvm_gc_count"] = m.GC.Count
@@ -195,10 +197,8 @@ func (w *WebSphere) collectWebContainer(mx map[string]int64, m *libertyMetrics) 
 	// Request metrics
 	mx["web_requests_total"] = m.Request.Total
 
-	// TODO: Error metrics not available in basic Liberty metrics
-	// Would need to parse access logs or use monitoring MBeans
-	mx["web_errors_400"] = 0
-	mx["web_errors_500"] = 0
+	// Note: HTTP error breakdown (4xx, 5xx) not available via REST API
+	// Would require access log parsing or MicroProfile Metrics
 }
 
 func (w *WebSphere) collectThreadPools(mx map[string]int64, m *libertyMetrics) {
@@ -269,7 +269,7 @@ func (w *WebSphere) collectConnectionPools(mx map[string]int64, m *libertyMetric
 		mx[fmt.Sprintf("connpool_%s_size", poolID)] = pool.Size
 		mx[fmt.Sprintf("connpool_%s_free", poolID)] = pool.Free
 		mx[fmt.Sprintf("connpool_%s_max", poolID)] = pool.Max
-		mx[fmt.Sprintf("connpool_%s_wait_time_avg", poolID)] = int64(pool.WaitTime)
+		mx[fmt.Sprintf("connpool_%s_wait_time_avg", poolID)] = int64(pool.WaitTime * precision)
 		mx[fmt.Sprintf("connpool_%s_timeouts", poolID)] = pool.Timeouts
 
 		collected++
@@ -305,7 +305,7 @@ func (w *WebSphere) collectApplications(mx map[string]int64, m *libertyMetrics) 
 
 		// Collect metrics
 		mx[fmt.Sprintf("app_%s_requests", appID)] = app.Requests
-		mx[fmt.Sprintf("app_%s_response_time_avg", appID)] = int64(app.ResponseTime)
+		mx[fmt.Sprintf("app_%s_response_time_avg", appID)] = int64(app.ResponseTime * precision)
 		mx[fmt.Sprintf("app_%s_errors", appID)] = app.Errors
 
 		collected++
