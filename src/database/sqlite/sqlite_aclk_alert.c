@@ -577,7 +577,7 @@ done:
 }
 
 #define SQL_REBUILD_HOST_ALERT_VERSION_TABLE                                                                           \
-    "INSERT INTO alert_version (health_log_id, unique_id, status, version, date_submitted) "                           \
+    "INSERT OR IGNORE INTO alert_version (health_log_id, unique_id, status, version, date_submitted) "                 \
     " SELECT hl.health_log_id, hld.unique_id, hld.new_status, hld.when_key, UNIXEPOCH() "                              \
     " FROM health_log hl, health_log_detail hld WHERE "                                                                \
     "  hl.host_id = @host_id AND hld.health_log_id = hl.health_log_id AND hld.transition_id = hl.last_transition_id"
