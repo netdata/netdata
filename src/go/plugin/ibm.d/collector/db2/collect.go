@@ -203,17 +203,17 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	}
 	
 	// Lock metrics
-	if err := d.collectLockMetrics(); err != nil {
+	if err := d.collectLockMetrics(ctx); err != nil {
 		d.Warningf("failed to collect lock metrics: %v", err)
 	}
 	
 	// Buffer pool aggregate hit ratio
-	if err := d.collectBufferpoolAggregateMetrics(); err != nil {
+	if err := d.collectBufferpoolAggregateMetrics(ctx); err != nil {
 		d.Warningf("failed to collect bufferpool metrics: %v", err)
 	}
 	
 	// Log space metrics
-	if err := d.collectLogSpaceMetrics(); err != nil {
+	if err := d.collectLogSpaceMetrics(ctx); err != nil {
 		d.Warningf("failed to collect log space metrics: %v", err)
 	}
 	

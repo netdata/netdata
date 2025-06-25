@@ -30,11 +30,11 @@ func init() {
 func New() *WebSphere {
 	return &WebSphere{
 		Config: Config{
-			HTTP: web.HTTP{
-				Request: web.Request{
+			HTTPConfig: web.HTTPConfig{
+				RequestConfig: web.RequestConfig{
 					URL: "https://localhost:9443",
 				},
-				Client: web.Client{
+				ClientConfig: web.ClientConfig{
 					Timeout: confopt.Duration(time.Second * 5),
 				},
 			},
@@ -64,7 +64,7 @@ func New() *WebSphere {
 type Config struct {
 	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTP    `yaml:",inline" json:""`
+	web.HTTPConfig    `yaml:",inline" json:""`
 	
 	// Server identification (for clustered environments)
 	CellName   string `yaml:"cell_name,omitempty" json:"cell_name"`
@@ -119,7 +119,7 @@ func (w *WebSphere) Configuration() any {
 }
 
 func (w *WebSphere) Init(context.Context) error {
-	if w.URL == "" {
+	if w.HTTPConfig.RequestConfig.URL == "" {
 		return errors.New("websphere URL is required")
 	}
 	
@@ -156,19 +156,19 @@ func (w *WebSphere) Init(context.Context) error {
 		w.poolSelector = m
 	}
 	
-	httpClient, err := web.NewHTTPClient(w.Client)
+	httpClient, err := web.NewHTTPClient(w.HTTPConfig.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
 	}
 	w.httpClient = httpClient
 	
-	w.Debugf("initialized websphere collector: url=%s, metrics_endpoint=%s", w.URL, w.MetricsEndpoint)
+	w.Debugf("initialized websphere collector: url=%s, metrics_endpoint=%s", w.HTTPConfig.RequestConfig.URL, w.MetricsEndpoint)
 	
 	return nil
 }
 
-func (w *WebSphere) Check(context.Context) error {
-	mx, err := w.collect()
+func (w *WebSphere) Check(ctx context.Context) error {
+	mx, err := w.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -184,8 +184,8 @@ func (w *WebSphere) Charts() *module.Charts {
 	return w.charts
 }
 
-func (w *WebSphere) Collect(context.Context) map[string]int64 {
-	mx, err := w.collect()
+func (w *WebSphere) Collect(ctx context.Context) map[string]int64 {
+	mx, err := w.collect(ctx)
 	if err != nil {
 		w.Error(err)
 		return nil

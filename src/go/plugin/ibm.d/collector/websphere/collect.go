@@ -119,7 +119,7 @@ func (w *WebSphere) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (w *WebSphere) collectLibertyMetrics(ctx context.Context) (*libertyMetrics, error) {
-	u, err := url.Parse(w.URL)
+	u, err := url.Parse(w.HTTPConfig.RequestConfig.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +132,8 @@ func (w *WebSphere) collectLibertyMetrics(ctx context.Context) (*libertyMetrics,
 	
 	// Set request headers
 	req.Header.Set("Accept", "application/json")
-	if w.Username != "" || w.Password != "" {
-		req.SetBasicAuth(w.Username, w.Password)
+	if w.HTTPConfig.RequestConfig.Username != "" || w.HTTPConfig.RequestConfig.Password != "" {
+		req.SetBasicAuth(w.HTTPConfig.RequestConfig.Username, w.HTTPConfig.RequestConfig.Password)
 	}
 	
 	resp, err := w.httpClient.Do(req)
