@@ -10,8 +10,20 @@ type metricsData struct {
 	ActiveJobsCount int64 `stm:"active_jobs_count"`
 	JobQueueLength  int64 `stm:"job_queue_length"` // Aggregate
 
+	// Job type breakdown
+	BatchJobs       int64 `stm:"batch_jobs"`
+	InteractiveJobs int64 `stm:"interactive_jobs"`
+	SystemJobs      int64 `stm:"system_jobs"`
+	SpooledJobs     int64 `stm:"spooled_jobs"`
+	OtherJobs       int64 `stm:"other_jobs"`
+
 	// Storage metrics
 	SystemASPUsed int64 `stm:"system_asp_used"`
+
+	// IFS metrics
+	IFSTotalSize int64 `stm:"ifs_total_size"`
+	IFSUsedSize  int64 `stm:"ifs_used_size"`
+	IFSFileCount int64 `stm:"ifs_file_count"`
 
 	// Memory pool metrics
 	MachinePoolSize     int64 `stm:"machine_pool_size"`
@@ -22,10 +34,15 @@ type metricsData struct {
 	// Aggregate disk metrics
 	DiskBusyPercentage int64 `stm:"disk_busy_percentage"`
 
+	// Message queue metrics
+	SystemMessageQueueDepth   int64 `stm:"system_message_queue_depth"`
+	QSYSOPRMessageQueueDepth int64 `stm:"qsysopr_message_queue_depth"`
+
 	// Per-instance metrics (not included in stm)
-	disks      map[string]diskInstanceMetrics
-	subsystems map[string]subsystemInstanceMetrics
-	jobQueues  map[string]jobQueueInstanceMetrics
+	disks         map[string]diskInstanceMetrics
+	subsystems    map[string]subsystemInstanceMetrics
+	jobQueues     map[string]jobQueueInstanceMetrics
+	messageQueues map[string]messageQueueInstanceMetrics
 }
 
 // Per-instance metric structures for stm conversion
@@ -49,4 +66,9 @@ type jobQueueInstanceMetrics struct {
 	JobsWaiting   int64 `stm:"jobs_waiting"`
 	JobsHeld      int64 `stm:"jobs_held"`
 	JobsScheduled int64 `stm:"jobs_scheduled"`
+}
+
+type messageQueueInstanceMetrics struct {
+	MessageCount int64 `stm:"message_count"`
+	OldestHours  int64 `stm:"oldest_hours"`
 }
