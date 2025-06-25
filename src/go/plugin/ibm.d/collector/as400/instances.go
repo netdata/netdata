@@ -4,34 +4,34 @@ package as400
 
 // diskMetrics holds metrics for an individual disk
 type diskMetrics struct {
-	unit           string
-	typeField      string // HDD, SSD, etc.
-	model          string
-	busyPercent    int64
-	readRequests   int64
-	writeRequests  int64
-	readBytes      int64
-	writeBytes     int64
-	averageTime    int64
-	
-	updated     bool
-	hasCharts   bool
+	unit          string
+	typeField     string // HDD, SSD, etc.
+	model         string
+	busyPercent   int64
+	readRequests  int64
+	writeRequests int64
+	readBytes     int64
+	writeBytes    int64
+	averageTime   int64
+
+	updated   bool
+	hasCharts bool
 }
 
 // subsystemMetrics holds metrics for an individual subsystem
 type subsystemMetrics struct {
-	name            string
-	library         string
-	status          string
-	jobsActive      int64
-	jobsHeld        int64
-	storageUsed     int64 // KB
-	poolID          int64
-	maxJobs         int64
-	currentJobs     int64
-	
-	updated     bool
-	hasCharts   bool
+	name        string
+	library     string
+	status      string
+	jobsActive  int64
+	jobsHeld    int64
+	storageUsed int64 // KB
+	poolID      int64
+	maxJobs     int64
+	currentJobs int64
+
+	updated   bool
+	hasCharts bool
 }
 
 // jobQueueMetrics holds metrics for an individual job queue
@@ -44,9 +44,9 @@ type jobQueueMetrics struct {
 	jobsScheduled int64
 	maxJobs       int64
 	priority      int64
-	
-	updated     bool
-	hasCharts   bool
+
+	updated   bool
+	hasCharts bool
 }
 
 // Per-instance metric methods

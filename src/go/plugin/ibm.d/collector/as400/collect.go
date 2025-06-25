@@ -37,13 +37,13 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 			return nil, fmt.Errorf("failed to reconnect to database: %v", err)
 		}
 		a.db = db
-		
+
 		// Retry ping
 		if err := a.ping(ctx); err != nil {
 			return nil, fmt.Errorf("database connection failed after reconnect: %v", err)
 		}
 	}
-	
+
 	// Collect system-wide metrics
 	if err := a.collectSystemStatus(ctx); err != nil {
 		return nil, fmt.Errorf("failed to collect system status: %v", err)
@@ -87,7 +87,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Build final metrics map
 	mx := stm.ToMap(a.mx)
-	
+
 	// Add per-instance metrics
 	for unit, metrics := range a.mx.disks {
 		cleanUnit := cleanName(unit)
@@ -95,14 +95,14 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 			mx[fmt.Sprintf("disk_%s_%s", cleanUnit, k)] = v
 		}
 	}
-	
+
 	for name, metrics := range a.mx.subsystems {
 		cleanName := cleanName(name)
 		for k, v := range stm.ToMap(metrics) {
 			mx[fmt.Sprintf("subsystem_%s_%s", cleanName, k)] = v
 		}
 	}
-	
+
 	for key, metrics := range a.mx.jobQueues {
 		cleanKey := cleanName(key)
 		for k, v := range stm.ToMap(metrics) {
@@ -278,26 +278,26 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 
 	var currentUnit string
 	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		
+
 		switch column {
 		case "UNIT_NUMBER":
 			currentUnit = value
-			
+
 			// Apply selector if configured
 			if a.diskSelector != nil && !a.diskSelector.MatchString(currentUnit) {
 				currentUnit = "" // Skip this disk
 				return
 			}
-			
+
 			disk := a.getDiskMetrics(currentUnit)
 			disk.updated = true
-			
+
 			// Add charts on first encounter
 			if !disk.hasCharts {
 				disk.hasCharts = true
 				a.addDiskCharts(disk)
 			}
-			
+
 		case "UNIT_TYPE":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
 				a.disks[currentUnit].typeField = value
@@ -377,7 +377,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 
 func (a *AS400) countDisks(ctx context.Context) (int, error) {
 	query := "SELECT COUNT(DISTINCT UNIT_NUMBER) as COUNT FROM QSYS2.DISK_STATUS"
-	
+
 	var count int
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
@@ -386,7 +386,7 @@ func (a *AS400) countDisks(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	
+
 	return count, err
 }
 
@@ -420,25 +420,25 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 
 	var currentName string
 	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		
+
 		switch column {
 		case "SUBSYSTEM_NAME":
 			currentName = value
-			
+
 			// Apply selector if configured
 			if a.subsystemSelector != nil && !a.subsystemSelector.MatchString(currentName) {
 				currentName = "" // Skip this subsystem
 				return
 			}
-			
+
 			subsystem := a.getSubsystemMetrics(currentName)
 			subsystem.updated = true
-			
+
 			if !subsystem.hasCharts {
 				subsystem.hasCharts = true
 				a.addSubsystemCharts(subsystem)
 			}
-			
+
 		case "SUBSYSTEM_LIBRARY_NAME":
 			if currentName != "" && a.subsystems[currentName] != nil {
 				subsystem := a.subsystems[currentName]
@@ -499,7 +499,7 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 
 func (a *AS400) countSubsystems(ctx context.Context) (int, error) {
 	query := "SELECT COUNT(*) as COUNT FROM QSYS2.SUBSYSTEM_INFO WHERE STATUS = 'ACTIVE'"
-	
+
 	var count int
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
@@ -508,7 +508,7 @@ func (a *AS400) countSubsystems(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	
+
 	return count, err
 }
 
@@ -541,30 +541,30 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 
 	var currentName, currentLib, key string
 	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		
+
 		switch column {
 		case "JOB_QUEUE_NAME":
 			currentName = value
 		case "JOB_QUEUE_LIBRARY":
 			currentLib = value
 			key = fmt.Sprintf("%s_%s", currentName, currentLib)
-			
+
 			// Apply selector if configured (matches on queue name)
 			if a.jobQueueSelector != nil && !a.jobQueueSelector.MatchString(currentName) {
 				key = "" // Skip this job queue
 				return
 			}
-			
+
 			jobQueue := a.getJobQueueMetrics(key)
 			jobQueue.updated = true
 			jobQueue.name = currentName
 			jobQueue.library = currentLib
-			
+
 			if !jobQueue.hasCharts {
 				jobQueue.hasCharts = true
 				a.addJobQueueCharts(jobQueue, key)
 			}
-			
+
 		case "JOB_QUEUE_STATUS":
 			if key != "" && a.jobQueues[key] != nil {
 				jobQueue := a.jobQueues[key]
@@ -615,7 +615,7 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 
 func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
 	query := "SELECT COUNT(*) as COUNT FROM QSYS2.JOB_QUEUE_INFO"
-	
+
 	var count int
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
@@ -624,6 +624,6 @@ func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	
+
 	return count, err
 }
