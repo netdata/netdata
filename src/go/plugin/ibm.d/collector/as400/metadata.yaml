@@ -27,17 +27,17 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors IBM AS/400 (IBM i) system performance metrics via IBM DB2 connection.
-          
+
           **IMPORTANT**: This collector is part of the ibm.d.plugin which requires CGO and is not included in the default Netdata build.
           See the setup section for build instructions.
           It collects system-wide metrics and optionally per-instance metrics for disks, subsystems, and job queues.
-          
+
           System-wide metrics include:
           - CPU utilization
           - Memory pool usage
           - System ASP usage
           - Aggregate disk and job statistics
-          
+
           Per-instance metrics (when enabled) include:
           - Individual disk performance (I/O, throughput, response time)
           - Subsystem job counts and storage usage
@@ -70,11 +70,11 @@ modules:
             description: |
               This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
               You must build the plugin from source with CGO_ENABLED=1.
-              
+
           - title: Install IBM DB2 Client Libraries
             description: |
               The IBM DB2 client libraries must be installed on the system where Netdata runs:
-              
+
               For Linux systems:
               ```bash
               # Download IBM DB2 client from IBM website
@@ -85,11 +85,11 @@ modules:
               export CGO_LDFLAGS="-L$IBM_DB_HOME/lib"
               export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
               ```
-              
+
           - title: Configure Database Connection
             description: |
               Ensure your IBM i system is configured to accept DB2 connections:
-              
+
               1. Verify DB2 Connect (or equivalent) is licensed and configured on your IBM i
               2. Check that the QZDASOINIT prestart jobs are running
               3. Verify TCP/IP connectivity to your IBM i system on the DB2 port (usually 446 or 8471)
@@ -115,10 +115,10 @@ modules:
               detailed_description: |
                 The connection string format for IBM DB2:
                 `DATABASE=dbname;HOSTNAME=host;PORT=port;PROTOCOL=TCPIP;UID=username;PWD=password`
-                
+
                 For SSL connections, add:
                 `;SECURITY=SSL;SSLServerCertificate=/path/to/certificate.crt`
-                
+
                 Parameters:
                 - DATABASE: Database name (can be 'bludb' for IBM Cloud or blank for AS/400)
                 - HOSTNAME: Your IBM i system hostname or IP
