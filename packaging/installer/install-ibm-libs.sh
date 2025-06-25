@@ -9,16 +9,18 @@ set -e
 DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
 
 # Determine the correct library directory based on Netdata installation
-if [ -d "/opt/netdata" ]; then
+if [ -n "${NETDATA_PREFIX}" ]; then
+    # Custom installation prefix
+    DRIVER_DIR="${NETDATA_PREFIX}/lib/netdata/ibm-clidriver"
+elif [ -d "/opt/netdata" ]; then
     # Static installation
     DRIVER_DIR="/opt/netdata/lib/netdata/ibm-clidriver"
 elif [ -d "/usr/libexec/netdata" ]; then
     # System package installation
     DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
 else
-    # Custom installation - try to detect
-    NETDATA_PREFIX="${NETDATA_PREFIX:-/usr}"
-    DRIVER_DIR="${NETDATA_PREFIX}/lib/netdata/ibm-clidriver"
+    # Default to /usr
+    DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
 fi
 
 # Check if already installed
