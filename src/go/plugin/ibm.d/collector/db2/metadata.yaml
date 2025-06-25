@@ -25,16 +25,16 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors IBM DB2 database performance metrics.
-          
+
           **IMPORTANT**: This collector is part of the ibm.d.plugin which requires CGO and is not included in the default Netdata build.
           See the setup section for build instructions.
-          
+
           It supports all DB2 editions:
           - DB2 LUW (Linux, Unix, Windows)
           - DB2 for z/OS
           - DB2 for i (AS/400)
           - Db2 on Cloud
-          
+
           The collector automatically detects the DB2 edition and adapts its queries accordingly.
         method_description: |
           The collector uses IBM DB2 driver to connect to the database and queries system catalog tables
@@ -66,12 +66,12 @@ modules:
             description: |
               This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
               See the AS/400 collector documentation for build instructions.
-              
+
           - title: Install IBM DB2 Client Libraries
             description: |
               The IBM DB2 client libraries must be installed on the system where Netdata runs.
               These are proprietary libraries that must be obtained from IBM.
-              
+
           - title: Database User Permissions
             description: |
               The database user needs SELECT permissions on SYSIBMADM views:
@@ -104,10 +104,10 @@ modules:
               detailed_description: |
                 The connection string format:
                 `DATABASE=dbname;HOSTNAME=host;PORT=port;PROTOCOL=TCPIP;UID=username;PWD=password`
-                
+
                 For SSL connections, add:
                 `;SECURITY=SSL;SSLServerCertificate=/path/to/certificate.crt`
-                
+
                 Common ports:
                 - 50000: Default for DB2 LUW
                 - 446: Default for DB2 for i

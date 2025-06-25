@@ -184,7 +184,7 @@ modules:
                     url: https://prod.example.com:9443
                     username: monitor
                     password: secret
-                    
+
                   - name: liberty_test
                     url: https://test.example.com:9443
                     username: monitor
