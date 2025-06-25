@@ -3,12 +3,13 @@
 package db2
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-func (d *DB2) collectDatabaseInstances() error {
+func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 	if d.MaxDatabases <= 0 {
 		return nil
 	}
@@ -23,7 +24,7 @@ func (d *DB2) collectDatabaseInstances() error {
 	`
 
 	count := 0
-	err := d.doQuery(fmt.Sprintf(query, d.MaxDatabases), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxDatabases), func(column, value string, lineEnd bool) {
 		var dbName string
 		
 		switch column {
@@ -31,6 +32,11 @@ func (d *DB2) collectDatabaseInstances() error {
 			dbName = strings.TrimSpace(value)
 			if dbName == "" {
 				return
+			}
+			
+			// Apply selector if configured
+			if d.databaseSelector != nil && !d.databaseSelector.MatchString(dbName) {
+				return // Skip this database
 			}
 			
 			if _, exists := d.databases[dbName]; !exists {
@@ -86,7 +92,7 @@ func (d *DB2) collectDatabaseInstances() error {
 	return err
 }
 
-func (d *DB2) collectBufferpoolInstances() error {
+func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 	if d.MaxBufferpools <= 0 {
 		return nil
 	}
@@ -110,11 +116,17 @@ func (d *DB2) collectBufferpoolInstances() error {
 	`
 
 	var currentBP string
-	err := d.doQuery(fmt.Sprintf(query, d.MaxBufferpools), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxBufferpools), func(column, value string, lineEnd bool) {
 		switch column {
 		case "BP_NAME":
 			currentBP = strings.TrimSpace(value)
 			if currentBP == "" {
+				return
+			}
+			
+			// Apply selector if configured
+			if d.bufferpoolSelector != nil && !d.bufferpoolSelector.MatchString(currentBP) {
+				currentBP = "" // Skip this bufferpool
 				return
 			}
 			
@@ -184,7 +196,7 @@ func (d *DB2) collectBufferpoolInstances() error {
 	return err
 }
 
-func (d *DB2) collectTablespaceInstances() error {
+func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 	if d.MaxTablespaces <= 0 {
 		return nil
 	}
@@ -211,7 +223,7 @@ func (d *DB2) collectTablespaceInstances() error {
 	`
 
 	var currentTbsp string
-	err := d.doQuery(fmt.Sprintf(query, d.MaxTablespaces), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxTablespaces), func(column, value string, lineEnd bool) {
 		switch column {
 		case "TBSP_NAME":
 			currentTbsp = strings.TrimSpace(value)
@@ -303,7 +315,7 @@ func (d *DB2) collectTablespaceInstances() error {
 	return err
 }
 
-func (d *DB2) collectConnectionInstances() error {
+func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 	if d.MaxConnections <= 0 {
 		return nil
 	}
@@ -326,7 +338,7 @@ func (d *DB2) collectConnectionInstances() error {
 	`
 
 	var currentAppID string
-	err := d.doQuery(fmt.Sprintf(query, d.MaxConnections), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxConnections), func(column, value string, lineEnd bool) {
 		switch column {
 		case "APPLICATION_ID":
 			currentAppID = strings.TrimSpace(value)

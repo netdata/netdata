@@ -12,11 +12,9 @@ It supports all DB2 editions:
 
 ## Requirements
 
-This collector is part of the `ibm.d.plugin` which requires:
-- CGO enabled build
-- IBM DB2 client libraries
-
-See the [AS/400 collector documentation](../as400/README.md) for build instructions.
+- IBM DB2 client libraries installed
+- Database user with SELECT permissions on monitoring views
+- Network connectivity to DB2 database
 
 ## Metrics
 
@@ -37,8 +35,6 @@ The collector provides:
 - **Connections**: state, row activity, CPU usage
 
 ## Configuration
-
-Edit the `ibm.d/db2.conf` configuration file.
 
 ```yaml
 jobs:
