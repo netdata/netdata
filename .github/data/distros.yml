@@ -278,6 +278,7 @@ include:
   - &rocky
     distro: rockylinux
     version: "10"
+    base_image: "quay.io/rockylinux/rockylinux:10"
     support_type: Core
     notes: ''
     jsonc_removal: |
@@ -299,6 +300,7 @@ include:
       ebpf-core: true
   - <<: *rocky
     version: "9"
+    base_image: rockylinux:9
     packages:
       <<: *rocky_packages
       repo_distro: el/9
@@ -308,6 +310,7 @@ include:
         - el/9RedHatVirtualizationHost
   - <<: *rocky
     version: "8"
+    base_image: rockylinux:8
     packages:
       <<: *rocky_packages
       repo_distro: el/8
