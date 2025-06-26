@@ -30,6 +30,17 @@ modules:
 
           **IMPORTANT**: This collector is part of the ibm.d.plugin which requires CGO and is not included in the default Netdata build.
           See the setup section for build instructions.
+          
+          **Supported IBM i Versions**:
+          - **V6R1 (6.1)**: Basic monitoring with core metrics (CPU, ASP, jobs, memory)
+          - **V7R1 (7.1)**: Enhanced SQL services become available
+          - **V7R2 (7.2)**: MESSAGE_QUEUE_INFO and JOB_QUEUE_ENTRIES support added
+          - **V7R3 (7.3)**: Full feature set including ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS
+          - **V7R4 (7.4)** and **V7R5 (7.5)**: Latest performance enhancements
+          
+          The collector automatically detects your IBM i version and enables only compatible features.
+          Core metrics work on all versions, while advanced features require newer releases.
+          
           It collects system-wide metrics and optionally per-instance metrics for disks, subsystems, and job queues.
 
           System-wide metrics include:
@@ -53,13 +64,16 @@ modules:
           The collector uses IBM DB2 driver to connect to the IBM i system and queries system catalog tables
           in QSYS2 schema to gather performance metrics.
           
-          The collector is designed for resilience across different IBM i versions:
-          - Automatically detects IBM i version and available features
+          The collector is designed for maximum resilience across different IBM i versions:
+          - Automatically detects IBM i version (V6R1 through V7R5+) and adapts monitoring
+          - Proactively disables features based on detected version before attempting queries
           - Uses individual queries for each metric to maximize compatibility
-          - Gracefully disables unavailable metrics without affecting collection
+          - Gracefully handles missing tables, views, and functions without failures
+          - Comprehensive logging of available and disabled features during startup
           - Logs version compatibility issues only once to avoid log spam
-          - Core metrics work on all IBM i versions
-          - Advanced features may require IBM i V7R3 or later
+          - Core metrics work on all IBM i versions (V6R1+)
+          - Advanced features (ACTIVE_JOB_INFO, IFS_OBJECT_STATISTICS) require V7R3+
+          - Version information added as labels to all charts for filtering and grouping
       supported_platforms:
         include: []
         exclude: []
@@ -76,8 +90,9 @@ modules:
           description: ""
         performance_impact:
           description: |
-            The performance impact is minimal, as the collector uses efficient SQL queries
-            against system catalog views.
+            The performance impact is minimal. The collector uses efficient SQL queries
+            against system catalog views and automatically skips unsupported features
+            based on the detected IBM i version, reducing unnecessary query attempts.
     setup:
       prerequisites:
         list:
@@ -290,12 +305,17 @@ modules:
           - name: Some metrics are not available
             description: Certain metrics are missing or show warnings about unavailable features.
             recommendations:
-              - Check your IBM i version - some features require V7R3 or later
-              - The collector automatically detects available features and disables incompatible ones
+              - Check your IBM i version - some features require specific versions:
+                - V6R1: Basic monitoring only, limited SQL services
+                - V7R1: SQL services available, some advanced features missing
+                - V7R2: MESSAGE_QUEUE_INFO and JOB_QUEUE_ENTRIES added
+                - V7R3: ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS added
+                - V7R4-V7R5: Enhanced performance services
+              - The collector proactively disables incompatible features at startup
+              - Check logs for "Feature availability" messages to see what's enabled
+              - Check logs for "Feature disabled" messages to understand limitations
               - Core metrics (CPU, ASP, Jobs) work on all IBM i versions
-              - Advanced metrics like CPU configuration details require V7R3+
-              - Table functions ACTIVE_JOB_INFO() and IFS_OBJECT_STATISTICS() require V7R3+
-              - Missing metrics will be logged once and then disabled automatically
+              - Missing metrics will be logged once and then skipped automatically
     alerts:
       - name: as400_cpu_utilization
         metric: as400.cpu_utilization

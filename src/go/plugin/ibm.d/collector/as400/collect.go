@@ -80,14 +80,22 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	if a.IFSTopNDirectories > 0 {
-		if err := a.collectIFSTopNDirectories(ctx); err != nil {
-			a.Warningf("failed to collect IFS top N directories: %v", err)
+		if !a.isDisabled("ifs_object_statistics") {
+			if err := a.collectIFSTopNDirectories(ctx); err != nil {
+				a.Warningf("failed to collect IFS top N directories: %v", err)
+			}
+		} else {
+			a.logOnce("ifs_top_directories_skipped", "IFS top directories collection skipped - IFS_OBJECT_STATISTICS not available on this IBM i version")
 		}
 	}
 
 	// Collect message queue depths
-	if err := a.collectMessageQueues(ctx); err != nil {
-		a.Warningf("failed to collect message queues: %v", err)
+	if !a.isDisabled("message_queue_info") {
+		if err := a.collectMessageQueues(ctx); err != nil {
+			a.Warningf("failed to collect message queues: %v", err)
+		}
+	} else {
+		a.logOnce("message_queues_skipped", "Message queue collection skipped - MESSAGE_QUEUE_INFO not available on this IBM i version")
 	}
 
 	// Collect critical message counts
@@ -102,8 +110,12 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Collect top active jobs if enabled
 	if a.CollectActiveJobs && a.MaxActiveJobs > 0 {
-		if err := a.collectActiveJobs(ctx); err != nil {
-			a.Warningf("failed to collect active jobs: %v", err)
+		if !a.isDisabled("active_job_info") {
+			if err := a.collectActiveJobs(ctx); err != nil {
+				a.Warningf("failed to collect active jobs: %v", err)
+			}
+		} else {
+			a.logOnce("active_jobs_skipped", "Active job collection skipped - ACTIVE_JOB_INFO not available on this IBM i version")
 		}
 	}
 

@@ -10,6 +10,12 @@
 
 This collector monitors IBM AS/400 (IBM i) system performance metrics via IBM DB2 connection.
 
+The collector features automatic version detection and proactive adaptation:
+- **Detects IBM i version** at startup (V6R1 through V7R5+)
+- **Proactively disables** incompatible features before attempting queries
+- **Adds version labels** to all charts for filtering and grouping
+- **Comprehensive logging** of available and disabled features
+
 It collects:
 
 **System-wide metrics:**
@@ -241,10 +247,13 @@ $IBM_DB_HOME/bin/db2cli validate -database "" -host your-as400-host -port 446 -u
 
 The AS400 collector is designed to work with different IBM i versions and gracefully handle missing features:
 
-### Version Detection
-The collector automatically detects the IBM i version and disables features that are not available:
-- **Core metrics** (CPU, ASP, Jobs) work on all IBM i versions
-- **Advanced metrics** may require newer IBM i versions (V7R3+)
+### Version Detection and Proactive Adaptation
+The collector automatically detects the IBM i version and proactively adapts:
+- **Parses version** into major/release/modification components (e.g., V7R3M5)
+- **Applies feature gates** based on known version compatibility
+- **Logs feature availability** at startup for transparency
+- **Core metrics** (CPU, ASP, Jobs) work on all IBM i versions (V6R1+)
+- **Advanced metrics** are enabled only on compatible versions
 
 ### Resilient Collection
 The collector uses individual queries for each metric to ensure maximum compatibility:
@@ -254,13 +263,22 @@ The collector uses individual queries for each metric to ensure maximum compatib
 
 ### Version-Specific Features
 
-| Feature | Required Version | Fallback Behavior |
-|---------|------------------|-------------------|
-| Basic CPU/ASP metrics | All versions | None needed |
-| CPU configuration details | V7R3+ | Metrics omitted |
-| Interactive/Database CPU | V7R3+ | Metrics omitted |
-| ACTIVE_JOB_INFO function | V7R3+ | Job type breakdown disabled |
-| IFS_OBJECT_STATISTICS | V7R3+ | IFS metrics disabled |
+| Feature | Required Version | Proactive Behavior |
+|---------|------------------|--------------------|
+| Basic CPU/ASP metrics | All versions | Always enabled |
+| SQL services support | V7R1+ | Disabled on V6R1 |
+| MESSAGE_QUEUE_INFO | V7R2+ | Disabled on older versions |
+| JOB_QUEUE_ENTRIES | V7R2+ | Disabled on older versions |
+| ACTIVE_JOB_INFO function | V7R3+ | Disabled before V7R3 |
+| IFS_OBJECT_STATISTICS | V7R3+ | Disabled before V7R3 |
+| Enhanced performance metrics | V7R4+ | Latest features on V7R4-V7R5 |
+
+### Feature Availability Logging
+
+At startup, the collector logs:
+- **Detected version**: "detected IBM i version: V7 R3"
+- **Feature gates applied**: "Feature disabled: active_job_info - ACTIVE_JOB_INFO requires IBM i 7.3 or later"
+- **Available features**: "Feature availability: IBM i 7.3 detected - ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS available"
 
 ### Known Compatibility Issues
 
@@ -272,4 +290,11 @@ The collector uses individual queries for each metric to ensure maximum compatib
    - `CONFIGURED_CPUS`, `CURRENT_PROCESSING_CAPACITY` (V7R3+)
    - `SHARED_PROCESSOR_POOL_UTILIZATION` (V7R3+)
 
-The collector handles these gracefully by disabling the affected metrics without impacting overall collection.
+The collector handles these proactively by:
+1. **Version detection** during initialization
+2. **Proactive feature gating** before any queries are attempted
+3. **Graceful error handling** for unexpected missing features
+4. **Single-use logging** to prevent log spam
+5. **Version labels** on all charts for easy filtering
+
+This ensures reliable collection across all IBM i environments without manual configuration.
