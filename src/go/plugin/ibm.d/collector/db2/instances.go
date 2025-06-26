@@ -88,8 +88,15 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 		return nil
 	}
 
+	// Use Cloud-specific query if Cloud edition detected
+	query := queryBufferpoolInstances
+	if d.edition == "Cloud" {
+		query = queryBufferpoolInstancesCloud
+		d.Debugf("using Cloud-specific bufferpool query for Db2 on Cloud")
+	}
+
 	var currentBP string
-	err := d.doQuery(ctx, fmt.Sprintf(queryBufferpoolInstances, d.MaxBufferpools), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxBufferpools), func(column, value string, lineEnd bool) {
 		switch column {
 		case "BP_NAME":
 			currentBP = strings.TrimSpace(value)
@@ -407,8 +414,15 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 		return nil
 	}
 
+	// Use Cloud-specific query if Cloud edition detected
+	query := queryConnectionInstances
+	if d.edition == "Cloud" {
+		query = queryConnectionInstancesCloud
+		d.Debugf("using Cloud-specific connection query for Db2 on Cloud")
+	}
+
 	var currentAppID string
-	err := d.doQuery(ctx, fmt.Sprintf(queryConnectionInstances, d.MaxConnections), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxConnections), func(column, value string, lineEnd bool) {
 		switch column {
 		case "APPLICATION_ID":
 			currentAppID = strings.TrimSpace(value)

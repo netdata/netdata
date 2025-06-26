@@ -29,13 +29,15 @@ modules:
           **IMPORTANT**: This collector is part of the ibm.d.plugin which requires CGO and is not included in the default Netdata build.
           See the setup section for build instructions.
 
-          It supports all DB2 editions:
-          - DB2 LUW (Linux, Unix, Windows)
-          - DB2 for z/OS
-          - DB2 for i (AS/400)
-          - Db2 on Cloud
-
-          The collector automatically detects the DB2 edition and version, then adapts its monitoring based on available features. Version information is added as labels to all charts for filtering and grouping capabilities.
+          **Supported DB2 Versions**:
+          - **DB2 LUW 9.7+**: Full feature set with SYSIBMADM views
+          - **DB2 LUW 10.0+**: Extended monitoring features
+          - **DB2 LUW 11.0+**: Column store metrics support
+          - **DB2 for z/OS**: Limited buffer pool detailed metrics
+          - **DB2 for i (AS/400)**: Basic monitoring without SYSIBMADM views
+          - **Db2 on Cloud**: Simplified metrics due to restricted schema (no POOL_COL_*, *_LBP_PAGES_FOUND, APPLICATION_NAME, UOW_COMP_STATUS, ROWS_MODIFIED, PAGESIZE, FREE_PAGES, TOTAL_LOG_USED/AVAILABLE)
+          
+          The collector automatically detects your DB2 edition and version, then enables only compatible features. Core metrics work on all versions, while advanced features require specific DB2 releases. Version information is added as labels to all charts for filtering and grouping capabilities.
           
           System-wide metrics include:
           - Database connections (total, active, executing, idle)
@@ -55,6 +57,17 @@ modules:
         method_description: |
           The collector uses IBM DB2 driver to connect to the database and queries system catalog tables
           in SYSIBMADM schema to gather performance metrics.
+          
+          The collector is designed for maximum resilience across different DB2 editions and versions:
+          - Automatically detects DB2 edition (LUW, z/OS, i, Cloud) and version
+          - Proactively disables features based on detected edition/version before attempting queries
+          - Uses individual queries for each metric to maximize compatibility
+          - Gracefully handles missing tables, views, columns, and functions without failures
+          - Provides Cloud-specific simplified queries for Db2 on Cloud's restricted schema
+          - Comprehensive logging of available and disabled features during startup
+          - Logs version/edition compatibility issues only once to avoid log spam
+          - Core metrics work on all DB2 editions and versions
+          - Version and edition information added as labels to all charts for filtering and grouping
       supported_platforms:
         include: []
         exclude: []
@@ -138,8 +151,8 @@ modules:
               default_value: 1
               required: false
             - name: max_db_life_time
-              description: Maximum connection lifetime in seconds.
-              default_value: 600
+              description: Maximum connection lifetime.
+              default_value: 10m
               required: false
             - name: collect_database_metrics
               description: Enable collection of per-database metrics.
@@ -172,6 +185,92 @@ modules:
             - name: max_connections
               description: Maximum number of connections to monitor individually.
               default_value: 200
+              required: false
+            - name: collect_lock_metrics
+              description: Enable collection of lock metrics.
+              default_value: true
+              required: false
+            - name: collect_table_metrics
+              description: Enable collection of per-table metrics (size, activity).
+              default_value: false
+              required: false
+            - name: collect_index_metrics
+              description: Enable collection of per-index metrics (scans, usage).
+              default_value: false
+              required: false
+            - name: max_tables
+              description: Maximum number of tables to monitor.
+              default_value: 50
+              required: false
+            - name: max_indexes
+              description: Maximum number of indexes to monitor.
+              default_value: 100
+              required: false
+            - name: backup_history_days
+              description: Number of days to look back for backup history.
+              default_value: 30
+              required: false
+            - name: collect_databases_matching
+              description: Pattern to filter databases. Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which databases to monitor.
+                Examples:
+                - 'PROD*' - Only databases starting with PROD
+                - '*TEST*|*DEV*' - Test or development databases
+                - Leave empty to collect all databases
+            - name: collect_bufferpools_matching
+              description: Pattern to filter buffer pools. Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which buffer pools to monitor.
+                Examples:
+                - 'IBMSYSTEM*' - Only system buffer pools
+                - Leave empty to collect all buffer pools
+            - name: collect_tablespaces_matching
+              description: Pattern to filter tablespaces. Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which tablespaces to monitor.
+                Examples:
+                - 'USER*' - Only user tablespaces
+                - '*TEMP*' - Temporary tablespaces
+                - Leave empty to collect all tablespaces
+            - name: collect_connections_matching
+              description: Pattern to filter connections by application name. Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which connections to monitor.
+                Examples:
+                - '*jdbc*' - Only JDBC connections
+                - '*java*|*python*' - Java or Python applications
+                - Leave empty to collect all connections
+            - name: collect_tables_matching
+              description: Pattern to filter tables (schema.table). Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which tables to monitor.
+                Examples:
+                - 'MYSCHEMA.*' - All tables in MYSCHEMA
+                - '*.ORDERS' - ORDERS table in any schema
+                - Leave empty to collect all tables
+            - name: collect_indexes_matching
+              description: Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
+              default_value: ""
+              required: false
+              detailed_description: |
+                Use SQL LIKE patterns to filter which indexes to monitor.
+                Examples:
+                - 'MYSCHEMA.IDX_*' - Indexes starting with IDX_ in MYSCHEMA
+                - Leave empty to collect all indexes
+            - name: vnode
+              description: Virtual node (vnode) assignment for Netdata Cloud.
+              default_value: ""
               required: false
         examples:
           folding:
@@ -228,8 +327,10 @@ modules:
             recommendations:
               - DB2 for i (AS/400) has limited SYSIBMADM view support
               - DB2 for z/OS has different monitoring capabilities
-              - Db2 on Cloud restricts system-level metrics
-              - The collector logs which features are enabled/disabled
+              - Db2 on Cloud restricts system-level metrics (missing columns like POOL_COL_*, *_LBP_PAGES_FOUND, APPLICATION_NAME, UOW_COMP_STATUS, ROWS_MODIFIED, PAGESIZE, FREE_PAGES, TOTAL_LOG_USED/AVAILABLE)
+              - The collector automatically detects edition/version and uses appropriate queries
+              - Check logs for "Feature availability" and "Feature disabled" messages
+              - The collector will gracefully degrade functionality based on what's available
     alerts:
       - name: db2_connection_usage
         metric: db2.connections
