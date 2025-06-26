@@ -34,6 +34,29 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibExchange = yes
 ```
 
+## Update Every per Thread
+
+When the plugin is running, most threads will collect data using Netdata’s default update `every interval`. However,
+to avoid overloading the host, Netdata uses different `update every` intervals for specific threads, as shown below:
+
+| Period (seconds) | Threads                                       |
+|------------------|-----------------------------------------------|
+| 5                | `HyperV`                                      |
+| 10               | `MSSQL`, `AD`, `ADCS`, `ADFS`, and `Exchange` |
+| 30               | `Services`                                    |
+
+To customize the update interval for a specific thread, you can set the update every value within the corresponding
+thread configuration in your `netdata.conf` file. For example, to modify the intervals for the `Object`
+and `HyperV` threads:
+
+```text
+[plugin:windows:PerflibObjects]
+        #update every = 10s
+
+[plugin:windows:PerflibHyperV]
+        #update every = 15s
+```
+
 ## Microsoft SQL Server Integration
 
 To collect metrics from [Microsoft SQL Server](https://www.microsoft.com/en-us/sql-server), Netdata needs access to internal server data. This requires configuration on both the Windows system and Netdata sides.
