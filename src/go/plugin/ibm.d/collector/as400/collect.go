@@ -326,7 +326,12 @@ func (a *AS400) doQuery(ctx context.Context, query string, assign func(column, v
 
 	rows, err := a.db.QueryContext(queryCtx, query)
 	if err != nil {
-		a.Errorf("failed to execute query: %s, error: %v", query, err)
+		// Log expected SQL feature errors at DEBUG level to reduce noise
+		if isSQLFeatureError(err) {
+			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		} else {
+			a.Errorf("failed to execute query: %s, error: %v", query, err)
+		}
 		return err
 	}
 	defer rows.Close()
@@ -412,8 +417,13 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 				disk := a.disks[currentUnit]
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
 					disk.busyPercent = int64(v * precision)
-					a.mx.disks[currentUnit] = diskInstanceMetrics{
-						BusyPercent: disk.busyPercent,
+					if m, ok := a.mx.disks[currentUnit]; ok {
+						m.BusyPercent = disk.busyPercent
+						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							BusyPercent: disk.busyPercent,
+						}
 					}
 				}
 			}
@@ -538,8 +548,13 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 				subsystem := a.subsystems[currentName]
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					subsystem.jobsActive = v
-					a.mx.subsystems[currentName] = subsystemInstanceMetrics{
-						JobsActive: v,
+					if m, ok := a.mx.subsystems[currentName]; ok {
+						m.JobsActive = v
+						a.mx.subsystems[currentName] = m
+					} else {
+						a.mx.subsystems[currentName] = subsystemInstanceMetrics{
+							JobsActive: v,
+						}
 					}
 				}
 			}
@@ -644,8 +659,13 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 				jobQueue := a.jobQueues[key]
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					jobQueue.jobsWaiting = v
-					a.mx.jobQueues[key] = jobQueueInstanceMetrics{
-						JobsWaiting: v,
+					if m, ok := a.mx.jobQueues[key]; ok {
+						m.JobsWaiting = v
+						a.mx.jobQueues[key] = m
+					} else {
+						a.mx.jobQueues[key] = jobQueueInstanceMetrics{
+							JobsWaiting: v,
+						}
 					}
 				}
 			}
@@ -735,7 +755,7 @@ func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
 	// Handle table function errors
 	if err != nil && isSQLFeatureError(err) {
 		a.logOnce("active_job_info", "ACTIVE_JOB_INFO function not available on this IBM i version: %v", err)
-		a.disabledFeatures["active_job_info"] = true
+		a.disabled["active_job_info"] = true
 		return nil
 	}
 
@@ -767,7 +787,7 @@ func (a *AS400) collectIFSUsage(ctx context.Context) error {
 	// Handle table function errors
 	if err != nil && isSQLFeatureError(err) {
 		a.logOnce("ifs_object_statistics", "IFS_OBJECT_STATISTICS function not available on this IBM i version: %v", err)
-		a.disabledFeatures["ifs_object_statistics"] = true
+		a.disabled["ifs_object_statistics"] = true
 		return nil
 	}
 
@@ -907,7 +927,7 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 	// Handle table function errors
 	if err != nil && isSQLFeatureError(err) {
 		a.logOnce("active_job_info", "ACTIVE_JOB_INFO function not available on this IBM i version: %v", err)
-		a.disabledFeatures["active_job_info"] = true
+		a.disabled["active_job_info"] = true
 		return nil
 	}
 
@@ -941,7 +961,7 @@ func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
 	// Handle table function errors
 	if err != nil && isSQLFeatureError(err) {
 		a.logOnce("ifs_object_statistics", "IFS_OBJECT_STATISTICS function not available on this IBM i version: %v", err)
-		a.disabledFeatures["ifs_object_statistics"] = true
+		a.disabled["ifs_object_statistics"] = true
 		return nil
 	}
 
