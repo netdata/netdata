@@ -11,7 +11,7 @@ import (
 
 // Disk charts
 func (a *AS400) addDiskCharts(disk *diskMetrics) {
-	charts := newDiskCharts(disk)
+	charts := a.newDiskCharts(disk)
 	if err := a.Charts().Add(*charts...); err != nil {
 		a.Warning(err)
 	}
@@ -29,7 +29,7 @@ func (a *AS400) removeDiskCharts(disk *diskMetrics) {
 
 // Subsystem charts
 func (a *AS400) addSubsystemCharts(subsystem *subsystemMetrics) {
-	charts := newSubsystemCharts(subsystem)
+	charts := a.newSubsystemCharts(subsystem)
 	if err := a.Charts().Add(*charts...); err != nil {
 		a.Warning(err)
 	}
@@ -47,7 +47,7 @@ func (a *AS400) removeSubsystemCharts(subsystem *subsystemMetrics) {
 
 // Job queue charts
 func (a *AS400) addJobQueueCharts(jobQueue *jobQueueMetrics, key string) {
-	charts := newJobQueueCharts(jobQueue, key)
+	charts := a.newJobQueueCharts(jobQueue, key)
 	if err := a.Charts().Add(*charts...); err != nil {
 		a.Warning(err)
 	}

@@ -232,7 +232,7 @@ var (
 )
 
 // Chart creation functions
-func newDatabaseCharts(db *databaseMetrics) *module.Charts {
+func (d *DB2) newDatabaseCharts(db *databaseMetrics) *module.Charts {
 	charts := module.Charts{
 		databaseStatusChartTmpl.Copy(),
 		databaseApplicationsChartTmpl.Copy(),
@@ -244,6 +244,8 @@ func newDatabaseCharts(db *databaseMetrics) *module.Charts {
 		chart.Labels = []module.Label{
 			{Key: "database", Value: db.name},
 			{Key: "status", Value: db.status},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
@@ -253,7 +255,7 @@ func newDatabaseCharts(db *databaseMetrics) *module.Charts {
 	return &charts
 }
 
-func newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
+func (d *DB2) newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 	charts := module.Charts{
 		bufferpoolHitRatioChartTmpl.Copy(),
 		bufferpoolDetailedHitRatioChartTmpl.Copy(),
@@ -269,6 +271,8 @@ func newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 		chart.Labels = []module.Label{
 			{Key: "bufferpool", Value: bp.name},
 			{Key: "page_size", Value: fmt.Sprintf("%d", bp.pageSize)},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
@@ -278,7 +282,7 @@ func newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 	return &charts
 }
 
-func newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
+func (d *DB2) newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 	charts := module.Charts{
 		tablespaceUsageChartTmpl.Copy(),
 		tablespaceSizeChartTmpl.Copy(),
@@ -293,6 +297,8 @@ func newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 			{Key: "type", Value: ts.tbspType},
 			{Key: "content_type", Value: ts.contentType},
 			{Key: "state", Value: ts.state},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
@@ -302,7 +308,7 @@ func newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 	return &charts
 }
 
-func newConnectionCharts(conn *connectionMetrics) *module.Charts {
+func (d *DB2) newConnectionCharts(conn *connectionMetrics) *module.Charts {
 	charts := module.Charts{
 		connectionStateChartTmpl.Copy(),
 		connectionActivityChartTmpl.Copy(),
@@ -317,6 +323,8 @@ func newConnectionCharts(conn *connectionMetrics) *module.Charts {
 			{Key: "client_hostname", Value: conn.clientHostname},
 			{Key: "client_user", Value: conn.clientUser},
 			{Key: "state", Value: conn.connectionState},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanID)
@@ -326,7 +334,7 @@ func newConnectionCharts(conn *connectionMetrics) *module.Charts {
 	return &charts
 }
 
-func newTableCharts(t *tableMetrics) *module.Charts {
+func (d *DB2) newTableCharts(t *tableMetrics) *module.Charts {
 	charts := module.Charts{
 		tableSizeChartTmpl.Copy(),
 		tableActivityChartTmpl.Copy(),
@@ -337,6 +345,8 @@ func newTableCharts(t *tableMetrics) *module.Charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: "table", Value: t.name},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
@@ -346,7 +356,7 @@ func newTableCharts(t *tableMetrics) *module.Charts {
 	return &charts
 }
 
-func newIndexCharts(i *indexMetrics) *module.Charts {
+func (d *DB2) newIndexCharts(i *indexMetrics) *module.Charts {
 	charts := module.Charts{
 		indexUsageChartTmpl.Copy(),
 	}
@@ -356,6 +366,8 @@ func newIndexCharts(i *indexMetrics) *module.Charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: "index", Value: i.name},
+			{Key: "db2_edition", Value: d.edition},
+			{Key: "db2_version", Value: d.version},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
