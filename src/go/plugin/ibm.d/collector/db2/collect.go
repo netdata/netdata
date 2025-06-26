@@ -67,40 +67,64 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		return nil, fmt.Errorf("failed to collect global metrics: %v", err)
 	}
 
-	// Collect per-instance metrics if enabled
+	// Collect per-instance metrics if enabled and supported
 	if d.CollectDatabaseMetrics {
-		if err := d.collectDatabaseInstances(ctx); err != nil {
-			d.Errorf("failed to collect database instances: %v", err)
+		if !d.isDisabled("sysibmadm_views") {
+			if err := d.collectDatabaseInstances(ctx); err != nil {
+				d.Errorf("failed to collect database instances: %v", err)
+			}
+		} else {
+			d.logOnce("database_instances_skipped", "Database instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectBufferpoolMetrics {
-		if err := d.collectBufferpoolInstances(ctx); err != nil {
-			d.Errorf("failed to collect bufferpool instances: %v", err)
+		if !d.isDisabled("sysibmadm_views") {
+			if err := d.collectBufferpoolInstances(ctx); err != nil {
+				d.Errorf("failed to collect bufferpool instances: %v", err)
+			}
+		} else {
+			d.logOnce("bufferpool_instances_skipped", "Bufferpool instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectTablespaceMetrics {
-		if err := d.collectTablespaceInstances(ctx); err != nil {
-			d.Errorf("failed to collect tablespace instances: %v", err)
+		if !d.isDisabled("sysibmadm_views") {
+			if err := d.collectTablespaceInstances(ctx); err != nil {
+				d.Errorf("failed to collect tablespace instances: %v", err)
+			}
+		} else {
+			d.logOnce("tablespace_instances_skipped", "Tablespace instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectConnectionMetrics {
-		if err := d.collectConnectionInstances(ctx); err != nil {
-			d.Errorf("failed to collect connection instances: %v", err)
+		if !d.isDisabled("sysibmadm_views") {
+			if err := d.collectConnectionInstances(ctx); err != nil {
+				d.Errorf("failed to collect connection instances: %v", err)
+			}
+		} else {
+			d.logOnce("connection_instances_skipped", "Connection instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectTableMetrics {
-		if err := d.collectTableInstances(ctx); err != nil {
-			d.Errorf("failed to collect table instances: %v", err)
+		if !d.isDisabled("extended_monitoring") {
+			if err := d.collectTableInstances(ctx); err != nil {
+				d.Errorf("failed to collect table instances: %v", err)
+			}
+		} else {
+			d.logOnce("table_instances_skipped", "Table instance metrics collection skipped - Extended monitoring not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectIndexMetrics {
-		if err := d.collectIndexInstances(ctx); err != nil {
-			d.Errorf("failed to collect index instances: %v", err)
+		if !d.isDisabled("extended_monitoring") {
+			if err := d.collectIndexInstances(ctx); err != nil {
+				d.Errorf("failed to collect index instances: %v", err)
+			}
+		} else {
+			d.logOnce("index_instances_skipped", "Index instance metrics collection skipped - Extended monitoring not available on this DB2 edition/version")
 		}
 	}
 
@@ -220,26 +244,39 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 		return err // Connection metrics are critical
 	}
 
-	// Lock metrics - graceful degradation
-	d.collectLockMetricsResilience(ctx)
+	// Advanced monitoring metrics - skip if disabled for this edition/version
+	if !d.isDisabled("advanced_monitoring") {
+		// Lock metrics - graceful degradation
+		d.collectLockMetricsResilience(ctx)
 
-	// Sorting metrics - graceful degradation
-	d.collectSortingMetricsResilience(ctx)
+		// Sorting metrics - graceful degradation
+		d.collectSortingMetricsResilience(ctx)
 
-	// Row activity metrics - graceful degradation
-	d.collectRowActivityMetricsResilience(ctx)
+		// Row activity metrics - graceful degradation
+		d.collectRowActivityMetricsResilience(ctx)
 
-	// Buffer pool metrics - graceful degradation
-	d.collectBufferpoolMetricsResilience(ctx)
+		// Long-running queries - graceful degradation
+		d.collectLongRunningQueriesResilience(ctx)
 
-	// Log space metrics - graceful degradation
-	d.collectLogSpaceMetricsResilience(ctx)
+		// Backup status - graceful degradation
+		d.collectBackupStatusResilience(ctx)
+	} else {
+		d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
+	}
 
-	// Long-running queries - graceful degradation
-	d.collectLongRunningQueriesResilience(ctx)
+	// Buffer pool metrics - may be limited on some editions
+	if !d.isDisabled("bufferpool_detailed_metrics") {
+		d.collectBufferpoolMetricsResilience(ctx)
+	} else {
+		d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
+	}
 
-	// Backup status - graceful degradation
-	d.collectBackupStatusResilience(ctx)
+	// Log space metrics - graceful degradation  
+	if !d.isDisabled("system_level_metrics") {
+		d.collectLogSpaceMetricsResilience(ctx)
+	} else {
+		d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
+	}
 
 	return nil
 }

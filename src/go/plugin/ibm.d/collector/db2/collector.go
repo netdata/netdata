@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -143,9 +144,11 @@ type DB2 struct {
 	indexSelector      matcher.Matcher
 
 	// DB2 version info
-	version    string
-	edition    string // LUW, z/OS, i, Cloud
-	serverInfo serverInfo
+	version       string
+	edition       string // LUW, z/OS, i, Cloud
+	versionMajor  int    // Parsed major version (e.g., 11 from "11.5.7")
+	versionMinor  int    // Parsed minor version (e.g., 5 from "11.5.7")
+	serverInfo    serverInfo
 	
 	// Resilience tracking (following AS/400 pattern)
 	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
@@ -373,6 +376,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -385,6 +389,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -397,6 +402,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -409,6 +415,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -417,9 +424,115 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	d.edition = "LUW"
 	d.version = "Unknown"
 	d.Warningf("could not detect DB2 edition, defaulting to LUW")
+	d.applyVersionBasedFeatureGating()
 	d.addVersionLabelsToCharts()
 	
 	return nil
+}
+
+// parseDB2Version extracts major/minor version numbers from version string
+func (d *DB2) parseDB2Version() {
+	if d.version == "" || d.version == "Unknown" {
+		return
+	}
+	
+	// Parse version strings like "DB2 v11.5.7.0", "11.5", "V11R5M0", etc.
+	versionStr := d.version
+	
+	// Handle different version formats
+	if strings.Contains(versionStr, "v") {
+		// Format: "DB2 v11.5.7.0"
+		parts := strings.Split(versionStr, "v")
+		if len(parts) > 1 {
+			versionStr = parts[1]
+		}
+	} else if strings.Contains(versionStr, "V") && strings.Contains(versionStr, "R") {
+		// Format: "V11R5M0" (z/OS style)
+		versionStr = strings.Replace(versionStr, "V", "", 1)
+		versionStr = strings.Replace(versionStr, "R", ".", 1)
+		versionStr = strings.Replace(versionStr, "M", ".", 1)
+	}
+	
+	// Split on dots and parse major.minor
+	parts := strings.Split(versionStr, ".")
+	if len(parts) >= 2 {
+		if major, err := strconv.Atoi(parts[0]); err == nil {
+			d.versionMajor = major
+		}
+		if minor, err := strconv.Atoi(parts[1]); err == nil {
+			d.versionMinor = minor
+		}
+	} else if len(parts) == 1 {
+		// Just major version
+		if major, err := strconv.Atoi(parts[0]); err == nil {
+			d.versionMajor = major
+		}
+	}
+	
+	d.Debugf("parsed DB2 version: major=%d, minor=%d", d.versionMajor, d.versionMinor)
+}
+
+// applyVersionBasedFeatureGating proactively disables features based on DB2 edition and version
+func (d *DB2) applyVersionBasedFeatureGating() {
+	d.parseDB2Version()
+	
+	// Edition-based feature gating
+	switch d.edition {
+	case "i": // DB2 for i (AS/400)
+		d.disableFeatureWithLog("sysibmadm_views", "SYSIBMADM views not available on DB2 for i (AS/400)")
+		d.disableFeatureWithLog("advanced_monitoring", "Advanced monitoring views not available on DB2 for i")
+		
+	case "z/OS": // DB2 for z/OS
+		d.disableFeatureWithLog("bufferpool_detailed_metrics", "Detailed buffer pool metrics limited on DB2 for z/OS")
+		d.logFeatureAvailability("z/OS specific features enabled for DB2 for z/OS")
+		
+	case "Cloud": // Db2 on Cloud
+		d.disableFeatureWithLog("system_level_metrics", "System-level metrics restricted on Db2 on Cloud")
+		d.logFeatureAvailability("Cloud-specific monitoring enabled for Db2 on Cloud")
+		
+	case "LUW": // DB2 LUW (most feature-complete)
+		d.logFeatureAvailability("Full feature set available for DB2 LUW")
+		
+	default:
+		d.Warningf("Unknown DB2 edition '%s', assuming LUW feature set", d.edition)
+	}
+	
+	// Version-based feature gating (primarily for LUW)
+	if d.edition == "LUW" && d.versionMajor > 0 {
+		if d.versionMajor < 9 || (d.versionMajor == 9 && d.versionMinor < 7) {
+			// DB2 < 9.7 doesn't have SYSIBMADM views
+			d.disableFeatureWithLog("sysibmadm_views", "SYSIBMADM views require DB2 9.7 or later (detected %d.%d)", d.versionMajor, d.versionMinor)
+			d.disableFeatureWithLog("advanced_monitoring", "Advanced monitoring requires DB2 9.7 or later")
+		}
+		
+		if d.versionMajor < 10 {
+			d.disableFeatureWithLog("extended_monitoring", "Extended monitoring features require DB2 10.0 or later")
+		}
+		
+		if d.versionMajor < 11 {
+			d.disableFeatureWithLog("columnstore_metrics", "Column store metrics require DB2 11.0 or later")
+		}
+		
+		// Log enabled features for newer versions
+		if d.versionMajor >= 11 {
+			d.logFeatureAvailability("Full DB2 11+ feature set enabled including column store metrics")
+		} else if d.versionMajor >= 10 {
+			d.logFeatureAvailability("DB2 10+ features enabled, column store metrics disabled")
+		} else if d.versionMajor >= 9 && d.versionMinor >= 7 {
+			d.logFeatureAvailability("DB2 9.7+ features enabled, advanced features disabled")
+		}
+	}
+}
+
+// disableFeatureWithLog disables a feature and logs the reason
+func (d *DB2) disableFeatureWithLog(feature string, reason string, args ...interface{}) {
+	d.disabledFeatures[feature] = true
+	d.Infof("Feature disabled: %s - "+reason, append([]interface{}{feature}, args...)...)
+}
+
+// logFeatureAvailability logs what features are available
+func (d *DB2) logFeatureAvailability(message string) {
+	d.Infof("Feature availability: %s", message)
 }
 
 // addVersionLabelsToCharts adds DB2 version and edition labels to all charts
