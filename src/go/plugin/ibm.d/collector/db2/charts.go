@@ -8,13 +8,24 @@ import (
 
 var (
 	baseCharts = module.Charts{
+		serviceHealthChart.Copy(),
 		connectionsChart.Copy(),
 		lockingChart.Copy(),
+		lockDetailsChart.Copy(),
+		lockWaitTimeChart.Copy(),
 		deadlocksChart.Copy(),
 		sortingChart.Copy(),
 		rowActivityChart.Copy(),
 		bufferpoolHitRatioChart.Copy(),
+		bufferpoolDetailedHitRatioChart.Copy(),
+		bufferpoolReadsChart.Copy(),
+		bufferpoolDataReadsChart.Copy(),
+		bufferpoolIndexReadsChart.Copy(),
+		bufferpoolXDAReadsChart.Copy(),
+		bufferpoolColumnReadsChart.Copy(),
 		logSpaceChart.Copy(),
+		logUtilizationChart.Copy(),
+		logIOChart.Copy(),
 		longRunningQueriesChart.Copy(),
 		backupStatusChart.Copy(),
 		backupAgeChart.Copy(),
@@ -22,6 +33,19 @@ var (
 )
 
 var (
+	serviceHealthChart = module.Chart{
+		ID:       "service_health",
+		Title:    "Service Health Status",
+		Units:    "status",
+		Fam:      "health",
+		Ctx:      "db2.service_health",
+		Priority: module.Priority - 10,
+		Dims: module.Dims{
+			{ID: "can_connect", Name: "connection"},
+			{ID: "database_status", Name: "database"},
+		},
+	}
+	
 	connectionsChart = module.Chart{
 		ID:       "connections",
 		Title:    "Database Connections",
@@ -34,6 +58,7 @@ var (
 			{ID: "conn_active", Name: "active"},
 			{ID: "conn_executing", Name: "executing"},
 			{ID: "conn_idle", Name: "idle"},
+			{ID: "conn_max", Name: "max_seen"},
 		},
 	}
 
@@ -77,6 +102,32 @@ var (
 		},
 	}
 
+	lockDetailsChart = module.Chart{
+		ID:       "lock_details",
+		Title:    "Lock Details",
+		Units:    "locks",
+		Fam:      "locking",
+		Ctx:      "db2.lock_details",
+		Priority: module.Priority + 12,
+		Dims: module.Dims{
+			{ID: "lock_active", Name: "active"},
+			{ID: "lock_waiting_agents", Name: "waiting_agents"},
+			{ID: "lock_memory_pages", Name: "memory_pages"},
+		},
+	}
+	
+	lockWaitTimeChart = module.Chart{
+		ID:       "lock_wait_time",
+		Title:    "Average Lock Wait Time",
+		Units:    "milliseconds",
+		Fam:      "locking",
+		Ctx:      "db2.lock_wait_time",
+		Priority: module.Priority + 13,
+		Dims: module.Dims{
+			{ID: "lock_wait_time", Name: "wait_time", Div: precision},
+		},
+	}
+
 	rowActivityChart = module.Chart{
 		ID:       "row_activity",
 		Title:    "Row Activity",
@@ -87,6 +138,7 @@ var (
 		Type:     module.Area,
 		Dims: module.Dims{
 			{ID: "rows_read", Name: "read", Algo: module.Incremental},
+			{ID: "rows_returned", Name: "returned", Algo: module.Incremental},
 			{ID: "rows_modified", Name: "modified", Algo: module.Incremental, Mul: -1},
 		},
 	}
@@ -103,6 +155,91 @@ var (
 		},
 	}
 
+	bufferpoolDetailedHitRatioChart = module.Chart{
+		ID:       "bufferpool_detailed_hit_ratio",
+		Title:    "Buffer Pool Detailed Hit Ratios",
+		Units:    "percentage",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_detailed_hit_ratio",
+		Priority: module.Priority + 41,
+		Dims: module.Dims{
+			{ID: "bufferpool_data_hit_ratio", Name: "data", Div: precision},
+			{ID: "bufferpool_index_hit_ratio", Name: "index", Div: precision},
+			{ID: "bufferpool_xda_hit_ratio", Name: "xda", Div: precision},
+			{ID: "bufferpool_column_hit_ratio", Name: "column", Div: precision},
+		},
+	}
+	
+	bufferpoolReadsChart = module.Chart{
+		ID:       "bufferpool_reads",
+		Title:    "Buffer Pool Reads",
+		Units:    "reads/s",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_reads",
+		Priority: module.Priority + 42,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+	
+	bufferpoolDataReadsChart = module.Chart{
+		ID:       "bufferpool_data_reads",
+		Title:    "Buffer Pool Data Page Reads",
+		Units:    "reads/s",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_data_reads",
+		Priority: module.Priority + 43,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_data_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_data_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+	
+	bufferpoolIndexReadsChart = module.Chart{
+		ID:       "bufferpool_index_reads",
+		Title:    "Buffer Pool Index Page Reads",
+		Units:    "reads/s",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_index_reads",
+		Priority: module.Priority + 44,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_index_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_index_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+	
+	bufferpoolXDAReadsChart = module.Chart{
+		ID:       "bufferpool_xda_reads",
+		Title:    "Buffer Pool XDA Page Reads",
+		Units:    "reads/s",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_xda_reads",
+		Priority: module.Priority + 45,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_xda_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_xda_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+	
+	bufferpoolColumnReadsChart = module.Chart{
+		ID:       "bufferpool_column_reads",
+		Title:    "Buffer Pool Column Page Reads",
+		Units:    "reads/s",
+		Fam:      "performance",
+		Ctx:      "db2.bufferpool_column_reads",
+		Priority: module.Priority + 46,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_column_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_column_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+
 	logSpaceChart = module.Chart{
 		ID:       "log_space",
 		Title:    "Log Space Usage",
@@ -114,6 +251,32 @@ var (
 		Dims: module.Dims{
 			{ID: "log_used_space", Name: "used"},
 			{ID: "log_available_space", Name: "available"},
+		},
+	}
+	
+	logUtilizationChart = module.Chart{
+		ID:       "log_utilization",
+		Title:    "Log Space Utilization",
+		Units:    "percentage",
+		Fam:      "storage",
+		Ctx:      "db2.log_utilization",
+		Priority: module.Priority + 51,
+		Dims: module.Dims{
+			{ID: "log_utilization", Name: "utilization", Div: precision},
+		},
+	}
+	
+	logIOChart = module.Chart{
+		ID:       "log_io",
+		Title:    "Log I/O Operations",
+		Units:    "operations/s",
+		Fam:      "storage",
+		Ctx:      "db2.log_io",
+		Priority: module.Priority + 52,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "log_reads", Name: "reads", Algo: module.Incremental},
+			{ID: "log_writes", Name: "writes", Algo: module.Incremental, Mul: -1},
 		},
 	}
 
@@ -147,13 +310,13 @@ var (
 	backupAgeChart = module.Chart{
 		ID:       "backup_age",
 		Title:    "Time Since Last Backup",
-		Units:    "hours",
+		Units:    "seconds",
 		Fam:      "backup",
 		Ctx:      "db2.backup_age",
 		Priority: module.Priority + 71,
 		Dims: module.Dims{
-			{ID: "last_full_backup_age", Name: "full"},
-			{ID: "last_incremental_backup_age", Name: "incremental"},
+			{ID: "last_full_backup_age", Name: "full", Mul: 3600},
+			{ID: "last_incremental_backup_age", Name: "incremental", Mul: 3600},
 		},
 	}
 )
