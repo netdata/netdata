@@ -18,6 +18,7 @@
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
 ND_THREAD *mssql_query_thread = NULL;
+static int local_update_every = UPDATE_EVERY_MIN;
 
 struct netdata_mssql_conn {
     const char *instance_name;
@@ -574,7 +575,8 @@ static int dict_mssql_fill_waits(struct mssql_instance *mi)
         goto endwait;
     }
 
-    ret = SQLBindCol(mi->conn->dbWaitsSTMT, 7, SQL_C_CHAR, wait_category, sizeof(wait_category), &col_wait_category_len);
+    ret =
+        SQLBindCol(mi->conn->dbWaitsSTMT, 7, SQL_C_CHAR, wait_category, sizeof(wait_category), &col_wait_category_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
@@ -615,7 +617,8 @@ endwait:
     return success;
 }
 
-static int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static int
+dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
@@ -846,8 +849,6 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
 
     strncpyz(&name[length], "Access Methods", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_ACCESS_METHODS] = strdupz(name);
-
-    mi->instanceID = strdupz(instance);
 }
 
 static inline void initialize_mssql_keys(struct mssql_instance *mi)
@@ -1000,10 +1001,7 @@ static struct netdata_mssql_conn *netdata_read_config_options()
 
     dbconn->instance_name = inicfg_get(&netdata_config, section_name, "instance", NULL);
     if (!dbconn->instance_name) {
-        nd_log(
-            NDLS_COLLECTORS,
-            NDLP_ERR,
-            "No instance name found in section %s", section_name);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "No instance name found in section %s", section_name);
 
         total_instances++;
         return dbconn;
@@ -1085,6 +1083,8 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     const char *instance = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     bool *create_thread = data;
 
+    mi->instanceID = strdupz(instance);
+    mi->update_every = local_update_every;
     if (!mi->locks_instances) {
         mi->locks_instances = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -1166,7 +1166,7 @@ endMSSQLFillDict:
         return -1;
     }
 
-    return  0;
+    return 0;
 }
 
 int netdata_mssql_reset_value(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1183,7 +1183,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     struct mssql_instance *mi = value;
     static long collecting = 1;
 
-    if(mi->conn && mi->conn->is_connected && collecting) {
+    if (mi->conn && mi->conn->is_connected && collecting) {
         collecting = metdata_mssql_check_permission(mi);
         if (!collecting) {
             nd_log(
@@ -1194,7 +1194,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                 mi->instanceID);
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
-            dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
+            // dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
             // collecting = dict_mssql_fill_waits(mi);
         }
     }
@@ -1783,11 +1783,11 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every __maybe_unused)
 {
-    if (unlikely(!mi->conn) || unlikely(!mi->conn->is_connected))
-        return;
+    if (pDataBlock) {
+        PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_LOCKS]);
+        if (!pObjectType)
+            goto parse_dict_lock;
 
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_LOCKS]);
-    if (pObjectType) {
         if (pObjectType->NumInstances) {
             PERF_INSTANCE_DEFINITION *pi = NULL;
             for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -1812,6 +1812,7 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *m
         }
     }
 
+parse_dict_lock:
     dictionary_sorted_walkthrough_read(mi->locks_instances, dict_mssql_locks_charts_cb, mi);
 }
 
@@ -2600,6 +2601,24 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
     }
 }
 
+static inline PERF_DATA_BLOCK *
+netdata_mssql_get_perf_data_block(bool *collect_perflib, struct mssql_instance *mi, DWORD idx)
+{
+    DWORD id = RegistryFindIDByName(mi->objectName[idx]);
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        collect_perflib[idx] = false;
+        return NULL;
+    }
+
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+    if (!pDataBlock) {
+        collect_perflib[idx] = false;
+        return NULL;
+    }
+
+    return pDataBlock;
+}
+
 int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_instance *mi = value;
@@ -2613,42 +2632,31 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_sql_statistics,
         do_mssql_access_methods,
 
-        do_mssql_databases,
         // Data Get with queries
-        /*
+        do_mssql_databases,
         do_mssql_locks,
         do_mssql_waits,
-         */
 
-        NULL
-    };
+        NULL};
 
-    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true};
+    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true, true};
 
+    PERF_DATA_BLOCK *pDataBlock;
     for (i = 0; i < NETDATA_MSSQL_DATABASE; i++) {
         if (!collect_perflib[i])
             continue;
 
-        DWORD id = RegistryFindIDByName(mi->objectName[i]);
-        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
-            collect_perflib[i] = false;
-            continue;
-        }
-
-        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-        if (!pDataBlock) {
-            collect_perflib[i] = false;
-            continue;
-        }
+        pDataBlock = netdata_mssql_get_perf_data_block(collect_perflib, mi, i);
 
         doMSSQL[i](pDataBlock, mi, *update_every);
     }
 
-    if (!mi->conn)
+    if (unlikely(!mi->conn) || unlikely(!mi->conn->is_connected))
         return 1;
 
     for (i = NETDATA_MSSQL_DATABASE; doMSSQL[i]; i++) {
-        doMSSQL[i](NULL, mi, *update_every);
+        pDataBlock = (collect_perflib[i]) ? netdata_mssql_get_perf_data_block(collect_perflib, mi, i) : NULL;
+        doMSSQL[i](pDataBlock, mi, *update_every);
     }
 
     return 1;
@@ -2661,6 +2669,7 @@ int do_PerflibMSSQL(int update_every, usec_t dt __maybe_unused)
     static bool initialized = false;
 
     if (unlikely(!initialized)) {
+        local_update_every = update_every;
         if (initialize(update_every))
             return -1;
 
