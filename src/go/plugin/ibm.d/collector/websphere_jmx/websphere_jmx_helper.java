@@ -65,8 +65,10 @@ public class websphere_jmx_helper {
                         sendError("Unknown command: " + cmd, "", true);
                 }
             }
-        } catch (Exception e) {
-            sendError("Unhandled exception in main loop", e.toString(), false);
+        } catch (IOException e) {
+            sendError("I/O error in main loop", e.toString(), false);
+        } catch (RuntimeException e) {
+            sendError("Unhandled runtime exception in main loop", e.toString(), false);
         } finally {
             cleanup();
         }
@@ -147,7 +149,7 @@ public class websphere_jmx_helper {
                 }
             }
         } catch (Exception e) {
-            sendError("Failed to parse command", e.toString(), true);
+            sendError("Failed to parse command JSON", e.toString(), true);
         }
         
         return result;
@@ -238,67 +240,96 @@ public class websphere_jmx_helper {
                     return;
             }
             
+            // Add cluster-aware properties to the data map
+            String clusterName = (String) command.get("cluster_name");
+            String cellName = (String) command.get("cell_name");
+            String nodeName = (String) command.get("node_name");
+            String serverType = (String) command.get("server_type");
+
+            if (clusterName != null && !clusterName.isEmpty()) {
+                data.put("cluster_name", clusterName);
+            }
+            if (cellName != null && !cellName.isEmpty()) {
+                data.put("cell_name", cellName);
+            }
+            if (nodeName != null && !nodeName.isEmpty()) {
+                data.put("node_name", nodeName);
+            }
+            if (serverType != null && !serverType.isEmpty()) {
+                data.put("server_type", serverType);
+            }
+
             sendSuccess("Metrics collected", data);
-        } catch (Exception e) {
-            sendError("Failed to collect metrics", e.toString(), true);
+        } catch (JMException e) {
+            sendError("JMX error during metrics collection", e.toString(), true);
+        } catch (IOException e) {
+            sendError("Connection error during metrics collection", e.toString(), true);
         }
     }
     
     private static Map<String, Object> collectJVMMetrics() throws Exception {
         Map<String, Object> jvm = new HashMap<>();
         
-        // Memory metrics
-        ObjectName memoryMBean = new ObjectName("java.lang:type=Memory");
-        CompositeData heapUsage = (CompositeData) mbsc.getAttribute(memoryMBean, "HeapMemoryUsage");
-        CompositeData nonHeapUsage = (CompositeData) mbsc.getAttribute(memoryMBean, "NonHeapMemoryUsage");
-        
-        Map<String, Object> heap = new HashMap<>();
-        heap.put("used", heapUsage.get("used"));
-        heap.put("committed", heapUsage.get("committed"));
-        heap.put("max", heapUsage.get("max"));
-        jvm.put("heap", heap);
-        
-        Map<String, Object> nonheap = new HashMap<>();
-        nonheap.put("used", nonHeapUsage.get("used"));
-        nonheap.put("committed", nonHeapUsage.get("committed"));
-        jvm.put("nonheap", nonheap);
-        
-        // GC metrics
-        ObjectName gcMBean = new ObjectName("java.lang:type=GarbageCollector,*");
-        Set<ObjectName> gcBeans = mbsc.queryNames(gcMBean, null);
-        
-        long totalGcCount = 0;
-        long totalGcTime = 0;
-        for (ObjectName gc : gcBeans) {
-            totalGcCount += (Long) mbsc.getAttribute(gc, "CollectionCount");
-            totalGcTime += (Long) mbsc.getAttribute(gc, "CollectionTime");
+        try {
+            // Memory metrics
+            ObjectName memoryMBean = new ObjectName("java.lang:type=Memory");
+            CompositeData heapUsage = (CompositeData) mbsc.getAttribute(memoryMBean, "HeapMemoryUsage");
+            CompositeData nonHeapUsage = (CompositeData) mbsc.getAttribute(memoryMBean, "NonHeapMemoryUsage");
+            
+            Map<String, Object> heap = new HashMap<>();
+            heap.put("used", heapUsage.get("used"));
+            heap.put("committed", heapUsage.get("committed"));
+            heap.put("max", heapUsage.get("max"));
+            jvm.put("heap", heap);
+            
+            Map<String, Object> nonheap = new HashMap<>();
+            nonheap.put("used", nonHeapUsage.get("used"));
+            nonheap.put("committed", nonHeapUsage.get("committed"));
+            jvm.put("nonheap", nonheap);
+            
+            // GC metrics
+            ObjectName gcMBean = new ObjectName("java.lang:type=GarbageCollector,*");
+            Set<ObjectName> gcBeans = mbsc.queryNames(gcMBean, null);
+            
+            long totalGcCount = 0;
+            long totalGcTime = 0;
+            for (ObjectName gc : gcBeans) {
+                totalGcCount += (Long) mbsc.getAttribute(gc, "CollectionCount");
+                totalGcTime += (Long) mbsc.getAttribute(gc, "CollectionTime");
+            }
+            
+            Map<String, Object> gc = new HashMap<>();
+            gc.put("count", totalGcCount);
+            gc.put("time", totalGcTime);
+            jvm.put("gc", gc);
+            
+            // Thread metrics
+            ObjectName threadMBean = new ObjectName("java.lang:type=Threading");
+            Map<String, Object> threads = new HashMap<>();
+            threads.put("count", mbsc.getAttribute(threadMBean, "ThreadCount"));
+            threads.put("daemon", mbsc.getAttribute(threadMBean, "DaemonThreadCount"));
+            threads.put("peak", mbsc.getAttribute(threadMBean, "PeakThreadCount"));
+            threads.put("totalStarted", mbsc.getAttribute(threadMBean, "TotalStartedThreadCount"));
+            
+            // Deadlock detection
+            long[] deadlockedThreadIds = (long[]) mbsc.invoke(threadMBean, "findDeadlockedThreads", null, null);
+            threads.put("deadlocked", deadlockedThreadIds != null ? deadlockedThreadIds.length : 0);
+            
+            jvm.put("threads", threads);
+            
+            // Class loading metrics
+            ObjectName classMBean = new ObjectName("java.lang:type=ClassLoading");
+            Map<String, Object> classes = new HashMap<>();
+            classes.put("loaded", mbsc.getAttribute(classMBean, "LoadedClassCount"));
+            classes.put("unloaded", mbsc.getAttribute(classMBean, "UnloadedClassCount"));
+            jvm.put("classes", classes);
+        } catch (MalformedObjectNameException e) {
+            sendError("Invalid MBean ObjectName for JVM metrics", e.getMessage(), true);
+        } catch (JMException e) {
+            sendError("JMX error collecting JVM metrics", e.getMessage(), true);
+        } catch (IOException e) {
+            sendError("Connection error collecting JVM metrics", e.getMessage(), true);
         }
-        
-        Map<String, Object> gc = new HashMap<>();
-        gc.put("count", totalGcCount);
-        gc.put("time", totalGcTime);
-        jvm.put("gc", gc);
-        
-        // Thread metrics
-        ObjectName threadMBean = new ObjectName("java.lang:type=Threading");
-        Map<String, Object> threads = new HashMap<>();
-        threads.put("count", mbsc.getAttribute(threadMBean, "ThreadCount"));
-        threads.put("daemon", mbsc.getAttribute(threadMBean, "DaemonThreadCount"));
-        threads.put("peak", mbsc.getAttribute(threadMBean, "PeakThreadCount"));
-        threads.put("totalStarted", mbsc.getAttribute(threadMBean, "TotalStartedThreadCount"));
-        
-        // Deadlock detection
-        long[] deadlockedThreadIds = (long[]) mbsc.invoke(threadMBean, "findDeadlockedThreads", null, null);
-        threads.put("deadlocked", deadlockedThreadIds != null ? deadlockedThreadIds.length : 0);
-        
-        jvm.put("threads", threads);
-        
-        // Class loading metrics
-        ObjectName classMBean = new ObjectName("java.lang:type=ClassLoading");
-        Map<String, Object> classes = new HashMap<>();
-        classes.put("loaded", mbsc.getAttribute(classMBean, "LoadedClassCount"));
-        classes.put("unloaded", mbsc.getAttribute(classMBean, "UnloadedClassCount"));
-        jvm.put("classes", classes);
         
         return jvm;
     }
@@ -307,34 +338,52 @@ public class websphere_jmx_helper {
         List<Map<String, Object>> pools = new ArrayList<>();
         int maxItems = getMaxItems(command);
         
-        // Real WebSphere thread pool MBeans include node and process attributes
-        // Pattern: WebSphere:type=ThreadPool,name=<poolName>,process=<processName>,node=<nodeName>,*
-        ObjectName pattern = new ObjectName("WebSphere:type=ThreadPool,*");
-        Set<ObjectName> poolBeans = mbsc.queryNames(pattern, null);
-        
-        int count = 0;
-        for (ObjectName poolBean : poolBeans) {
-            if (maxItems > 0 && count >= maxItems) break;
+        ObjectName pattern;
+        try {
+            // Real WebSphere thread pool MBeans include node and process attributes
+            // Pattern: WebSphere:type=ThreadPool,name=<poolName>,process=<processName>,node=<nodeName>,*
+            pattern = new ObjectName("WebSphere:type=ThreadPool,*");
+        } catch (MalformedObjectNameException e) {
+            sendError("Invalid MBean ObjectName for ThreadPools", e.getMessage(), true);
+            return pools;
+        }
+
+        try {
+            Set<ObjectName> poolBeans = mbsc.queryNames(pattern, null);
             
-            Map<String, Object> pool = new HashMap<>();
-            pool.put("name", poolBean.getKeyProperty("name"));
-            pool.put("node", poolBean.getKeyProperty("node"));
-            pool.put("process", poolBean.getKeyProperty("process"));
-            
-            // WebSphere uses different attribute names than the fictional ones
-            try {
-                pool.put("poolSize", mbsc.getAttribute(poolBean, "size"));
-                pool.put("activeCount", mbsc.getAttribute(poolBean, "activeThreads"));
-                pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumSize"));
-            } catch (AttributeNotFoundException e) {
-                // Try alternative attribute names used by WebSphere
-                pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
-                pool.put("activeCount", mbsc.getAttribute(poolBean, "activeCount"));
-                pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumPoolSize"));
+            int count = 0;
+            for (ObjectName poolBean : poolBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                Map<String, Object> pool = new HashMap<>();
+                pool.put("name", poolBean.getKeyProperty("name"));
+                pool.put("node", poolBean.getKeyProperty("node"));
+                pool.put("process", poolBean.getKeyProperty("process"));
+                
+                // WebSphere uses different attribute names than the fictional ones
+                try {
+                    pool.put("poolSize", mbsc.getAttribute(poolBean, "size"));
+                    pool.put("activeCount", mbsc.getAttribute(poolBean, "activeThreads"));
+                    pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumSize"));
+                } catch (AttributeNotFoundException e) {
+                    // Try alternative attribute names used by WebSphere
+                    try {
+                        pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
+                        pool.put("activeCount", mbsc.getAttribute(poolBean, "activeCount"));
+                        pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumPoolSize"));
+                    } catch (AttributeNotFoundException ex) {
+                        pool.put("attributes_unavailable", true);
+                        sendError("ThreadPool attributes not found for " + poolBean.getCanonicalName(), ex.getMessage(), true);
+                    }
+                }
+                
+                pools.add(pool);
+                count++;
             }
-            
-            pools.add(pool);
-            count++;
+        } catch (JMException e) {
+            sendError("JMX error collecting ThreadPools", e.getMessage(), true);
+        } catch (IOException e) {
+            sendError("Connection error collecting ThreadPools", e.getMessage(), true);
         }
         
         return pools;
@@ -344,38 +393,52 @@ public class websphere_jmx_helper {
         List<Map<String, Object>> pools = new ArrayList<>();
         int maxItems = getMaxItems(command);
         
-        // Real WebSphere JDBC connection pool MBeans use J2CConnectionFactory
-        // Pattern: WebSphere:type=J2CConnectionFactory,*
-        ObjectName pattern = new ObjectName("WebSphere:type=J2CConnectionFactory,*");
-        Set<ObjectName> poolBeans = mbsc.queryNames(pattern, null);
-        
-        // Also try DataSource pattern as alternative
-        if (poolBeans.isEmpty()) {
-            pattern = new ObjectName("WebSphere:type=DataSource,*");
-            poolBeans = mbsc.queryNames(pattern, null);
+        ObjectName patternJ2C;
+        ObjectName patternDataSource;
+        try {
+            // Real WebSphere JDBC connection pool MBeans use J2CConnectionFactory
+            // Pattern: WebSphere:type=J2CConnectionFactory,*
+            patternJ2C = new ObjectName("WebSphere:type=J2CConnectionFactory,*");
+            patternDataSource = new ObjectName("WebSphere:type=DataSource,*");
+        } catch (MalformedObjectNameException e) {
+            sendError("Invalid MBean ObjectName for JDBC Pools", e.getMessage(), true);
+            return pools;
         }
-        
-        int count = 0;
-        for (ObjectName poolBean : poolBeans) {
-            if (maxItems > 0 && count >= maxItems) break;
+
+        try {
+            Set<ObjectName> poolBeans = mbsc.queryNames(patternJ2C, null);
             
-            Map<String, Object> pool = new HashMap<>();
-            pool.put("name", poolBean.getKeyProperty("name"));
-            pool.put("jndiName", poolBean.getKeyProperty("jndiName"));
-            
-            // Connection pool statistics - WebSphere may require PMI to be enabled
-            try {
-                pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
-                pool.put("freePoolSize", mbsc.getAttribute(poolBean, "freePoolSize"));
-                pool.put("waitingThreadCount", mbsc.getAttribute(poolBean, "waitingThreadCount"));
-                pool.put("connectionTimeout", mbsc.getAttribute(poolBean, "connectionTimeout"));
-            } catch (AttributeNotFoundException e) {
-                // These metrics might require PMI (Performance Monitoring Infrastructure)
-                pool.put("pmi_required", true);
+            // Also try DataSource pattern as alternative
+            if (poolBeans.isEmpty()) {
+                poolBeans = mbsc.queryNames(patternDataSource, null);
             }
             
-            pools.add(pool);
-            count++;
+            int count = 0;
+            for (ObjectName poolBean : poolBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                Map<String, Object> pool = new HashMap<>();
+                pool.put("name", poolBean.getKeyProperty("name"));
+                pool.put("jndiName", poolBean.getKeyProperty("jndiName"));
+                
+                // Connection pool statistics - WebSphere may require PMI to be enabled
+                try {
+                    pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
+                    pool.put("freePoolSize", mbsc.getAttribute(poolBean, "freePoolSize"));
+                    pool.put("waitingThreadCount", mbsc.getAttribute(poolBean, "waitingThreadCount"));
+                    pool.put("connectionTimeout", mbsc.getAttribute(poolBean, "connectionTimeout"));
+                } catch (AttributeNotFoundException e) {
+                    // These metrics might require PMI (Performance Monitoring Infrastructure)
+                    pool.put("pmi_required", true);
+                }
+                
+                pools.add(pool);
+                count++;
+            }
+        } catch (JMException e) {
+            sendError("JMX error collecting JDBC Pools", e.getMessage(), true);
+        } catch (IOException e) {
+            sendError("Connection error collecting JDBC Pools", e.getMessage(), true);
         }
         
         return pools;
@@ -385,42 +448,56 @@ public class websphere_jmx_helper {
         List<Map<String, Object>> destinations = new ArrayList<>();
         int maxItems = getMaxItems(command);
         
-        // Real WebSphere JMS MBeans use different patterns
-        // Try SIB (Service Integration Bus) queue points first
-        ObjectName pattern = new ObjectName("WebSphere:type=SIBQueuePoint,*");
-        Set<ObjectName> destBeans = mbsc.queryNames(pattern, null);
-        
-        // Also try J2EE standard JMS destination pattern
-        if (destBeans.isEmpty()) {
-            pattern = new ObjectName("WebSphere:j2eeType=JMSDestination,*");
-            destBeans = mbsc.queryNames(pattern, null);
+        ObjectName patternSIB;
+        ObjectName patternJ2EE;
+        try {
+            // Real WebSphere JMS MBeans use different patterns
+            // Try SIB (Service Integration Bus) queue points first
+            patternSIB = new ObjectName("WebSphere:type=SIBQueuePoint,*");
+            patternJ2EE = new ObjectName("WebSphere:j2eeType=JMSDestination,*");
+        } catch (MalformedObjectNameException e) {
+            sendError("Invalid MBean ObjectName for JMS Destinations", e.getMessage(), true);
+            return destinations;
         }
-        
-        int count = 0;
-        for (ObjectName destBean : destBeans) {
-            if (maxItems > 0 && count >= maxItems) break;
+
+        try {
+            Set<ObjectName> destBeans = mbsc.queryNames(patternSIB, null);
             
-            Map<String, Object> dest = new HashMap<>();
-            dest.put("name", destBean.getKeyProperty("name"));
-            dest.put("identifier", destBean.getKeyProperty("identifier"));
-            
-            // SIB Queue Point attributes
-            try {
-                dest.put("depth", mbsc.getAttribute(destBean, "Depth"));
-                dest.put("maxDepth", mbsc.getAttribute(destBean, "MaxDepth"));
-                dest.put("state", mbsc.getAttribute(destBean, "State"));
-            } catch (AttributeNotFoundException e) {
-                // Try generic JMS attributes
-                try {
-                    dest.put("messagesCurrentCount", mbsc.getAttribute(destBean, "messagesCurrentCount"));
-                    dest.put("consumerCount", mbsc.getAttribute(destBean, "consumerCount"));
-                } catch (AttributeNotFoundException ex) {
-                    dest.put("attributes_unavailable", true);
-                }
+            // Also try J2EE standard JMS destination pattern
+            if (destBeans.isEmpty()) {
+                destBeans = mbsc.queryNames(patternJ2EE, null);
             }
             
-            destinations.add(dest);
-            count++;
+            int count = 0;
+            for (ObjectName destBean : destBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                Map<String, Object> dest = new HashMap<>();
+                dest.put("name", destBean.getKeyProperty("name"));
+                dest.put("identifier", destBean.getKeyProperty("identifier"));
+                
+                // SIB Queue Point attributes
+                try {
+                    dest.put("depth", mbsc.getAttribute(destBean, "Depth"));
+                    dest.put("maxDepth", mbsc.getAttribute(destBean, "MaxDepth"));
+                    dest.put("state", mbsc.getAttribute(destBean, "State"));
+                } catch (AttributeNotFoundException e) {
+                    // Try generic JMS attributes
+                    try {
+                        dest.put("messagesCurrentCount", mbsc.getAttribute(destBean, "messagesCurrentCount"));
+                        dest.put("consumerCount", mbsc.getAttribute(destBean, "consumerCount"));
+                    } catch (AttributeNotFoundException ex) {
+                        dest.put("attributes_unavailable", true);
+                    }
+                }
+                
+                destinations.add(dest);
+                count++;
+            }
+        } catch (JMException e) {
+            sendError("JMX error collecting JMS Destinations", e.getMessage(), true);
+        } catch (IOException e) {
+            sendError("Connection error collecting JMS Destinations", e.getMessage(), true);
         }
         
         return destinations;
@@ -435,42 +512,69 @@ public class websphere_jmx_helper {
         boolean collectSessions = options != null && Boolean.TRUE.equals(options.get("sessions"));
         boolean collectTransactions = options != null && Boolean.TRUE.equals(options.get("transactions"));
         
-        // Real WebSphere application MBeans
-        ObjectName pattern = new ObjectName("WebSphere:type=Application,*");
-        Set<ObjectName> appBeans = mbsc.queryNames(pattern, null);
-        
-        // Also try J2EE standard pattern
-        if (appBeans.isEmpty()) {
-            pattern = new ObjectName("WebSphere:j2eeType=J2EEApplication,*");
-            appBeans = mbsc.queryNames(pattern, null);
+        ObjectName patternApp;
+        ObjectName patternJ2EEApp;
+        try {
+            // Real WebSphere application MBeans
+            patternApp = new ObjectName("WebSphere:type=Application,*");
+            patternJ2EEApp = new ObjectName("WebSphere:j2eeType=J2EEApplication,*");
+        } catch (MalformedObjectNameException e) {
+            sendError("Invalid MBean ObjectName for Applications", e.getMessage(), true);
+            return applications;
         }
-        
-        int count = 0;
-        for (ObjectName appBean : appBeans) {
-            if (maxItems > 0 && count >= maxItems) break;
+
+        try {
+            Set<ObjectName> appBeans = mbsc.queryNames(patternApp, null);
             
-            Map<String, Object> app = new HashMap<>();
-            app.put("name", appBean.getKeyProperty("name"));
-            app.put("requestCount", mbsc.getAttribute(appBean, "requestCount"));
-            app.put("errorCount", mbsc.getAttribute(appBean, "errorCount"));
-            app.put("avgResponseTime", mbsc.getAttribute(appBean, "avgResponseTime"));
-            app.put("maxResponseTime", mbsc.getAttribute(appBean, "maxResponseTime"));
-            
-            if (collectSessions) {
-                app.put("activeSessions", mbsc.getAttribute(appBean, "activeSessions"));
-                app.put("liveSessions", mbsc.getAttribute(appBean, "liveSessions"));
-                app.put("invalidatedSessions", mbsc.getAttribute(appBean, "invalidatedSessions"));
+            // Also try J2EE standard pattern
+            if (appBeans.isEmpty()) {
+                appBeans = mbsc.queryNames(patternJ2EEApp, null);
             }
             
-            if (collectTransactions) {
-                app.put("activeTransactions", mbsc.getAttribute(appBean, "activeTransactions"));
-                app.put("committedTransactions", mbsc.getAttribute(appBean, "committedTransactions"));
-                app.put("rolledbackTransactions", mbsc.getAttribute(appBean, "rolledbackTransactions"));
-                app.put("timedoutTransactions", mbsc.getAttribute(appBean, "timedoutTransactions"));
+            int count = 0;
+            for (ObjectName appBean : appBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                Map<String, Object> app = new HashMap<>();
+                app.put("name", appBean.getKeyProperty("name"));
+                
+                try {
+                    app.put("requestCount", mbsc.getAttribute(appBean, "requestCount"));
+                    app.put("errorCount", mbsc.getAttribute(appBean, "errorCount"));
+                    app.put("avgResponseTime", mbsc.getAttribute(appBean, "avgResponseTime"));
+                    app.put("maxResponseTime", mbsc.getAttribute(appBean, "maxResponseTime"));
+                } catch (AttributeNotFoundException e) {
+                    app.put("metrics_unavailable", true);
+                }
+                
+                if (collectSessions) {
+                    try {
+                        app.put("activeSessions", mbsc.getAttribute(appBean, "activeSessions"));
+                        app.put("liveSessions", mbsc.getAttribute(appBean, "liveSessions"));
+                        app.put("invalidatedSessions", mbsc.getAttribute(appBean, "invalidatedSessions"));
+                    } catch (AttributeNotFoundException e) {
+                        app.put("sessions_metrics_unavailable", true);
+                    }
+                }
+                
+                if (collectTransactions) {
+                    try {
+                        app.put("activeTransactions", mbsc.getAttribute(appBean, "activeTransactions"));
+                        app.put("committedTransactions", mbsc.getAttribute(appBean, "committedTransactions"));
+                        app.put("rolledbackTransactions", mbsc.getAttribute(appBean, "rolledbackTransactions"));
+                        app.put("timedoutTransactions", mbsc.getAttribute(appBean, "timedoutTransactions"));
+                    } catch (AttributeNotFoundException e) {
+                        app.put("transactions_metrics_unavailable", true);
+                    }
+                }
+                
+                applications.add(app);
+                count++;
             }
-            
-            applications.add(app);
-            count++;
+        } catch (JMException e) {
+            sendError("JMX error collecting Applications", e.getMessage(), true);
+        } catch (IOException e) {
+            sendError("Connection error collecting Applications", e.getMessage(), true);
         }
         
         return applications;
@@ -486,8 +590,10 @@ public class websphere_jmx_helper {
             // Test connection by getting the default domain
             String defaultDomain = mbsc.getDefaultDomain();
             sendSuccess("Connection is healthy", null);
-        } catch (Exception e) {
-            sendError("Connection test failed", e.toString(), true);
+        } catch (JMException e) {
+            sendError("JMX error during connection test", e.toString(), true);
+        } catch (IOException e) {
+            sendError("Connection error during connection test", e.toString(), true);
         }
     }
     
