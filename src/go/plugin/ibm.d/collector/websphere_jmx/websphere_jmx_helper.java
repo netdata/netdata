@@ -1,5 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// WebSphere JMX Helper
+// 
+// NOTE: This implementation uses real WebSphere MBean patterns, but attribute names
+// may vary between WebSphere versions and require PMI (Performance Monitoring Infrastructure)
+// to be enabled for full metrics collection.
+//
+// Common WebSphere MBean patterns:
+// - Thread Pools: WebSphere:type=ThreadPool,name=*,process=*,node=*
+// - JDBC: WebSphere:type=J2CConnectionFactory,* or WebSphere:type=DataSource,*
+// - JMS: WebSphere:type=SIBQueuePoint,* or WebSphere:j2eeType=JMSDestination,*
+// - Applications: WebSphere:type=Application,* or WebSphere:j2eeType=J2EEApplication,*
+// - PMI Stats: WebSphere:type=Perf,*
+
 import javax.management.*;
 import javax.management.openmbean.CompositeData;
 import javax.management.remote.JMXConnector;
@@ -294,7 +307,8 @@ public class websphere_jmx_helper {
         List<Map<String, Object>> pools = new ArrayList<>();
         int maxItems = getMaxItems(command);
         
-        // WebSphere thread pool MBeans
+        // Real WebSphere thread pool MBeans include node and process attributes
+        // Pattern: WebSphere:type=ThreadPool,name=<poolName>,process=<processName>,node=<nodeName>,*
         ObjectName pattern = new ObjectName("WebSphere:type=ThreadPool,*");
         Set<ObjectName> poolBeans = mbsc.queryNames(pattern, null);
         
@@ -304,9 +318,20 @@ public class websphere_jmx_helper {
             
             Map<String, Object> pool = new HashMap<>();
             pool.put("name", poolBean.getKeyProperty("name"));
-            pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
-            pool.put("activeCount", mbsc.getAttribute(poolBean, "activeCount"));
-            pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumPoolSize"));
+            pool.put("node", poolBean.getKeyProperty("node"));
+            pool.put("process", poolBean.getKeyProperty("process"));
+            
+            // WebSphere uses different attribute names than the fictional ones
+            try {
+                pool.put("poolSize", mbsc.getAttribute(poolBean, "size"));
+                pool.put("activeCount", mbsc.getAttribute(poolBean, "activeThreads"));
+                pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumSize"));
+            } catch (AttributeNotFoundException e) {
+                // Try alternative attribute names used by WebSphere
+                pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
+                pool.put("activeCount", mbsc.getAttribute(poolBean, "activeCount"));
+                pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumPoolSize"));
+            }
             
             pools.add(pool);
             count++;
@@ -319,9 +344,16 @@ public class websphere_jmx_helper {
         List<Map<String, Object>> pools = new ArrayList<>();
         int maxItems = getMaxItems(command);
         
-        // WebSphere JDBC connection pool MBeans
-        ObjectName pattern = new ObjectName("WebSphere:type=ConnectionPool,*");
+        // Real WebSphere JDBC connection pool MBeans use J2CConnectionFactory
+        // Pattern: WebSphere:type=J2CConnectionFactory,*
+        ObjectName pattern = new ObjectName("WebSphere:type=J2CConnectionFactory,*");
         Set<ObjectName> poolBeans = mbsc.queryNames(pattern, null);
+        
+        // Also try DataSource pattern as alternative
+        if (poolBeans.isEmpty()) {
+            pattern = new ObjectName("WebSphere:type=DataSource,*");
+            poolBeans = mbsc.queryNames(pattern, null);
+        }
         
         int count = 0;
         for (ObjectName poolBean : poolBeans) {
@@ -329,13 +361,18 @@ public class websphere_jmx_helper {
             
             Map<String, Object> pool = new HashMap<>();
             pool.put("name", poolBean.getKeyProperty("name"));
-            pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
-            pool.put("numConnectionsUsed", mbsc.getAttribute(poolBean, "numConnectionsUsed"));
-            pool.put("numConnectionsFree", mbsc.getAttribute(poolBean, "numConnectionsFree"));
-            pool.put("avgWaitTime", mbsc.getAttribute(poolBean, "avgWaitTime"));
-            pool.put("avgInUseTime", mbsc.getAttribute(poolBean, "avgInUseTime"));
-            pool.put("numConnectionsCreated", mbsc.getAttribute(poolBean, "numConnectionsCreated"));
-            pool.put("numConnectionsDestroyed", mbsc.getAttribute(poolBean, "numConnectionsDestroyed"));
+            pool.put("jndiName", poolBean.getKeyProperty("jndiName"));
+            
+            // Connection pool statistics - WebSphere may require PMI to be enabled
+            try {
+                pool.put("poolSize", mbsc.getAttribute(poolBean, "poolSize"));
+                pool.put("freePoolSize", mbsc.getAttribute(poolBean, "freePoolSize"));
+                pool.put("waitingThreadCount", mbsc.getAttribute(poolBean, "waitingThreadCount"));
+                pool.put("connectionTimeout", mbsc.getAttribute(poolBean, "connectionTimeout"));
+            } catch (AttributeNotFoundException e) {
+                // These metrics might require PMI (Performance Monitoring Infrastructure)
+                pool.put("pmi_required", true);
+            }
             
             pools.add(pool);
             count++;
@@ -348,9 +385,16 @@ public class websphere_jmx_helper {
         List<Map<String, Object>> destinations = new ArrayList<>();
         int maxItems = getMaxItems(command);
         
-        // WebSphere JMS destination MBeans
-        ObjectName pattern = new ObjectName("WebSphere:type=JMSDestination,*");
+        // Real WebSphere JMS MBeans use different patterns
+        // Try SIB (Service Integration Bus) queue points first
+        ObjectName pattern = new ObjectName("WebSphere:type=SIBQueuePoint,*");
         Set<ObjectName> destBeans = mbsc.queryNames(pattern, null);
+        
+        // Also try J2EE standard JMS destination pattern
+        if (destBeans.isEmpty()) {
+            pattern = new ObjectName("WebSphere:j2eeType=JMSDestination,*");
+            destBeans = mbsc.queryNames(pattern, null);
+        }
         
         int count = 0;
         for (ObjectName destBean : destBeans) {
@@ -358,11 +402,22 @@ public class websphere_jmx_helper {
             
             Map<String, Object> dest = new HashMap<>();
             dest.put("name", destBean.getKeyProperty("name"));
-            dest.put("type", destBean.getKeyProperty("destinationType"));
-            dest.put("messagesCurrentCount", mbsc.getAttribute(destBean, "messagesCurrentCount"));
-            dest.put("messagesPendingCount", mbsc.getAttribute(destBean, "messagesPendingCount"));
-            dest.put("messagesAddedCount", mbsc.getAttribute(destBean, "messagesAddedCount"));
-            dest.put("consumerCount", mbsc.getAttribute(destBean, "consumerCount"));
+            dest.put("identifier", destBean.getKeyProperty("identifier"));
+            
+            // SIB Queue Point attributes
+            try {
+                dest.put("depth", mbsc.getAttribute(destBean, "Depth"));
+                dest.put("maxDepth", mbsc.getAttribute(destBean, "MaxDepth"));
+                dest.put("state", mbsc.getAttribute(destBean, "State"));
+            } catch (AttributeNotFoundException e) {
+                // Try generic JMS attributes
+                try {
+                    dest.put("messagesCurrentCount", mbsc.getAttribute(destBean, "messagesCurrentCount"));
+                    dest.put("consumerCount", mbsc.getAttribute(destBean, "consumerCount"));
+                } catch (AttributeNotFoundException ex) {
+                    dest.put("attributes_unavailable", true);
+                }
+            }
             
             destinations.add(dest);
             count++;
@@ -380,9 +435,15 @@ public class websphere_jmx_helper {
         boolean collectSessions = options != null && Boolean.TRUE.equals(options.get("sessions"));
         boolean collectTransactions = options != null && Boolean.TRUE.equals(options.get("transactions"));
         
-        // WebSphere application MBeans
+        // Real WebSphere application MBeans
         ObjectName pattern = new ObjectName("WebSphere:type=Application,*");
         Set<ObjectName> appBeans = mbsc.queryNames(pattern, null);
+        
+        // Also try J2EE standard pattern
+        if (appBeans.isEmpty()) {
+            pattern = new ObjectName("WebSphere:j2eeType=J2EEApplication,*");
+            appBeans = mbsc.queryNames(pattern, null);
+        }
         
         int count = 0;
         for (ObjectName appBean : appBeans) {
