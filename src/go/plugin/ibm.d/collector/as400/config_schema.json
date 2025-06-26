@@ -56,6 +56,12 @@
         "type": "boolean",
         "default": true
       },
+      "collect_active_jobs": {
+        "title": "Collect active jobs",
+        "description": "Enable collection of metrics for top active jobs by CPU usage.",
+        "type": "boolean",
+        "default": false
+      },
       "max_disks": {
         "title": "Maximum disks",
         "description": "Maximum number of disks to collect metrics for. Set to 0 for unlimited.",
@@ -76,6 +82,13 @@
         "type": "integer",
         "minimum": 0,
         "default": 50
+      },
+      "max_active_jobs": {
+        "title": "Maximum active jobs",
+        "description": "Maximum number of active jobs to collect metrics for.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
       },
       "collect_disks_matching": {
         "title": "Disk selector",
@@ -139,7 +152,8 @@
           "fields": [
             "collect_disk_metrics",
             "collect_subsystem_metrics",
-            "collect_job_queue_metrics"
+            "collect_job_queue_metrics",
+            "collect_active_jobs"
           ]
         },
         {
@@ -148,6 +162,7 @@
             "max_disks",
             "max_subsystems",
             "max_job_queues",
+            "max_active_jobs",
             "collect_disks_matching",
             "collect_subsystems_matching",
             "collect_job_queues_matching",

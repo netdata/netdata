@@ -13,10 +13,16 @@ This collector monitors IBM AS/400 (IBM i) system performance metrics via IBM DB
 It collects:
 
 **System-wide metrics:**
-- CPU utilization
-- Active jobs count
+- CPU utilization (overall, partition, interactive, database, shared pool)
+- CPU configuration (configured CPUs, current processing capacity)
+- Active jobs count and job type breakdown (batch, interactive, system, spooled, other)
 - System ASP (Auxiliary Storage Pool) usage
 - Memory pool usage (Machine, Base, Interactive, Spool)
+- Memory pool sizes (current, defined, reserved for Machine and Base pools)
+- IFS (Integrated File System) usage and file count
+- IFS top directories by size
+- System message queue depths (QSYSMSG, QSYSOPR)
+- Critical message counts in system queues
 - Aggregate disk busy percentage
 - Aggregate job queue length
 
@@ -24,6 +30,7 @@ It collects:
 - **Per-disk**: Busy percentage, I/O requests/s, throughput, response time
 - **Per-subsystem**: Active/held jobs, storage usage
 - **Per-job-queue**: Waiting/held/scheduled jobs
+- **Per-job** (top CPU consumers): CPU time, temporary storage, active time, CPU percentage
 
 ## Collected metrics
 
@@ -32,11 +39,21 @@ It collects:
 | Metric | Description | Unit |
 |--------|-------------|------|
 | as400.cpu_utilization | Average CPU utilization | percentage |
+| as400.cpu_details | CPU configuration (configured CPUs, capacity) | cpus |
+| as400.cpu_by_type | CPU utilization by type (partition, interactive, database, shared pool) | percentage |
 | as400.active_jobs | Number of active jobs in the system | jobs |
+| as400.job_type_breakdown | Jobs by type (batch, interactive, system, spooled, other) | jobs |
 | as400.system_asp_usage | System ASP usage percentage | percentage |
-| as400.memory_pool_usage | Memory pool sizes | megabytes |
+| as400.memory_pool_usage | Memory pool current sizes | bytes |
+| as400.memory_pool_defined | Memory pool defined sizes | bytes |
+| as400.memory_pool_reserved | Memory pool reserved sizes | bytes |
 | as400.disk_busy | Average disk busy percentage (aggregate) | percentage |
 | as400.job_queue_length | Number of jobs in queue (aggregate) | jobs |
+| as400.ifs_usage | IFS usage (used and total) | bytes |
+| as400.ifs_files | IFS file count | files |
+| as400.ifs_directory_usage | IFS top directories by size | bytes |
+| as400.message_queue_depth | System message queue depths | messages |
+| as400.message_queue_critical | Critical messages in system queues | messages |
 
 ### Per-instance metrics
 
