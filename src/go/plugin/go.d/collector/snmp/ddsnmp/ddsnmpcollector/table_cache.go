@@ -319,7 +319,7 @@ func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) st
 	}
 	sort.Strings(names)
 
-	if len(names) > 0 {
+	if sb.Len() > 0 && len(names) > 0 {
 		sb.WriteString(",")
 	}
 
