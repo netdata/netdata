@@ -407,11 +407,32 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 		return nil
 	}
 
-	// Try to detect Db2 on Cloud
+	// Try to detect Db2 on Cloud - first method
 	err = d.collectSingleMetric(ctx, "version_detection_cloud", queryDetectVersionCloud, func(value string) {
 		d.edition = "Cloud"
-		d.version = value
-		d.Debugf("detected Db2 on Cloud edition")
+		d.version = d.version // Keep LUW version if already detected
+		if d.version == "" {
+			d.version = "Db2 on Cloud"
+		}
+		d.Debugf("detected Db2 on Cloud edition via BLUADMIN schema")
+	})
+	
+	if err == nil && d.edition != "" {
+		d.applyVersionBasedFeatureGating()
+		d.addVersionLabelsToCharts()
+		return nil
+	}
+	
+	// Try alternative Cloud detection
+	err = d.collectSingleMetric(ctx, "version_detection_cloud_alt", queryDetectVersionCloudAlt, func(value string) {
+		if value == "Db2 on Cloud" {
+			d.edition = "Cloud"
+			d.version = d.version // Keep LUW version if already detected
+			if d.version == "" {
+				d.version = "Db2 on Cloud"
+			}
+			d.Debugf("detected Db2 on Cloud edition via PROD_RELEASE")
+		}
 	})
 	
 	if err == nil && d.edition != "" {
@@ -487,8 +508,18 @@ func (d *DB2) applyVersionBasedFeatureGating() {
 		d.logFeatureAvailability("z/OS specific features enabled for DB2 for z/OS")
 		
 	case "Cloud": // Db2 on Cloud
-		d.disableFeatureWithLog("system_level_metrics", "System-level metrics restricted on Db2 on Cloud")
-		d.logFeatureAvailability("Cloud-specific monitoring enabled for Db2 on Cloud")
+		// Db2 on Cloud has a restricted schema compared to standard DB2 LUW
+		d.disableFeatureWithLog("column_organized_metrics", "Column-organized table metrics (POOL_COL_*) not available on Db2 on Cloud")
+		d.disableFeatureWithLog("lbp_pages_found_metrics", "Detailed buffer pool hit metrics (*_LBP_PAGES_FOUND) not available on Db2 on Cloud")
+		d.disableFeatureWithLog("uow_comp_status", "UOW_COMP_STATUS column not available in APPLICATIONS view on Db2 on Cloud")
+		d.disableFeatureWithLog("application_name", "APPLICATION_NAME column not available in APPLICATIONS view on Db2 on Cloud")
+		d.disableFeatureWithLog("rows_modified", "ROWS_MODIFIED column not available in SNAPDB view on Db2 on Cloud")
+		d.disableFeatureWithLog("pagesize", "PAGESIZE column not available in SNAPBP view on Db2 on Cloud")
+		d.disableFeatureWithLog("free_pages", "FREE_PAGES column not available in SNAPBP view on Db2 on Cloud")
+		d.disableFeatureWithLog("total_log_metrics", "TOTAL_LOG_USED/AVAILABLE not available in LOG_UTILIZATION on Db2 on Cloud")
+		d.disableFeatureWithLog("bufferpool_instances", "Per-bufferpool instance metrics limited on Db2 on Cloud")
+		d.disableFeatureWithLog("connection_instances", "Per-connection instance metrics limited on Db2 on Cloud")
+		d.logFeatureAvailability("Cloud-specific monitoring enabled for Db2 on Cloud - using simplified metrics")
 		
 	case "LUW": // DB2 LUW (most feature-complete)
 		d.logFeatureAvailability("Full feature set available for DB2 LUW")
