@@ -3,19 +3,19 @@
 package as400
 
 const (
-	querySystemStatus = `
-		SELECT 
-			AVERAGE_CPU_UTILIZATION,
-			SYSTEM_ASP_USED,
-			ACTIVE_JOBS_IN_SYSTEM,
-			CONFIGURED_CPUS,
-			CURRENT_PROCESSING_CAPACITY,
-			SHARED_PROCESSOR_POOL_UTILIZATION,
-			PARTITION_CPU_UTILIZATION,
-			INTERACTIVE_CPU_UTILIZATION,
-			DATABASE_CPU_UTILIZATION
-		FROM QSYS2.SYSTEM_STATUS_INFO
-	`
+	// Individual queries for SYSTEM_STATUS_INFO columns for better resilience
+	// Core metrics that should always be available
+	queryAverageCPU = `SELECT AVERAGE_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
+	querySystemASP  = `SELECT SYSTEM_ASP_USED FROM QSYS2.SYSTEM_STATUS_INFO`
+	queryActiveJobs = `SELECT ACTIVE_JOBS_IN_SYSTEM FROM QSYS2.SYSTEM_STATUS_INFO`
+
+	// Version-specific metrics (V7R3+)
+	queryConfiguredCPUs            = `SELECT CONFIGURED_CPUS FROM QSYS2.SYSTEM_STATUS_INFO`
+	queryCurrentProcessingCapacity = `SELECT CURRENT_PROCESSING_CAPACITY FROM QSYS2.SYSTEM_STATUS_INFO`
+	querySharedProcessorPoolUtil   = `SELECT SHARED_PROCESSOR_POOL_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
+	queryPartitionCPUUtil          = `SELECT PARTITION_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
+	queryInteractiveCPUUtil        = `SELECT INTERACTIVE_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
+	queryDatabaseCPUUtil           = `SELECT DATABASE_CPU_UTILIZATION FROM QSYS2.SYSTEM_STATUS_INFO`
 
 	queryMemoryPools = `
 		SELECT 
@@ -141,7 +141,7 @@ const (
 	`
 
 	// New enhanced queries
-	queryActiveJobs = `
+	queryActiveJobsDetails = `
 		SELECT 
 			JOB_NAME,
 			JOB_TYPE,
@@ -207,5 +207,39 @@ const (
 			'QTOTJOB',     -- Total jobs
 			'QACTJOB'      -- Active job threshold
 		)
+	`
+
+	// Version detection queries
+	queryIBMiVersion = `
+		SELECT
+			OS_VERSION,
+			OS_RELEASE
+		FROM QSYS2.SYSTEM_STATUS_INFO_BASIC
+		FETCH FIRST 1 ROW ONLY
+	`
+
+	// Fallback for older systems
+	queryIBMiVersionFallback = `
+		SELECT
+			'Unknown' AS OS_VERSION,
+			'Unknown' AS OS_RELEASE
+		FROM SYSIBM.SYSDUMMY1
+	`
+
+	// Feature detection queries
+	queryCheckActiveJobInfo = `
+		SELECT COUNT(*) AS CNT
+		FROM QSYS2.SYSFUNCS
+		WHERE SPECIFIC_SCHEMA = 'QSYS2'
+		  AND ROUTINE_NAME = 'ACTIVE_JOB_INFO'
+		  AND ROUTINE_TYPE = 'FUNCTION'
+	`
+
+	queryCheckIFSObjectStats = `
+		SELECT COUNT(*) AS CNT
+		FROM QSYS2.SYSFUNCS
+		WHERE SPECIFIC_SCHEMA = 'QSYS2'
+		  AND ROUTINE_NAME = 'IFS_OBJECT_STATISTICS'
+		  AND ROUTINE_TYPE = 'FUNCTION'
 	`
 )

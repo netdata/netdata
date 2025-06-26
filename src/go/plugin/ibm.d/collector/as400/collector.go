@@ -64,13 +64,15 @@ func New() *AS400 {
 			IFSStartPath:       "/",
 		},
 
-		charts:        baseCharts.Copy(),
-		once:          &sync.Once{},
-		mx:            &metricsData{},
-		disks:         make(map[string]*diskMetrics),
-		subsystems:    make(map[string]*subsystemMetrics),
-		jobQueues:     make(map[string]*jobQueueMetrics),
-		messageQueues: make(map[string]*messageQueueMetrics),
+		charts:           baseCharts.Copy(),
+		once:             &sync.Once{},
+		mx:               &metricsData{},
+		disks:            make(map[string]*diskMetrics),
+		subsystems:       make(map[string]*subsystemMetrics),
+		jobQueues:        make(map[string]*jobQueueMetrics),
+		messageQueues:    make(map[string]*messageQueueMetrics),
+		disabledMetrics:  make(map[string]bool),
+		disabledFeatures: make(map[string]bool),
 	}
 }
 
@@ -129,6 +131,11 @@ type AS400 struct {
 	systemName   string
 	serialNumber string
 	model        string
+
+	// Resilience tracking
+	disabledMetrics  map[string]bool // Track disabled metrics
+	disabledFeatures map[string]bool // Track disabled features (table functions)
+	osVersion        string          // IBM i version for compatibility checks
 }
 
 func (a *AS400) Configuration() any {
@@ -164,6 +171,21 @@ func (a *AS400) Init(ctx context.Context) error {
 		}
 		a.jobQueueSelector = m
 	}
+
+	// Initialize database connection
+	db, err := a.initDatabase(ctx)
+	if err != nil {
+		return err
+	}
+	a.db = db
+
+	// Detect IBM i version
+	if err := a.detectIBMiVersion(ctx); err != nil {
+		a.Warningf("failed to detect IBM i version: %v", err)
+	}
+
+	// Detect available features
+	a.detectAvailableFeatures(ctx)
 
 	return nil
 }
@@ -266,237 +288,108 @@ func cleanName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-// Instance management methods
-func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
-	if a.disks[unit] == nil {
-		a.disks[unit] = &diskMetrics{unit: unit}
+
+// Helper functions for resilience
+func (a *AS400) logOnce(key string, format string, args ...interface{}) {
+	if a.disabledMetrics[key] || a.disabledFeatures[key] {
+		return // Already logged
 	}
-	return a.disks[unit]
+	a.Warningf(format, args...)
 }
 
-func (a *AS400) getSubsystemMetrics(name string) *subsystemMetrics {
-	if a.subsystems[name] == nil {
-		a.subsystems[name] = &subsystemMetrics{name: name}
-	}
-	return a.subsystems[name]
+func (a *AS400) isDisabled(key string) bool {
+	return a.disabledMetrics[key] || a.disabledFeatures[key]
 }
 
-func (a *AS400) getJobQueueMetrics(key string) *jobQueueMetrics {
-	if a.jobQueues[key] == nil {
-		a.jobQueues[key] = &jobQueueMetrics{}
+func isSQLFeatureError(err error) bool {
+	if err == nil {
+		return false
 	}
-	return a.jobQueues[key]
+	errStr := err.Error()
+	// SQL0204N = object not found (table, view, function)
+	// SQL0206N = column not found
+	// SQL0443N = function not found
+	return strings.Contains(errStr, "SQL0204N") ||
+		strings.Contains(errStr, "SQL0206N") ||
+		strings.Contains(errStr, "SQL0443N")
 }
 
-func (a *AS400) getMessageQueueMetrics(key string) *messageQueueMetrics {
-	if a.messageQueues[key] == nil {
-		a.messageQueues[key] = &messageQueueMetrics{}
-	}
-	return a.messageQueues[key]
-}
-
-// Chart management methods
-func (a *AS400) addDiskCharts(disk *diskMetrics) {
-	charts := module.Charts{
-		{
-			ID:       fmt.Sprintf("disk_%s_busy", cleanName(disk.unit)),
-			Title:    fmt.Sprintf("Disk %s Busy", disk.unit),
-			Units:    "percentage",
-			Fam:      "disk",
-			Ctx:      "as400.disk_busy",
-			Priority: module.Priority + 100,
-			Labels: []module.Label{
-				{Key: "disk", Value: disk.unit},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("disk_%s_busy_percent", cleanName(disk.unit)), Name: "busy", Div: precision},
-			},
-		},
-		{
-			ID:       fmt.Sprintf("disk_%s_io_requests", cleanName(disk.unit)),
-			Title:    fmt.Sprintf("Disk %s I/O Requests", disk.unit),
-			Units:    "requests/s",
-			Fam:      "disk",
-			Ctx:      "as400.disk_io_requests",
-			Priority: module.Priority + 101,
-			Type:     module.Stacked,
-			Labels: []module.Label{
-				{Key: "disk", Value: disk.unit},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("disk_%s_read_requests", cleanName(disk.unit)), Name: "read", Algo: module.Incremental},
-				{ID: fmt.Sprintf("disk_%s_write_requests", cleanName(disk.unit)), Name: "write", Algo: module.Incremental},
-			},
-		},
-		{
-			ID:       fmt.Sprintf("disk_%s_io_bandwidth", cleanName(disk.unit)),
-			Title:    fmt.Sprintf("Disk %s I/O Bandwidth", disk.unit),
-			Units:    "bytes/s",
-			Fam:      "disk",
-			Ctx:      "as400.disk_io_bandwidth",
-			Priority: module.Priority + 102,
-			Type:     module.Area,
-			Labels: []module.Label{
-				{Key: "disk", Value: disk.unit},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("disk_%s_read_bytes", cleanName(disk.unit)), Name: "read", Algo: module.Incremental},
-				{ID: fmt.Sprintf("disk_%s_write_bytes", cleanName(disk.unit)), Name: "write", Algo: module.Incremental, Mul: -1},
-			},
-		},
-		{
-			ID:       fmt.Sprintf("disk_%s_average_time", cleanName(disk.unit)),
-			Title:    fmt.Sprintf("Disk %s Average Request Time", disk.unit),
-			Units:    "milliseconds",
-			Fam:      "disk",
-			Ctx:      "as400.disk_average_time",
-			Priority: module.Priority + 103,
-			Labels: []module.Label{
-				{Key: "disk", Value: disk.unit},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("disk_%s_average_time", cleanName(disk.unit)), Name: "time"},
-			},
-		},
+// collectSingleMetric executes a single-value query and handles errors gracefully
+func (a *AS400) collectSingleMetric(ctx context.Context, metricKey string, query string, handler func(value string)) error {
+	if a.isDisabled(metricKey) {
+		return nil
 	}
 
-	for _, chart := range charts {
-		if err := a.charts.Add(chart); err != nil {
-			a.Warningf("failed to add disk chart for %s: %v", disk.unit, err)
+	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		if value != "" {
+			handler(value)
 		}
-	}
-}
+	})
 
-func (a *AS400) removeDiskCharts(unit string) {
-	cleanUnit := cleanName(unit)
-	_ = a.charts.Remove(fmt.Sprintf("disk_%s_busy", cleanUnit))
-	_ = a.charts.Remove(fmt.Sprintf("disk_%s_io_requests", cleanUnit))
-	_ = a.charts.Remove(fmt.Sprintf("disk_%s_io_bandwidth", cleanUnit))
-	_ = a.charts.Remove(fmt.Sprintf("disk_%s_average_time", cleanUnit))
-}
-
-func (a *AS400) addSubsystemCharts(subsystem *subsystemMetrics) {
-	charts := module.Charts{
-		{
-			ID:       fmt.Sprintf("subsystem_%s_jobs", cleanName(subsystem.name)),
-			Title:    fmt.Sprintf("Subsystem %s Jobs", subsystem.name),
-			Units:    "jobs",
-			Fam:      "subsystems",
-			Ctx:      "as400.subsystem_jobs",
-			Priority: module.Priority + 200,
-			Type:     module.Stacked,
-			Labels: []module.Label{
-				{Key: "subsystem", Value: subsystem.name},
-				{Key: "library", Value: subsystem.library},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("subsystem_%s_jobs_active", cleanName(subsystem.name)), Name: "active"},
-				{ID: fmt.Sprintf("subsystem_%s_jobs_held", cleanName(subsystem.name)), Name: "held"},
-			},
-		},
-		{
-			ID:       fmt.Sprintf("subsystem_%s_storage", cleanName(subsystem.name)),
-			Title:    fmt.Sprintf("Subsystem %s Storage Used", subsystem.name),
-			Units:    "kilobytes",
-			Fam:      "subsystems",
-			Ctx:      "as400.subsystem_storage",
-			Priority: module.Priority + 201,
-			Labels: []module.Label{
-				{Key: "subsystem", Value: subsystem.name},
-				{Key: "library", Value: subsystem.library},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("subsystem_%s_storage_used_kb", cleanName(subsystem.name)), Name: "used"},
-			},
-		},
-		{
-			ID:       fmt.Sprintf("subsystem_%s_jobs_current", cleanName(subsystem.name)),
-			Title:    fmt.Sprintf("Subsystem %s Current Jobs", subsystem.name),
-			Units:    "jobs",
-			Fam:      "subsystems",
-			Ctx:      "as400.subsystem_current_jobs",
-			Priority: module.Priority + 202,
-			Labels: []module.Label{
-				{Key: "subsystem", Value: subsystem.name},
-				{Key: "library", Value: subsystem.library},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("subsystem_%s_current_jobs", cleanName(subsystem.name)), Name: "current"},
-			},
-		},
+	if err != nil && isSQLFeatureError(err) {
+		a.logOnce(metricKey, "metric %s not available on this IBM i version: %v", metricKey, err)
+		a.disabledMetrics[metricKey] = true
+		return nil // Not a fatal error
 	}
 
-	for _, chart := range charts {
-		if err := a.charts.Add(chart); err != nil {
-			a.Warningf("failed to add subsystem chart for %s: %v", subsystem.name, err)
+	return err
+}
+
+// detectIBMiVersion tries to detect the IBM i OS version
+func (a *AS400) detectIBMiVersion(ctx context.Context) error {
+	var version, release string
+
+	// Try primary query first
+	err := a.doQuery(ctx, queryIBMiVersion, func(column, value string, lineEnd bool) {
+		switch column {
+		case "OS_VERSION":
+			version = value
+		case "OS_RELEASE":
+			release = value
 		}
-	}
-}
+	})
 
-func (a *AS400) removeSubsystemCharts(name string) {
-	cleanName := cleanName(name)
-	_ = a.charts.Remove(fmt.Sprintf("subsystem_%s_jobs", cleanName))
-	_ = a.charts.Remove(fmt.Sprintf("subsystem_%s_storage", cleanName))
-	_ = a.charts.Remove(fmt.Sprintf("subsystem_%s_jobs_current", cleanName))
-}
-
-func (a *AS400) addJobQueueCharts(queue *jobQueueMetrics, key string) {
-	cleanKey := cleanName(key)
-	charts := module.Charts{
-		{
-			ID:       fmt.Sprintf("jobqueue_%s_jobs", cleanKey),
-			Title:    fmt.Sprintf("Job Queue %s/%s Jobs", queue.library, queue.name),
-			Units:    "jobs",
-			Fam:      "job_queues",
-			Ctx:      "as400.job_queue_jobs",
-			Priority: module.Priority + 300,
-			Type:     module.Stacked,
-			Labels: []module.Label{
-				{Key: "queue", Value: queue.name},
-				{Key: "library", Value: queue.library},
-			},
-			Dims: module.Dims{
-				{ID: fmt.Sprintf("jobqueue_%s_jobs_waiting", cleanKey), Name: "waiting"},
-				{ID: fmt.Sprintf("jobqueue_%s_jobs_held", cleanKey), Name: "held"},
-				{ID: fmt.Sprintf("jobqueue_%s_jobs_scheduled", cleanKey), Name: "scheduled"},
-			},
-		},
-	}
-
-	for _, chart := range charts {
-		if err := a.charts.Add(chart); err != nil {
-			a.Warningf("failed to add job queue chart for %s: %v", key, err)
-		}
-	}
-}
-
-func (a *AS400) removeJobQueueCharts(key string) {
-	cleanKey := cleanName(key)
-	_ = a.charts.Remove(fmt.Sprintf("jobqueue_%s_jobs", cleanKey))
-}
-
-func (a *AS400) cleanupStaleInstances() {
-	// Clean up stale disk instances
-	for unit, disk := range a.disks {
-		if !disk.updated {
-			delete(a.disks, unit)
-			a.removeDiskCharts(unit)
+	if err != nil {
+		// Try fallback query
+		if err := a.doQuery(ctx, queryIBMiVersionFallback, func(column, value string, lineEnd bool) {
+			switch column {
+			case "OS_VERSION":
+				version = value
+			case "OS_RELEASE":
+				release = value
+			}
+		}); err != nil {
+			return err
 		}
 	}
 
-	// Clean up stale subsystem instances
-	for name, subsystem := range a.subsystems {
-		if !subsystem.updated {
-			delete(a.subsystems, name)
-			a.removeSubsystemCharts(name)
-		}
+	if version != "" && release != "" {
+		a.osVersion = fmt.Sprintf("%s %s", version, release)
+		a.Debugf("detected IBM i version: %s", a.osVersion)
 	}
 
-	// Clean up stale job queue instances
-	for key, queue := range a.jobQueues {
-		if !queue.updated {
-			delete(a.jobQueues, key)
-			a.removeJobQueueCharts(key)
+	return nil
+}
+
+// detectAvailableFeatures checks which table functions are available
+func (a *AS400) detectAvailableFeatures(ctx context.Context) {
+	// Check if ACTIVE_JOB_INFO is available
+	if err := a.doQuery(ctx, queryCheckActiveJobInfo, func(column, value string, lineEnd bool) {
+		if column == "CNT" && value == "0" {
+			a.disabledFeatures["active_job_info"] = true
+			a.Warningf("ACTIVE_JOB_INFO function not available on this IBM i version")
 		}
+	}); err != nil {
+		a.Debugf("failed to check ACTIVE_JOB_INFO availability: %v", err)
+	}
+
+	// Check if IFS_OBJECT_STATISTICS is available
+	if err := a.doQuery(ctx, queryCheckIFSObjectStats, func(column, value string, lineEnd bool) {
+		if column == "CNT" && value == "0" {
+			a.disabledFeatures["ifs_object_statistics"] = true
+			a.Warningf("IFS_OBJECT_STATISTICS function not available on this IBM i version")
+		}
+	}); err != nil {
+		a.Debugf("failed to check IFS_OBJECT_STATISTICS availability: %v", err)
 	}
 }

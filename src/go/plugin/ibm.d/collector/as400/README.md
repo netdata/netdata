@@ -236,3 +236,40 @@ ls -la $IBM_DB_HOME/lib/
 # Test connectivity with db2cli
 $IBM_DB_HOME/bin/db2cli validate -database "" -host your-as400-host -port 446 -user your-user -passwd your-password
 ```
+
+## IBM i Version Compatibility
+
+The AS400 collector is designed to work with different IBM i versions and gracefully handle missing features:
+
+### Version Detection
+The collector automatically detects the IBM i version and disables features that are not available:
+- **Core metrics** (CPU, ASP, Jobs) work on all IBM i versions
+- **Advanced metrics** may require newer IBM i versions (V7R3+)
+
+### Resilient Collection
+The collector uses individual queries for each metric to ensure maximum compatibility:
+- If a metric is not available, it is automatically disabled after the first attempt
+- Other metrics continue to be collected normally
+- Warning messages are logged once (not repeatedly) for unavailable features
+
+### Version-Specific Features
+
+| Feature | Required Version | Fallback Behavior |
+|---------|------------------|-------------------|
+| Basic CPU/ASP metrics | All versions | None needed |
+| CPU configuration details | V7R3+ | Metrics omitted |
+| Interactive/Database CPU | V7R3+ | Metrics omitted |
+| ACTIVE_JOB_INFO function | V7R3+ | Job type breakdown disabled |
+| IFS_OBJECT_STATISTICS | V7R3+ | IFS metrics disabled |
+
+### Known Compatibility Issues
+
+1. **Table Functions**: Some metrics use table functions (UDTFs) that may not be available on older IBM i versions:
+   - `ACTIVE_JOB_INFO()` - Used for job type breakdown and active job details
+   - `IFS_OBJECT_STATISTICS()` - Used for IFS file system metrics
+
+2. **Column Availability**: Some columns in QSYS2 tables were added in newer versions:
+   - `CONFIGURED_CPUS`, `CURRENT_PROCESSING_CAPACITY` (V7R3+)
+   - `SHARED_PROCESSOR_POOL_UTILIZATION` (V7R3+)
+
+The collector handles these gracefully by disabling the affected metrics without impacting overall collection.
