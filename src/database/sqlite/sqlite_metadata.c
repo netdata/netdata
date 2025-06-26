@@ -131,6 +131,16 @@ sqlite3 *db_meta = NULL;
 
 // SQL statements
 
+#define SQL_CLEANUP_AGENT_EVENT_LOG "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400"
+
+#define SQL_DELETE_ORPHAN_HEALTH_LOG "DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)"
+
+#define SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL                                                                            \
+    "DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
+
+#define SQL_DELETE_ORPHAN_ALERT_VERSION                                                                                \
+    "DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
+
 #define SQL_STORE_CLAIM_ID                                                                                             \
     "INSERT INTO node_instance "                                                                                       \
     "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, UNIXEPOCH()) "                                     \
@@ -1499,13 +1509,9 @@ static void cleanup_health_log(struct meta_config_s *config)
         return;
     }
 
-    (void)db_execute(db_meta, "DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)", NULL);
-    (void)db_execute(
-        db_meta,
-        "DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)",
-        NULL);
-    (void)db_execute(
-        db_meta, "DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)", NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
     worker_is_idle();
 }
 
@@ -2360,9 +2366,8 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
 {
     RRDHOST *host;
     size_t host_count = 0;
-    usec_t started_ut;
+    usec_t started_ut = now_monotonic_usec();
     if (!is_worker) {
-        started_ut = now_monotonic_usec();
         dfe_start_reentrant(rrdhost_root_index, host) {
             host_count++;
         }
@@ -2875,7 +2880,7 @@ done:
 
 void cleanup_agent_event_log(void)
 {
-    (void)db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400", NULL);
+    (void) db_execute(db_meta, SQL_CLEANUP_AGENT_EVENT_LOG, NULL);
 }
 
 #define SQL_GET_AGENT_EVENT_TYPE_MEDIAN                                                                                \
