@@ -23,11 +23,11 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 		d.db = db
 
-		// Detect DB2 version on first connection
-		if err := d.detectVersion(ctx); err != nil {
-			d.Warningf("failed to detect DB2 version: %v", err)
+		// Detect DB2 edition and version on first connection
+		if err := d.detectDB2Edition(ctx); err != nil {
+			d.Warningf("failed to detect DB2 edition: %v", err)
 		} else {
-			d.Infof("detected DB2 version: %s edition: %s", d.version, d.edition)
+			d.Infof("detected DB2 edition: %s version: %s", d.edition, d.version)
 		}
 	}
 
@@ -56,9 +56,9 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 			return nil, fmt.Errorf("database connection failed after reconnect: %v", err)
 		}
 
-		// Re-detect version after reconnect
-		if err := d.detectVersion(ctx); err != nil {
-			d.Warningf("failed to detect DB2 version after reconnect: %v", err)
+		// Re-detect edition after reconnect
+		if err := d.detectDB2Edition(ctx); err != nil {
+			d.Warningf("failed to detect DB2 edition after reconnect: %v", err)
 		}
 	}
 
@@ -210,71 +210,36 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 }
 
 func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
-	// Service health checks
-	d.collectServiceHealth(ctx)
-
-	// Connection counts - works across all DB2 versions
-	err := d.doQuery(ctx, queryGlobalConnections, func(column, value string, lineEnd bool) {
-		switch column {
-		case "TOTAL_CONNS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.ConnTotal = v
-			}
-		case "ACTIVE_CONNS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.ConnActive = v
-			}
-		case "EXECUTING_CONNS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.ConnExecuting = v
-			}
-		case "IDLE_CONNS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.ConnIdle = v
-			}
-		case "MAX_CONNS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				d.mx.ConnMax = v
-			}
-		}
-	})
-
-	// Calculate idle connections if not provided
-	if d.mx.ConnIdle == 0 && d.mx.ConnActive > 0 {
-		d.mx.ConnIdle = d.mx.ConnActive - d.mx.ConnExecuting
+	// Service health checks - core functionality
+	if err := d.collectServiceHealthResilience(ctx); err != nil {
+		return err // Service health is critical
 	}
 
-	if err != nil {
-		// Try simpler query for older versions
-		if err2 := d.doQuerySingleValue(ctx, queryGlobalConnectionsSimple, &d.mx.ConnTotal); err2 != nil {
-			return fmt.Errorf("failed to get connection count: %v", err)
-		}
+	// Connection metrics - core functionality that should always work
+	if err := d.collectConnectionMetricsResilience(ctx); err != nil {
+		return err // Connection metrics are critical
 	}
 
-	// Lock metrics
-	if err := d.collectLockMetrics(ctx); err != nil {
-		d.Warningf("failed to collect lock metrics: %v", err)
-	}
+	// Lock metrics - graceful degradation
+	d.collectLockMetricsResilience(ctx)
 
-	// Buffer pool aggregate hit ratio
-	if err := d.collectBufferpoolAggregateMetrics(ctx); err != nil {
-		d.Warningf("failed to collect bufferpool metrics: %v", err)
-	}
+	// Sorting metrics - graceful degradation
+	d.collectSortingMetricsResilience(ctx)
 
-	// Log space metrics
-	if err := d.collectLogSpaceMetrics(ctx); err != nil {
-		d.Warningf("failed to collect log space metrics: %v", err)
-	}
+	// Row activity metrics - graceful degradation
+	d.collectRowActivityMetricsResilience(ctx)
 
-	// Long-running queries
-	if err := d.collectLongRunningQueries(ctx); err != nil {
-		d.Warningf("failed to collect long-running queries: %v", err)
-	}
+	// Buffer pool metrics - graceful degradation
+	d.collectBufferpoolMetricsResilience(ctx)
 
-	// Backup status
-	if err := d.collectBackupStatus(ctx); err != nil {
-		d.Warningf("failed to collect backup status: %v", err)
-	}
+	// Log space metrics - graceful degradation
+	d.collectLogSpaceMetricsResilience(ctx)
+
+	// Long-running queries - graceful degradation
+	d.collectLongRunningQueriesResilience(ctx)
+
+	// Backup status - graceful degradation
+	d.collectBackupStatusResilience(ctx)
 
 	return nil
 }
@@ -598,4 +563,339 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// Resilient collection functions following AS/400 pattern
+
+func (d *DB2) collectServiceHealthResilience(ctx context.Context) error {
+	// Service health is critical - these must work
+	if err := d.collectSingleMetric(ctx, "can_connect", queryCanConnect, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.CanConnect = v
+		}
+	}); err != nil {
+		return err // Fatal - basic connectivity must work
+	}
+
+	// Database status - optional on some editions
+	_ = d.collectSingleMetric(ctx, "database_status", queryDatabaseStatus, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.DatabaseStatus = v
+		}
+	})
+
+	return nil
+}
+
+func (d *DB2) collectConnectionMetricsResilience(ctx context.Context) error {
+	// Core connection metrics - must work on all DB2 editions
+	if err := d.collectSingleMetric(ctx, "total_connections", queryTotalConnections, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.ConnTotal = v
+		}
+	}); err != nil {
+		return err // Fatal - basic connection count must work
+	}
+
+	// Optional connection breakdowns - graceful degradation
+	_ = d.collectSingleMetric(ctx, "active_connections", queryActiveConnections, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.ConnActive = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "executing_connections", queryExecutingConnections, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.ConnExecuting = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "idle_connections", queryIdleConnections, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.ConnIdle = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "max_connections", queryMaxConnections, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.ConnMax = v
+		}
+	})
+
+	// Calculate idle if not available directly
+	if d.mx.ConnIdle == 0 && d.mx.ConnActive > 0 {
+		d.mx.ConnIdle = d.mx.ConnActive - d.mx.ConnExecuting
+	}
+
+	return nil
+}
+
+func (d *DB2) collectLockMetricsResilience(ctx context.Context) {
+	_ = d.collectSingleMetric(ctx, "lock_waits", queryLockWaits, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockWaits = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "lock_timeouts", queryLockTimeouts, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockTimeouts = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "deadlocks", queryDeadlocks, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.Deadlocks = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "lock_escalations", queryLockEscalations, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockEscalations = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "active_locks", queryActiveLocks, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockActive = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "lock_wait_time", queryLockWaitTime, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockWaitTime = v * precision // Convert to milliseconds with precision
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "lock_waiting_agents", queryLockWaitingAgents, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockWaitingAgents = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "lock_memory_pages", queryLockMemoryPages, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LockMemoryPages = v
+		}
+	})
+}
+
+func (d *DB2) collectSortingMetricsResilience(ctx context.Context) {
+	_ = d.collectSingleMetric(ctx, "total_sorts", queryTotalSorts, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.TotalSorts = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "sort_overflows", querySortOverflows, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.SortOverflows = v
+		}
+	})
+}
+
+func (d *DB2) collectRowActivityMetricsResilience(ctx context.Context) {
+	_ = d.collectSingleMetric(ctx, "rows_read", queryRowsRead, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.RowsRead = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "rows_modified", queryRowsModified, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.RowsModified = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "rows_returned", queryRowsReturned, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.RowsReturned = v
+		}
+	})
+}
+
+func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
+	// Collect individual components first
+	var dataLogical, dataHits int64
+	var indexLogical, indexHits int64
+	var xdaLogical, xdaHits int64
+	var colLogical, colHits int64
+
+	// Get reads
+	_ = d.collectSingleMetric(ctx, "bufferpool_logical_reads", queryBufferpoolLogicalReads, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.BufferpoolLogicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_physical_reads", queryBufferpoolPhysicalReads, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.BufferpoolPhysicalReads = v
+		}
+	})
+
+	// Data reads
+	_ = d.collectSingleMetric(ctx, "bufferpool_data_logical", queryBufferpoolDataLogical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			dataLogical = v
+			d.mx.BufferpoolDataLogicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_data_physical", queryBufferpoolDataPhysical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.BufferpoolDataPhysicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_data_hits", queryBufferpoolDataHits, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			dataHits = v
+		}
+	})
+
+	// Index reads
+	_ = d.collectSingleMetric(ctx, "bufferpool_index_logical", queryBufferpoolIndexLogical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			indexLogical = v
+			d.mx.BufferpoolIndexLogicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_index_physical", queryBufferpoolIndexPhysical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.BufferpoolIndexPhysicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_index_hits", queryBufferpoolIndexHits, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			indexHits = v
+		}
+	})
+
+	// XDA reads
+	_ = d.collectSingleMetric(ctx, "bufferpool_xda_logical", queryBufferpoolXDALogical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			xdaLogical = v
+			d.mx.BufferpoolXDALogicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_xda_physical", queryBufferpoolXDAPhysical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.BufferpoolXDAPhysicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_xda_hits", queryBufferpoolXDAHits, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			xdaHits = v
+		}
+	})
+
+	// Column reads
+	_ = d.collectSingleMetric(ctx, "bufferpool_column_logical", queryBufferpoolColumnLogical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			colLogical = v
+			d.mx.BufferpoolColumnLogicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_column_physical", queryBufferpoolColumnPhysical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.BufferpoolColumnPhysicalReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "bufferpool_column_hits", queryBufferpoolColumnHits, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			colHits = v
+		}
+	})
+
+	// Calculate hit ratios from components
+	totalLogical := dataLogical + indexLogical + xdaLogical + colLogical
+	totalHits := dataHits + indexHits + xdaHits + colHits
+
+	if totalLogical > 0 {
+		d.mx.BufferpoolHitRatio = int64((float64(totalHits) * 100.0 * float64(precision)) / float64(totalLogical))
+	}
+
+	if dataLogical > 0 {
+		d.mx.BufferpoolDataHitRatio = int64((float64(dataHits) * 100.0 * float64(precision)) / float64(dataLogical))
+	}
+
+	if indexLogical > 0 {
+		d.mx.BufferpoolIndexHitRatio = int64((float64(indexHits) * 100.0 * float64(precision)) / float64(indexLogical))
+	}
+
+	if xdaLogical > 0 {
+		d.mx.BufferpoolXDAHitRatio = int64((float64(xdaHits) * 100.0 * float64(precision)) / float64(xdaLogical))
+	}
+
+	if colLogical > 0 {
+		d.mx.BufferpoolColumnHitRatio = int64((float64(colHits) * 100.0 * float64(precision)) / float64(colLogical))
+	}
+}
+
+func (d *DB2) collectLogSpaceMetricsResilience(ctx context.Context) {
+	var logUsed, logAvailable int64
+
+	_ = d.collectSingleMetric(ctx, "log_used_space", queryLogUsedSpace, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			logUsed = v
+			d.mx.LogUsedSpace = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "log_available_space", queryLogAvailableSpace, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			logAvailable = v
+			d.mx.LogAvailableSpace = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "log_reads", queryLogReads, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LogReads = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "log_writes", queryLogWrites, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LogWrites = v
+		}
+	})
+
+	// Calculate log utilization
+	if logUsed > 0 && logAvailable > 0 {
+		total := logUsed + logAvailable
+		d.mx.LogUtilization = int64((float64(logUsed) * 100.0 * float64(precision)) / float64(total))
+	}
+}
+
+func (d *DB2) collectLongRunningQueriesResilience(ctx context.Context) {
+	_ = d.collectSingleMetric(ctx, "long_running_total", queryLongRunningTotal, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LongRunningQueries = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "long_running_warning", queryLongRunningWarning, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LongRunningQueriesWarning = v
+		}
+	})
+
+	_ = d.collectSingleMetric(ctx, "long_running_critical", queryLongRunningCritical, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.LongRunningQueriesCritical = v
+		}
+	})
+}
+
+func (d *DB2) collectBackupStatusResilience(ctx context.Context) {
+	// This will use the existing collectBackupStatus function as it's already resilient
+	_ = d.collectBackupStatus(ctx)
 }

@@ -72,6 +72,10 @@ func New() *DB2 {
 		connections: make(map[string]*connectionMetrics),
 		tables:      make(map[string]*tableMetrics),
 		indexes:     make(map[string]*indexMetrics),
+		
+		// Initialize resilience tracking
+		disabledMetrics:  make(map[string]bool),
+		disabledFeatures: make(map[string]bool),
 	}
 }
 
@@ -140,8 +144,12 @@ type DB2 struct {
 
 	// DB2 version info
 	version    string
-	edition    string // LUW, z/OS, i
+	edition    string // LUW, z/OS, i, Cloud
 	serverInfo serverInfo
+	
+	// Resilience tracking (following AS/400 pattern)
+	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
+	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
 }
 
 type serverInfo struct {
@@ -293,4 +301,118 @@ func cleanName(name string) string {
 		"=", "_",
 	)
 	return strings.ToLower(r.Replace(name))
+}
+
+// Resilience functions following AS/400 pattern
+
+// logOnce logs a warning message only once per key to avoid spam
+func (d *DB2) logOnce(key string, format string, args ...interface{}) {
+	if d.disabledMetrics[key] || d.disabledFeatures[key] {
+		return // Already logged
+	}
+	d.Warningf(format, args...)
+}
+
+// isDisabled checks if a metric or feature is disabled due to version incompatibility
+func (d *DB2) isDisabled(key string) bool {
+	return d.disabledMetrics[key] || d.disabledFeatures[key]
+}
+
+// isSQLFeatureError detects SQL errors that indicate missing features (tables, columns, functions)
+func isSQLFeatureError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToUpper(err.Error())
+	// Common DB2 error codes for missing objects
+	return strings.Contains(errStr, "SQL0204N") ||  // object not found (table, view, function)
+		strings.Contains(errStr, "SQL0206N") ||     // column not found  
+		strings.Contains(errStr, "SQL0443N") ||     // function not found
+		strings.Contains(errStr, "SQL0551N") ||     // authorization error (often means table doesn't exist)
+		strings.Contains(errStr, "SQL0707N") ||     // name too long (version compatibility)
+		strings.Contains(errStr, "SQLCODE=-204") || // Alternative format
+		strings.Contains(errStr, "SQLCODE=-206") ||
+		strings.Contains(errStr, "SQLCODE=-443") ||
+		strings.Contains(errStr, "SQLCODE=-551")
+}
+
+// collectSingleMetric executes a single-value query and handles version-specific errors gracefully
+func (d *DB2) collectSingleMetric(ctx context.Context, metricKey string, query string, handler func(value string)) error {
+	if d.isDisabled(metricKey) {
+		return nil
+	}
+
+	var value string
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+
+	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
+	if err != nil {
+		if isSQLFeatureError(err) {
+			d.logOnce(metricKey, "metric %s not available on this DB2 edition/version: %v", metricKey, err)
+			d.disabledMetrics[metricKey] = true
+			return nil // Not a fatal error
+		}
+		return err
+	}
+
+	if value != "" {
+		handler(value)
+	}
+
+	return nil
+}
+
+// detectDB2Edition tries to detect the DB2 edition and version for compatibility
+func (d *DB2) detectDB2Edition(ctx context.Context) error {
+	// Try to detect LUW first (most common)
+	err := d.collectSingleMetric(ctx, "version_detection_luw", queryDetectVersionLUW, func(value string) {
+		d.edition = "LUW"
+		d.version = value
+		d.Debugf("detected DB2 LUW edition, version: %s", value)
+	})
+	
+	if err == nil && d.edition != "" {
+		return nil
+	}
+
+	// Try to detect DB2 for i (AS/400)
+	err = d.collectSingleMetric(ctx, "version_detection_i", queryDetectVersionI, func(value string) {
+		d.edition = "i"
+		d.version = "DB2 for i"
+		d.Debugf("detected DB2 for i (AS/400) edition")
+	})
+	
+	if err == nil && d.edition != "" {
+		return nil
+	}
+
+	// Try to detect z/OS by checking for z/OS specific tables
+	err = d.collectSingleMetric(ctx, "version_detection_zos", queryDetectVersionZOS, func(value string) {
+		d.edition = "z/OS"
+		d.version = value
+		d.Debugf("detected DB2 for z/OS edition")
+	})
+	
+	if err == nil && d.edition != "" {
+		return nil
+	}
+
+	// Try to detect Db2 on Cloud
+	err = d.collectSingleMetric(ctx, "version_detection_cloud", queryDetectVersionCloud, func(value string) {
+		d.edition = "Cloud"
+		d.version = value
+		d.Debugf("detected Db2 on Cloud edition")
+	})
+	
+	if err == nil && d.edition != "" {
+		return nil
+	}
+
+	// Default to LUW if all detection fails
+	d.edition = "LUW"
+	d.version = "Unknown"
+	d.Warningf("could not detect DB2 edition, defaulting to LUW")
+	
+	return nil
 }
