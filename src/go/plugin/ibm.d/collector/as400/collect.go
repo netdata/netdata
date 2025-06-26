@@ -139,6 +139,22 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 func (a *AS400) collectSystemStatus(ctx context.Context) error {
 	return a.doQuery(ctx, querySystemStatus, func(column, value string, lineEnd bool) {
+		switch column {
+		case "AVERAGE_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.CPUUtilization = int64(v * precision)
+			}
+		case "SYSTEM_ASP_USED":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.SystemASPUsed = int64(v * precision)
+			}
+		case "ACTIVE_JOBS_IN_SYSTEM":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ActiveJobs = v
+			}
+		}
+	})
+}
 
 func (a *AS400) collectMemoryPools(ctx context.Context) error {
 	var currentPoolName string
@@ -342,6 +358,14 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 func (a *AS400) countDisks(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQuery(ctx, queryCountDisks, func(column, value string, lineEnd bool) {
+		if column == "COUNT" {
+			if v, err := strconv.Atoi(value); err == nil {
+				count = v
+			}
+		}
+	})
+	return count, err
+}
 
 func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 	// Check cardinality
@@ -464,7 +488,7 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 	// Note: We apply selector in the result processing, not in the SQL query
 
 	var currentName, currentLib, key string
-	return a.doQuery(ctx, 	query := queryJobQueueInstances, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryJobQueueInstances, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "JOB_QUEUE_NAME":
