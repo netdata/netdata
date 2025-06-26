@@ -153,6 +153,9 @@ type DB2 struct {
 	// Resilience tracking (following AS/400 pattern)
 	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
 	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
+	
+	// Modern monitoring support
+	useMonGetFunctions bool // Use MON_GET_* functions instead of SNAP* views when available
 }
 
 type serverInfo struct {
@@ -577,4 +580,48 @@ func (d *DB2) addVersionLabelsToCharts() {
 	for _, chart := range *d.charts {
 		chart.Labels = append(chart.Labels, versionLabels...)
 	}
+}
+
+// detectMonGetSupport checks if MON_GET_* functions are available and usable
+func (d *DB2) detectMonGetSupport(ctx context.Context) {
+	// MON_GET_* functions are available in DB2 9.7+ for LUW
+	// They're not available on DB2 for i (AS/400) or older versions
+	
+	// First check if we should even try (edition and version check)
+	if d.edition == "i" {
+		d.Infof("MON_GET_* functions not available on DB2 for i, using SNAP* views")
+		d.useMonGetFunctions = false
+		return
+	}
+	
+	if d.edition == "LUW" && d.versionMajor > 0 {
+		if d.versionMajor < 9 || (d.versionMajor == 9 && d.versionMinor < 7) {
+			d.Infof("MON_GET_* functions require DB2 9.7+, using SNAP* views for version %d.%d", d.versionMajor, d.versionMinor)
+			d.useMonGetFunctions = false
+			return
+		}
+	}
+	
+	// Try a simple MON_GET_DATABASE query to verify it works
+	testQuery := `SELECT COUNT(*) FROM TABLE(MON_GET_DATABASE(-1)) AS T`
+	var count int
+	
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
+	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&count)
+	if err != nil {
+		if isSQLFeatureError(err) {
+			d.Infof("MON_GET_* functions not available or not authorized: %v, using SNAP* views", err)
+			d.useMonGetFunctions = false
+		} else {
+			d.Warningf("Error testing MON_GET_* support: %v, falling back to SNAP* views", err)
+			d.useMonGetFunctions = false
+		}
+		return
+	}
+	
+	// MON_GET functions are available and working
+	d.useMonGetFunctions = true
+	d.Infof("MON_GET_* functions detected and available - using modern monitoring approach for better performance")
 }
