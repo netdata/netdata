@@ -498,10 +498,8 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
                 c += 4;
                 status.BYPASS = 1;
                 break;
-            default:
-                status.OTHER = 1;
-                break;
             }
+            break;
         case 'C':
             switch (*++c) {
             case 'H':
@@ -512,10 +510,8 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
                 c++;
                 status.CAL = 1;
                 break;
-            default:
-                status.OTHER = 1;
-                break;
             }
+            break;
         case 'O':
             switch (*++c) {
             case 'B':
@@ -531,10 +527,8 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
                 c += 2;
                 status.OVER = 1;
                 break;
-            default:
-                status.OTHER = 1;
-                break;
             }
+            break;
         default:
             status.OTHER = 1;
             break;
