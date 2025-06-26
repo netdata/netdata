@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
+- chore\(go.d/snmp-profiles\): skip abstract when loading [\#20576](https://github.com/netdata/netdata/pull/20576) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/smartctl\): add Win default path for smartctl executable [\#20574](https://github.com/netdata/netdata/pull/20574) ([ilyam8](https://github.com/ilyam8))
+- NUMA Windows  [\#20573](https://github.com/netdata/netdata/pull/20573) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#20571](https://github.com/netdata/netdata/pull/20571) ([netdatabot](https://github.com/netdatabot))
 - improve\(go.d/smartctl\): add configurable concurrent device scanning [\#20569](https://github.com/netdata/netdata/pull/20569) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.10.0 to 9.11.0 in /src/go [\#20568](https://github.com/netdata/netdata/pull/20568) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -19,6 +23,7 @@
 - Fix save alert config transition on shutdown [\#20553](https://github.com/netdata/netdata/pull/20553) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#20552](https://github.com/netdata/netdata/pull/20552) ([netdatabot](https://github.com/netdatabot))
 - MSI parameter [\#20550](https://github.com/netdata/netdata/pull/20550) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add Remove Node guide [\#20549](https://github.com/netdata/netdata/pull/20549) ([kanelatechnical](https://github.com/kanelatechnical))
 - improve\(go.d/snmp-profiles\): add DHCP tags transform to bluecat profile [\#20547](https://github.com/netdata/netdata/pull/20547) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/prometheus/common from 0.64.0 to 0.65.0 in /src/go [\#20545](https://github.com/netdata/netdata/pull/20545) ([dependabot[bot]](https://github.com/apps/dependabot))
 - refactor\(go.d/ddsnmpcollector\): restructure into components [\#20543](https://github.com/netdata/netdata/pull/20543) ([ilyam8](https://github.com/ilyam8))
@@ -460,11 +465,6 @@
 - fix\(go.d/megacli\): handle BBU hardware component is not present [\#20008](https://github.com/netdata/netdata/pull/20008) ([ilyam8](https://github.com/ilyam8))
 - Fix crashes No 3 [\#20007](https://github.com/netdata/netdata/pull/20007) ([ktsaou](https://github.com/ktsaou))
 - Minor changes when handling systemd integration. [\#20006](https://github.com/netdata/netdata/pull/20006) ([vkalintiris](https://github.com/vkalintiris))
-- Deployment Guides Improved [\#20004](https://github.com/netdata/netdata/pull/20004) ([kanelatechnical](https://github.com/kanelatechnical))
-- daemon status 24c [\#20003](https://github.com/netdata/netdata/pull/20003) ([ktsaou](https://github.com/ktsaou))
-- use v4 UUIDs [\#20002](https://github.com/netdata/netdata/pull/20002) ([ktsaou](https://github.com/ktsaou))
-- Update synology.md [\#20001](https://github.com/netdata/netdata/pull/20001) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump golang.org/x/net from 0.37.0 to 0.38.0 in /src/go [\#20000](https://github.com/netdata/netdata/pull/20000) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
