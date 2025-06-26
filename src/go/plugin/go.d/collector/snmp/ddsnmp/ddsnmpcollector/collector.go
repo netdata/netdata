@@ -229,6 +229,11 @@ var metricMetaReplacer = strings.NewReplacer(
 	"\x00", "",
 )
 
+// handleCrossTableTagsWithoutMetrics ensures tables referenced only by cross-table tags
+// are still walked during collection. Without this, if a table like ifXTable is used
+// only for cross-table tags (e.g., getting interface names) but has no metrics defined,
+// it won't be walked and the tags will be missing. This creates synthetic metric entries
+// for such tables using the longest common OID prefix of the referenced columns.
 func handleCrossTableTagsWithoutMetrics(prof *ddsnmp.Profile) {
 	if prof.Definition == nil {
 		return
