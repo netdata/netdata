@@ -255,38 +255,78 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 		return err // Connection metrics are critical
 	}
 
-	// Advanced monitoring metrics - skip if disabled for this edition/version
+	// Use modern MON_GET_* functions for better performance when available
+	if d.useMonGetFunctions {
+		// Collect all database-level metrics in one efficient call
+		if !d.isDisabled("advanced_monitoring") {
+			if err := d.collectMonGetDatabase(ctx); err != nil {
+				d.Warningf("failed to collect database metrics using MON_GET_DATABASE: %v, falling back to individual queries", err)
+				// Fall back to individual SNAP queries
+				d.collectLockMetricsResilience(ctx)
+				d.collectSortingMetricsResilience(ctx)
+				d.collectRowActivityMetricsResilience(ctx)
+			}
+		} else {
+			d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
+		}
+
+		// Buffer pool metrics using MON_GET_BUFFERPOOL
+		if !d.isDisabled("bufferpool_detailed_metrics") {
+			if err := d.collectMonGetBufferpoolAggregate(ctx); err != nil {
+				d.Warningf("failed to collect bufferpool metrics using MON_GET_BUFFERPOOL: %v, falling back to SNAP views", err)
+				d.collectBufferpoolMetricsResilience(ctx)
+			}
+		} else {
+			d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
+		}
+
+		// Log space metrics using MON_GET_TRANSACTION_LOG
+		if !d.isDisabled("system_level_metrics") {
+			if err := d.collectMonGetTransactionLog(ctx); err != nil {
+				d.Warningf("failed to collect log metrics using MON_GET_TRANSACTION_LOG: %v, falling back to SNAP views", err)
+				d.collectLogSpaceMetricsResilience(ctx)
+			}
+		} else {
+			d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
+		}
+	} else {
+		// Fall back to SNAP views approach
+		// Advanced monitoring metrics - skip if disabled for this edition/version
+		if !d.isDisabled("advanced_monitoring") {
+			// Lock metrics - graceful degradation
+			d.collectLockMetricsResilience(ctx)
+
+			// Sorting metrics - graceful degradation
+			d.collectSortingMetricsResilience(ctx)
+
+			// Row activity metrics - graceful degradation
+			d.collectRowActivityMetricsResilience(ctx)
+		} else {
+			d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
+		}
+
+		// Buffer pool metrics - may be limited on some editions
+		if !d.isDisabled("bufferpool_detailed_metrics") {
+			d.collectBufferpoolMetricsResilience(ctx)
+		} else {
+			d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
+		}
+
+		// Log space metrics - graceful degradation  
+		if !d.isDisabled("system_level_metrics") {
+			d.collectLogSpaceMetricsResilience(ctx)
+		} else {
+			d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
+		}
+	}
+
+	// Long-running queries and backup status - collected separately as they don't have MON_GET equivalents
 	if !d.isDisabled("advanced_monitoring") {
-		// Lock metrics - graceful degradation
-		d.collectLockMetricsResilience(ctx)
-
-		// Sorting metrics - graceful degradation
-		d.collectSortingMetricsResilience(ctx)
-
-		// Row activity metrics - graceful degradation
-		d.collectRowActivityMetricsResilience(ctx)
-
 		// Long-running queries - graceful degradation
 		d.collectLongRunningQueriesResilience(ctx)
 
 		// Backup status - graceful degradation
 		d.collectBackupStatusResilience(ctx)
-	} else {
-		d.logOnce("advanced_monitoring_skipped", "Advanced monitoring metrics collection skipped - Not available on this DB2 edition/version")
-	}
-
-	// Buffer pool metrics - may be limited on some editions
-	if !d.isDisabled("bufferpool_detailed_metrics") {
-		d.collectBufferpoolMetricsResilience(ctx)
-	} else {
-		d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
-	}
-
-	// Log space metrics - graceful degradation  
-	if !d.isDisabled("system_level_metrics") {
-		d.collectLogSpaceMetricsResilience(ctx)
-	} else {
-		d.logOnce("system_level_skipped", "System-level metrics collection skipped - Restricted on this DB2 edition")
 	}
 
 	return nil
@@ -489,7 +529,11 @@ func (d *DB2) doQuery(ctx context.Context, query string, assign func(column, val
 
 	rows, err := d.db.QueryContext(queryCtx, query)
 	if err != nil {
-		d.Errorf("failed to execute query: %s, error: %v", query, err)
+		if isSQLFeatureError(err) {
+			d.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		} else {
+			d.Errorf("failed to execute query: %s, error: %v", query, err)
+		}
 		return err
 	}
 	defer rows.Close()
@@ -577,78 +621,56 @@ func (d *DB2) collectLongRunningQueries(ctx context.Context) error {
 }
 
 func (d *DB2) collectBackupStatus(ctx context.Context) error {
-	var (
-		lastFullBackupTime        time.Time
-		lastIncrementalBackupTime time.Time
-		lastBackupFailed          bool
-		currentStartTime          time.Time
-		currentOperationType      string
-	)
-
 	now := time.Now()
-
-	err := d.doQuery(ctx, fmt.Sprintf(queryBackupStatus, d.BackupHistoryDays), func(column, value string, lineEnd bool) {
-		switch column {
-		case "START_TIME":
-			// Parse backup time
-			if t, err := time.Parse("2006-01-02-15.04.05", value); err == nil {
-				currentStartTime = t
-			}
-		case "OPERATIONTYPE":
-			currentOperationType = value
-		case "SQLCODE":
-			// SQLCODE 0 = success, anything else = failure
-			if value == "0" && !currentStartTime.IsZero() {
-				// Successful backup
-				if currentOperationType == "F" && lastFullBackupTime.IsZero() {
-					lastFullBackupTime = currentStartTime
-				} else if (currentOperationType == "I" || currentOperationType == "O" || currentOperationType == "D") && lastIncrementalBackupTime.IsZero() {
-					lastIncrementalBackupTime = currentStartTime
-				}
-			} else if value != "0" && value != "" {
-				lastBackupFailed = true
-			}
+	
+	// Simplified approach - get the last successful full backup
+	var lastFullBackup sql.NullString
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
+	err := d.db.QueryRowContext(queryCtx, `
+		SELECT MAX(START_TIME) 
+		FROM SYSIBMADM.DB_HISTORY 
+		WHERE OPERATION = 'B' 
+		  AND OPERATIONTYPE = 'F' 
+		  AND SQLCODE = 0
+		  AND START_TIME >= CURRENT TIMESTAMP - 30 DAYS
+	`).Scan(&lastFullBackup)
+	
+	if err == nil && lastFullBackup.Valid {
+		if t, err := time.Parse("2006-01-02-15.04.05", lastFullBackup.String); err == nil {
+			d.mx.LastFullBackupAge = int64(now.Sub(t).Hours())
+			d.mx.LastBackupStatus = 0 // Success
+		} else {
+			d.mx.LastFullBackupAge = 999999 // Parse error
+			d.mx.LastBackupStatus = 1 // Failed
 		}
-
-		if lineEnd {
-			// Reset for next row
-			currentStartTime = time.Time{}
-			currentOperationType = ""
+	} else {
+		d.mx.LastFullBackupAge = 999999 // No backup found or query failed
+		d.mx.LastBackupStatus = 1 // No recent backup
+	}
+	
+	// Get the last successful incremental backup
+	var lastIncrementalBackup sql.NullString
+	err = d.db.QueryRowContext(queryCtx, `
+		SELECT MAX(START_TIME) 
+		FROM SYSIBMADM.DB_HISTORY 
+		WHERE OPERATION = 'B' 
+		  AND OPERATIONTYPE IN ('I', 'O', 'D') 
+		  AND SQLCODE = 0
+		  AND START_TIME >= CURRENT TIMESTAMP - 30 DAYS
+	`).Scan(&lastIncrementalBackup)
+	
+	if err == nil && lastIncrementalBackup.Valid {
+		if t, err := time.Parse("2006-01-02-15.04.05", lastIncrementalBackup.String); err == nil {
+			d.mx.LastIncrementalBackupAge = int64(now.Sub(t).Hours())
+		} else {
+			d.mx.LastIncrementalBackupAge = 999999 // Parse error
 		}
-	})
-
-	if err != nil {
-		// Try simpler approach - just get the latest backup timestamp
-		var lastBackup sql.NullString
-		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
-		defer cancel()
-
-		if err := d.db.QueryRowContext(queryCtx, queryBackupStatusSimple).Scan(&lastBackup); err == nil && lastBackup.Valid {
-			if t, err := time.Parse("2006-01-02-15.04.05", lastBackup.String); err == nil {
-				lastFullBackupTime = t
-			}
-		}
-	}
-
-	// Calculate age in hours
-	if !lastFullBackupTime.IsZero() {
-		d.mx.LastFullBackupAge = int64(now.Sub(lastFullBackupTime).Hours())
 	} else {
-		d.mx.LastFullBackupAge = 999999 // Very old/never
+		d.mx.LastIncrementalBackupAge = 999999 // No incremental backup found
 	}
-
-	if !lastIncrementalBackupTime.IsZero() {
-		d.mx.LastIncrementalBackupAge = int64(now.Sub(lastIncrementalBackupTime).Hours())
-	} else {
-		d.mx.LastIncrementalBackupAge = 999999 // Very old/never
-	}
-
-	if lastBackupFailed {
-		d.mx.LastBackupStatus = 1
-	} else {
-		d.mx.LastBackupStatus = 0
-	}
-
+	
 	return nil
 }
 
@@ -1069,12 +1091,6 @@ func (d *DB2) collectMonGetConnections(ctx context.Context) error {
 func (d *DB2) collectMonGetDatabase(ctx context.Context) error {
 	return d.doQuery(ctx, queryMonGetDatabase, func(column, value string, lineEnd bool) {
 		switch column {
-		case "COMMITS":
-			// Commits are not in the metricsData struct
-			// They would need to be added if needed
-		case "ROLLBACKS":
-			// Rollbacks are not in the metricsData struct
-			// They would need to be added if needed
 		case "LOCK_WAITS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				d.mx.LockWaits = v
@@ -1194,9 +1210,10 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 	d.mx.BufferpoolXDATotalReads = xdaLogical + xdaPhysical
 	d.mx.BufferpoolColumnTotalReads = colLogical + colPhysical
 	
-	// Calculate hit ratios
-	totalHits := dataHits + indexHits + xdaHits + colHits
+	// Calculate hit ratios using direct hit counts from MON_GET_BUFFERPOOL
+	// This is more accurate than calculating from logical/physical reads
 	totalLogical := dataLogical + indexLogical + xdaLogical + colLogical
+	totalHits := dataHits + indexHits + xdaHits + colHits
 	
 	if totalLogical > 0 {
 		d.mx.BufferpoolHitRatio = int64((float64(totalHits) * 100.0 * float64(precision)) / float64(totalLogical))
