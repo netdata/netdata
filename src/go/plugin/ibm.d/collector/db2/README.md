@@ -2,13 +2,15 @@
 
 ## Overview
 
-This collector monitors IBM DB2 database performance metrics.
+This collector monitors IBM DB2 database performance metrics across all editions.
 
-It supports all DB2 editions:
-- DB2 LUW (Linux, Unix, Windows) 
-- DB2 for z/OS
-- DB2 for i (AS/400)
-- Db2 on Cloud
+It supports all DB2 editions with automatic adaptation:
+- DB2 LUW (Linux, Unix, Windows) - Full feature set
+- DB2 for z/OS - Adapted for mainframe limitations 
+- DB2 for i (AS/400) - Limited SYSIBMADM view support
+- Db2 on Cloud - Cloud-specific restrictions
+
+The collector automatically detects the DB2 edition and version, then enables/disables features based on availability. Version information is added as labels to all charts for filtering and grouping.
 
 ## Requirements
 
@@ -84,6 +86,30 @@ jobs:
     collect_tables_matching: 'USER.*'
     collect_indexes_matching: 'USER.*'
 ```
+
+## Troubleshooting
+
+### Edition-Specific Behavior
+
+The collector automatically adapts to different DB2 editions:
+
+- **DB2 LUW**: Full feature set available
+- **DB2 for z/OS**: Limited buffer pool metrics, mainframe-specific features
+- **DB2 for i (AS/400)**: SYSIBMADM views not available, basic monitoring only
+- **Db2 on Cloud**: System-level metrics restricted
+
+### Common Issues
+
+- **SQL0204N errors**: Expected on older versions or limited editions. The collector logs which features are disabled.
+- **Missing metrics**: Check logs for feature availability messages. Some metrics are edition/version specific.
+- **Version detection**: The collector logs detected edition and version on startup.
+
+### Logs to Monitor
+
+Look for these informational messages:
+- "detected DB2 edition: X version: Y"
+- "Feature disabled: X - reason"
+- "Feature availability: X"
 
 ## Permissions
 
