@@ -52,6 +52,14 @@ modules:
         method_description: |
           The collector uses IBM DB2 driver to connect to the IBM i system and queries system catalog tables
           in QSYS2 schema to gather performance metrics.
+          
+          The collector is designed for resilience across different IBM i versions:
+          - Automatically detects IBM i version and available features
+          - Uses individual queries for each metric to maximize compatibility
+          - Gracefully disables unavailable metrics without affecting collection
+          - Logs version compatibility issues only once to avoid log spam
+          - Core metrics work on all IBM i versions
+          - Advanced features may require IBM i V7R3 or later
       supported_platforms:
         include: []
         exclude: []
@@ -279,6 +287,15 @@ modules:
               - Set IBM_DB_HOME environment variable
               - Add $IBM_DB_HOME/lib to LD_LIBRARY_PATH
               - Ensure the netdata user has access to the DB2 client libraries
+          - name: Some metrics are not available
+            description: Certain metrics are missing or show warnings about unavailable features.
+            recommendations:
+              - Check your IBM i version - some features require V7R3 or later
+              - The collector automatically detects available features and disables incompatible ones
+              - Core metrics (CPU, ASP, Jobs) work on all IBM i versions
+              - Advanced metrics like CPU configuration details require V7R3+
+              - Table functions ACTIVE_JOB_INFO() and IFS_OBJECT_STATISTICS() require V7R3+
+              - Missing metrics will be logged once and then disabled automatically
     alerts:
       - name: as400_cpu_utilization
         metric: as400.cpu_utilization
