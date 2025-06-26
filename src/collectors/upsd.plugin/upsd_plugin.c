@@ -460,7 +460,7 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
 
     struct nut_ups_status status = { 0 };
 
-    for (const char *c = value; *c; c++) {
+    for (const char *c = value; c && *c; c++) {
         switch (*c) {
         case ' ':
             continue;
@@ -498,6 +498,10 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
                 c += 4;
                 status.BYPASS = 1;
                 break;
+            default:
+                status.OTHER = 1;
+                c = strchr(c, ' ');
+                break;
             }
             break;
         case 'C':
@@ -509,6 +513,10 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
             case 'A':
                 c++;
                 status.CAL = 1;
+                break;
+            default:
+                status.OTHER = 1;
+                c = strchr(c, ' ');
                 break;
             }
             break;
@@ -527,10 +535,15 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
                 c += 2;
                 status.OVER = 1;
                 break;
+            default:
+                status.OTHER = 1;
+                c = strchr(c, ' ');
+                break;
             }
             break;
         default:
             status.OTHER = 1;
+            c = strchr(c, ' ');
             break;
         }
     }
