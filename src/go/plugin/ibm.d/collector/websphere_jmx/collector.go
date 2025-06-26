@@ -58,7 +58,6 @@ func New() *WebSphereJMX {
 			RetryBackoffMultiplier:  2.0,
 			CircuitBreakerThreshold: 5,
 			HelperRestartMax:        3,
-			HelperMemoryLimitMB:     512,
 		},
 		
 		charts:             &module.Charts{},
@@ -123,7 +122,6 @@ type Config struct {
 	RetryBackoffMultiplier   float64          `yaml:"retry_backoff_multiplier,omitempty" json:"retry_backoff_multiplier"`
 	CircuitBreakerThreshold  int              `yaml:"circuit_breaker_threshold,omitempty" json:"circuit_breaker_threshold"`
 	HelperRestartMax         int              `yaml:"helper_restart_max,omitempty" json:"helper_restart_max"`
-	HelperMemoryLimitMB      int              `yaml:"helper_memory_limit_mb,omitempty" json:"helper_memory_limit_mb"`
 }
 
 type WebSphereJMX struct {

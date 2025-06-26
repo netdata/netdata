@@ -128,7 +128,6 @@ type helperMonitor struct {
 	checkInterval     time.Duration
 	restartDelay      time.Duration
 	maxRestarts       int
-	memoryLimitMB     int
 	
 	mu                sync.Mutex
 	restartCount      int
@@ -143,7 +142,6 @@ func newHelperMonitor(collector *WebSphereJMX) *helperMonitor {
 		checkInterval:     30 * time.Second,
 		restartDelay:      5 * time.Second,
 		maxRestarts:       collector.HelperRestartMax,
-		memoryLimitMB:     collector.HelperMemoryLimitMB,
 		stopCh:            make(chan struct{}),
 	}
 }
@@ -195,13 +193,8 @@ func (hm *helperMonitor) checkAndRestart(ctx context.Context) error {
 		return hm.restartHelper(ctx)
 	}
 	
-	// Check memory usage if possible
-	if hm.memoryLimitMB > 0 {
-		if memoryMB := hm.getHelperMemoryMB(); memoryMB > hm.memoryLimitMB {
-			hm.collector.Warningf("Java helper using %dMB (limit: %dMB), restarting", memoryMB, hm.memoryLimitMB)
-			return hm.restartHelper(ctx)
-		}
-	}
+	// Memory monitoring removed - not applicable for remote JMX connections
+	// and local process memory is already monitored by Netdata
 	
 	return nil
 }
@@ -223,12 +216,6 @@ func (hm *helperMonitor) isHelperAlive() bool {
 	return resp != nil && resp.Status == "OK"
 }
 
-func (hm *helperMonitor) getHelperMemoryMB() int {
-	// TODO: Implement platform-specific memory monitoring
-	// This would require reading /proc/[pid]/status on Linux or using syscalls on other platforms
-	// For now, return 0 to skip memory checks
-	return 0
-}
 
 func (hm *helperMonitor) restartHelper(ctx context.Context) error {
 	hm.mu.Lock()
