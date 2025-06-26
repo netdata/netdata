@@ -444,7 +444,7 @@ int nut_list_ups(UPSCONN_t *ups, size_t *numa, char ***answer) {
     // Unfortunately, list_ups_next() will emit the list delimiter
     // "END LIST UPS" as its last iteration before returning 0. We don't
     // need it, so let's skip processing on that item.
-    if (!streq("END", answer[0][0])) {
+    if (streq("END", answer[0][0])) {
         started = false;
         return 0;
     }
