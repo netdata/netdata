@@ -1,0 +1,6 @@
+# Compiled Java files
+*.class
+
+# JAR files (except the embedded one)
+*.jar
+!websphere_jmx_helper.jar
