@@ -799,24 +799,82 @@ component: ServiceName
       to: role|silent
 ```
 
+## Version Information Labels
+
+For collectors that monitor multiple versions of an application, **always expose version information as chart labels**. This enables users to filter by version, group metrics by version, and understand which features are available.
+
+### Pattern: Detect and Label All Charts
+
+```go
+// After detecting version/edition during collection
+func (c *Collector) detectVersion(ctx context.Context) error {
+    // Version detection logic...
+    c.version = detectedVersion
+    c.edition = detectedEdition
+    
+    // Add labels to all existing charts after detection
+    c.addVersionLabelsToCharts()
+    return nil
+}
+
+// Add version labels to all charts (base and instance)
+func (c *Collector) addVersionLabelsToCharts() {
+    versionLabels := []module.Label{
+        {Key: "app_version", Value: c.version},
+        {Key: "app_edition", Value: c.edition},
+    }
+    
+    // Add to all existing charts
+    for _, chart := range *c.charts {
+        chart.Labels = append(chart.Labels, versionLabels...)
+    }
+}
+```
+
+### Include in Instance Chart Creation
+
+```go
+// Chart creation functions should include version labels
+func (c *Collector) newInstanceCharts(instance *instanceMetrics) *module.Charts {
+    // ... chart creation logic
+    
+    for _, chart := range charts {
+        chart.Labels = []module.Label{
+            {Key: "instance", Value: instance.name},
+            {Key: "app_version", Value: c.version},    // Version info
+            {Key: "app_edition", Value: c.edition},    // Edition info
+        }
+    }
+    return &charts
+}
+```
+
+### Benefits
+
+- **Filtering**: Users can filter dashboards by version: `app_version="11.5.7"`
+- **Grouping**: Aggregate metrics across multiple instances of the same version
+- **Troubleshooting**: Quickly identify version-specific issues
+- **Migration Planning**: Compare performance across versions during upgrades
+
 ## Best Practices Summary
 
 1. **Consider cardinality control** for dynamic instances - but not always required
 2. **Make configuration files self-documenting** with examples
 3. **Handle errors gracefully** - partial data is better than no data
 4. **Use labels** for instance identification in charts
-5. **Clean instance names** before using in metric IDs
-6. **Track instance lifecycle** to add/remove charts dynamically
-7. **Provide comprehensive metadata** for the marketplace
-8. **Test with large-scale scenarios** if implementing cardinality limits
-9. **Log warnings** when limits are reached or data is filtered
-10. **Follow existing patterns** - check similar collectors for examples
-11. **Use context parameters** in all interface methods
-12. **Reuse clients** when possible, reconnect on failure
-13. **Split complex collectors** into multiple collection files
-14. **Be consistent with precision** when converting floats
-15. **Use appropriate thresholds** - fixed for percentages and hard errors (i.e. testing non-zero errors), dynamic for other metrics
-16. **Route alerts appropriately** - use silent for non-critical issues
+5. **Expose version information as labels** on all charts for multi-version applications
+6. **Clean instance names** before using in metric IDs
+7. **Track instance lifecycle** to add/remove charts dynamically
+8. **Provide comprehensive metadata** for the marketplace
+9. **Test with large-scale scenarios** if implementing cardinality limits
+10. **Log warnings** when limits are reached or data is filtered
+11. **Follow existing patterns** - check similar collectors for examples
+12. **Use context parameters** in all interface methods
+13. **Reuse clients** when possible, reconnect on failure
+14. **Split complex collectors** into multiple collection files
+15. **Be consistent with precision** when converting floats
+16. **Use appropriate thresholds** - fixed for percentages and hard errors (i.e. testing non-zero errors), dynamic for other metrics
+17. **Route alerts appropriately** - use silent for non-critical issues
 
 ## Checklist
 

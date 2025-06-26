@@ -9,7 +9,7 @@ import (
 
 // Chart management functions
 func (d *DB2) addDatabaseCharts(db *databaseMetrics) {
-	charts := newDatabaseCharts(db)
+	charts := d.newDatabaseCharts(db)
 	for _, chart := range *charts {
 		if err := d.charts.Add(chart.Copy()); err != nil {
 			d.Warningf("failed to add database chart for %s: %v", db.name, err)
@@ -33,7 +33,7 @@ func (d *DB2) removeDatabaseCharts(name string) {
 }
 
 func (d *DB2) addBufferpoolCharts(bp *bufferpoolMetrics) {
-	charts := newBufferpoolCharts(bp)
+	charts := d.newBufferpoolCharts(bp)
 	for _, chart := range *charts {
 		if err := d.charts.Add(chart.Copy()); err != nil {
 			d.Warningf("failed to add bufferpool chart for %s: %v", bp.name, err)
@@ -58,7 +58,7 @@ func (d *DB2) removeBufferpoolCharts(name string) {
 }
 
 func (d *DB2) addTablespaceCharts(ts *tablespaceMetrics) {
-	charts := newTablespaceCharts(ts)
+	charts := d.newTablespaceCharts(ts)
 	for _, chart := range *charts {
 		if err := d.charts.Add(chart.Copy()); err != nil {
 			d.Warningf("failed to add tablespace chart for %s: %v", ts.name, err)
@@ -82,7 +82,7 @@ func (d *DB2) removeTablespaceCharts(name string) {
 }
 
 func (d *DB2) addConnectionCharts(conn *connectionMetrics) {
-	charts := newConnectionCharts(conn)
+	charts := d.newConnectionCharts(conn)
 	for _, chart := range *charts {
 		if err := d.charts.Add(chart.Copy()); err != nil {
 			d.Warningf("failed to add connection chart for %s: %v", conn.applicationID, err)
@@ -106,7 +106,7 @@ func (d *DB2) removeConnectionCharts(id string) {
 }
 
 func (d *DB2) addTableCharts(t *tableMetrics) {
-	charts := newTableCharts(t)
+	charts := d.newTableCharts(t)
 	for _, chart := range *charts {
 		if err := d.charts.Add(chart.Copy()); err != nil {
 			d.Warningf("failed to add table chart for %s: %v", t.name, err)
@@ -130,7 +130,7 @@ func (d *DB2) removeTableCharts(name string) {
 }
 
 func (d *DB2) addIndexCharts(i *indexMetrics) {
-	charts := newIndexCharts(i)
+	charts := d.newIndexCharts(i)
 	for _, chart := range *charts {
 		if err := d.charts.Add(chart.Copy()); err != nil {
 			d.Warningf("failed to add index chart for %s: %v", i.name, err)

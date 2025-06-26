@@ -368,6 +368,12 @@ func (a *AS400) detectIBMiVersion(ctx context.Context) error {
 		a.Debugf("detected IBM i version: %s", a.osVersion)
 	}
 
+	// Collect system information for labels
+	a.collectSystemInfo(ctx)
+	
+	// Add labels to charts after collecting all system info
+	a.addVersionLabelsToCharts()
+
 	return nil
 }
 
@@ -391,5 +397,55 @@ func (a *AS400) detectAvailableFeatures(ctx context.Context) {
 		}
 	}); err != nil {
 		a.Debugf("failed to check IFS_OBJECT_STATISTICS availability: %v", err)
+	}
+}
+
+// collectSystemInfo gathers system information for chart labels
+func (a *AS400) collectSystemInfo(ctx context.Context) {
+	// Collect system name
+	_ = a.collectSingleMetric(ctx, "system_name", querySystemName, func(value string) {
+		a.systemName = value
+		a.Debugf("detected system name: %s", a.systemName)
+	})
+
+	// Collect serial number
+	_ = a.collectSingleMetric(ctx, "serial_number", querySerialNumber, func(value string) {
+		a.serialNumber = value
+		a.Debugf("detected serial number: %s", a.serialNumber)
+	})
+
+	// Collect system model
+	_ = a.collectSingleMetric(ctx, "system_model", querySystemModel, func(value string) {
+		a.model = value
+		a.Debugf("detected system model: %s", a.model)
+	})
+
+	// Default values if collection fails
+	if a.systemName == "" {
+		a.systemName = "Unknown"
+	}
+	if a.serialNumber == "" {
+		a.serialNumber = "Unknown"
+	}
+	if a.model == "" {
+		a.model = "Unknown"
+	}
+	if a.osVersion == "" {
+		a.osVersion = "Unknown"
+	}
+}
+
+// addVersionLabelsToCharts adds IBM i version labels to all charts
+func (a *AS400) addVersionLabelsToCharts() {
+	versionLabels := []module.Label{
+		{Key: "ibmi_version", Value: a.osVersion},
+		{Key: "system_name", Value: a.systemName},
+		{Key: "serial_number", Value: a.serialNumber},
+		{Key: "model", Value: a.model},
+	}
+	
+	// Add labels to all existing charts
+	for _, chart := range *a.charts {
+		chart.Labels = append(chart.Labels, versionLabels...)
 	}
 }
