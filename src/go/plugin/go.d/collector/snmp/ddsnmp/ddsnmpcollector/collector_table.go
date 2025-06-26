@@ -162,13 +162,20 @@ type tablesToWalkInfo struct {
 	tablesToWalk map[string]bool
 	tableConfigs map[string][]ddprofiledefinition.MetricsConfig
 	missingOIDs  []string
+	// tagCrossTableOnlyConfigs contains synthetic configs for tables/columns that are:
+	// 1. Referenced by cross-table tags (e.g., tag from entPhysicalTable)
+	// 2. NOT defined in the metrics section (no metrics to collect)
+	// These are created so we can walk and cache their structure for tag resolution.
+	// Key: column OID, Value: synthetic MetricsConfig with empty Symbols
+	tagCrossTableOnlyConfigs map[string]ddprofiledefinition.MetricsConfig
 }
 
 // identifyTablesToWalk determines which tables need to be walked
 func (tc *tableCollector) identifyTablesToWalk(prof *ddsnmp.Profile) *tablesToWalkInfo {
 	info := &tablesToWalkInfo{
-		tablesToWalk: make(map[string]bool),
-		tableConfigs: make(map[string][]ddprofiledefinition.MetricsConfig),
+		tablesToWalk:             make(map[string]bool),
+		tableConfigs:             make(map[string][]ddprofiledefinition.MetricsConfig),
+		tagCrossTableOnlyConfigs: make(map[string]ddprofiledefinition.MetricsConfig),
 	}
 
 	for _, cfg := range prof.Definition.Metrics {
@@ -177,6 +184,7 @@ func (tc *tableCollector) identifyTablesToWalk(prof *ddsnmp.Profile) *tablesToWa
 		}
 
 		tableOID := cfg.Table.OID
+
 		if tc.missingOIDs[trimOID(tableOID)] {
 			info.missingOIDs = append(info.missingOIDs, tableOID)
 			continue
@@ -189,8 +197,52 @@ func (tc *tableCollector) identifyTablesToWalk(prof *ddsnmp.Profile) *tablesToWa
 		}
 	}
 
-	tc.log.Debugf("Tables walking %d cached %d (%d total)",
-		len(info.tablesToWalk), len(info.tableConfigs)-len(info.tablesToWalk), len(info.tableConfigs))
+	isInWalked := func(oid string) bool {
+		for k := range info.tablesToWalk {
+			if strings.HasPrefix(oid, k+".") {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, cfg := range prof.Definition.Metrics {
+		if cfg.IsScalar() || cfg.Table.OID == "" {
+			continue
+		}
+		for _, tagCfg := range cfg.MetricTags {
+			if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name || tagCfg.Symbol.OID == "" {
+				continue
+			}
+
+			columnOID := tagCfg.Symbol.OID
+
+			if isInWalked(columnOID) || tc.missingOIDs[trimOID(columnOID)] {
+				continue
+			}
+			if _, ok := info.tagCrossTableOnlyConfigs[columnOID]; ok {
+				continue
+			}
+
+			syntheticConfig := ddprofiledefinition.MetricsConfig{
+				Table: ddprofiledefinition.SymbolConfig{OID: columnOID, Name: tagCfg.Table},
+			}
+			info.tagCrossTableOnlyConfigs[columnOID] = syntheticConfig
+
+			if !tc.tableCache.isConfigCached(syntheticConfig) {
+				info.tablesToWalk[columnOID] = true
+			}
+		}
+	}
+
+	tablesWithMetrics := len(info.tableConfigs)
+	crossTableOnly := len(info.tagCrossTableOnlyConfigs)
+	totalTables := tablesWithMetrics + crossTableOnly
+	toWalk := len(info.tablesToWalk)
+	cached := totalTables - toWalk
+
+	tc.log.Debugf("Tables: walking %d, cached %d, total %d (metrics: %d, cross-table-only: %d)",
+		toWalk, cached, totalTables, tablesWithMetrics, crossTableOnly)
 
 	if len(info.missingOIDs) > 0 {
 		tc.log.Debugf("table metrics missing OIDs: %v", info.missingOIDs)
@@ -240,6 +292,23 @@ func (tc *tableCollector) buildWalkResults(walkedData map[string]map[string]gosn
 					config:   cfg,
 				})
 			}
+		}
+	}
+
+	for tableOID, cfg := range info.tagCrossTableOnlyConfigs {
+		if pdus, ok := walkedData[tableOID]; ok {
+			results = append(results, tableWalkResult{
+				tableOID: tableOID,
+				pdus:     pdus,
+				config:   cfg,
+			})
+		} else if tc.tableCache.isConfigCached(cfg) {
+			// Even synthetic configs can be cached
+			results = append(results, tableWalkResult{
+				tableOID: tableOID,
+				pdus:     nil,
+				config:   cfg,
+			})
 		}
 	}
 
@@ -342,6 +411,15 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 
 // processTableData processes walked table data
 func (tc *tableCollector) processTableData(ctx *tableProcessingContext) ([]ddsnmp.Metric, error) {
+	// If this is a synthetic config (no symbols), just cache the raw PDUs
+	if len(ctx.config.Symbols) == 0 {
+		// For cross-table-only, we don't need to organize by rows
+		// Just cache the table OID and dependencies
+		tc.tableCache.cacheData(ctx.config, nil, nil, extractTableDependencies(ctx.config, ctx.tableNameToOID))
+		tc.log.Debugf("Cached cross-table-only %s with %d PDUs", ctx.config.Table.Name, len(ctx.pdus))
+		return nil, nil
+	}
+
 	ctx.columnOIDs = buildColumnOIDs(ctx.config)
 	ctx.sameTableTagOIDs = buildSameTableTagOIDs(ctx.config)
 

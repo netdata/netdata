@@ -2367,6 +2367,67 @@ func TestTableCollector_Collect(t *testing.T) {
 			expectedError: false,
 		},
 
+		"cross-table tag from table without metrics": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1",
+								Name: "panEntityFRUModuleTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1",
+									Name: "panEntryFRUModulePowerUsed",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "ent_descr",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.47.1.1.1.1.2",
+										Name: "entPhysicalDescr",
+									},
+									Table: "entPhysicalTable",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk panEntityFRUModuleTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.SnmpPDU{
+					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+				})
+				// Walk entPhysicalDescr column only (not the whole entPhysicalTable)
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1.2", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "panEntryFRUModulePowerUsed",
+					Value:      100,
+					Tags:       map[string]string{"ent_descr": "Power Supply 1"},
+					MetricType: "gauge",
+					IsTable:    true,
+				},
+				{
+					Name:       "panEntryFRUModulePowerUsed",
+					Value:      150,
+					Tags:       map[string]string{"ent_descr": "Power Supply 2"},
+					MetricType: "gauge",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
+
 		"basic index tag": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
