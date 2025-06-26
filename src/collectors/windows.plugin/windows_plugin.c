@@ -173,6 +173,7 @@ void *win_plugin_main(void *ptr)
     // check the enabled status for each module
     int i;
     char buf[CONFIG_MAX_NAME + 1];
+    int update_every = localhost->rrd_update_every;
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
 
@@ -182,7 +183,7 @@ void *win_plugin_main(void *ptr)
         pm->rd = NULL;
 
         pm->update_every =
-            (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", localhost->rrd_update_every);
+            (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", update_every);
 
         worker_register_job_name(i, win_modules[i].dim);
     }
@@ -212,6 +213,9 @@ void *win_plugin_main(void *ptr)
                 break;
 
             struct proc_module *pm = &win_modules[i];
+            if (unlikely(update_every != win_modules[i].update_every))
+                continue;
+
             if (unlikely(!pm->enabled))
                 continue;
 
