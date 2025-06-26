@@ -29,6 +29,9 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		} else {
 			d.Infof("detected DB2 edition: %s version: %s", d.edition, d.version)
 		}
+		
+		// Check if we can use modern MON_GET_* functions
+		d.detectMonGetSupport(ctx)
 	}
 
 	// Reset metrics
@@ -290,11 +293,20 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectLockMetrics(ctx context.Context) error {
-	// Use Cloud-specific query if Cloud edition detected
-	query := queryLockMetrics
-	if d.edition == "Cloud" {
+	// Choose query based on monitoring approach
+	var query string
+	if d.useMonGetFunctions {
+		// Use modern MON_GET_DATABASE for lock metrics
+		query = queryMonGetDatabase
+		d.Debugf("using MON_GET_DATABASE for lock metrics (modern approach)")
+	} else if d.edition == "Cloud" {
+		// Use Cloud-specific SNAP query
 		query = queryLockMetricsCloud
 		d.Debugf("using Cloud-specific lock metrics query for Db2 on Cloud")
+	} else {
+		// Use standard SNAP query
+		query = queryLockMetrics
+		d.Debugf("using SNAP views for lock metrics (legacy approach)")
 	}
 
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
@@ -335,7 +347,20 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
-	return d.doQuery(ctx, queryBufferpoolAggregateMetrics, func(column, value string, lineEnd bool) {
+	// Choose query based on monitoring approach
+	var query string
+	if d.useMonGetFunctions {
+		query = queryMonGetBufferpoolAggregate
+		d.Debugf("using MON_GET_BUFFERPOOL for aggregate metrics (modern approach)")
+		
+		// With MON_GET, we need to calculate hit ratios differently
+		return d.collectMonGetBufferpoolAggregate(ctx)
+	} else {
+		query = queryBufferpoolAggregateMetrics
+		d.Debugf("using SNAP views for bufferpool metrics (legacy approach)")
+	}
+	
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "HIT_RATIO":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -422,7 +447,17 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
-	return d.doQuery(ctx, queryLogSpaceMetrics, func(column, value string, lineEnd bool) {
+	// Choose query based on monitoring approach
+	var query string
+	if d.useMonGetFunctions {
+		query = queryMonGetTransactionLog
+		d.Debugf("using MON_GET_TRANSACTION_LOG for log metrics (modern approach)")
+	} else {
+		query = queryLogSpaceMetrics
+		d.Debugf("using SNAP views for log metrics (legacy approach)")
+	}
+	
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_LOG_USED":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -640,6 +675,12 @@ func (d *DB2) collectServiceHealthResilience(ctx context.Context) error {
 }
 
 func (d *DB2) collectConnectionMetricsResilience(ctx context.Context) error {
+	// Use MON_GET if available for better performance
+	if d.useMonGetFunctions {
+		return d.collectMonGetConnections(ctx)
+	}
+	
+	// Fall back to SNAP views
 	// Core connection metrics - must work on all DB2 editions
 	if err := d.collectSingleMetric(ctx, "total_connections", queryTotalConnections, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -683,6 +724,18 @@ func (d *DB2) collectConnectionMetricsResilience(ctx context.Context) error {
 }
 
 func (d *DB2) collectLockMetricsResilience(ctx context.Context) {
+	// Use MON_GET if available for better performance
+	if d.useMonGetFunctions {
+		// MON_GET_DATABASE returns all these metrics in one query
+		if err := d.collectMonGetDatabase(ctx); err != nil {
+			d.Warningf("failed to collect lock metrics using MON_GET_DATABASE: %v, falling back to SNAP views", err)
+			// Fall through to use SNAP views
+		} else {
+			return // Successfully collected with MON_GET
+		}
+	}
+	
+	// Fall back to individual SNAP queries
 	_ = d.collectSingleMetric(ctx, "lock_waits", queryLockWaits, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.LockWaits = v
@@ -733,6 +786,13 @@ func (d *DB2) collectLockMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectSortingMetricsResilience(ctx context.Context) {
+	// MON_GET_DATABASE includes sorting metrics
+	if d.useMonGetFunctions {
+		// Already collected in collectLockMetricsResilience
+		return
+	}
+	
+	// Fall back to individual SNAP queries
 	_ = d.collectSingleMetric(ctx, "total_sorts", queryTotalSorts, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.TotalSorts = v
@@ -747,6 +807,13 @@ func (d *DB2) collectSortingMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectRowActivityMetricsResilience(ctx context.Context) {
+	// MON_GET_DATABASE includes row activity metrics
+	if d.useMonGetFunctions {
+		// Already collected in collectLockMetricsResilience
+		return
+	}
+	
+	// Fall back to individual SNAP queries
 	_ = d.collectSingleMetric(ctx, "rows_read", queryRowsRead, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.RowsRead = v
@@ -767,6 +834,17 @@ func (d *DB2) collectRowActivityMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
+	// Use MON_GET if available for better performance
+	if d.useMonGetFunctions {
+		if err := d.collectMonGetBufferpoolAggregate(ctx); err != nil {
+			d.Warningf("failed to collect bufferpool metrics using MON_GET_BUFFERPOOL: %v, falling back to SNAP views", err)
+			// Fall through to use SNAP views
+		} else {
+			return // Successfully collected with MON_GET
+		}
+	}
+	
+	// Fall back to individual SNAP queries
 	// Collect individual components first
 	var dataLogical, dataHits int64
 	var indexLogical, indexHits int64
@@ -892,6 +970,17 @@ func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectLogSpaceMetricsResilience(ctx context.Context) {
+	// Use MON_GET if available for better performance
+	if d.useMonGetFunctions {
+		if err := d.collectMonGetTransactionLog(ctx); err != nil {
+			d.Warningf("failed to collect log metrics using MON_GET_TRANSACTION_LOG: %v, falling back to SNAP views", err)
+			// Fall through to use SNAP views
+		} else {
+			return // Successfully collected with MON_GET
+		}
+	}
+	
+	// Fall back to individual SNAP queries
 	var logUsed, logAvailable int64
 
 	_ = d.collectSingleMetric(ctx, "log_used_space", queryLogUsedSpace, func(value string) {
@@ -950,4 +1039,221 @@ func (d *DB2) collectLongRunningQueriesResilience(ctx context.Context) {
 func (d *DB2) collectBackupStatusResilience(ctx context.Context) {
 	// This will use the existing collectBackupStatus function as it's already resilient
 	_ = d.collectBackupStatus(ctx)
+}
+
+// MON_GET collection functions for modern monitoring approach
+
+func (d *DB2) collectMonGetConnections(ctx context.Context) error {
+	return d.doQuery(ctx, queryMonGetConnections, func(column, value string, lineEnd bool) {
+		switch column {
+		case "TOTAL_CONNS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnTotal = v
+			}
+		case "ACTIVE_CONNS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnActive = v
+			}
+		case "IDLE_CONNS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnIdle = v
+			}
+		case "EXECUTING_CONNS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnExecuting = v
+			}
+		}
+	})
+}
+
+func (d *DB2) collectMonGetDatabase(ctx context.Context) error {
+	return d.doQuery(ctx, queryMonGetDatabase, func(column, value string, lineEnd bool) {
+		switch column {
+		case "COMMITS":
+			// Commits are not in the metricsData struct
+			// They would need to be added if needed
+		case "ROLLBACKS":
+			// Rollbacks are not in the metricsData struct
+			// They would need to be added if needed
+		case "LOCK_WAITS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockWaits = v
+			}
+		case "LOCK_TIMEOUTS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockTimeouts = v
+			}
+		case "DEADLOCKS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.Deadlocks = v
+			}
+		case "LOCK_ESCALS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockEscalations = v
+			}
+		case "LOCK_ACTIVE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockActive = v
+			}
+		case "LOCK_WAIT_TIME":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockWaitTime = v
+			}
+		case "LOCK_WAITING_AGENTS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockWaitingAgents = v
+			}
+		case "LOCK_MEMORY_PAGES":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LockMemoryPages = v
+			}
+		case "TOTAL_SORTS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.TotalSorts = v
+			}
+		case "SORT_OVERFLOWS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.SortOverflows = v
+			}
+		case "ROWS_READ":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.RowsRead = v
+			}
+		case "ROWS_MODIFIED":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.RowsModified = v
+			}
+		case "ROWS_RETURNED":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.RowsReturned = v
+			}
+		}
+	})
+}
+
+func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
+	var dataLogical, dataPhysical, dataHits int64
+	var indexLogical, indexPhysical, indexHits int64
+	var xdaLogical, xdaPhysical, xdaHits int64
+	var colLogical, colPhysical, colHits int64
+	
+	err := d.doQuery(ctx, queryMonGetBufferpoolAggregate, func(column, value string, lineEnd bool) {
+		v, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return
+		}
+		
+		switch column {
+		case "DATA_LOGICAL_READS":
+			dataLogical = v
+			d.mx.BufferpoolDataLogicalReads = v
+		case "DATA_PHYSICAL_READS":
+			dataPhysical = v
+			d.mx.BufferpoolDataPhysicalReads = v
+		case "DATA_HITS":
+			dataHits = v
+		case "INDEX_LOGICAL_READS":
+			indexLogical = v
+			d.mx.BufferpoolIndexLogicalReads = v
+		case "INDEX_PHYSICAL_READS":
+			indexPhysical = v
+			d.mx.BufferpoolIndexPhysicalReads = v
+		case "INDEX_HITS":
+			indexHits = v
+		case "XDA_LOGICAL_READS":
+			xdaLogical = v
+			d.mx.BufferpoolXDALogicalReads = v
+		case "XDA_PHYSICAL_READS":
+			xdaPhysical = v
+			d.mx.BufferpoolXDAPhysicalReads = v
+		case "XDA_HITS":
+			xdaHits = v
+		case "COLUMN_LOGICAL_READS":
+			colLogical = v
+			d.mx.BufferpoolColumnLogicalReads = v
+		case "COLUMN_PHYSICAL_READS":
+			colPhysical = v
+			d.mx.BufferpoolColumnPhysicalReads = v
+		case "COLUMN_HITS":
+			colHits = v
+		}
+	})
+	
+	if err != nil {
+		return err
+	}
+	
+	// Calculate totals
+	d.mx.BufferpoolLogicalReads = dataLogical + indexLogical + xdaLogical + colLogical
+	d.mx.BufferpoolPhysicalReads = dataPhysical + indexPhysical + xdaPhysical + colPhysical
+	d.mx.BufferpoolTotalReads = d.mx.BufferpoolLogicalReads + d.mx.BufferpoolPhysicalReads
+	
+	// Calculate data totals
+	d.mx.BufferpoolDataTotalReads = dataLogical + dataPhysical
+	d.mx.BufferpoolIndexTotalReads = indexLogical + indexPhysical
+	d.mx.BufferpoolXDATotalReads = xdaLogical + xdaPhysical
+	d.mx.BufferpoolColumnTotalReads = colLogical + colPhysical
+	
+	// Calculate hit ratios
+	totalHits := dataHits + indexHits + xdaHits + colHits
+	totalLogical := dataLogical + indexLogical + xdaLogical + colLogical
+	
+	if totalLogical > 0 {
+		d.mx.BufferpoolHitRatio = int64((float64(totalHits) * 100.0 * float64(precision)) / float64(totalLogical))
+	} else {
+		d.mx.BufferpoolHitRatio = 100 * precision
+	}
+	
+	if dataLogical > 0 {
+		d.mx.BufferpoolDataHitRatio = int64((float64(dataHits) * 100.0 * float64(precision)) / float64(dataLogical))
+	} else {
+		d.mx.BufferpoolDataHitRatio = 100 * precision
+	}
+	
+	if indexLogical > 0 {
+		d.mx.BufferpoolIndexHitRatio = int64((float64(indexHits) * 100.0 * float64(precision)) / float64(indexLogical))
+	} else {
+		d.mx.BufferpoolIndexHitRatio = 100 * precision
+	}
+	
+	if xdaLogical > 0 {
+		d.mx.BufferpoolXDAHitRatio = int64((float64(xdaHits) * 100.0 * float64(precision)) / float64(xdaLogical))
+	} else {
+		d.mx.BufferpoolXDAHitRatio = 100 * precision
+	}
+	
+	if colLogical > 0 {
+		d.mx.BufferpoolColumnHitRatio = int64((float64(colHits) * 100.0 * float64(precision)) / float64(colLogical))
+	} else {
+		d.mx.BufferpoolColumnHitRatio = 100 * precision
+	}
+	
+	return nil
+}
+
+func (d *DB2) collectMonGetTransactionLog(ctx context.Context) error {
+	return d.doQuery(ctx, queryMonGetTransactionLog, func(column, value string, lineEnd bool) {
+		switch column {
+		case "TOTAL_LOG_USED":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogUsedSpace = v
+			}
+		case "TOTAL_LOG_AVAILABLE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogAvailableSpace = v
+			}
+		case "LOG_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.LogUtilization = int64(v * precision)
+			}
+		case "LOG_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogReads = v
+			}
+		case "LOG_WRITES":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogWrites = v
+			}
+		}
+	})
 }
