@@ -21,9 +21,11 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	// Register IBM ecosystem collectors
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"     // Requires CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"       // Requires CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere" // Pure Go
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400"         // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"           // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere"     // Pure Go
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_jmx" // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_mp"  // Pure Go
 )
 
 const pluginName = "ibm.d.plugin"

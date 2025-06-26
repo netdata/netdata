@@ -1,0 +1,298 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WebSphere JMX collector configuration",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "jmx_url": {
+        "title": "JMX URL",
+        "description": "JMX service URL (e.g., service:jmx:rmi:///jndi/rmi://localhost:9999/jmxrmi)",
+        "type": "string",
+        "default": ""
+      },
+      "jmx_username": {
+        "title": "JMX username",
+        "description": "Username for JMX authentication (if required)",
+        "type": "string",
+        "default": ""
+      },
+      "jmx_password": {
+        "title": "JMX password",
+        "description": "Password for JMX authentication (if required)",
+        "type": "string",
+        "default": ""
+      },
+      "jmx_classpath": {
+        "title": "JMX classpath",
+        "description": "Additional classpath for WebSphere client libraries (if needed)",
+        "type": "string",
+        "default": ""
+      },
+      "java_exec_path": {
+        "title": "Java executable path",
+        "description": "Path to Java executable (defaults to 'java' in PATH)",
+        "type": "string",
+        "default": ""
+      },
+      "jmx_timeout": {
+        "title": "JMX timeout",
+        "description": "Timeout for JMX operations in seconds",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "collect_jvm_metrics": {
+        "title": "Collect JVM metrics",
+        "description": "Collect JVM heap, GC, thread, and class loading metrics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_threadpool_metrics": {
+        "title": "Collect thread pool metrics",
+        "description": "Collect WebSphere thread pool statistics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_jdbc_metrics": {
+        "title": "Collect JDBC metrics",
+        "description": "Collect JDBC connection pool statistics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_jms_metrics": {
+        "title": "Collect JMS metrics",
+        "description": "Collect JMS destination statistics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_webapp_metrics": {
+        "title": "Collect web application metrics",
+        "description": "Collect web application performance metrics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_session_metrics": {
+        "title": "Collect session metrics",
+        "description": "Collect HTTP session statistics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_transaction_metrics": {
+        "title": "Collect transaction metrics",
+        "description": "Collect JTA transaction statistics",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_cluster_metrics": {
+        "title": "Collect cluster metrics",
+        "description": "Collect cluster-specific metrics (deployment manager only)",
+        "type": "boolean",
+        "default": true
+      },
+      "cluster_name": {
+        "title": "Cluster name",
+        "description": "Name of the WebSphere cluster (for labeling)",
+        "type": "string",
+        "default": ""
+      },
+      "cell_name": {
+        "title": "Cell name",
+        "description": "Name of the WebSphere cell (for labeling)",
+        "type": "string",
+        "default": ""
+      },
+      "node_name": {
+        "title": "Node name",
+        "description": "Name of the WebSphere node (for labeling)",
+        "type": "string",
+        "default": ""
+      },
+      "server_type": {
+        "title": "Server type",
+        "description": "Type of WebSphere server (app_server, dmgr, nodeagent)",
+        "type": "string",
+        "enum": ["", "app_server", "dmgr", "nodeagent"],
+        "default": ""
+      },
+      "custom_labels": {
+        "title": "Custom labels",
+        "description": "Additional labels to add to all metrics",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "default": {}
+      },
+      "max_threadpools": {
+        "title": "Max thread pools",
+        "description": "Maximum number of thread pools to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_jdbc_pools": {
+        "title": "Max JDBC pools",
+        "description": "Maximum number of JDBC pools to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_jms_destinations": {
+        "title": "Max JMS destinations",
+        "description": "Maximum number of JMS destinations to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_applications": {
+        "title": "Max applications",
+        "description": "Maximum number of applications to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 100
+      },
+      "collect_apps_matching": {
+        "title": "Application name pattern",
+        "description": "Only collect metrics for applications matching this pattern (supports wildcards)",
+        "type": "string",
+        "default": ""
+      },
+      "collect_pools_matching": {
+        "title": "Pool name pattern",
+        "description": "Only collect metrics for pools matching this pattern (supports wildcards)",
+        "type": "string",
+        "default": ""
+      },
+      "collect_jms_matching": {
+        "title": "JMS destination pattern",
+        "description": "Only collect metrics for JMS destinations matching this pattern (supports wildcards)",
+        "type": "string",
+        "default": ""
+      },
+      "max_retries": {
+        "title": "Max retries",
+        "description": "Maximum number of retry attempts for failed collections",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10,
+        "default": 3
+      },
+      "retry_backoff_multiplier": {
+        "title": "Retry backoff multiplier",
+        "description": "Exponential backoff multiplier for retries",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 5,
+        "default": 2.0
+      },
+      "circuit_breaker_threshold": {
+        "title": "Circuit breaker threshold",
+        "description": "Number of consecutive failures before circuit breaker opens",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 5
+      },
+      "helper_restart_max": {
+        "title": "Helper restart max",
+        "description": "Maximum number of helper process restarts per hour",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 10,
+        "default": 3
+      },
+      "helper_memory_limit_mb": {
+        "title": "Helper memory limit (MB)",
+        "description": "Memory limit for Java helper process (0 to disable)",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4096,
+        "default": 512
+      }
+    },
+    "required": [
+      "jmx_url"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "jmx_password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "jmx_url",
+            "jmx_username",
+            "jmx_password",
+            "jmx_classpath",
+            "java_exec_path",
+            "jmx_timeout"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "collect_jvm_metrics",
+            "collect_threadpool_metrics",
+            "collect_jdbc_metrics",
+            "collect_jms_metrics",
+            "collect_webapp_metrics",
+            "collect_session_metrics",
+            "collect_transaction_metrics",
+            "collect_cluster_metrics"
+          ]
+        },
+        {
+          "title": "Cluster",
+          "fields": [
+            "cluster_name",
+            "cell_name",
+            "node_name",
+            "server_type",
+            "custom_labels"
+          ]
+        },
+        {
+          "title": "Filtering",
+          "fields": [
+            "max_threadpools",
+            "max_jdbc_pools",
+            "max_jms_destinations",
+            "max_applications",
+            "collect_apps_matching",
+            "collect_pools_matching",
+            "collect_jms_matching"
+          ]
+        },
+        {
+          "title": "Resilience",
+          "fields": [
+            "max_retries",
+            "retry_backoff_multiplier",
+            "circuit_breaker_threshold",
+            "helper_restart_max",
+            "helper_memory_limit_mb"
+          ]
+        }
+      ]
+    }
+  }
+}
