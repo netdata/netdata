@@ -141,9 +141,11 @@ public class websphere_jmx_helper {
     }
     
     private static void handleInit(Map<String, Object> command) {
+        String jmxUrl = null;
+        String username = null;
         try {
-            String jmxUrl = (String) command.get("jmx_url");
-            String username = (String) command.get("jmx_username");
+            jmxUrl = (String) command.get("jmx_url");
+            username = (String) command.get("jmx_username");
             String password = (String) command.get("jmx_password");
             String classpath = (String) command.get("jmx_classpath");
             String version = (String) command.get("protocol_version");
@@ -153,7 +155,7 @@ public class websphere_jmx_helper {
             }
             
             if (jmxUrl == null || jmxUrl.isEmpty()) {
-                sendError("JMX URL is required", "", false);
+                sendError("JMX URL is required", "Missing required parameter: jmx_url", false);
                 return;
             }
             
@@ -166,18 +168,24 @@ public class websphere_jmx_helper {
                 env.put(JMXConnector.CREDENTIALS, credentials);
             }
             
+            // Handle RMI/IIOP specifics
+            if (jmxUrl.contains("iiop")) {
+                env.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
+            }
+            
             jmxc = JMXConnectorFactory.connect(url, env);
             mbsc = jmxc.getMBeanServerConnection();
             
             sendSuccess("JMX connection established", null);
         } catch (MalformedURLException e) {
-            sendError("Invalid JMX URL", e.toString(), false);
+            sendError("Invalid JMX URL format", "URL: " + jmxUrl + ", Error: " + e.getMessage(), false);
         } catch (SecurityException e) {
-            sendError("Authentication failed", e.toString(), false);
+            sendError("Authentication failed", "Username: " + username + ", Error: " + e.getMessage(), false);
         } catch (IOException e) {
-            sendError("Connection failed", e.toString(), false);
+            sendError("Connection failed", "URL: " + jmxUrl + ", Error: " + e.getMessage() + 
+                     ". Check if the server is running and accessible.", false);
         } catch (Exception e) {
-            sendError("Initialization failed", e.toString(), false);
+            sendError("Initialization failed", e.getClass().getName() + ": " + e.getMessage(), false);
         }
     }
     
@@ -265,6 +273,11 @@ public class websphere_jmx_helper {
         threads.put("daemon", mbsc.getAttribute(threadMBean, "DaemonThreadCount"));
         threads.put("peak", mbsc.getAttribute(threadMBean, "PeakThreadCount"));
         threads.put("totalStarted", mbsc.getAttribute(threadMBean, "TotalStartedThreadCount"));
+        
+        // Deadlock detection
+        long[] deadlockedThreadIds = (long[]) mbsc.invoke(threadMBean, "findDeadlockedThreads", null, null);
+        threads.put("deadlocked", deadlockedThreadIds != null ? deadlockedThreadIds.length : 0);
+        
         jvm.put("threads", threads);
         
         // Class loading metrics
