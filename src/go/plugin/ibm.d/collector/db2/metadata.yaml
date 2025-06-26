@@ -384,6 +384,7 @@ modules:
                 - name: active
                 - name: executing
                 - name: idle
+                - name: max_seen
             - name: db2.locking
               description: Database Locking
               unit: events/s
@@ -558,7 +559,7 @@ modules:
               unit: percentage
               chart_type: line
               dimensions:
-                - name: hit_ratio
+                - name: overall
             - name: db2.bufferpool_instance_detailed_hit_ratio
               description: Buffer Pool Detailed Hit Ratios
               unit: percentage
@@ -626,6 +627,7 @@ modules:
               unit: bytes
               chart_type: line
               dimensions:
+                - name: total
                 - name: usable
         - name: connection
           description: These metrics refer to individual database connections.
