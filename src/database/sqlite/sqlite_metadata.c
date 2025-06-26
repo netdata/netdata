@@ -2366,9 +2366,8 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
 {
     RRDHOST *host;
     size_t host_count = 0;
-    usec_t started_ut;
+    usec_t started_ut = now_monotonic_usec();
     if (!is_worker) {
-        started_ut = now_monotonic_usec();
         dfe_start_reentrant(rrdhost_root_index, host) {
             host_count++;
         }
