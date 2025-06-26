@@ -35,7 +35,7 @@ modules:
           - DB2 for i (AS/400)
           - Db2 on Cloud
 
-          The collector automatically detects the DB2 edition and adapts its queries accordingly.
+          The collector automatically detects the DB2 edition and version, then adapts its monitoring based on available features. Version information is added as labels to all charts for filtering and grouping capabilities.
           
           System-wide metrics include:
           - Database connections (total, active, executing, idle)
@@ -73,8 +73,9 @@ modules:
             excessive memory usage. These limits can be adjusted in configuration.
         performance_impact:
           description: |
-            The performance impact is minimal, as the collector uses efficient queries
-            against system monitoring views.
+            The performance impact is minimal. The collector uses efficient queries
+            against system monitoring views and automatically disables unsupported features
+            based on the detected DB2 edition and version.
     setup:
       prerequisites:
         list:
@@ -220,7 +221,15 @@ modules:
             recommendations:
               - Ensure you're connecting to a DB2 database (not other database types)
               - Check if the DB2 version supports SYSIBMADM views (DB2 9.7+)
-              - For older versions, some metrics may not be available
+              - The collector automatically adapts to edition limitations (DB2 for i, z/OS)
+              - Check logs for feature availability messages
+          - name: Missing features on certain DB2 editions
+            description: Some features are not available on all DB2 editions.
+            recommendations:
+              - DB2 for i (AS/400) has limited SYSIBMADM view support
+              - DB2 for z/OS has different monitoring capabilities
+              - Db2 on Cloud restricts system-level metrics
+              - The collector logs which features are enabled/disabled
     alerts:
       - name: db2_connection_usage
         metric: db2.connections
