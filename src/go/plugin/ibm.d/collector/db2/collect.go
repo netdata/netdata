@@ -79,12 +79,16 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	if d.CollectBufferpoolMetrics {
-		if !d.isDisabled("sysibmadm_views") {
+		if !d.isDisabled("sysibmadm_views") && !d.isDisabled("bufferpool_instances") {
 			if err := d.collectBufferpoolInstances(ctx); err != nil {
 				d.Errorf("failed to collect bufferpool instances: %v", err)
 			}
 		} else {
-			d.logOnce("bufferpool_instances_skipped", "Bufferpool instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
+			if d.isDisabled("bufferpool_instances") {
+				d.logOnce("bufferpool_instances_cloud_skipped", "Bufferpool instance metrics collection skipped - limited on Db2 on Cloud")
+			} else {
+				d.logOnce("bufferpool_instances_skipped", "Bufferpool instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
+			}
 		}
 	}
 
@@ -99,12 +103,16 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	if d.CollectConnectionMetrics {
-		if !d.isDisabled("sysibmadm_views") {
+		if !d.isDisabled("sysibmadm_views") && !d.isDisabled("connection_instances") {
 			if err := d.collectConnectionInstances(ctx); err != nil {
 				d.Errorf("failed to collect connection instances: %v", err)
 			}
 		} else {
-			d.logOnce("connection_instances_skipped", "Connection instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
+			if d.isDisabled("connection_instances") {
+				d.logOnce("connection_instances_cloud_skipped", "Connection instance metrics collection skipped - limited on Db2 on Cloud")
+			} else {
+				d.logOnce("connection_instances_skipped", "Connection instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
+			}
 		}
 	}
 
@@ -282,7 +290,14 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectLockMetrics(ctx context.Context) error {
-	return d.doQuery(ctx, queryLockMetrics, func(column, value string, lineEnd bool) {
+	// Use Cloud-specific query if Cloud edition detected
+	query := queryLockMetrics
+	if d.edition == "Cloud" {
+		query = queryLockMetricsCloud
+		d.Debugf("using Cloud-specific lock metrics query for Db2 on Cloud")
+	}
+
+	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
