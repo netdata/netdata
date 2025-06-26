@@ -156,6 +156,21 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	return mx, nil
 }
 
+func (d *DB2) collectServiceHealth(ctx context.Context) {
+	// Connection check
+	d.mx.CanConnect = 0
+	if err := d.doQuerySingleValue(ctx, queryCanConnect, &d.mx.CanConnect); err != nil {
+		d.mx.CanConnect = 0
+	}
+	
+	// Database status check
+	// 0 = OK (active), 1 = WARNING (quiesce-pending, rollforward), 2 = CRITICAL (quiesced), 3 = UNKNOWN
+	d.mx.DatabaseStatus = 3
+	if err := d.doQuerySingleValue(ctx, queryDatabaseStatus, &d.mx.DatabaseStatus); err != nil {
+		d.mx.DatabaseStatus = 3
+	}
+}
+
 func (d *DB2) detectVersion(ctx context.Context) error {
 	// Try SYSIBMADM.ENV_INST_INFO (works on LUW)
 	query := queryDetectVersionLUW
@@ -195,6 +210,9 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 }
 
 func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
+	// Service health checks
+	d.collectServiceHealth(ctx)
+
 	// Connection counts - works across all DB2 versions
 	err := d.doQuery(ctx, queryGlobalConnections, func(column, value string, lineEnd bool) {
 		switch column {
@@ -210,11 +228,21 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				d.mx.ConnExecuting = v
 			}
+		case "IDLE_CONNS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnIdle = v
+			}
+		case "MAX_CONNS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.ConnMax = v
+			}
 		}
 	})
 
-	// Calculate idle connections
-	d.mx.ConnIdle = d.mx.ConnActive - d.mx.ConnExecuting
+	// Calculate idle connections if not provided
+	if d.mx.ConnIdle == 0 && d.mx.ConnActive > 0 {
+		d.mx.ConnIdle = d.mx.ConnActive - d.mx.ConnExecuting
+	}
 
 	if err != nil {
 		// Try simpler query for older versions
@@ -267,6 +295,14 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 			d.mx.Deadlocks = v
 		case "LOCK_ESCALS":
 			d.mx.LockEscalations = v
+		case "LOCK_ACTIVE":
+			d.mx.LockActive = v
+		case "LOCK_WAIT_TIME":
+			d.mx.LockWaitTime = v * precision // Convert to milliseconds with precision
+		case "LOCK_WAITING_AGENTS":
+			d.mx.LockWaitingAgents = v
+		case "LOCK_MEMORY_PAGES":
+			d.mx.LockMemoryPages = v
 		case "TOTAL_SORTS":
 			d.mx.TotalSorts = v
 		case "SORT_OVERFLOWS":
@@ -275,26 +311,122 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 			d.mx.RowsRead = v
 		case "ROWS_MODIFIED":
 			d.mx.RowsModified = v
+		case "ROWS_RETURNED":
+			d.mx.RowsReturned = v
 		}
 	})
 }
 
 func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
-	return d.doQuerySingleFloatValue(ctx, queryBufferpoolAggregateMetrics, &d.mx.BufferpoolHitRatio)
+	return d.doQuery(ctx, queryBufferpoolAggregateMetrics, func(column, value string, lineEnd bool) {
+		switch column {
+		case "HIT_RATIO":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.BufferpoolHitRatio = int64(v * precision)
+			}
+		case "DATA_HIT_RATIO":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.BufferpoolDataHitRatio = int64(v * precision)
+			}
+		case "INDEX_HIT_RATIO":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.BufferpoolIndexHitRatio = int64(v * precision)
+			}
+		case "XDA_HIT_RATIO":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.BufferpoolXDAHitRatio = int64(v * precision)
+			}
+		case "COLUMN_HIT_RATIO":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.BufferpoolColumnHitRatio = int64(v * precision)
+			}
+		case "LOGICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolLogicalReads = v
+			}
+		case "PHYSICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolPhysicalReads = v
+			}
+		case "TOTAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolTotalReads = v
+			}
+		case "DATA_LOGICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolDataLogicalReads = v
+			}
+		case "DATA_PHYSICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolDataPhysicalReads = v
+			}
+		case "DATA_TOTAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolDataTotalReads = v
+			}
+		case "INDEX_LOGICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolIndexLogicalReads = v
+			}
+		case "INDEX_PHYSICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolIndexPhysicalReads = v
+			}
+		case "INDEX_TOTAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolIndexTotalReads = v
+			}
+		case "XDA_LOGICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolXDALogicalReads = v
+			}
+		case "XDA_PHYSICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolXDAPhysicalReads = v
+			}
+		case "XDA_TOTAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolXDATotalReads = v
+			}
+		case "COLUMN_LOGICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolColumnLogicalReads = v
+			}
+		case "COLUMN_PHYSICAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolColumnPhysicalReads = v
+			}
+		case "COLUMN_TOTAL_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.BufferpoolColumnTotalReads = v
+			}
+		}
+	})
 }
 
 func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
 	return d.doQuery(ctx, queryLogSpaceMetrics, func(column, value string, lineEnd bool) {
-		v, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return
-		}
-
 		switch column {
 		case "TOTAL_LOG_USED":
-			d.mx.LogUsedSpace = v
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogUsedSpace = v
+			}
 		case "TOTAL_LOG_AVAILABLE":
-			d.mx.LogAvailableSpace = v
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogAvailableSpace = v
+			}
+		case "LOG_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				d.mx.LogUtilization = int64(v * precision)
+			}
+		case "LOG_READS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogReads = v
+			}
+		case "LOG_WRITES":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				d.mx.LogWrites = v
+			}
 		}
 	})
 }

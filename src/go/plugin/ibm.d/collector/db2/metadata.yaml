@@ -295,13 +295,6 @@ modules:
               dimensions:
                 - name: sorts
                 - name: overflows
-            - name: db2.row_activity
-              description: Row Activity
-              unit: rows/s
-              chart_type: area
-              dimensions:
-                - name: read
-                - name: modified
             - name: db2.bufferpool_hit_ratio
               description: Buffer Pool Hit Ratio
               unit: percentage
@@ -331,11 +324,97 @@ modules:
                 - name: status
             - name: db2.backup_age
               description: Time Since Last Backup
-              unit: hours
+              unit: seconds
               chart_type: line
               dimensions:
                 - name: full
                 - name: incremental
+            - name: db2.service_health
+              description: Service Health Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connection
+                - name: database
+            - name: db2.lock_details
+              description: Lock Details
+              unit: locks
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: waiting_agents
+                - name: memory_pages
+            - name: db2.lock_wait_time
+              description: Average Lock Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait_time
+            - name: db2.bufferpool_detailed_hit_ratio
+              description: Buffer Pool Detailed Hit Ratios
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: data
+                - name: index
+                - name: xda
+                - name: column
+            - name: db2.bufferpool_reads
+              description: Buffer Pool Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_data_reads
+              description: Buffer Pool Data Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_index_reads
+              description: Buffer Pool Index Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_xda_reads
+              description: Buffer Pool XDA Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_column_reads
+              description: Buffer Pool Column Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.log_utilization
+              description: Log Space Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: db2.log_io
+              description: Log I/O Operations
+              unit: operations/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: db2.row_activity
+              description: Row Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: returned
+                - name: modified
         - name: database
           description: These metrics refer to individual databases.
           labels:
@@ -364,20 +443,43 @@ modules:
             - name: page_size
               description: Page size in bytes
           metrics:
-            - name: db2.bufferpool_hit_ratio
+            - name: db2.bufferpool_instance_hit_ratio
               description: Buffer Pool Hit Ratio
               unit: percentage
               chart_type: line
               dimensions:
                 - name: hit_ratio
-            - name: db2.bufferpool_io
-              description: Buffer Pool I/O
-              unit: operations/s
-              chart_type: area
+            - name: db2.bufferpool_instance_detailed_hit_ratio
+              description: Buffer Pool Detailed Hit Ratios
+              unit: percentage
+              chart_type: line
               dimensions:
-                - name: reads
-                - name: writes
-            - name: db2.bufferpool_pages
+                - name: data
+                - name: index
+                - name: xda
+                - name: column
+            - name: db2.bufferpool_instance_reads
+              description: Buffer Pool Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_instance_data_reads
+              description: Buffer Pool Data Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_instance_index_reads
+              description: Buffer Pool Index Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_instance_pages
               description: Buffer Pool Pages
               unit: pages
               chart_type: stacked
@@ -409,6 +511,12 @@ modules:
               dimensions:
                 - name: used
                 - name: free
+            - name: db2.tablespace_usable_size
+              description: Tablespace Usable Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: usable
         - name: connection
           description: These metrics refer to individual database connections.
           labels:
