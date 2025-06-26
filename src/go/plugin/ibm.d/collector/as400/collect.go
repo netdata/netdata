@@ -28,6 +28,8 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		disks:             make(map[string]diskInstanceMetrics),
 		subsystems:        make(map[string]subsystemInstanceMetrics),
 		jobQueues:         make(map[string]jobQueueInstanceMetrics),
+		jobs:              make(map[string]jobMetrics),
+		aspPools:          make(map[string]aspMetrics),
 		IFSDirectoryUsage: make(map[string]int64),
 	}
 
@@ -87,6 +89,23 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		a.Warningf("failed to collect message queues: %v", err)
 	}
 
+	// Collect critical message counts
+	if err := a.collectCriticalMessages(ctx); err != nil {
+		a.Warningf("failed to collect critical messages: %v", err)
+	}
+
+	// Collect ASP (storage pool) information
+	if err := a.collectASPInfo(ctx); err != nil {
+		a.Warningf("failed to collect ASP info: %v", err)
+	}
+
+	// Collect top active jobs if enabled
+	if a.CollectActiveJobs && a.MaxActiveJobs > 0 {
+		if err := a.collectActiveJobs(ctx); err != nil {
+			a.Warningf("failed to collect active jobs: %v", err)
+		}
+	}
+
 	// Collect per-instance metrics if enabled
 	if a.CollectDiskMetrics {
 		if err := a.collectDiskInstances(ctx); err != nil {
@@ -134,6 +153,30 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Add individual job metrics if enabled
+	if a.CollectActiveJobs {
+		for jobName, metrics := range a.mx.jobs {
+			cleanJobName := cleanName(jobName)
+			for k, v := range stm.ToMap(metrics) {
+				mx[fmt.Sprintf("job_%s_%s", cleanJobName, k)] = v
+			}
+		}
+	}
+
+	// Add ASP pool metrics
+	for aspNum, metrics := range a.mx.aspPools {
+		cleanASP := cleanName(aspNum)
+		for k, v := range stm.ToMap(metrics) {
+			mx[fmt.Sprintf("asp_%s_%s", cleanASP, k)] = v
+		}
+	}
+
+	// Add IFS directory usage metrics
+	for dir, size := range a.mx.IFSDirectoryUsage {
+		cleanDir := cleanName(dir)
+		mx[fmt.Sprintf("ifs_directory_%s_size", cleanDir)] = size
+	}
+
 	return mx, nil
 }
 
@@ -151,6 +194,30 @@ func (a *AS400) collectSystemStatus(ctx context.Context) error {
 		case "ACTIVE_JOBS_IN_SYSTEM":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				a.mx.ActiveJobsCount = v
+			}
+		case "CONFIGURED_CPUS":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				a.mx.ConfiguredCPUs = v
+			}
+		case "CURRENT_PROCESSING_CAPACITY":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.CurrentProcessingCapacity = int64(v * precision)
+			}
+		case "SHARED_PROCESSOR_POOL_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.SharedProcessorPoolUsage = int64(v * precision)
+			}
+		case "PARTITION_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.PartitionCPUUtilization = int64(v * precision)
+			}
+		case "INTERACTIVE_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.InteractiveCPUUtilization = int64(v * precision)
+			}
+		case "DATABASE_CPU_UTILIZATION":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				a.mx.DatabaseCPUUtilization = int64(v * precision)
 			}
 		}
 	})
@@ -173,6 +240,24 @@ func (a *AS400) collectMemoryPools(ctx context.Context) error {
 					a.mx.InteractivePoolSize = v
 				case "*SPOOL":
 					a.mx.SpoolPoolSize = v
+				}
+			}
+		case "DEFINED_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				switch currentPoolName {
+				case "*MACHINE":
+					a.mx.MachinePoolDefinedSize = v
+				case "*BASE":
+					a.mx.BasePoolDefinedSize = v
+				}
+			}
+		case "RESERVED_SIZE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				switch currentPoolName {
+				case "*MACHINE":
+					a.mx.MachinePoolReservedSize = v
+				case "*BASE":
+					a.mx.BasePoolReservedSize = v
 				}
 			}
 		}
@@ -630,7 +715,7 @@ func (a *AS400) collectMessageQueues(ctx context.Context) error {
 	// Collect system message queue depth
 	var currentQueue string
 	var currentLib string
-	
+
 	return a.doQuery(ctx, queryMessageQueues, func(column, value string, lineEnd bool) {
 		switch column {
 		case "MESSAGE_QUEUE_NAME":
@@ -647,4 +732,163 @@ func (a *AS400) collectMessageQueues(ctx context.Context) error {
 			}
 		}
 	})
+}
+
+// New collection functions for enhanced metrics
+func (a *AS400) collectCriticalMessages(ctx context.Context) error {
+	var currentQueue, currentLib string
+	return a.doQuery(ctx, queryMessageQueueCritical, func(column, value string, lineEnd bool) {
+		switch column {
+		case "MESSAGE_QUEUE_NAME":
+			currentQueue = value
+		case "MESSAGE_QUEUE_LIBRARY":
+			currentLib = value
+		case "CRITICAL_COUNT":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if currentQueue == "QSYSMSG" && currentLib == "QSYS" {
+					a.mx.SystemCriticalMessages = v
+				} else if currentQueue == "QSYSOPR" && currentLib == "QSYS" {
+					a.mx.QSYSOPRCriticalMessages = v
+				}
+			}
+		}
+	})
+}
+
+func (a *AS400) collectASPInfo(ctx context.Context) error {
+	var currentASP string
+	return a.doQuery(ctx, queryASPInfo, func(column, value string, lineEnd bool) {
+		switch column {
+		case "ASP_NUMBER":
+			currentASP = value
+		case "TOTAL_CAPACITY_AVAILABLE":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if currentASP == "1" { // System ASP
+					if asp, ok := a.mx.aspPools[currentASP]; ok {
+						asp.TotalCapacityAvailable = v
+						a.mx.aspPools[currentASP] = asp
+					} else {
+						a.mx.aspPools[currentASP] = aspMetrics{TotalCapacityAvailable: v}
+					}
+				}
+			}
+		case "TOTAL_CAPACITY":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if currentASP == "1" { // System ASP
+					if asp, ok := a.mx.aspPools[currentASP]; ok {
+						asp.TotalCapacity = v
+						a.mx.aspPools[currentASP] = asp
+					} else {
+						a.mx.aspPools[currentASP] = aspMetrics{TotalCapacity: v}
+					}
+				}
+			}
+		}
+	})
+}
+
+func (a *AS400) collectActiveJobs(ctx context.Context) error {
+	query := fmt.Sprintf(queryActiveJobs, a.MaxActiveJobs)
+	var currentJobName string
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "JOB_NAME":
+			currentJobName = value
+			if _, exists := a.mx.jobs[currentJobName]; !exists {
+				a.mx.jobs[currentJobName] = jobMetrics{}
+			}
+		case "CPU_TIME":
+			if currentJobName != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if job, ok := a.mx.jobs[currentJobName]; ok {
+						job.CPUTime = v
+						a.mx.jobs[currentJobName] = job
+					}
+				}
+			}
+		case "TEMPORARY_STORAGE":
+			if currentJobName != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if job, ok := a.mx.jobs[currentJobName]; ok {
+						job.TemporaryStorage = v
+						a.mx.jobs[currentJobName] = job
+					}
+				}
+			}
+		case "JOB_ACTIVE_TIME":
+			if currentJobName != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					if job, ok := a.mx.jobs[currentJobName]; ok {
+						job.JobActiveTime = v
+						a.mx.jobs[currentJobName] = job
+					}
+				}
+			}
+		case "ELAPSED_CPU_PERCENTAGE":
+			if currentJobName != "" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					if job, ok := a.mx.jobs[currentJobName]; ok {
+						job.ElapsedCPUPercentage = int64(v * precision)
+						a.mx.jobs[currentJobName] = job
+					}
+				}
+			}
+		}
+	})
+}
+
+func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
+	query := fmt.Sprintf(queryIFSTopNDirectories, a.IFSStartPath, a.IFSTopNDirectories)
+	var currentDir string
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "DIR":
+			currentDir = value
+		case "TOTAL_SIZE":
+			if currentDir != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					a.mx.IFSDirectoryUsage[currentDir] = v
+					// Add directory to chart if not already present
+					if !a.hasIFSDirectoryDim(currentDir) {
+						a.addIFSDirectoryDim(currentDir)
+					}
+				}
+			}
+		}
+	})
+}
+
+func (a *AS400) hasIFSDirectoryDim(dir string) bool {
+	cleanDir := cleanName(dir)
+	dimID := fmt.Sprintf("ifs_directory_%s_size", cleanDir)
+
+	for _, chart := range *a.charts {
+		if chart.ID == "ifs_directory_usage" {
+			for _, dim := range chart.Dims {
+				if dim.ID == dimID {
+					return true
+				}
+			}
+			break
+		}
+	}
+	return false
+}
+
+func (a *AS400) addIFSDirectoryDim(dir string) {
+	cleanDir := cleanName(dir)
+	dimID := fmt.Sprintf("ifs_directory_%s_size", cleanDir)
+
+	for _, chart := range *a.charts {
+		if chart.ID == "ifs_directory_usage" {
+			dim := &module.Dim{
+				ID:   dimID,
+				Name: dir,
+			}
+			if err := chart.AddDim(dim); err != nil {
+				a.Warningf("failed to add IFS directory dimension for %s: %v", dir, err)
+			}
+			break
+		}
+	}
 }
