@@ -88,15 +88,27 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Use Cloud-specific query if Cloud edition detected
-	query := queryBufferpoolInstances
-	if d.edition == "Cloud" {
-		query = queryBufferpoolInstancesCloud
+	// Choose query based on monitoring approach
+	var query string
+	if d.useMonGetFunctions {
+		// Note: MON_GET_BUFFERPOOL doesn't support FETCH FIRST, so we'll handle limit in post-processing
+		query = queryMonGetBufferpool
+		d.Debugf("using MON_GET_BUFFERPOOL for bufferpool instances (modern approach)")
+	} else if d.edition == "Cloud" {
+		query = fmt.Sprintf(queryBufferpoolInstancesCloud, d.MaxBufferpools)
 		d.Debugf("using Cloud-specific bufferpool query for Db2 on Cloud")
+	} else {
+		query = fmt.Sprintf(queryBufferpoolInstances, d.MaxBufferpools)
+		d.Debugf("using SNAP views for bufferpool instances (legacy approach)")
 	}
 
 	var currentBP string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxBufferpools), func(column, value string, lineEnd bool) {
+	count := 0
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		// Handle limit for MON_GET queries
+		if d.useMonGetFunctions && count >= d.MaxBufferpools {
+			return
+		}
 		switch column {
 		case "BP_NAME":
 			currentBP = strings.TrimSpace(value)
@@ -113,6 +125,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			if _, exists := d.bufferpools[currentBP]; !exists {
 				d.bufferpools[currentBP] = &bufferpoolMetrics{name: currentBP}
 				d.addBufferpoolCharts(d.bufferpools[currentBP])
+				count++
 			}
 			d.mx.bufferpools[currentBP] = bufferpoolInstanceMetrics{}
 
@@ -296,6 +309,77 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
+
+		// MON_GET specific fields for buffer pool instances
+		case "POOL_CUR_SIZE":
+			if currentBP != "" && d.useMonGetFunctions {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					// For MON_GET, this is already in pages
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.TotalPages = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "POOL_WATERMARK":
+			if currentBP != "" && d.useMonGetFunctions {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					// Watermark can be used as an indicator of usage
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.UsedPages = v // Approximation for MON_GET
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+		}
+		
+		// Calculate hit ratios for MON_GET at end of line when using MON_GET
+		if d.useMonGetFunctions && lineEnd && currentBP != "" {
+			metrics := d.mx.bufferpools[currentBP]
+			
+			// Calculate total reads for each type
+			dataReads := metrics.DataLogicalReads
+			if dataReads > 0 && metrics.DataPhysicalReads >= 0 {
+				metrics.DataHitRatio = int64(((float64(dataReads - metrics.DataPhysicalReads)) * 100.0 * float64(precision)) / float64(dataReads))
+			} else {
+				metrics.DataHitRatio = 100 * precision
+			}
+			
+			indexReads := metrics.IndexLogicalReads
+			if indexReads > 0 && metrics.IndexPhysicalReads >= 0 {
+				metrics.IndexHitRatio = int64(((float64(indexReads - metrics.IndexPhysicalReads)) * 100.0 * float64(precision)) / float64(indexReads))
+			} else {
+				metrics.IndexHitRatio = 100 * precision
+			}
+			
+			xdaReads := metrics.XDALogicalReads
+			if xdaReads > 0 && metrics.XDAPhysicalReads >= 0 {
+				metrics.XDAHitRatio = int64(((float64(xdaReads - metrics.XDAPhysicalReads)) * 100.0 * float64(precision)) / float64(xdaReads))
+			} else {
+				metrics.XDAHitRatio = 100 * precision
+			}
+			
+			colReads := metrics.ColumnLogicalReads
+			if colReads > 0 && metrics.ColumnPhysicalReads >= 0 {
+				metrics.ColumnHitRatio = int64(((float64(colReads - metrics.ColumnPhysicalReads)) * 100.0 * float64(precision)) / float64(colReads))
+			} else {
+				metrics.ColumnHitRatio = 100 * precision
+			}
+			
+			// Overall hit ratio
+			totalLogical := dataReads + indexReads + xdaReads + colReads
+			totalPhysical := metrics.DataPhysicalReads + metrics.IndexPhysicalReads + metrics.XDAPhysicalReads + metrics.ColumnPhysicalReads
+			if totalLogical > 0 && totalPhysical >= 0 {
+				metrics.HitRatio = int64(((float64(totalLogical - totalPhysical)) * 100.0 * float64(precision)) / float64(totalLogical))
+			} else {
+				metrics.HitRatio = 100 * precision
+			}
+			
+			// Calculate total reads
+			metrics.LogicalReads = totalLogical
+			metrics.PhysicalReads = totalPhysical
+			metrics.TotalReads = totalLogical + totalPhysical
+			
+			d.mx.bufferpools[currentBP] = metrics
 		}
 	})
 
@@ -307,8 +391,18 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 		return nil
 	}
 
+	// Choose query based on monitoring approach
+	var query string
+	if d.useMonGetFunctions {
+		query = fmt.Sprintf(queryMonGetTablespace, d.MaxTablespaces)
+		d.Debugf("using MON_GET_TABLESPACE for tablespace metrics (modern approach)")
+	} else {
+		query = fmt.Sprintf(queryTablespaceInstances, d.MaxTablespaces)
+		d.Debugf("using SNAP views for tablespace metrics (legacy approach)")
+	}
+
 	var currentTbsp string
-	err := d.doQuery(ctx, fmt.Sprintf(queryTablespaceInstances, d.MaxTablespaces), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TBSP_NAME":
 			currentTbsp = strings.TrimSpace(value)
@@ -414,15 +508,21 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Use Cloud-specific query if Cloud edition detected
-	query := queryConnectionInstances
-	if d.edition == "Cloud" {
-		query = queryConnectionInstancesCloud
+	// Choose query based on monitoring approach
+	var query string
+	if d.useMonGetFunctions {
+		query = fmt.Sprintf(queryMonGetConnectionDetails, d.MaxConnections)
+		d.Debugf("using MON_GET_CONNECTION for connection instances (modern approach)")
+	} else if d.edition == "Cloud" {
+		query = fmt.Sprintf(queryConnectionInstancesCloud, d.MaxConnections)
 		d.Debugf("using Cloud-specific connection query for Db2 on Cloud")
+	} else {
+		query = fmt.Sprintf(queryConnectionInstances, d.MaxConnections)
+		d.Debugf("using SNAP views for connection instances (legacy approach)")
 	}
 
 	var currentAppID string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxConnections), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "APPLICATION_ID":
 			currentAppID = strings.TrimSpace(value)
