@@ -139,35 +139,6 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 }
 
 func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
-	// Find device vendor and type from any profile that has them.
-	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
-	// but only device-specific profiles contain vendor/type information.
-	// We need to apply vendor/type to ALL metrics across ALL profiles to ensure consistent
-	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
-	for _, ps := range c.profiles {
-		if !ps.initialized {
-			continue
-		}
-		if ps.profile.Definition == nil {
-			continue
-		}
-		res, ok := ps.profile.Definition.Metadata["device"]
-		if !ok {
-			continue
-		}
-		dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value
-		if dt == "" || dv == "" {
-			continue
-		}
-		for _, pm := range pms {
-			for i := range pm.Metrics {
-				m := &pm.Metrics[i]
-				m.Family = processMetricFamily(m.Family, dt, dv)
-			}
-		}
-		break
-	}
-
 	for _, pm := range pms {
 		for i := range pm.Metrics {
 			m := &pm.Metrics[i]
