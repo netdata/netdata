@@ -3891,49 +3891,49 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 
 				// First collection: Walk both table and cross-table column
-				gomock.InOrder(
-					// Walk main table
-					m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
-						[]gosnmp.SnmpPDU{
-							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
-							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
-						}, nil,
-					).Times(1),
 
-					// Walk cross-table column
-					m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1.2").Return(
-						[]gosnmp.SnmpPDU{
-							createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
-							createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
-						}, nil,
-					).Times(1),
+				// Walk main table
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
+					[]gosnmp.SnmpPDU{
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+					}, nil,
+				).Times(1)
 
-					// Second collection: GET metrics only, cross-table column should be cached
-					m.EXPECT().Get(gomock.InAnyOrder([]string{
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
-					})).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
-							},
-						}, nil,
-					).Times(1),
+				// Walk cross-table column
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1.2").Return(
+					[]gosnmp.SnmpPDU{
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+					}, nil,
+				).Times(1)
 
-					// Third collection: Still using cache
-					m.EXPECT().Get(gomock.InAnyOrder([]string{
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
-					})).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
-							},
-						}, nil,
-					).Times(1),
-				)
+				// Second collection: GET metrics only, cross-table column should be cached
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
+						},
+					}, nil,
+				).Times(1)
+
+				// Third collection: Still using cache
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
+						},
+					}, nil,
+				).Times(1)
+
 			},
 			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
@@ -4007,52 +4007,48 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 				m.EXPECT().MaxOids().Return(10).AnyTimes()
 				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 
-				// First collection: Walk both tables
-				gomock.InOrder(
-					// Walk main table
-					m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
-						[]gosnmp.SnmpPDU{
-							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
-							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
-						}, nil,
-					).Times(1),
+				// First collection: Walk both tables (order doesn't matter)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
+					[]gosnmp.SnmpPDU{
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+					}, nil,
+				).Times(1)
 
-					// Walk synthetic table (common prefix of cross-table columns)
-					m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1").Return(
-						[]gosnmp.SnmpPDU{
-							createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
-							createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
-							createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.1", "Type A"),
-							createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.2", "Type B"),
-						}, nil,
-					).Times(1),
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1").Return(
+					[]gosnmp.SnmpPDU{
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.1", "Type A"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.2", "Type B"),
+					}, nil,
+				).Times(1)
 
-					// Second collection: GET metrics only, tags are cached
-					m.EXPECT().Get(gomock.InAnyOrder([]string{
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
-					})).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
-							},
-						}, nil,
-					).Times(1),
+				// Second collection: GET metrics only
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
+						},
+					}, nil,
+				).Times(1)
 
-					// Third collection: Still using cache
-					m.EXPECT().Get(gomock.InAnyOrder([]string{
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
-						"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
-					})).Return(
-						&gosnmp.SnmpPacket{
-							Variables: []gosnmp.SnmpPDU{
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
-								createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
-							},
-						}, nil,
-					).Times(1),
-				)
+				// Third collection: Still using cache
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
+						},
+					}, nil,
+				).Times(1)
 			},
 			expectedResult: []*ddsnmp.ProfileMetrics{
 				{
