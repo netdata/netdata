@@ -13,20 +13,8 @@ func (d *DB2) collectIndexInstances(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT
-			INDSCHEMA,
-			INDNAME,
-			NLEAF,
-			INDEX_SCANS,
-			FULL_SCANS
-		FROM SYSCAT.INDEXES
-		ORDER BY NLEAF DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
 	var currentSchema, currentIndex, key string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxIndexes), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryIndexInstances, d.MaxIndexes), func(column, value string, lineEnd bool) {
 		switch column {
 		case "INDSCHEMA":
 			currentSchema = value

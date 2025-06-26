@@ -58,6 +58,9 @@ func New() *DB2 {
 			MaxConnections: 200,
 			MaxTables:      50,
 			MaxIndexes:     100,
+
+			// Backup history
+			BackupHistoryDays: 30,
 		},
 
 		charts:      baseCharts.Copy(),
@@ -96,6 +99,9 @@ type Config struct {
 	MaxConnections int `yaml:"max_connections,omitempty" json:"max_connections"`
 	MaxTables      int `yaml:"max_tables,omitempty" json:"max_tables"`
 	MaxIndexes     int `yaml:"max_indexes,omitempty" json:"max_indexes"`
+
+	// Backup history
+	BackupHistoryDays int `yaml:"backup_history_days,omitempty" json:"backup_history_days"`
 
 	// Selectors for filtering
 	DatabaseSelector   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`

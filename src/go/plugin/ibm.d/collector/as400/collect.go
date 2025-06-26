@@ -138,43 +138,11 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (a *AS400) collectSystemStatus(ctx context.Context) error {
-	query := `
-		SELECT 
-			AVERAGE_CPU_UTILIZATION,
-			SYSTEM_ASP_USED,
-			ACTIVE_JOBS_IN_SYSTEM
-		FROM QSYS2.SYSTEM_STATUS_INFO
-	`
-
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "AVERAGE_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CPUPercentage = int64(v * precision)
-			}
-		case "SYSTEM_ASP_USED":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.SystemASPUsed = int64(v * precision)
-			}
-		case "ACTIVE_JOBS_IN_SYSTEM":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.ActiveJobsCount = v
-			}
-		}
-	})
-}
+	return a.doQuery(ctx, querySystemStatus, func(column, value string, lineEnd bool) {
 
 func (a *AS400) collectMemoryPools(ctx context.Context) error {
-	query := `
-		SELECT 
-			POOL_NAME,
-			CURRENT_SIZE
-		FROM QSYS2.MEMORY_POOL_INFO
-		WHERE POOL_NAME IN ('*MACHINE', '*BASE', '*INTERACT', '*SPOOL')
-	`
-
 	var currentPoolName string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryMemoryPools, func(column, value string, lineEnd bool) {
 		switch column {
 		case "POOL_NAME":
 			currentPoolName = value
@@ -196,13 +164,7 @@ func (a *AS400) collectMemoryPools(ctx context.Context) error {
 }
 
 func (a *AS400) collectDiskStatus(ctx context.Context) error {
-	query := `
-		SELECT 
-			AVG(PERCENT_BUSY) as AVG_DISK_BUSY
-		FROM QSYS2.DISK_STATUS
-	`
-
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryDiskStatus, func(column, value string, lineEnd bool) {
 		if column == "AVG_DISK_BUSY" {
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
 				a.mx.DiskBusyPercentage = int64(v * precision)
@@ -212,14 +174,7 @@ func (a *AS400) collectDiskStatus(ctx context.Context) error {
 }
 
 func (a *AS400) collectJobInfo(ctx context.Context) error {
-	query := `
-		SELECT 
-			COUNT(*) as JOB_QUEUE_LENGTH
-		FROM QSYS2.JOB_INFO
-		WHERE JOB_STATUS = 'JOBQ'
-	`
-
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryJobInfo, func(column, value string, lineEnd bool) {
 		if column == "JOB_QUEUE_LENGTH" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				a.mx.JobQueueLength = v
@@ -285,24 +240,8 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 		}
 	}
 
-	query := `
-		SELECT 
-			UNIT_NUMBER,
-			UNIT_TYPE,
-			UNIT_MODEL,
-			PERCENT_BUSY,
-			READ_REQUESTS,
-			WRITE_REQUESTS,
-			READ_BYTES,
-			WRITE_BYTES,
-			AVERAGE_REQUEST_TIME
-		FROM QSYS2.DISK_STATUS
-	`
-
-	// Note: We apply selector in the result processing, not in the SQL query
-
 	var currentUnit string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryDiskInstances, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "UNIT_NUMBER":
@@ -401,19 +340,8 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 }
 
 func (a *AS400) countDisks(ctx context.Context) (int, error) {
-	query := "SELECT COUNT(DISTINCT UNIT_NUMBER) as COUNT FROM QSYS2.DISK_STATUS"
-
 	var count int
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		if column == "COUNT" {
-			if v, err := strconv.Atoi(value); err == nil {
-				count = v
-			}
-		}
-	})
-
-	return count, err
-}
+	err := a.doQuery(ctx, queryCountDisks, func(column, value string, lineEnd bool) {
 
 func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 	// Check cardinality
@@ -427,24 +355,10 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 		}
 	}
 
-	query := `
-		SELECT 
-			SUBSYSTEM_NAME,
-			SUBSYSTEM_LIBRARY_NAME,
-			STATUS,
-			CURRENT_ACTIVE_JOBS,
-			JOBS_IN_SUBSYSTEM_HELD,
-			STORAGE_USED,
-			SUBSYSTEM_POOL_ID,
-			MAXIMUM_JOBS
-		FROM QSYS2.SUBSYSTEM_INFO
-		WHERE STATUS = 'ACTIVE'
-	`
-
 	// Note: We apply selector in the result processing, not in the SQL query
 
 	var currentName string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, querySubsystemInstances, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "SUBSYSTEM_NAME":
@@ -523,10 +437,8 @@ func (a *AS400) collectSubsystemInstances(ctx context.Context) error {
 }
 
 func (a *AS400) countSubsystems(ctx context.Context) (int, error) {
-	query := "SELECT COUNT(*) as COUNT FROM QSYS2.SUBSYSTEM_INFO WHERE STATUS = 'ACTIVE'"
-
 	var count int
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, queryCountSubsystems, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
 			if v, err := strconv.Atoi(value); err == nil {
 				count = v
@@ -549,23 +461,10 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 		}
 	}
 
-	query := `
-		SELECT 
-			JOB_QUEUE_NAME,
-			JOB_QUEUE_LIBRARY,
-			JOB_QUEUE_STATUS,
-			NUMBER_OF_JOBS,
-			HELD_JOB_COUNT,
-			SCHEDULED_JOB_COUNT,
-			MAXIMUM_JOBS,
-			SEQUENCE_NUMBER
-		FROM QSYS2.JOB_QUEUE_INFO
-	`
-
 	// Note: We apply selector in the result processing, not in the SQL query
 
 	var currentName, currentLib, key string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, 	query := queryJobQueueInstances, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "JOB_QUEUE_NAME":
@@ -639,10 +538,8 @@ func (a *AS400) collectJobQueueInstances(ctx context.Context) error {
 }
 
 func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
-	query := "SELECT COUNT(*) as COUNT FROM QSYS2.JOB_QUEUE_INFO"
-
 	var count int
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, queryCountJobQueues, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
 			if v, err := strconv.Atoi(value); err == nil {
 				count = v
@@ -654,14 +551,6 @@ func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
 }
 
 func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
-	query := `
-		SELECT 
-			JOB_TYPE,
-			COUNT(*) as COUNT
-		FROM TABLE(QSYS2.ACTIVE_JOB_INFO()) X
-		GROUP BY JOB_TYPE
-	`
-
 	// Reset job type counts
 	a.mx.BatchJobs = 0
 	a.mx.InteractiveJobs = 0
@@ -670,7 +559,7 @@ func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
 	a.mx.OtherJobs = 0
 
 	var currentJobType string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryJobTypeBreakdown, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_TYPE":
 			// Store current job type for next COUNT value
@@ -695,19 +584,7 @@ func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
 }
 
 func (a *AS400) collectIFSUsage(ctx context.Context) error {
-	query := `
-		SELECT 
-			COUNT(*) as FILE_COUNT,
-			SUM(DATA_SIZE) as TOTAL_SIZE,
-			SUM(ALLOCATED_SIZE) as ALLOCATED_SIZE
-		FROM TABLE(QSYS2.IFS_OBJECT_STATISTICS(
-			START_PATH_NAME => '/',
-			SUBTREE_DIRECTORIES => 'YES',
-			OBJECT_TYPE_LIST => '*STMF'
-		)) X
-	`
-
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryIFSUsage, func(column, value string, lineEnd bool) {
 		switch column {
 		case "FILE_COUNT":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -727,20 +604,10 @@ func (a *AS400) collectIFSUsage(ctx context.Context) error {
 
 func (a *AS400) collectMessageQueues(ctx context.Context) error {
 	// Collect system message queue depth
-	query := `
-		SELECT 
-			MESSAGE_QUEUE_NAME,
-			MESSAGE_QUEUE_LIBRARY,
-			NUMBER_OF_MESSAGES
-		FROM QSYS2.MESSAGE_QUEUE_INFO
-		WHERE (MESSAGE_QUEUE_NAME = 'QSYSMSG' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
-		   OR (MESSAGE_QUEUE_NAME = 'QSYSOPR' AND MESSAGE_QUEUE_LIBRARY = 'QSYS')
-	`
-
 	var currentQueue string
 	var currentLib string
 	
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryMessageQueues, func(column, value string, lineEnd bool) {
 		switch column {
 		case "MESSAGE_QUEUE_NAME":
 			currentQueue = value
