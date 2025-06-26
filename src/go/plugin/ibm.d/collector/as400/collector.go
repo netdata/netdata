@@ -72,8 +72,7 @@ func New() *AS400 {
 		subsystems:       make(map[string]*subsystemMetrics),
 		jobQueues:        make(map[string]*jobQueueMetrics),
 		messageQueues:    make(map[string]*messageQueueMetrics),
-		disabledMetrics:  make(map[string]bool),
-		disabledFeatures: make(map[string]bool),
+		disabled:         make(map[string]bool),
 	}
 }
 
@@ -134,8 +133,7 @@ type AS400 struct {
 	model        string
 
 	// Resilience tracking
-	disabledMetrics  map[string]bool // Track disabled metrics
-	disabledFeatures map[string]bool // Track disabled features (table functions)
+	disabled         map[string]bool // Track disabled metrics and features
 	osVersion        string          // IBM i version for compatibility checks
 	versionMajor     int             // Parsed major version (e.g., 7 from "V7R3")
 	versionRelease   int             // Parsed release number (e.g., 3 from "V7R3")
@@ -300,14 +298,14 @@ func cleanName(name string) string {
 
 // Helper functions for resilience
 func (a *AS400) logOnce(key string, format string, args ...interface{}) {
-	if a.disabledMetrics[key] || a.disabledFeatures[key] {
+	if a.disabled[key] {
 		return // Already logged
 	}
 	a.Warningf(format, args...)
 }
 
 func (a *AS400) isDisabled(key string) bool {
-	return a.disabledMetrics[key] || a.disabledFeatures[key]
+	return a.disabled[key]
 }
 
 func isSQLFeatureError(err error) bool {
@@ -343,7 +341,7 @@ func (a *AS400) collectSingleMetric(ctx context.Context, metricKey string, query
 
 	if err != nil && isSQLFeatureError(err) {
 		a.logOnce(metricKey, "metric %s not available on this IBM i version: %v", metricKey, err)
-		a.disabledMetrics[metricKey] = true
+		a.disabled[metricKey] = true
 		return nil // Not a fatal error
 	}
 
@@ -400,7 +398,7 @@ func (a *AS400) detectAvailableFeatures(ctx context.Context) {
 	// Check if ACTIVE_JOB_INFO is available
 	if err := a.doQuery(ctx, queryCheckActiveJobInfo, func(column, value string, lineEnd bool) {
 		if column == "CNT" && value == "0" {
-			a.disabledFeatures["active_job_info"] = true
+			a.disabled["active_job_info"] = true
 			a.Warningf("ACTIVE_JOB_INFO function not available on this IBM i version")
 		}
 	}); err != nil {
@@ -410,7 +408,7 @@ func (a *AS400) detectAvailableFeatures(ctx context.Context) {
 	// Check if IFS_OBJECT_STATISTICS is available
 	if err := a.doQuery(ctx, queryCheckIFSObjectStats, func(column, value string, lineEnd bool) {
 		if column == "CNT" && value == "0" {
-			a.disabledFeatures["ifs_object_statistics"] = true
+			a.disabled["ifs_object_statistics"] = true
 			a.Warningf("IFS_OBJECT_STATISTICS function not available on this IBM i version")
 		}
 	}); err != nil {
@@ -579,7 +577,7 @@ func (a *AS400) applyVersionBasedFeatureGating() {
 
 // disableFeatureWithLog disables a feature and logs the reason
 func (a *AS400) disableFeatureWithLog(feature string, reason string, args ...interface{}) {
-	a.disabledFeatures[feature] = true
+	a.disabled[feature] = true
 	a.Infof("Feature disabled: %s - "+reason, append([]interface{}{feature}, args...)...)
 }
 
