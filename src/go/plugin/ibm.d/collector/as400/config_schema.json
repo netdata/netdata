@@ -96,18 +96,17 @@
         "default": ""
       },
       "ifs_top_n_directories": {
-        "title": "IFS Top N Directories",
-        "description": "The number of top-level IFS directories to monitor by size. Set to 0 to disable.",
+        "title": "IFS top N directories",
+        "description": "Monitor top N IFS directories by size. Set to 0 to disable.",
         "type": "integer",
         "minimum": 0,
         "default": 20
       },
-      "ifs_top_n_directories": {
-        "title": "IFS top N directories",
-        "description": "Monitor top N IFS directories by size.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 20
+      "ifs_start_path": {
+        "title": "IFS start path",
+        "description": "Starting path for IFS directory monitoring. Useful for monitoring specific subdirectories on large file systems.",
+        "type": "string",
+        "default": "/"
       },
       "vnode": {
         "title": "Vnode",
@@ -152,7 +151,8 @@
             "collect_disks_matching",
             "collect_subsystems_matching",
             "collect_job_queues_matching",
-            "ifs_top_n_directories"
+            "ifs_top_n_directories",
+            "ifs_start_path"
           ]
         },
         {
