@@ -373,6 +373,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.addVersionLabelsToCharts()
 		return nil
 	}
 
@@ -384,6 +385,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.addVersionLabelsToCharts()
 		return nil
 	}
 
@@ -395,6 +397,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.addVersionLabelsToCharts()
 		return nil
 	}
 
@@ -406,6 +409,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 	
 	if err == nil && d.edition != "" {
+		d.addVersionLabelsToCharts()
 		return nil
 	}
 
@@ -413,6 +417,20 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	d.edition = "LUW"
 	d.version = "Unknown"
 	d.Warningf("could not detect DB2 edition, defaulting to LUW")
+	d.addVersionLabelsToCharts()
 	
 	return nil
+}
+
+// addVersionLabelsToCharts adds DB2 version and edition labels to all charts
+func (d *DB2) addVersionLabelsToCharts() {
+	versionLabels := []module.Label{
+		{Key: "db2_edition", Value: d.edition},
+		{Key: "db2_version", Value: d.version},
+	}
+	
+	// Add labels to all existing charts
+	for _, chart := range *d.charts {
+		chart.Labels = append(chart.Labels, versionLabels...)
+	}
 }
