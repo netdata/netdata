@@ -107,7 +107,7 @@ var (
 )
 
 // Chart creation functions
-func newDiskCharts(disk *diskMetrics) *module.Charts {
+func (a *AS400) newDiskCharts(disk *diskMetrics) *module.Charts {
 	charts := module.Charts{
 		diskBusyChartTmpl.Copy(),
 		diskIORequestsChartTmpl.Copy(),
@@ -122,6 +122,10 @@ func newDiskCharts(disk *diskMetrics) *module.Charts {
 			{Key: "disk_unit", Value: disk.unit},
 			{Key: "disk_type", Value: disk.typeField},
 			{Key: "disk_model", Value: disk.model},
+			{Key: "ibmi_version", Value: a.osVersion},
+			{Key: "system_name", Value: a.systemName},
+			{Key: "serial_number", Value: a.serialNumber},
+			{Key: "model", Value: a.model},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanUnit)
@@ -131,7 +135,7 @@ func newDiskCharts(disk *diskMetrics) *module.Charts {
 	return &charts
 }
 
-func newSubsystemCharts(subsystem *subsystemMetrics) *module.Charts {
+func (a *AS400) newSubsystemCharts(subsystem *subsystemMetrics) *module.Charts {
 	charts := module.Charts{
 		subsystemJobsChartTmpl.Copy(),
 		subsystemStorageChartTmpl.Copy(),
@@ -144,6 +148,10 @@ func newSubsystemCharts(subsystem *subsystemMetrics) *module.Charts {
 			{Key: "subsystem", Value: subsystem.name},
 			{Key: "library", Value: subsystem.library},
 			{Key: "status", Value: subsystem.status},
+			{Key: "ibmi_version", Value: a.osVersion},
+			{Key: "system_name", Value: a.systemName},
+			{Key: "serial_number", Value: a.serialNumber},
+			{Key: "model", Value: a.model},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanSubsystem)
@@ -153,7 +161,7 @@ func newSubsystemCharts(subsystem *subsystemMetrics) *module.Charts {
 	return &charts
 }
 
-func newJobQueueCharts(jobQueue *jobQueueMetrics, key string) *module.Charts {
+func (a *AS400) newJobQueueCharts(jobQueue *jobQueueMetrics, key string) *module.Charts {
 	charts := module.Charts{
 		jobQueueLengthChartTmpl.Copy(),
 	}
@@ -165,6 +173,10 @@ func newJobQueueCharts(jobQueue *jobQueueMetrics, key string) *module.Charts {
 			{Key: "job_queue", Value: jobQueue.name},
 			{Key: "library", Value: jobQueue.library},
 			{Key: "status", Value: jobQueue.status},
+			{Key: "ibmi_version", Value: a.osVersion},
+			{Key: "system_name", Value: a.systemName},
+			{Key: "serial_number", Value: a.serialNumber},
+			{Key: "model", Value: a.model},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanKey)
