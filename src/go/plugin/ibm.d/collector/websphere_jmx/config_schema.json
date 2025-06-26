@@ -207,14 +207,6 @@
         "minimum": 0,
         "maximum": 10,
         "default": 3
-      },
-      "helper_memory_limit_mb": {
-        "title": "Helper memory limit (MB)",
-        "description": "Memory limit for Java helper process (0 to disable)",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 4096,
-        "default": 512
       }
     },
     "required": [
@@ -288,8 +280,7 @@
             "max_retries",
             "retry_backoff_multiplier",
             "circuit_breaker_threshold",
-            "helper_restart_max",
-            "helper_memory_limit_mb"
+            "helper_restart_max"
           ]
         }
       ]
