@@ -9,15 +9,20 @@ import (
 var (
 	baseCharts = module.Charts{
 		cpuUtilizationChart.Copy(),
+		cpuDetailsChart.Copy(),
+		cpuByTypeChart.Copy(),
 		activeJobsChart.Copy(),
 		jobTypeBreakdownChart.Copy(),
 		systemAspUsageChart.Copy(),
 		ifsUsageChart.Copy(),
 		ifsFilesChart.Copy(),
 		memoryPoolUsageChart.Copy(),
+		memoryPoolDefinedChart.Copy(),
+		memoryPoolReservedChart.Copy(),
 		diskBusyChart.Copy(),
 		jobQueueLengthChart.Copy(),
 		messageQueueDepthChart.Copy(),
+		messageQueueCriticalChart.Copy(),
 		ifsDirectoryUsageChart.Copy(),
 	}
 )
@@ -32,6 +37,35 @@ var (
 		Priority: module.Priority,
 		Dims: module.Dims{
 			{ID: "cpu_percentage", Name: "utilization", Div: precision},
+		},
+	}
+
+	cpuDetailsChart = module.Chart{
+		ID:       "cpu_details",
+		Title:    "CPU Configuration and Capacity",
+		Units:    "cpus",
+		Fam:      "cpu",
+		Ctx:      "as400.cpu_details",
+		Priority: module.Priority + 1,
+		Dims: module.Dims{
+			{ID: "configured_cpus", Name: "configured"},
+			{ID: "current_processing_capacity", Name: "capacity", Div: precision},
+		},
+	}
+
+	cpuByTypeChart = module.Chart{
+		ID:       "cpu_by_type",
+		Title:    "CPU Utilization by Type",
+		Units:    "percentage",
+		Fam:      "cpu",
+		Ctx:      "as400.cpu_by_type",
+		Priority: module.Priority + 2,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "partition_cpu_utilization", Name: "partition", Div: precision},
+			{ID: "interactive_cpu_utilization", Name: "interactive", Div: precision},
+			{ID: "database_cpu_utilization", Name: "database", Div: precision},
+			{ID: "shared_processor_pool_usage", Name: "shared_pool", Div: precision},
 		},
 	}
 
@@ -128,6 +162,32 @@ var (
 		},
 	}
 
+	memoryPoolDefinedChart = module.Chart{
+		ID:       "memory_pool_defined",
+		Title:    "Memory Pool Defined Sizes",
+		Units:    "bytes",
+		Fam:      "memory",
+		Ctx:      "as400.memory_pool_defined",
+		Priority: module.Priority + 31,
+		Dims: module.Dims{
+			{ID: "machine_pool_defined_size", Name: "machine"},
+			{ID: "base_pool_defined_size", Name: "base"},
+		},
+	}
+
+	memoryPoolReservedChart = module.Chart{
+		ID:       "memory_pool_reserved",
+		Title:    "Memory Pool Reserved Sizes",
+		Units:    "bytes",
+		Fam:      "memory",
+		Ctx:      "as400.memory_pool_reserved",
+		Priority: module.Priority + 32,
+		Dims: module.Dims{
+			{ID: "machine_pool_reserved_size", Name: "machine"},
+			{ID: "base_pool_reserved_size", Name: "base"},
+		},
+	}
+
 	diskBusyChart = module.Chart{
 		ID:       "disk_busy",
 		Title:    "Disk Busy Percentage",
@@ -162,6 +222,19 @@ var (
 		Dims: module.Dims{
 			{ID: "system_message_queue_depth", Name: "system"},
 			{ID: "qsysopr_message_queue_depth", Name: "qsysopr"},
+		},
+	}
+
+	messageQueueCriticalChart = module.Chart{
+		ID:       "message_queue_critical",
+		Title:    "Critical Messages in System Queues",
+		Units:    "messages",
+		Fam:      "system",
+		Ctx:      "as400.message_queue_critical",
+		Priority: module.Priority + 61,
+		Dims: module.Dims{
+			{ID: "system_critical_messages", Name: "system"},
+			{ID: "qsysopr_critical_messages", Name: "qsysopr"},
 		},
 	}
 )

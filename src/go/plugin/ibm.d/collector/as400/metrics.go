@@ -6,6 +6,14 @@ type metricsData struct {
 	// System-wide metrics
 	CPUPercentage int64 `stm:"cpu_percentage"`
 
+	// Enhanced CPU metrics
+	ConfiguredCPUs            int64 `stm:"configured_cpus"`
+	CurrentProcessingCapacity int64 `stm:"current_processing_capacity"`
+	SharedProcessorPoolUsage  int64 `stm:"shared_processor_pool_usage"`
+	PartitionCPUUtilization   int64 `stm:"partition_cpu_utilization"`
+	InteractiveCPUUtilization int64 `stm:"interactive_cpu_utilization"`
+	DatabaseCPUUtilization    int64 `stm:"database_cpu_utilization"`
+
 	// Job metrics
 	ActiveJobsCount int64 `stm:"active_jobs_count"`
 	JobQueueLength  int64 `stm:"job_queue_length"` // Aggregate
@@ -31,17 +39,27 @@ type metricsData struct {
 	InteractivePoolSize int64 `stm:"interactive_pool_size"`
 	SpoolPoolSize       int64 `stm:"spool_pool_size"`
 
+	// Enhanced memory pool metrics
+	MachinePoolDefinedSize  int64 `stm:"machine_pool_defined_size"`
+	MachinePoolReservedSize int64 `stm:"machine_pool_reserved_size"`
+	BasePoolDefinedSize     int64 `stm:"base_pool_defined_size"`
+	BasePoolReservedSize    int64 `stm:"base_pool_reserved_size"`
+
 	// Aggregate disk metrics
 	DiskBusyPercentage int64 `stm:"disk_busy_percentage"`
 
 	// Message queue metrics
-	SystemMessageQueueDepth   int64 `stm:"system_message_queue_depth"`
+	SystemMessageQueueDepth  int64 `stm:"system_message_queue_depth"`
 	QSYSOPRMessageQueueDepth int64 `stm:"qsysopr_message_queue_depth"`
+	SystemCriticalMessages   int64 `stm:"system_critical_messages"`
+	QSYSOPRCriticalMessages  int64 `stm:"qsysopr_critical_messages"`
 
 	// Per-instance metrics (not included in stm)
 	disks             map[string]diskInstanceMetrics
 	subsystems        map[string]subsystemInstanceMetrics
 	jobQueues         map[string]jobQueueInstanceMetrics
+	jobs              map[string]jobMetrics
+	aspPools          map[string]aspMetrics
 	messageQueues     map[string]messageQueueInstanceMetrics
 	IFSDirectoryUsage map[string]int64
 }
@@ -72,4 +90,19 @@ type jobQueueInstanceMetrics struct {
 type messageQueueInstanceMetrics struct {
 	MessageCount int64 `stm:"message_count"`
 	OldestHours  int64 `stm:"oldest_hours"`
+}
+
+// New metric structures for enhanced monitoring
+type jobMetrics struct {
+	CPUTime              int64 `stm:"cpu_time"`
+	TemporaryStorage     int64 `stm:"temporary_storage"`
+	JobActiveTime        int64 `stm:"job_active_time"`
+	ElapsedCPUPercentage int64 `stm:"elapsed_cpu_percentage"`
+}
+
+type aspMetrics struct {
+	TotalCapacityAvailable int64 `stm:"total_capacity_available"`
+	TotalCapacity          int64 `stm:"total_capacity"`
+	UsagePercentage        int64 `stm:"usage_percentage"`
+	StorageThreshold       int64 `stm:"storage_threshold"`
 }

@@ -33,12 +33,16 @@ modules:
           It collects system-wide metrics and optionally per-instance metrics for disks, subsystems, and job queues.
 
           System-wide metrics include:
-          - CPU utilization
+          - CPU utilization (overall, partition, interactive, database, shared pool)
+          - CPU configuration (configured CPUs, current processing capacity)
           - Memory pool usage (Machine, Base, Interactive, Spool)
+          - Memory pool sizes (current, defined, reserved)
           - System ASP usage
           - Active jobs count and job type breakdown
+          - Top active jobs by CPU usage (when enabled)
           - IFS (Integrated File System) usage and file count
           - System message queue depths (QSYSMSG, QSYSOPR)
+          - Critical message counts in system queues
           - Aggregate disk busy percentage
 
           Per-instance metrics (when enabled) include:
@@ -333,6 +337,22 @@ modules:
               chart_type: line
               dimensions:
                 - name: utilization
+            - name: as400.cpu_details
+              description: CPU Configuration and Capacity
+              unit: cpus
+              chart_type: line
+              dimensions:
+                - name: configured
+                - name: capacity
+            - name: as400.cpu_by_type
+              description: CPU Utilization by Type
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: partition
+                - name: interactive
+                - name: database
+                - name: shared_pool
             - name: as400.active_jobs
               description: Active Jobs
               unit: jobs
@@ -354,6 +374,20 @@ modules:
                 - name: base
                 - name: interactive
                 - name: spool
+            - name: as400.memory_pool_defined
+              description: Memory Pool Defined Sizes
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: machine
+                - name: base
+            - name: as400.memory_pool_reserved
+              description: Memory Pool Reserved Sizes
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: machine
+                - name: base
             - name: as400.disk_busy
               description: Disk Busy Percentage
               unit: percentage
@@ -391,6 +425,13 @@ modules:
                 - name: files
             - name: as400.message_queue_depth
               description: System Message Queue Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: system
+                - name: qsysopr
+            - name: as400.message_queue_critical
+              description: Critical Messages in System Queues
               unit: messages
               chart_type: line
               dimensions:
