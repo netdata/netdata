@@ -18,7 +18,6 @@
 #define NETDATA_MSSQL_NEXT_TRY (60)
 
 BOOL is_sqlexpress = FALSE;
-ND_THREAD *mssql_query_thread = NULL;
 
 struct netdata_mssql_conn {
     const char *driver;
@@ -1128,8 +1127,8 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
 void *netdata_mssql_queries(void *ptr __maybe_unused)
 {
     heartbeat_t hb;
-    int update_every = *((int *)ptr);
-    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+    heartbeat_init(&hb, USEC_PER_SEC);
+    int update_every = UPDATE_EVERY_MIN;
 
     while (service_running(SERVICE_COLLECTORS)) {
         (void)heartbeat_next(&hb);
@@ -1156,8 +1155,7 @@ static int initialize(int update_every)
     }
 
     if (create_thread)
-        mssql_query_thread =
-            nd_thread_create("mssql_queries", NETDATA_THREAD_OPTION_DEFAULT, netdata_mssql_queries, &update_every);
+        nd_thread_create("mssql_queries", NETDATA_THREAD_OPTION_DEFAULT, netdata_mssql_queries, &update_every);
 
     return 0;
 }
