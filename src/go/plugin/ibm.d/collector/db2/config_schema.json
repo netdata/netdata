@@ -112,78 +112,49 @@
         "default": ""
       },
       "collect_connections_matching": {
-          "type": "string",
-          "title": "Collect connections matching",
-          "description": "Pattern to filter connections by application name. Supports wildcards (*, ?) and multiple patterns separated by |."
-        },
-        "collect_table_metrics": {
-          "type": "boolean",
-          "title": "Collect table metrics",
-          "description": "Enable collection of per-table metrics.",
-          "default": false
-        },
-        "max_tables": {
-          "type": "integer",
-          "title": "Max tables",
-          "description": "Maximum number of tables to monitor.",
-          "default": 50
-        },
-        "collect_tables_matching": {
-          "type": "string",
-          "title": "Collect tables matching",
-          "description": "Pattern to filter tables (schema.table). Supports wildcards (*, ?) and multiple patterns."
-        },
-        "collect_index_metrics": {
-          "type": "boolean",
-          "title": "Collect index metrics",
-          "description": "Enable collection of per-index metrics.",
-          "default": false
-        },
-        "max_indexes": {
-          "type": "integer",
-          "title": "Max indexes",
-          "description": "Maximum number of indexes to monitor.",
-          "default": 100
-        },
-        "collect_indexes_matching": {
-          "type": "string",
-          "title": "Collect indexes matching",
-          "description": "Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns."
-        },
-        "collect_table_metrics": {
-          "type": "boolean",
-          "title": "Collect table metrics",
-          "description": "Enable collection of per-table metrics.",
-          "default": false
-        },
-        "max_tables": {
-          "type": "integer",
-          "title": "Max tables",
-          "description": "Maximum number of tables to monitor.",
-          "default": 50
-        },
-        "collect_tables_matching": {
-          "type": "string",
-          "title": "Collect tables matching",
-          "description": "Pattern to filter tables (schema.table). Supports wildcards (*, ?) and multiple patterns."
-        },
-        "collect_index_metrics": {
-          "type": "boolean",
-          "title": "Collect index metrics",
-          "description": "Enable collection of per-index metrics.",
-          "default": false
-        },
-        "max_indexes": {
-          "type": "integer",
-          "title": "Max indexes",
-          "description": "Maximum number of indexes to monitor.",
-          "default": 100
-        },
-        "collect_indexes_matching": {
-          "type": "string",
-          "title": "Collect indexes matching",
-          "description": "Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns."
-        },
+        "title": "Connection selector",
+        "description": "Pattern to filter connections by application name. Supports wildcards (*, ?) and multiple patterns separated by |.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_table_metrics": {
+        "title": "Collect table metrics",
+        "description": "Enable collection of per-table metrics.",
+        "type": "boolean",
+        "default": false
+      },
+      "max_tables": {
+        "title": "Max tables",
+        "description": "Maximum number of tables to monitor.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "collect_tables_matching": {
+        "title": "Table selector",
+        "description": "Pattern to filter tables (schema.table). Supports wildcards (*, ?) and multiple patterns separated by |.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_index_metrics": {
+        "title": "Collect index metrics",
+        "description": "Enable collection of per-index metrics.",
+        "type": "boolean",
+        "default": false
+      },
+      "max_indexes": {
+        "title": "Max indexes",
+        "description": "Maximum number of indexes to monitor.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 100
+      },
+      "collect_indexes_matching": {
+        "title": "Index selector",
+        "description": "Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns separated by |.",
+        "type": "string",
+        "default": ""
+      },
       "backup_history_days": {
         "title": "Backup history days",
         "description": "Number of days to look back for backup history. Reduces query time on databases with long backup histories.",
@@ -241,7 +212,27 @@
             "max_databases",
             "max_bufferpools",
             "max_tablespaces",
-            "max_connections"
+            "max_connections",
+            "max_tables",
+            "max_indexes"
+          ]
+        },
+        {
+          "title": "Selectors",
+          "fields": [
+            "collect_databases_matching",
+            "collect_bufferpools_matching",
+            "collect_tablespaces_matching",
+            "collect_connections_matching",
+            "collect_tables_matching",
+            "collect_indexes_matching"
+          ]
+        },
+        {
+          "title": "Advanced Metrics",
+          "fields": [
+            "collect_table_metrics",
+            "collect_index_metrics"
           ]
         }
       ]
