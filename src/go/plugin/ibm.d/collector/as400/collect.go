@@ -142,7 +142,7 @@ func (a *AS400) collectSystemStatus(ctx context.Context) error {
 		switch column {
 		case "AVERAGE_CPU_UTILIZATION":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CPUUtilization = int64(v * precision)
+				a.mx.CPUPercentage = int64(v * precision)
 			}
 		case "SYSTEM_ASP_USED":
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
@@ -150,7 +150,7 @@ func (a *AS400) collectSystemStatus(ctx context.Context) error {
 			}
 		case "ACTIVE_JOBS_IN_SYSTEM":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.ActiveJobs = v
+				a.mx.ActiveJobsCount = v
 			}
 		}
 	})
