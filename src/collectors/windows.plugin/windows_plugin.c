@@ -205,7 +205,7 @@ void *win_plugin_main(void *ptr)
         pm->enabled = inicfg_get_boolean(&netdata_config, "plugin:windows", pm->name, pm->enabled);
         pm->rd = NULL;
 
-        pm->update_every = (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", pm->update_every);
+        pm->update_every = (int)inicfg_get_duration_seconds(&netdata_config, buf, "update every", update_every);
 
         if (pm->enabled && unlikely(update_every != pm->update_every)) {
             char tag_name[ND_THREAD_TAG_MAX];
