@@ -1765,62 +1765,6 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"cross-table tag when referenced table not walked": {
-			profile: &ddsnmp.Profile{
-				SourceFile: "test-profile.yaml",
-				Definition: &ddprofiledefinition.ProfileDefinition{
-					Metrics: []ddprofiledefinition.MetricsConfig{
-						{
-							Table: ddprofiledefinition.SymbolConfig{
-								OID:  "1.3.6.1.2.1.2.2",
-								Name: "ifTable",
-							},
-							Symbols: []ddprofiledefinition.SymbolConfig{
-								{
-									OID:  "1.3.6.1.2.1.2.2.1.14",
-									Name: "ifInErrors",
-								},
-							},
-							MetricTags: []ddprofiledefinition.MetricTagConfig{
-								{
-									Tag: "interface",
-									Symbol: ddprofiledefinition.SymbolConfigCompat{
-										OID:  "1.3.6.1.2.1.31.1.1.1.1",
-										Name: "ifName",
-									},
-									Table: "ifXTable",
-								},
-							},
-						},
-						// Note: ifXTable is NOT in the metrics list
-					},
-				},
-			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				// Only walk ifTable
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.2.2", []gosnmp.SnmpPDU{
-					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.1", 10),
-					createCounter32PDU("1.3.6.1.2.1.2.2.1.14.2", 20),
-				})
-			},
-			expectedResult: []ddsnmp.Metric{
-				{
-					Name:       "ifInErrors",
-					Value:      10,
-					Tags:       nil, // No cross-table tag because ifXTable wasn't walked
-					MetricType: "rate",
-					IsTable:    true,
-				},
-				{
-					Name:       "ifInErrors",
-					Value:      20,
-					Tags:       nil,
-					MetricType: "rate",
-					IsTable:    true,
-				},
-			},
-			expectedError: false,
-		},
 		"cross-table tag with missing row in referenced table": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -2360,6 +2304,147 @@ func TestTableCollector_Collect(t *testing.T) {
 					Name:       "customMetric",
 					Value:      100,
 					Tags:       nil, // No tag because index transform failed
+					MetricType: "gauge",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tag from table without metrics": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1",
+								Name: "panEntityFRUModuleTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1",
+									Name: "panEntryFRUModulePowerUsed",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "ent_descr",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.47.1.1.1.1.2",
+										Name: "entPhysicalDescr",
+									},
+									Table: "entPhysicalTable",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk panEntityFRUModuleTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.SnmpPDU{
+					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+				})
+				// Walk entPhysicalDescr column only (not the whole entPhysicalTable)
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1.2", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "panEntryFRUModulePowerUsed",
+					Value:      100,
+					Tags:       map[string]string{"ent_descr": "Power Supply 1"},
+					MetricType: "gauge",
+					IsTable:    true,
+				},
+				{
+					Name:       "panEntryFRUModulePowerUsed",
+					Value:      150,
+					Tags:       map[string]string{"ent_descr": "Power Supply 2"},
+					MetricType: "gauge",
+					IsTable:    true,
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table multiple tags from same table without metrics": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1",
+								Name: "panEntityFRUModuleTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1",
+									Name: "panEntryFRUModulePowerUsed",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "ent_descr",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.47.1.1.1.1.2",
+										Name: "entPhysicalDescr",
+									},
+									Table: "entPhysicalTable",
+								},
+								{
+									Tag: "ent_type",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.2.1.47.1.1.1.1.3",
+										Name: "entPhysicalVendorType",
+									},
+									Table: "entPhysicalTable",
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				// Walk panEntityFRUModuleTable
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.25461.1.1.7.1.2.1", []gosnmp.SnmpPDU{
+					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+					createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+				})
+
+				// With preprocessing, should walk the common prefix for entPhysicalTable
+				// Common prefix of 1.3.6.1.2.1.47.1.1.1.1.2 and 1.3.6.1.2.1.47.1.1.1.1.3
+				// is 1.3.6.1.2.1.47.1.1.1.1
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.2.1.47.1.1.1.1", []gosnmp.SnmpPDU{
+					// entPhysicalDescr column
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+					// entPhysicalVendorType column
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.1", "PowerSupplyModule"),
+					createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.2", "PowerSupplyModule"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:  "panEntryFRUModulePowerUsed",
+					Value: 100,
+					Tags: map[string]string{
+						"ent_descr": "Power Supply 1",
+						"ent_type":  "PowerSupplyModule",
+					},
+					MetricType: "gauge",
+					IsTable:    true,
+				},
+				{
+					Name:  "panEntryFRUModulePowerUsed",
+					Value: 150,
+					Tags: map[string]string{
+						"ent_descr": "Power Supply 2",
+						"ent_type":  "PowerSupplyModule",
+					},
 					MetricType: "gauge",
 					IsTable:    true,
 				},
@@ -3236,6 +3321,7 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			tc.setupMock(mockHandler)
 
+			handleCrossTableTagsWithoutMetrics(tc.profile)
 			if err := ddsnmp.CompileTransforms(tc.profile); err != nil {
 				if tc.expectedError && tc.errorContains != "" && strings.Contains(err.Error(), tc.errorContains) {
 					return // Expected error during compilation
@@ -3766,6 +3852,236 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			enableCache:   true,
 			cacheTTL:      30 * time.Second,
 			collectCount:  2,
+			sleepBetween:  10 * time.Millisecond,
+		},
+		"table cache with cross-table-only columns": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1",
+									Name: "panEntityFRUModuleTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1",
+										Name: "panEntryFRUModulePowerUsed",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "ent_descr",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.47.1.1.1.1.2",
+											Name: "entPhysicalDescr",
+										},
+										Table: "entPhysicalTable",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// First collection: Walk both table and cross-table column
+
+				// Walk main table
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
+					[]gosnmp.SnmpPDU{
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+					}, nil,
+				).Times(1)
+
+				// Walk cross-table column
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1.2").Return(
+					[]gosnmp.SnmpPDU{
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+					}, nil,
+				).Times(1)
+
+				// Second collection: GET metrics only, cross-table column should be cached
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
+						},
+					}, nil,
+				).Times(1)
+
+				// Third collection: Still using cache
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
+						},
+					}, nil,
+				).Times(1)
+
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:       "panEntryFRUModulePowerUsed",
+							Value:      120, // Latest value
+							Tags:       map[string]string{"ent_descr": "Power Supply 1"},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+						{
+							Name:       "panEntryFRUModulePowerUsed",
+							Value:      170,
+							Tags:       map[string]string{"ent_descr": "Power Supply 2"},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+			enableCache:   true,
+			cacheTTL:      30 * time.Second,
+			collectCount:  3,
+			sleepBetween:  10 * time.Millisecond,
+		},
+		"table cache with multiple cross-table tags from same table": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1",
+									Name: "panEntityFRUModuleTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										OID:  "1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1",
+										Name: "panEntryFRUModulePowerUsed",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "ent_descr",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.47.1.1.1.1.2",
+											Name: "entPhysicalDescr",
+										},
+										Table: "entPhysicalTable",
+									},
+									{
+										Tag: "ent_type",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.2.1.47.1.1.1.1.3",
+											Name: "entPhysicalVendorType",
+										},
+										Table: "entPhysicalTable",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+
+				// First collection: Walk both tables (order doesn't matter)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.25461.1.1.7.1.2.1").Return(
+					[]gosnmp.SnmpPDU{
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 100),
+						createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 150),
+					}, nil,
+				).Times(1)
+
+				m.EXPECT().BulkWalkAll("1.3.6.1.2.1.47.1.1.1.1").Return(
+					[]gosnmp.SnmpPDU{
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.1", "Power Supply 1"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.2.2", "Power Supply 2"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.1", "Type A"),
+						createStringPDU("1.3.6.1.2.1.47.1.1.1.1.3.2", "Type B"),
+					}, nil,
+				).Times(1)
+
+				// Second collection: GET metrics only
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 110),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 160),
+						},
+					}, nil,
+				).Times(1)
+
+				// Third collection: Still using cache
+				m.EXPECT().Get(gomock.InAnyOrder([]string{
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1",
+					"1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2",
+				})).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.1", 120),
+							createGauge32PDU("1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1.2", 170),
+						},
+					}, nil,
+				).Times(1)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:  "panEntryFRUModulePowerUsed",
+							Value: 120, // Latest value
+							Tags: map[string]string{
+								"ent_descr": "Power Supply 1",
+								"ent_type":  "Type A",
+							},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+						{
+							Name:  "panEntryFRUModulePowerUsed",
+							Value: 170,
+							Tags: map[string]string{
+								"ent_descr": "Power Supply 2",
+								"ent_type":  "Type B",
+							},
+							MetricType: "gauge",
+							IsTable:    true,
+						},
+					},
+				},
+			},
+			expectedError: false,
+			enableCache:   true,
+			cacheTTL:      30 * time.Second,
+			collectCount:  3,
 			sleepBetween:  10 * time.Millisecond,
 		},
 	}
