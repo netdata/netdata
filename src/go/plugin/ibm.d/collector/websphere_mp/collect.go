@@ -177,7 +177,6 @@ func (w *WebSphereMicroProfile) extractLabel(labels, key string) string {
 }
 
 func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[string]float64) {
-	jvmCount := 0
 	restCount := 0
 	mpCount := 0
 	customCount := 0

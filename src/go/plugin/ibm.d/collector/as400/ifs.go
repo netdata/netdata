@@ -43,7 +43,7 @@ func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				dimID := cleanName(dirName)
 				if chart.GetDim(dimID) == nil {
-					chart.AddDim(module.Dim{ID: dimID, Name: dirName})
+					chart.AddDim(&module.Dim{ID: dimID, Name: dirName})
 				}
 				a.mx.IFSDirectoryUsage[dimID] = v
 			}
