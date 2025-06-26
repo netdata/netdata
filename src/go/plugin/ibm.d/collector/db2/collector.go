@@ -271,6 +271,8 @@ func (d *DB2) verifyConfig() error {
 }
 
 func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
+	d.Debugf("connecting to DB2 with DSN: %s", safeDSN(d.DSN))
+	
 	db, err := sql.Open("go_ibm_db", d.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
@@ -287,6 +289,7 @@ func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 		return nil, fmt.Errorf("error pinging database: %v", err)
 	}
 
+	d.Debugf("successfully connected to DB2")
 	return db, nil
 }
 
@@ -307,6 +310,60 @@ func cleanName(name string) string {
 		"=", "_",
 	)
 	return strings.ToLower(r.Replace(name))
+}
+
+// safeDSN masks sensitive information in DSN for logging
+func safeDSN(dsn string) string {
+	if dsn == "" {
+		return "<empty>"
+	}
+	
+	// Parse DSN and mask sensitive parts
+	masked := dsn
+	
+	// Mask password
+	if strings.Contains(masked, "PWD=") {
+		// Find PWD= and mask until next ; or end of string
+		start := strings.Index(masked, "PWD=")
+		if start != -1 {
+			end := strings.Index(masked[start:], ";")
+			if end == -1 {
+				// PWD is at the end
+				masked = masked[:start] + "PWD=***"
+			} else {
+				// PWD is in the middle
+				masked = masked[:start] + "PWD=***" + masked[start+end:]
+			}
+		}
+	}
+	
+	// Mask password in lowercase
+	if strings.Contains(masked, "pwd=") {
+		start := strings.Index(masked, "pwd=")
+		if start != -1 {
+			end := strings.Index(masked[start:], ";")
+			if end == -1 {
+				masked = masked[:start] + "pwd=***"
+			} else {
+				masked = masked[:start] + "pwd=***" + masked[start+end:]
+			}
+		}
+	}
+	
+	// Mask AUTHENTICATION fields if present
+	if strings.Contains(masked, "AUTHENTICATION=") {
+		start := strings.Index(masked, "AUTHENTICATION=")
+		if start != -1 {
+			end := strings.Index(masked[start:], ";")
+			if end == -1 {
+				masked = masked[:start] + "AUTHENTICATION=***"
+			} else {
+				masked = masked[:start] + "AUTHENTICATION=***" + masked[start+end:]
+			}
+		}
+	}
+	
+	return masked
 }
 
 // Resilience functions following AS/400 pattern
