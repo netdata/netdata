@@ -15,19 +15,7 @@ func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT
-			SUBSTRING(PATH_NAME, 1, LOCATE('/', PATH_NAME, 2) - 1) as DIR,
-			SUM(OBJECT_SIZE) as TOTAL_SIZE
-		FROM TABLE(QSYS2.IFS_OBJECT_STATISTICS(
-			START_PATH_NAME => '/',
-			SUBTREE_DIRECTORIES => 'YES'
-		)) AS T
-		WHERE LOCATE('/', PATH_NAME, 2) > 0
-		GROUP BY SUBSTRING(PATH_NAME, 1, LOCATE('/', PATH_NAME, 2) - 1)
-		ORDER BY TOTAL_SIZE DESC
-		FETCH FIRST %d ROWS ONLY
-	`
+	query := queryIFSTopNDirectories
 
 	chart := a.charts.Get("ifs_directory_usage")
 	if chart == nil {
@@ -35,7 +23,7 @@ func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
 	}
 
 	var dirName string
-	return a.doQuery(ctx, fmt.Sprintf(query, a.IFSTopNDirectories), func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, fmt.Sprintf(query, a.IFSStartPath, a.IFSTopNDirectories), func(column, value string, lineEnd bool) {
 		switch column {
 		case "DIR":
 			dirName = value

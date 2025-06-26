@@ -14,17 +14,8 @@ func (d *DB2) collectDatabaseInstances(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT 
-			DB_NAME,
-			DB_STATUS,
-			APPLS_CUR_CONS
-		FROM SYSIBMADM.SNAPDB
-		FETCH FIRST %d ROWS ONLY
-	`
-
 	count := 0
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxDatabases), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryDatabaseInstances, d.MaxDatabases), func(column, value string, lineEnd bool) {
 		var dbName string
 
 		switch column {
@@ -97,26 +88,8 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT 
-			BP_NAME,
-			POOL_DATA_L_READS + POOL_INDEX_L_READS as TOTAL_READS,
-			POOL_DATA_P_READS + POOL_INDEX_P_READS as TOTAL_WRITES,
-			CASE 
-				WHEN (POOL_DATA_L_READS + POOL_INDEX_L_READS) > 0 
-				THEN ((POOL_DATA_LBP_PAGES_FOUND + POOL_INDEX_LBP_PAGES_FOUND) * 100) / 
-				     (POOL_DATA_L_READS + POOL_INDEX_L_READS)
-				ELSE 100 
-			END as HIT_RATIO,
-			PAGESIZE,
-			NPAGES,
-			NPAGES - FREE_PAGES as USED_PAGES
-		FROM SYSIBMADM.SNAPBP
-		FETCH FIRST %d ROWS ONLY
-	`
-
 	var currentBP string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxBufferpools), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryBufferpoolInstances, d.MaxBufferpools), func(column, value string, lineEnd bool) {
 		switch column {
 		case "BP_NAME":
 			currentBP = strings.TrimSpace(value)
@@ -201,29 +174,8 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT 
-			TBSP_NAME,
-			TBSP_TYPE,
-			TBSP_CONTENT_TYPE,
-			TBSP_STATE,
-			TBSP_TOTAL_SIZE_KB,
-			TBSP_USED_SIZE_KB,
-			TBSP_FREE_SIZE_KB,
-			CASE 
-				WHEN TBSP_TOTAL_SIZE_KB > 0 
-				THEN (TBSP_USED_SIZE_KB * 100) / TBSP_TOTAL_SIZE_KB
-				ELSE 0 
-			END as USED_PERCENT,
-			TBSP_PAGE_SIZE
-		FROM SYSIBMADM.TBSP_UTILIZATION
-		WHERE TBSP_TYPE = 'DMS'
-		ORDER BY TBSP_USED_SIZE_KB DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
 	var currentTbsp string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxTablespaces), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryTablespaceInstances, d.MaxTablespaces), func(column, value string, lineEnd bool) {
 		switch column {
 		case "TBSP_NAME":
 			currentTbsp = strings.TrimSpace(value)
@@ -320,25 +272,8 @@ func (d *DB2) collectConnectionInstances(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT 
-			APPLICATION_ID,
-			APPLICATION_NAME,
-			CLIENT_HOSTNAME,
-			SESSION_AUTH_ID,
-			APPL_STATUS,
-			UOW_COMP_STATUS,
-			ROWS_READ,
-			ROWS_WRITTEN,
-			TOTAL_CPU_TIME
-		FROM SYSIBMADM.APPLICATIONS
-		WHERE APPL_STATUS IN ('CONNECTED', 'UOWEXEC')
-		ORDER BY TOTAL_CPU_TIME DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
 	var currentAppID string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxConnections), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryConnectionInstances, d.MaxConnections), func(column, value string, lineEnd bool) {
 		switch column {
 		case "APPLICATION_ID":
 			currentAppID = strings.TrimSpace(value)
