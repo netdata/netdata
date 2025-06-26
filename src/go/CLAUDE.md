@@ -14,6 +14,7 @@ This guide documents the patterns, conventions, and best practices for writing G
 8. [Testing](#testing)
 9. [Documentation](#documentation)
 10. [CGO and Plugin Separation](#cgo-and-plugin-separation)
+11. [## Checklist](#check-list)
 
 ## Collector Structure
 
@@ -711,19 +712,25 @@ Netdata follows specific patterns for alert thresholds:
    - Error count metrics (e.g., deadlocks > 0)
    - Status/state metrics (e.g., backup failed = 1)
    - Long-running operations (e.g., queries > X seconds)
+   - **Percentage-based metrics** (e.g., CPU usage %, memory usage %, disk usage %)
 
 2. **Preferred approaches**:
-   - **Rolling windows with predictions**: Compare current values to predicted normal ranges
-   - **Dynamic baselines**: Use historical data to establish normal behavior
+   - **Fixed thresholds on percentages**: Simple thresholds (e.g., > 80%, > 90%) work well for percentage metrics
+   - **Rolling windows with predictions**: For non-percentage metrics, compare current values to predicted normal ranges
+   - **Dynamic baselines**: Use historical data to establish normal behavior when percentages aren't available
    - **Percentile-based thresholds**: Adapt to workload patterns
    - **Rate of change detection**: Alert on sudden spikes or drops
 
 3. **Examples of good thresholds**:
    ```
-   # Using predictions (preferred)
+   # Fixed thresholds on percentages (preferred for percentage metrics)
+   warn: $this > 80   # for CPU usage %
+   crit: $this > 90   # for memory usage %
+   
+   # Using predictions (preferred for non-percentage metrics)
    warn: $this > (($1h_min_value * 2) + ($1h_average * 2))
    
-   # Using rolling averages
+   # Using rolling averages (for non-percentage metrics)
    warn: $this > ($10m_average * 1.5)
    
    # Rate of change
@@ -732,6 +739,10 @@ Netdata follows specific patterns for alert thresholds:
 
 4. **Examples of acceptable fixed thresholds**:
    ```
+   # Percentages (utilization, usage, ratios)
+   warn: $this > 80   # 80% threshold
+   crit: $this > 90   # 90% threshold
+   
    # Errors/failures (should be zero)
    warn: $this > 0
    
@@ -741,6 +752,8 @@ Netdata follows specific patterns for alert thresholds:
    # Time-based (queries taking too long)
    warn: $this > 5000  # 5 seconds
    ```
+
+**Note**: The dynamic threshold rule primarily applies when we cannot express the metric as a percentage. For percentage-based metrics (0-100%), fixed thresholds are appropriate and preferred for their simplicity and clarity.
 
 ### Alert Severity and Routing
 
@@ -802,5 +815,14 @@ component: ServiceName
 12. **Reuse clients** when possible, reconnect on failure
 13. **Split complex collectors** into multiple collection files
 14. **Be consistent with precision** when converting floats
-15. **Use dynamic thresholds** in alerts instead of fixed values
+15. **Use appropriate thresholds** - fixed for percentages and hard errors (i.e. testing non-zero errors), dynamic for other metrics
 16. **Route alerts appropriately** - use silent for non-critical issues
+
+## Checklist
+
+When finishing a new collector or improvements on a collector, follow this checklist:
+
+1. Review the code for any mock data, remaining TODOs, frictional logic, frictional API endpoints, frictional response formats, frictional members, etc. An independent reality check **MUST** be performed.
+2. The code, the stock configuration, the metadata.yaml, the config_schema.json and any stock alerts **MUST** match 100%. Even the slightest variation between them in config keys, possible values, enum values, contexts, dimension names, etc LEADS TO A NON WORKING SOLUTION. So, at the end of every change, an independent sync check **MUST** be performed. While doing this work, ensure also README.md reflects the facts.
+3. Once the above work is finished, the code **MUST** compile without errors or warnings. Use `build-claude` for build directory to avoid any interference with other builds and IDEs.
+4. Once all the above work is done and there are no outstanding issues, perform an independent usefulness check of the module being worked and provide a DevOps/SRE expert opinion on how useful, complete, powerful, comprehensive the module is.
