@@ -13,22 +13,8 @@ func (d *DB2) collectTableInstances(ctx context.Context) error {
 		return nil
 	}
 
-	query := `
-		SELECT 
-			TABSCHEMA,
-			TABNAME,
-			DATA_OBJECT_P_SIZE,
-			INDEX_OBJECT_P_SIZE,
-			LONG_OBJECT_P_SIZE,
-			ROWS_READ,
-			ROWS_WRITTEN
-		FROM SYSIBMADM.ADMINTABINFO
-		ORDER BY DATA_OBJECT_P_SIZE DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
 	var currentTable, currentSchema, key string
-	err := d.doQuery(ctx, fmt.Sprintf(query, d.MaxTables), func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryTableInstances, d.MaxTables), func(column, value string, lineEnd bool) {
 		switch column {
 		case "TABSCHEMA":
 			currentSchema = value

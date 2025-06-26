@@ -184,6 +184,13 @@
           "title": "Collect indexes matching",
           "description": "Pattern to filter indexes (schema.index). Supports wildcards (*, ?) and multiple patterns."
         },
+      "backup_history_days": {
+        "title": "Backup history days",
+        "description": "Number of days to look back for backup history. Reduces query time on databases with long backup histories.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 30
+      },
       "vnode": {
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
@@ -224,7 +231,8 @@
             "collect_bufferpool_metrics",
             "collect_tablespace_metrics",
             "collect_connection_metrics",
-            "collect_lock_metrics"
+            "collect_lock_metrics",
+            "backup_history_days"
           ]
         },
         {

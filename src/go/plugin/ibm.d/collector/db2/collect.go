@@ -158,7 +158,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 func (d *DB2) detectVersion(ctx context.Context) error {
 	// Try SYSIBMADM.ENV_INST_INFO (works on LUW)
-	query := `SELECT SERVICE_LEVEL, HOST_NAME, INST_NAME FROM SYSIBMADM.ENV_INST_INFO`
+	query := queryDetectVersionLUW
 
 	var serviceLevel, hostName, instName sql.NullString
 	err := d.db.QueryRow(query).Scan(&serviceLevel, &hostName, &instName)
@@ -182,7 +182,7 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 	}
 
 	// If that fails, might be AS/400 (DB2 for i)
-	query = `SELECT 'DB2 for i' FROM SYSIBM.SYSDUMMY1`
+	query = queryDetectVersionI
 	var dummy string
 	err = d.db.QueryRow(query).Scan(&dummy)
 	if err == nil {
@@ -196,15 +196,7 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 
 func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	// Connection counts - works across all DB2 versions
-	query := `
-		SELECT 
-			COUNT(*) as TOTAL_CONNS,
-			SUM(CASE WHEN APPL_STATUS = 'CONNECTED' THEN 1 ELSE 0 END) as ACTIVE_CONNS,
-			SUM(CASE WHEN APPL_STATUS = 'UOWEXEC' THEN 1 ELSE 0 END) as EXECUTING_CONNS
-		FROM SYSIBMADM.APPLICATIONS
-	`
-
-	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, queryGlobalConnections, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_CONNS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -227,7 +219,7 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	if err != nil {
 		// Try simpler query for older versions
 		simpleQuery := `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS`
-		if err2 := d.doQuerySingleValue(ctx, simpleQuery, &d.mx.ConnTotal); err2 != nil {
+		if err2 := d.doQuerySingleValue(ctx, queryGlobalConnectionsSimple, &d.mx.ConnTotal); err2 != nil {
 			return fmt.Errorf("failed to get connection count: %v", err)
 		}
 	}
@@ -261,20 +253,7 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectLockMetrics(ctx context.Context) error {
-	query := `
-		SELECT 
-			LOCK_WAITS,
-			LOCK_TIMEOUTS,
-			DEADLOCKS,
-			LOCK_ESCALS,
-			TOTAL_SORTS,
-			SORT_OVERFLOWS,
-			ROWS_READ,
-			ROWS_MODIFIED
-		FROM SYSIBMADM.SNAPDB
-	`
-
-	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return d.doQuery(ctx, queryLockMetrics, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
@@ -302,29 +281,11 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
-	query := `
-		SELECT 
-			CASE 
-				WHEN (POOL_DATA_L_READS + POOL_INDEX_L_READS) > 0 
-				THEN ((POOL_DATA_LBP_PAGES_FOUND + POOL_INDEX_LBP_PAGES_FOUND) * 100) / 
-				     (POOL_DATA_L_READS + POOL_INDEX_L_READS)
-				ELSE 100 
-			END as HIT_RATIO
-		FROM SYSIBMADM.SNAPBP
-	`
-
-	return d.doQuerySingleFloatValue(ctx, query, &d.mx.BufferpoolHitRatio)
+	return d.doQuerySingleFloatValue(ctx, queryBufferpoolAggregateMetrics, &d.mx.BufferpoolHitRatio)
 }
 
 func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
-	query := `
-		SELECT 
-			TOTAL_LOG_USED,
-			TOTAL_LOG_AVAILABLE
-		FROM SYSIBMADM.LOG_UTILIZATION
-	`
-
-	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return d.doQuery(ctx, queryLogSpaceMetrics, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
@@ -415,16 +376,7 @@ func (d *DB2) readRows(rows *sql.Rows, assign func(column, value string, lineEnd
 func (d *DB2) collectLongRunningQueries(ctx context.Context) error {
 	// Query to find long-running queries from SYSIBMADM.LONG_RUNNING_SQL
 	// Warning threshold: 5 minutes, Critical threshold: 15 minutes
-	query := `
-		SELECT 
-			COUNT(*) as TOTAL_COUNT,
-			SUM(CASE WHEN ELAPSED_TIME_MIN >= 5 AND ELAPSED_TIME_MIN < 15 THEN 1 ELSE 0 END) as WARNING_COUNT,
-			SUM(CASE WHEN ELAPSED_TIME_MIN >= 15 THEN 1 ELSE 0 END) as CRITICAL_COUNT
-		FROM SYSIBMADM.LONG_RUNNING_SQL
-		WHERE ELAPSED_TIME_MIN > 0
-	`
-
-	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return d.doQuery(ctx, queryLongRunningQueries, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
@@ -442,20 +394,6 @@ func (d *DB2) collectLongRunningQueries(ctx context.Context) error {
 }
 
 func (d *DB2) collectBackupStatus(ctx context.Context) error {
-	// Query backup history from SYSIBMADM.DB_HISTORY
-	// Note: This table structure varies between DB2 versions
-	query := `
-		SELECT 
-			OPERATION,
-			START_TIME,
-			OPERATIONTYPE,
-			SQLCODE
-		FROM SYSIBMADM.DB_HISTORY
-		WHERE OPERATION = 'B'
-		ORDER BY START_TIME DESC
-		FETCH FIRST 10 ROWS ONLY
-	`
-
 	var (
 		lastFullBackupTime        time.Time
 		lastIncrementalBackupTime time.Time
@@ -466,7 +404,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 
 	now := time.Now()
 
-	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := d.doQuery(ctx, fmt.Sprintf(queryBackupStatus, d.BackupHistoryDays), func(column, value string, lineEnd bool) {
 		switch column {
 		case "START_TIME":
 			// Parse backup time
@@ -498,17 +436,11 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 
 	if err != nil {
 		// Try simpler approach - just get the latest backup timestamp
-		simpleQuery := `
-			SELECT 
-				MAX(START_TIME) as LAST_BACKUP
-			FROM SYSIBMADM.DB_HISTORY
-			WHERE OPERATION = 'B' AND SQLCODE = 0
-		`
 		var lastBackup sql.NullString
 		queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 		defer cancel()
 
-		if err := d.db.QueryRowContext(queryCtx, simpleQuery).Scan(&lastBackup); err == nil && lastBackup.Valid {
+		if err := d.db.QueryRowContext(queryCtx, queryBackupStatusSimple).Scan(&lastBackup); err == nil && lastBackup.Valid {
 			if t, err := time.Parse("2006-01-02-15.04.05", lastBackup.String); err == nil {
 				lastFullBackupTime = t
 			}

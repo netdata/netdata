@@ -59,6 +59,7 @@ func New() *AS400 {
 
 			// IFS monitoring
 			IFSTopNDirectories: 20,
+			IFSStartPath:       "/",
 		},
 
 		charts:        baseCharts.Copy(),
@@ -96,6 +97,7 @@ type Config struct {
 
 	// IFS monitoring
 	IFSTopNDirectories int `yaml:"ifs_top_n_directories,omitempty" json:"ifs_top_n_directories"`
+	IFSStartPath       string `yaml:"ifs_start_path,omitempty" json:"ifs_start_path"`
 }
 
 type AS400 struct {
