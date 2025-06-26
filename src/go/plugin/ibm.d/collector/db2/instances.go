@@ -109,33 +109,6 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			}
 			d.mx.bufferpools[currentBP] = bufferpoolInstanceMetrics{}
 
-		case "TOTAL_READS":
-			if currentBP != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.bufferpools[currentBP]
-					metrics.Reads = v
-					d.mx.bufferpools[currentBP] = metrics
-				}
-			}
-
-		case "TOTAL_WRITES":
-			if currentBP != "" {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.bufferpools[currentBP]
-					metrics.Writes = v
-					d.mx.bufferpools[currentBP] = metrics
-				}
-			}
-
-		case "HIT_RATIO":
-			if currentBP != "" {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					metrics := d.mx.bufferpools[currentBP]
-					metrics.HitRatio = int64(v * precision)
-					d.mx.bufferpools[currentBP] = metrics
-				}
-			}
-
 		case "PAGESIZE":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -146,7 +119,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				}
 			}
 
-		case "NPAGES":
+		case "TOTAL_PAGES":
 			if currentBP != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
@@ -160,6 +133,159 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.bufferpools[currentBP]
 					metrics.UsedPages = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "HIT_RATIO":
+			if currentBP != "" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.HitRatio = int64(v * precision)
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "DATA_HIT_RATIO":
+			if currentBP != "" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.DataHitRatio = int64(v * precision)
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "INDEX_HIT_RATIO":
+			if currentBP != "" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.IndexHitRatio = int64(v * precision)
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "XDA_HIT_RATIO":
+			if currentBP != "" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.XDAHitRatio = int64(v * precision)
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "COLUMN_HIT_RATIO":
+			if currentBP != "" {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.ColumnHitRatio = int64(v * precision)
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "LOGICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.LogicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "PHYSICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.PhysicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "TOTAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.TotalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "DATA_LOGICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.DataLogicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "DATA_PHYSICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.DataPhysicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "INDEX_LOGICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.IndexLogicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "INDEX_PHYSICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.IndexPhysicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "XDA_LOGICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.XDALogicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "XDA_PHYSICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.XDAPhysicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "COLUMN_LOGICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.ColumnLogicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "COLUMN_PHYSICAL_READS":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.ColumnPhysicalReads = v
+					d.mx.bufferpools[currentBP] = metrics
+				}
+			}
+
+		case "WRITES":
+			if currentBP != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.bufferpools[currentBP]
+					metrics.Writes = v
 					d.mx.bufferpools[currentBP] = metrics
 				}
 			}
@@ -217,29 +343,38 @@ func (d *DB2) collectTablespaceInstances(ctx context.Context) error {
 				d.mx.tablespaces[currentTbsp] = metrics
 			}
 
-		case "TBSP_TOTAL_SIZE_KB":
+		case "TOTAL_SIZE":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.tablespaces[currentTbsp]
-					metrics.TotalSizeKB = v
+					metrics.TotalSize = v
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
 
-		case "TBSP_USED_SIZE_KB":
+		case "USED_SIZE":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.tablespaces[currentTbsp]
-					metrics.UsedSizeKB = v
+					metrics.UsedSize = v
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}
 
-		case "TBSP_FREE_SIZE_KB":
+		case "FREE_SIZE":
 			if currentTbsp != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					metrics := d.mx.tablespaces[currentTbsp]
-					metrics.FreeSizeKB = v
+					metrics.FreeSize = v
+					d.mx.tablespaces[currentTbsp] = metrics
+				}
+			}
+
+		case "USABLE_SIZE":
+			if currentTbsp != "" {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					metrics := d.mx.tablespaces[currentTbsp]
+					metrics.UsableSize = v
 					d.mx.tablespaces[currentTbsp] = metrics
 				}
 			}

@@ -40,24 +40,67 @@ var (
 		Title:    "Buffer Pool %s Hit Ratio",
 		Units:    "percentage",
 		Fam:      "bufferpool",
-		Ctx:      "db2.bufferpool_hit_ratio",
+		Ctx:      "db2.bufferpool_instance_hit_ratio",
 		Priority: module.Priority + 200,
 		Dims: module.Dims{
-			{ID: "bufferpool_%s_hit_ratio", Name: "hit_ratio", Div: precision},
+			{ID: "bufferpool_%s_hit_ratio", Name: "overall", Div: precision},
+		},
+	}
+	
+	bufferpoolDetailedHitRatioChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_detailed_hit_ratio",
+		Title:    "Buffer Pool %s Detailed Hit Ratios",
+		Units:    "percentage",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_detailed_hit_ratio",
+		Priority: module.Priority + 201,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_data_hit_ratio", Name: "data", Div: precision},
+			{ID: "bufferpool_%s_index_hit_ratio", Name: "index", Div: precision},
+			{ID: "bufferpool_%s_xda_hit_ratio", Name: "xda", Div: precision},
+			{ID: "bufferpool_%s_column_hit_ratio", Name: "column", Div: precision},
 		},
 	}
 
-	bufferpoolIOChartTmpl = module.Chart{
-		ID:       "bufferpool_%s_io",
-		Title:    "Buffer Pool %s I/O",
-		Units:    "operations/s",
+	bufferpoolReadsChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_reads",
+		Title:    "Buffer Pool %s Reads",
+		Units:    "reads/s",
 		Fam:      "bufferpool",
-		Ctx:      "db2.bufferpool_io",
-		Priority: module.Priority + 201,
-		Type:     module.Area,
+		Ctx:      "db2.bufferpool_instance_reads",
+		Priority: module.Priority + 202,
+		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "bufferpool_%s_reads", Name: "reads", Algo: module.Incremental},
-			{ID: "bufferpool_%s_writes", Name: "writes", Algo: module.Incremental, Mul: -1},
+			{ID: "bufferpool_%s_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_%s_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+	
+	bufferpoolDataReadsChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_data_reads",
+		Title:    "Buffer Pool %s Data Page Reads",
+		Units:    "reads/s",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_data_reads",
+		Priority: module.Priority + 203,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_data_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_%s_data_physical_reads", Name: "physical", Algo: module.Incremental},
+		},
+	}
+	
+	bufferpoolIndexReadsChartTmpl = module.Chart{
+		ID:       "bufferpool_%s_index_reads",
+		Title:    "Buffer Pool %s Index Page Reads",
+		Units:    "reads/s",
+		Fam:      "bufferpool",
+		Ctx:      "db2.bufferpool_instance_index_reads",
+		Priority: module.Priority + 204,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "bufferpool_%s_index_logical_reads", Name: "logical", Algo: module.Incremental},
+			{ID: "bufferpool_%s_index_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
 
@@ -66,8 +109,8 @@ var (
 		Title:    "Buffer Pool %s Pages",
 		Units:    "pages",
 		Fam:      "bufferpool",
-		Ctx:      "db2.bufferpool_pages",
-		Priority: module.Priority + 202,
+		Ctx:      "db2.bufferpool_instance_pages",
+		Priority: module.Priority + 210,
 		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "bufferpool_%s_used_pages", Name: "used"},
@@ -97,8 +140,21 @@ var (
 		Priority: module.Priority + 301,
 		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "tablespace_%s_used_size_kb", Name: "used", Mul: 1024},
-			{ID: "tablespace_%s_free_size_kb", Name: "free", Mul: 1024},
+			{ID: "tablespace_%s_used_size", Name: "used"},
+			{ID: "tablespace_%s_free_size", Name: "free"},
+		},
+	}
+	
+	tablespaceUsableSizeChartTmpl = module.Chart{
+		ID:       "tablespace_%s_usable_size",
+		Title:    "Tablespace %s Usable Size",
+		Units:    "bytes",
+		Fam:      "tablespace",
+		Ctx:      "db2.tablespace_usable_size",
+		Priority: module.Priority + 302,
+		Dims: module.Dims{
+			{ID: "tablespace_%s_total_size", Name: "total"},
+			{ID: "tablespace_%s_usable_size", Name: "usable"},
 		},
 	}
 
@@ -200,7 +256,10 @@ func newDatabaseCharts(db *databaseMetrics) *module.Charts {
 func newBufferpoolCharts(bp *bufferpoolMetrics) *module.Charts {
 	charts := module.Charts{
 		bufferpoolHitRatioChartTmpl.Copy(),
-		bufferpoolIOChartTmpl.Copy(),
+		bufferpoolDetailedHitRatioChartTmpl.Copy(),
+		bufferpoolReadsChartTmpl.Copy(),
+		bufferpoolDataReadsChartTmpl.Copy(),
+		bufferpoolIndexReadsChartTmpl.Copy(),
 		bufferpoolPagesChartTmpl.Copy(),
 	}
 
@@ -223,6 +282,7 @@ func newTablespaceCharts(ts *tablespaceMetrics) *module.Charts {
 	charts := module.Charts{
 		tablespaceUsageChartTmpl.Copy(),
 		tablespaceSizeChartTmpl.Copy(),
+		tablespaceUsableSizeChartTmpl.Copy(),
 	}
 
 	cleanName := cleanName(ts.name)
