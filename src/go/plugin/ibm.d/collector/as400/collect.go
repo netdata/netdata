@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
@@ -181,46 +182,69 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (a *AS400) collectSystemStatus(ctx context.Context) error {
-	return a.doQuery(ctx, querySystemStatus, func(column, value string, lineEnd bool) {
-		switch column {
-		case "AVERAGE_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CPUPercentage = int64(v * precision)
-			}
-		case "SYSTEM_ASP_USED":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.SystemASPUsed = int64(v * precision)
-			}
-		case "ACTIVE_JOBS_IN_SYSTEM":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.ActiveJobsCount = v
-			}
-		case "CONFIGURED_CPUS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.ConfiguredCPUs = v
-			}
-		case "CURRENT_PROCESSING_CAPACITY":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CurrentProcessingCapacity = int64(v * precision)
-			}
-		case "SHARED_PROCESSOR_POOL_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.SharedProcessorPoolUsage = int64(v * precision)
-			}
-		case "PARTITION_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.PartitionCPUUtilization = int64(v * precision)
-			}
-		case "INTERACTIVE_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.InteractiveCPUUtilization = int64(v * precision)
-			}
-		case "DATABASE_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.DatabaseCPUUtilization = int64(v * precision)
-			}
+	// Core metrics - should always be available
+	if err := a.collectSingleMetric(ctx, "average_cpu", queryAverageCPU, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.CPUPercentage = int64(v * precision)
+		}
+	}); err != nil {
+		return err // Fatal - basic metric must work
+	}
+
+	if err := a.collectSingleMetric(ctx, "system_asp", querySystemASP, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.SystemASPUsed = int64(v * precision)
+		}
+	}); err != nil {
+		return err // Fatal - basic metric must work
+	}
+
+	if err := a.collectSingleMetric(ctx, "active_jobs", queryActiveJobs, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			a.mx.ActiveJobsCount = v
+		}
+	}); err != nil {
+		return err // Fatal - basic metric must work
+	}
+
+	// Version-specific metrics - gracefully handle missing columns
+	_ = a.collectSingleMetric(ctx, "configured_cpus", queryConfiguredCPUs, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			a.mx.ConfiguredCPUs = v
 		}
 	})
+
+	_ = a.collectSingleMetric(ctx, "current_processing_capacity", queryCurrentProcessingCapacity, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.CurrentProcessingCapacity = int64(v * precision)
+		}
+	})
+
+	_ = a.collectSingleMetric(ctx, "shared_processor_pool_util", querySharedProcessorPoolUtil, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.SharedProcessorPoolUsage = int64(v * precision)
+		}
+	})
+
+	_ = a.collectSingleMetric(ctx, "partition_cpu_util", queryPartitionCPUUtil, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.PartitionCPUUtilization = int64(v * precision)
+		}
+	})
+
+	_ = a.collectSingleMetric(ctx, "interactive_cpu_util", queryInteractiveCPUUtil, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.InteractiveCPUUtilization = int64(v * precision)
+		}
+	})
+
+	_ = a.collectSingleMetric(ctx, "database_cpu_util", queryDatabaseCPUUtil, func(value string) {
+		if v, err := strconv.ParseFloat(value, 64); err == nil {
+			a.mx.DatabaseCPUUtilization = int64(v * precision)
+		}
+	})
+
+	return nil
 }
 
 func (a *AS400) collectMemoryPools(ctx context.Context) error {
@@ -660,6 +684,11 @@ func (a *AS400) countJobQueues(ctx context.Context) (int, error) {
 }
 
 func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
+	// Check if ACTIVE_JOB_INFO is disabled
+	if a.isDisabled("active_job_info") {
+		return nil
+	}
+
 	// Reset job type counts
 	a.mx.BatchJobs = 0
 	a.mx.InteractiveJobs = 0
@@ -668,7 +697,7 @@ func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
 	a.mx.OtherJobs = 0
 
 	var currentJobType string
-	return a.doQuery(ctx, queryJobTypeBreakdown, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, queryJobTypeBreakdown, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_TYPE":
 			// Store current job type for next COUNT value
@@ -690,10 +719,23 @@ func (a *AS400) collectJobTypeBreakdown(ctx context.Context) error {
 			}
 		}
 	})
+
+	// Handle table function errors
+	if err != nil && isSQLFeatureError(err) {
+		a.logOnce("active_job_info", "ACTIVE_JOB_INFO function not available on this IBM i version: %v", err)
+		a.disabledFeatures["active_job_info"] = true
+		return nil
+	}
+
+	return err
 }
 
 func (a *AS400) collectIFSUsage(ctx context.Context) error {
-	return a.doQuery(ctx, queryIFSUsage, func(column, value string, lineEnd bool) {
+	// Check if IFS_OBJECT_STATISTICS is disabled
+	if a.isDisabled("ifs_object_statistics") {
+		return nil
+	}
+	err := a.doQuery(ctx, queryIFSUsage, func(column, value string, lineEnd bool) {
 		switch column {
 		case "FILE_COUNT":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -709,6 +751,15 @@ func (a *AS400) collectIFSUsage(ctx context.Context) error {
 			}
 		}
 	})
+
+	// Handle table function errors
+	if err != nil && isSQLFeatureError(err) {
+		a.logOnce("ifs_object_statistics", "IFS_OBJECT_STATISTICS function not available on this IBM i version: %v", err)
+		a.disabledFeatures["ifs_object_statistics"] = true
+		return nil
+	}
+
+	return err
 }
 
 func (a *AS400) collectMessageQueues(ctx context.Context) error {
@@ -788,9 +839,14 @@ func (a *AS400) collectASPInfo(ctx context.Context) error {
 }
 
 func (a *AS400) collectActiveJobs(ctx context.Context) error {
-	query := fmt.Sprintf(queryActiveJobs, a.MaxActiveJobs)
+	// Check if ACTIVE_JOB_INFO is disabled
+	if a.isDisabled("active_job_info") {
+		return nil
+	}
+
+	query := fmt.Sprintf(queryActiveJobsDetails, a.MaxActiveJobs)
 	var currentJobName string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_NAME":
 			currentJobName = value
@@ -835,12 +891,25 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 		}
 	})
+
+	// Handle table function errors
+	if err != nil && isSQLFeatureError(err) {
+		a.logOnce("active_job_info", "ACTIVE_JOB_INFO function not available on this IBM i version: %v", err)
+		a.disabledFeatures["active_job_info"] = true
+		return nil
+	}
+
+	return err
 }
 
 func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
+	// Check if IFS_OBJECT_STATISTICS is disabled
+	if a.isDisabled("ifs_object_statistics") {
+		return nil
+	}
 	query := fmt.Sprintf(queryIFSTopNDirectories, a.IFSStartPath, a.IFSTopNDirectories)
 	var currentDir string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "DIR":
 			currentDir = value
@@ -856,6 +925,15 @@ func (a *AS400) collectIFSTopNDirectories(ctx context.Context) error {
 			}
 		}
 	})
+
+	// Handle table function errors
+	if err != nil && isSQLFeatureError(err) {
+		a.logOnce("ifs_object_statistics", "IFS_OBJECT_STATISTICS function not available on this IBM i version: %v", err)
+		a.disabledFeatures["ifs_object_statistics"] = true
+		return nil
+	}
+
+	return err
 }
 
 func (a *AS400) hasIFSDirectoryDim(dir string) bool {
