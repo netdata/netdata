@@ -796,6 +796,6 @@ func TestTableCacheConfigIDGeneration(t *testing.T) {
 	assert.NotEqual(t, id1, id3)
 
 	// IDs should be human-readable
-	assert.Equal(t, "ifInOctets,ifOutOctets", id1)
-	assert.Equal(t, "ifAdminStatus,ifOperStatus", id3)
+	assert.Equal(t, "ifTable,ifInOctets,ifOutOctets", id1)
+	assert.Equal(t, "ifTable,ifAdminStatus,ifOperStatus", id3)
 }
