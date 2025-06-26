@@ -218,7 +218,6 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 
 	if err != nil {
 		// Try simpler query for older versions
-		simpleQuery := `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS`
 		if err2 := d.doQuerySingleValue(ctx, queryGlobalConnectionsSimple, &d.mx.ConnTotal); err2 != nil {
 			return fmt.Errorf("failed to get connection count: %v", err)
 		}
