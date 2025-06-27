@@ -43,11 +43,11 @@ func New() *AS400 {
 			MaxDbConns:    1,
 			MaxDbLifeTime: confopt.Duration(time.Minute * 10),
 
-			// Instance collection defaults
-			CollectDiskMetrics:      true,
-			CollectSubsystemMetrics: true,
-			CollectJobQueueMetrics:  true,
-			CollectActiveJobs:       false,
+			// Instance collection defaults (will be set in Init based on version)
+			// CollectDiskMetrics:      nil,
+			// CollectSubsystemMetrics: nil,
+			// CollectJobQueueMetrics:  nil,
+			// CollectActiveJobs:       nil,
 
 			// Cardinality limits
 			MaxDisks:      50,
@@ -85,10 +85,13 @@ type Config struct {
 	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
 
 	// Instance collection settings
-	CollectDiskMetrics      bool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
-	CollectSubsystemMetrics bool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics"`
-	CollectJobQueueMetrics  bool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
-	CollectActiveJobs       bool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs"`
+	CollectDiskMetrics      *bool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
+	CollectSubsystemMetrics *bool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics"`
+	CollectJobQueueMetrics  *bool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
+	CollectActiveJobs       *bool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs"`
+
+	// Version check override
+	IgnoreVersionChecks bool `yaml:"ignore_version_checks,omitempty" json:"ignore_version_checks"`
 
 	// Cardinality limits
 	MaxDisks      int `yaml:"max_disks,omitempty" json:"max_disks"`
@@ -190,6 +193,9 @@ func (a *AS400) Init(ctx context.Context) error {
 
 	// Apply proactive version-based feature gating
 	a.applyVersionBasedFeatureGating()
+
+	// Set configuration defaults based on version (only if admin hasn't configured)
+	a.setConfigurationDefaults()
 
 	// Detect available features (reactive detection for unknown features)
 	a.detectAvailableFeatures(ctx)
@@ -573,6 +579,48 @@ func (a *AS400) applyVersionBasedFeatureGating() {
 		} else {
 			a.logFeatureAvailability("IBM i 7.1 detected - limited SQL services available")
 		}
+	}
+}
+
+// setConfigurationDefaults sets default values for configuration options based on detected version
+// Only sets defaults if the admin hasn't explicitly configured the option
+func (a *AS400) setConfigurationDefaults() {
+	// Helper to create bool pointer
+	boolPtr := func(v bool) *bool { return &v }
+
+	// CollectDiskMetrics - available on all versions
+	if a.CollectDiskMetrics == nil {
+		a.CollectDiskMetrics = boolPtr(true)
+		a.Debugf("CollectDiskMetrics not configured, defaulting to true")
+	}
+
+	// CollectSubsystemMetrics - available on all versions
+	if a.CollectSubsystemMetrics == nil {
+		a.CollectSubsystemMetrics = boolPtr(true)
+		a.Debugf("CollectSubsystemMetrics not configured, defaulting to true")
+	}
+
+	// CollectJobQueueMetrics - requires V7R2+
+	if a.CollectJobQueueMetrics == nil {
+		defaultValue := a.versionMajor >= 7 && a.versionRelease >= 2
+		a.CollectJobQueueMetrics = boolPtr(defaultValue)
+		a.Debugf("CollectJobQueueMetrics not configured, defaulting to %v (based on IBM i %d.%d)", 
+			defaultValue, a.versionMajor, a.versionRelease)
+	}
+
+	// CollectActiveJobs - requires V7R3+
+	if a.CollectActiveJobs == nil {
+		// Default to false even if version supports it (expensive operation)
+		a.CollectActiveJobs = boolPtr(false)
+		a.Debugf("CollectActiveJobs not configured, defaulting to false (expensive operation)")
+	}
+
+	// Log final configuration
+	a.Infof("Configuration after defaults: DiskMetrics=%v, SubsystemMetrics=%v, JobQueueMetrics=%v, ActiveJobs=%v",
+		*a.CollectDiskMetrics, *a.CollectSubsystemMetrics, *a.CollectJobQueueMetrics, *a.CollectActiveJobs)
+	
+	if a.IgnoreVersionChecks {
+		a.Warningf("IgnoreVersionChecks is enabled - collector will attempt all configured features regardless of IBM i version")
 	}
 }
 
