@@ -51,12 +51,9 @@ func New() *WebSphereMicroProfile {
 			// Collection flags
 			CollectJVMMetrics:    true,
 			CollectRESTMetrics:   true,
-			CollectMPMetrics:     true,
-			CollectCustomMetrics: false,
 
 			// Cardinality limits
 			MaxRESTEndpoints: 50,
-			MaxCustomMetrics: 100,
 		},
 
 		charts:           &module.Charts{},
@@ -81,16 +78,12 @@ type Config struct {
 	// Collection flags
 	CollectJVMMetrics    bool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics"`
 	CollectRESTMetrics   bool `yaml:"collect_rest_metrics" json:"collect_rest_metrics"`
-	CollectMPMetrics     bool `yaml:"collect_mp_metrics" json:"collect_mp_metrics"`
-	CollectCustomMetrics bool `yaml:"collect_custom_metrics" json:"collect_custom_metrics"`
 
 	// Cardinality control
 	MaxRESTEndpoints int `yaml:"max_rest_endpoints,omitempty" json:"max_rest_endpoints"`
-	MaxCustomMetrics int `yaml:"max_custom_metrics,omitempty" json:"max_custom_metrics"`
 
 	// Filtering
 	CollectRESTMatching   string `yaml:"collect_rest_matching,omitempty" json:"collect_rest_matching"`
-	CollectCustomMatching string `yaml:"collect_custom_matching,omitempty" json:"collect_custom_matching"`
 }
 
 type WebSphereMicroProfile struct {
@@ -104,10 +97,10 @@ type WebSphereMicroProfile struct {
 	// For tracking dynamic metrics
 	seenMetrics      map[string]bool
 	collectedMetrics map[string]bool
+	lastMetricCount  int
 
 	// Selectors
 	restSelector   matcher.Matcher
-	customSelector matcher.Matcher
 
 	// Cached server info
 	serverVersion string
@@ -116,8 +109,6 @@ type WebSphereMicroProfile struct {
 	// Metric name patterns
 	jvmPattern    *regexp.Regexp
 	restPattern   *regexp.Regexp
-	mpPattern     *regexp.Regexp
-	customPattern *regexp.Regexp
 }
 
 func (w *WebSphereMicroProfile) Configuration() any {
@@ -138,9 +129,6 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 	if w.MaxRESTEndpoints < 0 {
 		w.MaxRESTEndpoints = 0
 	}
-	if w.MaxCustomMetrics < 0 {
-		w.MaxCustomMetrics = 0
-	}
 
 	// Initialize selectors
 	if w.CollectRESTMatching != "" {
@@ -151,19 +139,10 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 		w.restSelector = m
 	}
 
-	if w.CollectCustomMatching != "" {
-		m, err := matcher.NewSimplePatternsMatcher(w.CollectCustomMatching)
-		if err != nil {
-			return fmt.Errorf("invalid custom selector pattern '%s': %v", w.CollectCustomMatching, err)
-		}
-		w.customSelector = m
-	}
-
 	// Initialize metric patterns
-	w.jvmPattern = regexp.MustCompile(`^(?:jvm_|base_jvm_).*`)
+	// Liberty MicroProfile JVM metrics use patterns like: memory_, gc_, thread_, classloader_, jvm_
+	w.jvmPattern = regexp.MustCompile(`^(?:jvm_|base_jvm_|memory_|gc_|thread_|classloader_|cpu_).*`)
 	w.restPattern = regexp.MustCompile(`^(?:REST_request_|base_REST_).*`)
-	w.mpPattern = regexp.MustCompile(`^(?:mp_|vendor_).*`)
-	w.customPattern = regexp.MustCompile(`^application_.*`)
 
 	httpClient, err := web.NewHTTPClient(w.HTTPConfig.ClientConfig)
 	if err != nil {
@@ -196,7 +175,7 @@ func (w *WebSphereMicroProfile) Charts() *module.Charts {
 func (w *WebSphereMicroProfile) Collect(ctx context.Context) map[string]int64 {
 	mx, err := w.collect(ctx)
 	if err != nil {
-		w.Error(err)
+		w.Errorf("failed to collect metrics: %v", err)
 		return nil
 	}
 

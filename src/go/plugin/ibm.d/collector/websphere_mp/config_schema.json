@@ -97,18 +97,6 @@
         "type": "boolean",
         "default": true
       },
-      "collect_mp_metrics": {
-        "title": "Collect MicroProfile metrics",
-        "description": "Enable collection of MicroProfile-specific metrics (Health, Config, etc.).",
-        "type": "boolean",
-        "default": true
-      },
-      "collect_custom_metrics": {
-        "title": "Collect custom application metrics",
-        "description": "Enable collection of custom application-defined metrics.",
-        "type": "boolean",
-        "default": false
-      },
       "max_rest_endpoints": {
         "title": "Maximum REST endpoints",
         "description": "Maximum number of REST endpoints to monitor. Set to 0 for unlimited.",
@@ -116,21 +104,9 @@
         "minimum": 0,
         "default": 50
       },
-      "max_custom_metrics": {
-        "title": "Maximum custom metrics",
-        "description": "Maximum number of custom metrics to monitor. Set to 0 for unlimited.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 100
-      },
       "collect_rest_matching": {
         "title": "REST endpoint filter",
         "description": "Only collect REST metrics for endpoints matching this pattern. Supports wildcards (* and ?) and multiple patterns separated by |.",
-        "type": "string"
-      },
-      "collect_custom_matching": {
-        "title": "Custom metrics filter",
-        "description": "Only collect custom metrics matching this pattern. Supports wildcards (* and ?) and multiple patterns separated by |.",
         "type": "string"
       },
       "cell_name": {
@@ -190,18 +166,14 @@
           "fields": [
             "metrics_endpoint",
             "collect_jvm_metrics",
-            "collect_rest_metrics", 
-            "collect_mp_metrics",
-            "collect_custom_metrics"
+            "collect_rest_metrics"
           ]
         },
         {
           "title": "Limits & Filtering",
           "fields": [
             "max_rest_endpoints",
-            "max_custom_metrics",
-            "collect_rest_matching",
-            "collect_custom_matching"
+            "collect_rest_matching"
           ]
         },
         {
@@ -234,9 +206,6 @@
     },
     "collect_rest_matching": {
       "ui:help": "Examples: '*api*' (contains 'api'), '/users/*' (starts with /users/), '*admin*|*management*' (contains 'admin' or 'management')"
-    },
-    "collect_custom_matching": {
-      "ui:help": "Examples: 'myapp_*' (starts with 'myapp_'), '*counter*' (contains 'counter'), 'app1_*|app2_*' (starts with 'app1_' or 'app2_')"
     }
   }
 }

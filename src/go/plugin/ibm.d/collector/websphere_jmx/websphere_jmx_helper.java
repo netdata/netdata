@@ -219,47 +219,52 @@ public class websphere_jmx_helper {
         try {
             Map<String, Object> data = new HashMap<>();
             
-            switch (target) {
-                case "JVM":
-                    data = collectJVMMetrics();
-                    break;
-                case "THREADPOOLS":
-                    data.put("threadPools", collectThreadPools(command));
-                    break;
-                case "JDBC":
-                    data.put("jdbcPools", collectJDBCPools(command));
-                    break;
-                case "JMS":
-                    data.put("jmsDestinations", collectJMSDestinations(command));
-                    break;
-                case "APPLICATIONS":
-                    data.put("applications", collectApplications(command));
-                    break;
-                case "CLUSTER":
-                    data.put("cluster", collectClusterMetrics());
-                    break;
-                case "HAMANAGER":
-                    data.put("hamanager", collectHAManagerMetrics());
-                    break;
-                case "DYNAMIC_CLUSTER":
-                    data.put("dynamicCluster", collectDynamicClusterMetrics());
-                    break;
-                case "REPLICATION":
-                    data.put("replication", collectReplicationMetrics());
-                    break;
-                // APM targets
-                case "SERVLET_METRICS":
-                    data.put("servletMetrics", collectServletMetrics(command));
-                    break;
-                case "EJB_METRICS":
-                    data.put("ejbMetrics", collectEJBMetrics(command));
-                    break;
-                case "JDBC_ADVANCED":
-                    data.put("jdbcAdvanced", collectJDBCAdvancedMetrics(command));
-                    break;
-                default:
-                    sendError("Unknown scrape target: " + target, "", true);
-                    return;
+            try {
+                switch (target) {
+                    case "JVM":
+                        data = collectJVMMetrics();
+                        break;
+                    case "THREADPOOLS":
+                        data.put("threadPools", collectThreadPools(command));
+                        break;
+                    case "JDBC":
+                        data.put("jdbcPools", collectJDBCPools(command));
+                        break;
+                    case "JMS":
+                        data.put("jmsDestinations", collectJMSDestinations(command));
+                        break;
+                    case "APPLICATIONS":
+                        data.put("applications", collectApplications(command));
+                        break;
+                    case "CLUSTER":
+                        data.put("cluster", collectClusterMetrics());
+                        break;
+                    case "HAMANAGER":
+                        data.put("hamanager", collectHAManagerMetrics());
+                        break;
+                    case "DYNAMIC_CLUSTER":
+                        data.put("dynamicCluster", collectDynamicClusterMetrics());
+                        break;
+                    case "REPLICATION":
+                        data.put("replication", collectReplicationMetrics());
+                        break;
+                    // APM targets
+                    case "SERVLET_METRICS":
+                        data.put("servletMetrics", collectServletMetrics(command));
+                        break;
+                    case "EJB_METRICS":
+                        data.put("ejbMetrics", collectEJBMetrics(command));
+                        break;
+                    case "JDBC_ADVANCED":
+                        data.put("jdbcAdvanced", collectJDBCAdvancedMetrics(command));
+                        break;
+                    default:
+                        sendError("Unknown scrape target: " + target, "", true);
+                        return;
+                }
+            } catch (Exception e) {
+                sendError("Error collecting metrics for target " + target, e.getMessage(), true);
+                return;
             }
             
             // Add cluster-aware properties to the data map
@@ -282,10 +287,8 @@ public class websphere_jmx_helper {
             }
 
             sendSuccess("Metrics collected", data);
-        } catch (JMException e) {
-            sendError("JMX error during metrics collection", e.toString(), true);
-        } catch (IOException e) {
-            sendError("Connection error during metrics collection", e.toString(), true);
+        } catch (Exception e) {
+            sendError("Error during metrics collection", e.toString(), true);
         }
     }
     
@@ -889,9 +892,7 @@ public class websphere_jmx_helper {
             // Test connection by getting the default domain
             String defaultDomain = mbsc.getDefaultDomain();
             sendSuccess("Connection is healthy", null);
-        } catch (JMException e) {
-            sendError("JMX error during connection test", e.toString(), true);
-        } catch (IOException e) {
+        } catch (Exception e) {
             sendError("Connection error during connection test", e.toString(), true);
         }
     }

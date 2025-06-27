@@ -917,6 +917,437 @@ func (c *Collector) newInstanceCharts(instance *instanceMetrics) *module.Charts 
 - **Troubleshooting**: Quickly identify version-specific issues
 - **Migration Planning**: Compare performance across versions during upgrades
 
+## Netdata Chart Design Rules
+
+### RULE #1: Non-Overlapping Dimensions
+
+**Dimensions within a single chart MUST NOT be overlapping or of different types.**
+
+Netdata is NOT like Prometheus/Grafana. The dashboard provides point-and-click slicing and dicing, which means dimensions get aggregated (summed or averaged) when grouping by anything except "by dimension". Mixing dimension types leads to nonsensical values.
+
+#### Examples of WRONG Design:
+```go
+// BAD: Mixing current values with historical peak
+{
+    ID: "threads",
+    Dims: module.Dims{
+        {ID: "current", Name: "current"},    // Current value
+        {ID: "daemon", Name: "daemon"},      // Subset of current
+        {ID: "peak", Name: "peak"},          // Historical maximum
+    },
+}
+// Problem: Aggregating gives meaningless sum of current + historical values
+```
+
+```go
+// BAD: Mixing used with limits
+{
+    ID: "memory",
+    Dims: module.Dims{
+        {ID: "used", Name: "used"},          // Current usage
+        {ID: "committed", Name: "committed"}, // Different concept
+        {ID: "max", Name: "max"},            // Configuration limit
+    },
+}
+// Problem: Sum of used + max makes no sense
+```
+
+#### Examples of CORRECT Design:
+```go
+// GOOD: Split into logical charts with additive dimensions
+{
+    ID: "threads_current",
+    Family: "threads",
+    Type: module.Stacked,
+    Dims: module.Dims{
+        {ID: "daemon", Name: "daemon"},
+        {ID: "other", Name: "other"},    // calculated as total - daemon
+    },
+}
+
+{
+    ID: "threads_peak", 
+    Family: "threads",
+    Dims: module.Dims{
+        {ID: "peak", Name: "peak"},
+    },
+}
+```
+
+```go
+// GOOD: Memory usage as additive components
+{
+    ID: "memory_usage",
+    Family: "memory",
+    Type: module.Stacked,
+    Dims: module.Dims{
+        {ID: "used", Name: "used"},
+        {ID: "free", Name: "free"},      // calculated as committed - used
+    },
+}
+
+{
+    ID: "memory_limits",
+    Family: "memory", 
+    Dims: module.Dims{
+        {ID: "committed", Name: "committed"},
+        {ID: "max", Name: "max"},
+    },
+}
+```
+
+#### Key Principles:
+1. **Dimensions must be additive or comparable** - they should make sense when summed
+2. **Use chart families** to group related metrics
+3. **Calculate derived values** (like "other" = total - specific) to maintain additivity
+4. **Separate different measurement types** into different charts
+5. **Historical/peak values** should be in separate charts from current values
+
+### RULE #2: Chart Types Based on Data Semantics
+
+**Choose chart types based on what the data represents and how users need to visualize it.**
+
+#### Chart Type Guidelines:
+
+**1. STACKED Charts** - Use when showing volume/size where users need to see "the whole"
+- Memory usage (used + free = total)
+- Disk space (used + available = total)
+- CPU states (user + system + idle + wait = 100%)
+- Any resource where parts sum to a meaningful total
+
+```go
+// GOOD: Memory usage as stacked chart
+{
+    ID: "memory_usage",
+    Type: module.Stacked,
+    Dims: module.Dims{
+        {ID: "used", Name: "used"},
+        {ID: "free", Name: "free"},
+    },
+}
+```
+
+**2. AREA Charts** - Use for bidirectional volume (in/out, read/write, rx/tx)
+- Network traffic (received positive, sent negative)
+- Disk I/O (reads positive, writes negative)  
+- Any flow with dual directions
+
+```go
+// GOOD: Network traffic as area chart
+{
+    ID: "network_traffic",
+    Type: module.Area,
+    Dims: module.Dims{
+        {ID: "received", Name: "received"},
+        {ID: "sent", Name: "sent", Mul: -1},  // Negative for opposite direction
+    },
+}
+```
+
+**3. LINE Charts** - Use for independent metrics
+- Counters (requests/sec, errors/sec)
+- Rates and percentages
+- Durations (response time, latency)
+- Independent values that don't sum to a whole
+
+```go
+// GOOD: Response time as line chart
+{
+    ID: "response_time",
+    Type: module.Line,
+    Dims: module.Dims{
+        {ID: "avg", Name: "average"},
+        {ID: "p95", Name: "95th percentile"},
+    },
+}
+```
+
+**4. HEATMAP Charts** - Use for distribution/histogram data
+- Response time distributions
+- Request size distributions
+- Any bucketed/histogram data
+
+#### Examples of WRONG Usage:
+```go
+// BAD: Using line for memory (should be stacked)
+{
+    ID: "memory",
+    Type: module.Line,  // WRONG!
+    Dims: module.Dims{
+        {ID: "used", Name: "used"},
+        {ID: "free", Name: "free"},
+    },
+}
+
+// BAD: Using stacked for independent rates
+{
+    ID: "request_rates", 
+    Type: module.Stacked,  // WRONG!
+    Dims: module.Dims{
+        {ID: "success", Name: "success/s"},
+        {ID: "errors", Name: "errors/s"},
+    },
+}
+```
+
+#### Key Benefits:
+1. **Stacked charts** instantly show resource utilization and pressure
+2. **Area charts** beautifully visualize flow direction and volume
+3. **Line charts** clearly show trends without implying relationships
+4. **Proper types** enable meaningful aggregations in Netdata's UI
+
+Note: The query engine intelligently handles negative values in area charts, converting them to positive when grouping by dimensions other than the default.
+
+### RULE #3: Incremental Charts and Rate Units
+
+**For incremental/rate charts, ALWAYS specify the time unit in the chart units, and provide raw counter values to Netdata.**
+
+Netdata's dashboard allows users to convert rates between different time units (e.g., /s to /min to /hour). This only works when:
+1. The time unit is explicitly specified in the chart units
+2. The raw counter value is provided (not pre-calculated rates)
+
+#### Correct Implementation:
+
+```go
+// GOOD: Units specify "/s" and dimension uses Incremental algorithm
+{
+    ID:       "requests",
+    Title:    "HTTP Requests",
+    Units:    "requests/s",     // MUST specify time unit
+    Type:     module.Line,
+    Dims: module.Dims{
+        {ID: "http_requests_total", Name: "requests", Algo: module.Incremental},
+    },
+}
+
+// GOOD: Other time-based rates
+{
+    Units: "errors/s",         // Per second
+    Units: "connections/s",    // Per second  
+    Units: "packets/s",        // Per second
+    Units: "operations/min",   // Per minute
+    Units: "backups/hour",     // Per hour
+}
+```
+
+#### WRONG Implementation:
+
+```go
+// BAD: Missing time unit
+{
+    Units: "requests",         // WRONG! No time unit
+    Dims: module.Dims{
+        {ID: "requests", Name: "requests", Algo: module.Incremental},
+    },
+}
+
+// BAD: Pre-calculating rate
+func (c *Collector) collect() {
+    requestsPerSec := (current - previous) / timeElapsed  // WRONG!
+    mx["requests"] = requestsPerSec
+}
+
+// GOOD: Provide raw counter
+func (c *Collector) collect() {
+    mx["requests_total"] = totalRequests  // Raw counter value
+    // Netdata calculates the rate using Algo: module.Incremental
+}
+```
+
+#### Key Principles:
+
+1. **Always use raw counters** - Send the actual counter value, not a pre-calculated rate
+2. **Specify time units** - Use "/s", "/min", "/hour" in the Units field
+3. **Use Incremental algorithm** - Set `Algo: module.Incremental` for rate calculation
+4. **Be consistent** - Most rates should be "/s" unless there's a specific reason
+
+#### Common Rate Units:
+- `requests/s` - HTTP requests, API calls
+- `operations/s` - Database operations, transactions
+- `bytes/s` or `B/s` - Data transfer rates
+- `packets/s` - Network packets
+- `errors/s` - Error rates
+- `connections/s` - Connection rates
+- `messages/s` - Message queue rates
+- `queries/s` - Database queries
+
+This enables Netdata's powerful rate conversion feature, allowing users to view the same metric as requests/second, requests/minute, or requests/hour based on their preference.
+
+### RULE #4: Collect Everything Available
+
+**Netdata's distributed architecture enables ingestion of SIGNIFICANTLY more metrics than centralized systems. Collect EVERYTHING unless there's a compelling reason not to.**
+
+Netdata's unique strengths:
+- **Distributed collection** - No central bottleneck
+- **High-resolution metrics** - Per-second granularity
+- **ML-based anomaly detection** - Correlates seemingly unrelated metrics
+- **Automatic dependency discovery** - Reveals hidden relationships between systems
+
+#### Collection Philosophy:
+
+**DEFAULT: COLLECT EVERYTHING**
+
+Only exclude metrics when:
+1. **100% redundant** - Exact duplicate of another metric already collected
+2. **Completely useless** - Provides zero operational value (very rare)
+3. **Performance impact** - Collection significantly affects the monitored application
+4. **Resource intensive** - Metric calculation is expensive on the target system
+
+#### Implementation Guidelines:
+
+```go
+// GOOD: Collect all available metrics
+func (c *Collector) Init() {
+    // By default, collect everything
+    c.CollectCPUMetrics = true
+    c.CollectMemoryMetrics = true
+    c.CollectDiskMetrics = true
+    c.CollectNetworkMetrics = true
+    c.CollectApplicationMetrics = true
+    
+    // Only disable if resource intensive
+    c.CollectExpensiveMetrics = false  // User can enable if needed
+}
+```
+
+```go
+// GOOD: Group metrics by family for organization
+{
+    // CPU metrics family
+    {Family: "cpu", /* all CPU-related metrics */},
+    
+    // Memory metrics family  
+    {Family: "memory", /* all memory metrics */},
+    
+    // Application-specific family
+    {Family: "servlet", /* all servlet metrics */},
+    {Family: "session", /* all session metrics */},
+}
+```
+
+#### Examples:
+
+**Seemingly "unimportant" metrics that prove valuable:**
+- **Thread pool size** - Correlates with response time degradation
+- **Session counts** - Predicts memory pressure
+- **CPU available processors** - Reveals container limit changes
+- **GC time per cycle** - Early warning for memory issues
+
+**Configuration for expensive metrics:**
+```yaml
+# Disabled by default due to performance impact
+collect_detailed_query_plans: false
+collect_execution_traces: false
+
+# Enabled by default - no significant impact
+collect_cpu_metrics: true
+collect_memory_metrics: true
+collect_servlet_metrics: true
+```
+
+#### Key Principles:
+
+1. **Storage is cheap, insights are valuable** - Disk space costs less than missing critical data
+2. **ML needs data variety** - More metrics enable better anomaly detection
+3. **Correlations emerge over time** - Relationships aren't always obvious immediately
+4. **Proper families organize the noise** - Good categorization makes many metrics manageable
+5. **Users can always disable** - But defaults should be comprehensive
+
+#### Anti-patterns to AVOID:
+
+```go
+// BAD: Arbitrary filtering
+if metricName.Contains("internal") {
+    continue  // DON'T arbitrarily skip metrics
+}
+
+// BAD: Pre-judging importance
+if value < 100 {
+    continue  // DON'T decide what's important for users
+}
+
+// BAD: Hardcoded collection limits
+if metricsCount > 50 {
+    break  // DON'T limit metric collection
+}
+```
+
+Remember: Netdata's strength lies in comprehensive, high-resolution data collection. When in doubt, collect it!
+
+### RULE #5: Chart Family Hierarchies
+
+**Netdata supports hierarchical families using "/" as a delimiter, creating expandable tree structures in the UI. Use this wisely.**
+
+#### How it Works:
+- Family string "cpu/core/usage" creates a 3-level tree
+- **First 2 levels auto-expand** (grouping: true property)
+- **Level 3 and deeper start collapsed** (no grouping property)
+- No hard depth limit - but deep trees become cumbersome to navigate
+- Enables logical organization of complex metrics
+
+#### Good Practices:
+
+```go
+// GOOD: Logical grouping with multiple charts per leaf
+{
+    Family: "database/connections",  // Multiple connection-related charts
+    // - active connections
+    // - idle connections  
+    // - connection rate
+    // - connection errors
+}
+
+// GOOD: Two-level hierarchy for clarity
+{
+    Family: "servlet/performance",   // Groups performance metrics
+    // - request rate
+    // - response time
+    // - error rate
+}
+```
+
+#### BAD Practices:
+
+```go
+// BAD: Deep hierarchy with single chart
+{
+    Family: "system/cpu/core0/usage",  // Only one chart at this leaf!
+}
+
+// BAD: Over-categorization
+{
+    Family: "app/module/submodule/component/metric",  // Too deep!
+}
+```
+
+#### Guidelines:
+
+1. **Use hierarchies when you have multiple related charts** to group
+2. **Limit depth to 2-3 levels** maximum
+3. **Ensure multiple charts per leaf** - avoid single-chart leaves
+4. **Keep it intuitive** - hierarchies should make finding metrics easier, not harder
+5. **Consider flat families** for small groups (< 5 charts)
+
+#### Example Structure:
+```
+Application
+├── jvm/memory         (4 charts: heap usage, committed, max, utilization)
+├── jvm/gc            (2 charts: collections, time)
+├── servlet           (2 charts: requests, response time)
+└── session           (2 charts: active, lifecycle)
+```
+
+NOT:
+```
+Application
+└── jvm
+    └── memory
+        └── heap
+            └── usage  (1 chart - BAD!)
+```
+
+The goal is logical organization that helps users navigate, not unnecessary nesting that makes charts harder to find.
+
 ## Best Practices Summary
 
 1. **Consider cardinality control** for dynamic instances - but not always required
@@ -941,13 +1372,50 @@ func (c *Collector) newInstanceCharts(instance *instanceMetrics) *module.Charts 
 
 When finishing a new collector or improvements on a collector, follow this checklist:
 
-1. Review the code for any mock data, remaining TODOs, frictional logic, frictional API endpoints, frictional response formats, frictional members, etc. An independent reality check **MUST** be performed.
-2. Review the code to ensure that different versions of the monitored application can be monitored. Our code **MUST** support all possible versions that may be in production out there and gracefully enable/disable features based on what is available. **CRITICAL**: Admin configuration **MUST** always take precedence over auto-detection. Auto-detection should only set intelligent defaults that admins can override. If an admin explicitly enables a feature, the collector **MUST** attempt to use it (with appropriate error handling) regardless of detected version.
-3. Review all logs generated by the code to ensure users a) have enough information to understand the selections the code made, b) have descriptive and detailed logs on failures, c) they are not spammed by repeated logs on failures that are supposed to be permanent (like a not supported feature by the monitored application)
-4. The code, the stock configuration, the metadata.yaml, the config_schema.json and any stock alerts **MUST** match 100%. Even the slightest variation between them in config keys, possible values, enum values, contexts, dimension names, etc LEADS TO A NON WORKING SOLUTION. So, at the end of every change, an independent sync check **MUST** be performed. While doing this work, ensure also README.md reflects the facts.
-5. The metadata.yaml is the PRIMARY documentation source shown on the Netdata integrations page - ensure troubleshooting information, setup instructions, and all documentation is up-to-date in BOTH README.md AND metadata.yaml.
-6. Once the above work is finished, the code **MUST** compile without errors or warnings. Use `build-claude` for build directory to avoid any interference with other builds and IDEs.
-7. Once all the above work is done and there are no outstanding issues, perform an independent usefulness check of the module being worked and provide a DevOps/SRE expert opinion on how useful, complete, powerful, comprehensive the module is.
+1. Perform an independent **Chart Design Review** for ALL charts in the collector. For each chart, verify and document:
+   - **Context**: The context string used (e.g., `websphere_mp.jvm_memory_heap_usage`)
+   - **Title**: The chart title shown to users
+   - **Instances**: How instances are identified (labels, naming patterns)
+   - **Units**: The units used (must be valid Netdata units, note if uncertain)
+   - **Labels**: All labels applied (e.g., `server_name`, `app_version`)
+   - **Family**: The family grouping related charts
+   - **Dimensions**: List each dimension with its original metric name
+   - **Rule #1 Compliance**: Verify dimensions are non-overlapping and additive
+   
+   Additionally, provide a **Chart Hierarchy Tree** showing the organization of all charts:
+   ```
+   WebSphere MP
+   ├── memory (priority: 1100)
+   │   ├── websphere_mp.jvm_memory_heap_usage [bytes] - JVM Heap Memory Usage
+   │   ├── websphere_mp.jvm_memory_heap_committed [bytes] - JVM Heap Memory Committed
+   │   ├── websphere_mp.jvm_memory_heap_max [bytes] - JVM Heap Memory Maximum
+   │   └── websphere_mp.jvm_heap_utilization [percentage] - JVM Heap Utilization
+   ├── cpu (priority: 1200)
+   │   ├── websphere_mp.cpu_usage [percentage] - JVM CPU Usage
+   │   ├── websphere_mp.cpu_time [seconds] - JVM CPU Time
+   │   ├── websphere_mp.cpu_processors [processors] - Available Processors
+   │   └── websphere_mp.system_load [load] - System Load Average
+   ├── gc (priority: 1300)
+   │   ├── websphere_mp.jvm_gc_collections [collections/s] - JVM Garbage Collection
+   │   └── websphere_mp.jvm_gc_time [milliseconds] - JVM GC Time
+   ├── threads (priority: 1400)
+   │   ├── websphere_mp.jvm_threads_current [threads] - JVM Current Threads
+   │   └── websphere_mp.jvm_threads_peak [threads] - JVM Peak Threads
+   ├── servlet (priority: 1500)
+   │   ├── websphere_mp.servlet_requests [requests/s] - Servlet Requests
+   │   └── websphere_mp.servlet_response_time [milliseconds] - Servlet Response Time
+   └── session (priority: 1600)
+       ├── websphere_mp.session_active [sessions] - Active Sessions
+       └── websphere_mp.session_lifecycle [sessions/s] - Session Lifecycle
+   ```
+   Sort families by ascending priority (MIN of contained chart priorities defines family priority)
+2. Review the code for any mock data, remaining TODOs, frictional logic, frictional API endpoints, frictional response formats, frictional members, etc. An independent reality check **MUST** be performed.
+3. Review the code to ensure that different versions of the monitored application can be monitored. Our code **MUST** support all possible versions that may be in production out there and gracefully enable/disable features based on what is available. **CRITICAL**: Admin configuration **MUST** always take precedence over auto-detection. Auto-detection should only set intelligent defaults that admins can override. If an admin explicitly enables a feature, the collector **MUST** attempt to use it (with appropriate error handling) regardless of detected version.
+4. Review all logs generated by the code to ensure users a) have enough information to understand the selections the code made, b) have descriptive and detailed logs on failures, c) they are not spammed by repeated logs on failures that are supposed to be permanent (like a not supported feature by the monitored application)
+5. The code, the stock configuration, the metadata.yaml, the config_schema.json and any stock alerts **MUST** match 100%. Even the slightest variation between them in config keys, possible values, enum values, contexts, dimension names, etc LEADS TO A NON WORKING SOLUTION. So, at the end of every change, an independent sync check **MUST** be performed. While doing this work, ensure also README.md reflects the facts.
+6. The metadata.yaml is the PRIMARY documentation source shown on the Netdata integrations page - ensure troubleshooting information, setup instructions, and all documentation is up-to-date in BOTH README.md AND metadata.yaml.
+7. Once the above work is finished, the code **MUST** compile without errors or warnings. Use `build-claude` for build directory to avoid any interference with other builds and IDEs.
+8. Once all the above work is done and there are no outstanding issues, perform an independent usefulness check of the module being worked and provide a DevOps/SRE expert opinion on how useful, complete, powerful, comprehensive the module is.
 
 ## Build Notes
 - To compile ibm.d.plugin, use cmake in `build-claude` directory with target `ibm-plugin`
