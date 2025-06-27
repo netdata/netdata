@@ -19,6 +19,8 @@ const (
 	prioJVMGC
 	prioJVMThreads
 	prioJVMClasses
+	prioJVMProcessCPU
+	prioJVMUptime
 
 	prioThreadPoolSize
 	prioThreadPoolActive
@@ -28,6 +30,14 @@ const (
 	prioJDBCPoolWaitTime
 	prioJDBCPoolUseTime
 	prioJDBCPoolCreatedDestroyed
+	prioJDBCPoolWaitingThreads
+
+	prioJCAPoolSize
+	prioJCAPoolActive
+	prioJCAPoolWaitTime
+	prioJCAPoolUseTime
+	prioJCAPoolCreatedDestroyed
+	prioJCAPoolWaitingThreads
 
 	prioJMSMessages
 	prioJMSConsumers
@@ -151,6 +161,32 @@ var baseCharts = module.Charts{
 		},
 	},
 
+	// JVM Process CPU Usage
+	{
+		ID:       "jvm_process_cpu_usage",
+		Title:    "JVM Process CPU Usage",
+		Units:    "percentage",
+		Fam:      "jvm",
+		Ctx:      "websphere_jmx.jvm_process_cpu_usage",
+		Priority: prioJVMProcessCPU,
+		Dims: module.Dims{
+			{ID: "jvm_process_cpu_usage", Name: "cpu", Div: precision},
+		},
+	},
+
+	// JVM Uptime
+	{
+		ID:       "jvm_uptime",
+		Title:    "JVM Uptime",
+		Units:    "seconds",
+		Fam:      "jvm",
+		Ctx:      "websphere_jmx.jvm_uptime",
+		Priority: prioJVMUptime,
+		Dims: module.Dims{
+			{ID: "jvm_uptime", Name: "uptime"},
+		},
+	},
+
 	// Connection health and resilience
 	{
 		ID:       "connection_health",
@@ -262,6 +298,90 @@ var jdbcPoolChartsTmpl = module.Charts{
 		Dims: module.Dims{
 			{ID: "jdbc_%s_total_created", Name: "created"},
 			{ID: "jdbc_%s_total_destroyed", Name: "destroyed"},
+		},
+	},
+	{
+		ID:       "jdbc_%s_waiting_threads",
+		Title:    "JDBC Pool Waiting Threads",
+		Units:    "threads",
+		Fam:      "jdbc pools",
+		Ctx:      "websphere_jmx.jdbc_pool_waiting_threads",
+		Priority: prioJDBCPoolWaitingThreads,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_waiting_threads", Name: "waiting"},
+		},
+	},
+}
+
+// JCA Pool Charts Template
+var jcaPoolChartsTmpl = module.Charts{
+	{
+		ID:       "jca_%s_size",
+		Title:    "JCA Pool Size",
+		Units:    "connections",
+		Fam:      "jca pools",
+		Ctx:      "websphere_jmx.jca_pool_size",
+		Priority: prioJCAPoolSize,
+		Dims: module.Dims{
+			{ID: "jca_%s_size", Name: "size"},
+		},
+	},
+	{
+		ID:       "jca_%s_active",
+		Title:    "JCA Pool Active Connections",
+		Units:    "connections",
+		Fam:      "jca pools",
+		Ctx:      "websphere_jmx.jca_pool_active",
+		Priority: prioJCAPoolActive,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "jca_%s_active", Name: "active"},
+			{ID: "jca_%s_free", Name: "free"},
+		},
+	},
+	{
+		ID:       "jca_%s_wait_time",
+		Title:    "JCA Pool Average Wait Time",
+		Units:    "milliseconds",
+		Fam:      "jca pools",
+		Ctx:      "websphere_jmx.jca_pool_wait_time",
+		Priority: prioJCAPoolWaitTime,
+		Dims: module.Dims{
+			{ID: "jca_%s_wait_time", Name: "wait_time", Div: precision},
+		},
+	},
+	{
+		ID:       "jca_%s_use_time",
+		Title:    "JCA Pool Average Use Time",
+		Units:    "milliseconds",
+		Fam:      "jca pools",
+		Ctx:      "websphere_jmx.jca_pool_use_time",
+		Priority: prioJCAPoolUseTime,
+		Dims: module.Dims{
+			{ID: "jca_%s_use_time", Name: "use_time", Div: precision},
+		},
+	},
+	{
+		ID:       "jca_%s_connections",
+		Title:    "JCA Pool Connections Created/Destroyed",
+		Units:    "connections",
+		Fam:      "jca pools",
+		Ctx:      "websphere_jmx.jca_pool_connections",
+		Priority: prioJCAPoolCreatedDestroyed,
+		Dims: module.Dims{
+			{ID: "jca_%s_total_created", Name: "created"},
+			{ID: "jca_%s_total_destroyed", Name: "destroyed"},
+		},
+	},
+	{
+		ID:       "jca_%s_waiting_threads",
+		Title:    "JCA Pool Waiting Threads",
+		Units:    "threads",
+		Fam:      "jca pools",
+		Ctx:      "websphere_jmx.jca_pool_waiting_threads",
+		Priority: prioJCAPoolWaitingThreads,
+		Dims: module.Dims{
+			{ID: "jca_%s_waiting_threads", Name: "waiting"},
 		},
 	},
 }
@@ -563,6 +683,25 @@ func (w *WebSphereJMX) newJDBCPoolCharts(pool string) *module.Charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
 		chart.Labels = []module.Label{
 			{Key: "jdbc_pool", Value: pool},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName(pool))
+		}
+	}
+
+	// Add cluster labels
+	w.addClusterLabels(charts)
+
+	return charts
+}
+
+func (w *WebSphereJMX) newJCAPoolCharts(pool string) *module.Charts {
+	charts := jcaPoolChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
+		chart.Labels = []module.Label{
+			{Key: "jca_pool", Value: pool},
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(pool))
