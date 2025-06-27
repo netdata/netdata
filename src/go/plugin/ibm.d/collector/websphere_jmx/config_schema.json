@@ -102,6 +102,24 @@
         "type": "boolean",
         "default": true
       },
+      "collect_servlet_metrics": {
+        "title": "Collect servlet metrics (APM)",
+        "description": "Collect per-servlet response times and request counts (requires PMI)",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_ejb_metrics": {
+        "title": "Collect EJB metrics (APM)",
+        "description": "Collect per-EJB method timings and invocation counts (requires PMI)",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_jdbc_advanced": {
+        "title": "Collect advanced JDBC metrics",
+        "description": "Collect detailed JDBC timing breakdown (query time vs connection hold time)",
+        "type": "boolean",
+        "default": false
+      },
       "cluster_name": {
         "title": "Cluster name",
         "description": "Name of the WebSphere cluster (for labeling)",
@@ -171,6 +189,20 @@
         "minimum": 0,
         "default": 100
       },
+      "max_servlets": {
+        "title": "Max servlets (APM)",
+        "description": "Maximum number of servlets to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_ejbs": {
+        "title": "Max EJBs (APM)",
+        "description": "Maximum number of EJBs to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
       "collect_apps_matching": {
         "title": "Application name pattern",
         "description": "Only collect metrics for applications matching this pattern (supports wildcards)",
@@ -186,6 +218,18 @@
       "collect_jms_matching": {
         "title": "JMS destination pattern",
         "description": "Only collect metrics for JMS destinations matching this pattern (supports wildcards)",
+        "type": "string",
+        "default": ""
+      },
+      "collect_servlets_matching": {
+        "title": "Servlet name pattern (APM)",
+        "description": "Only collect metrics for servlets matching this pattern (supports wildcards)",
+        "type": "string",
+        "default": ""
+      },
+      "collect_ejbs_matching": {
+        "title": "EJB name pattern (APM)",
+        "description": "Only collect metrics for EJBs matching this pattern (supports wildcards)",
         "type": "string",
         "default": ""
       },
@@ -267,6 +311,14 @@
           ]
         },
         {
+          "title": "APM",
+          "fields": [
+            "collect_servlet_metrics",
+            "collect_ejb_metrics",
+            "collect_jdbc_advanced"
+          ]
+        },
+        {
           "title": "Cluster",
           "fields": [
             "cluster_name",
@@ -284,9 +336,13 @@
             "max_jca_pools",
             "max_jms_destinations",
             "max_applications",
+            "max_servlets",
+            "max_ejbs",
             "collect_apps_matching",
             "collect_pools_matching",
-            "collect_jms_matching"
+            "collect_jms_matching",
+            "collect_servlets_matching",
+            "collect_ejbs_matching"
           ]
         },
         {

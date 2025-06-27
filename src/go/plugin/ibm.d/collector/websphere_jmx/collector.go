@@ -54,6 +54,8 @@ func New() *WebSphereJMX {
 			MaxJCAPools:        50,
 			MaxJMSDestinations: 50,
 			MaxApplications:    100,
+			MaxServlets:        50,
+			MaxEJBs:            50,
 
 			// Default resilience settings
 			MaxRetries:              3,
@@ -68,11 +70,15 @@ func New() *WebSphereJMX {
 		collectedJDBCPools: make(map[string]bool),
 		collectedJCAPools:  make(map[string]bool),
 		collectedJMS:       make(map[string]bool),
+		collectedServlets:  make(map[string]bool),
+		collectedEJBs:      make(map[string]bool),
 		seenApps:           make(map[string]bool),
 		seenPools:          make(map[string]bool),
 		seenJDBCPools:      make(map[string]bool),
 		seenJCAPools:       make(map[string]bool),
 		seenJMS:            make(map[string]bool),
+		seenServlets:       make(map[string]bool),
+		seenEJBs:           make(map[string]bool),
 		lastGoodMetrics:    make(map[string]int64),
 	}
 }
@@ -110,6 +116,11 @@ type Config struct {
 	CollectSessionMetrics     bool `yaml:"collect_session_metrics" json:"collect_session_metrics"`
 	CollectTransactionMetrics bool `yaml:"collect_transaction_metrics" json:"collect_transaction_metrics"`
 	CollectClusterMetrics     bool `yaml:"collect_cluster_metrics" json:"collect_cluster_metrics"`
+	
+	// APM Collection flags
+	CollectServletMetrics bool `yaml:"collect_servlet_metrics" json:"collect_servlet_metrics"`
+	CollectEJBMetrics     bool `yaml:"collect_ejb_metrics" json:"collect_ejb_metrics"`
+	CollectJDBCAdvanced   bool `yaml:"collect_jdbc_advanced" json:"collect_jdbc_advanced"`
 
 	// Cardinality control
 	MaxThreadPools     int `yaml:"max_threadpools,omitempty" json:"max_threadpools"`
@@ -117,11 +128,15 @@ type Config struct {
 	MaxJCAPools        int `yaml:"max_jca_pools,omitempty" json:"max_jca_pools"`
 	MaxJMSDestinations int `yaml:"max_jms_destinations,omitempty" json:"max_jms_destinations"`
 	MaxApplications    int `yaml:"max_applications,omitempty" json:"max_applications"`
+	MaxServlets        int `yaml:"max_servlets,omitempty" json:"max_servlets"`
+	MaxEJBs            int `yaml:"max_ejbs,omitempty" json:"max_ejbs"`
 
 	// Filtering
-	CollectAppsMatching  string `yaml:"collect_apps_matching,omitempty" json:"collect_apps_matching"`
-	CollectPoolsMatching string `yaml:"collect_pools_matching,omitempty" json:"collect_pools_matching"`
-	CollectJMSMatching   string `yaml:"collect_jms_matching,omitempty" json:"collect_jms_matching"`
+	CollectAppsMatching      string `yaml:"collect_apps_matching,omitempty" json:"collect_apps_matching"`
+	CollectPoolsMatching     string `yaml:"collect_pools_matching,omitempty" json:"collect_pools_matching"`
+	CollectJMSMatching       string `yaml:"collect_jms_matching,omitempty" json:"collect_jms_matching"`
+	CollectServletsMatching  string `yaml:"collect_servlets_matching,omitempty" json:"collect_servlets_matching"`
+	CollectEJBsMatching      string `yaml:"collect_ejbs_matching,omitempty" json:"collect_ejbs_matching"`
 
 	// Resilience settings
 	MaxRetries              int     `yaml:"max_retries,omitempty" json:"max_retries"`
@@ -146,16 +161,22 @@ type WebSphereJMX struct {
 	collectedJDBCPools map[string]bool // JDBC pools (separate tracking)
 	collectedJCAPools  map[string]bool // JCA pools
 	collectedJMS       map[string]bool
+	collectedServlets  map[string]bool // APM: Servlets
+	collectedEJBs      map[string]bool // APM: EJBs
 	seenApps           map[string]bool
 	seenPools          map[string]bool
 	seenJDBCPools      map[string]bool
 	seenJCAPools       map[string]bool
 	seenJMS            map[string]bool
+	seenServlets       map[string]bool // APM: Servlets
+	seenEJBs           map[string]bool // APM: EJBs
 
 	// Selectors
-	appSelector  matcher.Matcher
-	poolSelector matcher.Matcher
-	jmsSelector  matcher.Matcher
+	appSelector     matcher.Matcher
+	poolSelector    matcher.Matcher
+	jmsSelector     matcher.Matcher
+	servletSelector matcher.Matcher // APM
+	ejbSelector     matcher.Matcher // APM
 
 	// Resilience
 	circuitBreaker  *circuitBreaker
@@ -219,11 +240,20 @@ func (w *WebSphereJMX) validateConfig() error {
 	if w.MaxJDBCPools < 0 {
 		w.MaxJDBCPools = 0
 	}
+	if w.MaxJCAPools < 0 {
+		w.MaxJCAPools = 0
+	}
 	if w.MaxJMSDestinations < 0 {
 		w.MaxJMSDestinations = 0
 	}
 	if w.MaxApplications < 0 {
 		w.MaxApplications = 0
+	}
+	if w.MaxServlets < 0 {
+		w.MaxServlets = 0
+	}
+	if w.MaxEJBs < 0 {
+		w.MaxEJBs = 0
 	}
 
 	return nil
@@ -252,6 +282,22 @@ func (w *WebSphereJMX) initSelectors() error {
 			return fmt.Errorf("invalid jms selector pattern '%s': %v", w.CollectJMSMatching, err)
 		}
 		w.jmsSelector = m
+	}
+
+	if w.CollectServletsMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(w.CollectServletsMatching)
+		if err != nil {
+			return fmt.Errorf("invalid servlet selector pattern '%s': %v", w.CollectServletsMatching, err)
+		}
+		w.servletSelector = m
+	}
+
+	if w.CollectEJBsMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(w.CollectEJBsMatching)
+		if err != nil {
+			return fmt.Errorf("invalid ejb selector pattern '%s': %v", w.CollectEJBsMatching, err)
+		}
+		w.ejbSelector = m
 	}
 
 	return nil
