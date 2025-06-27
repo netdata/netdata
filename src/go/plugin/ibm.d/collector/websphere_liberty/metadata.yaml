@@ -2,7 +2,7 @@ plugin_name: ibm.d.plugin
 modules:
   - meta:
       plugin_name: ibm.d.plugin
-      module_name: websphere
+      module_name: websphere_liberty
       monitored_instance:
         name: IBM WebSphere Application Server
         link: https://www.ibm.com/products/websphere-application-server
@@ -75,7 +75,7 @@ modules:
               and LD_LIBRARY_PATH must be configured.
       configuration:
         file:
-          name: ibm.d/websphere.conf
+          name: ibm.d/websphere_liberty.conf
         options:
           description: |
             The following options can be defined globally, or per job in the `jobs` section.
@@ -266,7 +266,7 @@ modules:
           description: These metrics refer to the entire WebSphere server instance.
           labels: []
           metrics:
-            - name: websphere.jvm_heap_usage
+            - name: websphere_liberty.jvm_heap_usage
               description: JVM Heap Usage
               unit: bytes
               chart_type: stacked
@@ -274,19 +274,19 @@ modules:
                 - name: used
                 - name: committed
                 - name: max
-            - name: websphere.jvm_gc_time
+            - name: websphere_liberty.jvm_gc_time
               description: JVM Garbage Collection Time
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: gc_time
-            - name: websphere.jvm_gc_count
+            - name: websphere_liberty.jvm_gc_count
               description: JVM Garbage Collection Count
               unit: collections/s
               chart_type: line
               dimensions:
                 - name: collections
-            - name: websphere.jvm_threads
+            - name: websphere_liberty.jvm_threads
               description: JVM Threads
               unit: threads
               chart_type: line
@@ -294,14 +294,14 @@ modules:
                 - name: threads
                 - name: daemon
                 - name: peak
-            - name: websphere.jvm_classes
+            - name: websphere_liberty.jvm_classes
               description: JVM Loaded Classes
               unit: classes
               chart_type: line
               dimensions:
                 - name: loaded
                 - name: unloaded
-            - name: websphere.web_sessions
+            - name: websphere_liberty.web_sessions
               description: Web Sessions
               unit: sessions
               chart_type: line
@@ -309,7 +309,7 @@ modules:
                 - name: active
                 - name: live
                 - name: invalidated
-            - name: websphere.web_requests
+            - name: websphere_liberty.web_requests
               description: Web Requests
               unit: requests/s
               chart_type: line
@@ -321,20 +321,20 @@ modules:
             - name: thread_pool
               description: Thread pool name
           metrics:
-            - name: websphere.threadpool_size
+            - name: websphere_liberty.threadpool_size
               description: Thread Pool Size
               unit: threads
               chart_type: line
               dimensions:
                 - name: size
                 - name: max
-            - name: websphere.threadpool_active
+            - name: websphere_liberty.threadpool_active
               description: Thread Pool Active Threads
               unit: threads
               chart_type: line
               dimensions:
                 - name: active
-            - name: websphere.threadpool_hung
+            - name: websphere_liberty.threadpool_hung
               description: Thread Pool Hung Threads
               unit: threads
               chart_type: line
@@ -346,7 +346,7 @@ modules:
             - name: connection_pool
               description: Connection pool name
           metrics:
-            - name: websphere.connpool_size
+            - name: websphere_liberty.connpool_size
               description: Connection Pool Size
               unit: connections
               chart_type: line
@@ -354,13 +354,13 @@ modules:
                 - name: size
                 - name: free
                 - name: max
-            - name: websphere.connpool_wait_time
+            - name: websphere_liberty.connpool_wait_time
               description: Connection Pool Wait Time
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: avg_wait
-            - name: websphere.connpool_timeouts
+            - name: websphere_liberty.connpool_timeouts
               description: Connection Pool Timeouts
               unit: timeouts/s
               chart_type: line
@@ -372,19 +372,19 @@ modules:
             - name: application
               description: Application name
           metrics:
-            - name: websphere.app_requests
+            - name: websphere_liberty.app_requests
               description: Application Requests
               unit: requests/s
               chart_type: line
               dimensions:
                 - name: requests
-            - name: websphere.app_response_time
+            - name: websphere_liberty.app_response_time
               description: Application Response Time
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: avg_response
-            - name: websphere.app_errors
+            - name: websphere_liberty.app_errors
               description: Application Errors
               unit: errors/s
               chart_type: line
