@@ -32,6 +32,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibADCS = yes
         # PerflibADFS = yes
         # PerflibExchange = yes
+        # PerflibNUMA = yes
 ```
 
 ## Update Every per Thread
@@ -39,11 +40,11 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
 When the plugin is running, most threads will collect data using Netdata’s default update `every interval`. However,
 to avoid overloading the host, Netdata uses different `update every` intervals for specific threads, as shown below:
 
-| Period (seconds) | Threads                                       |
-|------------------|-----------------------------------------------|
-| 5                | `HyperV`                                      |
-| 10               | `MSSQL`, `AD`, `ADCS`, `ADFS`, and `Exchange` |
-| 30               | `Services`                                    |
+| Period (seconds) | Threads                                                                          |
+|------------------|----------------------------------------------------------------------------------|
+| 5                | `PerflibHyperV`, `PerflibThermalZone`                                            |
+| 10               | `PerflibMSSQL`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
+| 30               | `PerflibServices`                                                                |
 
 To customize the update interval for a specific thread, you can set the update every value within the corresponding
 thread configuration in your `netdata.conf` file. For example, to modify the intervals for the `Object`
