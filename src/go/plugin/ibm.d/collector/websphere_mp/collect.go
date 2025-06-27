@@ -220,7 +220,6 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 			}
 		} else {
 			// Everything else goes to "other" family
-			w.Debugf("processing OTHER metric: %s (value: %d)", metricName, intValue)
 			w.processOtherMetric(mx, metricName, intValue)
 		}
 	}
@@ -229,7 +228,6 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName string, value int64) {
 	// Map Liberty MicroProfile metrics to base chart dimensions
 	// Based on actual metric names observed in Liberty MicroProfile endpoints
-	w.Debugf("mapping JVM metric: %s -> ?", metricName)
 	switch metricName {
 	// JVM uptime
 	case "jvm_uptime_seconds":
@@ -317,6 +315,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	}
 
 	// Handle other JVM metrics dynamically
+	w.Debugf("JVM metric not mapped: %s (falling back to dynamic chart)", metricName)
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
 
