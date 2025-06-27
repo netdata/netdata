@@ -162,12 +162,6 @@
         "minimum": 1,
         "default": 30
       },
-      "ignore_version_checks": {
-        "title": "Ignore version checks",
-        "description": "WARNING: Disables all version and edition compatibility checks. The collector will attempt to use all configured features regardless of DB2 version or edition. Use with caution as this may cause errors on unsupported versions.",
-        "type": "boolean",
-        "default": false
-      },
       "vnode": {
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
@@ -239,12 +233,6 @@
           "fields": [
             "collect_table_metrics",
             "collect_index_metrics"
-          ]
-        },
-        {
-          "title": "Advanced",
-          "fields": [
-            "ignore_version_checks"
           ]
         }
       ]

@@ -90,8 +90,6 @@ type Config struct {
 	CollectJobQueueMetrics  *bool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
 	CollectActiveJobs       *bool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs"`
 
-	// Version check override
-	IgnoreVersionChecks bool `yaml:"ignore_version_checks,omitempty" json:"ignore_version_checks"`
 
 	// Cardinality limits
 	MaxDisks      int `yaml:"max_disks,omitempty" json:"max_disks"`
@@ -191,8 +189,8 @@ func (a *AS400) Init(ctx context.Context) error {
 		a.Infof("detected IBM i version: %s", a.osVersion)
 	}
 
-	// Apply proactive version-based feature gating
-	a.applyVersionBasedFeatureGating()
+	// Log version information for user awareness (no feature gating)
+	a.logVersionInformation()
 
 	// Set configuration defaults based on version (only if admin hasn't configured)
 	a.setConfigurationDefaults()
@@ -530,55 +528,30 @@ func (a *AS400) parseIBMiVersion() {
 	a.Debugf("parsed IBM i version: major=%d, release=%d, mod=%d", a.versionMajor, a.versionRelease, a.versionMod)
 }
 
-// applyVersionBasedFeatureGating proactively disables features based on IBM i version
-func (a *AS400) applyVersionBasedFeatureGating() {
-	// Log base version information
+// logVersionInformation logs detected IBM i version for informational purposes only
+func (a *AS400) logVersionInformation() {
+	// Log base version information for user awareness
 	if a.versionMajor > 0 {
-		a.logFeatureAvailability("IBM i %d.%d detected, applying version-specific feature gates", a.versionMajor, a.versionRelease)
-	} else {
-		a.logFeatureAvailability("Unknown IBM i version, assuming all features available")
-		return
-	}
-
-	// IBM i version-based feature availability:
-	// V6R1 (6.1) - Basic SQL support, limited services
-	// V7R1 (7.1) - Enhanced SQL services
-	// V7R2 (7.2) - More SQL services added
-	// V7R3 (7.3) - ACTIVE_JOB_INFO, IFS_OBJECT_STATISTICS added
-	// V7R4 (7.4) - Enhanced performance services
-	// V7R5 (7.5) - Latest features
-
-	// Check for V7R3+ features
-	if a.versionMajor < 7 || (a.versionMajor == 7 && a.versionRelease < 3) {
-		a.disableFeatureWithLog("active_job_info", "ACTIVE_JOB_INFO requires IBM i 7.3 or later (detected %d.%d)", a.versionMajor, a.versionRelease)
-		a.disableFeatureWithLog("ifs_object_statistics", "IFS_OBJECT_STATISTICS requires IBM i 7.3 or later")
-	}
-
-	// Check for V7R2+ features
-	if a.versionMajor < 7 || (a.versionMajor == 7 && a.versionRelease < 2) {
-		a.disableFeatureWithLog("message_queue_info", "MESSAGE_QUEUE_INFO requires IBM i 7.2 or later")
-		a.disableFeatureWithLog("job_queue_entries", "JOB_QUEUE_ENTRIES requires IBM i 7.2 or later")
-	}
-
-	// Check for V7R1+ features
-	if a.versionMajor < 7 {
-		a.disableFeatureWithLog("sql_services", "SQL services require IBM i 7.1 or later")
-		a.logFeatureAvailability("Running on IBM i %d.x - many SQL services unavailable", a.versionMajor)
-	}
-
-	// Log what's available based on version
-	if a.versionMajor >= 7 {
-		if a.versionRelease >= 5 {
-			a.logFeatureAvailability("IBM i 7.5+ detected - all current features available")
-		} else if a.versionRelease >= 4 {
-			a.logFeatureAvailability("IBM i 7.4 detected - most features available, latest 7.5 features disabled")
-		} else if a.versionRelease >= 3 {
-			a.logFeatureAvailability("IBM i 7.3 detected - ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS available")
-		} else if a.versionRelease >= 2 {
-			a.logFeatureAvailability("IBM i 7.2 detected - basic SQL services available")
+		a.Infof("IBM i %d.%d detected - collector will attempt all configured features with graceful error handling", a.versionMajor, a.versionRelease)
+		
+		// Provide informational context about typical version capabilities
+		if a.versionMajor >= 7 {
+			if a.versionRelease >= 5 {
+				a.Infof("IBM i 7.5+ typically supports all collector features")
+			} else if a.versionRelease >= 3 {
+				a.Infof("IBM i 7.3+ typically supports ACTIVE_JOB_INFO and IFS_OBJECT_STATISTICS")
+			} else if a.versionRelease >= 2 {
+				a.Infof("IBM i 7.2+ typically supports MESSAGE_QUEUE_INFO and JOB_QUEUE_ENTRIES")
+			} else {
+				a.Infof("IBM i 7.1+ has basic SQL services - some advanced features may not be available")
+			}
 		} else {
-			a.logFeatureAvailability("IBM i 7.1 detected - limited SQL services available")
+			a.Infof("IBM i %d.x has limited SQL services - many features may not be available", a.versionMajor)
 		}
+		
+		a.Infof("Note: Admin configuration takes precedence - all enabled features will be attempted regardless of version")
+	} else {
+		a.Infof("IBM i version unknown - collector will attempt all configured features with graceful error handling")
 	}
 }
 
@@ -618,19 +591,5 @@ func (a *AS400) setConfigurationDefaults() {
 	// Log final configuration
 	a.Infof("Configuration after defaults: DiskMetrics=%v, SubsystemMetrics=%v, JobQueueMetrics=%v, ActiveJobs=%v",
 		*a.CollectDiskMetrics, *a.CollectSubsystemMetrics, *a.CollectJobQueueMetrics, *a.CollectActiveJobs)
-	
-	if a.IgnoreVersionChecks {
-		a.Warningf("IgnoreVersionChecks is enabled - collector will attempt all configured features regardless of IBM i version")
-	}
 }
 
-// disableFeatureWithLog disables a feature and logs the reason
-func (a *AS400) disableFeatureWithLog(feature string, reason string, args ...interface{}) {
-	a.disabled[feature] = true
-	a.Infof("Feature disabled: %s - "+reason, append([]interface{}{feature}, args...)...)
-}
-
-// logFeatureAvailability logs what features are available
-func (a *AS400) logFeatureAvailability(format string, args ...interface{}) {
-	a.Infof("Feature availability: "+format, args...)
-}
