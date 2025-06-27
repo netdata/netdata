@@ -80,22 +80,22 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	if a.IFSTopNDirectories > 0 {
-		if a.IgnoreVersionChecks || !a.isDisabled("ifs_object_statistics") {
-			if err := a.collectIFSTopNDirectories(ctx); err != nil {
+		if err := a.collectIFSTopNDirectories(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				a.logOnce("ifs_top_directories_unavailable", "IFS top directories collection failed (likely unsupported on this IBM i version): %v", err)
+			} else {
 				a.Warningf("failed to collect IFS top N directories: %v", err)
 			}
-		} else {
-			a.logOnce("ifs_top_directories_skipped", "IFS top directories collection skipped - IFS_OBJECT_STATISTICS not available on this IBM i version")
 		}
 	}
 
 	// Collect message queue depths
-	if a.IgnoreVersionChecks || !a.isDisabled("message_queue_info") {
-		if err := a.collectMessageQueues(ctx); err != nil {
+	if err := a.collectMessageQueues(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			a.logOnce("message_queues_unavailable", "Message queue collection failed (likely unsupported on this IBM i version): %v", err)
+		} else {
 			a.Warningf("failed to collect message queues: %v", err)
 		}
-	} else {
-		a.logOnce("message_queues_skipped", "Message queue collection skipped - MESSAGE_QUEUE_INFO not available on this IBM i version")
 	}
 
 	// Collect critical message counts
@@ -110,12 +110,12 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Collect top active jobs if enabled
 	if a.CollectActiveJobs != nil && *a.CollectActiveJobs && a.MaxActiveJobs > 0 {
-		if a.IgnoreVersionChecks || !a.isDisabled("active_job_info") {
-			if err := a.collectActiveJobs(ctx); err != nil {
+		if err := a.collectActiveJobs(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				a.logOnce("active_jobs_unavailable", "Active job collection failed (likely unsupported on this IBM i version): %v", err)
+			} else {
 				a.Warningf("failed to collect active jobs: %v", err)
 			}
-		} else {
-			a.logOnce("active_jobs_skipped", "Active job collection skipped - ACTIVE_JOB_INFO not available on this IBM i version")
 		}
 	}
 

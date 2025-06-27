@@ -97,8 +97,6 @@ type Config struct {
 	CollectTableMetrics      *bool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics"`
 	CollectIndexMetrics      *bool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics"`
 
-	// Version check override
-	IgnoreVersionChecks bool `yaml:"ignore_version_checks,omitempty" json:"ignore_version_checks"`
 
 	// Cardinality limits
 	MaxDatabases   int `yaml:"max_databases,omitempty" json:"max_databases"`
@@ -184,6 +182,7 @@ func (d *DB2) Init(ctx context.Context) error {
 			return fmt.Errorf("invalid database selector pattern '%s': %v", d.CollectDatabasesMatching, err)
 		}
 		d.databaseSelector = m
+		d.Infof("database selector configured: pattern='%s'", d.CollectDatabasesMatching)
 	}
 
 	if d.CollectBufferpoolsMatching != "" {
@@ -192,6 +191,7 @@ func (d *DB2) Init(ctx context.Context) error {
 			return fmt.Errorf("invalid bufferpool selector pattern '%s': %v", d.CollectBufferpoolsMatching, err)
 		}
 		d.bufferpoolSelector = m
+		d.Infof("bufferpool selector configured: pattern='%s'", d.CollectBufferpoolsMatching)
 	}
 
 	if d.CollectTablespacesMatching != "" {
@@ -200,6 +200,7 @@ func (d *DB2) Init(ctx context.Context) error {
 			return fmt.Errorf("invalid tablespace selector pattern '%s': %v", d.CollectTablespacesMatching, err)
 		}
 		d.tablespaceSelector = m
+		d.Infof("tablespace selector configured: pattern='%s'", d.CollectTablespacesMatching)
 	}
 
 	if d.CollectConnectionsMatching != "" {
@@ -274,11 +275,11 @@ func (d *DB2) verifyConfig() error {
 }
 
 func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
-	d.Debugf("connecting to DB2 with DSN: %s", safeDSN(d.DSN))
+	d.Infof("connecting to DB2 with DSN: %s", safeDSN(d.DSN))
 
 	db, err := sql.Open("go_ibm_db", d.DSN)
 	if err != nil {
-		return nil, fmt.Errorf("error opening database: %v", err)
+		return nil, fmt.Errorf("error opening database connection: %v", err)
 	}
 
 	db.SetMaxOpenConns(d.MaxDbConns)
@@ -292,7 +293,7 @@ func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 		return nil, fmt.Errorf("error pinging database: %v", err)
 	}
 
-	d.Debugf("successfully connected to DB2")
+	d.Infof("successfully connected to DB2")
 	return db, nil
 }
 
@@ -445,7 +446,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 
 	if err == nil && d.edition != "" {
-		d.applyVersionBasedFeatureGating()
+		d.logVersionInformation()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -458,7 +459,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 
 	if err == nil && d.edition != "" {
-		d.applyVersionBasedFeatureGating()
+		d.logVersionInformation()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -471,7 +472,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 
 	if err == nil && d.edition != "" {
-		d.applyVersionBasedFeatureGating()
+		d.logVersionInformation()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -487,7 +488,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 
 	if err == nil && d.edition != "" {
-		d.applyVersionBasedFeatureGating()
+		d.logVersionInformation()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -505,7 +506,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	})
 
 	if err == nil && d.edition != "" {
-		d.applyVersionBasedFeatureGating()
+		d.logVersionInformation()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
@@ -514,7 +515,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	d.edition = "LUW"
 	d.version = "Unknown"
 	d.Warningf("could not detect DB2 edition, defaulting to LUW")
-	d.applyVersionBasedFeatureGating()
+	d.logVersionInformation()
 	d.addVersionLabelsToCharts()
 
 	return nil
@@ -621,88 +622,59 @@ func (d *DB2) setConfigurationDefaults() {
 	}
 
 	// Log final configuration
-	d.Infof("Configuration after defaults: DatabaseMetrics=%v, BufferpoolMetrics=%v, TablespaceMetrics=%v, "+
-		"ConnectionMetrics=%v, LockMetrics=%v, TableMetrics=%v, IndexMetrics=%v",
-		*d.CollectDatabaseMetrics, *d.CollectBufferpoolMetrics, *d.CollectTablespaceMetrics,
+	d.Infof("Configuration after defaults:")
+	d.Infof("  Collection settings: DatabaseMetrics=%v, BufferpoolMetrics=%v, TablespaceMetrics=%v",
+		*d.CollectDatabaseMetrics, *d.CollectBufferpoolMetrics, *d.CollectTablespaceMetrics)
+	d.Infof("  Collection settings: ConnectionMetrics=%v, LockMetrics=%v, TableMetrics=%v, IndexMetrics=%v",
 		*d.CollectConnectionMetrics, *d.CollectLockMetrics, *d.CollectTableMetrics, *d.CollectIndexMetrics)
+	d.Infof("  Cardinality limits: MaxDatabases=%d, MaxBufferpools=%d, MaxTablespaces=%d",
+		d.MaxDatabases, d.MaxBufferpools, d.MaxTablespaces)
+	d.Infof("  Cardinality limits: MaxConnections=%d, MaxTables=%d, MaxIndexes=%d",
+		d.MaxConnections, d.MaxTables, d.MaxIndexes)
 	
-	if d.IgnoreVersionChecks {
-		d.Warningf("IgnoreVersionChecks is enabled - collector will attempt all configured features regardless of DB2 version/edition")
-	}
 }
 
-// applyVersionBasedFeatureGating proactively disables features based on DB2 edition and version
-func (d *DB2) applyVersionBasedFeatureGating() {
+// logVersionInformation logs detected DB2 edition and version for informational purposes only
+func (d *DB2) logVersionInformation() {
 	d.parseDB2Version()
 
-	// Edition-based feature gating
+	// Log edition and version information for user awareness
+	d.Infof("DB2 %s edition detected - collector will attempt all configured features with graceful error handling", d.edition)
+	
+	// Provide informational context about typical edition/version capabilities
 	switch d.edition {
 	case "i": // DB2 for i (AS/400)
-		d.disableFeatureWithLog("sysibmadm_views", "SYSIBMADM views not available on DB2 for i (AS/400)")
-		d.disableFeatureWithLog("advanced_monitoring", "Advanced monitoring views not available on DB2 for i")
+		d.Infof("DB2 for i (AS/400) typically has limited SYSIBMADM view support")
 
 	case "z/OS": // DB2 for z/OS
-		d.disableFeatureWithLog("bufferpool_detailed_metrics", "Detailed buffer pool metrics limited on DB2 for z/OS")
-		d.logFeatureAvailability("z/OS specific features enabled for DB2 for z/OS")
+		d.Infof("DB2 for z/OS typically has different monitoring capabilities than LUW")
 
 	case "Cloud": // Db2 on Cloud
-		// Db2 on Cloud has a restricted schema compared to standard DB2 LUW
-		d.disableFeatureWithLog("column_organized_metrics", "Column-organized table metrics (POOL_COL_*) not available on Db2 on Cloud")
-		d.disableFeatureWithLog("lbp_pages_found_metrics", "Detailed buffer pool hit metrics (*_LBP_PAGES_FOUND) not available on Db2 on Cloud")
-		d.disableFeatureWithLog("uow_comp_status", "UOW_COMP_STATUS column not available in APPLICATIONS view on Db2 on Cloud")
-		d.disableFeatureWithLog("application_name", "APPLICATION_NAME column not available in APPLICATIONS view on Db2 on Cloud")
-		d.disableFeatureWithLog("rows_modified", "ROWS_MODIFIED column not available in SNAPDB view on Db2 on Cloud")
-		d.disableFeatureWithLog("pagesize", "PAGESIZE column not available in SNAPBP view on Db2 on Cloud")
-		d.disableFeatureWithLog("free_pages", "FREE_PAGES column not available in SNAPBP view on Db2 on Cloud")
-		d.disableFeatureWithLog("total_log_metrics", "TOTAL_LOG_USED/AVAILABLE not available in LOG_UTILIZATION on Db2 on Cloud")
-		d.disableFeatureWithLog("bufferpool_instances", "Per-bufferpool instance metrics limited on Db2 on Cloud")
-		d.disableFeatureWithLog("connection_instances", "Per-connection instance metrics limited on Db2 on Cloud")
-		d.logFeatureAvailability("Cloud-specific monitoring enabled for Db2 on Cloud - using simplified metrics")
+		d.Infof("Db2 on Cloud typically restricts some system-level metrics compared to standard DB2 LUW")
 
 	case "LUW": // DB2 LUW (most feature-complete)
-		d.logFeatureAvailability("Full feature set available for DB2 LUW")
+		if d.versionMajor > 0 {
+			d.Infof("DB2 LUW %d.%d detected", d.versionMajor, d.versionMinor)
+			if d.versionMajor >= 11 {
+				d.Infof("DB2 11+ typically supports all collector features including column store metrics")
+			} else if d.versionMajor >= 10 {
+				d.Infof("DB2 10+ typically supports most features, some advanced features may not be available")
+			} else if d.versionMajor >= 9 && d.versionMinor >= 7 {
+				d.Infof("DB2 9.7+ typically supports SYSIBMADM views, some advanced features may not be available")
+			} else {
+				d.Infof("DB2 %d.%d has limited monitoring capabilities - many features may not be available", d.versionMajor, d.versionMinor)
+			}
+		} else {
+			d.Infof("DB2 LUW version unknown - typical features include comprehensive monitoring")
+		}
 
 	default:
-		d.Warningf("Unknown DB2 edition '%s', assuming LUW feature set", d.edition)
+		d.Infof("Unknown DB2 edition '%s' - assuming LUW-like capabilities", d.edition)
 	}
-
-	// Version-based feature gating (primarily for LUW)
-	if d.edition == "LUW" && d.versionMajor > 0 {
-		if d.versionMajor < 9 || (d.versionMajor == 9 && d.versionMinor < 7) {
-			// DB2 < 9.7 doesn't have SYSIBMADM views
-			d.disableFeatureWithLog("sysibmadm_views", "SYSIBMADM views require DB2 9.7 or later (detected %d.%d)", d.versionMajor, d.versionMinor)
-			d.disableFeatureWithLog("advanced_monitoring", "Advanced monitoring requires DB2 9.7 or later")
-		}
-
-		if d.versionMajor < 10 {
-			d.disableFeatureWithLog("extended_monitoring", "Extended monitoring features require DB2 10.0 or later")
-		}
-
-		if d.versionMajor < 11 {
-			d.disableFeatureWithLog("columnstore_metrics", "Column store metrics require DB2 11.0 or later")
-		}
-
-		// Log enabled features for newer versions
-		if d.versionMajor >= 11 {
-			d.logFeatureAvailability("Full DB2 11+ feature set enabled including column store metrics")
-		} else if d.versionMajor >= 10 {
-			d.logFeatureAvailability("DB2 10+ features enabled, column store metrics disabled")
-		} else if d.versionMajor >= 9 && d.versionMinor >= 7 {
-			d.logFeatureAvailability("DB2 9.7+ features enabled, advanced features disabled")
-		}
-	}
+	
+	d.Infof("Note: Admin configuration takes precedence - all enabled features will be attempted regardless of edition/version")
 }
 
-// disableFeatureWithLog disables a feature and logs the reason
-func (d *DB2) disableFeatureWithLog(feature string, reason string, args ...interface{}) {
-	d.disabledFeatures[feature] = true
-	d.Infof("Feature disabled: %s - "+reason, append([]interface{}{feature}, args...)...)
-}
-
-// logFeatureAvailability logs what features are available
-func (d *DB2) logFeatureAvailability(message string) {
-	d.Infof("Feature availability: %s", message)
-}
 
 // addVersionLabelsToCharts adds DB2 version and edition labels to all charts
 func (d *DB2) addVersionLabelsToCharts() {

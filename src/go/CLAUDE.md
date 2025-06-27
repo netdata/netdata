@@ -948,3 +948,6 @@ When finishing a new collector or improvements on a collector, follow this check
 5. The metadata.yaml is the PRIMARY documentation source shown on the Netdata integrations page - ensure troubleshooting information, setup instructions, and all documentation is up-to-date in BOTH README.md AND metadata.yaml.
 6. Once the above work is finished, the code **MUST** compile without errors or warnings. Use `build-claude` for build directory to avoid any interference with other builds and IDEs.
 7. Once all the above work is done and there are no outstanding issues, perform an independent usefulness check of the module being worked and provide a DevOps/SRE expert opinion on how useful, complete, powerful, comprehensive the module is.
+
+## Build Notes
+- To compile ibm.d.plugin, use cmake in `build-claude` directory with target `ibm-plugin`
