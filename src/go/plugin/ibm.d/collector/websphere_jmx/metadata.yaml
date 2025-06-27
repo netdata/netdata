@@ -139,6 +139,10 @@ modules:
               description: Collect JDBC connection pool statistics
               default_value: true
               required: false
+            - name: collect_jca_metrics
+              description: Collect JCA (Java Connector Architecture) connection pool statistics
+              default_value: true
+              required: false
             - name: collect_jms_metrics
               description: Collect JMS destination statistics
               default_value: true
@@ -161,6 +165,10 @@ modules:
               required: false
             - name: max_jdbc_pools
               description: Maximum number of JDBC pools to monitor (0 for unlimited)
+              default_value: 50
+              required: false
+            - name: max_jca_pools
+              description: Maximum number of JCA pools to monitor (0 for unlimited)
               default_value: 50
               required: false
             - name: max_jms_destinations
@@ -319,6 +327,18 @@ modules:
               dimensions:
                 - name: loaded
                 - name: unloaded
+            - name: websphere_jmx.jvm_process_cpu_usage
+              description: JVM Process CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: websphere_jmx.jvm_uptime
+              description: JVM Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
         - name: thread pool
           description: These metrics refer to a specific thread pool.
           labels:
@@ -376,6 +396,56 @@ modules:
               dimensions:
                 - name: created
                 - name: destroyed
+            - name: websphere_jmx.jdbc_pool_waiting_threads
+              description: JDBC Pool Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting
+        - name: jca pool
+          description: These metrics refer to a specific JCA (Java Connector Architecture) connection pool.
+          labels:
+            - name: jca_pool
+              description: JCA pool name
+          metrics:
+            - name: websphere_jmx.jca_pool_size
+              description: JCA Pool Size
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: websphere_jmx.jca_pool_active
+              description: JCA Pool Active Connections
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: free
+            - name: websphere_jmx.jca_pool_wait_time
+              description: JCA Pool Average Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait_time
+            - name: websphere_jmx.jca_pool_use_time
+              description: JCA Pool Average Use Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: use_time
+            - name: websphere_jmx.jca_pool_connections
+              description: JCA Pool Connections Created/Destroyed
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: destroyed
+            - name: websphere_jmx.jca_pool_waiting_threads
+              description: JCA Pool Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting
         - name: jms destination
           description: These metrics refer to a specific JMS queue or topic.
           labels:
