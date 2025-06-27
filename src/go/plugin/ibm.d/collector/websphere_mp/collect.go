@@ -94,7 +94,7 @@ func (w *WebSphereMicroProfile) parsePrometheusMetrics(reader io.Reader) (map[st
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip comments and empty lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -135,11 +135,11 @@ func (w *WebSphereMicroProfile) cleanMetricName(metricName string) string {
 	if idx := strings.Index(metricName, "{"); idx != -1 {
 		baseMetric := metricName[:idx]
 		labels := metricName[idx:]
-		
+
 		// Extract meaningful labels for instance identification
 		return w.processMetricWithLabels(baseMetric, labels)
 	}
-	
+
 	return metricName
 }
 
@@ -153,7 +153,7 @@ func (w *WebSphereMicroProfile) processMetricWithLabels(baseMetric, labels strin
 			return fmt.Sprintf("%s_%s_%s", baseMetric, cleanName(method), cleanName(endpoint))
 		}
 	}
-	
+
 	// For application metrics, extract app name
 	if strings.HasPrefix(baseMetric, "application_") {
 		app := w.extractLabel(labels, "app")
@@ -161,7 +161,7 @@ func (w *WebSphereMicroProfile) processMetricWithLabels(baseMetric, labels strin
 			return fmt.Sprintf("%s_%s", baseMetric, cleanName(app))
 		}
 	}
-	
+
 	return baseMetric
 }
 
@@ -184,7 +184,7 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 	for metricName, value := range metrics {
 		// Convert float to int64 with precision
 		intValue := int64(value * precision)
-		
+
 		// Categorize and process metrics
 		if w.CollectJVMMetrics && w.jvmPattern.MatchString(metricName) {
 			w.processJVMMetric(mx, metricName, intValue)
@@ -213,10 +213,10 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	// Handle JVM metrics
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
-	
+
 	// Track for dynamic chart creation
 	w.seenMetrics[cleanedName] = true
-	
+
 	if !w.collectedMetrics[cleanedName] {
 		w.collectedMetrics[cleanedName] = true
 		// Add JVM charts dynamically if needed
@@ -232,10 +232,10 @@ func (w *WebSphereMicroProfile) processRESTMetric(mx map[string]int64, metricNam
 	// Handle REST metrics
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
-	
+
 	// Track for dynamic chart creation
 	w.seenMetrics[cleanedName] = true
-	
+
 	if !w.collectedMetrics[cleanedName] {
 		w.collectedMetrics[cleanedName] = true
 		// Add REST charts dynamically
@@ -251,10 +251,10 @@ func (w *WebSphereMicroProfile) processMPMetric(mx map[string]int64, metricName 
 	// Handle MicroProfile-specific metrics
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
-	
+
 	// Track for dynamic chart creation
 	w.seenMetrics[cleanedName] = true
-	
+
 	if !w.collectedMetrics[cleanedName] {
 		w.collectedMetrics[cleanedName] = true
 		// Add MicroProfile charts dynamically
@@ -270,10 +270,10 @@ func (w *WebSphereMicroProfile) processCustomMetric(mx map[string]int64, metricN
 	// Handle custom application metrics
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
-	
+
 	// Track for dynamic chart creation
 	w.seenMetrics[cleanedName] = true
-	
+
 	if !w.collectedMetrics[cleanedName] {
 		w.collectedMetrics[cleanedName] = true
 		// Add custom charts dynamically
@@ -299,7 +299,7 @@ func (w *WebSphereMicroProfile) updateSeenInstances() {
 			}
 		}
 	}
-	
+
 	// Reset seen metrics for next collection
 	w.seenMetrics = make(map[string]bool)
 }

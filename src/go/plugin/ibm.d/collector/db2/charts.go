@@ -45,7 +45,7 @@ var (
 			{ID: "database_status", Name: "database"},
 		},
 	}
-	
+
 	connectionsChart = module.Chart{
 		ID:       "connections",
 		Title:    "Database Connections",
@@ -115,7 +115,7 @@ var (
 			{ID: "lock_memory_pages", Name: "memory_pages"},
 		},
 	}
-	
+
 	lockWaitTimeChart = module.Chart{
 		ID:       "lock_wait_time",
 		Title:    "Average Lock Wait Time",
@@ -169,7 +169,7 @@ var (
 			{ID: "bufferpool_column_hit_ratio", Name: "column", Div: precision},
 		},
 	}
-	
+
 	bufferpoolReadsChart = module.Chart{
 		ID:       "bufferpool_reads",
 		Title:    "Buffer Pool Reads",
@@ -183,7 +183,7 @@ var (
 			{ID: "bufferpool_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
-	
+
 	bufferpoolDataReadsChart = module.Chart{
 		ID:       "bufferpool_data_reads",
 		Title:    "Buffer Pool Data Page Reads",
@@ -197,7 +197,7 @@ var (
 			{ID: "bufferpool_data_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
-	
+
 	bufferpoolIndexReadsChart = module.Chart{
 		ID:       "bufferpool_index_reads",
 		Title:    "Buffer Pool Index Page Reads",
@@ -211,7 +211,7 @@ var (
 			{ID: "bufferpool_index_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
-	
+
 	bufferpoolXDAReadsChart = module.Chart{
 		ID:       "bufferpool_xda_reads",
 		Title:    "Buffer Pool XDA Page Reads",
@@ -225,7 +225,7 @@ var (
 			{ID: "bufferpool_xda_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
-	
+
 	bufferpoolColumnReadsChart = module.Chart{
 		ID:       "bufferpool_column_reads",
 		Title:    "Buffer Pool Column Page Reads",
@@ -253,7 +253,7 @@ var (
 			{ID: "log_available_space", Name: "available"},
 		},
 	}
-	
+
 	logUtilizationChart = module.Chart{
 		ID:       "log_utilization",
 		Title:    "Log Space Utilization",
@@ -265,7 +265,7 @@ var (
 			{ID: "log_utilization", Name: "utilization", Div: precision},
 		},
 	}
-	
+
 	logIOChart = module.Chart{
 		ID:       "log_io",
 		Title:    "Log I/O Operations",

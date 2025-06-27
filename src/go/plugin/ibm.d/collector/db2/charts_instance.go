@@ -46,7 +46,7 @@ var (
 			{ID: "bufferpool_%s_hit_ratio", Name: "overall", Div: precision},
 		},
 	}
-	
+
 	bufferpoolDetailedHitRatioChartTmpl = module.Chart{
 		ID:       "bufferpool_%s_detailed_hit_ratio",
 		Title:    "Buffer Pool %s Detailed Hit Ratios",
@@ -75,7 +75,7 @@ var (
 			{ID: "bufferpool_%s_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
-	
+
 	bufferpoolDataReadsChartTmpl = module.Chart{
 		ID:       "bufferpool_%s_data_reads",
 		Title:    "Buffer Pool %s Data Page Reads",
@@ -89,7 +89,7 @@ var (
 			{ID: "bufferpool_%s_data_physical_reads", Name: "physical", Algo: module.Incremental},
 		},
 	}
-	
+
 	bufferpoolIndexReadsChartTmpl = module.Chart{
 		ID:       "bufferpool_%s_index_reads",
 		Title:    "Buffer Pool %s Index Page Reads",
@@ -144,7 +144,7 @@ var (
 			{ID: "tablespace_%s_free_size", Name: "free"},
 		},
 	}
-	
+
 	tablespaceUsableSizeChartTmpl = module.Chart{
 		ID:       "tablespace_%s_usable_size",
 		Title:    "Tablespace %s Usable Size",

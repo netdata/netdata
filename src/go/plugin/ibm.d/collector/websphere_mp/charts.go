@@ -27,11 +27,11 @@ const (
 func (w *WebSphereMicroProfile) initCharts() {
 	// Initialize with basic JVM charts
 	charts := module.Charts{}
-	
+
 	if w.CollectJVMMetrics {
 		charts = append(charts, *newBaseJVMCharts()...)
 	}
-	
+
 	w.charts = &charts
 }
 
@@ -115,7 +115,7 @@ func (w *WebSphereMicroProfile) createJVMChart(metricID, originalName string) *m
 	} else if strings.Contains(originalName, "class") {
 		return w.createClassChart(metricID, originalName)
 	}
-	
+
 	return w.createGenericChart(metricID, originalName, "jvm", prioJVMHeap+100)
 }
 
@@ -125,10 +125,10 @@ func (w *WebSphereMicroProfile) createRESTChart(metricID, originalName string) *
 	if len(parts) >= 3 {
 		method := parts[len(parts)-2]
 		endpoint := parts[len(parts)-1]
-		
+
 		chartID := fmt.Sprintf("rest_%s_%s", method, endpoint)
 		title := fmt.Sprintf("REST %s %s", strings.ToUpper(method), endpoint)
-		
+
 		if strings.Contains(originalName, "count") || strings.Contains(originalName, "total") {
 			return &module.Charts{
 				{
@@ -161,7 +161,7 @@ func (w *WebSphereMicroProfile) createRESTChart(metricID, originalName string) *
 			}
 		}
 	}
-	
+
 	return w.createGenericChart(metricID, originalName, "rest", prioRESTRequests+100)
 }
 
@@ -182,7 +182,7 @@ func (w *WebSphereMicroProfile) createMPChart(metricID, originalName string) *mo
 			},
 		}
 	}
-	
+
 	return w.createGenericChart(metricID, originalName, "mp", prioMPMetrics)
 }
 
@@ -195,10 +195,10 @@ func (w *WebSphereMicroProfile) createCustomChart(metricID, originalName string)
 			appName = parts[1]
 		}
 	}
-	
+
 	chartID := fmt.Sprintf("app_%s_%s", appName, strings.ReplaceAll(metricID, "application_", ""))
 	title := fmt.Sprintf("Application %s - %s", appName, strings.ReplaceAll(originalName, "_", " "))
-	
+
 	return &module.Charts{
 		{
 			ID:       chartID,

@@ -331,11 +331,11 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 				}
 			}
 		}
-		
+
 		// Calculate hit ratios for MON_GET at end of line when using MON_GET
 		if d.useMonGetFunctions && lineEnd && currentBP != "" {
 			metrics := d.mx.bufferpools[currentBP]
-			
+
 			// Calculate total reads for each type
 			dataReads := metrics.DataLogicalReads
 			if dataReads > 0 && metrics.DataPhysicalReads >= 0 {
@@ -343,28 +343,28 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			} else {
 				metrics.DataHitRatio = 100 * precision
 			}
-			
+
 			indexReads := metrics.IndexLogicalReads
 			if indexReads > 0 && metrics.IndexPhysicalReads >= 0 {
 				metrics.IndexHitRatio = int64(((float64(indexReads - metrics.IndexPhysicalReads)) * 100.0 * float64(precision)) / float64(indexReads))
 			} else {
 				metrics.IndexHitRatio = 100 * precision
 			}
-			
+
 			xdaReads := metrics.XDALogicalReads
 			if xdaReads > 0 && metrics.XDAPhysicalReads >= 0 {
 				metrics.XDAHitRatio = int64(((float64(xdaReads - metrics.XDAPhysicalReads)) * 100.0 * float64(precision)) / float64(xdaReads))
 			} else {
 				metrics.XDAHitRatio = 100 * precision
 			}
-			
+
 			colReads := metrics.ColumnLogicalReads
 			if colReads > 0 && metrics.ColumnPhysicalReads >= 0 {
 				metrics.ColumnHitRatio = int64(((float64(colReads - metrics.ColumnPhysicalReads)) * 100.0 * float64(precision)) / float64(colReads))
 			} else {
 				metrics.ColumnHitRatio = 100 * precision
 			}
-			
+
 			// Overall hit ratio
 			totalLogical := dataReads + indexReads + xdaReads + colReads
 			totalPhysical := metrics.DataPhysicalReads + metrics.IndexPhysicalReads + metrics.XDAPhysicalReads + metrics.ColumnPhysicalReads
@@ -373,12 +373,12 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 			} else {
 				metrics.HitRatio = 100 * precision
 			}
-			
+
 			// Calculate total reads
 			metrics.LogicalReads = totalLogical
 			metrics.PhysicalReads = totalPhysical
 			metrics.TotalReads = totalLogical + totalPhysical
-			
+
 			d.mx.bufferpools[currentBP] = metrics
 		}
 	})
