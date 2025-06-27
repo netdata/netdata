@@ -66,10 +66,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, m := range p.Definition.Metrics {
 		switch {
 		case m.IsScalar():
-			seen[m.Symbol.Name] = true
+			seen[m.Symbol.Name+"|"+m.Symbol.OID] = true
 		case m.IsColumn():
-			for _, symbol := range m.Symbols {
-				seen[symbol.Name] = true
+			for _, sym := range m.Symbols {
+				seen[sym.Name] = true
 			}
 		}
 	}
@@ -77,9 +77,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, bm := range base.Definition.Metrics {
 		switch {
 		case bm.IsScalar():
-			if !seen[bm.Symbol.Name] {
+			key := bm.Symbol.Name + "|" + bm.Symbol.OID
+			if !seen[key] {
 				p.Definition.Metrics = append(p.Definition.Metrics, bm)
-				seen[bm.Symbol.Name] = true
+				seen[key] = true
 			}
 		case bm.IsColumn():
 			bm.Symbols = slices.DeleteFunc(bm.Symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
