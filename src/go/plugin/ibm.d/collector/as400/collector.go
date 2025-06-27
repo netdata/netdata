@@ -301,6 +301,8 @@ func (a *AS400) logOnce(key string, format string, args ...interface{}) {
 		return // Already logged
 	}
 	a.Warningf(format, args...)
+	// Mark as logged to prevent future logs
+	a.disabled[key] = true
 }
 
 func (a *AS400) isDisabled(key string) bool {
