@@ -2,7 +2,7 @@
 
 Netdata is evolving rapidly and new features are added at a constant pace. Therefore, we have a frequent release cadence to deliver all these features to you as soon as possible.
 
-You can choose from 2 Netdata Agent versions:
+You can choose from 2 Netdata Agent release channels:
 
 | Release Channel |               Release Frequency               |                 Support Policy & Features                 |             Support Duration             |                              Backwards Compatibility                              |
 |:---------------:|:---------------------------------------------:|:---------------------------------------------------------:|:----------------------------------------:|:---------------------------------------------------------------------------------:|
@@ -11,84 +11,13 @@ You can choose from 2 Netdata Agent versions:
 
 :::info  
 
-**Support Duration** defines how long we consider each release actively used in production systems. After this period, you should update to the latest release to continue receiving bug fixes and security updates.
+"Support Duration" defines how long we consider each release actively used in production systems. After this period, you should update to the latest release to continue receiving bug fixes and security updates.
 
 :::
 
-## Switching Between Stable and Nightly Builds
+:::tip
 
-You can switch between stable and nightly channels depending on your needs. The method depends on how you originally installed Netdata.
-
-<details>
-<summary><strong>For Native Package Installations</strong></summary><br/>
-
-If you installed Netdata using our native packages (RPM, DEB), you can switch channels by updating your repository configuration:
-
-**Method 1: Using Package Manager (Recommended)**
-
-```bash
-# Switch from nightly to stable
-sudo apt install netdata-repo  # This will uninstall netdata-repo-edge automatically
-# Or for RPM-based systems:
-sudo yum install netdata-repo  # This will uninstall netdata-repo-edge automatically
-```
-
-**Method 2: Manual Repository Update**
-
-1. Update your repository configuration to point to the desired channel
-2. Reinstall the Netdata package using your system package manager
-
-</details>
-
-<br />
-
-<details>
-<summary><strong>For Kickstart Script Installations</strong></summary><br/>
-
-If you installed using the kickstart script, switching channels is straightforward:
-
-**Switch to Stable Channel:**
-```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-sh /tmp/netdata-kickstart.sh --stable-channel --reinstall
-```
-
-**Switch to Nightly Channel:**
-```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-sh /tmp/netdata-kickstart.sh --nightly-channel --reinstall
-```
-
-</details>
-
-<br />
-
-### For Static Build Installations
-
-For static builds, you need to reinstall using the kickstart script with the appropriate channel flag:
-
-**Switch to Stable Static Build:**
-```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-sh /tmp/netdata-kickstart.sh --static-only --stable-channel --reinstall
-```
-
-**Switch to Nightly Static Build:**
-```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
-sh /tmp/netdata-kickstart.sh --static-only --nightly-channel --reinstall
-```
-
-:::note  
-
-Notes on Switching Channels
-
-| Consideration | Details |
-|:-------------|:--------|
-| **Configuration Preservation** | Your existing configuration and data are preserved when switching between channels |
-| **Downtime** | There will be brief downtime during the switch as the agent restarts |
-| **Nightly Considerations** | Nightly builds automatically restart every night for updates, which may trigger brief connectivity alerts in Netdata Cloud |
-| **Production Recommendations** | For production environments, stable channel is recommended for better predictability |
+**Switching Between Stable and Nightly Builds**: You can switch between stable and nightly channels depending on your needs. The method depends on how you originally installed Netdata. For further information, please reference our [switching guide](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/switch-install-types-and-release-channels).
 
 :::
 
@@ -141,14 +70,13 @@ The following builds from source should usually work for you, although we don't 
 
 ## Static Builds and Unsupported Linux Versions
 
-You can run Netdata's static builds on any Linux platform with supported architecture, requiring only a functioning Linux kernel of any version. These self-contained packages include everything you need for Netdata to operate effectively.
+You can run Netdata's static builds on any Linux platform with a supported CPU architecture, requiring only a kernel version of 2.6 or newer. These self-contained packages include everything you need for Netdata to operate effectively.
 
 ### Limitations of Static Builds
 
 When you use static builds, you'll miss certain features that require specific operating system support, including:
 
 - IPMI hardware sensors monitoring
-- systemd-journal functionality
 - eBPF-related capabilities
 
 ### Impact of Platform End-of-Life (EOL)
@@ -166,76 +94,8 @@ When a platform is removed from the Binary Distribution Packages list:
 
 :::
 
-### Migrating from Native Package to Static Build: Step-by-Step Guide
+:::tip
 
-If upgrading your operating system isn't possible, you can manually switch to a static build. 
-
-:::important
-
-This process is **not officially supported** and may result in data loss. However, following these steps should preserve your metrics data and Netdata Cloud connection:
+**Migrating from Native Package to Static Build**: If upgrading your operating system isn't possible, you can manually switch to a static build. For more information, please reference our [switching guide](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/switch-install-types-and-release-channels).
 
 :::
-
-1. Stop your Netdata Agent [using the appropriate method for your platform](/docs/netdata-agent/start-stop-restart.md).
-
-2. Back up your Netdata configuration and data: `/etc/netdata`, `/var/cache/netdata`, `/var/lib/netdata`, `/var/log/netdata`.
-
-3. Uninstall the native package (confirm all prompts with "yes").
-
-   <details>
-   <summary>Click to see command</summary><br/>
-
-   ```bash
-   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
-   ```
-
-   </details>
-
-4. For systemd-based platforms, unmask the Netdata service:
-
-   <details>
-   <summary>Click to see command</summary><br/>
-
-   ```bash
-   sudo systemctl unmask netdata
-   sudo systemctl daemon-reload
-   ```
-
-   </details>
-
-5. Install the static build:
-
-   <details>
-   <summary>Click to see command</summary><br/>
-
-   ```bash
-   # For nightly builds
-   sh /tmp/netdata-kickstart.sh --static-only --dont-start-it
-
-   # For stable release builds
-   sh /tmp/netdata-kickstart.sh --static-only --dont-start-it --stable-channel
-   ```
-
-   </details>
-
-6. Restore your data from the previous installation:
-
-   <details>
-   <summary>Click to see command</summary><br/>
-
-   ```bash
-   # Install rsync if needed (example for Debian/Ubuntu)
-   # sudo apt-get update && sudo apt-get install -y rsync
-   # For RHEL/CentOS/Fedora
-   # sudo yum install -y rsync
-
-   cd /opt/netdata
-   sudo rsync -aRv --delete \
-              --exclude /etc/netdata/.install-type \
-              --exclude /etc/netdata/.environment \
-              /etc/netdata /var/lib/netdata /var/cache/netdata /var/log/netdata ./
-   ```
-
-   </details>
-
-7. Start your Netdata Agent to complete the migration.
