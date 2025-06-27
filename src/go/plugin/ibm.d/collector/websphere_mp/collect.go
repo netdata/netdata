@@ -236,6 +236,9 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "classloader_loadedClasses_total":
 		mx["jvm_classes_loaded"] = value
 		return
+	case "classloader_loadedClasses_count":
+		mx["jvm_classes_loaded"] = value
+		return
 	case "classloader_unloadedClasses_total":
 		mx["jvm_classes_unloaded"] = value
 		return
