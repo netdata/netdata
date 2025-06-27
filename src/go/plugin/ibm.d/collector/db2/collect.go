@@ -30,6 +30,9 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 			d.Infof("detected DB2 edition: %s version: %s", d.edition, d.version)
 		}
 
+		// Set configuration defaults based on detected version (only if admin hasn't configured)
+		d.setConfigurationDefaults()
+
 		// Check if we can use modern MON_GET_* functions
 		d.detectMonGetSupport(ctx)
 	}
@@ -71,8 +74,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Collect per-instance metrics if enabled and supported
-	if d.CollectDatabaseMetrics {
-		if !d.isDisabled("sysibmadm_views") {
+	if d.CollectDatabaseMetrics != nil && *d.CollectDatabaseMetrics {
+		if d.IgnoreVersionChecks || !d.isDisabled("sysibmadm_views") {
 			if err := d.collectDatabaseInstances(ctx); err != nil {
 				d.Errorf("failed to collect database instances: %v", err)
 			}
@@ -81,8 +84,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if d.CollectBufferpoolMetrics {
-		if !d.isDisabled("sysibmadm_views") && !d.isDisabled("bufferpool_instances") {
+	if d.CollectBufferpoolMetrics != nil && *d.CollectBufferpoolMetrics {
+		if d.IgnoreVersionChecks || (!d.isDisabled("sysibmadm_views") && !d.isDisabled("bufferpool_instances")) {
 			if err := d.collectBufferpoolInstances(ctx); err != nil {
 				d.Errorf("failed to collect bufferpool instances: %v", err)
 			}
@@ -95,8 +98,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if d.CollectTablespaceMetrics {
-		if !d.isDisabled("sysibmadm_views") {
+	if d.CollectTablespaceMetrics != nil && *d.CollectTablespaceMetrics {
+		if d.IgnoreVersionChecks || !d.isDisabled("sysibmadm_views") {
 			if err := d.collectTablespaceInstances(ctx); err != nil {
 				d.Errorf("failed to collect tablespace instances: %v", err)
 			}
@@ -105,8 +108,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if d.CollectConnectionMetrics {
-		if !d.isDisabled("sysibmadm_views") && !d.isDisabled("connection_instances") {
+	if d.CollectConnectionMetrics != nil && *d.CollectConnectionMetrics {
+		if d.IgnoreVersionChecks || (!d.isDisabled("sysibmadm_views") && !d.isDisabled("connection_instances")) {
 			if err := d.collectConnectionInstances(ctx); err != nil {
 				d.Errorf("failed to collect connection instances: %v", err)
 			}
@@ -119,8 +122,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if d.CollectTableMetrics {
-		if !d.isDisabled("extended_monitoring") {
+	if d.CollectTableMetrics != nil && *d.CollectTableMetrics {
+		if d.IgnoreVersionChecks || !d.isDisabled("extended_monitoring") {
 			if err := d.collectTableInstances(ctx); err != nil {
 				d.Errorf("failed to collect table instances: %v", err)
 			}
@@ -129,8 +132,8 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if d.CollectIndexMetrics {
-		if !d.isDisabled("extended_monitoring") {
+	if d.CollectIndexMetrics != nil && *d.CollectIndexMetrics {
+		if d.IgnoreVersionChecks || !d.isDisabled("extended_monitoring") {
 			if err := d.collectIndexInstances(ctx); err != nil {
 				d.Errorf("failed to collect index instances: %v", err)
 			}

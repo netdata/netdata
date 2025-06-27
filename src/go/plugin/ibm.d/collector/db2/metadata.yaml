@@ -210,6 +210,18 @@ modules:
               description: Number of days to look back for backup history.
               default_value: 30
               required: false
+            - name: ignore_version_checks
+              description: Disable all version and edition compatibility checks (use with caution).
+              default_value: false
+              required: false
+              detailed_description: |
+                WARNING: Disables all version and edition compatibility checks. The collector will 
+                attempt to use all configured features regardless of DB2 version or edition. 
+                Use with caution as this may cause errors on unsupported versions. This option is useful when:
+                - Testing on newer DB2 versions not yet validated
+                - Features have been backported to your specific system
+                - Your DB2 edition has custom features not detected by standard checks
+                - You want to force collection despite version/edition detection issues
             - name: collect_databases_matching
               description: Pattern to filter databases. Supports wildcards (*, ?) and multiple patterns separated by pipe (|).
               default_value: ""
@@ -300,6 +312,18 @@ modules:
                     max_tablespaces: 50
                     max_connections: 100
                     collect_connection_metrics: false  # Disable connection tracking
+            - name: Force collection with version override
+              description: Using ignore_version_checks to force features on custom/newer DB2 editions.
+              config: |
+                jobs:
+                  - name: db2_custom
+                    dsn: 'DATABASE=sample;HOSTNAME=db2custom.example.com;PORT=50000;PROTOCOL=TCPIP;UID=db2inst1;PWD=password'
+                    # Force all features regardless of detected edition
+                    collect_database_metrics: true
+                    collect_bufferpool_metrics: true
+                    collect_connection_metrics: true
+                    # Override version/edition checks (use with caution)
+                    ignore_version_checks: true
     troubleshooting:
       problems:
         list:
@@ -331,6 +355,8 @@ modules:
               - The collector automatically detects edition/version and uses appropriate queries
               - Check logs for "Feature availability" and "Feature disabled" messages
               - The collector will gracefully degrade functionality based on what's available
+              - If you believe features should work on your system, you can set 'ignore_version_checks: true' to force collection
+              - Admin configuration always takes precedence over auto-detection - if you enable a feature, the collector will attempt it
     alerts:
       - name: db2_connection_usage
         metric: db2.connections
