@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- remove devType/Vendor/ from ddsnmp metric families [\#20585](https://github.com/netdata/netdata/pull/20585) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ddsnmp\): include table name in config id [\#20584](https://github.com/netdata/netdata/pull/20584) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ddsnmp\): walk cross-table columns when referenced table has no metrics [\#20583](https://github.com/netdata/netdata/pull/20583) ([ilyam8](https://github.com/ilyam8))
+- Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d/snmp-profiles\): skip abstract when loading [\#20576](https://github.com/netdata/netdata/pull/20576) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/smartctl\): add Win default path for smartctl executable [\#20574](https://github.com/netdata/netdata/pull/20574) ([ilyam8](https://github.com/ilyam8))
 - NUMA Windows  [\#20573](https://github.com/netdata/netdata/pull/20573) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#20571](https://github.com/netdata/netdata/pull/20571) ([netdatabot](https://github.com/netdatabot))
+- Add defines for cleanup statements [\#20570](https://github.com/netdata/netdata/pull/20570) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/smartctl\): add configurable concurrent device scanning [\#20569](https://github.com/netdata/netdata/pull/20569) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.10.0 to 9.11.0 in /src/go [\#20568](https://github.com/netdata/netdata/pull/20568) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improve\(go.d/smartctl\): enable direct smartctl execution on non-Linux [\#20567](https://github.com/netdata/netdata/pull/20567) ([ilyam8](https://github.com/ilyam8))
@@ -18,6 +23,7 @@
 - Mcp disclaimer update [\#20563](https://github.com/netdata/netdata/pull/20563) ([kanelatechnical](https://github.com/kanelatechnical))
 - Simplify MRG loading mechanism logic [\#20562](https://github.com/netdata/netdata/pull/20562) ([stelfrag](https://github.com/stelfrag))
 - Additional checks for valid db during db\_execute [\#20560](https://github.com/netdata/netdata/pull/20560) ([stelfrag](https://github.com/stelfrag))
+- Improve SQLite library shutdown handling and initialization state [\#20559](https://github.com/netdata/netdata/pull/20559) ([stelfrag](https://github.com/stelfrag))
 - Add CLI command to schedule update information [\#20558](https://github.com/netdata/netdata/pull/20558) ([stelfrag](https://github.com/stelfrag))
 - Check that there is a valid thread when performing ACLK sync shutdown [\#20555](https://github.com/netdata/netdata/pull/20555) ([stelfrag](https://github.com/stelfrag))
 - Fix save alert config transition on shutdown [\#20553](https://github.com/netdata/netdata/pull/20553) ([stelfrag](https://github.com/stelfrag))
@@ -458,13 +464,6 @@
 - blacklist leaked machine guids [\#20016](https://github.com/netdata/netdata/pull/20016) ([ktsaou](https://github.com/ktsaou))
 - agent-events: add deduplicating web server [\#20014](https://github.com/netdata/netdata/pull/20014) ([ktsaou](https://github.com/ktsaou))
 - Validate journal file headers to prevent invalid memory access [\#20013](https://github.com/netdata/netdata/pull/20013) ([stelfrag](https://github.com/stelfrag))
-- added agent-events backend [\#20012](https://github.com/netdata/netdata/pull/20012) ([ktsaou](https://github.com/ktsaou))
-- daemon status 24d [\#20011](https://github.com/netdata/netdata/pull/20011) ([ktsaou](https://github.com/ktsaou))
-- Update synology.md [\#20010](https://github.com/netdata/netdata/pull/20010) ([ycdtosa](https://github.com/ycdtosa))
-- More completely disable our own telemetry in CI. [\#20009](https://github.com/netdata/netdata/pull/20009) ([Ferroin](https://github.com/Ferroin))
-- fix\(go.d/megacli\): handle BBU hardware component is not present [\#20008](https://github.com/netdata/netdata/pull/20008) ([ilyam8](https://github.com/ilyam8))
-- Fix crashes No 3 [\#20007](https://github.com/netdata/netdata/pull/20007) ([ktsaou](https://github.com/ktsaou))
-- Minor changes when handling systemd integration. [\#20006](https://github.com/netdata/netdata/pull/20006) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
