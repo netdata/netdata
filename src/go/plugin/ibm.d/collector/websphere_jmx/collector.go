@@ -41,6 +41,7 @@ func New() *WebSphereJMX {
 			CollectJVMMetrics:         true,
 			CollectThreadPoolMetrics:  true,
 			CollectJDBCMetrics:        true,
+			CollectJCAMetrics:         true,
 			CollectJMSMetrics:         true,
 			CollectWebAppMetrics:      true,
 			CollectSessionMetrics:     true,
@@ -50,6 +51,7 @@ func New() *WebSphereJMX {
 			// Default cardinality limits
 			MaxThreadPools:     50,
 			MaxJDBCPools:       50,
+			MaxJCAPools:        50,
 			MaxJMSDestinations: 50,
 			MaxApplications:    100,
 
@@ -64,10 +66,12 @@ func New() *WebSphereJMX {
 		collectedApps:      make(map[string]bool),
 		collectedPools:     make(map[string]bool),
 		collectedJDBCPools: make(map[string]bool),
+		collectedJCAPools:  make(map[string]bool),
 		collectedJMS:       make(map[string]bool),
 		seenApps:           make(map[string]bool),
 		seenPools:          make(map[string]bool),
 		seenJDBCPools:      make(map[string]bool),
+		seenJCAPools:       make(map[string]bool),
 		seenJMS:            make(map[string]bool),
 		lastGoodMetrics:    make(map[string]int64),
 	}
@@ -100,6 +104,7 @@ type Config struct {
 	CollectJVMMetrics         bool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics"`
 	CollectThreadPoolMetrics  bool `yaml:"collect_threadpool_metrics" json:"collect_threadpool_metrics"`
 	CollectJDBCMetrics        bool `yaml:"collect_jdbc_metrics" json:"collect_jdbc_metrics"`
+	CollectJCAMetrics         bool `yaml:"collect_jca_metrics" json:"collect_jca_metrics"`
 	CollectJMSMetrics         bool `yaml:"collect_jms_metrics" json:"collect_jms_metrics"`
 	CollectWebAppMetrics      bool `yaml:"collect_webapp_metrics" json:"collect_webapp_metrics"`
 	CollectSessionMetrics     bool `yaml:"collect_session_metrics" json:"collect_session_metrics"`
@@ -109,6 +114,7 @@ type Config struct {
 	// Cardinality control
 	MaxThreadPools     int `yaml:"max_threadpools,omitempty" json:"max_threadpools"`
 	MaxJDBCPools       int `yaml:"max_jdbc_pools,omitempty" json:"max_jdbc_pools"`
+	MaxJCAPools        int `yaml:"max_jca_pools,omitempty" json:"max_jca_pools"`
 	MaxJMSDestinations int `yaml:"max_jms_destinations,omitempty" json:"max_jms_destinations"`
 	MaxApplications    int `yaml:"max_applications,omitempty" json:"max_applications"`
 
@@ -138,10 +144,12 @@ type WebSphereJMX struct {
 	collectedApps      map[string]bool
 	collectedPools     map[string]bool // Thread pools
 	collectedJDBCPools map[string]bool // JDBC pools (separate tracking)
+	collectedJCAPools  map[string]bool // JCA pools
 	collectedJMS       map[string]bool
 	seenApps           map[string]bool
 	seenPools          map[string]bool
 	seenJDBCPools      map[string]bool
+	seenJCAPools       map[string]bool
 	seenJMS            map[string]bool
 
 	// Selectors
