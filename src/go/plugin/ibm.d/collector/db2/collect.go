@@ -548,6 +548,9 @@ func (d *DB2) doQuerySingleValue(ctx context.Context, query string, target *int6
 	var value sql.NullInt64
 	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
 	if err != nil {
+		if isSQLFeatureError(err) {
+			d.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		}
 		return err
 	}
 	if value.Valid {
@@ -563,6 +566,9 @@ func (d *DB2) doQuerySingleFloatValue(ctx context.Context, query string, target 
 	var value sql.NullFloat64
 	err := d.db.QueryRowContext(queryCtx, query).Scan(&value)
 	if err != nil {
+		if isSQLFeatureError(err) {
+			d.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+		}
 		return err
 	}
 	if value.Valid {
