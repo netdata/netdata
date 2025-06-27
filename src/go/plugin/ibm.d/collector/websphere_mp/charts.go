@@ -36,17 +36,17 @@ const (
 )
 
 func (w *WebSphereMicroProfile) initCharts() {
-	// Initialize with basic JVM charts
+	// Initialize with all base charts
 	charts := module.Charts{}
 
-	if w.CollectJVMMetrics {
-		charts = append(charts, *newBaseJVMCharts()...)
-	}
+	// Always initialize base charts (includes JVM, vendor metrics)
+	// Individual metrics will only be populated if they exist
+	charts = append(charts, *newBaseCharts()...)
 
 	w.charts = &charts
 }
 
-func newBaseJVMCharts() *module.Charts {
+func newBaseCharts() *module.Charts {
 	return &module.Charts{
 		{
 			ID:       "jvm_memory_heap_usage",
