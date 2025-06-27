@@ -50,6 +50,10 @@ func Test_FindProfiles(t *testing.T) {
 			sysObjOId:   "1.3.6.1.4.1.14988.1",
 			wanProfiles: 2,
 		},
+		"aruba": {
+			sysObjOId:   "1.3.6.1.4.1.14823.1.1.32",
+			wanProfiles: 4,
+		},
 		"no match": {
 			sysObjOId:   "0.1.2.3",
 			wanProfiles: 0,
