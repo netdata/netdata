@@ -1,5 +1,35 @@
 # ASSISTANTS **MUST** FOLLOW THESE RULES
 
+## 🚨 PRINCIPLE-001: ERROR VISIBILITY AND FAILURE HANDLING 🚨
+
+**CRITICAL RULE: WHEN WRITING CODE WE REVEAL UNEXPECTED ERRORS. WE DON'T WORK AROUND THEM.**
+
+- **UNEXPECTED ERRORS MUST BE PROMINENT** - Make them visible so developers can see and fix them
+- **SILENT ERROR HANDLING IS NEVER PERMITTED** - Unless it's expected behavior in normal processing flow
+- **UNEXPECTED ERRORS MUST BE LOGGED** - For developers to see (console.error)
+- **ERRORS AFFECTING USER FLOW MUST BE SHOWN ON UI** - Users must be informed when something fails
+- **ANY CODE NOT COMPLYING IS INCORRECT AND MUST BE FIXED IMMEDIATELY**
+
+**JavaScript developers have the BAD habit of providing fallbacks and default values on UNEXPECTED things. This is a SEVERE FLAW and IS NOT ACCEPTED in this project.**
+
+**Every fallback, default, and workaround MUST HAVE SPECIFIC BUSINESS LOGIC REASONING, otherwise it MUST be immediately fixed to log and FAIL.**
+
+**Examples of INCORRECT patterns:**
+```javascript
+// WRONG - Silent failure
+const chat = this.chats.get(chatId) || {};
+
+// WRONG - Fallback without reasoning
+const result = data?.property || 'default';
+
+// CORRECT - Explicit error handling
+const chat = this.chats.get(chatId);
+if (!chat) {
+    console.error(`[functionName] Chat not found for chatId: ${chatId}`);
+    return; // or throw, or show UI error
+}
+```
+
 1. This is a new application. No need for backward compatibility.
 2. When a task is concluded, existing `eslint` configuration MUST show zero errors and zero warnings.
 3. Do not use any deprecated or legacy code. This is a new application, so everything should be up-to-date.
@@ -85,9 +115,31 @@ When building messages for the LLM API:
 
 ## Cache Control Management
 
+### Cache Control Modes
+The cache control system now uses a simple 3-value configuration:
+
+- **`all-off`**: No cache control headers are emitted (default for new chats)
+- **`system`**: Cache control is applied ONLY to the system prompt
+- **`cached`**: Smart cache control - caches system prompt AND applies message-level caching
+
+### Configuration Changes
+- **Old Format**: `{ enabled: boolean, strategy: string }`
+- **New Format**: Single string value (`'all-off'`, `'system'`, `'cached'`)
+- **Migration**: Old configs are automatically migrated on load
+- **UI**: Dropdown selection instead of checkbox + mutual exclusivity
+
 ### Cache Position Tracking
 - Each assistant message stores `cacheControlIndex` indicating where cache control was applied
 - This allows freezing the cache position for cost-effective operations
+
+### System Prompt Caching
+- **`system` mode**: Only the system prompt gets cache control headers
+- **`cached` mode**: System prompt + message-level smart caching
+- **`all-off` mode**: No caching anywhere
+
+### Message-Level Caching (cached mode only)
+- Uses smart strategy: caches up to 70% of messages, avoiding recent tool results
+- Can be frozen during summary operations to prevent cache creation surcharge
 
 ### Frozen Cache for Summaries
 - When requesting a summary, `buildMessagesForAPI(chat, provider, true)` freezes the cache
@@ -111,14 +163,18 @@ The context window includes:
 ### Why Include Completion Tokens
 The assistant's response (completion tokens) becomes part of the conversation history sent in the next request, so they must be counted as part of the context.
 
-## Tool Inclusion Modes
+## Tool Filtering
 
-The `toolInclusionMode` property controls how tools are included:
-- `auto` - Automatic inclusion based on context
-- `cached` - Always include tools with cache control (default)
-- `all-on` - Include all tools
-- `all-off` - Exclude all tools
-- `manual` - User controls individual tool inclusion
+Tool filtering is now handled exclusively by the Message Optimizer:
+- **Single Source of Truth**: The Message Optimizer determines which tools to include
+- **No Provider Filtering**: LLM providers no longer have tool filtering logic
+- **Context-Aware**: Tools are filtered based on Tool Memory settings and conversation context
+- **Automatic**: No manual tool inclusion modes - all handled transparently
+
+### Removed Concepts
+- `toolInclusionMode` parameter is no longer used in providers
+- Manual tool filtering has been removed in favor of automatic optimization
+- All tool filtering logic consolidated in the Message Optimizer
 
 ## Summary Workflow
 
@@ -295,9 +351,9 @@ Result: When in Turn 2, tools A,B are filtered, but C,D are still visible
 ### Purpose
 This feature helps manage context window size and reduces costs by automatically removing old tool interactions that are no longer relevant to the current conversation flow.
 
-### Important: Mutual Exclusivity with Cache Control
-For Anthropic models, Tool Memory and Cache Control are mutually exclusive features:
-- When Tool Memory is enabled, Cache Control is automatically disabled
-- This prevents wasting money on caching content that will be filtered out
-- The cached content would include tools that Tool Memory removes in later turns
-- The UI enforces this by disabling the cache control option when tool memory is active
+### Cache Control Interaction
+Tool Memory and Cache Control can now be used together:
+- **Independent Features**: Tool Memory filtering and Cache Control are separate optimizations
+- **No Mutual Exclusivity**: Users can enable both features simultaneously
+- **Smart Optimization**: The Message Optimizer handles both features intelligently
+- **Cost Efficiency**: Tool Memory reduces context size, Cache Control reduces repeated processing

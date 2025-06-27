@@ -11,7 +11,7 @@ import {SafetyChecker, SafetyLimitError, SAFETY_LIMITS} from './safety-limits.js
 class NetdataMCPChat {
     constructor() {
         // Log version on startup
-        console.log('🚀 Netdata MCP Web Client v1.0.9 - Simplified resume using sendMessage');
+        console.log('🚀 Netdata MCP Web Client v1.0.67 - Multi-Chat Input Management Fixes');
         
         this.mcpServers = new Map(); // Multiple MCP servers
         this.mcpConnections = new Map(); // Active MCP connections
@@ -20,9 +20,9 @@ class NetdataMCPChat {
         this.communicationLog = []; // Universal log (not saved)
         this.tokenUsageHistory = new Map(); // Track token usage per chat
         this.toolInclusionStates = new Map(); // Track which tools are included/excluded per chat
-        this.currentContextWindow = 0; // Running total for delta calculation during rendering
-        this.shouldStopProcessing = false; // Flag to stop processing between requests
-        this.isProcessing = false; // Track if we're currently processing messages
+        // Removed global currentContextWindow - now stored per chat
+        // Removed global shouldStopProcessing - now stored per chat
+        // Removed global isProcessing - now stored per chat
         this.modelPricing = {}; // Initialize model pricing storage
         this.modelLimits = {}; // Initialize model context limits storage
         this.copiedModel = null; // Track copied model for paste functionality
@@ -31,7 +31,7 @@ class NetdataMCPChat {
         this.safetyChecker = new SafetyChecker();
         
         // Per-chat DOM management
-        this.chatContainers = new Map(); // Map of chatId -> DOM container
+        this.chatContainers = new Map(); // Map of chatId -> DOM container (includes both main and sub-chats)
 
         // Models will be loaded dynamically from the proxy server
         // No hardcoded model list needed
@@ -99,7 +99,7 @@ class NetdataMCPChat {
                 this.pendingNewChatTimeout = setTimeout(() => {
                     // Double-check user hasn't selected a chat in the meantime
                     if (!this.userHasSelectedChat && this.pendingNewChatLoad) {
-                        this.loadChat(newChatId);
+                        this.loadChat(this.pendingNewChatId);
                     }
                     // Clear the pending flag
                     this.pendingNewChatLoad = false;
@@ -203,6 +203,9 @@ class NetdataMCPChat {
         
         // Update cumulative token pricing
         this.updateChatTokenPricing(chat);
+        
+        // NOTE: Sub-chat cost accumulation is now handled in processSingleLLMResponse
+        // after tool-results are added to the parent chat, ensuring proper timing
         
         // Update the cumulative token display
         this.updateCumulativeTokenDisplay(chatId);
@@ -311,6 +314,16 @@ class NetdataMCPChat {
                     hasTokens = true;
                     break;
                 }
+            } else if (message.role === 'accounting' && message.cumulativeTokens) {
+                // Also check accounting nodes for tokens
+                const tokens = message.cumulativeTokens;
+                if ((tokens.inputTokens || 0) > 0 || 
+                    (tokens.outputTokens || 0) > 0 || 
+                    (tokens.cacheReadTokens || 0) > 0 || 
+                    (tokens.cacheCreationTokens || 0) > 0) {
+                    hasTokens = true;
+                    break;
+                }
             }
         }
         
@@ -338,6 +351,26 @@ class NetdataMCPChat {
                     tokens.cacheCreationTokens += message.usage.cacheCreationInputTokens || 0;
                     tokens.cacheReadTokens += message.usage.cacheReadInputTokens || 0;
                     tokens.messageCount++;
+                } else if (message.role === 'accounting' && message.model && message.cumulativeTokens) {
+                    // CRITICAL: Also collect tokens from accounting nodes being replaced
+                    const model = message.model;
+                    if (!tokensByModel.has(model)) {
+                        tokensByModel.set(model, {
+                            inputTokens: 0,
+                            outputTokens: 0,
+                            cacheReadTokens: 0,
+                            cacheCreationTokens: 0,
+                            messageCount: 0
+                        });
+                    }
+                    
+                    const tokens = tokensByModel.get(model);
+                    const cumTokens = message.cumulativeTokens;
+                    tokens.inputTokens += cumTokens.inputTokens || 0;
+                    tokens.outputTokens += cumTokens.outputTokens || 0;
+                    tokens.cacheCreationTokens += cumTokens.cacheCreationTokens || 0;
+                    tokens.cacheReadTokens += cumTokens.cacheReadTokens || 0;
+                    tokens.messageCount += message.discardedMessages || 0;
                 }
             }
             
@@ -410,6 +443,34 @@ class NetdataMCPChat {
     }
     
     /**
+     * Check if a string contains markdown formatting
+     */
+    isMarkdownContent(content) {
+        if (typeof content !== 'string' || !content.trim()) {
+            return false;
+        }
+        
+        // Common markdown patterns
+        const markdownPatterns = [
+            /^#+\s/m,                    // Headers: # ## ###
+            /\*\*.*\*\*/,               // Bold: **text**
+            /\*.*\*/,                   // Italic: *text*
+            /`.*`/,                     // Inline code: `code`
+            /```[\s\S]*?```/,           // Code blocks: ```code```
+            /^\s*[-*+]\s/m,             // Unordered lists: - * +
+            /^\s*\d+\.\s/m,             // Ordered lists: 1. 2.
+            /^\s*>\s/m,                 // Blockquotes: >
+            /\[.*\]\(.*\)/,             // Links: [text](url)
+            /!\[.*\]\(.*\)/,            // Images: ![alt](url)
+            /^\s*\|.*\|/m,              // Tables: | col1 | col2 |
+            /^---+$/m,                  // Horizontal rules: ---
+            /~~.*~~/,                   // Strikethrough: ~~text~~
+        ];
+        
+        return markdownPatterns.some(pattern => pattern.test(content));
+    }
+    
+    /**
      * Auto-save with debouncing for performance
      * Saves only the specific chat that was modified
      */
@@ -439,7 +500,10 @@ class NetdataMCPChat {
      */
     saveChatConfigSmart(chatId, config) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[saveChatConfigSmart] Chat not found for chatId: ${chatId}`);
+            return;
+        }
         
         // Always save as last config for new chats to inherit
         ChatConfig.saveLastConfig(config);
@@ -517,7 +581,7 @@ class NetdataMCPChat {
         if (!chat.perModelTokensPrice) {
             chat.perModelTokensPrice = {};
         }
-        
+
         // Reset totals
         chat.totalTokensPrice = {
             input: 0,
@@ -573,6 +637,87 @@ class NetdataMCPChat {
                 
                 // Note: We can't attribute accounting node tokens to specific models
                 // They represent aggregated tokens from deleted messages
+            }
+        }
+        
+        // Add sub-chat costs from tool-results
+        this.aggregateSubChatCostsFromToolResults(chat);
+    }
+
+    /**
+     * Update parent's tool-result with sub-chat costs
+     */
+    updateParentToolResultCosts(parentChatId, toolCallId, subChat) {
+        const parentChat = this.chats.get(parentChatId);
+        if (!parentChat) {
+            console.error(`[updateParentToolResultCosts] Parent chat ${parentChatId} not found`);
+            return;
+        }
+        
+        
+        // Find the tool-result in parent messages
+        for (const message of parentChat.messages) {
+            if (message.role === 'tool-results' && message.toolResults) {
+                const toolResult = message.toolResults.find(tr => tr.toolCallId === toolCallId);
+                if (toolResult) {
+                    // Store the sub-chat's current costs
+                    toolResult.subChatCosts = {
+                        totalTokens: { ...subChat.totalTokensPrice },
+                        perModel: {}
+                    };
+                    
+                    // Deep copy per-model costs
+                    for (const [model, costs] of Object.entries(subChat.perModelTokensPrice || {})) {
+                        toolResult.subChatCosts.perModel[model] = { ...costs };
+                    }
+                    
+                    // Save parent chat to persist the updated costs
+                    this.autoSave(parentChatId);
+                    return;
+                }
+            }
+        }
+        
+        console.error(`[updateParentToolResultCosts] Tool result ${toolCallId} not found in parent messages`);
+    }
+
+    /**
+     * Aggregate sub-chat costs from tool-results that have subChatCosts
+     */
+    aggregateSubChatCostsFromToolResults(chat) {
+        for (const message of chat.messages) {
+            if (message.role === 'tool-results' && message.toolResults) {
+                for (const toolResult of message.toolResults) {
+                    if (toolResult.subChatCosts) {
+                        const costs = toolResult.subChatCosts;
+
+                        // Add to total tokens
+                        chat.totalTokensPrice.input += costs.totalTokens.input || 0;
+                        chat.totalTokensPrice.output += costs.totalTokens.output || 0;
+                        chat.totalTokensPrice.cacheRead += costs.totalTokens.cacheRead || 0;
+                        chat.totalTokensPrice.cacheCreation += costs.totalTokens.cacheCreation || 0;
+                        chat.totalTokensPrice.totalCost += costs.totalTokens.totalCost || 0;
+
+                        // Add to per-model tokens
+                        for (const [model, modelCosts] of Object.entries(costs.perModel)) {
+                            if (!chat.perModelTokensPrice[model]) {
+                                chat.perModelTokensPrice[model] = {
+                                    input: 0,
+                                    output: 0,
+                                    cacheRead: 0,
+                                    cacheCreation: 0,
+                                    totalCost: 0
+                                };
+                            }
+
+                            chat.perModelTokensPrice[model].input += modelCosts.input || 0;
+                            chat.perModelTokensPrice[model].output += modelCosts.output || 0;
+                            chat.perModelTokensPrice[model].cacheRead += modelCosts.cacheRead || 0;
+                            chat.perModelTokensPrice[model].cacheCreation += modelCosts.cacheCreation || 0;
+                            chat.perModelTokensPrice[model].totalCost += modelCosts.totalCost || 0;
+                        }
+                    }
+                }
             }
         }
     }
@@ -652,7 +797,6 @@ class NetdataMCPChat {
         
         // These will be set when switching chats for backward compatibility
         this.chatTitle = null;
-        this.chatInput = null;
         this.sendMessageBtn = null;
         this.reconnectMcpBtn = null;
         this.copyMetricsBtn = null;
@@ -920,10 +1064,16 @@ class NetdataMCPChat {
         let targetDropdown = dropdown || this.llmModelDropdown;
         
         const chat = this.chats.get(targetChatId);
-        if (!chat) {return;}
+        if (!chat) {
+            console.error(`[showModelSelector] Chat not found for chatId: ${targetChatId}`);
+            return;
+        }
         
         const provider = this.llmProviders.get(chat.llmProviderId);
-        if (!provider || !provider.availableProviders) {return;}
+        if (!provider || !provider.availableProviders) {
+            console.error(`[showModelSelector] Provider not found or has no available providers for providerId: ${chat.llmProviderId}`, { provider, hasAvailableProviders: provider?.availableProviders });
+            return;
+        }
         
         // Create a modal overlay instead of using the dropdown
         const overlay = document.createElement('div');
@@ -1015,6 +1165,11 @@ class NetdataMCPChat {
         
         // Get current config
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        
+        // Ensure the config is assigned to the chat object
+        if (!chat.config) {
+            chat.config = config;
+        }
         
         // Create header section (fixed)
         const headerSection = document.createElement('div');
@@ -1153,44 +1308,45 @@ class NetdataMCPChat {
         `;
         section.appendChild(chatModelDiv);
         
-        // Tool Summarization Option (DISABLED - Not Implemented)
+        // Tool Summarization Option
         const toolSumDiv = document.createElement('div');
-        const _isEnabled = false; // Force disabled - not implemented
-        toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
+        const _isEnabled = true; // Feature is now implemented
+        toolSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px;`;
         
-        const currentThreshold = config.optimisation.toolSummarisation.thresholdKiB || 20; // Default 20KB
-        const toolSumModel = ChatConfig.modelConfigToString(config.optimisation.toolSummarisation.model) || ChatConfig.getChatModelString(chat);
+        const currentThreshold = chat.config.optimisation.toolSummarisation.thresholdKiB ?? 20; // Default 20KB, allow 0
+        const toolSumModel = ChatConfig.modelConfigToString(chat.config.optimisation.toolSummarisation.model) || ChatConfig.getChatModelString(chat);
         
         toolSumDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: not-allowed;">
-                <input type="checkbox" id="toolSummarization_${chatId}" disabled
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="toolSummarization_${chatId}" ${_isEnabled ? '' : 'disabled'}
+                       ${chat.config.optimisation.toolSummarisation.enabled ? 'checked' : ''}
                        style="margin-right: 6px;">
-                <span style="text-decoration: line-through;">Summarize tool responses of at least</span>
+                <span>Summarize tool responses of at least</span>
             </label>
-            <select id="toolThreshold_${chatId}" disabled
+            <select id="toolThreshold_${chatId}" ${_isEnabled ? '' : 'disabled'}
                     style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
                            border-radius: 4px; background: var(--background-color); color: var(--text-primary);
-                           cursor: not-allowed; text-decoration: line-through;">
-                <option value="0">0 (all)</option>
-                <option value="5">5</option>
-                <option value="10">10</option>
+                           cursor: pointer;">
+                <option value="0" ${currentThreshold === 0 ? 'selected' : ''}>0 (all)</option>
+                <option value="5" ${currentThreshold === 5 ? 'selected' : ''}>5</option>
+                <option value="10" ${currentThreshold === 10 ? 'selected' : ''}>10</option>
                 <option value="20" ${currentThreshold === 20 ? 'selected' : ''}>20</option>
-                <option value="30">30</option>
-                <option value="40">40</option>
-                <option value="50">50</option>
-                <option value="60">60</option>
-                <option value="70">70</option>
-                <option value="80">80</option>
-                <option value="90">90</option>
-                <option value="100">100</option>
+                <option value="30" ${currentThreshold === 30 ? 'selected' : ''}>30</option>
+                <option value="40" ${currentThreshold === 40 ? 'selected' : ''}>40</option>
+                <option value="50" ${currentThreshold === 50 ? 'selected' : ''}>50</option>
+                <option value="60" ${currentThreshold === 60 ? 'selected' : ''}>60</option>
+                <option value="70" ${currentThreshold === 70 ? 'selected' : ''}>70</option>
+                <option value="80" ${currentThreshold === 80 ? 'selected' : ''}>80</option>
+                <option value="90" ${currentThreshold === 90 ? 'selected' : ''}>90</option>
+                <option value="100" ${currentThreshold === 100 ? 'selected' : ''}>100</option>
             </select>
-            <span style="text-decoration: line-through;">KiB size, with</span>
+            <span>KiB size, with</span>
             <div class="model-select-wrapper" style="position: relative; display: inline-block;">
-                <button class="model-select-btn" id="toolSumModel_${chatId}" disabled
+                <button class="model-select-btn" id="toolSumModel_${chatId}" ${_isEnabled ? '' : 'disabled'}
                         style="padding: 2px 8px; border: 1px solid var(--border-color); 
                                border-radius: 4px; background: var(--background-color); 
-                               color: var(--text-primary); cursor: not-allowed;
-                               display: flex; align-items: center; gap: 4px; text-decoration: line-through;">
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;">
                     <span class="model-name">${toolSumModel || 'Select model'}</span>
                     <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                 </button>
@@ -1199,24 +1355,24 @@ class NetdataMCPChat {
         
         section.appendChild(toolSumDiv);
         
-        // Auto-summarization Option (DISABLED - Not Implemented)
+        // Auto-summarization Option
         const autoSumDiv = document.createElement('div');
-        const _autoSumEnabled = false; // Force disabled - not implemented
-        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; opacity: 0.4; color: var(--text-secondary);`;
+        const _autoSumEnabled = true; // Auto-summarization is now implemented
+        autoSumDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px;`;
         
-        const currentPercent = config.optimisation.autoSummarisation.triggerPercent || 50;
-        const autoSumModel = ChatConfig.modelConfigToString(config.optimisation.autoSummarisation.model) || ChatConfig.getChatModelString(chat);
+        const currentPercent = chat.config.optimisation.autoSummarisation.triggerPercent || 50;
+        const autoSumModel = ChatConfig.modelConfigToString(chat.config.optimisation.autoSummarisation.model) || ChatConfig.getChatModelString(chat);
         
         autoSumDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: not-allowed;">
-                <input type="checkbox" id="autoSummarization_${chatId}" disabled
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="autoSummarization_${chatId}" ${chat.config.optimisation.autoSummarisation.enabled ? 'checked' : ''}
                        style="margin-right: 6px;">
-                <span style="text-decoration: line-through;">Summarize conversation when context window above</span>
+                <span>Summarize conversation when context window above</span>
             </label>
-            <select id="autoSumThreshold_${chatId}" disabled
+            <select id="autoSumThreshold_${chatId}"
                     style="width: 70px; padding: 2px 4px; border: 1px solid var(--border-color); 
                            border-radius: 4px; background: var(--background-color); color: var(--text-primary);
-                           cursor: not-allowed; text-decoration: line-through;">
+                           cursor: pointer;">
                 <option value="30">30%</option>
                 <option value="40">40%</option>
                 <option value="50" ${currentPercent === 50 ? 'selected' : ''}>50%</option>
@@ -1225,13 +1381,13 @@ class NetdataMCPChat {
                 <option value="80">80%</option>
                 <option value="90">90%</option>
             </select>
-            <span style="text-decoration: line-through;">with</span>
+            <span>with</span>
             <div class="model-select-wrapper" style="position: relative; display: inline-block;">
-                <button class="model-select-btn" id="autoSumModel_${chatId}" disabled
+                <button class="model-select-btn" id="autoSumModel_${chatId}"
                         style="padding: 2px 8px; border: 1px solid var(--border-color); 
                                border-radius: 4px; background: var(--background-color); 
-                               color: var(--text-primary); cursor: not-allowed;
-                               display: flex; align-items: center; gap: 4px; text-decoration: line-through;">
+                               color: var(--text-primary); cursor: pointer;
+                               display: flex; align-items: center; gap: 4px;">
                     <span class="model-name">${autoSumModel || 'Select model'}</span>
                     <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
                 </button>
@@ -1242,10 +1398,10 @@ class NetdataMCPChat {
         
         // Title Generation Option
         const titleGenDiv = document.createElement('div');
-        const titleGenEnabled = config.optimisation.titleGeneration?.enabled !== false; // Default to true
+        const titleGenEnabled = chat.config.optimisation.titleGeneration?.enabled !== false; // Default to true
         titleGenDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!titleGenEnabled ? 'opacity: 0.5;' : ''}`;
         
-        const titleGenModel = ChatConfig.modelConfigToString(config.optimisation.titleGeneration?.model);
+        const titleGenModel = ChatConfig.modelConfigToString(chat.config.optimisation.titleGeneration?.model);
         
         titleGenDiv.innerHTML = `
             <label style="display: flex; align-items: center; cursor: pointer;">
@@ -1270,10 +1426,10 @@ class NetdataMCPChat {
         
         // Tool Memory Option
         const toolMemoryDiv = document.createElement('div');
-        const toolMemoryEnabled = config.optimisation.toolMemory.enabled;
+        const toolMemoryEnabled = chat.config.optimisation.toolMemory.enabled;
         toolMemoryDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${!toolMemoryEnabled ? 'opacity: 0.5;' : ''}`;
         
-        const forgetAfterConclusions = config.optimisation.toolMemory.forgetAfterConclusions;
+        const forgetAfterConclusions = chat.config.optimisation.toolMemory.forgetAfterConclusions;
         
         toolMemoryDiv.innerHTML = `
             <label style="display: flex; align-items: center; cursor: pointer;">
@@ -1296,20 +1452,27 @@ class NetdataMCPChat {
         
         section.appendChild(toolMemoryDiv);
         
-        // Cache Control Option (only for Anthropic provider)
-        const isAnthropicProvider = config.model && config.model.provider === 'anthropic';
+        // Cache Control Option (for Anthropic provider)
+        const isAnthropicProvider = chat.config.model && chat.config.model.provider === 'anthropic';
         const cacheControlDiv = document.createElement('div');
-        const cacheControlEnabled = config.optimisation.cacheControl.enabled;
-        const cacheControlDisabled = !isAnthropicProvider || toolMemoryEnabled;
+        const cacheControlMode = chat.config.optimisation.cacheControl;
+        const cacheControlDisabled = !isAnthropicProvider;
         cacheControlDiv.style.cssText = `display: flex; align-items: center; gap: 8px; margin-bottom: 8px; ${cacheControlDisabled ? 'opacity: 0.5;' : ''}`;
         
         cacheControlDiv.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: ${cacheControlDisabled ? 'default' : 'pointer'};">
-                <input type="checkbox" id="cacheControl_${chatId}" ${cacheControlEnabled ? 'checked' : ''}
-                       style="margin-right: 6px;"
-                       ${cacheControlDisabled ? 'disabled' : ''}>
-                <span>Enable Anthropic's cache control${toolMemoryEnabled ? ' (disabled: tool memory is on)' : ''}</span>
+            <label style="display: flex; align-items: center;">
+                <span>Cache control:</span>
             </label>
+            <select id="cacheControl_${chatId}" 
+                    style="width: 100px; padding: 2px 4px; border: 1px solid var(--border-color); 
+                           border-radius: 4px; background: var(--background-color); color: var(--text-primary);
+                           cursor: pointer;"
+                    ${cacheControlDisabled ? 'disabled' : ''}>
+                <option value="all-off" ${cacheControlMode === 'all-off' ? 'selected' : ''}>Off</option>
+                <option value="system" ${cacheControlMode === 'system' ? 'selected' : ''}>System</option>
+                <option value="cached" ${cacheControlMode === 'cached' ? 'selected' : ''}>Cached</option>
+            </select>
+            ${!isAnthropicProvider ? '<span style="color: var(--text-secondary); font-size: 12px;">Anthropic only</span>' : ''}
         `;
         
         section.appendChild(cacheControlDiv);
@@ -1404,8 +1567,9 @@ class NetdataMCPChat {
         
         thresholdSelect.addEventListener('change', (e) => {
             e.stopPropagation();
-            const kbValue = parseInt(e.target.value, 10) || 20;
-            const byteValue = kbValue * 1024;
+            const kbValue = parseInt(e.target.value, 10);
+            const validKbValue = isNaN(kbValue) ? 20 : kbValue; // Default 20KB only if invalid, allow 0
+            const byteValue = validKbValue * 1024;
             this.updateToolThreshold(chatId, byteValue);
         });
         
@@ -1451,28 +1615,7 @@ class NetdataMCPChat {
             toolMemorySelect.disabled = !enabled;
             toolMemoryDiv.style.opacity = enabled ? '1' : '0.5';
             
-            // Update cache control state for Anthropic (mutually exclusive with tool memory)
-            if (isAnthropicProvider) {
-                const cacheControlCheckbox = section.querySelector(`#cacheControl_${chatId}`);
-                const cacheControlLabel = cacheControlCheckbox.closest('label');
-                const cacheControlSpan = cacheControlLabel.querySelector('span');
-                
-                if (enabled) {
-                    // Disable cache control when tool memory is enabled
-                    cacheControlCheckbox.disabled = true;
-                    cacheControlCheckbox.closest('div').style.opacity = '0.5';
-                    cacheControlSpan.textContent = 'Enable Anthropic\'s cache control (disabled: tool memory is on)';
-                    if (cacheControlCheckbox.checked) {
-                        cacheControlCheckbox.checked = false;
-                        this.updateOptimizationSetting(chatId, 'cacheControl', false);
-                    }
-                } else {
-                    // Re-enable cache control when tool memory is disabled
-                    cacheControlCheckbox.disabled = false;
-                    cacheControlCheckbox.closest('div').style.opacity = '1';
-                    cacheControlSpan.textContent = 'Enable Anthropic\'s cache control';
-                }
-            }
+            // Cache control is no longer mutually exclusive with tool memory
             
             this.updateOptimizationSetting(chatId, 'toolMemory', enabled);
         });
@@ -1482,6 +1625,16 @@ class NetdataMCPChat {
             const newForgetAfterConclusions = parseInt(e.target.value, 10);
             this.updateToolMemoryThreshold(chatId, newForgetAfterConclusions);
         });
+        
+        // Cache control dropdown event listener
+        const cacheControlSelect = section.querySelector(`#cacheControl_${chatId}`);
+        if (cacheControlSelect) {
+            cacheControlSelect.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const newCacheMode = e.target.value;
+                this.updateCacheControlMode(chatId, newCacheMode);
+            });
+        }
         
         // Other checkboxes (smart filtering, cache control)
         section.querySelectorAll('input[type="checkbox"]:not(#toolSummarization_' + chatId + '):not(#autoSummarization_' + chatId + ')').forEach(checkbox => {
@@ -1618,8 +1771,9 @@ class NetdataMCPChat {
                     <tr>
                         <td style="padding: 4px 6px; color: var(--text-secondary);">Cache Control:</td>
                         <td style="padding: 4px 6px; text-align: right; font-size: 10px;">
-                            ${status(config.optimisation.cacheControl.enabled)} 
-                            ${config.optimisation.cacheControl.enabled ? `Strategy: ${config.optimisation.cacheControl.strategy}` : 'Disabled'}
+                            ${config.optimisation.cacheControl === 'all-off' ? 'Off' : 
+                              config.optimisation.cacheControl === 'system' ? 'System only' : 
+                              config.optimisation.cacheControl === 'cached' ? 'Cached' : config.optimisation.cacheControl}
                         </td>
                     </tr>
                     <tr>
@@ -1876,6 +2030,30 @@ class NetdataMCPChat {
                 // Focus search input when dropdown opens
                 setTimeout(() => searchInput.focus(), 0);
                 
+                // Function to update dropdown position on scroll/resize
+                const updateDropdownPosition = () => {
+                    const newButtonRect = button.getBoundingClientRect();
+                    const newViewportHeight = window.innerHeight;
+                    const newViewportWidth = window.innerWidth;
+                    const newSpaceBelow = newViewportHeight - newButtonRect.bottom;
+                    const newShouldShowAbove = newSpaceBelow < dropdownHeight && newButtonRect.top > dropdownHeight;
+                    
+                    if (newShouldShowAbove) {
+                        dropdown.style.top = 'auto';
+                        dropdown.style.bottom = `${newViewportHeight - newButtonRect.top + 4}px`;
+                    } else {
+                        dropdown.style.bottom = 'auto';
+                        dropdown.style.top = `${newButtonRect.bottom + 4}px`;
+                    }
+                    
+                    // Update horizontal position
+                    let newLeftPosition = newButtonRect.left;
+                    if (newLeftPosition + dropdownMinWidth > newViewportWidth) {
+                        newLeftPosition = Math.max(10, newViewportWidth - dropdownMinWidth - 10);
+                    }
+                    dropdown.style.left = `${newLeftPosition}px`;
+                };
+                
                 // Create pricing table
                 const models = this.getAllAvailableModels();
                 
@@ -1906,30 +2084,6 @@ class NetdataMCPChat {
                         </div>
                     `;
                     document.body.appendChild(dropdown);
-                    
-                    // Function to update dropdown position on scroll/resize
-                    const updateDropdownPosition = () => {
-                        const newButtonRect = button.getBoundingClientRect();
-                        const newViewportHeight = window.innerHeight;
-                        const newViewportWidth = window.innerWidth;
-                        const newSpaceBelow = newViewportHeight - newButtonRect.bottom;
-                        const newShouldShowAbove = newSpaceBelow < dropdownHeight && newButtonRect.top > dropdownHeight;
-                        
-                        if (newShouldShowAbove) {
-                            dropdown.style.top = 'auto';
-                            dropdown.style.bottom = `${newViewportHeight - newButtonRect.top + 4}px`;
-                        } else {
-                            dropdown.style.bottom = 'auto';
-                            dropdown.style.top = `${newButtonRect.bottom + 4}px`;
-                        }
-                        
-                        // Update horizontal position
-                        let newLeftPosition = newButtonRect.left;
-                        if (newLeftPosition + dropdownMinWidth > newViewportWidth) {
-                            newLeftPosition = Math.max(10, newViewportWidth - dropdownMinWidth - 10);
-                        }
-                        dropdown.style.left = `${newLeftPosition}px`;
-                    };
                     
                     // Close dropdown on outside click
                     const closeDropdown = (evt) => {
@@ -2147,31 +2301,6 @@ class NetdataMCPChat {
                     }
                 });
                 
-                // Define functions before they're used
-                // Function to update dropdown position on scroll/resize
-                const updateDropdownPosition = () => {
-                    const newButtonRect = button.getBoundingClientRect();
-                    const newViewportHeight = window.innerHeight;
-                    const newViewportWidth = window.innerWidth;
-                    const newSpaceBelow = newViewportHeight - newButtonRect.bottom;
-                    const newShouldShowAbove = newSpaceBelow < dropdownHeight && newButtonRect.top > dropdownHeight;
-                    
-                    if (newShouldShowAbove) {
-                        dropdown.style.top = 'auto';
-                        dropdown.style.bottom = `${newViewportHeight - newButtonRect.top + 4}px`;
-                    } else {
-                        dropdown.style.bottom = 'auto';
-                        dropdown.style.top = `${newButtonRect.bottom + 4}px`;
-                    }
-                    
-                    // Update horizontal position
-                    let newLeftPosition = newButtonRect.left;
-                    if (newLeftPosition + dropdownMinWidth > newViewportWidth) {
-                        newLeftPosition = Math.max(10, newViewportWidth - dropdownMinWidth - 10);
-                    }
-                    dropdown.style.left = `${newLeftPosition}px`;
-                };
-                
                 // Close dropdown on outside click
                 const closeDropdown = (evt) => {
                     // Check if click is outside dropdown and button
@@ -2227,7 +2356,10 @@ class NetdataMCPChat {
 
     updateOptimizationSetting(chatId, settingType, enabled) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[updateOptimizationSetting] Chat not found for chatId: ${chatId}, settingType: ${settingType}`);
+            return;
+        }
 
         // Get current config or create defaults
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
@@ -2239,9 +2371,6 @@ class NetdataMCPChat {
                 break;
             case 'toolMemory':
                 config.optimisation.toolMemory.enabled = enabled;
-                break;
-            case 'cacheControl':
-                config.optimisation.cacheControl.enabled = enabled;
                 break;
             case 'autoSummarization':
                 config.optimisation.autoSummarisation.enabled = enabled;
@@ -2276,10 +2405,47 @@ class NetdataMCPChat {
         this.autoSave(chatId);
     }
 
+    updateCacheControlMode(chatId, cacheMode) {
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[updateCacheControlMode] Chat not found for chatId: ${chatId}, cacheMode: ${cacheMode}`);
+            return;
+        }
+
+        // Get current config or create defaults
+        const config = chat.config || ChatConfig.loadChatConfig(chatId);
+        
+        // Update cache control mode
+        config.optimisation.cacheControl = cacheMode;
+
+        // Update chat config
+        chat.config = config;
+
+        // Recreate MessageOptimizer with new settings
+        const optimizerSettings = {
+            ...config,
+            llmProviderFactory: config.optimisation.toolSummarisation.enabled ? window.createLLMProvider : undefined
+        };
+        
+        try {
+            chat.messageOptimizer = new MessageOptimizer(optimizerSettings);
+        } catch (error) {
+            console.error('[updateCacheControlMode] Failed to create MessageOptimizer:', error);
+        }
+
+        // Save config
+        this.saveChatConfigSmart(chatId, config);
+        
+        // Auto-save chat
+        this.autoSave(chatId);
+    }
     
     updateChatModel(chatId, model) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[updateChatModel] Chat not found for chatId: ${chatId}, model: ${model}`);
+            return;
+        }
         
         // Update config
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
@@ -2306,7 +2472,10 @@ class NetdataMCPChat {
     
     updateToolSummarizationModel(chatId, model) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[updateToolSummarizationModel] Chat not found for chatId: ${chatId}, model: ${model}`);
+            return;
+        }
         
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
         config.optimisation.toolSummarisation.model = ChatConfig.modelConfigFromString(model);
@@ -2319,7 +2488,10 @@ class NetdataMCPChat {
     
     updateAutoSummarizationModel(chatId, model) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[updateAutoSummarizationModel] Chat not found for chatId: ${chatId}, model: ${model}`);
+            return;
+        }
         
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
         config.optimisation.autoSummarisation.model = ChatConfig.modelConfigFromString(model);
@@ -2332,7 +2504,10 @@ class NetdataMCPChat {
     
     updateTitleGenerationModel(chatId, model) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[updateTitleGenerationModel] Chat not found for chatId: ${chatId}, model: ${model}`);
+            return;
+        }
         
         const config = chat.config || ChatConfig.loadChatConfig(chatId);
         // Use feature-specific defaults for title generation
@@ -2911,7 +3086,7 @@ class NetdataMCPChat {
                 }
                 
                 // Update error state
-                this.showError(chatId, errorMessage, errorType);
+                this.showError(errorMessage, chatId, false, errorType);
                 
                 // Add error message
                 this.addMessage(chatId, { 
@@ -2939,8 +3114,8 @@ class NetdataMCPChat {
         
         // Continue the loop
         while (true) {
-            // Check if we should stop processing
-            if (this.shouldStopProcessing) {
+            // Check if we should stop processing for this chat
+            if (chat.shouldStopProcessing) {
                 break;
             }
             
@@ -3055,9 +3230,9 @@ class NetdataMCPChat {
                 
                 // Clean and add to messages for API
                 const cleanedContent = this.cleanContentForAPI(response.content);
-                if (cleanedContent && cleanedContent.trim()) {
-                    messages.push({ role: 'assistant', content: cleanedContent });
-                }
+                // Always add assistant message when no tool calls, even if content is empty
+                // This prevents infinite loops when LLM responds with only thinking tags
+                messages.push({ role: 'assistant', content: cleanedContent || '' });
             }
             return;
         }
@@ -3168,6 +3343,25 @@ class NetdataMCPChat {
                     turn: chat.currentTurn
                 });
                 
+                // CRITICAL: Now that tool-results are added, update sub-chat costs
+                for (const toolResult of toolResults) {
+                    if (toolResult.subChatId && toolResult.wasProcessedBySubChat) {
+                        const subChat = this.chats.get(toolResult.subChatId);
+                        if (subChat) {
+                            // Ensure sub-chat has up-to-date token pricing
+                            this.updateChatTokenPricing(subChat);
+                            // Store costs in parent tool-result
+                            this.updateParentToolResultCosts(chat.id, toolResult.toolCallId, subChat);
+                        } else {
+                            console.error(`[processSingleLLMResponse] ERROR: Sub-chat ${toolResult.subChatId} not found when trying to update parent costs for tool ${toolResult.toolCallId}`);
+                        }
+                    }
+                }
+                
+                // CRITICAL FIX: Update parent chat token pricing to include all sub-chat costs
+                this.updateChatTokenPricing(chat);
+                this.updateAllTokenDisplays(chat.id);
+                
                 // Add to messages for API
                 const includedResults = toolResults.filter(tr => tr.includeInContext !== false);
                 if (includedResults.length > 0) {
@@ -3182,28 +3376,7 @@ class NetdataMCPChat {
                     
                     messages.push(toolResultsMessage);
                     
-                    // Tool summarization if enabled
-                    if (chat.messageOptimizer && chat.config?.optimisation?.toolSummarisation?.enabled) {
-                        try {
-                            const toolSchemas = new Map();
-                            for (const tool of tools) {
-                                toolSchemas.set(tool.name, tool);
-                            }
-                            
-                            const summarizedMessages = await chat.messageOptimizer.performToolSummarization(
-                                messages,
-                                {
-                                    toolSchemas,
-                                    providerInfo: { url: provider.proxyUrl }
-                                }
-                            );
-                            
-                            messages.length = 0;
-                            messages.push(...summarizedMessages);
-                        } catch (error) {
-                            console.error('[Tool Summarization] Failed:', error);
-                        }
-                    }
+                    // Sub-chats are now processed immediately during tool execution (interleaved)
                 }
                 
                 // Reset assistant group and show thinking spinner for next iteration
@@ -3252,23 +3425,108 @@ class NetdataMCPChat {
                     ? result.length 
                     : JSON.stringify(result).length;
                 
-                // Show result
-                this.processRenderEvent({ 
-                    type: 'tool-result', 
-                    name: toolCall.name, 
-                    result, 
-                    toolCallId: toolCall.id,
-                    responseTime: toolResponseTime, 
-                    responseSize, 
-                    messageIndex: assistantMessageIndex 
-                }, chat.id);
+                // Check if we should create a sub-chat for this tool response
+                // eslint-disable-next-line no-await-in-loop
+                const shouldCreateSubChat = await this.shouldCreateSubChat(chat, responseSize, toolCall);
+
+                // Show result only if we're not creating a sub-chat
+                if (!shouldCreateSubChat) {
+                    this.processRenderEvent({ 
+                        type: 'tool-result', 
+                        name: toolCall.name, 
+                        result, 
+                        toolCallId: toolCall.id,
+                        responseTime: toolResponseTime, 
+                        responseSize, 
+                        messageIndex: assistantMessageIndex 
+                    }, chat.id);
+                }
                 
-                toolResults.push({
-                    toolCallId: toolCall.id,
-                    name: toolCall.name,
-                    result,
-                    includeInContext: true
-                });
+                if (shouldCreateSubChat) {
+                    console.log(`[executeToolCalls] Creating sub-chat for tool ${toolCall.id} (${toolCall.name})`);
+                    
+                    // Create sub-chat for processing this tool response
+                    // eslint-disable-next-line no-await-in-loop
+                    const subChatId = await this.createSubChatForTool(chat, toolCall, result);
+                    
+                    console.log(`[executeToolCalls] Created sub-chat ${subChatId} for tool ${toolCall.id}`);
+                    
+                    // Show secondary assistant waiting spinner for main chat
+                    this.showSecondaryAssistantWaiting(chat.id);
+                    
+                    // Render sub-chat DOM BEFORE processing starts so users can see it populate
+                    this.renderSubChatAsItem(chat.id, subChatId, toolCall.id, 'processing');
+                    
+                    // CRITICAL: Ensure the sub-chat container is available before processing
+                    // The container should have been created by renderSubChatAsItem
+                    const subChatContainer = this.chatContainers.get(subChatId);
+                    if (!subChatContainer) {
+                        console.error(`[executeToolCalls] Sub-chat container not found after renderSubChatAsItem for ${subChatId}`);
+                        // Update status to failed since we can't process without a container
+                        this.updateSubChatStatus(chat.id, toolCall.id, 'failed');
+                        continue;
+                    }
+                    
+                    // Process the sub-chat immediately (interleaved execution)
+                    let summarizedResult = null;
+                    try {
+                        // eslint-disable-next-line no-await-in-loop
+                        summarizedResult = await this.processSubChat(subChatId, chat.id, toolCall.id);
+                        
+                        if (!summarizedResult) {
+                            console.warn('[Sub-chat Processing] No summarized result returned, keeping original');
+                        } else {
+                            console.log(`[Sub-chat Processing] Replacing tool result for ${toolCall.id} with summarized content (${summarizedResult.length} chars)`);
+                        }
+                        
+                        // Update sub-chat status to final state
+                        this.updateSubChatStatus(chat.id, toolCall.id, summarizedResult ? 'success' : 'failed');
+                    } catch (error) {
+                        console.error('[Sub-chat Processing] Failed:', error);
+                        // Update sub-chat status to failed
+                        this.updateSubChatStatus(chat.id, toolCall.id, 'failed');
+                    }
+                    
+                    // Hide secondary assistant waiting spinner
+                    this.hideSecondaryAssistantWaiting(chat.id);
+                    
+                    this.processRenderEvent({ 
+                        type: 'tool-result', 
+                        name: toolCall.name, 
+                        result: summarizedResult || result, // Use summarized result if available
+                        toolCallId: toolCall.id,
+                        responseTime: toolResponseTime, 
+                        responseSize, 
+                        messageIndex: assistantMessageIndex,
+                        subChatId,
+                        wasProcessedBySubChat: !!summarizedResult
+                    }, chat.id);
+                    
+                    // Add the processed tool result
+                    const processedToolResult = {
+                        toolCallId: toolCall.id,
+                        name: toolCall.name,
+                        result: summarizedResult || result, // Use summarized result if available
+                        includeInContext: true,
+                        subChatId, // Keep for tracking
+                        wasProcessedBySubChat: !!summarizedResult,
+                        subChatFailed: !summarizedResult
+                    };
+                    toolResults.push(processedToolResult);
+                    
+                    // Update the DOM display to show final state
+                    this.updateToolResultDisplay(chat.id, toolCall.id, processedToolResult);
+                    
+                    // CRITICAL: Save the updated parent chat with summarized results
+                    this.autoSave(chat.id);
+                } else {
+                    toolResults.push({
+                        toolCallId: toolCall.id,
+                        name: toolCall.name,
+                        result,
+                        includeInContext: true
+                    });
+                }
                 
             } catch (error) {
                 const errorMsg = `Tool error (${toolCall.name}): ${error.message}`;
@@ -3322,7 +3580,7 @@ class NetdataMCPChat {
         try {
             // Track timing
             const llmStartTime = Date.now();
-            const response = await provider.sendMessage(messages, tools, temperature, cacheControlIndex);
+            const response = await provider.sendMessage(messages, tools, temperature, chat.config.optimisation.cacheControl || 'all-off', cacheControlIndex, chat);
             const llmResponseTime = Date.now() - llmStartTime;
             
             // Store response time
@@ -3400,7 +3658,7 @@ class NetdataMCPChat {
         chat.isProcessing = false;
         
         // Clear stop-related flags to ensure they're ready for next time
-        this.shouldStopProcessing = false;
+        chat.shouldStopProcessing = false;
         chat.processingWasStoppedByUser = false;
         
         // Clear error state on successful conclusion
@@ -3419,20 +3677,29 @@ class NetdataMCPChat {
         chat.updatedAt = new Date().toISOString();
         this.autoSave(chatId);
         
-        // Re-enable input if it's the active chat
-        if (chatId === this.getActiveChatId()) {
-            const container = this.getChatContainer(chatId);
-            if (container && container._elements) {
-                const input = container._elements.input;
-                if (input) {
-                    input.disabled = false;
+        // Always re-enable input for the chat that concluded
+        const container = this.getChatContainer(chatId);
+        if (container && container._elements) {
+            const input = container._elements.input;
+            if (input) {
+                // Always re-enable contentEditable
+                input.contentEditable = true;
+                
+                // Only focus if this is the active chat
+                if (chatId === this.getActiveChatId()) {
                     input.focus();
                 }
-                
-                // Update send button state
-                const sendBtn = container._elements.sendBtn;
-                if (sendBtn && input) {
-                    sendBtn.disabled = !input.value.trim();
+            }
+            
+            // Update send button state
+            const sendBtn = container._elements.sendBtn;
+            if (sendBtn && input) {
+                try {
+                    const content = this.getEditableContent(input).trim();
+                    sendBtn.disabled = !content;
+                } catch (error) {
+                    console.error('[assistantConcluded] ERROR getting editable content:', error);
+                    sendBtn.disabled = true;
                 }
             }
         }
@@ -3467,7 +3734,7 @@ class NetdataMCPChat {
         chat.isProcessing = false;
         
         // Clear stop-related flags when failure is handled
-        this.shouldStopProcessing = false;
+        chat.shouldStopProcessing = false;
         chat.processingWasStoppedByUser = false;
         
         // Clear current assistant group
@@ -3483,20 +3750,105 @@ class NetdataMCPChat {
         chat.updatedAt = new Date().toISOString();
         this.autoSave(chatId);
         
-        // Re-enable input if it's the active chat and not rate limited
-        if (!isRateLimitHandled && chatId === this.getActiveChatId()) {
+        // Re-enable input if not rate limited (always for the chat that failed)
+        if (!isRateLimitHandled) {
             const container = this.getChatContainer(chatId);
             if (container && container._elements) {
                 const input = container._elements.input;
                 if (input) {
-                    input.disabled = false;
-                    input.focus();
+                    // Always re-enable contentEditable
+                    input.contentEditable = true;
+                    
+                    // Only focus if this is the active chat
+                    if (chatId === this.getActiveChatId()) {
+                        input.focus();
+                    }
                 }
             }
         }
     }
     
-    showError(message, chatId, saveToMessages = true) {
+    /**
+     * Shows a professional confirmation dialog modal
+     * @param {string} title - Dialog title
+     * @param {string} message - Confirmation message
+     * @param {string} confirmText - Text for confirm button (default: 'OK')
+     * @param {string} cancelText - Text for cancel button (default: 'Cancel')
+     * @param {boolean} isDanger - Whether this is a dangerous action (shows red confirm button)
+     * @returns {Promise<boolean>} - Resolves to true if confirmed, false if cancelled
+     */
+    showConfirmDialog(title, message, confirmText = 'OK', cancelText = 'Cancel', isDanger = false) {
+        return new Promise((resolve) => {
+            // Create modal container
+            const modal = document.createElement('div');
+            modal.className = 'confirm-modal-container';
+            modal.innerHTML = `
+                <div class="confirm-modal-backdrop"></div>
+                <div class="confirm-modal">
+                    <div class="confirm-modal-header">
+                        <h3>${this.escapeHtml(title)}</h3>
+                    </div>
+                    <div class="confirm-modal-body">
+                        <p>${this.escapeHtml(message)}</p>
+                    </div>
+                    <div class="confirm-modal-footer">
+                        <button class="btn btn-secondary confirm-cancel">${this.escapeHtml(cancelText)}</button>
+                        <button class="btn ${isDanger ? 'btn-danger' : 'btn-primary'} confirm-ok">${this.escapeHtml(confirmText)}</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Focus the confirm button
+            const confirmBtn = modal.querySelector('.confirm-ok');
+            const cancelBtn = modal.querySelector('.confirm-cancel');
+            confirmBtn.focus();
+            
+            // Define all functions using function declarations to avoid hoisting issues
+            function cleanup() {
+                modal.remove();
+                document.removeEventListener('keydown', handleKeydown);
+            }
+            
+            function handleConfirm() {
+                cleanup();
+                resolve(true);
+            }
+            
+            function handleCancel() {
+                cleanup();
+                resolve(false);
+            }
+            
+            function handleKeydown(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleConfirm();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    handleCancel();
+                }
+            }
+            
+            // Add event listeners
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+            modal.querySelector('.confirm-modal-backdrop').addEventListener('click', handleCancel);
+            document.addEventListener('keydown', handleKeydown);
+        });
+    }
+    
+    /**
+     * Escapes HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    showError(message, chatId, saveToMessages = true, errorType = 'general') {
         // Log to console
         console.error('MCP Client Error:', message, chatId ? `(Chat ID: ${chatId})` : '(Global)');
         
@@ -3520,20 +3872,32 @@ class NetdataMCPChat {
         if (chatId) {
             const chat = this.chats.get(chatId);
             
-            // Save to messages if requested and chat exists
-            if (saveToMessages && chat) {
-                const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
-                this.addMessage(chatId, { 
-                    role: 'error', 
-                    content: message, 
-                    errorMessageIndex: lastUserMessageIndex,
-                    timestamp: new Date().toISOString()
-                });
+            if (chat) {
+                // Clear any spinners (from second method)
+                this.clearSpinnerState(chatId);
                 
-                // Set error state so the chat list shows the warning icon
+                // Save to messages if requested
+                if (saveToMessages) {
+                    const lastUserMessageIndex = chat.messages.findLastIndex(m => m.role === 'user');
+                    this.addMessage(chatId, { 
+                        role: 'error', 
+                        content: message, 
+                        errorMessageIndex: lastUserMessageIndex,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
+                // Set error state with structured error object (enhanced from second method)
                 chat.hasError = true;
-                chat.lastError = message;
+                chat.lastError = {
+                    message,
+                    type: errorType,
+                    timestamp: Date.now()
+                };
+                
+                // Update UI
                 this.updateChatSessions();
+                this.updateChatTileStatus(chatId);
             }
             
             const container = this.getChatContainer(chatId);
@@ -3961,10 +4325,17 @@ class NetdataMCPChat {
     }
 
     clearLog() {
-        if (confirm('Clear all communication logs?')) {
-            this.communicationLog = [];
-            this.logContent.innerHTML = '';
-        }
+        this.showConfirmDialog(
+            'Clear Communication Log',
+            'Are you sure you want to clear all communication logs?',
+            'Clear',
+            'Cancel'
+        ).then(confirmed => {
+            if (confirmed) {
+                this.communicationLog = [];
+                this.logContent.innerHTML = '';
+            }
+        });
     }
 
     downloadLog() {
@@ -4214,8 +4585,6 @@ class NetdataMCPChat {
         // Auto-detect the proxy URL from the current origin
         const proxyUrl = window.location.origin;
         
-        // console.log('Fetching models from:', `${proxyUrl}/models`);
-        
         try {
             // Fetch available models from the same origin
             const response = await fetch(`${proxyUrl}/models`);
@@ -4225,8 +4594,6 @@ class NetdataMCPChat {
             
             const data = await response.json();
             const providers = data.providers || {};
-            
-            // console.log('Received providers data from proxy:', providers);
             
             if (Object.keys(providers).length === 0) {
                 console.warn('No LLM providers configured in proxy');
@@ -4557,7 +4924,18 @@ class NetdataMCPChat {
     }
 
     async removeMcpServer(serverId) {
-        if (confirm('Remove this MCP server?')) {
+        const server = this.mcpServers.get(serverId);
+        const serverName = server ? server.name : 'this MCP server';
+        
+        const confirmed = await this.showConfirmDialog(
+            'Remove MCP Server',
+            `Are you sure you want to remove "${serverName}"?`,
+            'Remove',
+            'Cancel',
+            true // danger style
+        );
+        
+        if (confirmed) {
             // Disconnect if connected
             const connection = this.mcpConnections.get(serverId);
             if (connection) {
@@ -4597,16 +4975,15 @@ class NetdataMCPChat {
         // Check if there's an unsaved chat
         const unsavedChat = Array.from(this.chats.values()).find(chat => chat.isSaved === false);
         if (unsavedChat) {
+            console.log(`[createNewChatDirectly] Found unsaved chat: ${unsavedChat.id}, will switch to it instead of creating new`);
             const activeChatId = this.getActiveChatId();
-            console.log('[createNewChatDirectly] Found unsaved chat:', unsavedChat.id, 'Active chat:', activeChatId);
-            
+
             // Check if we're already in the unsaved chat
             if (activeChatId === unsavedChat.id) {
                 // Already in the unsaved chat, just show toast
                 this.showToast('Please use the current chat or save it by sending a message before creating a new one.');
             } else {
                 // Switch to the unsaved chat instead of creating a new one
-                console.log('[createNewChatDirectly] Switching to unsaved chat:', unsavedChat.id);
                 this.loadChat(unsavedChat.id);
             }
             return;
@@ -4674,21 +5051,53 @@ class NetdataMCPChat {
     
     // Per-chat DOM management
     getChatContainer(chatId) {
-        if (!this.chatContainers.has(chatId)) {
-            const container = this.createChatDOM(chatId);
-            if (container) {
-                this.chatContainersEl.appendChild(container);
-                this.chatContainers.set(chatId, container);
-                
-                // Apply any pending connection state
-                const chat = this.chats.get(chatId);
-                if (chat && chat.pendingConnectionState) {
-                    this.updateChatConnectionUI(chatId, chat.pendingConnectionState.state, chat.pendingConnectionState.details);
-                    delete chat.pendingConnectionState;
-                }
+        // All containers (including sub-chats) are now in chatContainers
+        // No more temporary containers!
+        
+        // First check if container already exists
+        if (this.chatContainers.has(chatId)) {
+            return this.chatContainers.get(chatId);
+        }
+        
+        // Container doesn't exist - need to create one
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error(`[getChatContainer] Chat ${chatId} not found`);
+            return null;
+        }
+        
+        // Create container based on chat type
+        if (chat.isSubChat) {
+            // Sub-chats should ONLY have containers created by renderSubChatAsItem
+            // If we're here, it means there's a sequencing error
+            console.error(`[getChatContainer] CRITICAL: Attempted to get container for sub-chat ${chatId} before renderSubChatAsItem was called. This is a bug in the code flow.`);
+            console.trace(); // Show stack trace to debug the issue
+            return null; // Return null to fail fast
+        }
+        
+        // Regular chat - create full DOM
+        const container = this.createChatDOM(chatId);
+        if (container) {
+            this.chatContainersEl.appendChild(container);
+            this.chatContainers.set(chatId, container);
+            
+            // Apply any pending connection state
+            if (chat.pendingConnectionState) {
+                this.updateChatConnectionUI(chatId, chat.pendingConnectionState.state, chat.pendingConnectionState.details);
+                delete chat.pendingConnectionState;
             }
         }
-        return this.chatContainers.get(chatId);
+        
+        return container;
+    }
+    
+    // Helper method to get the input element for a specific chat
+    getChatInput(chatId) {
+        const container = this.getChatContainer(chatId);
+        if (container && container._elements && container._elements.input) {
+            return container._elements.input;
+        }
+        return null;
     }
     
     createChatDOM(chatId) {
@@ -4791,11 +5200,12 @@ class NetdataMCPChat {
                 <div class="chat-input-container">
                     <button class="reconnect-mcp-btn btn btn-primary" style="display: none;">Reconnect MCP Server</button>
                     <div class="chat-input-wrapper">
-                        <textarea 
+                        <div 
                             class="chat-input" 
-                            placeholder="Ask about your Netdata metrics..."
-                            rows="3"
-                        ></textarea>
+                            contenteditable="true"
+                            data-placeholder="Ask about your Netdata metrics..."
+                            style="min-height: 4.5em; max-height: 200px; overflow-y: auto; white-space: pre-wrap;"
+                        ></div>
                         <button class="send-message-btn btn btn-send">Send</button>
                     </div>
                 </div>
@@ -4855,13 +5265,18 @@ class NetdataMCPChat {
         
         // Send button
         elements.sendBtn.addEventListener('click', () => {
-            if (this.isProcessing) {
-                // Stop processing
-                console.log('[Stop Button] Setting shouldStopProcessing = true');
-                this.shouldStopProcessing = true;
-                this.isProcessing = false;
-                this.updateSendButton();
-                this.chatInput.disabled = false;
+            if (chat && chat.isProcessing) {
+                // Stop processing for this specific chat
+                chat.shouldStopProcessing = true;
+                chat.isProcessing = false;
+                this.updateSendButton(chatId);
+                // Re-enable chat-specific input
+                if (elements.input) {
+                    elements.input.contentEditable = true;
+                } else if (!chat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[sendBtn.click] ERROR: Could not find input element when stopping processing for chat', chatId);
+                }
                 // Don't add a system message as it breaks message sequencing
                 // The assistantFailed handler will take care of the UI feedback
             } else {
@@ -4875,11 +5290,12 @@ class NetdataMCPChat {
         
         // Input field
         elements.input.addEventListener('input', (e) => {
-            // Save draft in memory only - don't update UI or save to storage on every keystroke
-            chat.draftMessage = e.target.value;
+            // For contentEditable, get content while preserving formatting
+            const content = this.getEditableContent(e.target);
+            chat.draftMessage = content;
             
             // Update send button state
-            elements.sendBtn.disabled = !e.target.value.trim();
+            elements.sendBtn.disabled = !content.trim();
             
             // Debounce saving to storage - save after 2 seconds of no typing
             if (this.draftSaveTimeout) {
@@ -4889,6 +5305,37 @@ class NetdataMCPChat {
                 this.autoSave(chatId);
                 // Still don't update UI here - just save to storage
             }, 2000);
+        });
+        
+        // Handle paste events to convert HTML to markdown immediately
+        elements.input.addEventListener('paste', (e) => {
+            e.preventDefault(); // Prevent default paste
+            
+            // Get clipboard data
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+            
+            // Try to get HTML content first, fall back to plain text
+            let content = clipboardData.getData('text/html');
+            const hasHtml = content && content.trim() !== '';
+            
+            if (!hasHtml) {
+                // No HTML, just use plain text
+                content = clipboardData.getData('text/plain');
+                if (content) {
+                    // Insert plain text at cursor position
+                    document.execCommand('insertText', false, content);
+                }
+                return;
+            }
+            
+            // Convert HTML to markdown
+            const markdown = this.convertHtmlToMarkdown(content);
+            
+            // Insert markdown as plain text
+            if (markdown) {
+                document.execCommand('insertText', false, markdown);
+            }
         });
         
         // Enter to send
@@ -4965,10 +5412,10 @@ class NetdataMCPChat {
         this.chatContainers.forEach(container => {
             const elements = container._elements;
             if (elements) {
-                if (elements.llmModelDropdown !== dropdownEl) {
+                if (elements.llmModelDropdown && elements.llmModelDropdown !== dropdownEl) {
                     elements.llmModelDropdown.style.display = 'none';
                 }
-                if (elements.mcpServerDropdown !== dropdownEl) {
+                if (elements.mcpServerDropdown && elements.mcpServerDropdown !== dropdownEl) {
                     elements.mcpServerDropdown.style.display = 'none';
                 }
             }
@@ -4983,7 +5430,6 @@ class NetdataMCPChat {
         if (this.pendingNewChatId === chatId && this.userHasSelectedChat) {
             const activeChatId = this.getActiveChatId();
             if (activeChatId && activeChatId !== chatId) {
-                console.log('Blocking DOM switch to new chat - user already selected:', activeChatId);
                 return;
             }
         }
@@ -4995,7 +5441,9 @@ class NetdataMCPChat {
         
         // Hide all chat containers
         this.chatContainers.forEach((container, id) => {
-            container.classList.remove('active');
+            if (container && container.classList) {
+                container.classList.remove('active');
+            }
             const chat = this.chats.get(id);
             if (chat) {
                 chat.isActive = false;
@@ -5012,8 +5460,7 @@ class NetdataMCPChat {
             if (chat) {
                 chat.isActive = true;
                 
-                // Update global references for compatibility
-                this.chatInput = container._elements.input;
+                // No longer need to update global chatInput reference
                 this.sendMessageBtn = container._elements.sendBtn;
                 this.reconnectMcpBtn = container._elements.reconnectBtn;
                 this.chatTitle = container._elements.title;
@@ -5080,12 +5527,6 @@ class NetdataMCPChat {
             // Create display string with unique models
             const uniqueModels = [...new Set(modelsInUse.values())];
             const modelDisplay = uniqueModels.join(' / ');
-            
-            // Create tooltip content
-            const tooltipLines = [];
-            modelsInUse.forEach((model, purpose) => {
-                tooltipLines.push(`${purpose.padEnd(10)} | ${model}`);
-            });
             
             // Update model display in the header
             const modelNameSpan = elements.llmMeta.querySelector('.model-name');
@@ -5154,9 +5595,9 @@ class NetdataMCPChat {
             if (mcpConnection && mcpConnection.isReady()) {
                 // Only enable if connection ready AND chat not busy
                 if (!chat.isProcessing && !chat.spinnerState) {
-                    elements.input.disabled = false;
+                    elements.input.contentEditable = true;
                     elements.sendBtn.disabled = false;
-                    elements.input.placeholder = 'Ask about your Netdata metrics...';
+                    elements.input.setAttribute('data-placeholder', 'Ask about your Netdata metrics...');
                     elements.reconnectBtn.style.display = 'none';
                     
                     // Focus input if this is the active chat
@@ -5165,9 +5606,9 @@ class NetdataMCPChat {
                     }
                 } else {
                     // Chat is busy - keep input disabled but hide reconnect button
-                    elements.input.disabled = true;
+                    elements.input.contentEditable = false;
                     elements.sendBtn.disabled = true;
-                    elements.input.placeholder = 'Processing...';
+                    elements.input.setAttribute('data-placeholder', 'Processing...');
                     elements.reconnectBtn.style.display = 'none';
                 }
                 
@@ -5190,6 +5631,11 @@ class NetdataMCPChat {
         const selectedModel = options.model;
         let title = options.title || '';
         const isSaved = options.isSaved !== undefined ? options.isSaved : true;
+        
+        // Sub-chat support
+        const parentChatId = options.parentChatId || null;
+        const parentToolCallId = options.parentToolCallId || null;
+        const toolMetadata = options.toolMetadata || null;
         
         if (!mcpServerId || !llmProviderId) {
             this.showError('Cannot create chat: Missing MCP server or LLM provider', null);
@@ -5258,7 +5704,12 @@ class NetdataMCPChat {
             // Per-chat assistant group tracking (DOM element for grouping messages)
             currentAssistantGroup: null,
             // Per-chat pending tool calls map
-            pendingToolCalls: new Map()
+            pendingToolCalls: new Map(),
+            // Sub-chat support
+            parentChatId,
+            isSubChat: !!parentChatId,
+            parentToolCallId,
+            toolMetadata
         };
         
         // Create isolated MessageOptimizer instance for this chat
@@ -5276,8 +5727,10 @@ class NetdataMCPChat {
             model: selectedModel
         });
         
-        // Save the config for next time
-        ChatConfig.saveLastConfig(chatConfig);
+        // Save the config for next time (but not for sub-chats)
+        if (!chat.isSubChat) {
+            ChatConfig.saveLastConfig(chatConfig);
+        }
         
         // Only save settings if this is a saved chat
         if (isSaved) {
@@ -5330,6 +5783,7 @@ class NetdataMCPChat {
         }
         
         const sortedChats = Array.from(this.chats.values())
+            .filter(chat => !chat.isSubChat) // Hide sub-chats from sidebar
             .sort((a, b) => {
                 // Show unsaved chats first
                 if (a.isSaved === false && b.isSaved !== false) {return -1;}
@@ -5566,7 +6020,6 @@ class NetdataMCPChat {
         
         // If user has already selected a chat and this is the auto-created new chat trying to load, ignore it
         if (this.userHasSelectedChat && this.pendingNewChatId === chatId && this.getActiveChatId() !== chatId) {
-            console.log('Blocking auto-load of new chat because user already selected a different chat');
             return;
         }
         
@@ -5575,7 +6028,6 @@ class NetdataMCPChat {
         
         // Cancel any pending new chat load if this is a different chat
         if (this.pendingNewChatId && this.pendingNewChatId !== chatId) {
-            console.log('User selected different chat, cancelling new chat load');
             this.pendingNewChatLoad = false;
             // Don't clear pendingNewChatId here - we need it to block the switch
             
@@ -5622,12 +6074,8 @@ class NetdataMCPChat {
         
         // Migrate old chat data if needed
         if (!chat.totalTokensPrice || !chat.perModelTokensPrice) {
-            // console.log('[loadChat] Migrating token pricing for chat:', chatId);
             this.migrateTokenPricing(chat);
         }
-        
-        // Log the totalTokensPrice after migration
-        // console.log('[loadChat] totalTokensPrice after migration:', chat.totalTokensPrice);
         
         // Initialize token usage history for this chat if it doesn't exist
         if (!this.tokenUsageHistory.has(chatId)) {
@@ -5683,23 +6131,23 @@ class NetdataMCPChat {
                 if (mcpConnection && mcpConnection.isReady()) {
                     // Only enable if connection ready AND chat not busy
                     if (!chat.isProcessing && !chat.spinnerState) {
-                        elements.input.disabled = false;
+                        elements.input.contentEditable = true;
                         elements.sendBtn.disabled = false;
-                        elements.input.placeholder = 'Ask about your Netdata metrics...';
+                        elements.input.setAttribute('data-placeholder', 'Ask about your Netdata metrics...');
                         elements.reconnectBtn.style.display = 'none';
                     } else {
                         // Chat is busy - keep input disabled
-                        elements.input.disabled = true;
+                        elements.input.contentEditable = false;
                         elements.sendBtn.disabled = true;
-                        elements.input.placeholder = 'Processing...';
+                        elements.input.setAttribute('data-placeholder', 'Processing...');
                         elements.reconnectBtn.style.display = 'none';
                     }
                     
                 } else {
                     // Connection exists but not ready yet
-                    elements.input.disabled = true;
+                    elements.input.contentEditable = false;
                     elements.sendBtn.disabled = true;
-                    elements.input.placeholder = 'Connecting to MCP server...';
+                    elements.input.setAttribute('data-placeholder', 'Connecting to MCP server...');
                     elements.reconnectBtn.style.display = 'none';
                     
                     // Check again in a moment
@@ -5711,9 +6159,9 @@ class NetdataMCPChat {
                 }
             } else {
                 // No connection yet - try to establish it
-                elements.input.disabled = true;
+                elements.input.contentEditable = false;
                 elements.sendBtn.disabled = true;
-                elements.input.placeholder = 'Connecting to MCP server...';
+                elements.input.setAttribute('data-placeholder', 'Connecting to MCP server...');
                 elements.reconnectBtn.style.display = 'none';
                 
                 // Try to establish connection
@@ -5728,21 +6176,21 @@ class NetdataMCPChat {
                         // Connection failed
                         console.error('Failed to connect to MCP server:', error);
                         if (this.getActiveChatId() === chatId) {
-                            elements.input.placeholder = 'MCP server connection failed - click Reconnect';
+                            elements.input.setAttribute('data-placeholder', 'MCP server connection failed - click Reconnect');
                             elements.reconnectBtn.style.display = 'block';
                         }
                     });
             }
         } else {
-            elements.input.disabled = true;
+            elements.input.contentEditable = false;
             elements.sendBtn.disabled = true;
             
             if (!server) {
-                elements.input.placeholder = 'MCP server not found';
+                elements.input.setAttribute('data-placeholder', 'MCP server not found');
             } else if (!provider) {
-                elements.input.placeholder = 'LLM provider not found';
+                elements.input.setAttribute('data-placeholder', 'LLM provider not found');
             } else {
-                elements.input.placeholder = 'MCP server or LLM provider not available';
+                elements.input.setAttribute('data-placeholder', 'MCP server or LLM provider not available');
             }
         }
         
@@ -5758,7 +6206,8 @@ class NetdataMCPChat {
                 currentStepInTurn: 1
             };
         }
-        this.currentContextWindow = 0; // Reset context window counter for delta calculation
+        // Reset context window counter for delta calculation (stored per chat)
+        chat.currentContextWindow = 0;
         
         // Check if we need to re-render messages
         // Re-render if: 1) Never rendered before, 2) DOM is empty (switched from another chat), 3) Force render requested
@@ -5919,6 +6368,9 @@ class NetdataMCPChat {
             
             // Mark chat as rendered  
             chat.hasBeenRendered = true;
+            
+            // For loaded chats, sub-chats are already rendered as part of tool results
+            // via the sub-chat-indicator in addToolResult, so we don't need to render them separately
         }
         
         // Update global toggle UI based on chat's tool inclusion mode
@@ -5951,13 +6403,20 @@ class NetdataMCPChat {
                     
                     // Focus the chat input after scrolling
                     const chatInput = container && container._elements && container._elements.input;
-                    if (chatInput && !chatInput.disabled) {
+                    if (chatInput && chatInput.contentEditable === 'true') {
                         chatInput.focus();
                     }
                     
                     // Restore draft message if exists
                     if (chatInput && chat.draftMessage) {
-                        chatInput.value = chat.draftMessage;
+                        // Convert markdown to HTML for contentEditable display
+                        const htmlContent = chat.draftMessage
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/\n/g, '<br>');
+                        chatInput.innerHTML = htmlContent;
+                        
                         // Update send button state
                         const sendBtn = container._elements.sendBtn;
                         if (sendBtn) {
@@ -6083,7 +6542,9 @@ class NetdataMCPChat {
                         name: result.name || result.toolName, 
                         result: result.result,
                         toolCallId: result.toolCallId,  // Required tool call ID for matching
-                        includeInContext: result.includeInContext
+                        includeInContext: result.includeInContext,
+                        subChatId: result.subChatId,  // Include sub-chat ID if present
+                        wasProcessedBySubChat: result.wasProcessedBySubChat  // Include processing status
                     });
                 }
                 // Reset assistant group after tool results
@@ -6195,7 +6656,31 @@ class NetdataMCPChat {
                 break;
                 
             case 'tool-result':
-                this.addToolResult(event.name, event.result, chatId, event.responseTime || 0, event.responseSize || null, event.includeInContext, event.messageIndex, event.toolCallId);
+                // Check if we need to render sub-chat DOM for loaded chats
+                if (event.subChatId) {
+                    const subChat = this.chats.get(event.subChatId);
+                    if (!subChat) {
+                        console.error(`[processRenderEvent] Sub-chat not found for subChatId: ${event.subChatId} in tool-result event for chatId: ${chatId}, toolCallId: ${event.toolCallId}`);
+                        break;
+                    }
+                    if (subChat) {
+                        // Check if sub-chat DOM already exists
+                        const container = this.getChatContainer(chatId);
+                        const existingSubChatDom = container && container._elements.messages.querySelector(`[data-sub-chat-id="${event.subChatId}"]`);
+                        
+                        if (!existingSubChatDom) {
+                            console.log(`[processRenderEvent] Sub-chat DOM not found for ${event.subChatId}, creating it now`);
+                            // Determine status based on whether the sub-chat successfully processed the tool
+                            const status = event.wasProcessedBySubChat ? 'success' : 'failed';
+                            // Render sub-chat DOM element
+                            this.renderSubChatAsItem(chatId, event.subChatId, event.toolCallId, status);
+                        } else {
+                            console.log(`[processRenderEvent] Sub-chat DOM already exists for ${event.subChatId}, skipping duplicate creation`);
+                        }
+                    }
+                }
+                
+                this.addToolResult(event.name, event.result, chatId, event.responseTime || 0, event.responseSize || null, event.includeInContext, event.messageIndex, event.toolCallId, event.subChatId);
                 break;
                 
                 
@@ -6270,8 +6755,8 @@ class NetdataMCPChat {
                     };
                     
                     messageDiv.appendChild(retryBtn);
-                } else if (event.errorType !== 'safety_limit' && (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0)) {
-                    // This error has context - use redo button
+                } else if (!chat.isSubChat && event.errorType !== 'safety_limit' && (event.errorMessageIndex !== undefined && event.errorMessageIndex >= 0)) {
+                    // This error has context - use redo button (but not in sub-chats)
                     const redoBtn = document.createElement('button');
                     redoBtn.className = 'redo-button';
                     redoBtn.textContent = 'Redo';
@@ -6297,7 +6782,10 @@ class NetdataMCPChat {
                         
                         // Remove the error message from chat
                         const currentChat = this.chats.get(retryChatId);
-                        if (!currentChat) return;
+                        if (!currentChat) {
+                            console.error(`[processRenderEvent] Chat not found for retry operation, retryChatId: ${retryChatId}`);
+                            return;
+                        }
                         
                         const errorIndex = currentChat.messages.findIndex(m => m.role === 'error' && m.content === event.content);
                         if (errorIndex !== -1) {
@@ -6384,13 +6872,34 @@ class NetdataMCPChat {
         this.moveSpinnerToBottom(chatId);
     }
 
-    deleteChat(chatId) {
+    async deleteChat(chatId) {
         if (!chatId) {return;}
         
         const chat = this.chats.get(chatId);
         if (!chat) {return;}
         
-        if (confirm(`Delete chat "${chat.title}"?`)) {
+        const confirmed = await this.showConfirmDialog(
+            'Delete Chat',
+            `Are you sure you want to delete "${chat.title}"?`,
+            'Delete',
+            'Cancel',
+            true // danger style
+        );
+        
+        if (confirmed) {
+            // Delete sub-chats first (cascade delete)
+            for (const [subChatId, subChat] of this.chats) {
+                if (subChat.parentChatId === chatId) {
+                    // Clean up sub-chat container
+                    if (this.chatContainers.has(subChatId)) {
+                        this.chatContainers.delete(subChatId);
+                    }
+                    this.chats.delete(subChatId);
+                    localStorage.removeItem(subChatId);
+                    localStorage.removeItem(`chatConfig_${subChatId}`);
+                }
+            }
+            
             this.chats.delete(chatId);
             
             // Remove from storage
@@ -6471,8 +6980,9 @@ class NetdataMCPChat {
     }
 
     // Update send button appearance based on processing state
-    updateSendButton() {
-        if (this.isProcessing) {
+    updateSendButton(chatId) {
+        const chat = this.chats.get(chatId);
+        if (chat && chat.isProcessing) {
             this.sendMessageBtn.textContent = 'Stop';
             this.sendMessageBtn.classList.remove('btn-send');
             this.sendMessageBtn.classList.add('btn-danger');
@@ -6481,7 +6991,24 @@ class NetdataMCPChat {
             this.sendMessageBtn.textContent = 'Send';
             this.sendMessageBtn.classList.remove('btn-danger');
             this.sendMessageBtn.classList.add('btn-send');
-            this.sendMessageBtn.disabled = !this.chatInput.value.trim();
+            // Get chat-specific input
+            const chatInput = this.getChatInput(chatId);
+            if (!chatInput) {
+                const chat = this.chats.get(chatId);
+                if (!chat || !chat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[updateSendButton] ERROR: Could not find input for chat', chatId);
+                }
+                this.sendMessageBtn.disabled = true;
+            } else {
+                try {
+                    const content = this.getEditableContent(chatInput);
+                    this.sendMessageBtn.disabled = !content.trim();
+                } catch (error) {
+                    console.error('[updateSendButton] ERROR getting editable content:', error);
+                    this.sendMessageBtn.disabled = true;
+                }
+            }
         }
     }
     
@@ -6490,8 +7017,27 @@ class NetdataMCPChat {
         // If no message provided, get it from the input
         let message = messageParam;
         if (message === null) {
-            message = this.chatInput.value.trim();
-            if (!message && !isResume) {return;}
+            // Get chat-specific input
+            const chatInput = this.getChatInput(chatId);
+            if (!chatInput) {
+                if (!chat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[sendMessage] ERROR: Could not find input for chat', chatId);
+                    this.showError('Chat input not found', chatId);
+                    return;
+                }
+                // For sub-chats, continue without input element
+            }
+            
+            // For contentEditable input, extract formatted content
+            try {
+                message = this.getEditableContent(chatInput).trim();
+                if (!message && !isResume) {return;}
+            } catch (error) {
+                console.error('[sendMessage] ERROR extracting message content:', error);
+                this.showError('Failed to get message content', chatId);
+                return;
+            }
         }
         
         const chat = this.chats.get(chatId);
@@ -6535,13 +7081,21 @@ class NetdataMCPChat {
         this.updateChatSessions(); // Update UI to remove draft indicator
         
         // Disable input and update button to Stop
-        if (!isResume) {
-            this.chatInput.value = '';
+        // Get chat-specific input element (only for main chats, not sub-chats)
+        const container = this.getChatContainer(chatId);
+        if (container && container._elements && container._elements.input) {
+            const input = container._elements.input;
+            if (!isResume) {
+                input.innerHTML = '';
+            }
+            input.contentEditable = false;
+        } else if (!chat.isSubChat) {
+            // Only log error for main chats - sub-chats don't have input elements
+            console.error('[sendMessage] ERROR: Could not find chat input element for chat', chatId);
         }
-        this.chatInput.disabled = true;
-        this.isProcessing = true;
-        this.shouldStopProcessing = false;
-        this.updateSendButton();
+        chat.isProcessing = true;
+        chat.shouldStopProcessing = false;
+        this.updateSendButton(chatId);
         
         // Only add user message if this is not a resume (resume continues from existing messages)
         if (!isResume) {
@@ -6549,7 +7103,13 @@ class NetdataMCPChat {
             chat.currentTurn = (chat.currentTurn || 0) + 1;
             
             // CRITICAL: Add and display the user's message immediately for better UX
-            this.addMessage(chat.id, { role: 'user', content: message, turn: chat.currentTurn });
+            // Add stable timestamp to ensure cache control works properly
+            this.addMessage(chat.id, { 
+                role: 'user', 
+                content: message, 
+                turn: chat.currentTurn,
+                timestamp: new Date().toISOString()
+            });
             const userMessageIndex = chat.messages.length - 1;
             this.processRenderEvent({ type: 'user-message', content: message, messageIndex: userMessageIndex }, chat.id);
         }
@@ -6576,9 +7136,15 @@ class NetdataMCPChat {
         } catch (error) {
             this.showError(`Failed to connect to MCP server: ${error.message}`, chat.id);
             // Re-enable input so user can try again
-            this.chatInput.disabled = false;
-            this.isProcessing = false;
-            this.updateSendButton();
+            const errorContainer = this.getChatContainer(chatId);
+            if (errorContainer && errorContainer._elements && errorContainer._elements.input) {
+                errorContainer._elements.input.contentEditable = true;
+            } else if (!chat.isSubChat) {
+                // Only log error for main chats - sub-chats don't have input elements
+                console.error('[sendMessage] ERROR: Could not find chat input element when re-enabling after MCP error for chat', chatId);
+            }
+            chat.isProcessing = false;
+            this.updateSendButton(chatId);
             return;
         }
         
@@ -6608,7 +7174,7 @@ class NetdataMCPChat {
             const lastMessage = chat.messages[chat.messages.length - 1];
             const hasCompleteSequence = lastMessage && lastMessage.role === 'assistant';
             
-            if (!this.shouldStopProcessing && hasCompleteSequence && this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
+            if (!chat.shouldStopProcessing && hasCompleteSequence && this.isFirstUserMessage(chat) && TitleGenerator.shouldGenerateTitleAutomatically(chat)) {
                 const llmProxy = this.llmProviders.get(chat.llmProviderId);
                 if (llmProxy) {
                     const titleProvider = TitleGenerator.getTitleGenerationProvider(
@@ -6643,23 +7209,28 @@ class NetdataMCPChat {
             // Success - assistant has concluded
             this.assistantConcluded(chat.id);
             
-            // Reset global processing state
-            this.isProcessing = false;
-            this.shouldStopProcessing = false;
+            // Reset processing state for this chat
+            chat.isProcessing = false;
+            chat.shouldStopProcessing = false;
             
             // Re-enable send button if the input has text
-            if (this.chatInput && this.chatInput.value.trim()) {
-                this.sendBtn.disabled = false;
+            const chatInput = this.getChatInput(chatId);
+            if (chatInput) {
+                try {
+                    const content = this.getEditableContent(chatInput).trim();
+                    if (content && this.sendBtn) {
+                        this.sendBtn.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('[sendMessage] ERROR checking input content:', error);
+                }
+            } else if (!chat.isSubChat) {
+                // Only log warning for main chats - sub-chats don't have input elements
+                console.error('[sendMessage] WARNING: Could not find input for chat when trying to re-enable send button', chatId);
             }
         } catch (error) {
             // Check if the user stopped processing
-            if (this.shouldStopProcessing || chat.processingWasStoppedByUser || error.isUserStop) {
-                console.log('[Stop Detection] Flags:', {
-                    shouldStopProcessing: this.shouldStopProcessing,
-                    processingWasStoppedByUser: chat.processingWasStoppedByUser,
-                    isUserStop: error.isUserStop
-                });
-                
+            if (chat.shouldStopProcessing || chat.processingWasStoppedByUser || error.isUserStop) {
                 // Clear the flag for next time
                 chat.processingWasStoppedByUser = false;
                 
@@ -6741,10 +7312,10 @@ class NetdataMCPChat {
                 }
             }
             
-            // Reset global processing state (for all cases)
-            this.isProcessing = false;
-            this.shouldStopProcessing = false;
-            this.updateSendButton();
+            // Reset processing state for this chat (for all cases)
+            chat.isProcessing = false;
+            chat.shouldStopProcessing = false;
+            this.updateSendButton(chatId);
         }
     }
 
@@ -6832,14 +7403,7 @@ class NetdataMCPChat {
             const mcpInstructions = mcpConnection && mcpConnection.instructions ? mcpConnection.instructions : null;
             
             // Delegate to the chat's MessageOptimizer
-            const result = chat.messageOptimizer.buildMessagesForAPI(chat, freezeCache, mcpInstructions);
-            
-            // Log optimization stats if available
-            if (result.stats) {
-                // console.log(`[buildMessagesForAPI] Optimization stats for chat ${chat.id}:`, result.stats);
-            }
-            
-            return result;
+            return chat.messageOptimizer.buildMessagesForAPI(chat, freezeCache, mcpInstructions);
         } catch (error) {
             console.error('[buildMessagesForAPI] MessageOptimizer failed:', error);
             this.showError(`Message optimization failed: ${error.message}`, chat.id);
@@ -6855,7 +7419,7 @@ class NetdataMCPChat {
         }
 
         // Clear any stop flags
-        this.shouldStopProcessing = false;
+        chat.shouldStopProcessing = false;
         chat.processingWasStoppedByUser = false;
         
         // Simply call sendMessage without adding a new user message
@@ -6897,8 +7461,8 @@ class NetdataMCPChat {
             while (true) {
             // attempts++;
             
-            // Check if we should stop processing
-            if (this.shouldStopProcessing) {
+            // Check if we should stop processing for this chat
+            if (chat.shouldStopProcessing) {
                 // Mark that processing was stopped in the chat object
                 chat.processingWasStoppedByUser = true;
                 // Throw an error to trigger the catch block in sendMessage
@@ -7026,8 +7590,11 @@ class NetdataMCPChat {
             messageDiv.className = `message ${role}`;
         }
         
-        // Add redo button only for user and assistant messages
-        if (messageIndex !== undefined && (role === 'user' || role === 'assistant')) {
+        // Add redo button only for user and assistant messages (but not in sub-chats)
+        const chat = this.chats.get(chatId);
+        const isSubChat = chat && chat.isSubChat;
+        
+        if (!isSubChat && messageIndex !== undefined && (role === 'user' || role === 'assistant')) {
             const redoBtn = document.createElement('button');
             redoBtn.className = 'redo-button';
             redoBtn.textContent = 'Redo';
@@ -7179,14 +7746,22 @@ class NetdataMCPChat {
                     deleteBtn.style.marginLeft = '10px';
                     deleteBtn.onclick = (e) => {
                         e.stopPropagation(); // Prevent header toggle
-                        const chat = this.chats.get(chatId);
-                        if (chat) {
+                        const summaryChat = this.chats.get(chatId);
+                        if (summaryChat) {
                             // Find the most recent summary message
-                            for (let i = chat.messages.length - 1; i >= 0; i--) {
-                                if (chat.messages[i]?.role === 'summary') {
-                                    if (confirm('Delete this summary and replace with accounting record?')) {
-                                        this.deleteSummaryMessages(i, chatId);
-                                    }
+                            for (let i = summaryChat.messages.length - 1; i >= 0; i--) {
+                                if (summaryChat.messages[i]?.role === 'summary') {
+                                    this.showConfirmDialog(
+                                        'Delete Summary',
+                                        'Delete this summary and replace with accounting record?',
+                                        'Delete',
+                                        'Cancel',
+                                        true // danger style
+                                    ).then(confirmed => {
+                                        if (confirmed) {
+                                            this.deleteSummaryMessages(i, chatId);
+                                        }
+                                    });
                                     break;
                                 }
                             }
@@ -7728,6 +8303,12 @@ class NetdataMCPChat {
         const container = this.getChatContainer(chatId);
         if (!container || !container._elements) {return;}
         
+        const chat = this.chats.get(chatId);
+        if (!chat) {
+            console.error('appendMetricsToChat: chat not found for chatId', chatId);
+            return;
+        }
+        
         const chatMessages = container._elements.messages;
         
         const metricsFooter = document.createElement('div');
@@ -7783,14 +8364,14 @@ class NetdataMCPChat {
                 // Don't update currentContextWindow
             } else if (messageType === 'summary') {
                 // Summaries reset context to just their output tokens
-                deltaTokens = (usage.completionTokens || 0) - this.currentContextWindow;
+                deltaTokens = (usage.completionTokens || 0) - (chat.currentContextWindow || 0);
                 // Reset context window to just the summary's output
-                this.currentContextWindow = usage.completionTokens || 0;
+                chat.currentContextWindow = usage.completionTokens || 0;
             } else {
                 // Regular assistant messages
-                deltaTokens = totalTokens - this.currentContextWindow;
+                deltaTokens = totalTokens - (chat.currentContextWindow || 0);
                 // Update the running total
-                this.currentContextWindow = totalTokens;
+                chat.currentContextWindow = totalTokens;
             }
             
             // Always show delta, even if zero
@@ -7812,6 +8393,297 @@ class NetdataMCPChat {
     
     
     
+    /**
+     * Extracts content from a contentEditable div while preserving formatting
+     * Converts HTML to markdown format to preserve visual formatting
+     */
+    getEditableContent(contentDiv) {
+        // CRITICAL: Add error checking for undefined contentDiv
+        if (!contentDiv) {
+            console.error('[getEditableContent] ERROR: contentDiv is undefined or null');
+            return '';
+        }
+        
+        // Get the HTML content
+        let htmlContent = contentDiv.innerHTML || '';
+        
+        // Convert HTML tables to markdown tables before other processing
+        htmlContent = this.convertHtmlTablesToMarkdown(htmlContent);
+        
+        // Convert HTML to markdown-like format to preserve formatting
+        return htmlContent
+            // Convert headers (h1-h6)
+            .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '\n# $1\n')
+            .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '\n## $1\n')
+            .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '\n### $1\n')
+            .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '\n#### $1\n')
+            .replace(/<h5[^>]*>(.*?)<\/h5>/gi, '\n##### $1\n')
+            .replace(/<h6[^>]*>(.*?)<\/h6>/gi, '\n###### $1\n')
+            
+            // Convert bold and strong
+            .replace(/<(b|strong)[^>]*>(.*?)<\/(b|strong)>/gi, '**$2**')
+            
+            // Convert italic and emphasis
+            .replace(/<(i|em)[^>]*>(.*?)<\/(i|em)>/gi, '*$2*')
+            
+            // Convert underline to emphasis (markdown doesn't have underline)
+            .replace(/<u[^>]*>(.*?)<\/u>/gi, '*$1*')
+            
+            // Convert strikethrough
+            .replace(/<(s|strike|del)[^>]*>(.*?)<\/(s|strike|del)>/gi, '~~$2~~')
+            
+            // Convert code blocks
+            .replace(/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/gi, '\n```\n$1\n```\n')
+            
+            // Convert inline code
+            .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+            
+            // Convert ordered lists
+            .replace(/<ol[^>]*>/gi, '\n')
+            .replace(/<\/ol>/gi, '\n')
+            
+            // Convert unordered lists
+            .replace(/<ul[^>]*>/gi, '\n')
+            .replace(/<\/ul>/gi, '\n')
+            
+            // Convert list items
+            .replace(/<li[^>]*>(.*?)<\/li>/gi, (match, content) => {
+                // Check if it's within an ordered list by looking at context
+                // For now, use bullet points for all lists
+                return '- ' + content.trim() + '\n';
+            })
+            
+            // Convert blockquotes
+            .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '\n> $1\n')
+            
+            // Convert horizontal rules
+            .replace(/<hr[^>]*>/gi, '\n---\n')
+            
+            // Convert line breaks
+            .replace(/<br\s*\/?>/gi, '\n')
+            
+            // Convert paragraphs
+            .replace(/<p[^>]*>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            
+            // Convert divs (contentEditable creates these)
+            .replace(/<div[^>]*>/gi, '\n')
+            .replace(/<\/div>/gi, '')
+            
+            // Convert links
+            .replace(/<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+            
+            // Replace non-breaking spaces
+            .replace(/&nbsp;/gi, ' ')
+            
+            // Remove any remaining HTML tags
+            .replace(/<[^>]*>/g, '')
+            
+            // Decode HTML entities
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&apos;/g, "'")
+            .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+            .replace(/&#x([a-f0-9]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+            
+            // Clean up excessive whitespace
+            .replace(/\n\s*\n\s*\n/g, '\n\n')
+            .replace(/[ \t]+$/gm, '')
+            .trim();
+    }
+    
+    /**
+     * Converts HTML tables to markdown tables
+     */
+    convertHtmlTablesToMarkdown(html) {
+        // Find all tables and convert them
+        return html.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (match, tableContent) => {
+            try {
+                // Parse the table content
+                const rows = [];
+                const tableRows = tableContent.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+                
+                tableRows.forEach((tr, _rowIndex) => {
+                    const cells = [];
+                    // Match both th and td tags
+                    const cellMatches = tr.match(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gi) || [];
+                    
+                    cellMatches.forEach(cell => {
+                        // Extract cell content
+                        const cellContent = cell
+                            .replace(/<(th|td)[^>]*>/gi, '')
+                            .replace(/<\/(th|td)>/gi, '')
+                            .replace(/<br\s*\/?>/gi, ' ')
+                            .replace(/<[^>]*>/g, '')
+                            .replace(/&nbsp;/gi, ' ')
+                            .trim();
+                        cells.push(cellContent);
+                    });
+                    
+                    if (cells.length > 0) {
+                        rows.push(cells);
+                    }
+                });
+                
+                if (rows.length === 0) {
+                    return '';
+                }
+                
+                // Build markdown table
+                let markdownTable = '\n\n';
+                
+                // Add header row
+                markdownTable += '| ' + rows[0].join(' | ') + ' |\n';
+                
+                // Add separator row
+                markdownTable += '|' + rows[0].map(() => ' --- ').join('|') + '|\n';
+                
+                // Add data rows
+                for (let i = 1; i < rows.length; i++) {
+                    // Ensure the row has the same number of columns as the header
+                    while (rows[i].length < rows[0].length) {
+                        rows[i].push('');
+                    }
+                    markdownTable += '| ' + rows[i].join(' | ') + ' |\n';
+                }
+                
+                markdownTable += '\n';
+                
+                return markdownTable;
+            } catch (error) {
+                console.error('[convertHtmlTablesToMarkdown] Error converting table:', error);
+                // Return the original table HTML if conversion fails
+                return match;
+            }
+        });
+    }
+    
+    /**
+     * Comprehensive HTML to Markdown converter
+     * Handles full HTML documents from clipboard
+     */
+    convertHtmlToMarkdown(html) {
+        let result = html;
+        
+        // Remove any style tags and their content
+        result = result.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        
+        // Remove any script tags and their content
+        result = result.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        
+        // Remove HTML comments
+        result = result.replace(/<!--[\s\S]*?-->/g, '');
+        
+        // Extract body content if it's a full HTML document
+        const bodyMatch = result.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        if (bodyMatch) {
+            result = bodyMatch[1];
+        }
+        
+        // Convert tables first (before other processing)
+        result = this.convertHtmlTablesToMarkdown(result);
+        
+        // Process nested elements properly by converting from innermost to outermost
+        // Convert links with proper text extraction
+        result = result.replace(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, text) => {
+            // Clean up the link text
+            const cleanText = text.replace(/<[^>]*>/g, '').trim();
+            return `[${cleanText}](${url})`;
+        });
+        
+        // Convert images
+        result = result.replace(/<img[^>]+src=["']([^"']+)["'](?:[^>]+alt=["']([^"']+)["'])?[^>]*>/gi, (match, src, alt) => {
+            return alt ? `![${alt}](${src})` : `![](${src})`;
+        });
+        
+        // Convert headers
+        result = result.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n');
+        result = result.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n');
+        result = result.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n');
+        result = result.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, '\n#### $1\n');
+        result = result.replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, '\n##### $1\n');
+        result = result.replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, '\n###### $1\n');
+        
+        // Convert lists - handle nested lists
+        // Process lists from innermost to outermost
+        let previousHtml;
+        do {
+            previousHtml = result;
+            
+            // Convert unordered lists
+            result = result.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
+                const items = content.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+                const converted = items.map(item => {
+                    const itemContent = item.replace(/<li[^>]*>/i, '').replace(/<\/li>/i, '').trim();
+                    return '- ' + itemContent;
+                }).join('\n');
+                return '\n' + converted + '\n';
+            });
+            
+            // Convert ordered lists  
+            result = result.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
+                const items = content.match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+                const converted = items.map((item, index) => {
+                    const itemContent = item.replace(/<li[^>]*>/i, '').replace(/<\/li>/i, '').trim();
+                    return `${index + 1}. ${itemContent}`;
+                }).join('\n');
+                return '\n' + converted + '\n';
+            });
+        } while (result !== previousHtml);
+        
+        // Convert code blocks
+        result = result.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '\n```\n$1\n```\n');
+        result = result.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, '\n```\n$1\n```\n');
+        
+        // Convert inline code
+        result = result.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
+        
+        // Convert formatting
+        result = result.replace(/<(b|strong)[^>]*>([\s\S]*?)<\/(b|strong)>/gi, '**$2**');
+        result = result.replace(/<(i|em)[^>]*>([\s\S]*?)<\/(i|em)>/gi, '*$2*');
+        result = result.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '*$1*');
+        result = result.replace(/<(s|strike|del)[^>]*>([\s\S]*?)<\/(s|strike|del)>/gi, '~~$2~~');
+        
+        // Convert blockquotes
+        result = result.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, '\n> $1\n');
+        
+        // Convert horizontal rules
+        result = result.replace(/<hr[^>]*>/gi, '\n---\n');
+        
+        // Convert line breaks
+        result = result.replace(/<br\s*\/?>/gi, '\n');
+        
+        // Convert paragraphs
+        result = result.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '\n$1\n');
+        
+        // Convert divs
+        result = result.replace(/<div[^>]*>([\s\S]*?)<\/div>/gi, '\n$1\n');
+        
+        // Remove any remaining HTML tags
+        result = result.replace(/<[^>]*>/g, '');
+        
+        // Decode HTML entities
+        result = result.replace(/&nbsp;/gi, ' ');
+        result = result.replace(/&lt;/g, '<');
+        result = result.replace(/&gt;/g, '>');
+        result = result.replace(/&amp;/g, '&');
+        result = result.replace(/&quot;/g, '"');
+        result = result.replace(/&#39;/g, "'");
+        result = result.replace(/&apos;/g, "'");
+        result = result.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+        result = result.replace(/&#x([a-f0-9]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+        
+        // Clean up excessive whitespace
+        result = result.replace(/\n\s*\n\s*\n/g, '\n\n');
+        result = result.replace(/[ \t]+$/gm, '');
+        result = result.trim();
+        
+        return result;
+    }
+
     editUserMessage(contentDiv, originalContent, chatId) {
         if (!chatId) {return;}
         
@@ -7849,10 +8721,22 @@ class NetdataMCPChat {
             return;
         }
         
-        // Make content editable
+        // Get the original raw content from chat history
+        const originalMessage = chat.messages[messageIndex];
+        const originalRawContent = originalMessage ? originalMessage.content : '';
+        
+        // Make content editable and populate with original text for editing
         contentDiv.contentEditable = true;
         contentDiv.classList.add('editing');
-        const originalText = contentDiv.textContent;
+        
+        // CRITICAL FIX: Convert newlines to <br> tags so they display properly in contentEditable
+        const editableContent = originalRawContent
+            .replace(/&/g, '&amp;')    // Escape ampersands first
+            .replace(/</g, '&lt;')     // Escape less-than
+            .replace(/>/g, '&gt;')     // Escape greater-than
+            .replace(/\n/g, '<br>');   // Convert newlines to <br> tags
+        
+        contentDiv.innerHTML = editableContent;
         
         // Just focus, don't select all - let user position cursor
         contentDiv.focus();
@@ -7896,17 +8780,21 @@ class NetdataMCPChat {
         cancel = () => {
             contentDiv.contentEditable = false;
             contentDiv.classList.remove('editing');
-            contentDiv.textContent = originalText;
+            // Restore the original rendered HTML content (markdown processed)
+            contentDiv.innerHTML = marked.parse(originalRawContent, {
+                breaks: true, gfm: true, sanitize: false
+            });
             buttonsDiv.remove();
             // Clean up event listeners
             contentDiv.removeEventListener('keydown', keyHandler);
             document.removeEventListener('click', clickOutside);
             // Restore the edit trigger
-            this.addEditTrigger(contentDiv, originalText, 'user', chatId);
+            this.addEditTrigger(contentDiv, originalRawContent, 'user', chatId);
         };
         
         save = async () => {
-            const newContent = contentDiv.textContent.trim();
+            // CRITICAL FIX: Get edited content while preserving formatting
+            const newContent = this.getEditableContent(contentDiv).trim();
             if (!newContent) {
                 this.showError('Message cannot be empty', chatId);
                 return;
@@ -7921,8 +8809,25 @@ class NetdataMCPChat {
             this.loadChat(chatId, true);
             
             // Send the new message
-            this.chatInput.value = newContent;
-            await this.sendMessage(chatId);
+            const chatInput = this.getChatInput(chatId);
+            if (chatInput) {
+                // Convert markdown to HTML for contentEditable
+                const htmlContent = newContent
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>');
+                chatInput.innerHTML = htmlContent;
+                await this.sendMessage(chatId);
+            } else {
+                const editChat = this.chats.get(chatId);
+                if (!editChat || !editChat.isSubChat) {
+                    // Only log error for main chats - sub-chats don't have input elements
+                    console.error('[editUserMessage.save] ERROR: Could not find input for chat', chatId);
+                }
+                // Fall back to sending message directly with the new content
+                await this.sendMessage(chatId, newContent);
+            }
         };
         
         buttonsDiv.querySelector('.btn-primary').onclick = save;
@@ -7968,9 +8873,29 @@ class NetdataMCPChat {
             toolDiv.dataset.turn = chat.currentTurn || 0;
         }
         
+        // Extract metadata fields from args if present
+        const metadataFields = ['tool_purpose', 'expected_format', 'key_information', 'success_indicators', 'context_for_interpretation'];
+        const metadata = {};
+        const cleanedArgs = { ...args };
+        
+        // Extract and remove metadata fields from args
+        for (const field of metadataFields) {
+            if (args && field in args) {
+                metadata[field] = args[field];
+                delete cleanedArgs[field];
+            }
+        }
+        
+        // Store metadata for later use
+        toolDiv.dataset.metadata = JSON.stringify(metadata);
+        
+        // Don't display metadata in tool header - it will be shown in sub-chat
+        const metadataHtml = '';
+        
         const toolHeader = document.createElement('div');
         toolHeader.className = 'tool-header';
         toolHeader.innerHTML = `
+            ${metadataHtml}
             <span class="tool-toggle">▶</span>
             <span class="tool-label"><i class="fas fa-wrench"></i> ${toolName}</span>
             <span class="tool-info">
@@ -7994,15 +8919,15 @@ class NetdataMCPChat {
         const requestCopyBtn = this.createCopyButton({
             buttonClass: 'tool-section-copy',
             tooltip: 'Copy request',
-            onCopy: () => JSON.stringify(args, null, 2)
+            onCopy: () => JSON.stringify(cleanedArgs, null, 2)
         });
         
         controlsDiv.appendChild(requestCopyBtn);
         requestSection.appendChild(controlsDiv);
         
-        // Add the request content
+        // Add the request content (without metadata fields)
         const preElement = document.createElement('pre');
-        preElement.textContent = JSON.stringify(args, null, 2);
+        preElement.textContent = JSON.stringify(cleanedArgs, null, 2);
         requestSection.appendChild(preElement);
         
         toolContent.appendChild(requestSection);
@@ -8051,7 +8976,7 @@ class NetdataMCPChat {
         this.moveSpinnerToBottom(chatId);
     }
 
-    addToolResult(toolName, result, chatId, responseTime, responseSize, includeInContext, _messageIndex, toolCallId) {
+    addToolResult(toolName, result, chatId, responseTime, responseSize, includeInContext, _messageIndex, toolCallId, _subChatId) {
         if (!chatId) {
             console.error('addToolResult called without chatId');
             return;
@@ -8128,6 +9053,8 @@ class NetdataMCPChat {
             
             if (responseSection) {
                 let formattedResult;
+                let isMarkdown = false;
+                
                 if (typeof result === 'object') {
                     if (result.error) {
                         formattedResult = `<span style="color: var(--danger-color);">${result.error}</span>`;
@@ -8135,7 +9062,18 @@ class NetdataMCPChat {
                         formattedResult = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
                     }
                 } else {
-                    formattedResult = result;
+                    // For string responses, check if it looks like markdown
+                    const textResult = String(result);
+                    if (this.isMarkdownContent(textResult)) {
+                        formattedResult = marked.parse(textResult, {
+                            breaks: true,
+                            gfm: true,
+                            sanitize: false
+                        });
+                        isMarkdown = true;
+                    } else {
+                        formattedResult = `<pre>${textResult}</pre>`;
+                    }
                 }
                 
                 // Clear and rebuild response section
@@ -8158,6 +9096,9 @@ class NetdataMCPChat {
                 
                 // Add the formatted result
                 const resultDiv = document.createElement('div');
+                if (isMarkdown) {
+                    resultDiv.className = 'message-content';
+                }
                 resultDiv.innerHTML = formattedResult;
                 responseSection.appendChild(resultDiv);
                 
@@ -8166,6 +9107,9 @@ class NetdataMCPChat {
                 if (separator) {
                     separator.style.display = 'block';
                 }
+                
+                // Sub-chats are rendered as separate chat items via renderSubChatAsItem
+                // No need for expandable UI here
             }
             
             // Remove from pending using the toolCallId
@@ -8176,6 +9120,804 @@ class NetdataMCPChat {
         
         this.scrollToBottom(chatId);
         this.moveSpinnerToBottom(chatId);
+    }
+    
+    /**
+     * Check if a sub-chat should be created for tool response
+     */
+    async shouldCreateSubChat(chat, responseSize, _toolCall) {
+        // Never create sub-chats within sub-chats
+        if (chat.isSubChat) {
+            return false;
+        }
+        
+        // Check if tool summarization is enabled
+        if (!chat.config?.optimisation?.toolSummarisation?.enabled) {
+            return false;
+        }
+        
+        // Get threshold in bytes (convert from KiB)
+        const thresholdKiB = chat.config.optimisation.toolSummarisation.thresholdKiB ?? 20;
+        const thresholdBytes = thresholdKiB * 1024;
+        
+        // If threshold is 0, process all tools
+        if (thresholdKiB === 0) {
+            return true;
+        }
+        
+        // Check if response exceeds threshold
+        return responseSize > thresholdBytes;
+    }
+    
+    /**
+     * Create a sub-chat for processing tool response
+     */
+    async createSubChatForTool(parentChat, toolCall, toolResult) {
+        // Try to find the tool div in the current chat's container
+        const chatContainer = this.chatContainers.get(parentChat.id);
+        let toolDiv = null;
+        
+        if (chatContainer) {
+            toolDiv = chatContainer.querySelector(`[data-tool-id="${toolCall.id}"]`);
+        }
+        
+        // Fallback: search globally
+        if (!toolDiv) {
+            toolDiv = document.querySelector(`[data-tool-id="${toolCall.id}"]`);
+        }
+        
+        // Debug: check all tool divs in current chat
+        if (chatContainer) {
+            const _allToolDivs = chatContainer.querySelectorAll('[data-tool-id]');
+        }
+        
+        const metadata = toolDiv ? JSON.parse(toolDiv.dataset.metadata || '{}') : {};
+
+        // Determine sub-chat model
+        const subChatModel = parentChat.config.optimisation.toolSummarisation.model || {
+            provider: parentChat.model.provider || 'anthropic',
+            id: parentChat.model.id || 'claude-3-haiku-20240307'
+        };
+        
+        // Create sub-chat with minimal config - no optimizations
+        const subChatOptions = {
+            mcpServerId: parentChat.mcpServerId,
+            llmProviderId: parentChat.llmProviderId,
+            model: ChatConfig.modelConfigToString(subChatModel),
+            title: `Processing: ${toolCall.name}`,
+            parentChatId: parentChat.id,
+            parentToolCallId: toolCall.id,
+            toolMetadata: metadata,
+            config: {
+                model: subChatModel,
+                optimisation: {
+                    // Disable ALL optimizations for sub-chats
+                    toolSummarisation: {
+                        enabled: false,
+                        thresholdKiB: 20,
+                        model: null
+                    },
+                    autoSummarisation: {
+                        enabled: false,
+                        triggerPercent: 50,
+                        model: null
+                    },
+                    toolMemory: {
+                        enabled: false,
+                        forgetAfterConclusions: 1
+                    },
+                    cacheControl: parentChat.config.optimisation.cacheControl || 'all-off', // Inherit parent's cache control
+                    titleGeneration: {
+                        enabled: false,
+                        model: null
+                    }
+                },
+                mcpServer: parentChat.mcpServerId
+            }
+        };
+        
+        const subChatId = await this.createNewChat(subChatOptions);
+        if (!subChatId) {
+            console.error('[createSubChatForTool] Failed to create sub-chat');
+            return null;
+        }
+        
+        const subChat = this.chats.get(subChatId);
+        if (!subChat) {
+            console.error('[createSubChatForTool] Sub-chat not found after creation');
+            return null;
+        }
+        
+        // Sub-chat visibility will be handled when it's rendered as a separate item
+        
+        // Initialize sub-chat with system prompt and tool result
+        await this.initializeSubChat(subChatId, toolCall, toolResult, metadata);
+        
+        // Sub-chat will be processed synchronously in processSingleLLMResponse
+        
+        return subChatId;
+    }
+    
+    /**
+     * Update sub-chat section visibility in tool result
+     */
+    updateSubChatVisibility(toolCallId, subChatId, subChat) {
+        // Find the parent chat ID from the sub-chat
+        const parentChatId = subChat.parentChatId;
+        if (!parentChatId) {
+            console.error('[updateSubChatVisibility] Sub-chat missing parentChatId');
+            return;
+        }
+        
+        const container = this.getChatContainer(parentChatId);
+        if (!container) {
+            console.error(`[updateSubChatVisibility] Container not found for parent chat: ${parentChatId}`);
+            return;
+        }
+        
+        const subChatSection = container.querySelector(`.sub-chat-section[data-tool-call-id="${toolCallId}"]`);
+
+        if (subChatSection) {
+            subChatSection.dataset.subChatId = subChatId;
+            subChatSection.style.display = 'block';
+            
+            // Update stats
+            const statsSpan = subChatSection.querySelector('.sub-chat-stats');
+            if (statsSpan) {
+                const messageCount = subChat.messages.length;
+                const modelName = ChatConfig.getModelDisplayName(subChat.model);
+                statsSpan.textContent = `${messageCount} messages • ${modelName}`;
+            }
+        } else {
+            console.error(`[updateSubChatVisibility] Sub-chat section not found for toolCallId: ${toolCallId}`);
+            // List all existing sub-chat sections for debugging
+            const allSubChatSections = container.querySelectorAll('.sub-chat-section');
+            allSubChatSections.forEach((_section, _index) => {  });
+        }
+    }
+    
+    /**
+     * Initialize sub-chat with system prompt and tool result
+     */
+    async initializeSubChat(subChatId, toolCall, toolResult, metadata) {
+        const subChat = this.chats.get(subChatId);
+        if (!subChat) {
+            console.error(`[initializeSubChat] Sub-chat not found for subChatId: ${subChatId}, toolCallId: ${toolCall?.id}`);
+            return;
+        }
+        
+        // Create the sub-chat system prompt with full MCP capabilities
+        const systemPrompt = SystemMsg.createSpecializedSystemPrompt('subchat');
+        
+        // Update system message
+        if (subChat.messages.length > 0 && subChat.messages[0].role === 'system') {
+            subChat.messages[0].content = systemPrompt;
+        }
+        
+        // Clean the tool arguments by removing metadata fields
+        const metadataFields = ['tool_purpose', 'expected_format', 'key_information', 'success_indicators', 'context_for_interpretation'];
+        const cleanedArgs = { ...toolCall.arguments };
+        
+        // Remove metadata fields from the arguments
+        for (const field of metadataFields) {
+            if (cleanedArgs && field in cleanedArgs) {
+                delete cleanedArgs[field];
+            }
+        }
+        
+        // Create a user message that combines the instructions from the primary LLM
+        let userMessage = 'I am an AI assistant and I need your help to answer a broader question I am asked.';
+        
+        if (metadata.tool_purpose) {
+            userMessage += `\n\nYour task is: ${metadata.tool_purpose}. `;
+        }
+
+        userMessage += `\n\nThis is usually done by executing the ${toolCall.name} tool. `;
+        userMessage += `\n\nHere are the arguments I would use:\n\`\`\`json\n${JSON.stringify(cleanedArgs, null, 2)}\n\`\`\``;
+        userMessage += `\n\nMy assumption that this tool and parameters will provide the desired result, may be wrong. `;
+        userMessage += `In that case, come up with your own plan to answer the question.`;
+
+        if (metadata.key_information) {
+            userMessage += `\n\nFocus on: ${metadata.key_information}`;
+        }
+        
+        if (metadata.expected_format) {
+            userMessage += `\n\n**CRITICAL**: The expected format is: ${metadata.expected_format}`;
+        }
+        
+        if (metadata.success_indicators) {
+            userMessage += `\n\nSuccess indicators to look for: ${metadata.success_indicators}`;
+        }
+        
+        if (metadata.context_for_interpretation) {
+            userMessage += `\n\nAdditional context you may need during your investigation: ${metadata.context_for_interpretation}`;
+        }
+
+        if (metadata.tool_purpose) {
+            userMessage += `\n\nPlease use any of your tools, and adapt to ${metadata.tool_purpose}. `;
+        }
+        else {
+            userMessage += '\n\nPlease use any of your tools, and adapt to provide the answer I seek. ';
+        }
+        userMessage += '\n\nImportant: Do not ask me any question back, or provide explanations on tool usage, or give up on the first try. ';
+        userMessage += 'Check your tools available, adapt to the issues you face (wrong parameters, empty responses, wrong tool chosen, etc), ';
+        userMessage += 'and provide an authoritative answer. ';
+        userMessage += '\n\n**CRITICAL**: If you encounter large datasets or lists, process EVERY single item. ';
+        userMessage += 'Never sample, never use "..." or "among others". Process all items and explicitly state how many you analyzed. ';
+        userMessage += 'Your thoroughness is essential for accurate analysis.';
+        userMessage += '\n\n**CRITICAL**: If tools return errors or empty data, DO NOT give up! ';
+        userMessage += 'Try different parameters, broader time ranges, different filters, or alternative approaches. ';
+        userMessage += 'Make multiple attempts before concluding no data exists. The primary assistant is counting on you to be persistent and thorough.';
+        userMessage += '\n\n**IF TASK CANNOT BE COMPLETED**: Use the ESCALATION protocol to document your attempts, ';
+        userMessage += 'provide any partial data you found, and suggest specific alternatives for the primary assistant to try.';
+
+        // Add the formatted user request
+        subChat.messages.push({
+            role: 'user',
+            content: userMessage,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Simulate the assistant requesting the tool
+        const toolRequestContent = [{
+            type: 'text',
+            text: `Let me first call the ${toolCall.name} tool to get some data.`
+        }, {
+            type: 'tool_use',
+            id: toolCall.id,
+            name: toolCall.name,
+            input: cleanedArgs || {}
+        }];
+        
+        subChat.messages.push({
+            role: 'assistant',
+            content: toolRequestContent,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Add the tool result
+        subChat.messages.push({
+            role: 'tool-results',
+            toolResults: [{
+                toolCallId: toolCall.id,
+                toolName: toolCall.name,
+                result: toolResult,
+                isError: false
+            }],
+            timestamp: new Date().toISOString()
+        });
+        
+        // Save sub-chat
+        this.autoSave(subChatId);
+    }
+    
+    /**
+     * Process sub-chat and update parent
+     */
+    async processSubChat(subChatId, parentChatId, _toolCallId) {
+        const subChat = this.chats.get(subChatId);
+        const parentChat = this.chats.get(parentChatId);
+        if (!subChat || !parentChat) {
+            console.error('[processSubChat] Missing chats:', { subChat: !!subChat, parentChat: !!parentChat });
+            return;
+        }
+        
+        try {
+            // Send message to process the tool result
+            // Use a dummy message to trigger processing since sub-chat already has the tool result as a user message
+            await this.sendMessage(subChatId, 'process', true); // isResume = true to skip adding new user message
+            
+            // CRITICAL: Wait for the sub-chat to be completely done processing
+            // The sub-chat might make multiple tool calls, so we need to wait until it's no longer processing
+            while (subChat.isProcessing) {
+                console.log(`[processSubChat] Sub-chat ${subChatId} is still processing, waiting...`);
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise(resolve => { setTimeout(resolve, 100); }); // Check every 100ms
+            }
+            
+            // Find the latest assistant response (skip title and other special messages)
+            let assistantMessage = null;
+            for (let i = subChat.messages.length - 1; i >= 0; i--) {
+                const msg = subChat.messages[i];
+                if (msg.role === 'assistant') {
+                    assistantMessage = msg;
+                    break;
+                }
+            }
+            
+            if (assistantMessage) {
+                // NOTE: The assistant message has already been rendered by sendMessage
+                // We don't need to render it again here
+                
+                // Extract text content from assistant response
+                let textContent = '';
+                if (typeof assistantMessage.content === 'string') {
+                    textContent = assistantMessage.content;
+                } else if (Array.isArray(assistantMessage.content)) {
+                    // Extract text from content blocks
+                    const textBlocks = assistantMessage.content
+                        .filter(block => block.type === 'text')
+                        .map(block => block.text)
+                        .join('\n\n');
+                    textContent = textBlocks;
+                } else {
+                    textContent = JSON.stringify(assistantMessage.content);
+                }
+                
+                // Note: Parent tool result is now updated directly in executeToolCalls
+                // during interleaved execution, so we don't need to update it here
+                
+                // Update sub-chat stats display
+                // Sub-chat DOM status will be updated through renderSubChatAsItem
+                
+                // NOTE: Don't update parent tool-result costs here - it's too early
+                // The parent chat's tool-results message hasn't been added yet
+                // Cost accumulation happens later in executeToolCalls after tool-results are added
+                
+                // Return the summarized result for the promise chain
+                return textContent;
+            } else {
+                console.error('[processSubChat] No valid assistant response found');
+                return null;
+            }
+        } catch (error) {
+            console.error('[processSubChat] Error processing sub-chat:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Update parent chat's tool result with summarized version
+     */
+    updateParentToolResult(parentChatId, toolCallId, summarizedResult) {
+        const parentChat = this.chats.get(parentChatId);
+        if (!parentChat) {
+            console.error('[updateParentToolResult] Parent chat not found');
+            return;
+        }
+        
+        // Get sub-chat costs by finding the sub-chat and using its existing totals
+        let subChatCosts = null;
+        for (const [_chatId, chat] of this.chats.entries()) {
+            if (chat.isSubChat && chat.parentToolCallId === toolCallId) {
+                // Ensure the sub-chat has up-to-date pricing
+                this.updateChatTokenPricing(chat);
+                
+                // Copy the totals
+                subChatCosts = {
+                    totalTokens: { ...chat.totalTokensPrice },
+                    perModel: {}
+                };
+                
+                // Deep copy per-model data
+                for (const [model, costs] of Object.entries(chat.perModelTokensPrice)) {
+                    subChatCosts.perModel[model] = { ...costs };
+                }
+                break;
+            }
+        }
+        
+        // Find and update the tool result in parent messages
+        let found = false;
+        for (const message of parentChat.messages) {
+            if (message.role === 'tool-results' && message.toolResults) {
+                const toolResult = message.toolResults.find(tr => tr.toolCallId === toolCallId);
+                if (!toolResult) {
+                    console.warn(`[updateParentToolResult] Tool result not found in message for toolCallId: ${toolCallId}, parentChatId: ${parentChatId}`);
+                    continue;
+                }
+                if (toolResult) {
+                    toolResult.result = summarizedResult;
+                    toolResult.wasProcessedBySubChat = true;
+                    
+                    // Add sub-chat cost information
+                    toolResult.subChatCosts = subChatCosts;
+                    
+                    found = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!found) {
+            console.error(`[updateParentToolResult] Tool result not found in parent messages for toolCallId: ${toolCallId}, parentChatId: ${parentChatId}`);
+        }
+        
+        // Update the DOM display
+        const container = this.getChatContainer(parentChatId);
+        if (container) {
+            const toolDiv = container.querySelector(`[data-tool-id="${toolCallId}"]`);
+            if (toolDiv) {
+                const responseSection = toolDiv.querySelector('.tool-response-section');
+                if (responseSection) {
+                    // Find the actual result content div (not the controls or indicator)
+                    const resultDivs = responseSection.querySelectorAll('div');
+                    let actualResultDiv = null;
+                    
+                    for (const div of resultDivs) {
+                        // Skip controls div and sub-chat indicator
+                        if (!div.classList.contains('tool-section-controls') && 
+                            !div.classList.contains('sub-chat-indicator') &&
+                            !div.querySelector('.sub-chat-indicator')) {
+                            actualResultDiv = div;
+                            break;
+                        }
+                    }
+                    
+                    if (actualResultDiv) {
+                        // Format as markdown if the content looks like markdown
+                        let formattedContent;
+                        if (this.isMarkdownContent(summarizedResult)) {
+                            formattedContent = marked.parse(summarizedResult, {
+                                breaks: true,
+                                gfm: true,
+                                sanitize: false
+                            });
+                        } else {
+                            formattedContent = this.escapeHtml(summarizedResult);
+                        }
+                        actualResultDiv.innerHTML = `<div class="tool-summarized-result message-content">${formattedContent}</div>`;
+                    }
+                }
+            }
+        }
+        
+        // Update parent chat token pricing to include new sub-chat costs
+        if (found && subChatCosts) {
+            this.updateChatTokenPricing(parentChat);
+            this.updateCumulativeTokenDisplay(parentChatId);
+        }
+        
+        // Save parent chat
+        this.autoSave(parentChatId);
+    }
+    
+    /**
+     * Update the status of an existing sub-chat item
+     */
+    updateSubChatStatus(parentChatId, toolCallId, newStatus) {
+        const container = this.getChatContainer(parentChatId);
+        if (!container) {
+            console.error(`[updateSubChatStatus] Container not found for parent chat ${parentChatId}`);
+            return;
+        }
+        
+        // Find the sub-chat item
+        const subChatItem = container.querySelector(`[data-tool-call-id="${toolCallId}"]`);
+        if (!subChatItem) {
+            console.error(`[updateSubChatStatus] Sub-chat item not found for tool ${toolCallId}`);
+            return;
+        }
+        
+        // Find the status element
+        const statusElement = subChatItem.querySelector('.tool-status');
+        if (!statusElement) {
+            console.error(`[updateSubChatStatus] Status element not found in sub-chat`);
+            return;
+        }
+        
+        // Update status based on newStatus
+        let iconClass, text;
+        if (newStatus === 'processing') {
+            iconClass = 'fas fa-hourglass-half';
+            text = 'Processing...';
+        } else if (newStatus === 'success') {
+            iconClass = 'fas fa-check-circle';
+            text = 'Summarized';
+        } else if (newStatus === 'failed') {
+            iconClass = 'fas fa-times-circle';
+            text = 'Failed';
+        } else {
+            console.error(`[updateSubChatStatus] Unknown status: ${newStatus}`);
+            return;
+        }
+        
+        // Update the status element
+        statusElement.innerHTML = `<i class="${iconClass}"></i> ${text}`;
+    }
+    
+    /**
+     * Render sub-chat as a separate chat item in the main chat flow
+     */
+    renderSubChatAsItem(parentChatId, subChatId, toolCallId, status = 'success') {
+        const parentContainer = this.getChatContainer(parentChatId);
+        const subChat = this.chats.get(subChatId);
+        
+        if (!parentContainer || !subChat) {
+            console.error(`[renderSubChatAsItem] Missing required data - parentContainer: ${!!parentContainer}, subChat: ${!!subChat}, parentChatId: ${parentChatId}, subChatId: ${subChatId}, toolCallId: ${toolCallId}`);
+            return;
+        }
+        
+        // Find the tool result to insert sub-chat after
+        let toolDiv = parentContainer.querySelector(`[data-tool-id="${toolCallId}"]`);
+        
+        // For loaded chats, we may need to find the tool div differently or create a placeholder
+        if (!toolDiv) {
+            // Try to find by searching all tool blocks and matching the content
+            const allToolBlocks = parentContainer.querySelectorAll('.tool-block');
+            for (const block of allToolBlocks) {
+                // Check if this tool block might be our target
+                // This is a fallback for loaded chats where tool IDs might not match
+                if (block.textContent.includes(subChat.parentToolName || '')) {
+                    toolDiv = block;
+                    break;
+                }
+            }
+            
+            if (!toolDiv) {
+                // If we still can't find it, create a standalone sub-chat display
+                // This ensures sub-chats are visible even if we can't find the parent tool
+                const messagesContainer = parentContainer._elements.messages;
+                const standaloneSubChat = document.createElement('div');
+                standaloneSubChat.className = 'tool-block sub-chat-standalone';
+                standaloneSubChat.dataset.subChatId = subChatId;
+                messagesContainer.appendChild(standaloneSubChat);
+                toolDiv = standaloneSubChat; // Use this as our insertion point
+            }
+        }
+        
+        // Create sub-chat item container - use tool-block class for consistent styling
+        const subChatItem = document.createElement('div');
+        subChatItem.className = 'tool-block sub-chat-item';
+        subChatItem.dataset.subChatId = subChatId;
+        subChatItem.dataset.toolCallId = toolCallId;
+        
+        // Get tool metadata from the tool div
+        let toolMetadata = {};
+        try {
+            const metadataStr = toolDiv.dataset.metadata;
+            if (metadataStr) {
+                toolMetadata = JSON.parse(metadataStr);
+            }
+        } catch (e) {
+            console.warn('[renderSubChatAsItem] Failed to parse tool metadata:', e);
+        }
+        
+        // Create header for expandable section - use tool-header class
+        const subChatHeader = document.createElement('div');
+        subChatHeader.className = 'tool-header sub-chat-header';
+        
+        // Handle different status types with appropriate icons and colors
+        let statusIcon, statusLabel;
+        if (status === 'processing') {
+            statusIcon = 'fa-hourglass-half';
+            statusLabel = 'Processing...';
+        } else if (status === 'success') {
+            statusIcon = 'fa-check-circle';
+            statusLabel = 'Summarized';
+        } else { // 'failed' or any other status
+            statusIcon = 'fa-times-circle';
+            statusLabel = 'Failed';
+        }
+        
+        subChatHeader.innerHTML = `
+            <span class="tool-toggle">▶</span>
+            <span class="tool-label"><i class="fas fa-robot"></i> Tool Summarization </span>
+            <span class="tool-info">
+                <span class="tool-status"><i class="fas ${statusIcon}"></i> ${statusLabel}</span>
+                <span class="tool-metric"><i class="fas fa-comments"></i> ${subChat.messages.length}</span>
+                ${toolMetadata.tool_purpose ? `<span class="tool-metric" title="${this.escapeHtml(toolMetadata.tool_purpose)}"><i class="fas fa-info-circle"></i> Purpose</span>` : ''}
+            </span>
+        `;
+        
+        // Create content area - EXACTLY like tool-content
+        const subChatContent = document.createElement('div');
+        subChatContent.className = 'tool-content collapsed'; // Use tool-content class with collapsed
+        
+        // CRITICAL CHANGE: Create permanent messages container immediately
+        // This ensures sub-chat has a real DOM container from the start
+        const messagesDiv = document.createElement('div');
+        messagesDiv.className = 'chat-messages';
+        messagesDiv.style.maxHeight = '400px'; // Limit height for sub-chats
+        messagesDiv.style.overflowY = 'auto';
+        messagesDiv.style.backgroundColor = 'var(--sub-chat-bg, rgba(0, 0, 0, 0.02))'; // Theme-aware background
+        messagesDiv.style.borderRadius = '8px';
+        messagesDiv.style.padding = '10px';
+        messagesDiv.style.margin = '10px';
+        
+        // Add the messages div to content immediately (even if collapsed)
+        subChatContent.appendChild(messagesDiv);
+        
+        // Create permanent container structure for the sub-chat
+        const permanentContainer = {
+            _elements: {
+                messages: messagesDiv
+            },
+            _isSubChatContainer: true,
+            _parentChatId: parentChatId
+        };
+        
+        // Store the permanent container in regular chatContainers
+        // This ensures getChatContainer will return the permanent container
+        this.chatContainers.set(subChatId, permanentContainer);
+        
+        // Add click handler for expand/collapse - EXACTLY like tools
+        subChatHeader.addEventListener('click', () => {
+            const isCollapsed = subChatContent.classList.contains('collapsed');
+            subChatContent.classList.toggle('collapsed');
+            subChatHeader.querySelector('.tool-toggle').textContent = isCollapsed ? '▼' : '▶';
+            
+            // Always load full sub-chat history when expanding
+            // This ensures both live and loaded chats show complete history
+            if (isCollapsed) {
+                this.loadSubChatMessagesIntoContainer(subChatId, messagesDiv);
+            }
+        });
+        
+        subChatItem.appendChild(subChatHeader);
+        subChatItem.appendChild(subChatContent);
+        
+        // Insert sub-chat item after the tool result
+        toolDiv.parentNode.insertBefore(subChatItem, toolDiv.nextSibling);
+    }
+    
+    /**
+     * Load and render sub-chat messages into an existing messages container
+     */
+    loadSubChatMessagesIntoContainer(subChatId, messagesDiv) {
+        const subChat = this.chats.get(subChatId);
+        if (!subChat) {
+            console.error(`[loadSubChatMessagesIntoContainer] Sub-chat not found for subChatId: ${subChatId}`);
+            return;
+        }
+        
+        // Clear existing content
+        messagesDiv.innerHTML = '';
+        
+        // Initialize rendering state for sub-chat if needed
+        if (!subChat.renderingState) {
+            subChat.renderingState = {
+                lastDisplayedTurn: 0,
+                currentStepInTurn: 1
+            };
+        }
+        
+        // Add Processing Guidance as a system message at the beginning
+        const parentChat = this.chats.get(subChat.parentChatId);
+        if (parentChat) {
+            const container = this.getChatContainer(subChat.parentChatId);
+            if (container) {
+                const toolDiv = container.querySelector(`[data-tool-id="${subChat.parentToolCallId}"]`);
+                if (toolDiv && toolDiv.dataset.metadata) {
+                    try {
+                        const metadata = JSON.parse(toolDiv.dataset.metadata);
+                        if (Object.keys(metadata).length > 0) {
+                            // Create a guidance div with proper chat message styling
+                            const guidanceDiv = document.createElement('div');
+                            guidanceDiv.className = 'message-wrapper system';
+                            guidanceDiv.innerHTML = `
+                                <div class="message">
+                                    <div class="message-content">
+                                        <div class="processing-guidance">
+                                            <h4>
+                                                <i class="fas fa-info-circle"></i> Processing Guidance
+                                            </h4>
+                                            ${metadata.tool_purpose ? `<div class="guidance-item"><i class="fas fa-lightbulb"></i><strong>Purpose:</strong> ${metadata.tool_purpose}</div>` : ''}
+                                            ${metadata.expected_format ? `<div class="guidance-item"><i class="fas fa-file-alt"></i><strong>Expected:</strong> ${metadata.expected_format}</div>` : ''}
+                                            ${metadata.key_information ? `<div class="guidance-item"><i class="fas fa-search"></i><strong>Looking for:</strong> ${metadata.key_information}</div>` : ''}
+                                            ${metadata.success_indicators ? `<div class="guidance-item"><i class="fas fa-check-circle"></i><strong>Success:</strong> ${metadata.success_indicators}</div>` : ''}
+                                            ${metadata.context_for_interpretation ? `<div class="guidance-item"><i class="fas fa-book"></i><strong>Context:</strong> ${metadata.context_for_interpretation}</div>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            messagesDiv.appendChild(guidanceDiv);
+                        }
+                    } catch (e) {
+                        console.warn('[loadSubChatMessagesIntoContainer] Failed to parse metadata:', e);
+                    }
+                }
+            }
+        }
+        
+        // Use the regular chat rendering system for each message
+        for (let i = 0; i < subChat.messages.length; i++) {
+            const message = subChat.messages[i];
+            
+            // Special handling for system messages to make them collapsible
+            if (message.role === 'system') {
+                this.displaySystemPrompt(message.content, subChatId);
+            } else {
+                this.displayStoredMessage(message, i, subChatId);
+            }
+        }
+    }
+    
+    /**
+     * Render sub-chats for loaded chat history
+     */
+    renderSubChatsForLoadedChat(parentChatId) {
+        const parentChat = this.chats.get(parentChatId);
+        if (!parentChat) {
+            console.error(`[renderSubChatsForLoadedChat] Parent chat not found for parentChatId: ${parentChatId}`);
+            return;
+        }
+        
+        // Find all sub-chats for this parent
+        this.chats.forEach((chat, chatId) => {
+            if (chat.isSubChat && chat.parentChatId === parentChatId) {
+                // Determine status based on whether sub-chat has valid assistant response
+                let status = 'failed';
+                const lastMessage = chat.messages[chat.messages.length - 1];
+                if (lastMessage && lastMessage.role === 'assistant') {
+                    status = 'success';
+                }
+                
+                // Render the sub-chat item
+                this.renderSubChatAsItem(parentChatId, chatId, chat.parentToolCallId, status);
+            }
+        });
+    }
+    
+    /**
+     * Load sub-chat content into a container
+     */
+    
+    /**
+     * Update the tool result display in the DOM to show actual results instead of "Processing"
+     */
+    updateToolResultDisplay(chatId, toolCallId, toolResult) {
+        // Skip updating DOM if this tool result was already processed by sub-chat
+        // The sub-chat processing already updated the DOM with summarized content
+        if (toolResult.wasProcessedBySubChat) {
+            return;
+        }
+        
+        const container = this.getChatContainer(chatId);
+        if (!container) {
+            console.error('[updateToolResultDisplay] Chat container not found');
+            return;
+        }
+        
+        const toolDiv = container.querySelector(`[data-tool-id="${toolCallId}"]`);
+        if (!toolDiv) {
+            console.error('[updateToolResultDisplay] Tool div not found');
+            return;
+        }
+        
+        const responseSection = toolDiv.querySelector('.tool-response-section');
+        if (responseSection) {
+            // Update the processing message with actual result
+            const processingDiv = responseSection.querySelector('.sub-chat-processing');
+            if (processingDiv) {
+                // Replace processing message with actual result
+                const resultContent = typeof toolResult.result === 'string' 
+                    ? toolResult.result 
+                    : JSON.stringify(toolResult.result, null, 2);
+                    
+                responseSection.innerHTML = `
+                    <div class="tool-result-content">
+                        <pre>${this.escapeHtml(resultContent.substring(0, 1000))}${resultContent.length > 1000 ? '...' : ''}</pre>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    /**
+     * Recalculate total tokens price for a chat
+     */
+    recalculateTotalTokensPrice(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat || !chat.perModelTokensPrice) return;
+        
+        const total = {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheCreation: 0,
+            totalCost: 0
+        };
+        
+        for (const data of Object.values(chat.perModelTokensPrice)) {
+            total.input += data.input || 0;
+            total.output += data.output || 0;
+            total.cacheRead += data.cacheRead || 0;
+            total.cacheCreation += data.cacheCreation || 0;
+            total.totalCost += data.totalCost || 0;
+        }
+        
+        chat.totalTokensPrice = total;
     }
     
     scrollToBottom(chatId, force = false) {
@@ -8394,6 +10136,24 @@ class NetdataMCPChat {
     }
     
     /**
+     * Shows secondary assistant waiting spinner
+     */
+    showSecondaryAssistantWaiting(chatId) {
+        const chat = this.chats.get(chatId);
+        if (!chat) return;
+        
+        this.setSpinnerState(chatId, 'secondary-waiting', 'Waiting secondary assistant...');
+    }
+    
+    
+    /**
+     * Hides secondary assistant waiting spinner
+     */
+    hideSecondaryAssistantWaiting(chatId) {
+        this.clearSpinnerState(chatId);
+    }
+    
+    /**
      * Central method to set spinner state
      */
     setSpinnerState(chatId, type, text) {
@@ -8405,7 +10165,6 @@ class NetdataMCPChat {
         
         // Special handling for rate limit countdown
         if (chat.isInRateLimitCountdown && type !== 'waiting') {
-            console.log(`[setSpinnerState] Ignoring ${type} spinner during rate limit countdown`);
             return;
         }
         
@@ -8431,11 +10190,13 @@ class NetdataMCPChat {
      */
     clearSpinnerState(chatId) {
         const chat = this.chats.get(chatId);
-        if (!chat) return;
+        if (!chat) {
+            console.error(`[clearSpinnerState] Chat not found for chatId: ${chatId}`);
+            return;
+        }
         
         // Don't clear spinner if we're in a rate limit countdown
         if (chat.isInRateLimitCountdown) {
-            console.log('[clearSpinnerState] Preserving rate limit countdown spinner');
             return;
         }
         
@@ -8622,33 +10383,6 @@ class NetdataMCPChat {
         // Update icon
         statusIcon.innerHTML = iconHtml;
         statusIcon.className = 'status-icon ' + statusClass;
-    }
-    
-    /**
-     * Show error and update chat state
-     */
-    showError(chatId, errorMessage, errorType = 'general') {
-        const chat = this.chats.get(chatId);
-        if (!chat) {
-            console.error(`[showError] Chat not found: ${chatId}`);
-            return;
-        }
-        
-        // Clear any spinners
-        this.clearSpinnerState(chatId);
-        
-        // Set error state
-        chat.hasError = true;
-        chat.lastError = {
-            message: errorMessage,
-            type: errorType,
-            timestamp: Date.now()
-        };
-        
-        // Update tile
-        this.updateChatTileStatus(chatId);
-        
-        // Error display is handled by existing addMessage/processRenderEvent
     }
     
     /**
@@ -8914,7 +10648,7 @@ class NetdataMCPChat {
                 
             default:
                 // For any other states, just log them
-                console.log(`Unhandled connection state: ${connectionState}`, details);
+                console.warn(`Unhandled connection state: ${connectionState}`, details);
                 break;
         }
     }
@@ -9171,7 +10905,7 @@ class NetdataMCPChat {
         
         const container = this.chatContainers.get(chatId);
         if (!container) {
-            console.error('updateContextWindowIndicator: container not found for chat', chatId);
+            console.error(`[updateContextWindowIndicator] Container not found for chatId: ${chatId}`);
             return;
         }
         
@@ -9252,8 +10986,7 @@ class NetdataMCPChat {
         
         const chat = this.chats.get(chatId);
         if (!chat) {
-            // console.log('[getCumulativeTokenUsage] Chat not found:', chatId);
-            return { 
+            return {
                 inputTokens: 0, 
                 outputTokens: 0,
                 cacheCreationTokens: 0,
@@ -9262,16 +10995,13 @@ class NetdataMCPChat {
         }
         
         if (!chat.totalTokensPrice) {
-            // console.log('[getCumulativeTokenUsage] No totalTokensPrice for chat:', chatId);
-            return { 
+            return {
                 inputTokens: 0, 
                 outputTokens: 0,
                 cacheCreationTokens: 0,
                 cacheReadTokens: 0
             };
         }
-        
-        // console.log('[getCumulativeTokenUsage] totalTokensPrice:', chat.totalTokensPrice);
         
         // Use stored token counts
         return { 
@@ -9314,9 +11044,13 @@ class NetdataMCPChat {
             return;
         }
         
+        // Skip token display updates for sub-chats - they don't have token counter UI
+        const chat = this.chats.get(chatId);
+        if (chat && chat.isSubChat) {
+            return;
+        }
+        
         const cumulative = this.getCumulativeTokenUsage(chatId);
-        // console.log('[updateCumulativeTokenDisplay] Cumulative tokens for chat', chatId, cumulative);
-
         // Get the chat-specific DOM elements
         const container = this.getChatContainer(chatId);
         if (!container || !container._elements) {
@@ -9324,19 +11058,10 @@ class NetdataMCPChat {
             return;
         }
         
-        // console.log('[updateCumulativeTokenDisplay] Container elements:', container._elements);
-        
         const inputElement = container._elements.cumulativeInputTokens;
         const outputElement = container._elements.cumulativeOutputTokens;
         const cacheReadElement = container._elements.cumulativeCacheReadTokens;
         const cacheCreationElement = container._elements.cumulativeCacheCreationTokens;
-        
-        // console.log('[updateCumulativeTokenDisplay] Elements found:', {
-        //     inputElement: Boolean(inputElement),
-        //     outputElement: Boolean(outputElement),
-        //     cacheReadElement: Boolean(cacheReadElement),
-        //     cacheCreationElement: Boolean(cacheCreationElement)
-        // });
         
         // Format numbers with k suffix for thousands
         const formatTokens = (num) => {
@@ -9829,8 +11554,6 @@ class NetdataMCPChat {
                 });
             }
             
-            console.log('Messages before adding summary request:', messages.length, messages.map(m => ({ role: m.role, contentLength: m.content?.length || 0 })));
-            
             // IMPORTANT: The summary request should be added AFTER building messages
             // but BEFORE the system-summary message is added to chat history
             // This way it's not included in the conversation being summarized
@@ -9840,8 +11563,6 @@ class NetdataMCPChat {
             
             // For summaries, we can use a simple cache control on the last conversational message
             const cacheControlIndex = messages.length - 2; // Before the summary request
-            
-            console.log('Total messages being sent:', messages.length);
             
             // Send request with low temperature for consistent summaries
             const temperature = 0.5;
@@ -9859,6 +11580,9 @@ class NetdataMCPChat {
             if (response._rateLimitHandled) {
                 return { rateLimitHandled: true };
             }
+            
+            // Extract response time from the response object
+            const llmResponseTime = response._responseTime || 0;
             
             // Update metrics
             if (response.usage) {
@@ -10081,42 +11805,48 @@ class NetdataMCPChat {
     }
     
     // Check if automatic summary should be generated
-    shouldGenerateSummary(_chat) {
-        // Placeholder implementation - customize conditions as needed
-        // Examples of conditions you might want:
-        // - After X messages
-        // - After Y tokens used
-        // - After Z time elapsed
-        // - When context window is X% full
-        // - Every N user messages
-        
-        // For now, return false - no automatic summaries
-        return false;
-        
-        // Example implementation (uncomment and customize):
-        /*
-        // Don't summarize if already has a summary
-        if (chat.summaryGenerated) return false;
-        
-        // Check message count (e.g., after 20 exchanges)
-        const userMessages = chat.messages.filter(m => m.role === 'user' && !['system-title', 'system-summary'].includes(m.role));
-        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
-        if (userMessages.length < 10 || assistantMessages.length < 10) return false;
-        
-        // Check context window usage (e.g., when 80% full)
-        const contextTokens = this.calculateContextWindowTokens(chat.id);
-        const modelLimit = this.getModelContextLimit(ChatConfig.getChatModelString(chat));
-        if (contextTokens < modelLimit * 0.8) return false;
-        
-        // Check time elapsed (e.g., after 30 minutes)
-        const firstMessage = chat.messages.find(m => m.timestamp);
-        if (firstMessage) {
-            const elapsed = Date.now() - new Date(firstMessage.timestamp).getTime();
-            if (elapsed < 30 * 60 * 1000) return false;
+    shouldGenerateSummary(chat) {
+        // Check if auto-summarization is enabled
+        if (!chat.config?.optimisation?.autoSummarisation?.enabled) {
+            return false;
         }
         
-        return true;
-        */
+        // Don't summarize if we recently created a summary (within 10 minutes)
+        const recentSummary = chat.messages.findLast(m => m.role === 'system-summary');
+        if (recentSummary) {
+            const summaryAge = Date.now() - new Date(recentSummary.timestamp).getTime();
+            if (summaryAge < 10 * 60 * 1000) {
+                console.log('[Auto-summarize] Skipping - recent summary exists', {
+                    summaryAge: Math.round(summaryAge / 1000 / 60) + ' minutes'
+                });
+                return false;
+            }
+        }
+        
+        // Need at least a few exchanges before summarizing
+        const userMessages = chat.messages.filter(m => m.role === 'user');
+        const assistantMessages = chat.messages.filter(m => m.role === 'assistant');
+        if (userMessages.length < 3 || assistantMessages.length < 3) {
+            return false;
+        }
+        
+        // Calculate current context window usage
+        const contextTokens = this.calculateContextWindowTokens(chat.id);
+        const modelString = ChatConfig.getChatModelString(chat);
+        const modelLimit = this.modelLimits[modelString] || 128000; // fallback to 128k
+        
+        const percentUsed = Math.round((contextTokens / modelLimit) * 100);
+        const triggerPercent = chat.config.optimisation.autoSummarisation.triggerPercent || 50;
+        
+        console.log('[Auto-summarize] Context check', {
+            contextTokens,
+            modelLimit,
+            percentUsed: percentUsed + '%',
+            triggerPercent: triggerPercent + '%',
+            willTrigger: percentUsed >= triggerPercent
+        });
+        
+        return percentUsed >= triggerPercent;
     }
     
     
@@ -10135,9 +11865,11 @@ class NetdataMCPChat {
     
     clearCurrentAssistantGroup(chatId) {
         const chat = this.chats.get(chatId);
-        if (chat) {
-            chat.currentAssistantGroup = null;
+        if (!chat) {
+            console.error(`[clearCurrentAssistantGroup] Chat not found for chatId: ${chatId}`);
+            return;
         }
+        chat.currentAssistantGroup = null;
     }
     
     // Get callbacks for title generation
@@ -10161,12 +11893,10 @@ class NetdataMCPChat {
     
     // Reset global state when switching chats
     resetGlobalChatState() {
-        // Clear processing state
-        this.isProcessing = false;
-        this.shouldStopProcessing = false;
+        // isProcessing is now per-chat, no need to reset globally
+        // shouldStopProcessing is now per-chat, no need to reset globally
         
-        // Clear token display state
-        this.currentContextWindow = 0;
+        // currentContextWindow is now per-chat, no need to reset globally
         
         // Clear UI state
         if (this.spinnerInterval) {
@@ -10189,27 +11919,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.migrateCurrentChat = () => {
         const activeChatId = window.app.getActiveChatId();
         if (!activeChatId) {
-            console.log('No chat is currently loaded');
             return;
         }
         const chat = window.app.chats.get(activeChatId);
         if (!chat) {
-            console.log('Chat not found');
             return;
         }
-        console.log('Migrating chat:', chat.title);
-        console.log('Before migration:', {
-            totalTokensPrice: chat.totalTokensPrice,
-            perModelTokensPrice: chat.perModelTokensPrice
-        });
         window.app.migrateTokenPricing(chat);
-        console.log('After migration:', {
-            totalTokensPrice: chat.totalTokensPrice,
-            perModelTokensPrice: chat.perModelTokensPrice
-        });
         // Update displays
         window.app.updateAllTokenDisplays(activeChatId);
-        console.log('Migration complete!');
     };
 });
 

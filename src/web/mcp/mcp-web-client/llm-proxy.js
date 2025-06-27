@@ -1658,13 +1658,14 @@ const server = http.createServer(async (req, res) => {
     }
   });
 
-  // Collect request body
-  let body = '';
+  // Collect request body using Buffer for proper handling of large payloads
+  const chunks = [];
   req.on('data', chunk => {
-    body += chunk.toString();
+    chunks.push(chunk);
   });
 
   req.on('end', () => {
+    const body = Buffer.concat(chunks).toString();
     // Prepare options for the outgoing request
     const options = {
       hostname: targetUrl.hostname,

@@ -24,7 +24,7 @@ function createSettings(forgetAfterConclusions = 0, toolMemoryEnabled = true) {
             toolSummarisation: { enabled: false, thresholdKiB: 20, model: null },
             autoSummarisation: { enabled: false, triggerPercent: 50, model: null },
             toolMemory: { enabled: toolMemoryEnabled, forgetAfterConclusions },
-            cacheControl: { enabled: false, strategy: 'smart' },
+            cacheControl: 'all-off',
             titleGeneration: { enabled: true, model: null }
         },
         mcpServer: 'test'
@@ -153,7 +153,7 @@ runTest('Test 2: Real-world scenario with 4 turns', () => {
             toolSummarisation: { enabled: false, thresholdKiB: 20, model: null },
             autoSummarisation: { enabled: false, triggerPercent: 50, model: null },
             toolMemory: { enabled: true, forgetAfterConclusions: 0 },
-            cacheControl: { enabled: false, strategy: 'smart' },
+            cacheControl: 'all-off',
             titleGeneration: { enabled: true, model: null }
         },
         mcpServer: 'demos_registry'
