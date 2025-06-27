@@ -227,13 +227,34 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 
 func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName string, value int64) {
 	// Map Liberty MicroProfile metrics to base chart dimensions
+	// Based on actual metric names observed in Liberty MicroProfile endpoints
 	switch metricName {
-	// Actual Liberty metric names
+	// JVM uptime
 	case "jvm_uptime_seconds":
 		mx["jvm_uptime_seconds"] = value
 		return
 	case "classloader_loadedClasses_total":
 		mx["jvm_classes_loaded"] = value
+		return
+	case "classloader_unloadedClasses_total":
+		mx["jvm_classes_unloaded"] = value
+		return
+	case "thread_count":
+		mx["jvm_thread_count"] = value
+		// Store for calculating "other" threads later
+		if daemonCount, exists := mx["jvm_thread_daemon_count"]; exists {
+			mx["jvm_thread_other_count"] = value - daemonCount
+		}
+		return
+	case "thread_daemon_count":
+		mx["jvm_thread_daemon_count"] = value
+		// Calculate "other" threads if we have total count
+		if totalCount, exists := mx["jvm_thread_count"]; exists {
+			mx["jvm_thread_other_count"] = totalCount - value
+		}
+		return
+	case "thread_max_count":
+		mx["jvm_thread_max_count"] = value
 		return
 	case "memory_usedHeap_bytes":
 		mx["jvm_memory_heap_used"] = value
@@ -255,30 +276,13 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "gc_total":
 		mx["jvm_gc_collections_total"] = value
 		return
-	case "thread_count":
-		mx["jvm_thread_count"] = value
-		// Store for calculating "other" threads later
-		if daemonCount, exists := mx["jvm_thread_daemon_count"]; exists {
-			mx["jvm_thread_other_count"] = value - daemonCount
-		}
+	case "gc_time_seconds":
+		mx["gc_time_seconds"] = value
 		return
-	case "thread_daemon_count":
-		mx["jvm_thread_daemon_count"] = value
-		// Calculate "other" threads if we have total count
-		if totalCount, exists := mx["jvm_thread_count"]; exists {
-			mx["jvm_thread_other_count"] = totalCount - value
-		}
+	case "gc_time_per_cycle_seconds":
+		mx["gc_time_per_cycle_seconds"] = value
 		return
-	case "thread_max_count":
-		mx["jvm_thread_max_count"] = value
-		return
-	case "classloader_loadedClasses_count":
-		mx["jvm_classes_loaded"] = value
-		return
-	case "classloader_unloadedClasses_total":
-		mx["jvm_classes_unloaded"] = value
-		return
-	// CPU metrics
+	// CPU metrics  
 	case "cpu_availableProcessors":
 		mx["cpu_availableProcessors"] = value
 		return
@@ -294,16 +298,19 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "cpu_systemLoadAverage":
 		mx["cpu_systemLoadAverage"] = value
 		return
-	// Additional GC metrics
-	case "gc_time_seconds":
-		mx["gc_time_seconds"] = value
-		return
-	case "gc_time_per_cycle_seconds":
-		mx["gc_time_per_cycle_seconds"] = value
-		return
 	// Memory utilization
 	case "memory_heapUtilization_percent":
 		mx["memory_heapUtilization_percent"] = value
+		return
+	// Non-heap memory metrics
+	case "memory_usedNonHeap_bytes":
+		mx["memory_usedNonHeap_bytes"] = value
+		return
+	case "memory_committedNonHeap_bytes":
+		mx["memory_committedNonHeap_bytes"] = value
+		return
+	case "memory_maxNonHeap_bytes":
+		mx["memory_maxNonHeap_bytes"] = value
 		return
 	}
 
