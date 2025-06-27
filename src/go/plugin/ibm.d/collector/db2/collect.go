@@ -642,6 +642,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 			d.mx.LastFullBackupAge = int64(now.Sub(t).Hours())
 			d.mx.LastBackupStatus = 0 // Success
 		} else {
+			d.Warningf("failed to parse last full backup time '%s': %v", lastFullBackup.String, err)
 			d.mx.LastFullBackupAge = 999999 // Parse error
 			d.mx.LastBackupStatus = 1 // Failed
 		}
@@ -665,6 +666,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastIncrementalBackup.String); err == nil {
 			d.mx.LastIncrementalBackupAge = int64(now.Sub(t).Hours())
 		} else {
+			d.Warningf("failed to parse last incremental backup time '%s': %v", lastIncrementalBackup.String, err)
 			d.mx.LastIncrementalBackupAge = 999999 // Parse error
 		}
 	} else {
