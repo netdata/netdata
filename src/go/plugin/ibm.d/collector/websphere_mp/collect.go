@@ -41,6 +41,13 @@ func (w *WebSphereMicroProfile) collect(ctx context.Context) (map[string]int64, 
 	// Update seen instances for lifecycle management
 	w.updateSeenInstances()
 
+	// Log collection summary on first successful collection or significant changes
+	metricCount := len(mx)
+	if metricCount > 0 && (len(w.collectedMetrics) == 1 || metricCount != w.lastMetricCount) {
+		w.Infof("collected %d metrics from %s", metricCount, w.MetricsEndpoint)
+		w.lastMetricCount = metricCount
+	}
+
 	return mx, nil
 }
 
@@ -64,13 +71,18 @@ func (w *WebSphereMicroProfile) collectMicroProfileMetrics(ctx context.Context) 
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, fmt.Errorf("authentication failed (401): verify username and password")
+		} else if resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("metrics endpoint not found (404): verify endpoint path '%s' and that MicroProfile Metrics is enabled", w.MetricsEndpoint)
+		}
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse Prometheus format metrics
@@ -112,7 +124,7 @@ func (w *WebSphereMicroProfile) parsePrometheusMetrics(reader io.Reader) (map[st
 		// Parse value
 		value, err := strconv.ParseFloat(valueStr, 64)
 		if err != nil {
-			w.Debugf("failed to parse metric value '%s': %v", valueStr, err)
+			w.Debugf("failed to parse metric '%s' value '%s': %v", metricName, valueStr, err)
 			continue
 		}
 
@@ -178,15 +190,17 @@ func (w *WebSphereMicroProfile) extractLabel(labels, key string) string {
 
 func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[string]float64) {
 	restCount := 0
-	mpCount := 0
-	customCount := 0
 
 	for metricName, value := range metrics {
 		// Convert float to int64 with precision
 		intValue := int64(value * precision)
 
-		// Categorize and process metrics
-		if w.CollectJVMMetrics && w.jvmPattern.MatchString(metricName) {
+		// Check for vendor-specific metrics first (servlet, session, threadpool)
+		if strings.HasPrefix(metricName, "servlet_") || 
+		   strings.HasPrefix(metricName, "session_") || 
+		   strings.HasPrefix(metricName, "threadpool_") {
+			w.processVendorMetric(mx, metricName, intValue)
+		} else if w.CollectJVMMetrics && w.jvmPattern.MatchString(metricName) {
 			w.processJVMMetric(mx, metricName, intValue)
 		} else if w.CollectRESTMetrics && w.restPattern.MatchString(metricName) {
 			if w.MaxRESTEndpoints == 0 || restCount < w.MaxRESTEndpoints {
@@ -195,22 +209,89 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 					restCount++
 				}
 			}
-		} else if w.CollectMPMetrics && w.mpPattern.MatchString(metricName) {
-			w.processMPMetric(mx, metricName, intValue)
-			mpCount++
-		} else if w.CollectCustomMetrics && w.customPattern.MatchString(metricName) {
-			if w.MaxCustomMetrics == 0 || customCount < w.MaxCustomMetrics {
-				if w.customSelector == nil || w.customSelector.MatchString(metricName) {
-					w.processCustomMetric(mx, metricName, intValue)
-					customCount++
-				}
-			}
+		} else {
+			// Everything else goes to "other" family
+			w.processOtherMetric(mx, metricName, intValue)
 		}
 	}
 }
 
 func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName string, value int64) {
-	// Handle JVM metrics
+	// Map Liberty MicroProfile metrics to base chart dimensions
+	switch metricName {
+	case "memory_usedHeap_bytes":
+		mx["jvm_memory_heap_used"] = value
+		// Calculate free memory if we have committed memory
+		if committed, exists := mx["jvm_memory_heap_committed"]; exists {
+			mx["jvm_memory_heap_free"] = committed - value
+		}
+		return
+	case "memory_committedHeap_bytes":
+		mx["jvm_memory_heap_committed"] = value
+		// Calculate free memory if we have used memory
+		if used, exists := mx["jvm_memory_heap_used"]; exists {
+			mx["jvm_memory_heap_free"] = value - used
+		}
+		return
+	case "memory_maxHeap_bytes":
+		mx["jvm_memory_heap_max"] = value
+		return
+	case "gc_total":
+		mx["jvm_gc_collections_total"] = value
+		return
+	case "thread_count":
+		mx["jvm_thread_count"] = value
+		// Store for calculating "other" threads later
+		if daemonCount, exists := mx["jvm_thread_daemon_count"]; exists {
+			mx["jvm_thread_other_count"] = value - daemonCount
+		}
+		return
+	case "thread_daemon_count":
+		mx["jvm_thread_daemon_count"] = value
+		// Calculate "other" threads if we have total count
+		if totalCount, exists := mx["jvm_thread_count"]; exists {
+			mx["jvm_thread_other_count"] = totalCount - value
+		}
+		return
+	case "thread_max_count":
+		mx["jvm_thread_max_count"] = value
+		return
+	case "classloader_loadedClasses_count":
+		mx["jvm_classes_loaded"] = value
+		return
+	case "classloader_unloadedClasses_total":
+		mx["jvm_classes_unloaded"] = value
+		return
+	// CPU metrics
+	case "cpu_availableProcessors":
+		mx["cpu_availableProcessors"] = value
+		return
+	case "cpu_processCpuLoad_percent":
+		mx["cpu_processCpuLoad_percent"] = value
+		return
+	case "cpu_processCpuTime_seconds":
+		mx["cpu_processCpuTime_seconds"] = value
+		return
+	case "cpu_processCpuUtilization_percent":
+		mx["cpu_processCpuUtilization_percent"] = value
+		return
+	case "cpu_systemLoadAverage":
+		mx["cpu_systemLoadAverage"] = value
+		return
+	// Additional GC metrics
+	case "gc_time_seconds":
+		mx["gc_time_seconds"] = value
+		return
+	case "gc_time_per_cycle_seconds":
+		mx["gc_time_per_cycle_seconds"] = value
+		return
+	// Memory utilization
+	case "memory_heapUtilization_percent":
+		mx["memory_heapUtilization_percent"] = value
+		return
+	}
+
+	// Handle other JVM metrics dynamically
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
 
@@ -222,7 +303,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 		// Add JVM charts dynamically if needed
 		if charts := w.createJVMChart(cleanedName, metricName); charts != nil {
 			if err := w.charts.Add(*charts...); err != nil {
-				w.Warning(err)
+				w.Warningf("failed to add JVM chart for metric '%s': %v", metricName, err)
 			}
 		}
 	}
@@ -241,14 +322,63 @@ func (w *WebSphereMicroProfile) processRESTMetric(mx map[string]int64, metricNam
 		// Add REST charts dynamically
 		if charts := w.createRESTChart(cleanedName, metricName); charts != nil {
 			if err := w.charts.Add(*charts...); err != nil {
-				w.Warning(err)
+				w.Warningf("failed to add REST chart for metric '%s': %v", metricName, err)
 			}
 		}
 	}
 }
 
-func (w *WebSphereMicroProfile) processMPMetric(mx map[string]int64, metricName string, value int64) {
-	// Handle MicroProfile-specific metrics
+
+
+func (w *WebSphereMicroProfile) processVendorMetric(mx map[string]int64, metricName string, value int64) {
+	// Handle vendor-specific metrics (servlet, session, threadpool)
+	switch metricName {
+	// Threadpool metrics
+	case "threadpool_activeThreads":
+		mx["threadpool_activeThreads"] = value
+		// Calculate idle threads if we have pool size
+		if poolSize, exists := mx["threadpool_size"]; exists {
+			mx["threadpool_idle"] = poolSize - value
+		}
+		return
+	case "threadpool_size":
+		mx["threadpool_size"] = value
+		// Calculate idle threads if we have active count
+		if activeThreads, exists := mx["threadpool_activeThreads"]; exists {
+			mx["threadpool_idle"] = value - activeThreads
+		}
+		return
+	// Servlet metrics
+	case "servlet_request_total":
+		mx["servlet_request_total"] = value
+		return
+	case "servlet_request_elapsedTime_per_request_seconds":
+		mx["servlet_request_elapsedTime_per_request_seconds"] = value
+		return
+	case "servlet_responseTime_total_seconds":
+		mx["servlet_responseTime_total_seconds"] = value
+		return
+	// Session metrics
+	case "session_activeSessions":
+		mx["session_activeSessions"] = value
+		return
+	case "session_create_total":
+		mx["session_create_total"] = value
+		return
+	case "session_invalidated_total":
+		mx["session_invalidated_total"] = value
+		return
+	case "session_invalidatedbyTimeout_total":
+		mx["session_invalidatedbyTimeout_total"] = value
+		return
+	case "session_liveSessions":
+		mx["session_liveSessions"] = value
+		return
+	}
+}
+
+func (w *WebSphereMicroProfile) processOtherMetric(mx map[string]int64, metricName string, value int64) {
+	// Handle any other metrics that don't fit predefined categories
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
 
@@ -257,29 +387,10 @@ func (w *WebSphereMicroProfile) processMPMetric(mx map[string]int64, metricName 
 
 	if !w.collectedMetrics[cleanedName] {
 		w.collectedMetrics[cleanedName] = true
-		// Add MicroProfile charts dynamically
-		if charts := w.createMPChart(cleanedName, metricName); charts != nil {
+		// Add chart dynamically
+		if charts := w.createOtherChart(cleanedName, metricName); charts != nil {
 			if err := w.charts.Add(*charts...); err != nil {
-				w.Warning(err)
-			}
-		}
-	}
-}
-
-func (w *WebSphereMicroProfile) processCustomMetric(mx map[string]int64, metricName string, value int64) {
-	// Handle custom application metrics
-	cleanedName := cleanName(metricName)
-	mx[cleanedName] = value
-
-	// Track for dynamic chart creation
-	w.seenMetrics[cleanedName] = true
-
-	if !w.collectedMetrics[cleanedName] {
-		w.collectedMetrics[cleanedName] = true
-		// Add custom charts dynamically
-		if charts := w.createCustomChart(cleanedName, metricName); charts != nil {
-			if err := w.charts.Add(*charts...); err != nil {
-				w.Warning(err)
+				w.Warningf("failed to add chart for other metric '%s': %v", metricName, err)
 			}
 		}
 	}
