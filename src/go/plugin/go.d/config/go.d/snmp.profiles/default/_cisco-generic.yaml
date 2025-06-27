@@ -300,6 +300,8 @@ metrics:
           OID: 1.3.6.1.4.1.9.9.48.1.1.1.2
           name: ciscoMemoryPoolName
         tag: mem_pool_name
+      - index: 1
+        tag: mem_pool_index
 
   - MIB: CISCO-FIREWALL-MIB
     table:
