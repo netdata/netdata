@@ -2,6 +2,9 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.24.0
 
+replace github.com/netdata/netdata/go/plugins/plugin/go.d => ./plugin/go.d
+
+replace github.com/netdata/netdata/go/plugins/plugin/ibm.d => ./plugin/ibm.d
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 require (
