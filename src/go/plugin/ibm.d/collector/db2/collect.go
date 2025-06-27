@@ -49,11 +49,12 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Test connection with a ping before proceeding
 	if err := d.ping(ctx); err != nil {
+		d.Infof("connection test failed, attempting to reconnect: %v", err)
 		// Try to reconnect once
 		d.Cleanup(ctx)
 		db, err := d.initDatabase(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reconnect to database: %v", err)
+			return nil, fmt.Errorf("failed to reconnect to database after connection test failure: %v", err)
 		}
 		d.db = db
 
@@ -75,70 +76,68 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Collect per-instance metrics if enabled and supported
 	if d.CollectDatabaseMetrics != nil && *d.CollectDatabaseMetrics {
-		if d.IgnoreVersionChecks || !d.isDisabled("sysibmadm_views") {
-			if err := d.collectDatabaseInstances(ctx); err != nil {
+		d.Debugf("collecting database instance metrics (limit: %d)", d.MaxDatabases)
+		if err := d.collectDatabaseInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("database_instances_unavailable", "Database instance collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
 				d.Errorf("failed to collect database instances: %v", err)
 			}
-		} else {
-			d.logOnce("database_instances_skipped", "Database instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectBufferpoolMetrics != nil && *d.CollectBufferpoolMetrics {
-		if d.IgnoreVersionChecks || (!d.isDisabled("sysibmadm_views") && !d.isDisabled("bufferpool_instances")) {
-			if err := d.collectBufferpoolInstances(ctx); err != nil {
-				d.Errorf("failed to collect bufferpool instances: %v", err)
-			}
-		} else {
-			if d.isDisabled("bufferpool_instances") {
-				d.logOnce("bufferpool_instances_cloud_skipped", "Bufferpool instance metrics collection skipped - limited on Db2 on Cloud")
+		d.Debugf("collecting bufferpool instance metrics (limit: %d)", d.MaxBufferpools)
+		if err := d.collectBufferpoolInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("bufferpool_instances_unavailable", "Bufferpool instance collection failed (likely unsupported on this DB2 edition/version): %v", err)
 			} else {
-				d.logOnce("bufferpool_instances_skipped", "Bufferpool instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
+				d.Errorf("failed to collect bufferpool instances: %v", err)
 			}
 		}
 	}
 
 	if d.CollectTablespaceMetrics != nil && *d.CollectTablespaceMetrics {
-		if d.IgnoreVersionChecks || !d.isDisabled("sysibmadm_views") {
-			if err := d.collectTablespaceInstances(ctx); err != nil {
+		d.Debugf("collecting tablespace instance metrics (limit: %d)", d.MaxTablespaces)
+		if err := d.collectTablespaceInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("tablespace_instances_unavailable", "Tablespace instance collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
 				d.Errorf("failed to collect tablespace instances: %v", err)
 			}
-		} else {
-			d.logOnce("tablespace_instances_skipped", "Tablespace instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectConnectionMetrics != nil && *d.CollectConnectionMetrics {
-		if d.IgnoreVersionChecks || (!d.isDisabled("sysibmadm_views") && !d.isDisabled("connection_instances")) {
-			if err := d.collectConnectionInstances(ctx); err != nil {
-				d.Errorf("failed to collect connection instances: %v", err)
-			}
-		} else {
-			if d.isDisabled("connection_instances") {
-				d.logOnce("connection_instances_cloud_skipped", "Connection instance metrics collection skipped - limited on Db2 on Cloud")
+		d.Debugf("collecting connection instance metrics (limit: %d)", d.MaxConnections)
+		if err := d.collectConnectionInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("connection_instances_unavailable", "Connection instance collection failed (likely unsupported on this DB2 edition/version): %v", err)
 			} else {
-				d.logOnce("connection_instances_skipped", "Connection instance metrics collection skipped - SYSIBMADM views not available on this DB2 edition/version")
+				d.Errorf("failed to collect connection instances: %v", err)
 			}
 		}
 	}
 
 	if d.CollectTableMetrics != nil && *d.CollectTableMetrics {
-		if d.IgnoreVersionChecks || !d.isDisabled("extended_monitoring") {
-			if err := d.collectTableInstances(ctx); err != nil {
+		d.Debugf("collecting table instance metrics (limit: %d)", d.MaxTables)
+		if err := d.collectTableInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("table_instances_unavailable", "Table instance collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
 				d.Errorf("failed to collect table instances: %v", err)
 			}
-		} else {
-			d.logOnce("table_instances_skipped", "Table instance metrics collection skipped - Extended monitoring not available on this DB2 edition/version")
 		}
 	}
 
 	if d.CollectIndexMetrics != nil && *d.CollectIndexMetrics {
-		if d.IgnoreVersionChecks || !d.isDisabled("extended_monitoring") {
-			if err := d.collectIndexInstances(ctx); err != nil {
+		d.Debugf("collecting index instance metrics (limit: %d)", d.MaxIndexes)
+		if err := d.collectIndexInstances(ctx); err != nil {
+			if isSQLFeatureError(err) {
+				d.logOnce("index_instances_unavailable", "Index instance collection failed (likely unsupported on this DB2 edition/version): %v", err)
+			} else {
 				d.Errorf("failed to collect index instances: %v", err)
 			}
-		} else {
-			d.logOnce("index_instances_skipped", "Index instance metrics collection skipped - Extended monitoring not available on this DB2 edition/version")
 		}
 	}
 
@@ -248,6 +247,8 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 }
 
 func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
+	d.Debugf("starting global metrics collection")
+	
 	// Service health checks - core functionality
 	if err := d.collectServiceHealthResilience(ctx); err != nil {
 		return err // Service health is critical
@@ -332,6 +333,7 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 		d.collectBackupStatusResilience(ctx)
 	}
 
+	d.Debugf("completed global metrics collection")
 	return nil
 }
 
@@ -651,7 +653,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 			d.mx.LastFullBackupAge = int64(now.Sub(t).Hours())
 			d.mx.LastBackupStatus = 0 // Success
 		} else {
-			d.Warningf("failed to parse last full backup time '%s': %v", lastFullBackup.String, err)
+			d.Warningf("failed to parse last full backup time '%s': %v (expected format: YYYY-MM-DD-HH.MM.SS)", lastFullBackup.String, err)
 			d.mx.LastFullBackupAge = 999999 // Parse error
 			d.mx.LastBackupStatus = 1       // Failed
 		}
@@ -675,7 +677,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastIncrementalBackup.String); err == nil {
 			d.mx.LastIncrementalBackupAge = int64(now.Sub(t).Hours())
 		} else {
-			d.Warningf("failed to parse last incremental backup time '%s': %v", lastIncrementalBackup.String, err)
+			d.Warningf("failed to parse last incremental backup time '%s': %v (expected format: YYYY-MM-DD-HH.MM.SS)", lastIncrementalBackup.String, err)
 			d.mx.LastIncrementalBackupAge = 999999 // Parse error
 		}
 	} else {
