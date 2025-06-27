@@ -3,7 +3,7 @@
 //go:build cgo
 // +build cgo
 
-package websphere
+package websphere_liberty
 
 import (
 	"fmt"
@@ -44,7 +44,7 @@ var baseCharts = module.Charts{
 		Title:    "JVM Heap Usage",
 		Units:    "bytes",
 		Fam:      "jvm",
-		Ctx:      "websphere.jvm_heap_usage",
+		Ctx:      "websphere_liberty.jvm_heap_usage",
 		Priority: prioJVMHeap,
 		Type:     module.Stacked,
 		Dims: module.Dims{
@@ -58,7 +58,7 @@ var baseCharts = module.Charts{
 		Title:    "JVM Garbage Collection Time",
 		Units:    "milliseconds",
 		Fam:      "jvm",
-		Ctx:      "websphere.jvm_gc_time",
+		Ctx:      "websphere_liberty.jvm_gc_time",
 		Priority: prioJVMGC,
 		Dims: module.Dims{
 			{ID: "jvm_gc_time", Name: "gc_time", Algo: module.Incremental},
@@ -69,7 +69,7 @@ var baseCharts = module.Charts{
 		Title:    "JVM Garbage Collection Count",
 		Units:    "collections/s",
 		Fam:      "jvm",
-		Ctx:      "websphere.jvm_gc_count",
+		Ctx:      "websphere_liberty.jvm_gc_count",
 		Priority: prioJVMGC,
 		Dims: module.Dims{
 			{ID: "jvm_gc_count", Name: "collections", Algo: module.Incremental},
@@ -80,7 +80,7 @@ var baseCharts = module.Charts{
 		Title:    "JVM Threads",
 		Units:    "threads",
 		Fam:      "jvm",
-		Ctx:      "websphere.jvm_threads",
+		Ctx:      "websphere_liberty.jvm_threads",
 		Priority: prioJVMThreads,
 		Dims: module.Dims{
 			{ID: "jvm_thread_count", Name: "threads"},
@@ -93,7 +93,7 @@ var baseCharts = module.Charts{
 		Title:    "JVM Loaded Classes",
 		Units:    "classes",
 		Fam:      "jvm",
-		Ctx:      "websphere.jvm_classes",
+		Ctx:      "websphere_liberty.jvm_classes",
 		Priority: prioJVMClasses,
 		Dims: module.Dims{
 			{ID: "jvm_classes_loaded", Name: "loaded"},
@@ -107,7 +107,7 @@ var baseCharts = module.Charts{
 		Title:    "Web Sessions",
 		Units:    "sessions",
 		Fam:      "web",
-		Ctx:      "websphere.web_sessions",
+		Ctx:      "websphere_liberty.web_sessions",
 		Priority: prioSessions,
 		Dims: module.Dims{
 			{ID: "web_sessions_active", Name: "active"},
@@ -120,7 +120,7 @@ var baseCharts = module.Charts{
 		Title:    "Web Requests",
 		Units:    "requests/s",
 		Fam:      "web",
-		Ctx:      "websphere.web_requests",
+		Ctx:      "websphere_liberty.web_requests",
 		Priority: prioRequests,
 		Dims: module.Dims{
 			{ID: "web_requests_total", Name: "requests", Algo: module.Incremental},
@@ -135,7 +135,7 @@ var threadPoolChartsTmpl = module.Charts{
 		Title:    "Thread Pool Size",
 		Units:    "threads",
 		Fam:      "threadpools",
-		Ctx:      "websphere.threadpool_size",
+		Ctx:      "websphere_liberty.threadpool_size",
 		Priority: prioThreadPoolSize,
 		Dims: module.Dims{
 			{ID: "threadpool_%s_size", Name: "size"},
@@ -147,7 +147,7 @@ var threadPoolChartsTmpl = module.Charts{
 		Title:    "Thread Pool Active Threads",
 		Units:    "threads",
 		Fam:      "threadpools",
-		Ctx:      "websphere.threadpool_active",
+		Ctx:      "websphere_liberty.threadpool_active",
 		Priority: prioThreadPoolActive,
 		Dims: module.Dims{
 			{ID: "threadpool_%s_active", Name: "active"},
@@ -158,7 +158,7 @@ var threadPoolChartsTmpl = module.Charts{
 		Title:    "Thread Pool Hung Threads",
 		Units:    "threads",
 		Fam:      "threadpools",
-		Ctx:      "websphere.threadpool_hung",
+		Ctx:      "websphere_liberty.threadpool_hung",
 		Priority: prioThreadPoolHung,
 		Dims: module.Dims{
 			{ID: "threadpool_%s_hung", Name: "hung"},
@@ -173,7 +173,7 @@ var connectionPoolChartsTmpl = module.Charts{
 		Title:    "Connection Pool Size",
 		Units:    "connections",
 		Fam:      "connpools",
-		Ctx:      "websphere.connpool_size",
+		Ctx:      "websphere_liberty.connpool_size",
 		Priority: prioConnectionPoolSize,
 		Dims: module.Dims{
 			{ID: "connpool_%s_size", Name: "size"},
@@ -186,7 +186,7 @@ var connectionPoolChartsTmpl = module.Charts{
 		Title:    "Connection Pool Wait Time",
 		Units:    "milliseconds",
 		Fam:      "connpools",
-		Ctx:      "websphere.connpool_wait_time",
+		Ctx:      "websphere_liberty.connpool_wait_time",
 		Priority: prioConnectionPoolWait,
 		Dims: module.Dims{
 			{ID: "connpool_%s_wait_time_avg", Name: "avg_wait", Div: precision},
@@ -197,7 +197,7 @@ var connectionPoolChartsTmpl = module.Charts{
 		Title:    "Connection Pool Timeouts",
 		Units:    "timeouts/s",
 		Fam:      "connpools",
-		Ctx:      "websphere.connpool_timeouts",
+		Ctx:      "websphere_liberty.connpool_timeouts",
 		Priority: prioConnectionPoolWait,
 		Dims: module.Dims{
 			{ID: "connpool_%s_timeouts", Name: "timeouts", Algo: module.Incremental},
@@ -212,7 +212,7 @@ var applicationChartsTmpl = module.Charts{
 		Title:    "Application Requests",
 		Units:    "requests/s",
 		Fam:      "applications",
-		Ctx:      "websphere.app_requests",
+		Ctx:      "websphere_liberty.app_requests",
 		Priority: prioAppRequests,
 		Dims: module.Dims{
 			{ID: "app_%s_requests", Name: "requests", Algo: module.Incremental},
@@ -223,7 +223,7 @@ var applicationChartsTmpl = module.Charts{
 		Title:    "Application Response Time",
 		Units:    "milliseconds",
 		Fam:      "applications",
-		Ctx:      "websphere.app_response_time",
+		Ctx:      "websphere_liberty.app_response_time",
 		Priority: prioResponseTime,
 		Dims: module.Dims{
 			{ID: "app_%s_response_time_avg", Name: "avg_response", Div: precision},
@@ -234,7 +234,7 @@ var applicationChartsTmpl = module.Charts{
 		Title:    "Application Errors",
 		Units:    "errors/s",
 		Fam:      "applications",
-		Ctx:      "websphere.app_errors",
+		Ctx:      "websphere_liberty.app_errors",
 		Priority: prioAppErrors,
 		Dims: module.Dims{
 			{ID: "app_%s_errors", Name: "errors", Algo: module.Incremental},

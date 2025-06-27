@@ -3,7 +3,7 @@
 //go:build cgo
 // +build cgo
 
-package websphere
+package websphere_liberty
 
 import (
 	"context"

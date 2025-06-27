@@ -3,7 +3,7 @@
 //go:build cgo
 // +build cgo
 
-package websphere
+package websphere_liberty
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("websphere", module.Creator{
+	module.Register("websphere_liberty", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
@@ -123,7 +123,7 @@ func (w *WebSphere) Configuration() any {
 
 func (w *WebSphere) Init(context.Context) error {
 	if w.HTTPConfig.RequestConfig.URL == "" {
-		return errors.New("websphere URL is required")
+		return errors.New("websphere_liberty URL is required")
 	}
 
 	// Set default metrics endpoint for Liberty
@@ -165,7 +165,7 @@ func (w *WebSphere) Init(context.Context) error {
 	}
 	w.httpClient = httpClient
 
-	w.Debugf("initialized websphere collector: url=%s, metrics_endpoint=%s", w.HTTPConfig.RequestConfig.URL, w.MetricsEndpoint)
+	w.Debugf("initialized websphere_liberty collector: url=%s, metrics_endpoint=%s", w.HTTPConfig.RequestConfig.URL, w.MetricsEndpoint)
 
 	return nil
 }
