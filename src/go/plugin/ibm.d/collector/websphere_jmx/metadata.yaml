@@ -27,7 +27,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors IBM WebSphere Application Server via JMX.
-          
+
           It collects metrics for:
           - JVM performance (heap, GC, threads, classes)
           - Thread pool utilization
