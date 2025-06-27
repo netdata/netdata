@@ -21,6 +21,7 @@ metadata:
 
 metrics:
   - MIB: CISCO-ENTITY-SENSOR-MIB
+    # TODO: sensors of different types in one chart, transformation required
     table:
       OID: 1.3.6.1.4.1.9.9.91.1.1.1
       name: entSensorValueTable
@@ -38,31 +39,31 @@ metrics:
       - index: 1
         tag: sensor_id
   - MIB: CISCO-IF-EXTENSION-MIB
+    # TODO: this is not Catalyst-specific, need to add to other Cisco devices
     table:
       OID: 1.3.6.1.4.1.9.9.276.1.1.1
       name: cieIfPacketStatsTable
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.1
         name: cieIfLastInTime
         description: "Elapsed time in milliseconds since last protocol input packet was received"
-        family: Interfaces/Packets
+        family: Interfaces/Activity
         unit: "ms"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.2
         name: cieIfLastOutTime
         description: "Elapsed time in milliseconds since last protocol output packet was transmitted"
-        family: Interfaces/Packets
+        family: Interfaces/Activity
         unit: "ms"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.10
         name: cieIfInputQueueDrops
         description: "Number of input packets which were dropped"
-        family: Interfaces/Packets
-        unit: "{packet}"
+        family: Interfaces/Drops
+        unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.11
         name: cieIfOutputQueueDrops
         description: "Number of output packets dropped by the interface"
-        family: Interfaces/Packets
-        unit: "{packet}"
+        family: Interfaces/Drops
+        unit: "{drop}/s"
     metric_tags:
       - MIB: IF-MIB
         symbol:
