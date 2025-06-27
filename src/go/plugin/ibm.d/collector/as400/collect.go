@@ -80,7 +80,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	if a.IFSTopNDirectories > 0 {
-		if !a.isDisabled("ifs_object_statistics") {
+		if a.IgnoreVersionChecks || !a.isDisabled("ifs_object_statistics") {
 			if err := a.collectIFSTopNDirectories(ctx); err != nil {
 				a.Warningf("failed to collect IFS top N directories: %v", err)
 			}
@@ -90,7 +90,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Collect message queue depths
-	if !a.isDisabled("message_queue_info") {
+	if a.IgnoreVersionChecks || !a.isDisabled("message_queue_info") {
 		if err := a.collectMessageQueues(ctx); err != nil {
 			a.Warningf("failed to collect message queues: %v", err)
 		}
@@ -109,8 +109,8 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Collect top active jobs if enabled
-	if a.CollectActiveJobs && a.MaxActiveJobs > 0 {
-		if !a.isDisabled("active_job_info") {
+	if a.CollectActiveJobs != nil && *a.CollectActiveJobs && a.MaxActiveJobs > 0 {
+		if a.IgnoreVersionChecks || !a.isDisabled("active_job_info") {
 			if err := a.collectActiveJobs(ctx); err != nil {
 				a.Warningf("failed to collect active jobs: %v", err)
 			}
@@ -120,19 +120,19 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Collect per-instance metrics if enabled
-	if a.CollectDiskMetrics {
+	if a.CollectDiskMetrics != nil && *a.CollectDiskMetrics {
 		if err := a.collectDiskInstances(ctx); err != nil {
 			a.Errorf("failed to collect disk instances: %v", err)
 		}
 	}
 
-	if a.CollectSubsystemMetrics {
+	if a.CollectSubsystemMetrics != nil && *a.CollectSubsystemMetrics {
 		if err := a.collectSubsystemInstances(ctx); err != nil {
 			a.Errorf("failed to collect subsystem instances: %v", err)
 		}
 	}
 
-	if a.CollectJobQueueMetrics {
+	if a.CollectJobQueueMetrics != nil && *a.CollectJobQueueMetrics {
 		if err := a.collectJobQueueInstances(ctx); err != nil {
 			a.Errorf("failed to collect job queue instances: %v", err)
 		}
@@ -167,7 +167,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Add individual job metrics if enabled
-	if a.CollectActiveJobs {
+	if a.CollectActiveJobs != nil && *a.CollectActiveJobs {
 		for jobName, metrics := range a.mx.jobs {
 			cleanJobName := cleanName(jobName)
 			for k, v := range stm.ToMap(metrics) {

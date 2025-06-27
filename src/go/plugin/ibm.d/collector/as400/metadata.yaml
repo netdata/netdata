@@ -182,6 +182,33 @@ modules:
               description: Enable collection of per-job-queue metrics.
               default_value: true
               required: false
+            - name: collect_active_jobs
+              description: Enable collection of top active jobs by CPU usage (requires IBM i 7.3+).
+              default_value: false
+              required: false
+              detailed_description: |
+                Collects metrics for the top N active jobs by CPU usage. 
+                This is an expensive operation and requires IBM i 7.3 or later.
+                The collector will attempt to use ACTIVE_JOB_INFO if the admin enables this option,
+                regardless of the detected version.
+            - name: ignore_version_checks
+              description: Disable all version compatibility checks (use with caution).
+              default_value: false
+              required: false
+              detailed_description: |
+                WARNING: Disables all version compatibility checks. The collector will attempt 
+                to use all configured features regardless of IBM i version. Use with caution 
+                as this may cause errors on older systems. This option is useful when:
+                - Testing on newer IBM i versions not yet validated
+                - Features have been backported to your specific system
+                - You want to force collection despite version detection issues
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Associates this data collection job with a Virtual Node for configuration management.
+                See Virtual Nodes documentation for details on organizing systems, metrics and alerts.
             - name: max_disks
               description: Maximum number of disks to monitor. Set to 0 for unlimited.
               default_value: 50
@@ -194,10 +221,22 @@ modules:
               description: Maximum number of job queues to monitor.
               default_value: 50
               required: false
+            - name: max_active_jobs
+              description: Maximum number of active jobs to monitor when collect_active_jobs is enabled.
+              default_value: 10
+              required: false
             - name: ifs_top_n_directories
               description: Monitor top N IFS directories by size.
               default_value: 20
               required: false
+            - name: ifs_start_path
+              description: Starting path for IFS directory monitoring.
+              default_value: "/"
+              required: false
+              detailed_description: |
+                Starting path for IFS directory monitoring. Useful for monitoring specific 
+                subdirectories on large file systems. The collector will only scan directories 
+                under this path when collecting IFS directory usage statistics.
             - name: collect_disks_matching
               description: SQL LIKE pattern to filter disks.
               default_value: ""
@@ -279,6 +318,17 @@ modules:
                     collect_subsystems_matching: 'QINTER|QBATCH%'
                     # Only monitor night batch queues
                     collect_job_queues_matching: '%NIGHT%'
+            - name: Advanced configuration with version override
+              description: Using ignore_version_checks to force collection on newer/custom systems.
+              config: |
+                jobs:
+                  - name: as400_custom
+                    dsn: 'DATABASE=;HOSTNAME=custom.as400.com;PORT=446;PROTOCOL=TCPIP;UID=monitor;PWD=secret'
+                    # Force collection of active jobs even on older versions
+                    collect_active_jobs: true
+                    max_active_jobs: 20
+                    # Override version checks (use with caution)
+                    ignore_version_checks: true
     troubleshooting:
       problems:
         list:
@@ -313,6 +363,7 @@ modules:
                   - V7R4-V7R5: Enhanced performance services
               - The collector proactively disables incompatible features at startup
               - Check logs for "Feature availability" messages to see what's enabled
+              - If you believe features should work on your system, you can set 'ignore_version_checks: true' to force collection
               - Check logs for "Feature disabled" messages to understand limitations
               - Core metrics (CPU, ASP, Jobs) work on all IBM i versions
               - Missing metrics will be logged once and then skipped automatically

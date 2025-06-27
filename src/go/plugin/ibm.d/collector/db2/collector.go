@@ -43,14 +43,14 @@ func New() *DB2 {
 			MaxDbConns:    1,
 			MaxDbLifeTime: confopt.Duration(time.Minute * 10),
 
-			// Instance collection defaults
-			CollectDatabaseMetrics:   true,
-			CollectBufferpoolMetrics: true,
-			CollectTablespaceMetrics: true,
-			CollectConnectionMetrics: true,
-			CollectLockMetrics:       true,
-			CollectTableMetrics:      false,
-			CollectIndexMetrics:      false,
+			// Instance collection defaults (will be set in Init based on version)
+			// CollectDatabaseMetrics:   nil,
+			// CollectBufferpoolMetrics: nil,
+			// CollectTablespaceMetrics: nil,
+			// CollectConnectionMetrics: nil,
+			// CollectLockMetrics:       nil,
+			// CollectTableMetrics:      nil,
+			// CollectIndexMetrics:      nil,
 
 			// Cardinality limits
 			MaxDatabases:   10,
@@ -89,13 +89,16 @@ type Config struct {
 	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time"`
 
 	// Instance collection settings
-	CollectDatabaseMetrics   bool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics"`
-	CollectBufferpoolMetrics bool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics"`
-	CollectTablespaceMetrics bool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics"`
-	CollectConnectionMetrics bool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics"`
-	CollectLockMetrics       bool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics"`
-	CollectTableMetrics      bool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics"`
-	CollectIndexMetrics      bool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics"`
+	CollectDatabaseMetrics   *bool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics"`
+	CollectBufferpoolMetrics *bool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics"`
+	CollectTablespaceMetrics *bool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics"`
+	CollectConnectionMetrics *bool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics"`
+	CollectLockMetrics       *bool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics"`
+	CollectTableMetrics      *bool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics"`
+	CollectIndexMetrics      *bool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics"`
+
+	// Version check override
+	IgnoreVersionChecks bool `yaml:"ignore_version_checks,omitempty" json:"ignore_version_checks"`
 
 	// Cardinality limits
 	MaxDatabases   int `yaml:"max_databases,omitempty" json:"max_databases"`
@@ -109,12 +112,12 @@ type Config struct {
 	BackupHistoryDays int `yaml:"backup_history_days,omitempty" json:"backup_history_days"`
 
 	// Selectors for filtering
-	DatabaseSelector   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
-	BufferpoolSelector string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching"`
-	TablespaceSelector string `yaml:"collect_tablespaces_matching,omitempty" json:"collect_tablespaces_matching"`
-	ConnectionSelector string `yaml:"collect_connections_matching,omitempty" json:"collect_connections_matching"`
-	TableSelector      string `yaml:"collect_tables_matching,omitempty" json:"collect_tables_matching"`
-	IndexSelector      string `yaml:"collect_indexes_matching,omitempty" json:"collect_indexes_matching"`
+	CollectDatabasesMatching   string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
+	CollectBufferpoolsMatching string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching"`
+	CollectTablespacesMatching string `yaml:"collect_tablespaces_matching,omitempty" json:"collect_tablespaces_matching"`
+	CollectConnectionsMatching string `yaml:"collect_connections_matching,omitempty" json:"collect_connections_matching"`
+	CollectTablesMatching      string `yaml:"collect_tables_matching,omitempty" json:"collect_tables_matching"`
+	CollectIndexesMatching     string `yaml:"collect_indexes_matching,omitempty" json:"collect_indexes_matching"`
 }
 
 type DB2 struct {
@@ -175,50 +178,50 @@ func (d *DB2) Init(ctx context.Context) error {
 	}
 
 	// Initialize selectors
-	if d.DatabaseSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(d.DatabaseSelector)
+	if d.CollectDatabasesMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.CollectDatabasesMatching)
 		if err != nil {
-			return fmt.Errorf("invalid database selector pattern '%s': %v", d.DatabaseSelector, err)
+			return fmt.Errorf("invalid database selector pattern '%s': %v", d.CollectDatabasesMatching, err)
 		}
 		d.databaseSelector = m
 	}
 
-	if d.BufferpoolSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(d.BufferpoolSelector)
+	if d.CollectBufferpoolsMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.CollectBufferpoolsMatching)
 		if err != nil {
-			return fmt.Errorf("invalid bufferpool selector pattern '%s': %v", d.BufferpoolSelector, err)
+			return fmt.Errorf("invalid bufferpool selector pattern '%s': %v", d.CollectBufferpoolsMatching, err)
 		}
 		d.bufferpoolSelector = m
 	}
 
-	if d.TablespaceSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(d.TablespaceSelector)
+	if d.CollectTablespacesMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.CollectTablespacesMatching)
 		if err != nil {
-			return fmt.Errorf("invalid tablespace selector pattern '%s': %v", d.TablespaceSelector, err)
+			return fmt.Errorf("invalid tablespace selector pattern '%s': %v", d.CollectTablespacesMatching, err)
 		}
 		d.tablespaceSelector = m
 	}
 
-	if d.ConnectionSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(d.ConnectionSelector)
+	if d.CollectConnectionsMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.CollectConnectionsMatching)
 		if err != nil {
-			return fmt.Errorf("invalid connection selector pattern '%s': %v", d.ConnectionSelector, err)
+			return fmt.Errorf("invalid connection selector pattern '%s': %v", d.CollectConnectionsMatching, err)
 		}
 		d.connectionSelector = m
 	}
 
-	if d.TableSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(d.TableSelector)
+	if d.CollectTablesMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.CollectTablesMatching)
 		if err != nil {
-			return fmt.Errorf("invalid table selector pattern '%s': %v", d.TableSelector, err)
+			return fmt.Errorf("invalid table selector pattern '%s': %v", d.CollectTablesMatching, err)
 		}
 		d.tableSelector = m
 	}
 
-	if d.IndexSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(d.IndexSelector)
+	if d.CollectIndexesMatching != "" {
+		m, err := matcher.NewSimplePatternsMatcher(d.CollectIndexesMatching)
 		if err != nil {
-			return fmt.Errorf("invalid index selector pattern '%s': %v", d.IndexSelector, err)
+			return fmt.Errorf("invalid index selector pattern '%s': %v", d.CollectIndexesMatching, err)
 		}
 		d.indexSelector = m
 	}
@@ -557,6 +560,75 @@ func (d *DB2) parseDB2Version() {
 	}
 
 	d.Debugf("parsed DB2 version: major=%d, minor=%d", d.versionMajor, d.versionMinor)
+}
+
+// setConfigurationDefaults sets default values for configuration options based on detected version
+// Only sets defaults if the admin hasn't explicitly configured the option
+func (d *DB2) setConfigurationDefaults() {
+	// Helper to create bool pointer
+	boolPtr := func(v bool) *bool { return &v }
+
+	// CollectDatabaseMetrics - available on all editions with SYSIBMADM views
+	if d.CollectDatabaseMetrics == nil {
+		defaultValue := d.edition == "LUW" || d.edition == "Cloud"
+		d.CollectDatabaseMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectDatabaseMetrics not configured, defaulting to %v (based on DB2 edition: %s)", 
+			defaultValue, d.edition)
+	}
+
+	// CollectBufferpoolMetrics - available on most editions
+	if d.CollectBufferpoolMetrics == nil {
+		defaultValue := d.edition != "i" // Not available on AS/400
+		d.CollectBufferpoolMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectBufferpoolMetrics not configured, defaulting to %v (based on DB2 edition: %s)", 
+			defaultValue, d.edition)
+	}
+
+	// CollectTablespaceMetrics - available on all editions
+	if d.CollectTablespaceMetrics == nil {
+		defaultValue := true
+		d.CollectTablespaceMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectTablespaceMetrics not configured, defaulting to %v", defaultValue)
+	}
+
+	// CollectConnectionMetrics - available with SYSIBMADM views
+	if d.CollectConnectionMetrics == nil {
+		defaultValue := d.edition == "LUW" || (d.edition == "Cloud" && !d.isDisabled("connection_instances"))
+		d.CollectConnectionMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectConnectionMetrics not configured, defaulting to %v (based on DB2 edition: %s)", 
+			defaultValue, d.edition)
+	}
+
+	// CollectLockMetrics - available on all editions
+	if d.CollectLockMetrics == nil {
+		defaultValue := true
+		d.CollectLockMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectLockMetrics not configured, defaulting to %v", defaultValue)
+	}
+
+	// CollectTableMetrics - expensive operation, default to false
+	if d.CollectTableMetrics == nil {
+		defaultValue := false
+		d.CollectTableMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectTableMetrics not configured, defaulting to %v (expensive operation)", defaultValue)
+	}
+
+	// CollectIndexMetrics - expensive operation, default to false
+	if d.CollectIndexMetrics == nil {
+		defaultValue := false
+		d.CollectIndexMetrics = boolPtr(defaultValue)
+		d.Debugf("CollectIndexMetrics not configured, defaulting to %v (expensive operation)", defaultValue)
+	}
+
+	// Log final configuration
+	d.Infof("Configuration after defaults: DatabaseMetrics=%v, BufferpoolMetrics=%v, TablespaceMetrics=%v, "+
+		"ConnectionMetrics=%v, LockMetrics=%v, TableMetrics=%v, IndexMetrics=%v",
+		*d.CollectDatabaseMetrics, *d.CollectBufferpoolMetrics, *d.CollectTablespaceMetrics,
+		*d.CollectConnectionMetrics, *d.CollectLockMetrics, *d.CollectTableMetrics, *d.CollectIndexMetrics)
+	
+	if d.IgnoreVersionChecks {
+		d.Warningf("IgnoreVersionChecks is enabled - collector will attempt all configured features regardless of DB2 version/edition")
+	}
 }
 
 // applyVersionBasedFeatureGating proactively disables features based on DB2 edition and version

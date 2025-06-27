@@ -264,6 +264,24 @@
         "minimum": 0,
         "maximum": 10,
         "default": 3
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string",
+        "default": ""
+      },
+      "init_timeout": {
+        "title": "Init timeout",
+        "description": "Timeout for initialization.",
+        "type": "string",
+        "default": "30s"
+      },
+      "shutdown_delay": {
+        "title": "Shutdown delay",
+        "description": "Delay before shutdown.",
+        "type": "string",
+        "default": "100ms"
       }
     },
     "required": [
