@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"text/template"
@@ -135,6 +136,9 @@ func newMetricTransformFuncMap() template.FuncMap {
 				return ""
 			}
 			return strconv.Itoa(prefixLen)
+		},
+		"pow": func(base float64, exp int) float64 {
+			return math.Pow(base, float64(exp))
 		},
 	}
 
