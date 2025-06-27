@@ -370,10 +370,16 @@ func safeDSN(dsn string) string {
 
 // logOnce logs a warning message only once per key to avoid spam
 func (d *DB2) logOnce(key string, format string, args ...interface{}) {
+	// Check if already logged using either map
 	if d.disabledMetrics[key] || d.disabledFeatures[key] {
 		return // Already logged
 	}
+	
+	// Log the message
 	d.Warningf(format, args...)
+	
+	// Mark as logged to prevent future logs
+	d.disabledMetrics[key] = true
 }
 
 // isDisabled checks if a metric or feature is disabled due to version incompatibility
