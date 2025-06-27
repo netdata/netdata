@@ -283,17 +283,17 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5
         name: ciscoMemoryPoolUsed
         description: Number of bytes from the memory pool currently in use
-        family: Memory/Pool/Usage
+        family: Memory
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
         description: Number of bytes from the memory pool currently unused
-        family: Memory/Pool/Usage
+        family: Memory
         unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
         description: Largest number of contiguous bytes from the memory pool currently unused
-        family: Memory/Pool/Usage
+        family: Memory
         unit: "By"
     metric_tags:
       - symbol:
