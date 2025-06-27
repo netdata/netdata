@@ -43,6 +43,7 @@ This integration adheres to SCIM v2 specifications. Supported features include:
 - Import groups: Not supported
 - Bulk operations: Not supported
 - Password synchronization: Not supported, as we rely on SSO/OIDC authentication
+- Push Now: Not supported
 - eTag: Not supported
 
 ### Netdata Configuration Steps
