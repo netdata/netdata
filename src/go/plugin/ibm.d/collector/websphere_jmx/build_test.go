@@ -16,7 +16,7 @@ func TestJMXHelperJarEmbedded(t *testing.T) {
 	// Verify that the JAR file is embedded
 	assert.NotNil(t, jmxHelperJar)
 	assert.Greater(t, len(jmxHelperJar), 0)
-	
+
 	// JAR files start with PK (ZIP format)
 	if len(jmxHelperJar) >= 2 {
 		assert.Equal(t, byte('P'), jmxHelperJar[0])
