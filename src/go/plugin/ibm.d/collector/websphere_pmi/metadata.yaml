@@ -1,0 +1,551 @@
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      id: collector-ibm.d-websphere_pmi
+      plugin_name: ibm.d.plugin
+      module_name: websphere_pmi
+      monitored_instance:
+        name: IBM WebSphere Application Server (PMI)
+        link: https://www.ibm.com/products/websphere-application-server
+        icon_filename: websphere.svg
+        categories:
+          - data-collection.apm
+          - data-collection.java-application-servers
+      keywords:
+        - websphere
+        - was
+        - java
+        - jee
+        - application server
+        - ibm
+        - pmi
+        - performance monitoring
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors IBM WebSphere Application Server instances using the Performance Monitoring Infrastructure (PMI) via the PerfServlet interface.
+          
+          It collects a wide range of metrics including JVM performance, thread pools, JDBC connections, JMS destinations, web applications, and more.
+        method_description: |
+          The collector connects to WebSphere's PerfServlet endpoint (typically at `/wasPerfTool/servlet/perfservlet`) via HTTP/HTTPS.
+          
+          It parses the XML response containing PMI counter data to extract performance metrics.
+      supported_platforms:
+        include:
+          - Linux
+          - macOS
+          - Windows
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector does not auto-detect WebSphere instances.
+            You need to manually configure the PerfServlet URL for each instance you want to monitor.
+        limits:
+          description: |
+            The collector enforces cardinality limits to prevent excessive memory usage when monitoring large environments.
+            Default limits can be adjusted in the configuration.
+        performance_impact:
+          description: |
+            The performance impact is minimal on the Netdata side.
+            
+            On the WebSphere side, PMI data collection has some overhead that depends on the statistics level configured.
+    setup:
+      prerequisites:
+        list:
+          - title: Enable PMI in WebSphere
+            description: |
+              PMI must be enabled in your WebSphere Application Server. To enable:
+              
+              1. Open WebSphere Admin Console
+              2. Navigate to Monitoring and Tuning > Performance Monitoring Infrastructure (PMI)
+              3. Select your server
+              4. Enable PMI and set the monitoring level (Basic, Extended, All, or Custom)
+              5. Apply changes and restart if necessary
+          - title: Enable PerfServlet
+            description: |
+              The PerfServlet must be deployed and accessible. It's typically available at:
+              - Traditional WAS: `http://host:port/wasPerfTool/servlet/perfservlet`
+              - Liberty Profile: May require additional configuration
+              
+              Verify access by navigating to the URL in a browser.
+          - title: Configure Security
+            description: |
+              If security is enabled, you'll need credentials with appropriate permissions to access PMI data.
+              
+              The user must have at least Monitor role for the cell/node/server.
+      configuration:
+        file:
+          name: "go.d/websphere_pmi.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: All options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: The PerfServlet URL for the WebSphere instance.
+              default_value: "http://localhost:9080/wasPerfTool/servlet/perfservlet"
+              required: true
+            - name: username
+              description: Username for HTTP basic authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for HTTP basic authentication.
+              default_value: ""
+              required: false
+            - name: pmi_stats_type
+              description: "PMI statistics level to collect. Options: basic, extended, all, custom."
+              default_value: "extended"
+              required: false
+            - name: timeout
+              description: HTTP request timeout in seconds.
+              default_value: 5
+              required: false
+            - name: collect_jvm_metrics
+              description: Enable collection of JVM metrics.
+              default_value: true
+              required: false
+            - name: collect_threadpool_metrics
+              description: Enable collection of thread pool metrics.
+              default_value: true
+              required: false
+            - name: collect_jdbc_metrics
+              description: Enable collection of JDBC connection pool metrics.
+              default_value: true
+              required: false
+            - name: collect_webapp_metrics
+              description: Enable collection of web application metrics.
+              default_value: true
+              required: false
+            - name: max_threadpools
+              description: Maximum number of thread pools to monitor (0 = unlimited).
+              default_value: 50
+              required: false
+            - name: max_jdbc_pools
+              description: Maximum number of JDBC pools to monitor (0 = unlimited).
+              default_value: 50
+              required: false
+            - name: max_applications
+              description: Maximum number of applications to monitor (0 = unlimited).
+              default_value: 100
+              required: false
+            - name: pmi_refresh_rate
+              description: How often to refresh PMI statistics (in seconds).
+              default_value: 60
+              required: false
+            - name: pmi_custom_stats_paths
+              description: Array of specific PMI paths to collect when using custom stats type.
+              default_value: []
+              required: false
+            - name: cluster_name
+              description: WebSphere cluster name for proper aggregation in dashboards.
+              default_value: ""
+              required: false
+            - name: cell_name
+              description: WebSphere cell name for identification.
+              default_value: ""
+              required: false
+            - name: node_name
+              description: WebSphere node name for identification.
+              default_value: ""
+              required: false
+            - name: server_type
+              description: "Server type: app_server, dmgr, or nodeagent."
+              default_value: "app_server"
+              required: false
+            - name: custom_labels
+              description: Additional labels to add to all metrics.
+              default_value: {}
+              required: false
+            - name: collect_jca_metrics
+              description: Enable collection of JCA connection pool metrics.
+              default_value: true
+              required: false
+            - name: collect_jms_metrics
+              description: Enable collection of JMS destination metrics.
+              default_value: true
+              required: false
+            - name: collect_session_metrics
+              description: Enable collection of HTTP session metrics.
+              default_value: true
+              required: false
+            - name: collect_transaction_metrics
+              description: Enable collection of JTA transaction metrics.
+              default_value: true
+              required: false
+            - name: collect_cluster_metrics
+              description: Enable collection of cluster-level metrics (deployment manager only).
+              default_value: true
+              required: false
+            - name: collect_servlet_metrics
+              description: Enable APM-level servlet metrics (higher overhead).
+              default_value: false
+              required: false
+            - name: collect_ejb_metrics
+              description: Enable APM-level EJB metrics (higher overhead).
+              default_value: false
+              required: false
+            - name: collect_jdbc_advanced
+              description: Enable advanced JDBC timing breakdown.
+              default_value: false
+              required: false
+            - name: max_jca_pools
+              description: Maximum number of JCA pools to monitor (0 = unlimited).
+              default_value: 50
+              required: false
+            - name: max_jms_destinations
+              description: Maximum number of JMS destinations to monitor (0 = unlimited).
+              default_value: 50
+              required: false
+            - name: max_servlets
+              description: Maximum number of servlets to monitor for APM (0 = unlimited).
+              default_value: 50
+              required: false
+            - name: max_ejbs
+              description: Maximum number of EJBs to monitor for APM (0 = unlimited).
+              default_value: 50
+              required: false
+            - name: collect_apps_matching
+              description: Pattern to filter applications (supports wildcards and pipe separation).
+              default_value: ""
+              required: false
+            - name: collect_pools_matching
+              description: Pattern to filter thread pools (supports wildcards and pipe separation).
+              default_value: ""
+              required: false
+            - name: collect_jms_matching
+              description: Pattern to filter JMS destinations (supports wildcards and pipe separation).
+              default_value: ""
+              required: false
+            - name: collect_servlets_matching
+              description: Pattern to filter servlets for APM (supports wildcards and pipe separation).
+              default_value: ""
+              required: false
+            - name: collect_ejbs_matching
+              description: Pattern to filter EJBs for APM (supports wildcards and pipe separation).
+              default_value: ""
+              required: false
+            - name: vnode
+              description: Virtual node identifier for configuration management.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config examples
+            enabled: true
+          list:
+            - name: Basic configuration
+              description: Monitor a local WebSphere instance with default settings.
+              config: |
+                jobs:
+                  - name: local_websphere
+                    url: http://localhost:9080/wasPerfTool/servlet/perfservlet
+            - name: HTTPS with authentication
+              description: Monitor a secure WebSphere instance.
+              config: |
+                jobs:
+                  - name: prod_websphere
+                    url: https://websphere.example.com:9443/wasPerfTool/servlet/perfservlet
+                    username: wasadmin
+                    password: secret
+                    tls_skip_verify: true
+            - name: Multiple instances
+              description: Monitor multiple WebSphere servers.
+              config: |
+                jobs:
+                  - name: websphere_node1
+                    url: http://node1.example.com:9080/wasPerfTool/servlet/perfservlet
+                    node_name: Node01
+                    
+                  - name: websphere_node2
+                    url: http://node2.example.com:9080/wasPerfTool/servlet/perfservlet
+                    node_name: Node02
+            - name: Custom statistics level
+              description: Collect all available PMI statistics.
+              config: |
+                jobs:
+                  - name: websphere_detailed
+                    url: http://localhost:9080/wasPerfTool/servlet/perfservlet
+                    pmi_stats_type: all
+                    collect_servlet_metrics: true
+                    collect_ejb_metrics: true
+            - name: Filtered collection
+              description: Collect metrics only for specific resources.
+              config: |
+                jobs:
+                  - name: websphere_filtered
+                    url: http://localhost:9080/wasPerfTool/servlet/perfservlet
+                    collect_apps_matching: "production_*"
+                    collect_pools_matching: "WebContainer|Default"
+                    max_servlets: 20
+    troubleshooting:
+      problems:
+        list:
+          - name: Can't access PerfServlet
+            description: |
+              If you get connection errors or 404 responses:
+              
+              1. Verify the PerfServlet URL is correct
+              2. Check if PMI is enabled in WebSphere
+              3. Ensure the PerfServlet is deployed (it's part of the perfServletApp)
+              4. Check WebSphere logs for any errors
+          - name: Authentication failures
+            description: |
+              If you get 401/403 errors:
+              
+              1. Verify the username and password are correct
+              2. Ensure the user has Monitor role or higher
+              3. Check if security is properly configured in WebSphere
+          - name: No metrics collected
+            description: |
+              If the collector runs but no metrics appear:
+              
+              1. Check PMI is enabled and set to appropriate level
+              2. Verify the XML response from PerfServlet contains data
+              3. Check Netdata logs for parsing errors
+              4. Ensure the statistics type matches your PMI configuration
+          - name: Missing specific metrics
+            description: |
+              If some metrics are missing:
+              
+              1. Check if the corresponding collection flag is enabled
+              2. Verify the PMI level includes those statistics
+              3. Check cardinality limits aren't being exceeded
+              4. Ensure the resources exist and are active
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        The collector organizes metrics into several categories based on WebSphere components.
+      availability: []
+      scopes:
+        - name: global
+          description: Global metrics for the WebSphere instance.
+          labels: []
+          metrics:
+            - name: websphere_pmi.jvm_heap_memory
+              description: JVM Heap Memory
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: websphere_pmi.jvm_heap_usage
+              description: JVM Heap Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: websphere_pmi.jvm_nonheap_memory
+              description: JVM Non-Heap Memory
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: websphere_pmi.jvm_gc_count
+              description: JVM Garbage Collection Count
+              unit: collections/s
+              chart_type: stacked
+              dimensions:
+                - name: collections
+            - name: websphere_pmi.jvm_gc_time
+              description: JVM Garbage Collection Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: websphere_pmi.jvm_threads
+              description: JVM Thread Count
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: live
+                - name: daemon
+            - name: websphere_pmi.jvm_classes
+              description: JVM Loaded Classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: loaded
+                - name: unloaded
+            - name: websphere_pmi.jvm_process_cpu
+              description: JVM Process CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: websphere_pmi.jvm_uptime
+              description: JVM Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: thread pool
+          description: Metrics for a thread pool.
+          labels:
+            - name: pool
+              description: Thread pool name
+          metrics:
+            - name: websphere_pmi.threadpool_size
+              description: Thread Pool Size
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: size
+                - name: max_size
+            - name: websphere_pmi.threadpool_active
+              description: Thread Pool Active Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: websphere_pmi.threadpool_hung
+              description: Thread Pool Hung Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: hung
+        - name: JDBC datasource
+          description: Metrics for a JDBC datasource.
+          labels:
+            - name: datasource
+              description: Datasource name
+          metrics:
+            - name: websphere_pmi.jdbc_pool_size
+              description: JDBC Connection Pool Size
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: size
+                - name: max_size
+            - name: websphere_pmi.jdbc_pool_active
+              description: JDBC Pool Active Connections
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: free
+            - name: websphere_pmi.jdbc_wait_time
+              description: JDBC Pool Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: max
+            - name: websphere_pmi.jdbc_use_time
+              description: JDBC Connection Use Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: max
+            - name: websphere_pmi.jdbc_created_destroyed
+              description: JDBC Connections Created/Destroyed
+              unit: connections/s
+              chart_type: area
+              dimensions:
+                - name: created
+                - name: destroyed
+            - name: websphere_pmi.jdbc_waiting_threads
+              description: JDBC Pool Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting
+        - name: application
+          description: Metrics for a web application.
+          labels:
+            - name: application
+              description: Application name
+          metrics:
+            - name: websphere_pmi.app_requests
+              description: Application Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_pmi.app_response_time
+              description: Application Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: max
+            - name: websphere_pmi.app_sessions
+              description: Application Sessions
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: live
+        - name: servlet
+          description: Metrics for a servlet.
+          labels:
+            - name: servlet
+              description: Servlet name
+          metrics:
+            - name: websphere_pmi.servlet_requests
+              description: Servlet Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: errors
+            - name: websphere_pmi.servlet_response_time
+              description: Servlet Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: max
+        - name: EJB
+          description: Metrics for an Enterprise JavaBean.
+          labels:
+            - name: ejb
+              description: EJB name
+          metrics:
+            - name: websphere_pmi.ejb_invocations
+              description: EJB Method Invocations
+              unit: invocations/s
+              chart_type: line
+              dimensions:
+                - name: invocations
+            - name: websphere_pmi.ejb_response_time
+              description: EJB Method Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: max
+            - name: websphere_pmi.ejb_pool
+              description: EJB Bean Pool
+              unit: beans
+              chart_type: stacked
+              dimensions:
+                - name: size
+                - name: active
