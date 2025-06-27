@@ -15,7 +15,7 @@ import (
 const precision = 1000 // Precision multiplier for floating-point values
 
 func (w *WebSphereJMX) collect(ctx context.Context) (map[string]int64, error) {
-	if w.charts == nil {
+	if w.charts == nil || len(*w.charts) == 0 {
 		w.initCharts()
 	}
 
