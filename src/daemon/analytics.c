@@ -731,14 +731,23 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
 
 void get_system_timezone(void)
 {
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    const char *tz = getenv("TZ");
-    if (!tz || !*tz)
-        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
-
     char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
+    const char *tz = NULL;
+#ifdef OS_WINDOWS
+    TIME_ZONE_INFORMATION win_tz;
+    GetTimeZoneInformation(&win_tz);
+    WideCharToMultiByte(CP_UTF8, 0, win_tz.StandardName, -1, buffer, FILENAME_MAX, NULL, NULL);
+
+    timezone = buffer;
+#else
+    // avoid flood calls to stat(/etc/localtime)
+    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+    tz = getenv("TZ");
+    if (!tz || !*tz)
+        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
+#endif
+
     ssize_t ret;
 
     // use the TZ variable
