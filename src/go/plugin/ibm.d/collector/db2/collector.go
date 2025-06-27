@@ -374,10 +374,10 @@ func (d *DB2) logOnce(key string, format string, args ...interface{}) {
 	if d.disabledMetrics[key] || d.disabledFeatures[key] {
 		return // Already logged
 	}
-	
+
 	// Log the message
 	d.Warningf(format, args...)
-	
+
 	// Mark as logged to prevent future logs
 	d.disabledMetrics[key] = true
 }
