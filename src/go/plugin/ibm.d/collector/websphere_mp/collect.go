@@ -23,7 +23,7 @@ const precision = 1000 // Precision multiplier for floating-point values
 var promMetricPattern = regexp.MustCompile(`^([a-zA-Z_:][a-zA-Z0-9_:]*(?:\{[^}]*\})?)?\s+([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)\s*$`)
 
 func (w *WebSphereMicroProfile) collect(ctx context.Context) (map[string]int64, error) {
-	if w.charts == nil {
+	if w.charts == nil || len(*w.charts) == 0 {
 		w.initCharts()
 	}
 
@@ -318,7 +318,6 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	}
 
 	// Handle other JVM metrics dynamically
-	w.Debugf("JVM metric not mapped: %s (falling back to dynamic chart)", metricName)
 	cleanedName := cleanName(metricName)
 	mx[cleanedName] = value
 
