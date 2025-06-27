@@ -12,6 +12,18 @@ It supports all DB2 editions with automatic adaptation:
 
 The collector automatically detects the DB2 edition and version, then enables/disables features based on availability. Version information is added as labels to all charts for filtering and grouping.
 
+### Version Labels
+
+All charts include these labels:
+- `db2_edition`: The DB2 edition (LUW, z/OS, i, Cloud)
+- `db2_version`: The full version string (e.g., "DB2 v11.5.7.0")
+
+This allows you to:
+- Filter dashboards by DB2 version: `db2_edition="LUW"`
+- Group metrics across multiple DB2 instances of the same version
+- Track version-specific performance differences
+- Monitor mixed-version environments during migrations
+
 ## Requirements
 
 - IBM DB2 client libraries installed
