@@ -60,6 +60,13 @@ func (w *WebSphereJMX) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Collect JCA metrics
+	if w.CollectJCAMetrics {
+		if err := w.collectJCAMetrics(collectCtx, mx); err != nil {
+			w.Warningf("failed to collect JCA metrics: %v", err)
+		}
+	}
+
 	// Collect JMS metrics
 	if w.CollectJMSMetrics {
 		if err := w.collectJMSMetrics(collectCtx, mx); err != nil {
@@ -137,6 +144,16 @@ func (w *WebSphereJMX) collectJVMMetrics(ctx context.Context, mx map[string]int6
 	if classes, ok := data["classes"].(map[string]interface{}); ok {
 		mx["jvm_classes_loaded"] = int64(getFloat(classes, "loaded"))
 		mx["jvm_classes_unloaded"] = int64(getFloat(classes, "unloaded"))
+	}
+
+	// Process CPU usage
+	if cpu, ok := data["cpu"].(map[string]interface{}); ok {
+		mx["jvm_process_cpu_usage"] = int64(getFloat(cpu, "processCpuUsage") * precision)
+	}
+
+	// JVM uptime
+	if uptime, ok := data["uptime"].(float64); ok {
+		mx["jvm_uptime"] = int64(uptime)
 	}
 
 	return nil
@@ -269,6 +286,77 @@ func (w *WebSphereJMX) collectJDBCMetrics(ctx context.Context, mx map[string]int
 		mx[fmt.Sprintf("jdbc_%s_use_time", poolID)] = int64(getFloat(pool, "avgInUseTime") * precision)
 		mx[fmt.Sprintf("jdbc_%s_total_created", poolID)] = int64(getFloat(pool, "numConnectionsCreated"))
 		mx[fmt.Sprintf("jdbc_%s_total_destroyed", poolID)] = int64(getFloat(pool, "numConnectionsDestroyed"))
+		mx[fmt.Sprintf("jdbc_%s_waiting_threads", poolID)] = int64(getFloat(pool, "waitingThreadCount"))
+
+		collected++
+	}
+
+	return nil
+}
+
+func (w *WebSphereJMX) collectJCAMetrics(ctx context.Context, mx map[string]int64) error {
+	resp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
+		Command:  "SCRAPE",
+		Target:   "JCA",
+		MaxItems: w.MaxJCAPools,
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "OK" {
+		return fmt.Errorf("JCA metrics collection failed: %s", resp.Message)
+	}
+
+	pools, ok := resp.Data["jcaPools"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	collected := 0
+	for _, poolData := range pools {
+		pool, ok := poolData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, ok := pool["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+
+		// Apply selector if configured
+		if w.poolSelector != nil && !w.poolSelector.MatchString(name) {
+			continue
+		}
+
+		// Check cardinality limit
+		if w.MaxJCAPools > 0 && collected >= w.MaxJCAPools {
+			w.Debugf("reached max JCA pools limit (%d)", w.MaxJCAPools)
+			break
+		}
+
+		// Mark as seen
+		w.seenJCAPools[name] = true
+
+		// Create charts if new pool
+		if !w.collectedJCAPools[name] {
+			w.collectedJCAPools[name] = true
+			if err := w.charts.Add(*w.newJCAPoolCharts(name)...); err != nil {
+				w.Warning(err)
+			}
+		}
+
+		// Collect metrics (similar to JDBC pools)
+		poolID := cleanName(name)
+		mx[fmt.Sprintf("jca_%s_size", poolID)] = int64(getFloat(pool, "poolSize"))
+		mx[fmt.Sprintf("jca_%s_active", poolID)] = int64(getFloat(pool, "numConnectionsUsed"))
+		mx[fmt.Sprintf("jca_%s_free", poolID)] = int64(getFloat(pool, "numConnectionsFree"))
+		mx[fmt.Sprintf("jca_%s_wait_time", poolID)] = int64(getFloat(pool, "avgWaitTime") * precision)
+		mx[fmt.Sprintf("jca_%s_use_time", poolID)] = int64(getFloat(pool, "avgInUseTime") * precision)
+		mx[fmt.Sprintf("jca_%s_total_created", poolID)] = int64(getFloat(pool, "numConnectionsCreated"))
+		mx[fmt.Sprintf("jca_%s_total_destroyed", poolID)] = int64(getFloat(pool, "numConnectionsDestroyed"))
+		mx[fmt.Sprintf("jca_%s_waiting_threads", poolID)] = int64(getFloat(pool, "waitingThreadCount"))
 
 		collected++
 	}
@@ -456,6 +544,14 @@ func (w *WebSphereJMX) updateInstanceLifecycle() {
 		}
 	}
 
+	// Remove JCA pools that are no longer present
+	for pool := range w.collectedJCAPools {
+		if !w.seenJCAPools[pool] {
+			delete(w.collectedJCAPools, pool)
+			w.removeJCAPoolCharts(pool)
+		}
+	}
+
 	// Remove JMS destinations that are no longer present
 	for dest := range w.collectedJMS {
 		if !w.seenJMS[dest] {
@@ -501,6 +597,17 @@ func (w *WebSphereJMX) removeJDBCPoolCharts(pool string) {
 func (w *WebSphereJMX) removeJMSDestinationCharts(dest string) {
 	destID := cleanName(dest)
 	prefix := fmt.Sprintf("jms_%s_", destID)
+	for _, chart := range *w.charts {
+		if strings.HasPrefix(chart.ID, prefix) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
+func (w *WebSphereJMX) removeJCAPoolCharts(pool string) {
+	poolID := cleanName(pool)
+	prefix := fmt.Sprintf("jca_%s_", poolID)
 	for _, chart := range *w.charts {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()

@@ -66,6 +66,12 @@
         "type": "boolean",
         "default": true
       },
+      "collect_jca_metrics": {
+        "title": "Collect JCA metrics",
+        "description": "Collect JCA (Java Connector Architecture) connection pool statistics",
+        "type": "boolean",
+        "default": true
+      },
       "collect_jms_metrics": {
         "title": "Collect JMS metrics",
         "description": "Collect JMS destination statistics",
@@ -140,6 +146,13 @@
       "max_jdbc_pools": {
         "title": "Max JDBC pools",
         "description": "Maximum number of JDBC pools to monitor (0 for unlimited)",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_jca_pools": {
+        "title": "Max JCA pools",
+        "description": "Maximum number of JCA pools to monitor (0 for unlimited)",
         "type": "integer",
         "minimum": 0,
         "default": 50
@@ -245,6 +258,7 @@
             "collect_jvm_metrics",
             "collect_threadpool_metrics",
             "collect_jdbc_metrics",
+            "collect_jca_metrics",
             "collect_jms_metrics",
             "collect_webapp_metrics",
             "collect_session_metrics",
@@ -267,6 +281,7 @@
           "fields": [
             "max_threadpools",
             "max_jdbc_pools",
+            "max_jca_pools",
             "max_jms_destinations",
             "max_applications",
             "collect_apps_matching",
