@@ -51,8 +51,8 @@ metrics:
         family: Power/Current
         unit: "A"
     metric_tags:
-      - index: 1
-        tag: fru
+      - tag: fru_index
+        index: 1
   - MIB: CISCO-PROCESS-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.109.1.1.1
@@ -79,8 +79,8 @@ metrics:
         family: CPU/Memory
         unit: "By"
     metric_tags:
-      - index: 1
-        tag: cpu
+      - tag: cpu_index
+        index: 1
   - MIB: CISCO-IF-EXTENSION-MIB
     metric_type: monotonic_count
     table:
@@ -93,12 +93,12 @@ metrics:
         family: Interfaces/Resets
         unit: "{reset}/s"
     metric_tags:
-      - MIB: IF-MIB
+      - tag: interface
+        table: ifXTable
+        MIB: IF-MIB
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
-        table: ifXTable
-        tag: interface
   - MIB: CISCO-ENVMON-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.13.1.3
@@ -198,19 +198,19 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.2.1.1
         name: cswStackPortOperStatus
         description: State of the stackport
-        unit: "{status}"
         family: StackWise/Stack Port/Status
+        unit: "{status}"
         mapping:
           1: up
           2: down
           3: forcedDown
     metric_tags:
-      - MIB: IF-MIB
+      - tag: interface
+        table: ifXTable
+        MIB: IF-MIB
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
-        table: ifXTable
-        tag: interface
 
   # every switch with entPhysicalClass chassis will have an entry in switchinfo
   - MIB: CISCO-STACKWISE-MIB
@@ -221,8 +221,8 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
         name: cswSwitchState
         description: Current state of a switch
-        unit: "{status}"
         family: StackWise/Status
+        unit: "{status}"
         mapping:
           1: waiting
           2: progressing
@@ -241,12 +241,12 @@ metrics:
           OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.7
           name: cswSwitchMacAddress
           format: mac_address
-      - MIB: ENTITY-MIB
+      - tag: entity_name
+        table: entPhysicalTable
+        MIB: ENTITY-MIB
         symbol:
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
           name: entPhysicalName
-        table: entPhysicalTable
-        tag: entity_name
 
   - MIB: CISCO-ENTITY-FRU-CONTROL-MIB
     table:
@@ -265,12 +265,12 @@ metrics:
           3: down
           4: warning
     metric_tags:
-      - index: 1
-        tag: fru
-      - symbol:
+      - tag: fru_index
+        index: 1
+      - tag: cefc_fan_tray_direction
+        symbol:
           OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.2
           name: cefcFanTrayDirection
-        tag: cefc_fan_tray_direction
         mapping:
           1: unknown
           2: front_to_back
@@ -297,12 +297,12 @@ metrics:
         family: Memory
         unit: "By"
     metric_tags:
-      - symbol:
+      - tag: mem_pool_index
+        index: 1
+      - tag: _mem_pool_name
+        symbol:
           OID: 1.3.6.1.4.1.9.9.48.1.1.1.2
           name: ciscoMemoryPoolName
-        tag: mem_pool_name
-      - index: 1
-        tag: mem_pool_index
 
   - MIB: CISCO-FIREWALL-MIB
     table:
@@ -312,13 +312,13 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.4
         name: cfwConnectionStatCount
         description: Integer that contains the value of the resource statistic.
-        unit: "1"
         family: Connections
+        unit: "1"
     metric_tags:
-      - symbol:
+      - tag: conn_stat_id
+        symbol:
           OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.1
           name: cfwConnectionStatService
-        tag: conn_stat_id
         mapping:
           1: otherFWService
           2: fileXferFtp
@@ -370,8 +370,8 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.1.1.1.3
         name: cfwHardwareStatusValue
         description: Current status of the resource
-        unit: "{status}"
         family: Hardware/Status
+        unit: "{status}"
         mapping:
           1: other
           2: up
@@ -384,12 +384,12 @@ metrics:
           9: active
           10: standby
     metric_tags:
-      - index: 1
-        tag: hardware_type
-      - symbol:
+      - tag: hardware_type
+        index: 1
+      - tag: hardware_desc
+        symbol:
           OID: 1.3.6.1.4.1.9.9.147.1.2.1.1.1.2
           name: cfwHardwareInformation
-        tag: hardware_desc
 
   - MIB: CISCO-VIRTUAL-SWITCH-MIB
     table:
@@ -399,13 +399,13 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.3
         name: cvsChassisUpTime
         description: Up time for the chassis since last re-initialization
-        unit: "cs"
         family: Chassis/Uptime
+        unit: "cs"
     metric_tags:
-      - symbol:
+      - tag: chassis_switch_id
+        symbol:
           OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.1
           name: cvsChassisSwitchID
-        tag: chassis_switch_id
 
     # RTT info
   - MIB: CISCO-RTTMON-MIB
@@ -421,8 +421,8 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.2
         name: rttMonLatestRttOperSense
         description: Sense code for the completion status of the latest RTT operation
-        unit: "{status}"
         family: RTT/Operations/Status
+        unit: "{status}"
         mapping:
           0: other
           1: ok
@@ -445,20 +445,20 @@ metrics:
       - tag: rtt_index
         index: 1
       - tag: _rtt_owner
+        table: rttMonCtrlAdminTable
         symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.2
           name: rttMonCtrlAdminOwner
-        table: rttMonCtrlAdminTable
       - tag: _rtt_tag
+        table: rttMonCtrlAdminTable
         symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.3
           name: rttMonCtrlAdminTag
-        table: rttMonCtrlAdminTable
       - tag: _rtt_type
+        table: rttMonCtrlAdminTable
         symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.4
           name: rttMonCtrlAdminRttType
-        table: rttMonCtrlAdminTable
         mapping:
           1: echo
           2: path_echo
@@ -508,24 +508,24 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.6
         name: rttMonCtrlOperTimeoutOccurred
         description: Indicates if a timeout occurred for the RTT operation
-        unit: "{status}"
         family: RTT/Operations/Status
+        unit: "{status}"
         mapping:
           1: timeout_occurred
           2: ok
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.5
         name: rttMonCtrlOperConnectionLostOccurred
         description: Indicates if a connection lost occurred for the RTT operation
-        unit: "{status}"
         family: RTT/Operations/Status
+        unit: "{status}"
         mapping:
           1: connection_lost_occurred
           2: ok
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.7
         name: rttMonCtrlOperOverThresholdOccurred
         description: Indicates if the latest RTT operation exceeded its configured threshold value
-        unit: "{status}"
         family: RTT/Operations/Status
+        unit: "{status}"
         mapping:
           1: over_threshold_occurred
           2: ok
@@ -533,20 +533,20 @@ metrics:
       - tag: rtt_index
         index: 1
       - tag: _rtt_owner
+        table: rttMonCtrlAdminTable
         symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.2
           name: rttMonCtrlAdminOwner
-        table: rttMonCtrlAdminTable
       - tag: _rtt_tag
+        table: rttMonCtrlAdminTable
         symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.3
           name: rttMonCtrlAdminTag
-        table: rttMonCtrlAdminTable
       - tag: _rtt_type
+        table: rttMonCtrlAdminTable
         symbol:
           OID: 1.3.6.1.4.1.9.9.42.1.2.1.1.4
           name: rttMonCtrlAdminRttType
-        table: rttMonCtrlAdminTable
         mapping:
           1: echo
           2: path_echo

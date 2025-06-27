@@ -14,8 +14,8 @@ metrics:
         unit: "{connection}"
         family: Connections
     metric_tags:
-      - index: 1
-        tag: service_type
+      - tag: service_type
+        index: 1
         mapping:
           1: otherFWService
           2: fileXferFtp
@@ -58,8 +58,8 @@ metrics:
           39: protoUdp
           40: protoIp
           41: protoSnmp
-      - index: 2
-        tag: stat_type
+      - tag: stat_type
+        index: 2
         mapping:
           1: other
           2: totalOpen         # Total number of connections opened since system startup
@@ -71,43 +71,39 @@ metrics:
 
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     symbol:
-      # declined sessions
       OID: 1.3.6.1.4.1.9.9.392.1.4.1.2.0
       name: crasNumDeclinedSessions
       description: Number of session setup attempts declined due to authentication or authorization failure
-      unit: "{session}/s"
       family: Sessions
+      unit: "{session}/s"
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     symbol:
-      # num sessions
       OID: 1.3.6.1.4.1.9.9.392.1.3.1.0
       name: crasNumSessions
       description: Number of currently active sessions
-      unit: "{session}"
       family: Sessions
+      unit: "{session}"
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     symbol:
-      # num users
       OID: 1.3.6.1.4.1.9.9.392.1.3.3.0
       name: crasNumUsers
       description: Number of users who have active sessions
-      unit: "{user}"
       family: Users
+      unit: "{user}"
   - MIB: CISCO-REMOTE-ACCESS-MONITOR-MIB
     metric_type: monotonic_count
     symbol:
-      # session setup failed
       OID: 1.3.6.1.4.1.9.9.392.1.4.1.3.0
       name: crasNumSetupFailInsufResources
       description: Number of session setup attempts failed due to insufficient resources
-      unit: "{failure}/s"
       family: Sessions
+      unit: "{failure}/s"
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     symbol:
       OID: 1.3.6.1.4.1.9.9.171.1.3.1.1.0
       name: cipSecGlobalActiveTunnels
       description: Number of currently active IPsec Phase-2 Tunnels
-      family: IPsec/Tunnels/Phase-2
+      family: IPsec/Phase2/Tunnels/Active
       unit: "{tunnel}"
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     metric_type: monotonic_count
@@ -115,7 +111,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.171.1.3.1.4.0
       name: cipSecGlobalHcInOctets
       description: High capacity count of total octets received by all current and previous IPsec Phase-2 Tunnels
-      family: IPsec/Tunnels/Phase-2
+      family: IPsec/Phase2/Tunnels/Traffic
       unit: "By/s"
   - MIB: CISCO-IPSEC-FLOW-MONITOR-MIB
     metric_type: monotonic_count
@@ -123,7 +119,7 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.171.1.3.1.17.0
       name: cipSecGlobalHcOutOctets
       description: High capacity count of total octets sent by all current and previous IPsec Phase-2 Tunnels
-      family: IPsec/Tunnels/Phase-2
+      family: IPsec/Phase2/Tunnels/Traffic
       unit: "By/s"
   - MIB: ENTITY-SENSOR-MIB
     table:
@@ -138,21 +134,21 @@ metrics:
         transform: |
           {{- transformEntPhySensor .Metric -}}
     metric_tags:
-      - symbol:
+      - tag: sensor_type # needed for transform
+        symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
           name: entPhySensorType
-        tag: sensor_type # needed for transform
-      - symbol:
+      - tag: sensor_scale # needed for transform
+        symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.2
           name: entPhySensorScale
-        tag: sensor_scale # needed for transform
-      - symbol:
+      - tag: sensor_precision # needed for transform
+        symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.3
           name: entPhySensorPrecision
-        tag: sensor_precision # needed for transform
-      - symbol:
+      - tag: _sensor_desc
+        symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.6
           name: entPhySensorUnitsDisplay
-        tag: _sensor_desc
-      - index: 1
-        tag: sensor_id
+      - tag: sensor_id
+        index: 1

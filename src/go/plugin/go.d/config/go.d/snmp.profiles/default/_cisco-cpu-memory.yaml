@@ -12,8 +12,8 @@ metrics:
         family: CPU/Usage
         unit: "%"
     metric_tags:
-      - index: 1
-        tag: cpu
+      - tag: cpu
+        index: 1
 
   - MIB: CISCO-MEMORY-POOL-MIB
     table:
@@ -40,5 +40,5 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.9.9.48.1.1.1.2
           name: ciscoMemoryPoolName
-      - index: 1
-        tag: mem_pool_index
+      - tag: mem_pool_index
+        index: 1
