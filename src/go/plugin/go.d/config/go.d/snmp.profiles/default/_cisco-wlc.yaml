@@ -30,22 +30,22 @@ metrics:
           1: enable
           2: disable
     metric_tags:
-      - symbol:
+      - tag: ap_mac_address
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        tag: ap_ip_address
 
   # Connected APs 802.11 interfaces metrics
 
@@ -71,42 +71,42 @@ metrics:
           1: enable
           2: disable
     metric_tags:
-      - symbol:
+      - tag: ap_if_slot_id
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
           name: bsnAPIfSlotId
-        tag: ap_if_slot_id
-      - symbol:
+      - tag: ap_mac_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_ip_address
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -120,42 +120,42 @@ metrics:
         family: Interfaces/Users
         unit: "{user}"
     metric_tags:
-      - symbol:
+      - tag: ap_if_slot_id
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
           name: bsnAPIfSlotId
-        tag: ap_if_slot_id
-      - symbol:
+      - tag: ap_mac_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_ip_address
 
   # Load metrics
 
@@ -185,43 +185,43 @@ metrics:
         family: Channel/Utilization
         unit: "%"
     metric_tags:
-      - symbol:
+      - tag: ap_if_slot_id
+        table: bsnAPIfTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
           name: bsnAPIfSlotId
-        table: bsnAPIfTable
-        tag: ap_if_slot_id
-      - symbol:
+      - table: bsnAPTable
+        tag: ap_mac_address
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_ip_address
 
   # WLAN Metrics
 
@@ -256,11 +256,11 @@ metrics:
         family: WLAN/Mobile Stations
         unit: "{station}"
     metric_tags:
-      - symbol:
+      - tag: wlan_index
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.1
           name: bsnDot11EssIndex
-        tag: wlan_index
-      - symbol:
+      - tag: ssid
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.2
           name: bsnDot11EssSsid
-        tag: ssid
