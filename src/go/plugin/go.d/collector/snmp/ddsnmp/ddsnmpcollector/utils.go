@@ -8,18 +8,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
-
-func getMetricType(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
-	if sym.MetricType != "" {
-		return sym.MetricType
-	}
-	return getMetricTypeFromPDUType(pdu)
-}
 
 func getMetricTypeFromPDUType(pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
 	switch pdu.Type {
@@ -114,10 +108,8 @@ func convPduToString(pdu gosnmp.SnmpPDU) (string, error) {
 			return "", fmt.Errorf("OctetString has unexpected type %T", pdu.Value)
 		}
 
-		// Convert to string and check if it can be represented as a raw string literal
-		s := string(bs)
-		if strconv.CanBackquote(s) {
-			return s, nil
+		if utf8.Valid(bs) {
+			return strings.ToValidUTF8(string(bs), "�"), nil
 		}
 		return hex.EncodeToString(bs), nil
 	case gosnmp.Counter32, gosnmp.Counter64, gosnmp.Integer, gosnmp.Gauge32, gosnmp.Uinteger32, gosnmp.TimeTicks:
@@ -179,7 +171,9 @@ func isPduNumericType(pdu gosnmp.SnmpPDU) bool {
 		gosnmp.Integer,
 		gosnmp.Gauge32,
 		gosnmp.Uinteger32,
-		gosnmp.TimeTicks:
+		gosnmp.TimeTicks,
+		gosnmp.OpaqueFloat,
+		gosnmp.OpaqueDouble:
 		return true
 	default:
 		return false
@@ -220,11 +214,10 @@ func isInt(s string) bool {
 	return err == nil
 }
 
-func isMappingKeysNumeric(mapping map[string]string) bool {
-	for k := range mapping {
-		if !isInt(k) {
-			return false
+func mergeTagsWithEmptyFallback(dest, src map[string]string) {
+	for k, v := range src {
+		if existing, ok := dest[k]; !ok || existing == "" {
+			dest[k] = v
 		}
 	}
-	return true
 }

@@ -15,6 +15,7 @@
   },
   "username": "ok",
   "password": "ok",
+  "bearer_token_file": "ok",
   "proxy_url": "ok",
   "proxy_username": "ok",
   "proxy_password": "ok",

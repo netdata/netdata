@@ -402,7 +402,7 @@ static int do_migration_v14_v15(sqlite3 *database)
     SQLITE_FINALIZE(res);
 
     if (count)
-        (void) db_execute(database, buffer_tostring(wb));
+        (void)db_execute(database, buffer_tostring(wb), NULL);
 
     buffer_free(wb);
     return 0;
@@ -431,7 +431,7 @@ static int do_migration_v15_v16(sqlite3 *database)
     SQLITE_FINALIZE(res);
 
     if (count)
-        (void) db_execute(database, buffer_tostring(wb));
+        (void)db_execute(database, buffer_tostring(wb), NULL);
 
     buffer_free(wb);
     return 0;

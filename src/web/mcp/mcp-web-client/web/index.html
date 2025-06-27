@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netdata MCP LLM Client</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
+    <!-- IBM Plex Sans Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Error Toast Container -->
+    <div class="error-toast-container" id="errorToastContainer"></div>
+
+    <!-- Main Application Layout -->
+    <div class="app-container">
+        <div class="app-body">
+            <!-- Chat Sessions Sidebar -->
+            <aside class="chat-sidebar" id="chatSidebar">
+                <div class="sidebar-header">
+                    <h2>Chats</h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="newChatBtn" class="btn btn-primary btn-small">+ New</button>
+                        <button id="toggleSidebarBtn" class="btn-icon" data-tooltip="Toggle Sidebar">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="chat-sessions" id="chatSessions"></div>
+                <div class="sidebar-footer">
+                    <button id="themeToggle" class="btn-icon" data-tooltip="Toggle Theme">
+                        <span class="theme-icon-light"><i class="fas fa-moon"></i></span>
+                        <span class="theme-icon-dark"><i class="fas fa-sun"></i></span>
+                    </button>
+                    <button id="settingsBtn" class="btn-icon" data-tooltip="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </aside>
+            <div class="resize-handle resize-handle-vertical" id="chatSidebarResize"></div>
+
+            <!-- Main Chat Area -->
+            <main class="chat-main" id="chatMain">
+                <!-- This will be the container for all chat DOMs -->
+                <div class="chat-containers" id="chatContainers">
+                    <!-- Individual chat containers will be dynamically created here -->
+                    <!-- Default welcome screen when no chat is selected -->
+                    <div class="welcome-screen" id="welcomeScreen">
+                        <div class="welcome-content">
+                            <h2>Welcome to Netdata MCP LLM Client</h2>
+                            <p>Select an existing chat or create a new one to get started</p>
+                            <button class="btn btn-primary" onclick="app.createNewChatDirectly()">
+                                <i class="fas fa-plus"></i> Create New Chat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            <div class="resize-handle resize-handle-vertical" id="logPanelResize"></div>
+
+            <!-- Communication Log -->
+            <aside class="log-panel" id="logPanel">
+                <!-- Expand button when collapsed -->
+                <button id="expandLogBtn" class="btn-icon expand-log-btn" data-tooltip="Show Communication Log" style="display: none;">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="log-header">
+                    <button id="toggleLogBtn" class="btn-icon" data-tooltip="Toggle Log">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <h3>Communication Log</h3>
+                </div>
+                <div class="log-controls">
+                    <button id="clearLogBtn" class="btn-icon" data-tooltip="Clear log">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button id="downloadLogBtn" class="btn-icon" data-tooltip="Download log">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+                <div class="log-content" id="logContent"></div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-backdrop" id="settingsBackdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="btn-icon modal-close" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- MCP Servers (no tabs needed anymore) -->
+                <div class="config-section">
+                    <h3>MCP Servers</h3>
+                    <div class="config-list" id="mcpServersList"></div>
+                    <button id="addMcpServerBtn" class="btn btn-primary">+ Add MCP Server</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Chat Modal - No longer used, kept for potential future use -->
+    <!-- 
+    <div class="modal" id="newChatModal">
+        <div class="modal-backdrop" id="newChatBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>New Chat</h2>
+                <button class="btn-icon modal-close" id="closeNewChatBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newChatLlmProvider">LLM Provider*</label>
+                    <select id="newChatLlmProvider" required>
+                        <option value="">Select LLM Provider</option>
+                    </select>
+                </div>
+                <div class="form-group" id="newChatModelGroup" style="display: none;">
+                    <label for="newChatModel">Model*</label>
+                    <select id="newChatModel" required>
+                        <option value="">Select Model</option>
+                    </select>
+                    <small>Choose a model for this chat. You can change it later.</small>
+                </div>
+                <div class="form-group">
+                    <label for="newChatMcpServer">MCP Server*</label>
+                    <select id="newChatMcpServer" required>
+                        <option value="">Select MCP Server</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newChatTitle">Chat Title (optional)</label>
+                    <input type="text" id="newChatTitle" placeholder="Auto-generated if empty">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelNewChatBtn" class="btn btn-secondary">Cancel</button>
+                <button id="createChatBtn" class="btn btn-primary">Create Chat</button>
+            </div>
+        </div>
+    </div>
+    -->
+
+    <!-- Add MCP Server Modal -->
+    <div class="modal" id="addMcpModal">
+        <div class="modal-backdrop" id="addMcpBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Add MCP Server</h2>
+                <button class="btn-icon modal-close" id="closeAddMcpBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="mcpServerUrl">WebSocket URL*</label>
+                    <input type="text" id="mcpServerUrl" placeholder="ws://localhost:19999/ws/mcp?api_key=YOUR_KEY" required>
+                    <small>Include API key in URL if needed</small>
+                </div>
+                <div class="form-group">
+                    <label for="mcpServerName">Server Name*</label>
+                    <input type="text" id="mcpServerName" placeholder="e.g., Local Netdata, Production Server" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelAddMcpBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveMcpServerBtn" class="btn btn-primary">Add Server</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add LLM Provider Modal -->
+    <div class="modal" id="addLlmModal">
+        <div class="modal-backdrop" id="addLlmBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Add LLM Provider</h2>
+                <button class="btn-icon modal-close" id="closeAddLlmBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="llmProxyUrl">Proxy URL*</label>
+                    <input type="text" id="llmProxyUrl" placeholder="http://localhost:8081" value="http://localhost:8081" required>
+                    <small>The LLM proxy server manages API keys and provides access to models</small>
+                </div>
+                <div class="form-group">
+                    <label for="llmProviderName">Provider Name*</label>
+                    <input type="text" id="llmProviderName" placeholder="e.g., Local LLM Proxy" required>
+                </div>
+                <div class="form-group" id="llmProvidersStatus" style="display: none;">
+                    <label>Available Providers</label>
+                    <div id="llmProvidersInfo" style="padding: 10px; background: var(--bg-secondary); border-radius: 4px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelAddLlmBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveLlmProviderBtn" class="btn btn-primary">Add Provider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Prompt Modal -->
+    <div class="modal" id="systemPromptModal">
+        <div class="modal-backdrop" id="systemPromptBackdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit System Prompt</h2>
+                <button class="btn-icon modal-close" id="closeSystemPromptBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="systemPromptTextarea">System Prompt</label>
+                    <textarea id="systemPromptTextarea" rows="10" style="width: 100%; font-family: inherit;" placeholder="Enter the system prompt that will be sent at the beginning of each conversation..."></textarea>
+                    <small>This prompt is sent as the first message to the LLM to set its behavior and context. Changes will restart the conversation.</small>
+                </div>
+                <div class="form-group">
+                    <button id="resetToDefaultPromptBtn" class="btn btn-secondary btn-small">Reset to Default</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelSystemPromptBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveSystemPromptBtn" class="btn btn-primary">Save & Restart Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Models Available Modal -->
+    <div class="modal" id="noModelsModal">
+        <div class="modal-backdrop no-close" id="noModelsBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2><i class="fas fa-robot"></i> No LLM Models Available</h2>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div style="font-size: 48px; margin: 20px 0;"><i class="fas fa-plug"></i></div>
+                <p style="font-size: 16px; margin-bottom: 10px;">
+                    <strong>The LLM proxy server is not accessible.</strong>
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    This application needs to connect to an LLM proxy server to access AI models.
+                </p>
+                <div style="background: var(--hover-color); padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600;">To fix this:</p>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        <li>Ensure the LLM proxy is running at: <code id="noModelsProxyUrl" style="font-family: monospace; background: var(--background-color); padding: 2px 4px; border-radius: 3px;">http://localhost:8081</code></li>
+                        <li>Check that you have API keys configured in the proxy</li>
+                        <li>Verify there are no network or firewall issues</li>
+                    </ol>
+                </div>
+                <p style="font-size: 14px; color: var(--text-secondary);">
+                    Once the proxy is running with configured API keys, click Retry to continue.
+                </p>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button id="retryModelsBtn" class="btn btn-primary">
+                    <span><i class="fas fa-sync-alt"></i></span>
+                    <span>Retry</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="debug-messages.js"></script>
+    <script src="mcp-client.js"></script>
+    <script src="llm-providers.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

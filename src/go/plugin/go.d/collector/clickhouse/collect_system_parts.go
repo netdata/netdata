@@ -34,7 +34,10 @@ type tableStats struct {
 }
 
 func (c *Collector) collectSystemParts(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(c.RequestConfig)
+	if err != nil {
+		return err
+	}
 	req.URL.RawQuery = makeURLQuery(querySystemParts)
 
 	seen := make(map[string]*tableStats)
@@ -51,7 +54,7 @@ func (c *Collector) collectSystemParts(mx map[string]int64) error {
 
 	var database, table string
 
-	err := c.doHTTP(req, func(column, value string, lineEnd bool) {
+	err = c.doHTTP(req, func(column, value string, lineEnd bool) {
 		switch column {
 		case "database":
 			database = value

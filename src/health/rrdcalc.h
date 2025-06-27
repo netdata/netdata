@@ -83,7 +83,7 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // the chart this alarm it is linked to
 
-    size_t labels_version;
+    uint32_t labels_version;
     struct rrdset *rrdset;
 
     struct rrdcalc *next;

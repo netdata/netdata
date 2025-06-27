@@ -26,6 +26,8 @@ typedef enum __attribute__ ((__packed__)) rrdlabel_source {
 struct rrdlabels;
 typedef struct rrdlabels RRDLABELS;
 
+void rrdlabels_aral_init(bool with_stats);
+void rrdlabels_aral_destroy(bool with_stats);
 RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);
 void rrdlabels_flush(RRDLABELS *labels);
@@ -38,7 +40,7 @@ void rrdlabels_get_value_strdup_or_null(RRDLABELS *labels, char **value, const c
 void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const char *key, const char *unset);
 bool rrdlabels_exist(RRDLABELS *labels, const char *key);
 size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused);
-size_t rrdlabels_version(RRDLABELS *labels __maybe_unused);
+uint32_t rrdlabels_version(RRDLABELS *labels __maybe_unused);
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key);
 
 void rrdlabels_unmark_all(RRDLABELS *labels);
