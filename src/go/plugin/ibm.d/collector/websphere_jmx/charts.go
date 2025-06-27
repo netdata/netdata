@@ -19,24 +19,24 @@ const (
 	prioJVMGC
 	prioJVMThreads
 	prioJVMClasses
-	
+
 	prioThreadPoolSize
 	prioThreadPoolActive
-	
+
 	prioJDBCPoolSize
 	prioJDBCPoolActive
 	prioJDBCPoolWaitTime
 	prioJDBCPoolUseTime
 	prioJDBCPoolCreatedDestroyed
-	
+
 	prioJMSMessages
 	prioJMSConsumers
-	
+
 	prioAppRequests
 	prioAppResponseTime
 	prioAppSessions
 	prioAppTransactions
-	
+
 	prioClusterState
 	prioClusterMembers
 	prioHAManager
@@ -71,7 +71,7 @@ var baseCharts = module.Charts{
 			{ID: "jvm_heap_usage_percent", Name: "usage", Div: precision},
 		},
 	},
-	
+
 	// JVM Non-Heap Memory
 	{
 		ID:       "jvm_nonheap_memory",
@@ -85,7 +85,7 @@ var baseCharts = module.Charts{
 			{ID: "jvm_nonheap_committed", Name: "committed"},
 		},
 	},
-	
+
 	// JVM GC
 	{
 		ID:       "jvm_gc_count",
@@ -109,7 +109,7 @@ var baseCharts = module.Charts{
 			{ID: "jvm_gc_time", Name: "time"},
 		},
 	},
-	
+
 	// JVM Threads
 	{
 		ID:       "jvm_threads",
@@ -136,7 +136,7 @@ var baseCharts = module.Charts{
 			{ID: "jvm_thread_started", Name: "started"},
 		},
 	},
-	
+
 	// JVM Classes
 	{
 		ID:       "jvm_classes",
@@ -150,7 +150,7 @@ var baseCharts = module.Charts{
 			{ID: "jvm_classes_unloaded", Name: "unloaded"},
 		},
 	},
-	
+
 	// Connection health and resilience
 	{
 		ID:       "connection_health",
@@ -504,12 +504,12 @@ var clusterCharts = module.Charts{
 
 func (w *WebSphereJMX) initCharts() {
 	w.charts = baseCharts.Copy()
-	
+
 	// Add cluster charts if this is a deployment manager
 	if w.ServerType == "dmgr" && w.CollectClusterMetrics {
 		w.charts.Add(*clusterCharts.Copy()...)
 	}
-	
+
 	// Add cluster labels to all charts
 	w.addClusterLabels(w.charts)
 }
@@ -529,7 +529,7 @@ func (w *WebSphereJMX) addClusterLabels(charts *module.Charts) {
 		if w.ServerType != "" {
 			chart.Labels = append(chart.Labels, module.Label{Key: "server_type", Value: w.ServerType})
 		}
-		
+
 		// Add custom labels
 		for k, v := range w.CustomLabels {
 			chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
@@ -539,7 +539,7 @@ func (w *WebSphereJMX) addClusterLabels(charts *module.Charts) {
 
 func (w *WebSphereJMX) newThreadPoolCharts(pool string) *module.Charts {
 	charts := threadPoolChartsTmpl.Copy()
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
 		chart.Labels = []module.Label{
@@ -549,16 +549,16 @@ func (w *WebSphereJMX) newThreadPoolCharts(pool string) *module.Charts {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(pool))
 		}
 	}
-	
+
 	// Add cluster labels
 	w.addClusterLabels(charts)
-	
+
 	return charts
 }
 
 func (w *WebSphereJMX) newJDBCPoolCharts(pool string) *module.Charts {
 	charts := jdbcPoolChartsTmpl.Copy()
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
 		chart.Labels = []module.Label{
@@ -568,16 +568,16 @@ func (w *WebSphereJMX) newJDBCPoolCharts(pool string) *module.Charts {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(pool))
 		}
 	}
-	
+
 	// Add cluster labels
 	w.addClusterLabels(charts)
-	
+
 	return charts
 }
 
 func (w *WebSphereJMX) newJMSDestinationCharts(dest string, destType string) *module.Charts {
 	charts := jmsDestinationChartsTmpl.Copy()
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(dest))
 		chart.Title = fmt.Sprintf(chart.Title, destType)
@@ -589,26 +589,26 @@ func (w *WebSphereJMX) newJMSDestinationCharts(dest string, destType string) *mo
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(dest))
 		}
 	}
-	
+
 	// Add cluster labels
 	w.addClusterLabels(charts)
-	
+
 	return charts
 }
 
 func (w *WebSphereJMX) newApplicationCharts(app string, includeSessions, includeTransactions bool) *module.Charts {
 	charts := applicationChartsTmpl.Copy()
-	
+
 	// Add session charts if enabled
 	if includeSessions {
 		charts.Add(*sessionChartsTmpl.Copy()...)
 	}
-	
+
 	// Add transaction charts if enabled
 	if includeTransactions {
 		charts.Add(*transactionChartsTmpl.Copy()...)
 	}
-	
+
 	// Update all charts with application-specific information
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(app))
@@ -619,9 +619,9 @@ func (w *WebSphereJMX) newApplicationCharts(app string, includeSessions, include
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(app))
 		}
 	}
-	
+
 	// Add cluster labels
 	w.addClusterLabels(charts)
-	
+
 	return charts
 }
