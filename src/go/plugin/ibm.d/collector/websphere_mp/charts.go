@@ -148,6 +148,18 @@ func newBaseCharts() *module.Charts {
 			},
 		},
 		{
+			ID:       "jvm_uptime",
+			Title:    "JVM Uptime",
+			Units:    "seconds",
+			Fam:      "jvm",
+			Ctx:      "websphere_mp.jvm_uptime",
+			Priority: prioJVMClasses - 100,
+			Type:     module.Line,
+			Dims: module.Dims{
+				{ID: "jvm_uptime_seconds", Name: "uptime", Mul: precision},
+			},
+		},
+		{
 			ID:       "jvm_classes_loaded",
 			Title:    "JVM Classes Loaded",
 			Units:    "classes",
