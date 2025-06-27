@@ -2,39 +2,34 @@
 
 ## Overview
 
-This collector monitors IBM WebSphere Liberty servers with MicroProfile Metrics enabled, providing comprehensive performance monitoring through the standardized MicroProfile Metrics API.
-
-Supported features:
-
-- **MicroProfile Metrics 4.0+** - Full support for base, vendor, and application metrics
-- **Prometheus format** - Native support for Prometheus-format metrics endpoint
-- **Dynamic metric discovery** - Automatic detection and charting of new metrics
-- **Cardinality control** - Configurable limits to prevent metric explosion
+This collector monitors IBM WebSphere Liberty servers with MicroProfile Metrics enabled, providing performance monitoring through the standardized MicroProfile Metrics API in Prometheus format.
 
 It collects:
 
 **JVM metrics:**
-- Memory usage (heap, non-heap, pools)
-- Garbage collection statistics
-- Thread counts and states
-- Class loading metrics
+- Memory usage (heap used, free, committed, max)
+- Heap utilization percentage
+- Garbage collection (rate and time)
+- Thread counts (current daemon/other, peak)
+- Class loading (loaded classes, unload rate)
+- CPU usage (process load, utilization percentage)
+- CPU time and available processors
+- System load average
 
-**REST endpoint metrics:**
-- Request counts and rates
-- Response times and percentiles
-- Error rates by endpoint and method
+**Vendor-specific metrics:**
+- Thread pool usage (active, idle, size)
+- Servlet performance (request rate, response time)
+- Session management (active, live, lifecycle)
 
-**MicroProfile component metrics:**
-- Health check status
-- Configuration values
-- Fault tolerance statistics
-- Custom application metrics
+**Other metrics:**
+- Any additional metrics exposed by the MicroProfile Metrics endpoint
+- Collected as generic "other" category metrics
 
 ## Requirements
 
 - WebSphere Liberty with MicroProfile Metrics feature enabled
 - Liberty version 20.0.0.3+ (supports mpMetrics-3.0 or higher)
-- Network access to Liberty metrics endpoint
+- Network access to Liberty metrics endpoint (default: /metrics)
 - Appropriate user credentials (if authentication is enabled)
 
 ## Configuration
@@ -47,247 +42,121 @@ jobs:
     password: password
 ```
 
+### All available options
+
+```yaml
+  - name: liberty_mp_example
+    url: https://localhost:9443          # Required
+    username: admin                       # Optional
+    password: password                    # Optional
+    metrics_endpoint: /metrics            # Default: /metrics
+    collect_jvm_metrics: true            # Default: true
+    collect_rest_metrics: true           # Default: true
+    max_rest_endpoints: 50               # Default: 50 (0 = unlimited)
+    collect_rest_matching: '/api/*'      # Optional: filter REST metrics
+    timeout: 10                          # Default: 10 seconds
+    tls_skip_verify: false               # Default: false
+    tls_ca: /path/to/ca.crt             # Optional
+    tls_cert: /path/to/client.crt       # Optional
+    tls_key: /path/to/client.key        # Optional
+    cell_name: MyCell                    # Optional: for clustering
+    node_name: MyNode                    # Optional: for clustering
+    server_name: server1                 # Optional: for clustering
+```
+
 ## Metrics
 
-All metrics have "websphere_mp." prefix.
+All metrics have the prefix `websphere_mp.`.
 
 ### JVM Metrics
 
-| Metric | Dimensions | Unit |
-|:-------|:-----------|:-----|
-| jvm_memory_heap | used, committed | bytes |
-| jvm_memory_heap_max | max | bytes |
-| jvm_gc_collections | collections | collections/s |
-| jvm_threads | threads, daemon, max | threads |
-| jvm_classes | loaded, unloaded | classes |
+| Metric | Description | Dimensions | Unit |
+|--------|-------------|------------|------|
+| jvm_memory_heap_usage | JVM heap memory usage | used, free | bytes |
+| jvm_memory_heap_committed | JVM heap memory committed | committed | bytes |
+| jvm_memory_heap_max | JVM heap memory maximum | limit | bytes |
+| jvm_heap_utilization | JVM heap utilization | utilization | percentage |
+| jvm_gc_collections | JVM garbage collection rate | rate | collections/s |
+| jvm_gc_time | JVM garbage collection time | total, per_cycle | milliseconds |
+| jvm_threads_current | Current JVM threads | daemon, other | threads |
+| jvm_threads_peak | Peak JVM threads | peak | threads |
+| jvm_classes_loaded | Loaded classes | loaded | classes |
+| jvm_classes_unloaded_rate | Class unload rate | unloaded | classes/s |
+| cpu_usage | JVM CPU usage | process, utilization | percentage |
+| cpu_time | JVM CPU time | total | seconds |
+| cpu_processors | Available processors | available | processors |
+| system_load | System load average | 1min | load |
 
-### REST Endpoint Metrics (per endpoint)
+### Vendor Metrics
 
-| Metric | Dimensions | Unit |
-|:-------|:-----------|:-----|
-| rest_requests | requests | requests/s |
-| rest_timing | response_time | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|--------|-------------|------------|------|
+| threadpool_usage | Thread pool usage | active, idle | threads |
+| threadpool_size | Thread pool size | size | threads |
+| servlet_requests | Servlet request rate | requests | requests/s |
+| servlet_response_time | Servlet response time | avg_response_time | milliseconds |
+| session_active | Active sessions | active, live | sessions |
+| session_lifecycle | Session lifecycle | created, invalidated, timed_out | sessions/s |
 
-### MicroProfile Component Metrics
+### Other Metrics
 
-| Metric | Dimensions | Unit |
-|:-------|:-----------|:-----|
-| mp_health | status | status |
-| mp_metrics | value | value |
-
-### Custom Application Metrics (per application)
-
-| Metric | Dimensions | Unit |
-|:-------|:-----------|:-----|
-| application | value | value |
-
-## Setup
-
-### Enable MicroProfile Metrics in Liberty
-
-Add the MicroProfile Metrics feature to your `server.xml`:
-
-```xml
-<server>
-    <featureManager>
-        <feature>mpMetrics-4.0</feature>
-        <!-- Other features -->
-    </featureManager>
-    
-    <!-- Optional: Configure metrics endpoint -->
-    <mpMetrics authentication="false" />
-</server>
-```
-
-### Configure authentication (recommended for production)
-
-```xml
-<server>
-    <basicRegistry>
-        <user name="monitor" password="{xor}...encoded..." />
-    </basicRegistry>
-    
-    <administrator-role>
-        <user>monitor</user>
-    </administrator-role>
-    
-    <!-- Secure metrics endpoint -->
-    <mpMetrics authentication="true" />
-</server>
-```
-
-### Test connectivity
-
-```bash
-# Without authentication
-curl -k https://localhost:9443/metrics
-
-# With authentication
-curl -k -u monitor:password https://localhost:9443/metrics
-```
-
-## Configuration Examples
-
-### Basic monitoring
-
-```yaml
-jobs:
-  - name: liberty_mp_basic
-    url: https://localhost:9443
-    username: admin
-    password: adminpwd
-```
-
-### Production setup with filtering
-
-```yaml
-jobs:
-  - name: liberty_mp_prod
-    url: https://prod.example.com:9443
-    username: monitor
-    password: secret
-    
-    # Only monitor API endpoints
-    collect_rest_matching: "/api/*"
-    max_rest_endpoints: 20
-    
-    # Enable custom application metrics
-    collect_custom_metrics: true
-    collect_custom_matching: "myapp_*"
-    max_custom_metrics: 50
-```
-
-### Multiple servers
-
-```yaml
-jobs:
-  - name: liberty_mp_server1
-    url: https://server1.example.com:9443
-    username: monitor
-    password: secret
-    
-  - name: liberty_mp_server2
-    url: https://server2.example.com:9443
-    username: monitor
-    password: secret
-    update_every: 10
-```
-
-### TLS client certificate authentication
-
-```yaml
-jobs:
-  - name: liberty_mp_secure
-    url: https://secure.example.com:9443
-    tls_cert: /path/to/client.crt
-    tls_key: /path/to/client.key
-    tls_ca: /path/to/ca.crt
-```
-
-### Minimal JVM-only monitoring
-
-```yaml
-jobs:
-  - name: liberty_mp_minimal
-    url: https://localhost:9443
-    username: admin
-    password: adminpwd
-    
-    # Disable dynamic metrics to reduce overhead
-    collect_rest_metrics: false
-    collect_mp_metrics: false
-    collect_custom_metrics: false
-```
+Any metrics not matching JVM or vendor patterns are collected in the "other" family with appropriate units based on metric name suffixes (_bytes, _seconds, _percent, etc.).
 
 ## Troubleshooting
 
-### Connection issues
+### Connection refused
+- Verify the URL and port are correct
+- Check if Liberty is running
+- Ensure MicroProfile Metrics feature is enabled in server.xml:
+  ```xml
+  <featureManager>
+      <feature>mpMetrics-3.0</feature>
+  </featureManager>
+  ```
 
-1. **Connection refused**
-   - Verify Liberty is running and port is correct
-   - Check firewall rules
-   - Ensure MicroProfile Metrics feature is enabled
+### 401 Unauthorized
+- Verify username and password
+- Ensure user has reader or administrator role
+- Check if metrics endpoint requires authentication
 
-2. **SSL/TLS errors**
-   - Use `tls_skip_verify: true` for testing (not production)
-   - Provide proper CA certificate with `tls_ca`
-   - Verify certificate validity
+### 404 Not Found
+- Verify metrics_endpoint path (default: /metrics)
+- Ensure mpMetrics feature is enabled
+- Check Liberty version supports MicroProfile Metrics
 
-### Authentication problems
+### High memory usage
+- Reduce max_rest_endpoints
+- Use collect_rest_matching to filter endpoints
+- Increase update_every to reduce collection frequency
 
-1. **401 Unauthorized**
-   - Verify username and password
-   - Check user has reader or administrator role
-   - Verify `mpMetrics` configuration in server.xml
+### Certificate errors
+- For self-signed certificates, use: `tls_skip_verify: true` (not for production!)
+- Provide proper CA certificate with tls_ca option
+- Ensure certificate paths are absolute and readable
 
-2. **403 Forbidden**
-   - User lacks sufficient permissions
-   - Check role assignments in Liberty configuration
+## Testing
 
-### Metrics issues
-
-1. **404 Not Found for /metrics**
-   - Verify `mpMetrics` feature is enabled
-   - Check if custom metrics endpoint is configured
-   - Ensure Liberty version supports MicroProfile Metrics
-
-2. **No custom metrics**
-   - Enable `collect_custom_metrics: true`
-   - Check application is publishing metrics correctly
-   - Verify metric names match filtering patterns
-
-3. **Missing REST endpoints**
-   - Verify JAX-RS applications are deployed
-   - Check if endpoints have been accessed (some metrics only appear after first request)
-   - Review `collect_rest_matching` pattern
-
-### Performance considerations
-
-1. **High memory usage**
-   - Reduce `max_rest_endpoints` and `max_custom_metrics`
-   - Use filtering to monitor only critical metrics
-   - Increase `update_every` to reduce collection frequency
-
-2. **Slow dashboard**
-   - High cardinality from many REST endpoints
-   - Consider filtering endpoints by importance
-   - Monitor only business-critical applications
-
-## Differences from regular WebSphere collector
-
-| Feature | websphere | websphere_mp |
-|:--------|:----------|:-------------|
-| Data format | JSON (REST API) | Prometheus (MicroProfile) |
-| Endpoint | `/ibm/api/metrics` | `/metrics` |
-| Metric types | Fixed Liberty metrics | Extensible MP metrics |
-| Custom metrics | Not supported | Full support |
-| REST endpoint details | Basic counts | Detailed timing/percentiles |
-| Standards compliance | Liberty-specific | MicroProfile standard |
-
-## Advanced configuration
-
-### Custom metric patterns
-
-Use filtering to control which metrics are collected:
-
-```yaml
-# Only collect counters and gauges from myapp
-collect_custom_matching: "application:myapp_counter_*|application:myapp_gauge_*"
-
-# Only collect API endpoints, exclude health checks
-collect_rest_matching: "/api/*"
+To test MicroProfile Metrics connectivity:
+```bash
+curl -k -u admin:adminpwd https://localhost:9443/metrics
 ```
 
-### Cardinality management
-
-For large applications with many endpoints:
-
-```yaml
-# Limit to most important endpoints
-max_rest_endpoints: 10
-collect_rest_matching: "/api/v1/users/*|/api/v1/orders/*"
-
-# Limit custom metrics
-max_custom_metrics: 25
-collect_custom_matching: "*business_*|*critical_*"
+To test the collector:
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo -u netdata ./ibm.d.plugin -d -m websphere_mp
 ```
+
+## Comparison with websphere collector
+
+Use `websphere_mp` when:
+- You have Liberty with MicroProfile Metrics enabled
+- You want metrics in Prometheus format
+- You need CPU metrics and thread pool monitoring
+- You prefer the MicroProfile standard metric names
+
+Use `websphere` when:
+- You have Traditional WebSphere (not Liberty)
+- You don't have MicroProfile Metrics enabled
+- You need PMI-based metrics
+- You want lower overhead collection
