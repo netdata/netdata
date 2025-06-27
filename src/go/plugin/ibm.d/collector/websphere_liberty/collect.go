@@ -81,7 +81,7 @@ type libertyMetrics struct {
 }
 
 func (w *WebSphere) collect(ctx context.Context) (map[string]int64, error) {
-	if w.charts == nil {
+	if w.charts == nil || len(*w.charts) == 0 {
 		w.initCharts()
 	}
 
