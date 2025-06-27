@@ -746,18 +746,7 @@ func (d *DB2) collectConnectionMetricsResilience(ctx context.Context) error {
 }
 
 func (d *DB2) collectLockMetricsResilience(ctx context.Context) {
-	// Use MON_GET if available for better performance
-	if d.useMonGetFunctions {
-		// MON_GET_DATABASE returns all these metrics in one query
-		if err := d.collectMonGetDatabase(ctx); err != nil {
-			d.Warningf("failed to collect lock metrics using MON_GET_DATABASE: %v, falling back to SNAP views", err)
-			// Fall through to use SNAP views
-		} else {
-			return // Successfully collected with MON_GET
-		}
-	}
-	
-	// Fall back to individual SNAP queries
+	// Individual SNAP queries for lock metrics
 	_ = d.collectSingleMetric(ctx, "lock_waits", queryLockWaits, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.LockWaits = v
@@ -808,13 +797,7 @@ func (d *DB2) collectLockMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectSortingMetricsResilience(ctx context.Context) {
-	// MON_GET_DATABASE includes sorting metrics
-	if d.useMonGetFunctions {
-		// Already collected in collectLockMetricsResilience
-		return
-	}
-	
-	// Fall back to individual SNAP queries
+	// Individual SNAP queries for sorting metrics
 	_ = d.collectSingleMetric(ctx, "total_sorts", queryTotalSorts, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.TotalSorts = v
@@ -829,13 +812,7 @@ func (d *DB2) collectSortingMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectRowActivityMetricsResilience(ctx context.Context) {
-	// MON_GET_DATABASE includes row activity metrics
-	if d.useMonGetFunctions {
-		// Already collected in collectLockMetricsResilience
-		return
-	}
-	
-	// Fall back to individual SNAP queries
+	// Individual SNAP queries for row activity metrics
 	_ = d.collectSingleMetric(ctx, "rows_read", queryRowsRead, func(value string) {
 		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 			d.mx.RowsRead = v
@@ -856,17 +833,7 @@ func (d *DB2) collectRowActivityMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
-	// Use MON_GET if available for better performance
-	if d.useMonGetFunctions {
-		if err := d.collectMonGetBufferpoolAggregate(ctx); err != nil {
-			d.Warningf("failed to collect bufferpool metrics using MON_GET_BUFFERPOOL: %v, falling back to SNAP views", err)
-			// Fall through to use SNAP views
-		} else {
-			return // Successfully collected with MON_GET
-		}
-	}
-	
-	// Fall back to individual SNAP queries
+	// Individual SNAP queries for bufferpool metrics
 	// Collect individual components first
 	var dataLogical, dataHits int64
 	var indexLogical, indexHits int64
@@ -992,17 +959,7 @@ func (d *DB2) collectBufferpoolMetricsResilience(ctx context.Context) {
 }
 
 func (d *DB2) collectLogSpaceMetricsResilience(ctx context.Context) {
-	// Use MON_GET if available for better performance
-	if d.useMonGetFunctions {
-		if err := d.collectMonGetTransactionLog(ctx); err != nil {
-			d.Warningf("failed to collect log metrics using MON_GET_TRANSACTION_LOG: %v, falling back to SNAP views", err)
-			// Fall through to use SNAP views
-		} else {
-			return // Successfully collected with MON_GET
-		}
-	}
-	
-	// Fall back to individual SNAP queries
+	// Individual SNAP queries for log space metrics
 	var logUsed, logAvailable int64
 
 	_ = d.collectSingleMetric(ctx, "log_used_space", queryLogUsedSpace, func(value string) {
