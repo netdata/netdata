@@ -55,6 +55,11 @@ The collector provides comprehensive monitoring across multiple areas:
 - **Replication**: Traffic rates and sync failures
 - **Dynamic Clusters**: Min/max/target instance configuration
 
+### Application Performance Monitoring (APM) Features
+- **Servlet Metrics**: Per-servlet response times, request counts, error rates, and concurrent requests
+- **EJB Metrics**: Method invocation rates, response times, and bean pool utilization
+- **Advanced JDBC Metrics**: Query execution time vs connection hold time breakdown, statement cache performance
+
 ### Connection Health Metrics
 - **Connection Status**: Real-time JMX connection health
 - **Circuit Breaker State**: Closed, half-open, or open status
@@ -68,6 +73,7 @@ The collector provides comprehensive monitoring across multiple areas:
 2. **Java Runtime**: Java 8+ must be installed and available in PATH
 3. **Network Access**: Connectivity to the WebSphere JMX port (typically 9999 for RMI or 2809 for IIOP)
 4. **WebSphere Client Libraries** (Traditional WAS only): Required for IIOP protocol connections
+5. **PMI enabled** (for APM features): Performance Monitoring Infrastructure must be enabled for servlet and EJB metrics
 
 ### Basic Configuration
 
@@ -114,6 +120,26 @@ jobs:
     collect_cluster_metrics: true
 ```
 
+### APM Configuration
+
+Enable Application Performance Monitoring features for detailed servlet and EJB visibility:
+
+```yaml
+jobs:
+  - name: apm_monitoring
+    jmx_url: service:jmx:rmi:///jndi/rmi://localhost:9999/jmxrmi
+    # Enable APM features (requires PMI to be enabled in WebSphere)
+    collect_servlet_metrics: true
+    collect_ejb_metrics: true
+    collect_jdbc_advanced: true
+    # Control APM cardinality
+    max_servlets: 100
+    max_ejbs: 50
+    # Focus on important servlets and EJBs
+    collect_servlets_matching: "com.mycompany.api.*"
+    collect_ejbs_matching: "OrderProcessing*|PaymentGateway*"
+```
+
 ### Configuration Options
 
 | Parameter | Description | Default | Required |
@@ -132,6 +158,9 @@ jobs:
 | `collect_session_metrics` | Enable HTTP session monitoring | true | No |
 | `collect_transaction_metrics` | Enable JTA transaction monitoring | true | No |
 | `collect_cluster_metrics` | Enable cluster metrics (dmgr only) | true | No |
+| `collect_servlet_metrics` | Enable per-servlet APM metrics (requires PMI) | false | No |
+| `collect_ejb_metrics` | Enable per-EJB APM metrics (requires PMI) | false | No |
+| `collect_jdbc_advanced` | Enable advanced JDBC timing breakdown | false | No |
 
 ### Cardinality Control
 
@@ -143,6 +172,8 @@ To prevent metric explosion in large environments:
 | `max_jdbc_pools` | Maximum JDBC pools to monitor | 50 |
 | `max_jms_destinations` | Maximum JMS destinations to monitor | 50 |
 | `max_applications` | Maximum applications to monitor | 100 |
+| `max_servlets` | Maximum servlets to monitor for APM | 50 |
+| `max_ejbs` | Maximum EJBs to monitor for APM | 50 |
 
 ### Filtering Options
 
@@ -153,6 +184,8 @@ Use pattern matching to monitor specific resources:
 | `collect_apps_matching` | Application name pattern | `"prod_*"` |
 | `collect_pools_matching` | Pool name pattern | `"*oracle*"` |
 | `collect_jms_matching` | JMS destination pattern | `"Queue_*"` |
+| `collect_servlets_matching` | Servlet APM pattern | `"com.mycompany.*"` |
+| `collect_ejbs_matching` | EJB APM pattern | `"OrderProcessing*"` |
 
 ### Cluster Labels
 
@@ -258,6 +291,26 @@ Add to `server.xml`:
 2. Use more restrictive filtering patterns
 3. Disable unnecessary metric collection (`collect_*_metrics: false`)
 4. Monitor for memory leaks in the Java helper process
+
+#### APM Metrics Not Available
+**Symptoms**: Missing servlet or EJB metrics despite enabling APM collection
+
+**Solutions**:
+1. **Enable PMI**: Ensure Performance Monitoring Infrastructure is enabled in WebSphere
+2. **Set PMI level**: Configure PMI statistical level to "Extended" or "Custom" with servlet/EJB statistics enabled
+3. **Check application activity**: APM metrics only appear for actively used servlets and EJBs
+4. **Verify permissions**: Ensure JMX user has access to PMI MBeans
+5. **Check filtering patterns**: Verify `collect_servlets_matching` and `collect_ejbs_matching` patterns
+
+#### PMI Configuration (Traditional WAS)
+In the WebSphere admin console:
+1. Navigate to: Monitoring and Tuning > Performance Monitoring Infrastructure (PMI)
+2. Select your server and click "Configuration"
+3. Set statistical level to "Extended" or "Custom"
+4. For Custom level, enable:
+   - servletSessionsModule (for servlet metrics)
+   - ejbModule (for EJB metrics)
+   - connectionPoolModule (for advanced JDBC metrics)
 
 ### Performance Tuning
 

@@ -53,6 +53,17 @@ const (
 	prioDynamicCluster
 	prioReplication
 	prioConnectionHealth
+
+	// APM priorities
+	prioServletRequests
+	prioServletResponseTime
+	prioServletConcurrent
+	prioEJBInvocations
+	prioEJBResponseTime
+	prioEJBPool
+	prioJDBCTimeBreakdown
+	prioJDBCStmtCache
+	prioJDBCConnectionReuse
 )
 
 var baseCharts = module.Charts{
@@ -622,6 +633,138 @@ var clusterCharts = module.Charts{
 	},
 }
 
+// APM Chart Templates
+
+// Servlet Charts Template
+var servletChartsTmpl = module.Charts{
+	{
+		ID:       "servlet_%s_requests",
+		Title:    "Servlet Requests",
+		Units:    "requests/s",
+		Fam:      "apm.servlets",
+		Ctx:      "websphere_jmx.servlet_requests",
+		Priority: prioServletRequests,
+		Dims: module.Dims{
+			{ID: "servlet_%s_requests", Name: "requests", Algo: module.Incremental},
+			{ID: "servlet_%s_errors", Name: "errors", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "servlet_%s_response_time",
+		Title:    "Servlet Response Time",
+		Units:    "milliseconds",
+		Fam:      "apm.servlets",
+		Ctx:      "websphere_jmx.servlet_response_time",
+		Priority: prioServletResponseTime,
+		Dims: module.Dims{
+			{ID: "servlet_%s_response_time_avg", Name: "avg", Div: precision},
+			{ID: "servlet_%s_response_time_max", Name: "max", Div: precision},
+		},
+	},
+	{
+		ID:       "servlet_%s_concurrent",
+		Title:    "Servlet Concurrent Requests",
+		Units:    "requests",
+		Fam:      "apm.servlets",
+		Ctx:      "websphere_jmx.servlet_concurrent_requests",
+		Priority: prioServletConcurrent,
+		Dims: module.Dims{
+			{ID: "servlet_%s_concurrent_requests", Name: "concurrent"},
+		},
+	},
+}
+
+// EJB Charts Template
+var ejbChartsTmpl = module.Charts{
+	{
+		ID:       "ejb_%s_invocations",
+		Title:    "EJB Method Invocations",
+		Units:    "invocations/s",
+		Fam:      "apm.ejbs",
+		Ctx:      "websphere_jmx.ejb_invocations",
+		Priority: prioEJBInvocations,
+		Dims: module.Dims{
+			{ID: "ejb_%s_invocations", Name: "invocations", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "ejb_%s_response_time",
+		Title:    "EJB Response Time",
+		Units:    "milliseconds",
+		Fam:      "apm.ejbs",
+		Ctx:      "websphere_jmx.ejb_response_time",
+		Priority: prioEJBResponseTime,
+		Dims: module.Dims{
+			{ID: "ejb_%s_response_time_avg", Name: "avg", Div: precision},
+			{ID: "ejb_%s_response_time_max", Name: "max", Div: precision},
+		},
+	},
+	{
+		ID:       "ejb_%s_pool",
+		Title:    "EJB Bean Pool",
+		Units:    "beans",
+		Fam:      "apm.ejbs",
+		Ctx:      "websphere_jmx.ejb_pool",
+		Priority: prioEJBPool,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "ejb_%s_pool_size", Name: "total"},
+			{ID: "ejb_%s_pool_available", Name: "available"},
+		},
+	},
+}
+
+// Advanced JDBC Charts (extensions to existing JDBC pools)
+var jdbcAdvancedChartsTmpl = module.Charts{
+	{
+		ID:       "jdbc_%s_time_breakdown",
+		Title:    "JDBC Time Breakdown",
+		Units:    "milliseconds",
+		Fam:      "jdbc pools",
+		Ctx:      "websphere_jmx.jdbc_time_breakdown",
+		Priority: prioJDBCTimeBreakdown,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_query_time", Name: "query_time", Div: precision},
+			{ID: "jdbc_%s_connection_hold_time", Name: "connection_hold_time", Div: precision},
+		},
+	},
+	{
+		ID:       "jdbc_%s_stmt_cache",
+		Title:    "JDBC Statement Cache",
+		Units:    "operations/s",
+		Fam:      "jdbc pools",
+		Ctx:      "websphere_jmx.jdbc_stmt_cache",
+		Priority: prioJDBCStmtCache,
+		Type:     module.Stacked,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_stmt_cache_hits", Name: "hits", Algo: module.Incremental},
+			{ID: "jdbc_%s_stmt_cache_misses", Name: "misses", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "jdbc_%s_stmt_cache_size",
+		Title:    "JDBC Statement Cache Size",
+		Units:    "statements",
+		Fam:      "jdbc pools",
+		Ctx:      "websphere_jmx.jdbc_stmt_cache_size",
+		Priority: prioJDBCStmtCache + 1,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_stmt_cache_size", Name: "size"},
+		},
+	},
+	{
+		ID:       "jdbc_%s_connection_reuse",
+		Title:    "JDBC Connection Reuse",
+		Units:    "reuses/s",
+		Fam:      "jdbc pools",
+		Ctx:      "websphere_jmx.jdbc_connection_reuse",
+		Priority: prioJDBCConnectionReuse,
+		Dims: module.Dims{
+			{ID: "jdbc_%s_connection_reuse_count", Name: "reuses", Algo: module.Incremental},
+		},
+	},
+}
+
 func (w *WebSphereJMX) initCharts() {
 	w.charts = baseCharts.Copy()
 
@@ -678,6 +821,11 @@ func (w *WebSphereJMX) newThreadPoolCharts(pool string) *module.Charts {
 
 func (w *WebSphereJMX) newJDBCPoolCharts(pool string) *module.Charts {
 	charts := jdbcPoolChartsTmpl.Copy()
+
+	// Add advanced JDBC charts if enabled
+	if w.CollectJDBCAdvanced {
+		charts.Add(*jdbcAdvancedChartsTmpl.Copy()...)
+	}
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName(pool))
@@ -756,6 +904,46 @@ func (w *WebSphereJMX) newApplicationCharts(app string, includeSessions, include
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName(app))
+		}
+	}
+
+	// Add cluster labels
+	w.addClusterLabels(charts)
+
+	return charts
+}
+
+// APM Chart Creation Methods
+
+func (w *WebSphereJMX) newServletCharts(servlet string) *module.Charts {
+	charts := servletChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName(servlet))
+		chart.Labels = []module.Label{
+			{Key: "servlet", Value: servlet},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName(servlet))
+		}
+	}
+
+	// Add cluster labels
+	w.addClusterLabels(charts)
+
+	return charts
+}
+
+func (w *WebSphereJMX) newEJBCharts(ejb string) *module.Charts {
+	charts := ejbChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, cleanName(ejb))
+		chart.Labels = []module.Label{
+			{Key: "ejb", Value: ejb},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, cleanName(ejb))
 		}
 	}
 
