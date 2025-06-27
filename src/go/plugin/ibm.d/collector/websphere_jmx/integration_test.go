@@ -37,7 +37,7 @@ func TestWebSphereJMX_Integration(t *testing.T) {
 	defer ws.Cleanup(ctx)
 
 	require.NoError(t, ws.Check(ctx))
-	
+
 	mx := ws.Collect(ctx)
 	require.NotNil(t, mx)
 	assert.Greater(t, len(mx), 0, "should collect at least some metrics")
@@ -45,7 +45,7 @@ func TestWebSphereJMX_Integration(t *testing.T) {
 	// Verify JVM metrics are present
 	assert.Contains(t, mx, "jvm_heap_used", "should collect JVM heap metrics")
 	assert.Contains(t, mx, "jvm_thread_count", "should collect JVM thread metrics")
-	
+
 	// Verify heap usage percentage is calculated
 	if mx["jvm_heap_max"] > 0 {
 		assert.Contains(t, mx, "jvm_heap_usage_percent", "should calculate heap usage percentage")
@@ -72,7 +72,7 @@ func TestWebSphereJMX_Integration_WithAuth(t *testing.T) {
 	defer ws.Cleanup(ctx)
 
 	require.NoError(t, ws.Check(ctx))
-	
+
 	mx := ws.Collect(ctx)
 	require.NotNil(t, mx)
 	assert.Greater(t, len(mx), 0)
@@ -87,7 +87,7 @@ func TestWebSphereJMX_Integration_CardinalityLimits(t *testing.T) {
 
 	ws := New()
 	ws.Config.JMXURL = jmxURL
-	
+
 	// Set very low limits to test cardinality control
 	ws.Config.MaxThreadPools = 1
 	ws.Config.MaxJDBCPools = 1
@@ -99,16 +99,16 @@ func TestWebSphereJMX_Integration_CardinalityLimits(t *testing.T) {
 	defer ws.Cleanup(ctx)
 
 	require.NoError(t, ws.Check(ctx))
-	
+
 	mx := ws.Collect(ctx)
 	require.NotNil(t, mx)
-	
+
 	// Count dynamic instances to verify limits are respected
 	threadPools := 0
 	jdbcPools := 0
 	applications := 0
 	jmsDestinations := 0
-	
+
 	for key := range mx {
 		switch {
 		case strings.HasPrefix(key, "threadpool_"):
@@ -129,7 +129,7 @@ func TestWebSphereJMX_Integration_CardinalityLimits(t *testing.T) {
 			}
 		}
 	}
-	
+
 	assert.LessOrEqual(t, threadPools, 1, "should respect thread pool limit")
 	assert.LessOrEqual(t, jdbcPools, 1, "should respect JDBC pool limit")
 	assert.LessOrEqual(t, applications, 1, "should respect application limit")
@@ -145,7 +145,7 @@ func TestWebSphereJMX_Integration_SelectiveCollection(t *testing.T) {
 
 	ws := New()
 	ws.Config.JMXURL = jmxURL
-	
+
 	// Disable most collection to test selective monitoring
 	ws.Config.CollectJVMMetrics = true
 	ws.Config.CollectThreadPoolMetrics = false
@@ -160,18 +160,18 @@ func TestWebSphereJMX_Integration_SelectiveCollection(t *testing.T) {
 	defer ws.Cleanup(ctx)
 
 	require.NoError(t, ws.Check(ctx))
-	
+
 	mx := ws.Collect(ctx)
 	require.NotNil(t, mx)
-	
+
 	// Should have JVM metrics
 	assert.Contains(t, mx, "jvm_heap_used")
-	
+
 	// Should not have other metrics
 	hasThreadPool := false
 	hasJDBC := false
 	hasApp := false
-	
+
 	for key := range mx {
 		if strings.HasPrefix(key, "threadpool_") {
 			hasThreadPool = true
@@ -183,7 +183,7 @@ func TestWebSphereJMX_Integration_SelectiveCollection(t *testing.T) {
 			hasApp = true
 		}
 	}
-	
+
 	assert.False(t, hasThreadPool, "should not collect thread pool metrics when disabled")
 	assert.False(t, hasJDBC, "should not collect JDBC metrics when disabled")
 	assert.False(t, hasApp, "should not collect application metrics when disabled")

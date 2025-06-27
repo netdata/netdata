@@ -67,12 +67,12 @@ func TestCleanName(t *testing.T) {
 		input    string
 		expected string
 	}{
-		"simple":      {input: "test", expected: "test"},
-		"with spaces": {input: "test name", expected: "test_name"},
-		"with dots":   {input: "test.name", expected: "test_name"},
+		"simple":       {input: "test", expected: "test"},
+		"with spaces":  {input: "test name", expected: "test_name"},
+		"with dots":    {input: "test.name", expected: "test_name"},
 		"with slashes": {input: "test/name", expected: "test_name"},
-		"mixed":       {input: "Test-Name:123", expected: "test_name_123"},
-		"complex":     {input: "jdbc/DB2(user)", expected: "jdbc_db2_user_"},
+		"mixed":        {input: "Test-Name:123", expected: "test_name_123"},
+		"complex":      {input: "jdbc/DB2(user)", expected: "jdbc_db2_user_"},
 	}
 
 	for name, test := range tests {
@@ -119,15 +119,15 @@ func TestGetFloat(t *testing.T) {
 
 func TestWebSphereJMX_ValidateCardinality(t *testing.T) {
 	ws := New()
-	
+
 	// Test negative values get reset to 0
 	ws.Config.MaxThreadPools = -1
 	ws.Config.MaxJDBCPools = -5
 	ws.Config.MaxJMSDestinations = -10
 	ws.Config.MaxApplications = -20
-	
+
 	require.NoError(t, ws.Init(context.Background()))
-	
+
 	assert.Equal(t, 0, ws.Config.MaxThreadPools)
 	assert.Equal(t, 0, ws.Config.MaxJDBCPools)
 	assert.Equal(t, 0, ws.Config.MaxJMSDestinations)

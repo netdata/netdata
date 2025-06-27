@@ -29,7 +29,7 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 		} else {
 			d.Infof("detected DB2 edition: %s version: %s", d.edition, d.version)
 		}
-		
+
 		// Check if we can use modern MON_GET_* functions
 		d.detectMonGetSupport(ctx)
 	}
@@ -197,7 +197,7 @@ func (d *DB2) collectServiceHealth(ctx context.Context) {
 	if err := d.doQuerySingleValue(ctx, queryCanConnect, &d.mx.CanConnect); err != nil {
 		d.mx.CanConnect = 0
 	}
-	
+
 	// Database status check
 	// 0 = OK (active), 1 = WARNING (quiesce-pending, rollforward), 2 = CRITICAL (quiesced), 3 = UNKNOWN
 	d.mx.DatabaseStatus = 3
@@ -312,7 +312,7 @@ func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 			d.logOnce("bufferpool_detailed_skipped", "Detailed buffer pool metrics collection skipped - Limited on this DB2 edition")
 		}
 
-		// Log space metrics - graceful degradation  
+		// Log space metrics - graceful degradation
 		if !d.isDisabled("system_level_metrics") {
 			d.collectLogSpaceMetricsResilience(ctx)
 		} else {
@@ -392,14 +392,14 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 	if d.useMonGetFunctions {
 		query = queryMonGetBufferpoolAggregate
 		d.Debugf("using MON_GET_BUFFERPOOL for aggregate metrics (modern approach)")
-		
+
 		// With MON_GET, we need to calculate hit ratios differently
 		return d.collectMonGetBufferpoolAggregate(ctx)
 	} else {
 		query = queryBufferpoolAggregateMetrics
 		d.Debugf("using SNAP views for bufferpool metrics (legacy approach)")
 	}
-	
+
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "HIT_RATIO":
@@ -496,7 +496,7 @@ func (d *DB2) collectLogSpaceMetrics(ctx context.Context) error {
 		query = queryLogSpaceMetrics
 		d.Debugf("using SNAP views for log metrics (legacy approach)")
 	}
-	
+
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_LOG_USED":
@@ -628,12 +628,12 @@ func (d *DB2) collectLongRunningQueries(ctx context.Context) error {
 
 func (d *DB2) collectBackupStatus(ctx context.Context) error {
 	now := time.Now()
-	
+
 	// Simplified approach - get the last successful full backup
 	var lastFullBackup sql.NullString
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-	
+
 	err := d.db.QueryRowContext(queryCtx, `
 		SELECT MAX(START_TIME) 
 		FROM SYSIBMADM.DB_HISTORY 
@@ -642,7 +642,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		  AND SQLCODE = 0
 		  AND START_TIME >= CURRENT TIMESTAMP - 30 DAYS
 	`).Scan(&lastFullBackup)
-	
+
 	if err == nil && lastFullBackup.Valid {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastFullBackup.String); err == nil {
 			d.mx.LastFullBackupAge = int64(now.Sub(t).Hours())
@@ -650,13 +650,13 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		} else {
 			d.Warningf("failed to parse last full backup time '%s': %v", lastFullBackup.String, err)
 			d.mx.LastFullBackupAge = 999999 // Parse error
-			d.mx.LastBackupStatus = 1 // Failed
+			d.mx.LastBackupStatus = 1       // Failed
 		}
 	} else {
 		d.mx.LastFullBackupAge = 999999 // No backup found or query failed
-		d.mx.LastBackupStatus = 1 // No recent backup
+		d.mx.LastBackupStatus = 1       // No recent backup
 	}
-	
+
 	// Get the last successful incremental backup
 	var lastIncrementalBackup sql.NullString
 	err = d.db.QueryRowContext(queryCtx, `
@@ -667,7 +667,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		  AND SQLCODE = 0
 		  AND START_TIME >= CURRENT TIMESTAMP - 30 DAYS
 	`).Scan(&lastIncrementalBackup)
-	
+
 	if err == nil && lastIncrementalBackup.Valid {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastIncrementalBackup.String); err == nil {
 			d.mx.LastIncrementalBackupAge = int64(now.Sub(t).Hours())
@@ -678,7 +678,7 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 	} else {
 		d.mx.LastIncrementalBackupAge = 999999 // No incremental backup found
 	}
-	
+
 	return nil
 }
 
@@ -709,7 +709,7 @@ func (d *DB2) collectConnectionMetricsResilience(ctx context.Context) error {
 	if d.useMonGetFunctions {
 		return d.collectMonGetConnections(ctx)
 	}
-	
+
 	// Fall back to SNAP views
 	// Core connection metrics - must work on all DB2 editions
 	if err := d.collectSingleMetric(ctx, "total_connections", queryTotalConnections, func(value string) {
@@ -1117,13 +1117,13 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 	var indexLogical, indexPhysical, indexHits int64
 	var xdaLogical, xdaPhysical, xdaHits int64
 	var colLogical, colPhysical, colHits int64
-	
+
 	err := d.doQuery(ctx, queryMonGetBufferpoolAggregate, func(column, value string, lineEnd bool) {
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return
 		}
-		
+
 		switch column {
 		case "DATA_LOGICAL_READS":
 			dataLogical = v
@@ -1159,57 +1159,57 @@ func (d *DB2) collectMonGetBufferpoolAggregate(ctx context.Context) error {
 			colHits = v
 		}
 	})
-	
+
 	if err != nil {
 		return err
 	}
-	
+
 	// Calculate totals
 	d.mx.BufferpoolLogicalReads = dataLogical + indexLogical + xdaLogical + colLogical
 	d.mx.BufferpoolPhysicalReads = dataPhysical + indexPhysical + xdaPhysical + colPhysical
 	d.mx.BufferpoolTotalReads = d.mx.BufferpoolLogicalReads + d.mx.BufferpoolPhysicalReads
-	
+
 	// Calculate data totals
 	d.mx.BufferpoolDataTotalReads = dataLogical + dataPhysical
 	d.mx.BufferpoolIndexTotalReads = indexLogical + indexPhysical
 	d.mx.BufferpoolXDATotalReads = xdaLogical + xdaPhysical
 	d.mx.BufferpoolColumnTotalReads = colLogical + colPhysical
-	
+
 	// Calculate hit ratios using direct hit counts from MON_GET_BUFFERPOOL
 	// This is more accurate than calculating from logical/physical reads
 	totalLogical := dataLogical + indexLogical + xdaLogical + colLogical
 	totalHits := dataHits + indexHits + xdaHits + colHits
-	
+
 	if totalLogical > 0 {
 		d.mx.BufferpoolHitRatio = int64((float64(totalHits) * 100.0 * float64(precision)) / float64(totalLogical))
 	} else {
 		d.mx.BufferpoolHitRatio = 100 * precision
 	}
-	
+
 	if dataLogical > 0 {
 		d.mx.BufferpoolDataHitRatio = int64((float64(dataHits) * 100.0 * float64(precision)) / float64(dataLogical))
 	} else {
 		d.mx.BufferpoolDataHitRatio = 100 * precision
 	}
-	
+
 	if indexLogical > 0 {
 		d.mx.BufferpoolIndexHitRatio = int64((float64(indexHits) * 100.0 * float64(precision)) / float64(indexLogical))
 	} else {
 		d.mx.BufferpoolIndexHitRatio = 100 * precision
 	}
-	
+
 	if xdaLogical > 0 {
 		d.mx.BufferpoolXDAHitRatio = int64((float64(xdaHits) * 100.0 * float64(precision)) / float64(xdaLogical))
 	} else {
 		d.mx.BufferpoolXDAHitRatio = 100 * precision
 	}
-	
+
 	if colLogical > 0 {
 		d.mx.BufferpoolColumnHitRatio = int64((float64(colHits) * 100.0 * float64(precision)) / float64(colLogical))
 	} else {
 		d.mx.BufferpoolColumnHitRatio = 100 * precision
 	}
-	
+
 	return nil
 }
 

@@ -5,12 +5,11 @@ package db2
 const (
 	// Edition detection queries - each targets specific edition characteristics
 	queryDetectVersionLUW = `SELECT SERVICE_LEVEL, HOST_NAME, INST_NAME FROM SYSIBMADM.ENV_INST_INFO`
-	queryDetectVersionI = `SELECT 'DB2 for i' FROM SYSIBM.SYSDUMMY1`
+	queryDetectVersionI   = `SELECT 'DB2 for i' FROM SYSIBM.SYSDUMMY1`
 	queryDetectVersionZOS = `SELECT VERSION FROM SYSIBM.SYSVERSIONS WHERE VERSION_TYPE = 'DB2'`
 	// Try multiple methods to detect Db2 on Cloud
-	queryDetectVersionCloud = `SELECT 'Db2 on Cloud' FROM SYSIBM.SYSDUMMY1 WHERE EXISTS (SELECT 1 FROM SYSCAT.TABLES WHERE TABSCHEMA = 'BLUADMIN' AND TABNAME = 'BLUADMIN_CLOUD_CONTROLS')`
+	queryDetectVersionCloud    = `SELECT 'Db2 on Cloud' FROM SYSIBM.SYSDUMMY1 WHERE EXISTS (SELECT 1 FROM SYSCAT.TABLES WHERE TABSCHEMA = 'BLUADMIN' AND TABNAME = 'BLUADMIN_CLOUD_CONTROLS')`
 	queryDetectVersionCloudAlt = `SELECT CASE WHEN PROD_RELEASE LIKE '%Cloud%' THEN 'Db2 on Cloud' ELSE NULL END FROM TABLE(SYSPROC.ENV_GET_INST_INFO()) FETCH FIRST 1 ROW ONLY`
-
 
 	queryLockMetrics = `
 		SELECT 
@@ -249,7 +248,7 @@ const (
 		ORDER BY NLEAF DESC
 		FETCH FIRST %d ROWS ONLY
 	`
-	
+
 	queryDatabaseStatus = `
 		SELECT 
 			CASE 
@@ -260,65 +259,65 @@ const (
 			END as DB_STATUS_CHECK
 		FROM SYSIBM.SYSDUMMY1
 	`
-	
+
 	queryCanConnect = `SELECT 1 as CAN_CONNECT FROM SYSIBM.SYSDUMMY1`
 
 	// Individual metric queries for resilience (following AS/400 pattern)
 	// Core connection metrics - should always be available on LUW
-	queryTotalConnections    = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS`
-	queryActiveConnections   = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'CONNECTED'`
+	queryTotalConnections     = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS`
+	queryActiveConnections    = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'CONNECTED'`
 	queryExecutingConnections = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'UOWEXEC'`
-	queryIdleConnections     = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'CONNECTED' AND UOW_COMP_STATUS = 'NONE'`
-	queryMaxConnections      = `SELECT MAX(APPLS_CUR_CONS) FROM SYSIBMADM.SNAPDB`
+	queryIdleConnections      = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'CONNECTED' AND UOW_COMP_STATUS = 'NONE'`
+	queryMaxConnections       = `SELECT MAX(APPLS_CUR_CONS) FROM SYSIBMADM.SNAPDB`
 
-	// Core lock metrics - should be available on most DB2 editions  
-	queryLockWaits           = `SELECT SUM(LOCK_WAITS) FROM SYSIBMADM.SNAPDB`
-	queryLockTimeouts        = `SELECT SUM(LOCK_TIMEOUTS) FROM SYSIBMADM.SNAPDB`  
-	queryDeadlocks           = `SELECT SUM(DEADLOCKS) FROM SYSIBMADM.SNAPDB`
-	queryLockEscalations     = `SELECT SUM(LOCK_ESCALS) FROM SYSIBMADM.SNAPDB`
-	queryActiveLocks         = `SELECT SUM(LOCKS_HELD) FROM SYSIBMADM.SNAPDB`
-	queryLockWaitTime        = `SELECT SUM(LOCK_WAIT_TIME) FROM SYSIBMADM.SNAPDB`
-	queryLockWaitingAgents   = `SELECT SUM(LOCKS_WAITING) FROM SYSIBMADM.SNAPDB`
-	queryLockMemoryPages     = `SELECT SUM(LOCK_LIST_IN_USE) FROM SYSIBMADM.SNAPDB`
+	// Core lock metrics - should be available on most DB2 editions
+	queryLockWaits         = `SELECT SUM(LOCK_WAITS) FROM SYSIBMADM.SNAPDB`
+	queryLockTimeouts      = `SELECT SUM(LOCK_TIMEOUTS) FROM SYSIBMADM.SNAPDB`
+	queryDeadlocks         = `SELECT SUM(DEADLOCKS) FROM SYSIBMADM.SNAPDB`
+	queryLockEscalations   = `SELECT SUM(LOCK_ESCALS) FROM SYSIBMADM.SNAPDB`
+	queryActiveLocks       = `SELECT SUM(LOCKS_HELD) FROM SYSIBMADM.SNAPDB`
+	queryLockWaitTime      = `SELECT SUM(LOCK_WAIT_TIME) FROM SYSIBMADM.SNAPDB`
+	queryLockWaitingAgents = `SELECT SUM(LOCKS_WAITING) FROM SYSIBMADM.SNAPDB`
+	queryLockMemoryPages   = `SELECT SUM(LOCK_LIST_IN_USE) FROM SYSIBMADM.SNAPDB`
 
 	// Sorting metrics
-	queryTotalSorts          = `SELECT SUM(TOTAL_SORTS) FROM SYSIBMADM.SNAPDB`
-	querySortOverflows       = `SELECT SUM(SORT_OVERFLOWS) FROM SYSIBMADM.SNAPDB`
+	queryTotalSorts    = `SELECT SUM(TOTAL_SORTS) FROM SYSIBMADM.SNAPDB`
+	querySortOverflows = `SELECT SUM(SORT_OVERFLOWS) FROM SYSIBMADM.SNAPDB`
 
 	// Row activity metrics
-	queryRowsRead            = `SELECT SUM(ROWS_READ) FROM SYSIBMADM.SNAPDB`
-	queryRowsModified        = `SELECT SUM(ROWS_MODIFIED) FROM SYSIBMADM.SNAPDB`
-	queryRowsReturned        = `SELECT SUM(ROWS_SELECTED) FROM SYSIBMADM.SNAPDB`
+	queryRowsRead     = `SELECT SUM(ROWS_READ) FROM SYSIBMADM.SNAPDB`
+	queryRowsModified = `SELECT SUM(ROWS_MODIFIED) FROM SYSIBMADM.SNAPDB`
+	queryRowsReturned = `SELECT SUM(ROWS_SELECTED) FROM SYSIBMADM.SNAPDB`
 
 	// Log space metrics
-	queryLogUsedSpace        = `SELECT SUM(TOTAL_LOG_USED) FROM SYSIBMADM.LOG_UTILIZATION`
-	queryLogAvailableSpace   = `SELECT SUM(TOTAL_LOG_AVAILABLE) FROM SYSIBMADM.LOG_UTILIZATION`
-	queryLogReads            = `SELECT SUM(LOG_READS) FROM SYSIBMADM.SNAPDB`
-	queryLogWrites           = `SELECT SUM(LOG_WRITES) FROM SYSIBMADM.SNAPDB`
+	queryLogUsedSpace      = `SELECT SUM(TOTAL_LOG_USED) FROM SYSIBMADM.LOG_UTILIZATION`
+	queryLogAvailableSpace = `SELECT SUM(TOTAL_LOG_AVAILABLE) FROM SYSIBMADM.LOG_UTILIZATION`
+	queryLogReads          = `SELECT SUM(LOG_READS) FROM SYSIBMADM.SNAPDB`
+	queryLogWrites         = `SELECT SUM(LOG_WRITES) FROM SYSIBMADM.SNAPDB`
 
 	// Buffer pool aggregate metrics
-	queryBufferpoolLogicalReads  = `SELECT SUM(POOL_DATA_L_READS + POOL_INDEX_L_READS + POOL_XDA_L_READS + POOL_COL_L_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolPhysicalReads = `SELECT SUM(POOL_DATA_P_READS + POOL_INDEX_P_READS + POOL_XDA_P_READS + POOL_COL_P_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolDataLogical   = `SELECT SUM(POOL_DATA_L_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolDataPhysical  = `SELECT SUM(POOL_DATA_P_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolIndexLogical  = `SELECT SUM(POOL_INDEX_L_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolIndexPhysical = `SELECT SUM(POOL_INDEX_P_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolXDALogical    = `SELECT SUM(POOL_XDA_L_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolXDAPhysical   = `SELECT SUM(POOL_XDA_P_READS) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolColumnLogical = `SELECT SUM(POOL_COL_L_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolLogicalReads   = `SELECT SUM(POOL_DATA_L_READS + POOL_INDEX_L_READS + POOL_XDA_L_READS + POOL_COL_L_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolPhysicalReads  = `SELECT SUM(POOL_DATA_P_READS + POOL_INDEX_P_READS + POOL_XDA_P_READS + POOL_COL_P_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolDataLogical    = `SELECT SUM(POOL_DATA_L_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolDataPhysical   = `SELECT SUM(POOL_DATA_P_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolIndexLogical   = `SELECT SUM(POOL_INDEX_L_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolIndexPhysical  = `SELECT SUM(POOL_INDEX_P_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolXDALogical     = `SELECT SUM(POOL_XDA_L_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolXDAPhysical    = `SELECT SUM(POOL_XDA_P_READS) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolColumnLogical  = `SELECT SUM(POOL_COL_L_READS) FROM SYSIBMADM.SNAPBP`
 	queryBufferpoolColumnPhysical = `SELECT SUM(POOL_COL_P_READS) FROM SYSIBMADM.SNAPBP`
 
 	// Hit ratio components for calculation
-	queryBufferpoolDataHits      = `SELECT SUM(POOL_DATA_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolIndexHits     = `SELECT SUM(POOL_INDEX_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolXDAHits       = `SELECT SUM(POOL_XDA_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
-	queryBufferpoolColumnHits    = `SELECT SUM(POOL_COL_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolDataHits   = `SELECT SUM(POOL_DATA_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolIndexHits  = `SELECT SUM(POOL_INDEX_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolXDAHits    = `SELECT SUM(POOL_XDA_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
+	queryBufferpoolColumnHits = `SELECT SUM(POOL_COL_LBP_PAGES_FOUND) FROM SYSIBMADM.SNAPBP`
 
 	// Long running queries
-	queryLongRunningTotal        = `SELECT COUNT(*) FROM SYSIBMADM.LONG_RUNNING_SQL WHERE ELAPSED_TIME_MIN > 0`
-	queryLongRunningWarning      = `SELECT COUNT(*) FROM SYSIBMADM.LONG_RUNNING_SQL WHERE ELAPSED_TIME_MIN >= 5 AND ELAPSED_TIME_MIN < 15`
-	queryLongRunningCritical     = `SELECT COUNT(*) FROM SYSIBMADM.LONG_RUNNING_SQL WHERE ELAPSED_TIME_MIN >= 15`
-	
+	queryLongRunningTotal    = `SELECT COUNT(*) FROM SYSIBMADM.LONG_RUNNING_SQL WHERE ELAPSED_TIME_MIN > 0`
+	queryLongRunningWarning  = `SELECT COUNT(*) FROM SYSIBMADM.LONG_RUNNING_SQL WHERE ELAPSED_TIME_MIN >= 5 AND ELAPSED_TIME_MIN < 15`
+	queryLongRunningCritical = `SELECT COUNT(*) FROM SYSIBMADM.LONG_RUNNING_SQL WHERE ELAPSED_TIME_MIN >= 15`
+
 	// Cloud-specific simplified queries (without problematic columns)
 	queryBufferpoolInstancesCloud = `
 		SELECT 
@@ -356,7 +355,7 @@ const (
 		FROM SYSIBMADM.SNAPBP
 		FETCH FIRST 10 ROWS ONLY
 	`
-	
+
 	queryConnectionInstancesCloud = `
 		SELECT 
 			APPLICATION_ID,
@@ -373,7 +372,7 @@ const (
 		ORDER BY TOTAL_CPU_TIME DESC
 		FETCH FIRST 100 ROWS ONLY
 	`
-	
+
 	queryGlobalConnectionsCloud = `
 		SELECT 
 			COUNT(*) as TOTAL_CONNS,
@@ -383,7 +382,7 @@ const (
 			(SELECT MAX(APPLS_CUR_CONS) FROM SYSIBMADM.SNAPDB) as MAX_CONNS
 		FROM SYSIBMADM.APPLICATIONS
 	`
-	
+
 	queryLockMetricsCloud = `
 		SELECT 
 			LOCK_WAITS,
@@ -401,10 +400,10 @@ const (
 			ROWS_SELECTED as ROWS_RETURNED
 		FROM SYSIBMADM.SNAPDB
 	`
-	
+
 	// Modern MON_GET_* function queries (DB2 9.7+ LUW)
 	// These provide better performance and real-time data compared to SNAP* views
-	
+
 	// Database-level metrics using MON_GET_DATABASE
 	queryMonGetDatabase = `
 		SELECT 
@@ -423,7 +422,7 @@ const (
 			SUM(ROWS_RETURNED) as ROWS_RETURNED
 		FROM TABLE(MON_GET_DATABASE(-2)) AS T
 	`
-	
+
 	// Buffer pool metrics using MON_GET_BUFFERPOOL
 	queryMonGetBufferpool = `
 		SELECT 
@@ -445,7 +444,7 @@ const (
 			POOL_WATERMARK
 		FROM TABLE(MON_GET_BUFFERPOOL('',-2)) AS T
 	`
-	
+
 	// Aggregate buffer pool metrics
 	queryMonGetBufferpoolAggregate = `
 		SELECT 
@@ -463,7 +462,7 @@ const (
 			SUM(POOL_COL_LBP_PAGES_FOUND) as COLUMN_HITS
 		FROM TABLE(MON_GET_BUFFERPOOL('',-2)) AS T
 	`
-	
+
 	// Transaction log metrics using MON_GET_TRANSACTION_LOG
 	queryMonGetTransactionLog = `
 		SELECT 
@@ -479,7 +478,7 @@ const (
 		FROM TABLE(MON_GET_TRANSACTION_LOG(-2)) AS T
 		WHERE MEMBER = 0
 	`
-	
+
 	// Tablespace metrics using MON_GET_TABLESPACE
 	queryMonGetTablespace = `
 		SELECT 
@@ -502,7 +501,7 @@ const (
 		ORDER BY TBSP_USED_SIZE_KB DESC
 		FETCH FIRST %d ROWS ONLY
 	`
-	
+
 	// Connection metrics using MON_GET_CONNECTION
 	queryMonGetConnections = `
 		SELECT 
@@ -512,7 +511,7 @@ const (
 			SUM(CASE WHEN UOW_START_TIME IS NOT NULL THEN 1 ELSE 0 END) as EXECUTING_CONNS
 		FROM TABLE(MON_GET_CONNECTION(NULL,-2)) AS T
 	`
-	
+
 	// Individual connection details
 	queryMonGetConnectionDetails = `
 		SELECT 

@@ -65,14 +65,14 @@ func New() *AS400 {
 			IFSStartPath:       "/",
 		},
 
-		charts:           baseCharts.Copy(),
-		once:             &sync.Once{},
-		mx:               &metricsData{},
-		disks:            make(map[string]*diskMetrics),
-		subsystems:       make(map[string]*subsystemMetrics),
-		jobQueues:        make(map[string]*jobQueueMetrics),
-		messageQueues:    make(map[string]*messageQueueMetrics),
-		disabled:         make(map[string]bool),
+		charts:        baseCharts.Copy(),
+		once:          &sync.Once{},
+		mx:            &metricsData{},
+		disks:         make(map[string]*diskMetrics),
+		subsystems:    make(map[string]*subsystemMetrics),
+		jobQueues:     make(map[string]*jobQueueMetrics),
+		messageQueues: make(map[string]*messageQueueMetrics),
+		disabled:      make(map[string]bool),
 	}
 }
 
@@ -133,11 +133,11 @@ type AS400 struct {
 	model        string
 
 	// Resilience tracking
-	disabled         map[string]bool // Track disabled metrics and features
-	osVersion        string          // IBM i version for compatibility checks
-	versionMajor     int             // Parsed major version (e.g., 7 from "V7R3")
-	versionRelease   int             // Parsed release number (e.g., 3 from "V7R3")
-	versionMod       int             // Parsed modification level (e.g., 5 from "V7R3M5")
+	disabled       map[string]bool // Track disabled metrics and features
+	osVersion      string          // IBM i version for compatibility checks
+	versionMajor   int             // Parsed major version (e.g., 7 from "V7R3")
+	versionRelease int             // Parsed release number (e.g., 3 from "V7R3")
+	versionMod     int             // Parsed modification level (e.g., 5 from "V7R3M5")
 }
 
 func (a *AS400) Configuration() any {
@@ -295,7 +295,6 @@ func cleanName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-
 // Helper functions for resilience
 func (a *AS400) logOnce(key string, format string, args ...interface{}) {
 	if a.disabled[key] {
@@ -314,12 +313,12 @@ func isSQLFeatureError(err error) bool {
 	}
 	errStr := strings.ToUpper(err.Error())
 	// Common IBM i SQL errors for missing objects
-	return strings.Contains(errStr, "SQL0204") ||     // object not found (table, view, function)
-		strings.Contains(errStr, "SQL0206") ||     // column not found
-		strings.Contains(errStr, "SQL0443") ||     // function not found
-		strings.Contains(errStr, "SQL0551") ||     // authorization error (often means object doesn't exist)
-		strings.Contains(errStr, "SQL7024") ||     // index not found
-		strings.Contains(errStr, "SQL0707") ||     // name too long (version compatibility)
+	return strings.Contains(errStr, "SQL0204") || // object not found (table, view, function)
+		strings.Contains(errStr, "SQL0206") || // column not found
+		strings.Contains(errStr, "SQL0443") || // function not found
+		strings.Contains(errStr, "SQL0551") || // authorization error (often means object doesn't exist)
+		strings.Contains(errStr, "SQL7024") || // index not found
+		strings.Contains(errStr, "SQL0707") || // name too long (version compatibility)
 		strings.Contains(errStr, "SQLCODE=-204") || // Alternative format
 		strings.Contains(errStr, "SQLCODE=-206") ||
 		strings.Contains(errStr, "SQLCODE=-443") ||
@@ -379,14 +378,14 @@ func (a *AS400) detectIBMiVersion(ctx context.Context) error {
 	if version != "" && release != "" {
 		a.osVersion = fmt.Sprintf("%s %s", version, release)
 		a.Debugf("detected IBM i version: %s", a.osVersion)
-		
+
 		// Parse version components
 		a.parseIBMiVersion()
 	}
 
 	// Collect system information for labels
 	a.collectSystemInfo(ctx)
-	
+
 	// Add labels to charts after collecting all system info
 	a.addVersionLabelsToCharts()
 
@@ -459,7 +458,7 @@ func (a *AS400) addVersionLabelsToCharts() {
 		{Key: "serial_number", Value: a.serialNumber},
 		{Key: "model", Value: a.model},
 	}
-	
+
 	// Add labels to all existing charts
 	for _, chart := range *a.charts {
 		chart.Labels = append(chart.Labels, versionLabels...)
@@ -471,20 +470,20 @@ func (a *AS400) parseIBMiVersion() {
 	if a.osVersion == "" || a.osVersion == "Unknown" {
 		return
 	}
-	
+
 	// Parse version strings like "V7 R3", "V7R3M0", "7.3", etc.
 	versionStr := strings.ToUpper(strings.ReplaceAll(a.osVersion, " ", ""))
-	
+
 	// Try to parse VxRyMz format
 	if strings.HasPrefix(versionStr, "V") {
 		versionStr = versionStr[1:] // Remove "V" prefix
-		
+
 		// Extract major version (before R)
 		if idx := strings.Index(versionStr, "R"); idx > 0 {
 			if major, err := strconv.Atoi(versionStr[:idx]); err == nil {
 				a.versionMajor = major
 			}
-			
+
 			// Extract release (after R, before M if exists)
 			remainder := versionStr[idx+1:]
 			if mIdx := strings.Index(remainder, "M"); mIdx > 0 {
@@ -519,7 +518,7 @@ func (a *AS400) parseIBMiVersion() {
 			}
 		}
 	}
-	
+
 	a.Debugf("parsed IBM i version: major=%d, release=%d, mod=%d", a.versionMajor, a.versionRelease, a.versionMod)
 }
 
@@ -532,7 +531,7 @@ func (a *AS400) applyVersionBasedFeatureGating() {
 		a.logFeatureAvailability("Unknown IBM i version, assuming all features available")
 		return
 	}
-	
+
 	// IBM i version-based feature availability:
 	// V6R1 (6.1) - Basic SQL support, limited services
 	// V7R1 (7.1) - Enhanced SQL services
@@ -540,25 +539,25 @@ func (a *AS400) applyVersionBasedFeatureGating() {
 	// V7R3 (7.3) - ACTIVE_JOB_INFO, IFS_OBJECT_STATISTICS added
 	// V7R4 (7.4) - Enhanced performance services
 	// V7R5 (7.5) - Latest features
-	
+
 	// Check for V7R3+ features
 	if a.versionMajor < 7 || (a.versionMajor == 7 && a.versionRelease < 3) {
 		a.disableFeatureWithLog("active_job_info", "ACTIVE_JOB_INFO requires IBM i 7.3 or later (detected %d.%d)", a.versionMajor, a.versionRelease)
 		a.disableFeatureWithLog("ifs_object_statistics", "IFS_OBJECT_STATISTICS requires IBM i 7.3 or later")
 	}
-	
+
 	// Check for V7R2+ features
 	if a.versionMajor < 7 || (a.versionMajor == 7 && a.versionRelease < 2) {
 		a.disableFeatureWithLog("message_queue_info", "MESSAGE_QUEUE_INFO requires IBM i 7.2 or later")
 		a.disableFeatureWithLog("job_queue_entries", "JOB_QUEUE_ENTRIES requires IBM i 7.2 or later")
 	}
-	
+
 	// Check for V7R1+ features
 	if a.versionMajor < 7 {
 		a.disableFeatureWithLog("sql_services", "SQL services require IBM i 7.1 or later")
 		a.logFeatureAvailability("Running on IBM i %d.x - many SQL services unavailable", a.versionMajor)
 	}
-	
+
 	// Log what's available based on version
 	if a.versionMajor >= 7 {
 		if a.versionRelease >= 5 {

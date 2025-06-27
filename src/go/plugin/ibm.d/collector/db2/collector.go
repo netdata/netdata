@@ -73,7 +73,7 @@ func New() *DB2 {
 		connections: make(map[string]*connectionMetrics),
 		tables:      make(map[string]*tableMetrics),
 		indexes:     make(map[string]*indexMetrics),
-		
+
 		// Initialize resilience tracking
 		disabledMetrics:  make(map[string]bool),
 		disabledFeatures: make(map[string]bool),
@@ -144,16 +144,16 @@ type DB2 struct {
 	indexSelector      matcher.Matcher
 
 	// DB2 version info
-	version       string
-	edition       string // LUW, z/OS, i, Cloud
-	versionMajor  int    // Parsed major version (e.g., 11 from "11.5.7")
-	versionMinor  int    // Parsed minor version (e.g., 5 from "11.5.7")
-	serverInfo    serverInfo
-	
+	version      string
+	edition      string // LUW, z/OS, i, Cloud
+	versionMajor int    // Parsed major version (e.g., 11 from "11.5.7")
+	versionMinor int    // Parsed minor version (e.g., 5 from "11.5.7")
+	serverInfo   serverInfo
+
 	// Resilience tracking (following AS/400 pattern)
 	disabledMetrics  map[string]bool // Track disabled metrics due to version incompatibility
 	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
-	
+
 	// Modern monitoring support
 	useMonGetFunctions bool // Use MON_GET_* functions instead of SNAP* views when available
 }
@@ -272,7 +272,7 @@ func (d *DB2) verifyConfig() error {
 
 func (d *DB2) initDatabase(ctx context.Context) (*sql.DB, error) {
 	d.Debugf("connecting to DB2 with DSN: %s", safeDSN(d.DSN))
-	
+
 	db, err := sql.Open("go_ibm_db", d.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %v", err)
@@ -317,10 +317,10 @@ func safeDSN(dsn string) string {
 	if dsn == "" {
 		return "<empty>"
 	}
-	
+
 	// Parse DSN and mask sensitive parts
 	masked := dsn
-	
+
 	// Mask password
 	if strings.Contains(masked, "PWD=") {
 		// Find PWD= and mask until next ; or end of string
@@ -336,7 +336,7 @@ func safeDSN(dsn string) string {
 			}
 		}
 	}
-	
+
 	// Mask password in lowercase
 	if strings.Contains(masked, "pwd=") {
 		start := strings.Index(masked, "pwd=")
@@ -349,7 +349,7 @@ func safeDSN(dsn string) string {
 			}
 		}
 	}
-	
+
 	// Mask AUTHENTICATION fields if present
 	if strings.Contains(masked, "AUTHENTICATION=") {
 		start := strings.Index(masked, "AUTHENTICATION=")
@@ -362,7 +362,7 @@ func safeDSN(dsn string) string {
 			}
 		}
 	}
-	
+
 	return masked
 }
 
@@ -388,11 +388,11 @@ func isSQLFeatureError(err error) bool {
 	}
 	errStr := strings.ToUpper(err.Error())
 	// Common DB2 error codes for missing objects
-	return strings.Contains(errStr, "SQL0204N") ||  // object not found (table, view, function)
-		strings.Contains(errStr, "SQL0206N") ||     // column not found  
-		strings.Contains(errStr, "SQL0443N") ||     // function not found
-		strings.Contains(errStr, "SQL0551N") ||     // authorization error (often means table doesn't exist)
-		strings.Contains(errStr, "SQL0707N") ||     // name too long (version compatibility)
+	return strings.Contains(errStr, "SQL0204N") || // object not found (table, view, function)
+		strings.Contains(errStr, "SQL0206N") || // column not found
+		strings.Contains(errStr, "SQL0443N") || // function not found
+		strings.Contains(errStr, "SQL0551N") || // authorization error (often means table doesn't exist)
+		strings.Contains(errStr, "SQL0707N") || // name too long (version compatibility)
 		strings.Contains(errStr, "SQLCODE=-204") || // Alternative format
 		strings.Contains(errStr, "SQLCODE=-206") ||
 		strings.Contains(errStr, "SQLCODE=-443") ||
@@ -434,7 +434,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 		d.version = value
 		d.Debugf("detected DB2 LUW edition, version: %s", value)
 	})
-	
+
 	if err == nil && d.edition != "" {
 		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
@@ -447,7 +447,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 		d.version = "DB2 for i"
 		d.Debugf("detected DB2 for i (AS/400) edition")
 	})
-	
+
 	if err == nil && d.edition != "" {
 		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
@@ -460,7 +460,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 		d.version = value
 		d.Debugf("detected DB2 for z/OS edition")
 	})
-	
+
 	if err == nil && d.edition != "" {
 		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
@@ -476,13 +476,13 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 		}
 		d.Debugf("detected Db2 on Cloud edition via BLUADMIN schema")
 	})
-	
+
 	if err == nil && d.edition != "" {
 		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
 		return nil
 	}
-	
+
 	// Try alternative Cloud detection
 	err = d.collectSingleMetric(ctx, "version_detection_cloud_alt", queryDetectVersionCloudAlt, func(value string) {
 		if value == "Db2 on Cloud" {
@@ -494,7 +494,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 			d.Debugf("detected Db2 on Cloud edition via PROD_RELEASE")
 		}
 	})
-	
+
 	if err == nil && d.edition != "" {
 		d.applyVersionBasedFeatureGating()
 		d.addVersionLabelsToCharts()
@@ -507,7 +507,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	d.Warningf("could not detect DB2 edition, defaulting to LUW")
 	d.applyVersionBasedFeatureGating()
 	d.addVersionLabelsToCharts()
-	
+
 	return nil
 }
 
@@ -516,10 +516,10 @@ func (d *DB2) parseDB2Version() {
 	if d.version == "" || d.version == "Unknown" {
 		return
 	}
-	
+
 	// Parse version strings like "DB2 v11.5.7.0", "11.5", "V11R5M0", etc.
 	versionStr := d.version
-	
+
 	// Handle different version formats
 	if strings.Contains(versionStr, "v") {
 		// Format: "DB2 v11.5.7.0"
@@ -533,7 +533,7 @@ func (d *DB2) parseDB2Version() {
 		versionStr = strings.Replace(versionStr, "R", ".", 1)
 		versionStr = strings.Replace(versionStr, "M", ".", 1)
 	}
-	
+
 	// Split on dots and parse major.minor
 	parts := strings.Split(versionStr, ".")
 	if len(parts) >= 2 {
@@ -549,24 +549,24 @@ func (d *DB2) parseDB2Version() {
 			d.versionMajor = major
 		}
 	}
-	
+
 	d.Debugf("parsed DB2 version: major=%d, minor=%d", d.versionMajor, d.versionMinor)
 }
 
 // applyVersionBasedFeatureGating proactively disables features based on DB2 edition and version
 func (d *DB2) applyVersionBasedFeatureGating() {
 	d.parseDB2Version()
-	
+
 	// Edition-based feature gating
 	switch d.edition {
 	case "i": // DB2 for i (AS/400)
 		d.disableFeatureWithLog("sysibmadm_views", "SYSIBMADM views not available on DB2 for i (AS/400)")
 		d.disableFeatureWithLog("advanced_monitoring", "Advanced monitoring views not available on DB2 for i")
-		
+
 	case "z/OS": // DB2 for z/OS
 		d.disableFeatureWithLog("bufferpool_detailed_metrics", "Detailed buffer pool metrics limited on DB2 for z/OS")
 		d.logFeatureAvailability("z/OS specific features enabled for DB2 for z/OS")
-		
+
 	case "Cloud": // Db2 on Cloud
 		// Db2 on Cloud has a restricted schema compared to standard DB2 LUW
 		d.disableFeatureWithLog("column_organized_metrics", "Column-organized table metrics (POOL_COL_*) not available on Db2 on Cloud")
@@ -580,14 +580,14 @@ func (d *DB2) applyVersionBasedFeatureGating() {
 		d.disableFeatureWithLog("bufferpool_instances", "Per-bufferpool instance metrics limited on Db2 on Cloud")
 		d.disableFeatureWithLog("connection_instances", "Per-connection instance metrics limited on Db2 on Cloud")
 		d.logFeatureAvailability("Cloud-specific monitoring enabled for Db2 on Cloud - using simplified metrics")
-		
+
 	case "LUW": // DB2 LUW (most feature-complete)
 		d.logFeatureAvailability("Full feature set available for DB2 LUW")
-		
+
 	default:
 		d.Warningf("Unknown DB2 edition '%s', assuming LUW feature set", d.edition)
 	}
-	
+
 	// Version-based feature gating (primarily for LUW)
 	if d.edition == "LUW" && d.versionMajor > 0 {
 		if d.versionMajor < 9 || (d.versionMajor == 9 && d.versionMinor < 7) {
@@ -595,15 +595,15 @@ func (d *DB2) applyVersionBasedFeatureGating() {
 			d.disableFeatureWithLog("sysibmadm_views", "SYSIBMADM views require DB2 9.7 or later (detected %d.%d)", d.versionMajor, d.versionMinor)
 			d.disableFeatureWithLog("advanced_monitoring", "Advanced monitoring requires DB2 9.7 or later")
 		}
-		
+
 		if d.versionMajor < 10 {
 			d.disableFeatureWithLog("extended_monitoring", "Extended monitoring features require DB2 10.0 or later")
 		}
-		
+
 		if d.versionMajor < 11 {
 			d.disableFeatureWithLog("columnstore_metrics", "Column store metrics require DB2 11.0 or later")
 		}
-		
+
 		// Log enabled features for newer versions
 		if d.versionMajor >= 11 {
 			d.logFeatureAvailability("Full DB2 11+ feature set enabled including column store metrics")
@@ -632,7 +632,7 @@ func (d *DB2) addVersionLabelsToCharts() {
 		{Key: "db2_edition", Value: d.edition},
 		{Key: "db2_version", Value: d.version},
 	}
-	
+
 	// Add labels to all existing charts
 	for _, chart := range *d.charts {
 		chart.Labels = append(chart.Labels, versionLabels...)
@@ -643,14 +643,14 @@ func (d *DB2) addVersionLabelsToCharts() {
 func (d *DB2) detectMonGetSupport(ctx context.Context) {
 	// MON_GET_* functions are available in DB2 9.7+ for LUW
 	// They're not available on DB2 for i (AS/400) or older versions
-	
+
 	// First check if we should even try (edition and version check)
 	if d.edition == "i" {
 		d.Infof("MON_GET_* functions not available on DB2 for i, using SNAP* views")
 		d.useMonGetFunctions = false
 		return
 	}
-	
+
 	if d.edition == "LUW" && d.versionMajor > 0 {
 		if d.versionMajor < 9 || (d.versionMajor == 9 && d.versionMinor < 7) {
 			d.Infof("MON_GET_* functions require DB2 9.7+, using SNAP* views for version %d.%d", d.versionMajor, d.versionMinor)
@@ -658,14 +658,14 @@ func (d *DB2) detectMonGetSupport(ctx context.Context) {
 			return
 		}
 	}
-	
+
 	// Try a simple MON_GET_DATABASE query to verify it works
 	testQuery := `SELECT COUNT(*) FROM TABLE(MON_GET_DATABASE(-1)) AS T`
 	var count int
-	
+
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-	
+
 	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&count)
 	if err != nil {
 		if isSQLFeatureError(err) {
@@ -677,7 +677,7 @@ func (d *DB2) detectMonGetSupport(ctx context.Context) {
 		}
 		return
 	}
-	
+
 	// MON_GET functions are available and working
 	d.useMonGetFunctions = true
 	d.Infof("MON_GET_* functions detected and available - using modern monitoring approach for better performance")

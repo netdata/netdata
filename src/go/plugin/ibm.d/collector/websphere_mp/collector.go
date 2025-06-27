@@ -49,10 +49,10 @@ func New() *WebSphereMicroProfile {
 			MetricsEndpoint: "/metrics",
 
 			// Collection flags
-			CollectJVMMetrics:     true,
-			CollectRESTMetrics:    true,
-			CollectMPMetrics:      true,
-			CollectCustomMetrics:  false,
+			CollectJVMMetrics:    true,
+			CollectRESTMetrics:   true,
+			CollectMPMetrics:     true,
+			CollectCustomMetrics: false,
 
 			// Cardinality limits
 			MaxRESTEndpoints: 50,
@@ -218,11 +218,11 @@ func cleanName(name string) string {
 	// Replace non-alphanumeric characters with underscores
 	reg := regexp.MustCompile(`[^a-zA-Z0-9_]`)
 	cleaned := reg.ReplaceAllString(name, "_")
-	
+
 	// Remove multiple consecutive underscores
 	reg2 := regexp.MustCompile(`_+`)
 	cleaned = reg2.ReplaceAllString(cleaned, "_")
-	
+
 	// Trim leading/trailing underscores
 	return strings.Trim(cleaned, "_")
 }

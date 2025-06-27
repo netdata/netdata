@@ -18,7 +18,7 @@ func (w *WebSphereJMX) collect(ctx context.Context) (map[string]int64, error) {
 	if w.charts == nil {
 		w.initCharts()
 	}
-	
+
 	// Reset seen maps for dynamic instance management
 	for k := range w.seenApps {
 		delete(w.seenApps, k)
@@ -32,58 +32,58 @@ func (w *WebSphereJMX) collect(ctx context.Context) (map[string]int64, error) {
 	for k := range w.seenJMS {
 		delete(w.seenJMS, k)
 	}
-	
+
 	mx := make(map[string]int64)
-	
+
 	// Collect different metric types based on configuration
 	collectCtx, cancel := context.WithTimeout(ctx, time.Duration(w.JMXTimeout))
 	defer cancel()
-	
+
 	// Always collect JVM metrics
 	if w.CollectJVMMetrics {
 		if err := w.collectJVMMetrics(collectCtx, mx); err != nil {
 			w.Warningf("failed to collect JVM metrics: %v", err)
 		}
 	}
-	
+
 	// Collect thread pool metrics
 	if w.CollectThreadPoolMetrics {
 		if err := w.collectThreadPoolMetrics(collectCtx, mx); err != nil {
 			w.Warningf("failed to collect thread pool metrics: %v", err)
 		}
 	}
-	
+
 	// Collect JDBC metrics
 	if w.CollectJDBCMetrics {
 		if err := w.collectJDBCMetrics(collectCtx, mx); err != nil {
 			w.Warningf("failed to collect JDBC metrics: %v", err)
 		}
 	}
-	
+
 	// Collect JMS metrics
 	if w.CollectJMSMetrics {
 		if err := w.collectJMSMetrics(collectCtx, mx); err != nil {
 			w.Warningf("failed to collect JMS metrics: %v", err)
 		}
 	}
-	
+
 	// Collect application metrics
 	if w.CollectWebAppMetrics {
 		if err := w.collectApplicationMetrics(collectCtx, mx); err != nil {
 			w.Warningf("failed to collect application metrics: %v", err)
 		}
 	}
-	
+
 	// Collect cluster metrics (only on deployment managers)
 	if w.CollectClusterMetrics && w.ServerType == "dmgr" {
 		if err := w.collectClusterMetrics(collectCtx, mx); err != nil {
 			w.Warningf("failed to collect cluster metrics: %v", err)
 		}
 	}
-	
+
 	// Update lifecycle for dynamic instances
 	w.updateInstanceLifecycle()
-	
+
 	return mx, nil
 }
 
@@ -95,36 +95,36 @@ func (w *WebSphereJMX) collectJVMMetrics(ctx context.Context, mx map[string]int6
 	if err != nil {
 		return err
 	}
-	
+
 	if resp.Status != "OK" {
 		return fmt.Errorf("JVM metrics collection failed: %s", resp.Message)
 	}
-	
+
 	data := resp.Data
-	
+
 	// Heap memory metrics
 	if heap, ok := data["heap"].(map[string]interface{}); ok {
 		mx["jvm_heap_used"] = int64(getFloat(heap, "used"))
 		mx["jvm_heap_committed"] = int64(getFloat(heap, "committed"))
 		mx["jvm_heap_max"] = int64(getFloat(heap, "max"))
-		
+
 		if max := mx["jvm_heap_max"]; max > 0 {
 			mx["jvm_heap_usage_percent"] = (mx["jvm_heap_used"] * 100 * precision) / max
 		}
 	}
-	
+
 	// Non-heap memory
 	if nonheap, ok := data["nonheap"].(map[string]interface{}); ok {
 		mx["jvm_nonheap_used"] = int64(getFloat(nonheap, "used"))
 		mx["jvm_nonheap_committed"] = int64(getFloat(nonheap, "committed"))
 	}
-	
+
 	// GC metrics
 	if gc, ok := data["gc"].(map[string]interface{}); ok {
 		mx["jvm_gc_count"] = int64(getFloat(gc, "count"))
 		mx["jvm_gc_time"] = int64(getFloat(gc, "time"))
 	}
-	
+
 	// Thread metrics
 	if threads, ok := data["threads"].(map[string]interface{}); ok {
 		mx["jvm_thread_count"] = int64(getFloat(threads, "count"))
@@ -132,13 +132,13 @@ func (w *WebSphereJMX) collectJVMMetrics(ctx context.Context, mx map[string]int6
 		mx["jvm_thread_peak"] = int64(getFloat(threads, "peak"))
 		mx["jvm_thread_started"] = int64(getFloat(threads, "totalStarted"))
 	}
-	
+
 	// Class loading
 	if classes, ok := data["classes"].(map[string]interface{}); ok {
 		mx["jvm_classes_loaded"] = int64(getFloat(classes, "loaded"))
 		mx["jvm_classes_unloaded"] = int64(getFloat(classes, "unloaded"))
 	}
-	
+
 	return nil
 }
 
@@ -151,42 +151,42 @@ func (w *WebSphereJMX) collectThreadPoolMetrics(ctx context.Context, mx map[stri
 	if err != nil {
 		return err
 	}
-	
+
 	if resp.Status != "OK" {
 		return fmt.Errorf("thread pool metrics collection failed: %s", resp.Message)
 	}
-	
+
 	pools, ok := resp.Data["threadPools"].([]interface{})
 	if !ok {
 		return nil
 	}
-	
+
 	collected := 0
 	for _, poolData := range pools {
 		pool, ok := poolData.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		name, ok := pool["name"].(string)
 		if !ok || name == "" {
 			continue
 		}
-		
+
 		// Apply selector if configured
 		if w.poolSelector != nil && !w.poolSelector.MatchString(name) {
 			continue
 		}
-		
+
 		// Check cardinality limit
 		if w.MaxThreadPools > 0 && collected >= w.MaxThreadPools {
 			w.Debugf("reached max thread pools limit (%d)", w.MaxThreadPools)
 			break
 		}
-		
+
 		// Mark as seen
 		w.seenPools[name] = true
-		
+
 		// Create charts if new pool
 		if !w.collectedPools[name] {
 			w.collectedPools[name] = true
@@ -194,16 +194,16 @@ func (w *WebSphereJMX) collectThreadPoolMetrics(ctx context.Context, mx map[stri
 				w.Warning(err)
 			}
 		}
-		
+
 		// Collect metrics
 		poolID := cleanName(name)
 		mx[fmt.Sprintf("threadpool_%s_size", poolID)] = int64(getFloat(pool, "poolSize"))
 		mx[fmt.Sprintf("threadpool_%s_active", poolID)] = int64(getFloat(pool, "activeCount"))
 		mx[fmt.Sprintf("threadpool_%s_max", poolID)] = int64(getFloat(pool, "maximumPoolSize"))
-		
+
 		collected++
 	}
-	
+
 	return nil
 }
 
@@ -216,42 +216,42 @@ func (w *WebSphereJMX) collectJDBCMetrics(ctx context.Context, mx map[string]int
 	if err != nil {
 		return err
 	}
-	
+
 	if resp.Status != "OK" {
 		return fmt.Errorf("JDBC metrics collection failed: %s", resp.Message)
 	}
-	
+
 	pools, ok := resp.Data["jdbcPools"].([]interface{})
 	if !ok {
 		return nil
 	}
-	
+
 	collected := 0
 	for _, poolData := range pools {
 		pool, ok := poolData.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		name, ok := pool["name"].(string)
 		if !ok || name == "" {
 			continue
 		}
-		
+
 		// Apply selector if configured
 		if w.poolSelector != nil && !w.poolSelector.MatchString(name) {
 			continue
 		}
-		
+
 		// Check cardinality limit
 		if w.MaxJDBCPools > 0 && collected >= w.MaxJDBCPools {
 			w.Debugf("reached max JDBC pools limit (%d)", w.MaxJDBCPools)
 			break
 		}
-		
+
 		// Mark as seen
 		w.seenJDBCPools[name] = true
-		
+
 		// Create charts if new pool
 		if !w.collectedJDBCPools[name] {
 			w.collectedJDBCPools[name] = true
@@ -259,7 +259,7 @@ func (w *WebSphereJMX) collectJDBCMetrics(ctx context.Context, mx map[string]int
 				w.Warning(err)
 			}
 		}
-		
+
 		// Collect metrics
 		poolID := cleanName(name)
 		mx[fmt.Sprintf("jdbc_%s_size", poolID)] = int64(getFloat(pool, "poolSize"))
@@ -269,10 +269,10 @@ func (w *WebSphereJMX) collectJDBCMetrics(ctx context.Context, mx map[string]int
 		mx[fmt.Sprintf("jdbc_%s_use_time", poolID)] = int64(getFloat(pool, "avgInUseTime") * precision)
 		mx[fmt.Sprintf("jdbc_%s_total_created", poolID)] = int64(getFloat(pool, "numConnectionsCreated"))
 		mx[fmt.Sprintf("jdbc_%s_total_destroyed", poolID)] = int64(getFloat(pool, "numConnectionsDestroyed"))
-		
+
 		collected++
 	}
-	
+
 	return nil
 }
 
@@ -285,42 +285,42 @@ func (w *WebSphereJMX) collectJMSMetrics(ctx context.Context, mx map[string]int6
 	if err != nil {
 		return err
 	}
-	
+
 	if resp.Status != "OK" {
 		return fmt.Errorf("JMS metrics collection failed: %s", resp.Message)
 	}
-	
+
 	destinations, ok := resp.Data["jmsDestinations"].([]interface{})
 	if !ok {
 		return nil
 	}
-	
+
 	collected := 0
 	for _, destData := range destinations {
 		dest, ok := destData.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		name, ok := dest["name"].(string)
 		if !ok || name == "" {
 			continue
 		}
-		
+
 		// Apply selector if configured
 		if w.jmsSelector != nil && !w.jmsSelector.MatchString(name) {
 			continue
 		}
-		
+
 		// Check cardinality limit
 		if w.MaxJMSDestinations > 0 && collected >= w.MaxJMSDestinations {
 			w.Debugf("reached max JMS destinations limit (%d)", w.MaxJMSDestinations)
 			break
 		}
-		
+
 		// Mark as seen
 		w.seenJMS[name] = true
-		
+
 		// Create charts if new destination
 		if !w.collectedJMS[name] {
 			w.collectedJMS[name] = true
@@ -332,17 +332,17 @@ func (w *WebSphereJMX) collectJMSMetrics(ctx context.Context, mx map[string]int6
 				w.Warning(err)
 			}
 		}
-		
+
 		// Collect metrics
 		destID := cleanName(name)
 		mx[fmt.Sprintf("jms_%s_messages_current", destID)] = int64(getFloat(dest, "messagesCurrentCount"))
 		mx[fmt.Sprintf("jms_%s_messages_pending", destID)] = int64(getFloat(dest, "messagesPendingCount"))
 		mx[fmt.Sprintf("jms_%s_messages_total", destID)] = int64(getFloat(dest, "messagesAddedCount"))
 		mx[fmt.Sprintf("jms_%s_consumers", destID)] = int64(getFloat(dest, "consumerCount"))
-		
+
 		collected++
 	}
-	
+
 	return nil
 }
 
@@ -359,42 +359,42 @@ func (w *WebSphereJMX) collectApplicationMetrics(ctx context.Context, mx map[str
 	if err != nil {
 		return err
 	}
-	
+
 	if resp.Status != "OK" {
 		return fmt.Errorf("application metrics collection failed: %s", resp.Message)
 	}
-	
+
 	apps, ok := resp.Data["applications"].([]interface{})
 	if !ok {
 		return nil
 	}
-	
+
 	collected := 0
 	for _, appData := range apps {
 		app, ok := appData.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		name, ok := app["name"].(string)
 		if !ok || name == "" {
 			continue
 		}
-		
+
 		// Apply selector if configured
 		if w.appSelector != nil && !w.appSelector.MatchString(name) {
 			continue
 		}
-		
+
 		// Check cardinality limit
 		if w.MaxApplications > 0 && collected >= w.MaxApplications {
 			w.Debugf("reached max applications limit (%d)", w.MaxApplications)
 			break
 		}
-		
+
 		// Mark as seen
 		w.seenApps[name] = true
-		
+
 		// Create charts if new app
 		if !w.collectedApps[name] {
 			w.collectedApps[name] = true
@@ -402,21 +402,21 @@ func (w *WebSphereJMX) collectApplicationMetrics(ctx context.Context, mx map[str
 				w.Warning(err)
 			}
 		}
-		
+
 		// Collect metrics
 		appID := cleanName(name)
 		mx[fmt.Sprintf("app_%s_requests", appID)] = int64(getFloat(app, "requestCount"))
 		mx[fmt.Sprintf("app_%s_errors", appID)] = int64(getFloat(app, "errorCount"))
 		mx[fmt.Sprintf("app_%s_response_time", appID)] = int64(getFloat(app, "avgResponseTime") * precision)
 		mx[fmt.Sprintf("app_%s_max_response_time", appID)] = int64(getFloat(app, "maxResponseTime") * precision)
-		
+
 		// Session metrics
 		if w.CollectSessionMetrics {
 			mx[fmt.Sprintf("app_%s_sessions_active", appID)] = int64(getFloat(app, "activeSessions"))
 			mx[fmt.Sprintf("app_%s_sessions_live", appID)] = int64(getFloat(app, "liveSessions"))
 			mx[fmt.Sprintf("app_%s_sessions_invalidated", appID)] = int64(getFloat(app, "invalidatedSessions"))
 		}
-		
+
 		// Transaction metrics
 		if w.CollectTransactionMetrics {
 			mx[fmt.Sprintf("app_%s_transactions_active", appID)] = int64(getFloat(app, "activeTransactions"))
@@ -424,10 +424,10 @@ func (w *WebSphereJMX) collectApplicationMetrics(ctx context.Context, mx map[str
 			mx[fmt.Sprintf("app_%s_transactions_rolledback", appID)] = int64(getFloat(app, "rolledbackTransactions"))
 			mx[fmt.Sprintf("app_%s_transactions_timeout", appID)] = int64(getFloat(app, "timedoutTransactions"))
 		}
-		
+
 		collected++
 	}
-	
+
 	return nil
 }
 
@@ -439,7 +439,7 @@ func (w *WebSphereJMX) updateInstanceLifecycle() {
 			w.removeApplicationCharts(app)
 		}
 	}
-	
+
 	// Remove thread pools that are no longer present
 	for pool := range w.collectedPools {
 		if !w.seenPools[pool] {
@@ -447,7 +447,7 @@ func (w *WebSphereJMX) updateInstanceLifecycle() {
 			w.removeThreadPoolCharts(pool)
 		}
 	}
-	
+
 	// Remove JDBC pools that are no longer present
 	for pool := range w.collectedJDBCPools {
 		if !w.seenJDBCPools[pool] {
@@ -455,7 +455,7 @@ func (w *WebSphereJMX) updateInstanceLifecycle() {
 			w.removeJDBCPoolCharts(pool)
 		}
 	}
-	
+
 	// Remove JMS destinations that are no longer present
 	for dest := range w.collectedJMS {
 		if !w.seenJMS[dest] {
@@ -518,11 +518,11 @@ func (w *WebSphereJMX) collectClusterMetrics(ctx context.Context, mx map[string]
 	if err != nil {
 		return err
 	}
-	
+
 	if resp.Status != "OK" {
 		return fmt.Errorf("cluster metrics collection failed: %s", resp.Message)
 	}
-	
+
 	// Access cluster data from resp.Data
 	if clusterData, ok := resp.Data["cluster"].(map[string]interface{}); ok {
 		// Cluster state: 0=stopped, 1=partial, 2=running
@@ -538,13 +538,13 @@ func (w *WebSphereJMX) collectClusterMetrics(ctx context.Context, mx map[string]
 				mx["cluster_state"] = -1
 			}
 		}
-		
+
 		mx["cluster_target_members"] = int64(getFloat(clusterData, "targetMemberCount"))
 		mx["cluster_running_members"] = int64(getFloat(clusterData, "runningMemberCount"))
 		mx["cluster_wlm_enabled"] = boolToInt(clusterData["wlmEnabled"])
 		mx["cluster_session_affinity"] = boolToInt(clusterData["sessionAffinity"])
 	}
-	
+
 	// HAManager metrics
 	haResp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
 		Command: "SCRAPE",
@@ -557,7 +557,7 @@ func (w *WebSphereJMX) collectClusterMetrics(ctx context.Context, mx map[string]
 			mx["ha_bulletins_sent"] = int64(getFloat(haData, "bulletinsSent"))
 		}
 	}
-	
+
 	// Dynamic cluster metrics
 	dynResp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
 		Command: "SCRAPE",
@@ -570,7 +570,7 @@ func (w *WebSphereJMX) collectClusterMetrics(ctx context.Context, mx map[string]
 			mx["dynamic_cluster_target_instances"] = int64(getFloat(dynData, "targetInstances"))
 		}
 	}
-	
+
 	// Replication domain metrics
 	replResp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
 		Command: "SCRAPE",
@@ -584,7 +584,7 @@ func (w *WebSphereJMX) collectClusterMetrics(ctx context.Context, mx map[string]
 			mx["replication_async_queue_depth"] = int64(getFloat(replData, "asyncQueueDepth"))
 		}
 	}
-	
+
 	return nil
 }
 
