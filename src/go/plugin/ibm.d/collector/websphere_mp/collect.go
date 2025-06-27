@@ -97,6 +97,15 @@ func (w *WebSphereMicroProfile) collectMicroProfileMetrics(ctx context.Context) 
 		w.Debugf("detected WebSphere Liberty with MicroProfile Metrics")
 	}
 
+	// Debug: log first few metrics to see what we're getting
+	count := 0
+	for name, value := range metrics {
+		if count < 10 {
+			w.Debugf("metric: %s = %f", name, value)
+			count++
+		}
+	}
+
 	return metrics, nil
 }
 
