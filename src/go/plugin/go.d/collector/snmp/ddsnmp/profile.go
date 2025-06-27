@@ -29,6 +29,7 @@ func FindProfiles(sysObjId string) []*Profile {
 			}
 			if m.MatchString(sysObjId) {
 				profiles = append(profiles, prof.clone())
+				break
 			}
 		}
 	}
