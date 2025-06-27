@@ -36,9 +36,9 @@ modules:
           - **DB2 for z/OS**: Limited buffer pool detailed metrics
           - **DB2 for i (AS/400)**: Basic monitoring without SYSIBMADM views
           - **Db2 on Cloud**: Simplified metrics due to restricted schema (no POOL_COL_*, *_LBP_PAGES_FOUND, APPLICATION_NAME, UOW_COMP_STATUS, ROWS_MODIFIED, PAGESIZE, FREE_PAGES, TOTAL_LOG_USED/AVAILABLE)
-          
+
           The collector automatically detects your DB2 edition and version, then enables only compatible features. Core metrics work on all versions, while advanced features require specific DB2 releases. Version information is added as labels to all charts for filtering and grouping capabilities.
-          
+
           System-wide metrics include:
           - Database connections (total, active, executing, idle)
           - Locking activity (waits, timeouts, deadlocks, escalations)
@@ -57,7 +57,7 @@ modules:
         method_description: |
           The collector uses IBM DB2 driver to connect to the database and queries system catalog tables
           in SYSIBMADM schema to gather performance metrics.
-          
+
           The collector is designed for maximum resilience across different DB2 editions and versions:
           - Automatically detects DB2 edition (LUW, z/OS, i, Cloud) and version
           - Proactively disables features based on detected edition/version before attempting queries
