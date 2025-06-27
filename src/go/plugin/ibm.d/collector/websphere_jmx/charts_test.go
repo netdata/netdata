@@ -15,10 +15,10 @@ import (
 func TestInitCharts(t *testing.T) {
 	ws := &WebSphereJMX{}
 	ws.initCharts()
-	
+
 	assert.NotNil(t, ws.charts)
 	assert.Greater(t, len(*ws.charts), 0)
-	
+
 	// Check that base charts are present
 	foundHeap := false
 	foundGC := false
@@ -37,10 +37,10 @@ func TestInitCharts(t *testing.T) {
 func TestNewThreadPoolCharts(t *testing.T) {
 	poolName := "Default ThreadPool"
 	charts := newThreadPoolCharts(poolName)
-	
+
 	assert.NotNil(t, charts)
 	assert.Greater(t, len(*charts), 0)
-	
+
 	// Check chart properties
 	for _, chart := range *charts {
 		assert.Contains(t, chart.ID, "threadpool_default_threadpool_")
@@ -53,10 +53,10 @@ func TestNewThreadPoolCharts(t *testing.T) {
 func TestNewJDBCPoolCharts(t *testing.T) {
 	poolName := "jdbc/OracleDS"
 	charts := newJDBCPoolCharts(poolName)
-	
+
 	assert.NotNil(t, charts)
 	assert.Greater(t, len(*charts), 0)
-	
+
 	// Check chart properties
 	for _, chart := range *charts {
 		assert.Contains(t, chart.ID, "jdbc_jdbc_oracleds_")
@@ -70,15 +70,15 @@ func TestNewJMSDestinationCharts(t *testing.T) {
 	destName := "Queue.Orders"
 	destType := "queue"
 	charts := newJMSDestinationCharts(destName, destType)
-	
+
 	assert.NotNil(t, charts)
 	assert.Greater(t, len(*charts), 0)
-	
+
 	// Check chart properties
 	for _, chart := range *charts {
 		assert.Contains(t, chart.ID, "jms_queue_orders_")
 		assert.Equal(t, 2, len(chart.Labels))
-		
+
 		// Check labels
 		labelMap := make(map[string]string)
 		for _, label := range chart.Labels {
@@ -91,7 +91,7 @@ func TestNewJMSDestinationCharts(t *testing.T) {
 
 func TestNewApplicationCharts(t *testing.T) {
 	appName := "MyWebApp"
-	
+
 	tests := map[string]struct {
 		includeSessions     bool
 		includeTransactions bool
@@ -118,14 +118,14 @@ func TestNewApplicationCharts(t *testing.T) {
 			expectedChartCount:  7, // all charts
 		},
 	}
-	
+
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			charts := newApplicationCharts(appName, test.includeSessions, test.includeTransactions)
-			
+
 			assert.NotNil(t, charts)
 			assert.Equal(t, test.expectedChartCount, len(*charts))
-			
+
 			// Check that all charts have proper labels
 			for _, chart := range *charts {
 				assert.Contains(t, chart.ID, "app_mywebapp_")
@@ -140,7 +140,7 @@ func TestNewApplicationCharts(t *testing.T) {
 func TestChartPriorities(t *testing.T) {
 	ws := &WebSphereJMX{}
 	ws.initCharts()
-	
+
 	// Verify that charts have different priorities
 	priorities := make(map[int]bool)
 	for _, chart := range *ws.charts {
@@ -154,7 +154,7 @@ func TestChartPriorities(t *testing.T) {
 func TestChartDimensions(t *testing.T) {
 	// Test that dimension IDs match what collect.go expects
 	charts := baseCharts.Copy()
-	
+
 	// Find JVM heap chart
 	var heapChart *module.Chart
 	for _, chart := range *charts {
@@ -163,16 +163,16 @@ func TestChartDimensions(t *testing.T) {
 			break
 		}
 	}
-	
+
 	assert.NotNil(t, heapChart)
 	assert.Equal(t, 3, len(heapChart.Dims))
-	
+
 	// Check dimension IDs
 	dimIDs := make(map[string]bool)
 	for _, dim := range heapChart.Dims {
 		dimIDs[dim.ID] = true
 	}
-	
+
 	assert.True(t, dimIDs["jvm_heap_used"])
 	assert.True(t, dimIDs["jvm_heap_committed"])
 	assert.True(t, dimIDs["jvm_heap_max"])
