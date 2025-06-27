@@ -228,6 +228,13 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName string, value int64) {
 	// Map Liberty MicroProfile metrics to base chart dimensions
 	switch metricName {
+	// Actual Liberty metric names
+	case "jvm_uptime_seconds":
+		mx["jvm_uptime_seconds"] = value
+		return
+	case "classloader_loadedClasses_total":
+		mx["jvm_classes_loaded"] = value
+		return
 	case "memory_usedHeap_bytes":
 		mx["jvm_memory_heap_used"] = value
 		// Calculate free memory if we have committed memory
