@@ -29,12 +29,12 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors IBM WebSphere Liberty servers with MicroProfile Metrics enabled.
-          It collects comprehensive metrics including JVM performance, REST endpoint statistics,
-          MicroProfile health and configuration metrics, and custom application-defined metrics.
+          It collects comprehensive metrics including JVM performance, CPU usage, thread pool status,
+          servlet performance, and session management.
         method_description: |
           The collector uses MicroProfile Metrics API to gather metrics in Prometheus format
           from the `/metrics` endpoint. This provides detailed performance data including
-          JVM statistics, REST endpoint timing and throughput, and application-specific metrics.
+          JVM statistics, CPU utilization, thread pool usage, and servlet/session metrics.
       supported_platforms:
         include: []
         exclude: []
@@ -47,14 +47,12 @@ modules:
             The collector does not auto-detect WebSphere Liberty instances. Manual configuration is required.
         limits:
           description: |
-            The collector limits the number of monitored dynamic instances to prevent high cardinality:
-            - REST endpoints: 50 (configurable)
-            - Custom metrics: 100 (configurable)
+            The collector provides comprehensive monitoring of JVM and application server metrics
+            with minimal performance impact.
         performance_impact:
           description: |
             The collector makes HTTP requests to the MicroProfile Metrics endpoint. Impact depends on
-            the number of monitored metrics and collection frequency. REST and custom metrics
-            create dynamic charts which may impact dashboard performance.
+            the collection frequency. The collector efficiently processes standard JVM and server metrics.
     setup:
       prerequisites:
         list:
@@ -120,34 +118,6 @@ modules:
               description: Enable JVM metrics collection.
               default_value: true
               required: false
-            - name: collect_rest_metrics
-              description: Enable REST endpoint metrics collection.
-              default_value: true
-              required: false
-            - name: collect_mp_metrics
-              description: Enable MicroProfile-specific metrics collection.
-              default_value: true
-              required: false
-            - name: collect_custom_metrics
-              description: Enable custom application metrics collection.
-              default_value: false
-              required: false
-            - name: max_rest_endpoints
-              description: Maximum number of REST endpoints to monitor.
-              default_value: 50
-              required: false
-            - name: max_custom_metrics
-              description: Maximum number of custom metrics to monitor.
-              default_value: 100
-              required: false
-            - name: collect_rest_matching
-              description: Filter REST endpoints by pattern (supports wildcards).
-              default_value: ""
-              required: false
-            - name: collect_custom_matching
-              description: Filter custom metrics by pattern (supports wildcards).
-              default_value: ""
-              required: false
             - name: tls_skip_verify
               description: Skip TLS certificate verification.
               default_value: false
@@ -177,23 +147,19 @@ modules:
                     url: https://localhost:9443
                     username: admin
                     password: adminpwd
-            - name: Multiple servers with filtering
-              description: Monitor multiple servers with selective metric collection.
+            - name: Multiple servers
+              description: Monitor multiple Liberty servers.
               config: |
                 jobs:
                   - name: liberty_mp_prod
                     url: https://prod.example.com:9443
                     username: monitor
                     password: secret
-                    collect_rest_matching: "/api/*"
-                    max_rest_endpoints: 20
 
                   - name: liberty_mp_test
                     url: https://test.example.com:9443
                     username: monitor
                     password: secret
-                    collect_custom_metrics: true
-                    collect_custom_matching: "myapp_*"
             - name: With TLS client certificate
               description: Connect using TLS client certificate authentication.
               config: |
@@ -204,16 +170,14 @@ modules:
                     tls_key: /path/to/client.key
                     tls_ca: /path/to/ca.crt
             - name: Minimal JVM monitoring
-              description: Collect only JVM metrics without REST or custom metrics.
+              description: Collect only JVM metrics.
               config: |
                 jobs:
                   - name: liberty_mp_minimal
                     url: https://localhost:9443
                     username: admin
                     password: adminpwd
-                    collect_rest_metrics: false
-                    collect_mp_metrics: false
-                    collect_custom_metrics: false
+                    collect_jvm_metrics: true
       troubleshooting:
         problems:
           list:
@@ -240,21 +204,6 @@ modules:
                 1. Verify metrics_endpoint path (default: /metrics)
                 2. Ensure mpMetrics feature is enabled in server.xml
                 3. Check Liberty version supports MicroProfile Metrics
-            - name: No custom metrics
-              description: |
-                Custom application metrics are not being collected.
-              resolution: |
-                1. Verify collect_custom_metrics is enabled
-                2. Check application is publishing metrics correctly
-                3. Verify custom metric names match collect_custom_matching pattern
-                4. Check max_custom_metrics limit
-            - name: Too many REST endpoints
-              description: |
-                REST endpoint metrics are being limited.
-              resolution: |
-                1. Increase max_rest_endpoints value
-                2. Use collect_rest_matching to filter specific endpoints
-                3. Consider if all REST endpoints need monitoring
     alerts: []
     metrics:
       folding:
@@ -262,96 +211,138 @@ modules:
         enabled: false
       description: |
         The collector provides comprehensive metrics from MicroProfile Metrics including JVM statistics,
-        REST endpoint performance, MicroProfile component metrics, and custom application metrics.
+        CPU usage, thread pool status, servlet performance, and session management.
       availability: []
       scopes:
         - name: global
           description: These metrics refer to the entire WebSphere Liberty server instance.
           labels: []
           metrics:
-            - name: websphere_mp.jvm_memory_heap
+            - name: websphere_mp.jvm_memory_heap_usage
               description: JVM Heap Memory Usage
               unit: bytes
               chart_type: stacked
               dimensions:
                 - name: used
+                - name: free
+            - name: websphere_mp.jvm_memory_heap_committed
+              description: JVM Heap Memory Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
                 - name: committed
             - name: websphere_mp.jvm_memory_heap_max
               description: JVM Heap Memory Maximum
               unit: bytes
               chart_type: line
               dimensions:
-                - name: max
+                - name: limit
+            - name: websphere_mp.jvm_heap_utilization
+              description: JVM Heap Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
             - name: websphere_mp.jvm_gc_collections
-              description: JVM Garbage Collection Count
+              description: JVM Garbage Collection
               unit: collections/s
               chart_type: line
               dimensions:
-                - name: collections
-            - name: websphere_mp.jvm_threads
-              description: JVM Threads
+                - name: rate
+            - name: websphere_mp.jvm_gc_time
+              description: JVM GC Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: per_cycle
+            - name: websphere_mp.jvm_threads_current
+              description: JVM Current Threads
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: daemon
+                - name: other
+            - name: websphere_mp.jvm_threads_peak
+              description: JVM Peak Threads
               unit: threads
               chart_type: line
               dimensions:
-                - name: threads
-                - name: daemon
-                - name: max
-            - name: websphere_mp.jvm_classes
-              description: JVM Loaded Classes
+                - name: peak
+            - name: websphere_mp.jvm_classes_loaded
+              description: JVM Classes Loaded
               unit: classes
               chart_type: line
               dimensions:
                 - name: loaded
+            - name: websphere_mp.jvm_classes_unloaded_rate
+              description: JVM Classes Unloaded Rate
+              unit: classes/s
+              chart_type: line
+              dimensions:
                 - name: unloaded
-        - name: rest_endpoint
-          description: These metrics refer to specific REST endpoints.
-          labels:
-            - name: method
-              description: HTTP method (GET, POST, etc.)
-            - name: endpoint
-              description: REST endpoint path
-          metrics:
-            - name: websphere_mp.rest_requests
-              description: REST Endpoint Requests
+            - name: websphere_mp.cpu_usage
+              description: JVM CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: process
+                - name: utilization
+            - name: websphere_mp.cpu_time
+              description: JVM CPU Time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: websphere_mp.cpu_processors
+              description: Available Processors
+              unit: processors
+              chart_type: line
+              dimensions:
+                - name: available
+            - name: websphere_mp.system_load
+              description: System Load Average
+              unit: load
+              chart_type: line
+              dimensions:
+                - name: 1min
+            - name: websphere_mp.threadpool_usage
+              description: Thread Pool Usage
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: idle
+            - name: websphere_mp.threadpool_size
+              description: Thread Pool Size
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: websphere_mp.servlet_requests
+              description: Servlet Requests
               unit: requests/s
               chart_type: line
               dimensions:
                 - name: requests
-            - name: websphere_mp.rest_timing
-              description: REST Endpoint Response Time
+            - name: websphere_mp.servlet_response_time
+              description: Servlet Response Time
               unit: milliseconds
               chart_type: line
               dimensions:
-                - name: response_time
-        - name: microprofile_component
-          description: These metrics refer to MicroProfile components.
-          labels:
-            - name: component
-              description: MicroProfile component name
-          metrics:
-            - name: websphere_mp.mp_health
-              description: MicroProfile Health Status
-              unit: status
+                - name: avg_response_time
+            - name: websphere_mp.session_active
+              description: Active Sessions
+              unit: sessions
               chart_type: line
               dimensions:
-                - name: status
-            - name: websphere_mp.mp_metrics
-              description: MicroProfile Metrics Component
-              unit: value
+                - name: active
+                - name: live
+            - name: websphere_mp.session_lifecycle
+              description: Session Lifecycle
+              unit: sessions/s
               chart_type: line
               dimensions:
-                - name: value
-        - name: application
-          description: These metrics refer to custom application metrics.
-          labels:
-            - name: application
-              description: Application name
-            - name: metric_name
-              description: Custom metric name
-          metrics:
-            - name: websphere_mp.application
-              description: Custom Application Metrics
-              unit: value
-              chart_type: line
-              dimensions:
-                - name: value
+                - name: created
+                - name: invalidated
+                - name: timed_out
