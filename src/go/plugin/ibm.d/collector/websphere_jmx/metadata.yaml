@@ -29,13 +29,15 @@ modules:
           This collector monitors IBM WebSphere Application Server via JMX.
 
           It collects metrics for:
-          - JVM performance (heap, GC, threads, classes)
+          - JVM performance (heap, GC, threads, classes, CPU usage)
           - Thread pool utilization
-          - JDBC connection pool statistics
+          - JDBC connection pool statistics with advanced timing breakdown
+          - JCA (Java Connector Architecture) connection pool statistics
           - JMS destination metrics
           - Web application performance
           - HTTP session statistics
           - JTA transaction metrics
+          - APM features: servlet-level response times and EJB method timing (requires PMI)
         method_description: |
           The collector uses a persistent Java helper process to connect to WebSphere's JMX interface.
           This approach avoids JVM startup overhead and provides efficient metric collection.
@@ -159,6 +161,24 @@ modules:
               description: Collect JTA transaction statistics
               default_value: true
               required: false
+            - name: collect_servlet_metrics
+              description: |
+                Collect per-servlet response times and request counts (requires PMI to be enabled).
+                Provides APM-level visibility into individual servlet performance.
+              default_value: false
+              required: false
+            - name: collect_ejb_metrics
+              description: |
+                Collect per-EJB method timings and invocation counts (requires PMI to be enabled).
+                Provides APM-level visibility into EJB method performance.
+              default_value: false
+              required: false
+            - name: collect_jdbc_advanced
+              description: |
+                Collect detailed JDBC timing breakdown including query execution time vs connection hold time,
+                statement cache performance, and connection reuse metrics.
+              default_value: false
+              required: false
             - name: max_threadpools
               description: Maximum number of thread pools to monitor (0 for unlimited)
               default_value: 50
@@ -179,6 +199,14 @@ modules:
               description: Maximum number of applications to monitor (0 for unlimited)
               default_value: 100
               required: false
+            - name: max_servlets
+              description: Maximum number of servlets to monitor for APM metrics (0 for unlimited)
+              default_value: 50
+              required: false
+            - name: max_ejbs
+              description: Maximum number of EJBs to monitor for APM metrics (0 for unlimited)
+              default_value: 50
+              required: false
             - name: collect_apps_matching
               description: Only collect metrics for applications matching this pattern
               default_value: ""
@@ -189,6 +217,14 @@ modules:
               required: false
             - name: collect_jms_matching
               description: Only collect metrics for JMS destinations matching this pattern
+              default_value: ""
+              required: false
+            - name: collect_servlets_matching
+              description: Only collect servlet APM metrics for servlets matching this pattern
+              default_value: ""
+              required: false
+            - name: collect_ejbs_matching
+              description: Only collect EJB APM metrics for EJBs matching this pattern
               default_value: ""
               required: false
         examples:
@@ -235,6 +271,22 @@ modules:
                     collect_apps_matching: "prod_*"
                     collect_pools_matching: "*oracle*"
                     collect_jms_matching: "Queue_*"
+            - name: APM monitoring
+              description: Enable Application Performance Monitoring features with PMI.
+              config: |
+                jobs:
+                  - name: apm
+                    jmx_url: service:jmx:rmi:///jndi/rmi://localhost:9999/jmxrmi
+                    # Enable APM features (requires PMI to be enabled in WebSphere)
+                    collect_servlet_metrics: true
+                    collect_ejb_metrics: true
+                    collect_jdbc_advanced: true
+                    # Control APM cardinality
+                    max_servlets: 100
+                    max_ejbs: 50
+                    # Focus on important servlets and EJBs
+                    collect_servlets_matching: "com.mycompany.api.*"
+                    collect_ejbs_matching: "OrderProcessing*|PaymentGateway*"
     troubleshooting:
       problems:
         list:
@@ -257,6 +309,13 @@ modules:
               1. Java is installed and in PATH
               2. The websphere_jmx_helper.jar file exists
               3. For WebSphere Traditional, the jmx_classpath points to valid libraries
+          - name: APM metrics not available
+            description: |
+              APM metrics (servlets, EJBs) require:
+              1. PMI (Performance Monitoring Infrastructure) to be enabled in WebSphere
+              2. PMI statistical level set to "Extended" or "Custom" with servlet/EJB statistics enabled
+              3. The monitored applications to be actively processing requests
+              4. Proper permissions to access PMI MBeans through JMX
     alerts:
       - name: websphere_jmx_jvm_heap_usage
         metric: websphere_jmx.jvm_heap_usage
@@ -402,6 +461,32 @@ modules:
               chart_type: line
               dimensions:
                 - name: waiting
+            - name: websphere_jmx.jdbc_time_breakdown
+              description: JDBC Time Breakdown
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: query_time
+                - name: connection_hold_time
+            - name: websphere_jmx.jdbc_stmt_cache
+              description: JDBC Statement Cache
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: websphere_jmx.jdbc_stmt_cache_size
+              description: JDBC Statement Cache Size
+              unit: statements
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: websphere_jmx.jdbc_connection_reuse
+              description: JDBC Connection Reuse
+              unit: reuses/s
+              chart_type: line
+              dimensions:
+                - name: reuses
         - name: jca pool
           description: These metrics refer to a specific JCA (Java Connector Architecture) connection pool.
           labels:
@@ -613,3 +698,55 @@ modules:
               dimensions:
                 - name: age
                   description: "Seconds since last successful collection"
+        - name: servlet
+          description: These metrics refer to a specific servlet (APM feature, requires PMI).
+          labels:
+            - name: servlet
+              description: Servlet name
+          metrics:
+            - name: websphere_jmx.servlet_requests
+              description: Servlet Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: errors
+            - name: websphere_jmx.servlet_response_time
+              description: Servlet Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: max
+            - name: websphere_jmx.servlet_concurrent_requests
+              description: Servlet Concurrent Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: concurrent
+        - name: ejb
+          description: These metrics refer to a specific EJB (APM feature, requires PMI).
+          labels:
+            - name: ejb
+              description: EJB name
+          metrics:
+            - name: websphere_jmx.ejb_invocations
+              description: EJB Method Invocations
+              unit: invocations/s
+              chart_type: line
+              dimensions:
+                - name: invocations
+            - name: websphere_jmx.ejb_response_time
+              description: EJB Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: max
+            - name: websphere_jmx.ejb_pool
+              description: EJB Bean Pool
+              unit: beans
+              chart_type: stacked
+              dimensions:
+                - name: total
+                - name: available

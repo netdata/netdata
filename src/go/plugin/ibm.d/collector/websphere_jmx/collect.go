@@ -29,8 +29,17 @@ func (w *WebSphereJMX) collect(ctx context.Context) (map[string]int64, error) {
 	for k := range w.seenJDBCPools {
 		delete(w.seenJDBCPools, k)
 	}
+	for k := range w.seenJCAPools {
+		delete(w.seenJCAPools, k)
+	}
 	for k := range w.seenJMS {
 		delete(w.seenJMS, k)
+	}
+	for k := range w.seenServlets {
+		delete(w.seenServlets, k)
+	}
+	for k := range w.seenEJBs {
+		delete(w.seenEJBs, k)
 	}
 
 	mx := make(map[string]int64)
@@ -88,8 +97,28 @@ func (w *WebSphereJMX) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
+	// Collect APM metrics if enabled
+	if w.CollectServletMetrics {
+		if err := w.collectServletMetrics(collectCtx, mx); err != nil {
+			w.Warningf("failed to collect servlet metrics: %v", err)
+		}
+	}
+
+	if w.CollectEJBMetrics {
+		if err := w.collectEJBMetrics(collectCtx, mx); err != nil {
+			w.Warningf("failed to collect EJB metrics: %v", err)
+		}
+	}
+
+	if w.CollectJDBCAdvanced {
+		if err := w.collectJDBCAdvancedMetrics(collectCtx, mx); err != nil {
+			w.Warningf("failed to collect advanced JDBC metrics: %v", err)
+		}
+	}
+
 	// Update lifecycle for dynamic instances
 	w.updateInstanceLifecycle()
+	w.updateAPMInstanceLifecycle()
 
 	return mx, nil
 }
@@ -740,4 +769,234 @@ func cleanName(name string) string {
 		"]", "_",
 	)
 	return strings.ToLower(r.Replace(name))
+}
+
+// APM Collection Methods
+
+func (w *WebSphereJMX) collectServletMetrics(ctx context.Context, mx map[string]int64) error {
+	resp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
+		Command:  "SCRAPE",
+		Target:   "SERVLET_METRICS",
+		MaxItems: w.MaxServlets,
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "OK" {
+		return fmt.Errorf("servlet metrics collection failed: %s", resp.Message)
+	}
+
+	servlets, ok := resp.Data["servletMetrics"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	collected := 0
+	for _, servletData := range servlets {
+		servlet, ok := servletData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, ok := servlet["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+
+		// Apply selector if configured
+		if w.servletSelector != nil && !w.servletSelector.MatchString(name) {
+			continue
+		}
+
+		// Check cardinality limit
+		if w.MaxServlets > 0 && collected >= w.MaxServlets {
+			w.Debugf("reached max servlets limit (%d)", w.MaxServlets)
+			break
+		}
+
+		// Mark as seen
+		w.seenServlets[name] = true
+
+		// Create charts if new servlet
+		if !w.collectedServlets[name] {
+			w.collectedServlets[name] = true
+			if err := w.charts.Add(*w.newServletCharts(name)...); err != nil {
+				w.Warning(err)
+			}
+		}
+
+		// Collect metrics
+		servletID := cleanName(name)
+		mx[fmt.Sprintf("servlet_%s_requests", servletID)] = int64(getFloat(servlet, "requestCount"))
+		mx[fmt.Sprintf("servlet_%s_errors", servletID)] = int64(getFloat(servlet, "errorCount"))
+		mx[fmt.Sprintf("servlet_%s_response_time_avg", servletID)] = int64(getFloat(servlet, "avgResponseTime") * precision)
+		mx[fmt.Sprintf("servlet_%s_response_time_max", servletID)] = int64(getFloat(servlet, "maxResponseTime") * precision)
+		mx[fmt.Sprintf("servlet_%s_concurrent_requests", servletID)] = int64(getFloat(servlet, "concurrentRequests"))
+
+		collected++
+	}
+
+	return nil
+}
+
+func (w *WebSphereJMX) collectEJBMetrics(ctx context.Context, mx map[string]int64) error {
+	resp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
+		Command:  "SCRAPE",
+		Target:   "EJB_METRICS",
+		MaxItems: w.MaxEJBs,
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "OK" {
+		return fmt.Errorf("EJB metrics collection failed: %s", resp.Message)
+	}
+
+	ejbs, ok := resp.Data["ejbMetrics"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	collected := 0
+	for _, ejbData := range ejbs {
+		ejb, ok := ejbData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, ok := ejb["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+
+		// Apply selector if configured
+		if w.ejbSelector != nil && !w.ejbSelector.MatchString(name) {
+			continue
+		}
+
+		// Check cardinality limit
+		if w.MaxEJBs > 0 && collected >= w.MaxEJBs {
+			w.Debugf("reached max EJBs limit (%d)", w.MaxEJBs)
+			break
+		}
+
+		// Mark as seen
+		w.seenEJBs[name] = true
+
+		// Create charts if new EJB
+		if !w.collectedEJBs[name] {
+			w.collectedEJBs[name] = true
+			if err := w.charts.Add(*w.newEJBCharts(name)...); err != nil {
+				w.Warning(err)
+			}
+		}
+
+		// Collect metrics
+		ejbID := cleanName(name)
+		mx[fmt.Sprintf("ejb_%s_invocations", ejbID)] = int64(getFloat(ejb, "invocationCount"))
+		mx[fmt.Sprintf("ejb_%s_response_time_avg", ejbID)] = int64(getFloat(ejb, "avgResponseTime") * precision)
+		mx[fmt.Sprintf("ejb_%s_response_time_max", ejbID)] = int64(getFloat(ejb, "maxResponseTime") * precision)
+		mx[fmt.Sprintf("ejb_%s_pool_size", ejbID)] = int64(getFloat(ejb, "poolSize"))
+		mx[fmt.Sprintf("ejb_%s_pool_available", ejbID)] = int64(getFloat(ejb, "poolAvailable"))
+
+		collected++
+	}
+
+	return nil
+}
+
+func (w *WebSphereJMX) collectJDBCAdvancedMetrics(ctx context.Context, mx map[string]int64) error {
+	resp, err := w.jmxHelper.sendCommand(ctx, jmxCommand{
+		Command:  "SCRAPE",
+		Target:   "JDBC_ADVANCED",
+		MaxItems: w.MaxJDBCPools,
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "OK" {
+		return fmt.Errorf("advanced JDBC metrics collection failed: %s", resp.Message)
+	}
+
+	pools, ok := resp.Data["jdbcAdvanced"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	for _, poolData := range pools {
+		pool, ok := poolData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, ok := pool["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+
+		// Only collect for pools we're already tracking
+		if !w.collectedJDBCPools[name] {
+			continue
+		}
+
+		// Collect advanced metrics
+		poolID := cleanName(name)
+		
+		// Time breakdown: query time vs connection hold time
+		mx[fmt.Sprintf("jdbc_%s_query_time", poolID)] = int64(getFloat(pool, "avgQueryTime") * precision)
+		mx[fmt.Sprintf("jdbc_%s_connection_hold_time", poolID)] = int64(getFloat(pool, "avgConnectionHoldTime") * precision)
+		
+		// Statement cache metrics
+		mx[fmt.Sprintf("jdbc_%s_stmt_cache_hits", poolID)] = int64(getFloat(pool, "statementCacheHits"))
+		mx[fmt.Sprintf("jdbc_%s_stmt_cache_misses", poolID)] = int64(getFloat(pool, "statementCacheMisses"))
+		mx[fmt.Sprintf("jdbc_%s_stmt_cache_size", poolID)] = int64(getFloat(pool, "statementCacheSize"))
+		
+		// Connection reuse
+		mx[fmt.Sprintf("jdbc_%s_connection_reuse_count", poolID)] = int64(getFloat(pool, "connectionReuseCount"))
+	}
+
+	return nil
+}
+
+func (w *WebSphereJMX) updateAPMInstanceLifecycle() {
+	// Remove servlets that are no longer present
+	for servlet := range w.collectedServlets {
+		if !w.seenServlets[servlet] {
+			delete(w.collectedServlets, servlet)
+			w.removeServletCharts(servlet)
+		}
+	}
+
+	// Remove EJBs that are no longer present
+	for ejb := range w.collectedEJBs {
+		if !w.seenEJBs[ejb] {
+			delete(w.collectedEJBs, ejb)
+			w.removeEJBCharts(ejb)
+		}
+	}
+}
+
+func (w *WebSphereJMX) removeServletCharts(servlet string) {
+	servletID := cleanName(servlet)
+	prefix := fmt.Sprintf("servlet_%s_", servletID)
+	for _, chart := range *w.charts {
+		if strings.HasPrefix(chart.ID, prefix) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
+func (w *WebSphereJMX) removeEJBCharts(ejb string) {
+	ejbID := cleanName(ejb)
+	prefix := fmt.Sprintf("ejb_%s_", ejbID)
+	for _, chart := range *w.charts {
+		if strings.HasPrefix(chart.ID, prefix) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
 }

@@ -235,6 +235,28 @@ public class websphere_jmx_helper {
                 case "APPLICATIONS":
                     data.put("applications", collectApplications(command));
                     break;
+                case "CLUSTER":
+                    data.put("cluster", collectClusterMetrics());
+                    break;
+                case "HAMANAGER":
+                    data.put("hamanager", collectHAManagerMetrics());
+                    break;
+                case "DYNAMIC_CLUSTER":
+                    data.put("dynamicCluster", collectDynamicClusterMetrics());
+                    break;
+                case "REPLICATION":
+                    data.put("replication", collectReplicationMetrics());
+                    break;
+                // APM targets
+                case "SERVLET_METRICS":
+                    data.put("servletMetrics", collectServletMetrics(command));
+                    break;
+                case "EJB_METRICS":
+                    data.put("ejbMetrics", collectEJBMetrics(command));
+                    break;
+                case "JDBC_ADVANCED":
+                    data.put("jdbcAdvanced", collectJDBCAdvancedMetrics(command));
+                    break;
                 default:
                     sendError("Unknown scrape target: " + target, "", true);
                     return;
@@ -323,6 +345,31 @@ public class websphere_jmx_helper {
             classes.put("loaded", mbsc.getAttribute(classMBean, "LoadedClassCount"));
             classes.put("unloaded", mbsc.getAttribute(classMBean, "UnloadedClassCount"));
             jvm.put("classes", classes);
+            
+            // Operating System metrics (CPU usage)
+            ObjectName osMBean = new ObjectName("java.lang:type=OperatingSystem");
+            Map<String, Object> cpu = new HashMap<>();
+            
+            // Process CPU usage (0.0 to 1.0)
+            Double processCpuLoad = (Double) mbsc.getAttribute(osMBean, "ProcessCpuLoad");
+            if (processCpuLoad != null && processCpuLoad >= 0) {
+                cpu.put("processCpuUsage", processCpuLoad);
+            }
+            
+            // System CPU usage (0.0 to 1.0)
+            Double systemCpuLoad = (Double) mbsc.getAttribute(osMBean, "SystemCpuLoad");
+            if (systemCpuLoad != null && systemCpuLoad >= 0) {
+                cpu.put("systemCpuUsage", systemCpuLoad);
+            }
+            
+            jvm.put("cpu", cpu);
+            
+            // Runtime metrics (uptime)
+            ObjectName runtimeMBean = new ObjectName("java.lang:type=Runtime");
+            Long uptimeMillis = (Long) mbsc.getAttribute(runtimeMBean, "Uptime");
+            if (uptimeMillis != null) {
+                jvm.put("uptime", uptimeMillis / 1000.0); // Convert to seconds
+            }
         } catch (MalformedObjectNameException e) {
             sendError("Invalid MBean ObjectName for JVM metrics", e.getMessage(), true);
         } catch (JMException e) {
@@ -365,6 +412,10 @@ public class websphere_jmx_helper {
                     pool.put("poolSize", mbsc.getAttribute(poolBean, "size"));
                     pool.put("activeCount", mbsc.getAttribute(poolBean, "activeThreads"));
                     pool.put("maximumPoolSize", mbsc.getAttribute(poolBean, "maximumSize"));
+                    
+                    // Thread hang detection
+                    pool.put("hungThreadCount", mbsc.getAttribute(poolBean, "hungThreads"));
+                    pool.put("threadHangThreshold", mbsc.getAttribute(poolBean, "hungThreadThreshold"));
                 } catch (AttributeNotFoundException e) {
                     // Try alternative attribute names used by WebSphere
                     try {
@@ -578,6 +629,254 @@ public class websphere_jmx_helper {
         }
         
         return applications;
+    }
+    
+    // Cluster metrics collection methods
+    private static Map<String, Object> collectClusterMetrics() throws Exception {
+        Map<String, Object> cluster = new HashMap<>();
+        
+        try {
+            ObjectName clusterMBean = new ObjectName("WebSphere:type=Cluster,*");
+            Set<ObjectName> clusterBeans = mbsc.queryNames(clusterMBean, null);
+            
+            if (!clusterBeans.isEmpty()) {
+                ObjectName bean = clusterBeans.iterator().next();
+                
+                cluster.put("name", bean.getKeyProperty("name"));
+                cluster.put("state", mbsc.getAttribute(bean, "state"));
+                cluster.put("targetMemberCount", mbsc.getAttribute(bean, "clusterTargetState"));
+                cluster.put("runningMemberCount", mbsc.getAttribute(bean, "clusterRunningMembers"));
+                cluster.put("wlmEnabled", mbsc.getAttribute(bean, "wlmEnabled"));
+                cluster.put("sessionAffinity", mbsc.getAttribute(bean, "sessionAffinityEnabled"));
+            }
+        } catch (Exception e) {
+            cluster.put("error", e.getMessage());
+        }
+        
+        return cluster;
+    }
+    
+    private static Map<String, Object> collectHAManagerMetrics() throws Exception {
+        Map<String, Object> ha = new HashMap<>();
+        
+        try {
+            ObjectName haMBean = new ObjectName("WebSphere:type=HAManager,*");
+            Set<ObjectName> haBeans = mbsc.queryNames(haMBean, null);
+            
+            if (!haBeans.isEmpty()) {
+                ObjectName bean = haBeans.iterator().next();
+                
+                ha.put("coreGroupSize", mbsc.getAttribute(bean, "numCoreGroupMembers"));
+                ha.put("isCoordinator", mbsc.getAttribute(bean, "isCoordinator"));
+                ha.put("bulletinsSent", mbsc.getAttribute(bean, "numBulletinsSent"));
+            }
+        } catch (Exception e) {
+            ha.put("error", e.getMessage());
+        }
+        
+        return ha;
+    }
+    
+    private static Map<String, Object> collectDynamicClusterMetrics() throws Exception {
+        Map<String, Object> dynCluster = new HashMap<>();
+        
+        try {
+            ObjectName dcMBean = new ObjectName("WebSphere:type=DynamicCluster,*");
+            Set<ObjectName> dcBeans = mbsc.queryNames(dcMBean, null);
+            
+            if (!dcBeans.isEmpty()) {
+                ObjectName bean = dcBeans.iterator().next();
+                
+                dynCluster.put("minInstances", mbsc.getAttribute(bean, "minInstances"));
+                dynCluster.put("maxInstances", mbsc.getAttribute(bean, "maxInstances"));
+                dynCluster.put("targetInstances", mbsc.getAttribute(bean, "numVerticalInstances"));
+            }
+        } catch (Exception e) {
+            dynCluster.put("error", e.getMessage());
+        }
+        
+        return dynCluster;
+    }
+    
+    private static Map<String, Object> collectReplicationMetrics() throws Exception {
+        Map<String, Object> repl = new HashMap<>();
+        
+        try {
+            ObjectName replMBean = new ObjectName("WebSphere:type=DataReplicationDomain,*");
+            Set<ObjectName> replBeans = mbsc.queryNames(replMBean, null);
+            
+            if (!replBeans.isEmpty()) {
+                ObjectName bean = replBeans.iterator().next();
+                
+                repl.put("bytesSent", mbsc.getAttribute(bean, "totalBytesSent"));
+                repl.put("bytesReceived", mbsc.getAttribute(bean, "totalBytesReceived"));
+                repl.put("syncFailures", mbsc.getAttribute(bean, "numSyncFailures"));
+                repl.put("asyncQueueDepth", mbsc.getAttribute(bean, "asyncReplicationQueueDepth"));
+            }
+        } catch (Exception e) {
+            repl.put("error", e.getMessage());
+        }
+        
+        return repl;
+    }
+    
+    // APM collection methods
+    private static List<Map<String, Object>> collectServletMetrics(Map<String, Object> command) throws Exception {
+        List<Map<String, Object>> servlets = new ArrayList<>();
+        int maxItems = getMaxItems(command);
+        
+        try {
+            // WebSphere PMI servlet stats pattern
+            ObjectName pattern = new ObjectName("WebSphere:type=Servlet,*");
+            Set<ObjectName> servletBeans = mbsc.queryNames(pattern, null);
+            
+            int count = 0;
+            for (ObjectName servletBean : servletBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                Map<String, Object> servlet = new HashMap<>();
+                servlet.put("name", servletBean.getKeyProperty("name"));
+                servlet.put("application", servletBean.getKeyProperty("J2EEApplication"));
+                servlet.put("module", servletBean.getKeyProperty("WebModule"));
+                
+                try {
+                    // Request count
+                    servlet.put("requestCount", mbsc.getAttribute(servletBean, "RequestCount"));
+                    
+                    // Response times (requires PMI)
+                    servlet.put("responseTime", mbsc.getAttribute(servletBean, "ServiceTime"));
+                    servlet.put("maxResponseTime", mbsc.getAttribute(servletBean, "ServiceTimeMax"));
+                    servlet.put("minResponseTime", mbsc.getAttribute(servletBean, "ServiceTimeMin"));
+                    
+                    // Concurrent requests
+                    servlet.put("concurrentRequests", mbsc.getAttribute(servletBean, "ConcurrentRequests"));
+                    servlet.put("maxConcurrentRequests", mbsc.getAttribute(servletBean, "ConcurrentRequestsMax"));
+                    
+                    // Error count
+                    servlet.put("errorCount", mbsc.getAttribute(servletBean, "ErrorCount"));
+                    
+                } catch (AttributeNotFoundException e) {
+                    servlet.put("pmi_required", true);
+                }
+                
+                servlets.add(servlet);
+                count++;
+            }
+        } catch (Exception e) {
+            sendError("Error collecting servlet metrics", e.getMessage(), true);
+        }
+        
+        return servlets;
+    }
+    
+    private static List<Map<String, Object>> collectEJBMetrics(Map<String, Object> command) throws Exception {
+        List<Map<String, Object>> ejbs = new ArrayList<>();
+        int maxItems = getMaxItems(command);
+        
+        try {
+            // WebSphere EJB MBean pattern
+            ObjectName pattern = new ObjectName("WebSphere:j2eeType=StatelessSessionBean,*");
+            Set<ObjectName> ejbBeans = mbsc.queryNames(pattern, null);
+            
+            // Also check for stateful beans
+            ObjectName statefulPattern = new ObjectName("WebSphere:j2eeType=StatefulSessionBean,*");
+            ejbBeans.addAll(mbsc.queryNames(statefulPattern, null));
+            
+            int count = 0;
+            for (ObjectName ejbBean : ejbBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                Map<String, Object> ejb = new HashMap<>();
+                ejb.put("name", ejbBean.getKeyProperty("name"));
+                ejb.put("application", ejbBean.getKeyProperty("J2EEApplication"));
+                ejb.put("type", ejbBean.getKeyProperty("j2eeType"));
+                
+                try {
+                    // Method invocation stats
+                    ejb.put("methodCalls", mbsc.getAttribute(ejbBean, "MethodCallCount"));
+                    ejb.put("methodResponseTime", mbsc.getAttribute(ejbBean, "MethodResponseTime"));
+                    ejb.put("maxMethodResponseTime", mbsc.getAttribute(ejbBean, "MethodResponseTimeMax"));
+                    
+                    // Pool stats for stateless beans
+                    if (ejbBean.getKeyProperty("j2eeType").contains("Stateless")) {
+                        ejb.put("poolSize", mbsc.getAttribute(ejbBean, "PoolSize"));
+                        ejb.put("pooledInstances", mbsc.getAttribute(ejbBean, "PooledCount"));
+                    }
+                    
+                    // Transaction stats
+                    ejb.put("activeTransactions", mbsc.getAttribute(ejbBean, "ActiveMethodCount"));
+                    
+                } catch (AttributeNotFoundException e) {
+                    ejb.put("pmi_required", true);
+                }
+                
+                ejbs.add(ejb);
+                count++;
+            }
+        } catch (Exception e) {
+            sendError("Error collecting EJB metrics", e.getMessage(), true);
+        }
+        
+        return ejbs;
+    }
+    
+    private static List<Map<String, Object>> collectJDBCAdvancedMetrics(Map<String, Object> command) throws Exception {
+        List<Map<String, Object>> pools = new ArrayList<>();
+        int maxItems = getMaxItems(command);
+        
+        try {
+            // PMI JDBC provider pattern
+            ObjectName pattern = new ObjectName("WebSphere:type=JDBCProvider,*");
+            Set<ObjectName> providerBeans = mbsc.queryNames(pattern, null);
+            
+            int count = 0;
+            for (ObjectName providerBean : providerBeans) {
+                if (maxItems > 0 && count >= maxItems) break;
+                
+                // Get data sources for this provider
+                String providerName = providerBean.getKeyProperty("name");
+                ObjectName dsPattern = new ObjectName("WebSphere:type=DataSource,JDBCProvider=" + providerName + ",*");
+                Set<ObjectName> dsBeans = mbsc.queryNames(dsPattern, null);
+                
+                for (ObjectName dsBean : dsBeans) {
+                    if (maxItems > 0 && count >= maxItems) break;
+                    
+                    Map<String, Object> pool = new HashMap<>();
+                    pool.put("name", dsBean.getKeyProperty("name"));
+                    pool.put("provider", providerName);
+                    
+                    try {
+                        // Standard pool metrics
+                        pool.put("poolSize", mbsc.getAttribute(dsBean, "PoolSize"));
+                        pool.put("freePoolSize", mbsc.getAttribute(dsBean, "FreePoolSize"));
+                        pool.put("waitingThreadCount", mbsc.getAttribute(dsBean, "WaitingThreadCount"));
+                        
+                        // Advanced timing metrics
+                        pool.put("jdbcTime", mbsc.getAttribute(dsBean, "JDBCTime")); // Time in JDBC driver
+                        pool.put("useTime", mbsc.getAttribute(dsBean, "UseTime")); // Time connection held
+                        pool.put("waitTime", mbsc.getAttribute(dsBean, "WaitTime")); // Time waiting for connection
+                        
+                        // Statement cache stats
+                        pool.put("prepStmtCacheDiscardCount", mbsc.getAttribute(dsBean, "PrepStmtCacheDiscardCount"));
+                        pool.put("prepStmtCacheSize", mbsc.getAttribute(dsBean, "PreparedStatementCacheSize"));
+                        
+                        // Connection reuse stats
+                        pool.put("connectionHandleCount", mbsc.getAttribute(dsBean, "ConnectionHandleCount"));
+                        pool.put("connectionCloseCount", mbsc.getAttribute(dsBean, "ConnectionCloseCount"));
+                        
+                    } catch (AttributeNotFoundException e) {
+                        pool.put("pmi_advanced_required", true);
+                    }
+                    
+                    pools.add(pool);
+                    count++;
+                }
+            }
+        } catch (Exception e) {
+            sendError("Error collecting advanced JDBC metrics", e.getMessage(), true);
+        }
+        
+        return pools;
     }
     
     private static void handlePing() {
