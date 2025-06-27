@@ -78,11 +78,6 @@ type Config struct {
 	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 
-	// HTTP connection settings
-	URL      string `yaml:"url" json:"url"`
-	Username string `yaml:"username,omitempty" json:"username"`
-	Password string `yaml:"password,omitempty" json:"password"`
-
 	// PMI settings
 	PMIStatsType        string   `yaml:"pmi_stats_type,omitempty" json:"pmi_stats_type"`
 	PMIRefreshRate      int      `yaml:"pmi_refresh_rate,omitempty" json:"pmi_refresh_rate"`
@@ -357,7 +352,7 @@ func (w *WebSpherePMI) setConfigurationDefaults() {
 }
 
 func (w *WebSpherePMI) validateConfig() error {
-	if w.URL == "" {
+	if w.HTTPConfig.RequestConfig.URL == "" {
 		return errors.New("url is required")
 	}
 
@@ -448,7 +443,7 @@ func (w *WebSpherePMI) initSelectors() error {
 }
 
 func (w *WebSpherePMI) buildPMIURL() error {
-	baseURL := strings.TrimRight(w.URL, "/")
+	baseURL := strings.TrimRight(w.HTTPConfig.RequestConfig.URL, "/")
 
 	// Check if it's already a full PerfServlet URL
 	if strings.Contains(baseURL, "/wasPerfTool/servlet/perfservlet") {
@@ -555,8 +550,8 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 	}
 
 	// Add authentication if configured
-	if w.Username != "" && w.Password != "" {
-		req.SetBasicAuth(w.Username, w.Password)
+	if w.HTTPConfig.RequestConfig.Username != "" && w.HTTPConfig.RequestConfig.Password != "" {
+		req.SetBasicAuth(w.HTTPConfig.RequestConfig.Username, w.HTTPConfig.RequestConfig.Password)
 	}
 
 	// Execute request
