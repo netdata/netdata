@@ -1,0 +1,1157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE PerformanceMonitor SYSTEM "/wasPerfTool/dtd/performancemonitor.dtd">
+<PerformanceMonitor responseStatus="success" version="9.0.5.24">
+<Node name="DefaultNode01">
+<Server name="server1">
+<Stat name="server">
+<Stat name="ExtensionRegistryStats.name">
+<CountStatistic ID="1" count="74" lastSampleTime="1751111155384" name="RequestCount" startTime="1751064152157" unit="None"/>
+<CountStatistic ID="2" count="58" lastSampleTime="1751111155384" name="HitCount" startTime="1751064152157" unit="None"/>
+<DoubleStatistic ID="3" double="78.37837837837837" lastSampleTime="1751111155384" name="HitRate" startTime="1751064152157" unit="%"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751111155384" name="DisplacementCount" startTime="1751064152157" unit="None"/>
+</Stat>
+<Stat name="Security Authentication">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151523" name="WebAuthenticationCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151523" name="TAIRequestCount" startTime="1751064151523" unit="none"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064151523" name="IdentityAssertionCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064151523" name="BasicAuthenticationCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="5" count="0" lastSampleTime="1751064151523" name="TokenAuthenticationCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151523" name="JAASIdentityAssertionCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151523" name="JAASBasicAuthenticationCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064151523" name="JAASTokenAuthenticationCount" startTime="1751064151523" unit="None"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064151523" name="RMIAuthenticationCount" startTime="1751064151523" unit="None"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064151523" max="0" min="0" name="WebAuthenticationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151523" max="0" min="0" name="TAIRequestTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064151523" max="0" min="0" name="IdentityAssertionTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064151523" max="0" min="0" name="BasicAuthenticationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064151523" max="0" min="0" name="TokenAuthenticationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064151523" max="0" min="0" name="JAASIdentityAssertionTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064151523" max="0" min="0" name="JAASBasicAuthenticationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064151523" max="0" min="0" name="JAASTokenAuthenticationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064151523" max="0" min="0" name="RMIAuthenticationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064151523" max="0" min="0" name="CredentialCreationTime" startTime="1751064151523" totalTime="0" unit="Milliseconds"/>
+</Stat>
+<Stat name="Security Authorization">
+<TimeStatistic ID="1" count="0" lastSampleTime="1751064151921" max="0" min="0" name="WebAuthorizationTime" startTime="1751064151921" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="2" count="0" lastSampleTime="1751064151921" max="0" min="0" name="EJBAuthorizationTime" startTime="1751064151921" totalTime="0" unit="Milliseconds"/>
+<TimeStatistic ID="3" count="3748" lastSampleTime="1751111155384" max="1" min="0" name="AdminAuthorizationTime" startTime="1751064151921" totalTime="209" unit="Milliseconds"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064151921" max="0" min="0" name="JACCAuthorizationTime" startTime="1751064151921" totalTime="0" unit="Milliseconds"/>
+</Stat>
+<Stat name="Dynamic Caching">
+<Stat name="Object: ws/com.ibm.workplace/ExtensionRegistryCache">
+<Stat name="Object Cache">
+<Stat name="Counters">
+<CountStatistic ID="21" count="61" lastSampleTime="1751064152813" name="HitsInMemoryCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152154" name="HitsOnDiskCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152154" name="ExplicitInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152154" name="LruInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152154" name="TimeoutInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="26" count="14" lastSampleTime="1751064152550" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152154" name="RemoteHitCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="28" count="16" lastSampleTime="1751064152810" name="MissCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="29" count="91" lastSampleTime="1751064152813" name="ClientRequestCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152154" name="DistributedRequestCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152154" name="ExplicitMemoryInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152154" name="ExplicitDiskInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152154" name="LocalExplicitInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152154" name="RemoteExplicitInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152154" name="RemoteCreationCount" startTime="1751064152154" unit="N/A"/>
+</Stat>
+<CountStatistic ID="21" count="61" lastSampleTime="1751064152813" name="HitsInMemoryCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152154" name="HitsOnDiskCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152154" name="ExplicitInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152154" name="LruInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152154" name="TimeoutInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="26" count="14" lastSampleTime="1751064152550" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152154" name="RemoteHitCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="28" count="16" lastSampleTime="1751064152810" name="MissCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="29" count="91" lastSampleTime="1751064152813" name="ClientRequestCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152154" name="DistributedRequestCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152154" name="ExplicitMemoryInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152154" name="ExplicitDiskInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152154" name="LocalExplicitInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152154" name="RemoteExplicitInvalidationCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152154" name="RemoteCreationCount" startTime="1751064152154" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="5000" lastSampleTime="1751064154143" name="MaxInMemoryCacheEntryCount" startTime="1751064152154" unit="N/A"/>
+<CountStatistic ID="2" count="14" lastSampleTime="1751064154143" name="InMemoryCacheEntryCount" startTime="1751064152154" unit="N/A"/>
+</Stat>
+<Stat name="Object: ws/com.ibm.ws.wssecurity.sctClientCacheMap">
+<Stat name="Object Cache">
+<Stat name="Counters">
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152144" name="HitsInMemoryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152144" name="HitsOnDiskCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152144" name="ExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152144" name="LruInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152144" name="TimeoutInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="26" count="0" lastSampleTime="1751064152144" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152144" name="RemoteHitCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="28" count="0" lastSampleTime="1751064152144" name="MissCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="29" count="0" lastSampleTime="1751064152144" name="ClientRequestCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152144" name="DistributedRequestCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152144" name="ExplicitMemoryInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152144" name="ExplicitDiskInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152144" name="LocalExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152144" name="RemoteExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152144" name="RemoteCreationCount" startTime="1751064152144" unit="N/A"/>
+</Stat>
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152144" name="HitsInMemoryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152144" name="HitsOnDiskCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152144" name="ExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152144" name="LruInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152144" name="TimeoutInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="26" count="0" lastSampleTime="1751064152144" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152144" name="RemoteHitCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="28" count="0" lastSampleTime="1751064152144" name="MissCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="29" count="0" lastSampleTime="1751064152144" name="ClientRequestCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152144" name="DistributedRequestCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152144" name="ExplicitMemoryInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152144" name="ExplicitDiskInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152144" name="LocalExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152144" name="RemoteExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152144" name="RemoteCreationCount" startTime="1751064152144" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="2000" lastSampleTime="1751064152144" name="MaxInMemoryCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152144" name="InMemoryCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+</Stat>
+<Stat name="Object: ws/com.ibm.ws.wssecurity.sctServiceCacheMap">
+<Stat name="Object Cache">
+<Stat name="Counters">
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152146" name="HitsInMemoryCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152146" name="HitsOnDiskCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152146" name="ExplicitInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152146" name="LruInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152146" name="TimeoutInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="26" count="0" lastSampleTime="1751064152146" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152146" name="RemoteHitCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="28" count="0" lastSampleTime="1751064152146" name="MissCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="29" count="0" lastSampleTime="1751064152146" name="ClientRequestCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152146" name="DistributedRequestCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152146" name="ExplicitMemoryInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152146" name="ExplicitDiskInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152146" name="LocalExplicitInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152146" name="RemoteExplicitInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152146" name="RemoteCreationCount" startTime="1751064152146" unit="N/A"/>
+</Stat>
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152146" name="HitsInMemoryCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152146" name="HitsOnDiskCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152146" name="ExplicitInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152146" name="LruInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152146" name="TimeoutInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="26" count="0" lastSampleTime="1751064152146" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152146" name="RemoteHitCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="28" count="0" lastSampleTime="1751064152146" name="MissCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="29" count="0" lastSampleTime="1751064152146" name="ClientRequestCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152146" name="DistributedRequestCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152146" name="ExplicitMemoryInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152146" name="ExplicitDiskInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152146" name="LocalExplicitInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152146" name="RemoteExplicitInvalidationCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152146" name="RemoteCreationCount" startTime="1751064152146" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="2000" lastSampleTime="1751064152146" name="MaxInMemoryCacheEntryCount" startTime="1751064152146" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152146" name="InMemoryCacheEntryCount" startTime="1751064152146" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="9000" lastSampleTime="1751064154143" name="MaxInMemoryCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="2" count="14" lastSampleTime="1751064154143" name="InMemoryCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="21" count="61" lastSampleTime="1751064152813" name="HitsInMemoryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="22" count="0" lastSampleTime="1751064152154" name="HitsOnDiskCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="23" count="0" lastSampleTime="1751064152154" name="ExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="24" count="0" lastSampleTime="1751064152154" name="LruInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="25" count="0" lastSampleTime="1751064152154" name="TimeoutInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="26" count="14" lastSampleTime="1751064152550" name="InMemoryAndDiskCacheEntryCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="27" count="0" lastSampleTime="1751064152154" name="RemoteHitCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="28" count="16" lastSampleTime="1751064152810" name="MissCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="29" count="91" lastSampleTime="1751064152813" name="ClientRequestCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="30" count="0" lastSampleTime="1751064152154" name="DistributedRequestCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="31" count="0" lastSampleTime="1751064152154" name="ExplicitMemoryInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="32" count="0" lastSampleTime="1751064152154" name="ExplicitDiskInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="34" count="0" lastSampleTime="1751064152154" name="LocalExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="35" count="0" lastSampleTime="1751064152154" name="RemoteExplicitInvalidationCount" startTime="1751064152144" unit="N/A"/>
+<CountStatistic ID="36" count="0" lastSampleTime="1751064152154" name="RemoteCreationCount" startTime="1751064152144" unit="N/A"/>
+</Stat>
+<Stat name="JDBC Connection Pools">
+<Stat name="Derby JDBC Provider (XA)">
+<Stat name="jdbc/DefaultEJBTimerDataSource">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152088" name="CreateCount" startTime="1751064152088" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152088" name="CloseCount" startTime="1751064152088" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152088" name="AllocateCount" startTime="1751064152088" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152088" name="ReturnCount" startTime="1751064152088" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152088" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152088" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152088" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152088" name="FaultCount" startTime="1751064152088" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152088" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152088" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152088" max="0" min="0" name="UseTime" startTime="1751064152088" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152088" max="0" min="0" name="WaitTime" startTime="1751064152088" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152088" name="ManagedConnectionCount" startTime="1751064152088" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152088" name="ConnectionHandleCount" startTime="1751064152088" unit="N/A"/>
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152088" name="PrepStmtCacheDiscardCount" startTime="1751064152088" unit="N/A"/>
+<TimeStatistic ID="22" count="0" lastSampleTime="1751064152088" max="0" min="0" name="JDBCTime" startTime="1751064152088" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="jdbc/built-in-derby-datasource">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152054" name="CreateCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152054" name="CloseCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152054" name="AllocateCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152054" name="ReturnCount" startTime="1751064152054" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152054" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152054" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152054" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152054" name="FaultCount" startTime="1751064152054" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152054" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152054" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152054" max="0" min="0" name="UseTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152054" max="0" min="0" name="WaitTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152054" name="ManagedConnectionCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152054" name="ConnectionHandleCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152054" name="PrepStmtCacheDiscardCount" startTime="1751064152054" unit="N/A"/>
+<TimeStatistic ID="22" count="0" lastSampleTime="1751064152054" max="0" min="0" name="JDBCTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152088" name="CreateCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152088" name="CloseCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152088" name="AllocateCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152088" name="ReturnCount" startTime="1751064152054" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152054" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152054" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152054" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152088" name="FaultCount" startTime="1751064152054" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152054" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152054" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152088" max="0" min="0" name="UseTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152088" max="0" min="0" name="WaitTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152088" name="ManagedConnectionCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152088" name="ConnectionHandleCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152088" name="PrepStmtCacheDiscardCount" startTime="1751064152054" unit="N/A"/>
+<TimeStatistic ID="22" count="0" lastSampleTime="1751064152088" max="0" min="0" name="JDBCTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152088" name="CreateCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152088" name="CloseCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152088" name="AllocateCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152088" name="ReturnCount" startTime="1751064152054" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152054" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152054" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152054" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152088" name="FaultCount" startTime="1751064152054" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152054" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152054" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152088" max="0" min="0" name="UseTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152088" max="0" min="0" name="WaitTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152088" name="ManagedConnectionCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152088" name="ConnectionHandleCount" startTime="1751064152054" unit="N/A"/>
+<CountStatistic ID="21" count="0" lastSampleTime="1751064152088" name="PrepStmtCacheDiscardCount" startTime="1751064152054" unit="N/A"/>
+<TimeStatistic ID="22" count="0" lastSampleTime="1751064152088" max="0" min="0" name="JDBCTime" startTime="1751064152054" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="HAManager">
+<Stat name="HAManagerMBean">
+<BoundedRangeStatistic ID="1" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="LocalGroupCount" startTime="1751064151326" unit="None" upperBound="0" value="0"/>
+<TimeStatistic ID="2" count="0" lastSampleTime="1751064151326" max="0" min="0" name="GroupStateRebuildTime" startTime="1751064151326" totalTime="0" unit="ms"/>
+<BoundedRangeStatistic ID="3" highWaterMark="15" integral="7.05042302E8" lastSampleTime="1751111155384" lowWaterMark="3" lowerBound="0" mean="14.999604970277247" name="BulletinBoardSubjectCount" startTime="1751064151326" unit="None" upperBound="0" value="15"/>
+<BoundedRangeStatistic ID="4" highWaterMark="20" integral="9.4005614E8" lastSampleTime="1751111155384" lowWaterMark="3" lowerBound="0" mean="19.999467705533" name="BulletinBoardSubcriptionCount" startTime="1751064151326" unit="None" upperBound="0" value="20"/>
+<TimeStatistic ID="5" count="0" lastSampleTime="1751064151326" max="0" min="0" name="BulletinBoardRebuildTime" startTime="1751064151326" totalTime="0" unit="ms"/>
+<BoundedRangeStatistic ID="6" highWaterMark="15" integral="7.05045543E8" lastSampleTime="1751111155384" lowWaterMark="1" lowerBound="0" mean="14.999673921770754" name="LocalBulletinBoardSubjectCount" startTime="1751064151326" unit="None" upperBound="0" value="15"/>
+<BoundedRangeStatistic ID="7" highWaterMark="20" integral="9.40060154E8" lastSampleTime="1751111155384" lowWaterMark="1" lowerBound="0" mean="19.999553102415113" name="LocalBulletinBoardSubcriptionCount" startTime="1751064151326" unit="None" upperBound="0" value="20"/>
+</Stat>
+<BoundedRangeStatistic ID="1" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="LocalGroupCount" startTime="1751064151326" unit="None" upperBound="0" value="0"/>
+<TimeStatistic ID="2" count="0" lastSampleTime="1751064151326" max="0" min="0" name="GroupStateRebuildTime" startTime="1751064151326" totalTime="0" unit="ms"/>
+<BoundedRangeStatistic ID="3" highWaterMark="15" integral="7.05042302E8" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="14.999604970277247" name="BulletinBoardSubjectCount" startTime="1751064151326" unit="None" upperBound="0" value="15"/>
+<BoundedRangeStatistic ID="4" highWaterMark="20" integral="9.4005614E8" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="19.999467705533" name="BulletinBoardSubcriptionCount" startTime="1751064151326" unit="None" upperBound="0" value="20"/>
+<TimeStatistic ID="5" count="0" lastSampleTime="1751064151326" max="0" min="0" name="BulletinBoardRebuildTime" startTime="1751064151326" totalTime="0" unit="ms"/>
+<BoundedRangeStatistic ID="6" highWaterMark="15" integral="7.05045543E8" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="14.999673921770754" name="LocalBulletinBoardSubjectCount" startTime="1751064151326" unit="None" upperBound="0" value="15"/>
+<BoundedRangeStatistic ID="7" highWaterMark="20" integral="9.40060153E8" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="19.999553081140355" name="LocalBulletinBoardSubcriptionCount" startTime="1751064151326" unit="None" upperBound="0" value="20"/>
+</Stat>
+<Stat name="JCA Connection Pools">
+<Stat name="SIB JMS Resource Adapter">
+<Stat name="jms/built-in-jms-connectionfactory">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152061" name="CreateCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152061" name="CloseCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152061" name="AllocateCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152061" name="FreedCount" startTime="1751064152061" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152061" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152061" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152061" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152061" name="FaultCount" startTime="1751064152061" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152061" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152061" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152061" max="0" min="0" name="UseTime" startTime="1751064152061" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152061" max="0" min="0" name="WaitTime" startTime="1751064152061" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152061" name="ManagedConnectionCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152061" name="ConnectionHandleCount" startTime="1751064152061" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152062" name="CreateCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152062" name="CloseCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152062" name="AllocateCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152062" name="FreedCount" startTime="1751064152061" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152061" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152061" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152061" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152062" name="FaultCount" startTime="1751064152061" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152061" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152061" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152061" max="0" min="0" name="UseTime" startTime="1751064152061" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152061" max="0" min="0" name="WaitTime" startTime="1751064152061" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152062" name="ManagedConnectionCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152062" name="ConnectionHandleCount" startTime="1751064152061" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152062" name="CreateCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152062" name="CloseCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152062" name="AllocateCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152062" name="FreedCount" startTime="1751064152061" unit="N/A"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="PoolSize" startTime="1751064152061" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" lowerBound="0" mean="0.0" name="FreePoolSize" startTime="1751064152061" unit="N/A" upperBound="0" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1751064152061" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152062" name="FaultCount" startTime="1751064152061" unit="N/A"/>
+<RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1751064152061" unit="N/A" value="0"/>
+<RangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155384" lowWaterMark="0" mean="0.0" name="PercentMaxed" startTime="1751064152061" unit="N/A" value="0"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152061" max="0" min="0" name="UseTime" startTime="1751064152061" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152061" max="0" min="0" name="WaitTime" startTime="1751064152061" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152062" name="ManagedConnectionCount" startTime="1751064152061" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152062" name="ConnectionHandleCount" startTime="1751064152061" unit="N/A"/>
+</Stat>
+<Stat name="JVM Runtime">
+<BoundedRangeStatistic ID="1" highWaterMark="84992" integral="1.48717759616E11" lastSampleTime="1751111155384" lowWaterMark="51200" lowerBound="51200" mean="3163.917782681442" name="HeapSize" startTime="1751064151078" unit="KILOBYTE" upperBound="4092928" value="80256"/>
+<CountStatistic ID="2" count="30560" lastSampleTime="1751111155384" name="FreeMemory" startTime="1751064151078" unit="KILOBYTE"/>
+<CountStatistic ID="3" count="49695" lastSampleTime="1751111155384" name="UsedMemory" startTime="1751064151078" unit="KILOBYTE"/>
+<CountStatistic ID="4" count="47004" lastSampleTime="1751111155384" name="UpTime" startTime="1751064151078" unit="SECOND"/>
+<CountStatistic ID="5" count="0" lastSampleTime="1751111155385" name="ProcessCpuUsage" startTime="1751064151078" unit="N/A"/>
+</Stat>
+<Stat name="Object Pool">
+<Stat name="ObjectPool_ibm.system.objectpool_com.ibm.ws.webcontainer.srt.SRTConnectionContextImpl">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152360" name="ObjectsCreatedCount" startTime="1751064152360" unit="unit.none"/>
+<BoundedRangeStatistic ID="2" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ObjectsAllocatedCount" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ObjectsReturnedCount" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="1" integral="4.6927097E7" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.9983846146072514" name="IdleObjectsSize" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+</Stat>
+<Stat name="ObjectPool_ibm.system.objectpool_com.ibm.ws.webcontainer.srt.SRTConnectionContextImpl.class@bbf1d352">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152360" name="ObjectsCreatedCount" startTime="1751064152360" unit="unit.none"/>
+<BoundedRangeStatistic ID="2" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ObjectsAllocatedCount" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ObjectsReturnedCount" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="1" integral="4.6927099E7" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.9983846571577042" name="IdleObjectsSize" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152360" name="ObjectsCreatedCount" startTime="1751064152360" unit="unit.none"/>
+<BoundedRangeStatistic ID="2" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ObjectsAllocatedCount" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ObjectsReturnedCount" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="1" integral="9.3854196E7" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="1.9967692717649554" name="IdleObjectsSize" startTime="1751064152360" unit="unit.none" upperBound="0" value="0"/>
+</Stat>
+<Stat name="ORB">
+<Stat name="Interceptors">
+<Stat name="PMIServerRequestInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151103" max="0" min="0" name="ProcessingTime" startTime="1751064151103" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="SecurityIORInterceptor">
+<TimeStatistic ID="11" count="76" lastSampleTime="1751064152799" max="3" min="0" name="ProcessingTime" startTime="1751064151104" totalTime="5" unit="MILLISECOND"/>
+</Stat>
+<Stat name="TxIORInterceptor">
+<TimeStatistic ID="11" count="76" lastSampleTime="1751064152799" max="0" min="0" name="ProcessingTime" startTime="1751064151100" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="WLMClientRequestInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151095" max="0" min="0" name="ProcessingTime" startTime="1751064151095" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="WLMServerRequestInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151103" max="0" min="0" name="ProcessingTime" startTime="1751064151103" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="WLMTaggedComponentManager">
+<TimeStatistic ID="11" count="76" lastSampleTime="1751064152799" max="0" min="0" name="ProcessingTime" startTime="1751064151104" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ISecurityLocalObjectBaseL13Impl.CSIClientRI">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151094" max="0" min="0" name="ProcessingTime" startTime="1751064151094" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ISecurityLocalObjectBaseL13Impl.CSIServerRI">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151103" max="0" min="0" name="ProcessingTime" startTime="1751064151103" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.debug.DebugPortableInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151104" max="0" min="0" name="ProcessingTime" startTime="1751064151104" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ws.Transaction.JTS.TxClientInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151096" max="0" min="0" name="ProcessingTime" startTime="1751064151096" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ws.Transaction.JTS.TxServerInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151096" max="0" min="0" name="ProcessingTime" startTime="1751064151096" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ws.activity.remote.cos.ActivityIORInterceptor">
+<TimeStatistic ID="11" count="76" lastSampleTime="1751064152799" max="0" min="0" name="ProcessingTime" startTime="1751064151104" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ws.activity.remote.cos.ActivityServiceClientInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151095" max="0" min="0" name="ProcessingTime" startTime="1751064151095" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ws.activity.remote.cos.ActivityServiceServerInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151104" max="0" min="0" name="ProcessingTime" startTime="1751064151104" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="com.ibm.ws.runtime.workloadcontroller.OrbWorkloadRequestInterceptor">
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064151104" max="0" min="0" name="ProcessingTime" startTime="1751064151104" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<TimeStatistic ID="11" count="304" lastSampleTime="1751064152799" max="3" min="0" name="ProcessingTime" startTime="1751064151088" totalTime="5" unit="MILLISECOND"/>
+</Stat>
+<TimeStatistic ID="1" count="0" lastSampleTime="1751064151088" max="0" min="0" name="LookupTime" startTime="1751064151088" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151088" name="RequestCount" startTime="1751064151088" unit="N/A"/>
+<RangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751064151088" lowWaterMark="0" mean="0.0" name="ConcurrentRequestCount" startTime="1751064151088" unit="N/A" value="0"/>
+</Stat>
+<Stat name="pmiWebServiceModule">
+<Stat name="filetransferSecured.filetransfer.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152409" name="RequestReceivedService" startTime="1751064152409" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152409" name="RequestDispatchedService" startTime="1751064152409" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152409" name="RequestSuccessfulService" startTime="1751064152409" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152409" max="0" min="0" name="ResponseTimeService" startTime="1751064152409" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152409" max="0" min="0" name="RequestResponseService" startTime="1751064152409" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152409" max="0" min="0" name="DispatchResponseService" startTime="1751064152409" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152409" max="0" min="0" name="ReplyResponseService" startTime="1751064152409" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152409" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152409" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152409" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152409" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152409" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152409" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152408" name="ServicesLoaded" startTime="1751064152408" unit="N/A"/>
+</Stat>
+<Stat name="ibmasyncrsp.ibmasyncrsp.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152516" name="RequestReceivedService" startTime="1751064152516" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152516" name="RequestDispatchedService" startTime="1751064152516" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152516" name="RequestSuccessfulService" startTime="1751064152516" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152516" max="0" min="0" name="ResponseTimeService" startTime="1751064152516" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152516" max="0" min="0" name="RequestResponseService" startTime="1751064152516" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152516" max="0" min="0" name="DispatchResponseService" startTime="1751064152516" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152516" max="0" min="0" name="ReplyResponseService" startTime="1751064152516" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152516" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152516" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152516" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152516" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152516" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152516" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152516" name="ServicesLoaded" startTime="1751064152516" unit="N/A"/>
+</Stat>
+<Stat name="isclite.ISCAdminPortlet.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152731" name="RequestReceivedService" startTime="1751064152731" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152731" name="RequestDispatchedService" startTime="1751064152731" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152731" name="RequestSuccessfulService" startTime="1751064152731" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152731" max="0" min="0" name="ResponseTimeService" startTime="1751064152731" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152731" max="0" min="0" name="RequestResponseService" startTime="1751064152731" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152731" max="0" min="0" name="DispatchResponseService" startTime="1751064152731" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152731" max="0" min="0" name="ReplyResponseService" startTime="1751064152731" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152731" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152731" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152731" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152731" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152731" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152731" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152731" name="ServicesLoaded" startTime="1751064152731" unit="N/A"/>
+</Stat>
+<Stat name="isclite.WIMPortlet.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152751" name="RequestReceivedService" startTime="1751064152751" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152751" name="RequestDispatchedService" startTime="1751064152751" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152751" name="RequestSuccessfulService" startTime="1751064152751" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152751" max="0" min="0" name="ResponseTimeService" startTime="1751064152751" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152751" max="0" min="0" name="RequestResponseService" startTime="1751064152751" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152751" max="0" min="0" name="DispatchResponseService" startTime="1751064152751" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152751" max="0" min="0" name="ReplyResponseService" startTime="1751064152751" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152751" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152751" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152751" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152751" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152751" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152751" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152751" name="ServicesLoaded" startTime="1751064152751" unit="N/A"/>
+</Stat>
+<Stat name="isclite.adminredirector.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152672" name="RequestReceivedService" startTime="1751064152672" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152672" name="RequestDispatchedService" startTime="1751064152672" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152672" name="RequestSuccessfulService" startTime="1751064152672" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152672" max="0" min="0" name="ResponseTimeService" startTime="1751064152672" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152672" max="0" min="0" name="RequestResponseService" startTime="1751064152672" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152672" max="0" min="0" name="DispatchResponseService" startTime="1751064152672" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152672" max="0" min="0" name="ReplyResponseService" startTime="1751064152672" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152672" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152672" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152672" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152672" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152672" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152672" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152672" name="ServicesLoaded" startTime="1751064152672" unit="N/A"/>
+</Stat>
+<Stat name="isclite.isclite.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152645" name="RequestReceivedService" startTime="1751064152645" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152645" name="RequestDispatchedService" startTime="1751064152645" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152645" name="RequestSuccessfulService" startTime="1751064152645" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152645" max="0" min="0" name="ResponseTimeService" startTime="1751064152645" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152645" max="0" min="0" name="RequestResponseService" startTime="1751064152645" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152645" max="0" min="0" name="DispatchResponseService" startTime="1751064152645" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152645" max="0" min="0" name="ReplyResponseService" startTime="1751064152645" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152645" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152645" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152645" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152645" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152645" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152645" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152645" name="ServicesLoaded" startTime="1751064152645" unit="N/A"/>
+</Stat>
+<Stat name="isclite.wasportlet.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152768" name="RequestReceivedService" startTime="1751064152768" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152768" name="RequestDispatchedService" startTime="1751064152768" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152768" name="RequestSuccessfulService" startTime="1751064152768" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152768" max="0" min="0" name="ResponseTimeService" startTime="1751064152768" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152768" max="0" min="0" name="RequestResponseService" startTime="1751064152768" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152768" max="0" min="0" name="DispatchResponseService" startTime="1751064152768" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152768" max="0" min="0" name="ReplyResponseService" startTime="1751064152768" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152768" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152768" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152768" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152768" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152768" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152768" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152768" name="ServicesLoaded" startTime="1751064152768" unit="N/A"/>
+</Stat>
+<Stat name="perfServletApp.perfServletApp.war">
+<Stat name="pmiWebServiceService">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152662" name="RequestReceivedService" startTime="1751064152662" unit="N/A"/>
+<CountStatistic ID="12" count="0" lastSampleTime="1751064152662" name="RequestDispatchedService" startTime="1751064152662" unit="N/A"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152662" name="RequestSuccessfulService" startTime="1751064152662" unit="N/A"/>
+<TimeStatistic ID="14" count="0" lastSampleTime="1751064152662" max="0" min="0" name="ResponseTimeService" startTime="1751064152662" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152662" max="0" min="0" name="RequestResponseService" startTime="1751064152662" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="16" count="0" lastSampleTime="1751064152662" max="0" min="0" name="DispatchResponseService" startTime="1751064152662" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152662" max="0" min="0" name="ReplyResponseService" startTime="1751064152662" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751064152662" max="0" mean="0.0" min="0" name="SizeService" startTime="1751064152662" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="19" count="0" lastSampleTime="1751064152662" max="0" mean="0.0" min="0" name="RequestSizeService" startTime="1751064152662" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+<AverageStatistic ID="20" count="0" lastSampleTime="1751064152662" max="0" mean="0.0" min="0" name="ReplySizeService" startTime="1751064152662" sumOfSquares="0.0" total="0" unit="unit.byte"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152662" name="ServicesLoaded" startTime="1751064152662" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152768" name="ServicesLoaded" startTime="1751064152408" unit="N/A"/>
+</Stat>
+<Stat name="Servlet Session Manager">
+<Stat name="filetransferSecured#filetransfer.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152384" name="CreateCount" startTime="1751064152384" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152384" name="InvalidateCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152384" max="0" min="0" name="LifeTime" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152384" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152384" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152384" name="NoRoomForNewSessionCount" startTime="1751064152384" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152384" name="CacheDiscardCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152384" max="0" min="0" name="ExternalReadTime" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152384" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152384" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152384" max="0" min="0" name="ExternalWriteTime" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152384" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152384" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152384" name="AffinityBreakCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152384" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152384" name="TimeoutInvalidationCount" startTime="1751064152384" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152384" name="ActivateNonExistSessionCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152384" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="ibmasyncrsp#ibmasyncrsp.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152504" name="CreateCount" startTime="1751064152504" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152504" name="InvalidateCount" startTime="1751064152504" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152504" max="0" min="0" name="LifeTime" startTime="1751064152504" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152504" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152504" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152504" name="NoRoomForNewSessionCount" startTime="1751064152504" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152504" name="CacheDiscardCount" startTime="1751064152504" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152504" max="0" min="0" name="ExternalReadTime" startTime="1751064152504" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152504" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152504" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152504" max="0" min="0" name="ExternalWriteTime" startTime="1751064152504" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152504" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152504" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152504" name="AffinityBreakCount" startTime="1751064152504" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152504" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152504" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152504" name="TimeoutInvalidationCount" startTime="1751064152504" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152504" name="ActivateNonExistSessionCount" startTime="1751064152504" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152504" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="isclite#ISCAdminPortlet.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152713" name="CreateCount" startTime="1751064152713" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152713" name="InvalidateCount" startTime="1751064152713" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152713" max="0" min="0" name="LifeTime" startTime="1751064152713" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152713" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152713" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152713" name="NoRoomForNewSessionCount" startTime="1751064152713" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152713" name="CacheDiscardCount" startTime="1751064152713" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152713" max="0" min="0" name="ExternalReadTime" startTime="1751064152713" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152713" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152713" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152713" max="0" min="0" name="ExternalWriteTime" startTime="1751064152713" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152713" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152713" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152713" name="AffinityBreakCount" startTime="1751064152713" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152713" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152713" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152713" name="TimeoutInvalidationCount" startTime="1751064152713" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152713" name="ActivateNonExistSessionCount" startTime="1751064152713" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152713" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="isclite#WIMPortlet.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152745" name="CreateCount" startTime="1751064152745" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152745" name="InvalidateCount" startTime="1751064152745" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152745" max="0" min="0" name="LifeTime" startTime="1751064152745" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152745" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152745" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152745" name="NoRoomForNewSessionCount" startTime="1751064152745" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152745" name="CacheDiscardCount" startTime="1751064152745" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152745" max="0" min="0" name="ExternalReadTime" startTime="1751064152745" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152745" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152745" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152745" max="0" min="0" name="ExternalWriteTime" startTime="1751064152745" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152745" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152745" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152745" name="AffinityBreakCount" startTime="1751064152745" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152745" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152745" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152745" name="TimeoutInvalidationCount" startTime="1751064152745" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152745" name="ActivateNonExistSessionCount" startTime="1751064152745" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152745" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="isclite#adminredirector.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152668" name="CreateCount" startTime="1751064152668" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152668" name="InvalidateCount" startTime="1751064152668" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152668" max="0" min="0" name="LifeTime" startTime="1751064152668" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152668" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152668" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152668" name="NoRoomForNewSessionCount" startTime="1751064152668" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152668" name="CacheDiscardCount" startTime="1751064152668" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152668" max="0" min="0" name="ExternalReadTime" startTime="1751064152668" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152668" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152668" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152668" max="0" min="0" name="ExternalWriteTime" startTime="1751064152668" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152668" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152668" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152668" name="AffinityBreakCount" startTime="1751064152668" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152668" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152668" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152668" name="TimeoutInvalidationCount" startTime="1751064152668" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152668" name="ActivateNonExistSessionCount" startTime="1751064152668" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152668" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="isclite#isclite.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152563" name="CreateCount" startTime="1751064152563" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152563" name="InvalidateCount" startTime="1751064152563" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152563" max="0" min="0" name="LifeTime" startTime="1751064152563" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152563" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152563" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152563" name="NoRoomForNewSessionCount" startTime="1751064152563" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152563" name="CacheDiscardCount" startTime="1751064152563" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152563" max="0" min="0" name="ExternalReadTime" startTime="1751064152563" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152563" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152563" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152563" max="0" min="0" name="ExternalWriteTime" startTime="1751064152563" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152563" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152563" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152563" name="AffinityBreakCount" startTime="1751064152563" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152563" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152563" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152563" name="TimeoutInvalidationCount" startTime="1751064152563" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152563" name="ActivateNonExistSessionCount" startTime="1751064152563" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152563" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="isclite#wasportlet.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152764" name="CreateCount" startTime="1751064152764" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152764" name="InvalidateCount" startTime="1751064152764" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152764" max="0" min="0" name="LifeTime" startTime="1751064152764" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152764" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152764" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152764" name="NoRoomForNewSessionCount" startTime="1751064152764" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152764" name="CacheDiscardCount" startTime="1751064152764" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152764" max="0" min="0" name="ExternalReadTime" startTime="1751064152764" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152764" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152764" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152764" max="0" min="0" name="ExternalWriteTime" startTime="1751064152764" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152764" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152764" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152764" name="AffinityBreakCount" startTime="1751064152764" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152764" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152764" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152764" name="TimeoutInvalidationCount" startTime="1751064152764" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152764" name="ActivateNonExistSessionCount" startTime="1751064152764" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152764" totalTime="0" unit="BYTE"/>
+</Stat>
+<Stat name="perfServletApp#perfServletApp.war">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152657" name="CreateCount" startTime="1751064152657" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152657" name="InvalidateCount" startTime="1751064152657" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152657" max="0" min="0" name="LifeTime" startTime="1751064152657" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152657" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152657" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152657" name="NoRoomForNewSessionCount" startTime="1751064152657" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152657" name="CacheDiscardCount" startTime="1751064152657" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152657" max="0" min="0" name="ExternalReadTime" startTime="1751064152657" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152657" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152657" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152657" max="0" min="0" name="ExternalWriteTime" startTime="1751064152657" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152657" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152657" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152657" name="AffinityBreakCount" startTime="1751064152657" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152657" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152657" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152657" name="TimeoutInvalidationCount" startTime="1751064152657" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152657" name="ActivateNonExistSessionCount" startTime="1751064152657" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" min="0" name="SessionObjectSize" startTime="1751064152657" totalTime="0" unit="BYTE"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152764" name="CreateCount" startTime="1751064152384" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152764" name="InvalidateCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="4" count="0" lastSampleTime="1751064152764" max="0" min="0" name="LifeTime" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<RangeStatistic ID="6" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ActiveCount" startTime="1751064152384" unit="N/A" value="0"/>
+<RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="LiveCount" startTime="1751064152384" unit="N/A" value="0"/>
+<CountStatistic ID="8" count="0" lastSampleTime="1751064152764" name="NoRoomForNewSessionCount" startTime="1751064152384" unit="N/A"/>
+<CountStatistic ID="9" count="0" lastSampleTime="1751064152764" name="CacheDiscardCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152764" max="0" min="0" name="ExternalReadTime" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="11" count="0" lastSampleTime="1751064152764" max="0" mean="0.0" min="0" name="ExternalReadSize" startTime="1751064152384" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152764" max="0" min="0" name="ExternalWriteTime" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<AverageStatistic ID="13" count="0" lastSampleTime="1751064152764" max="0" mean="0.0" min="0" name="ExternalWriteSize" startTime="1751064152384" sumOfSquares="0.0" total="0" unit="BYTE"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152764" name="AffinityBreakCount" startTime="1751064152384" unit="N/A"/>
+<TimeStatistic ID="15" count="0" lastSampleTime="1751064152764" max="0" min="0" name="TimeSinceLastActivated" startTime="1751064152384" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152764" name="TimeoutInvalidationCount" startTime="1751064152384" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152764" name="ActivateNonExistSessionCount" startTime="1751064152384" unit="N/A"/>
+<AverageStatistic ID="18" count="0" lastSampleTime="1751111155385" max="0" mean="0.0" min="0" name="SessionObjectSize" startTime="1751064152384" sumOfSquares="0.0" total="0" unit="BYTE"/>
+</Stat>
+<Stat name="System Data">
+<CountStatistic ID="1" count="1" lastSampleTime="1751111155385" name="CPUUsageSinceLastMeasurement" startTime="1751064151079" unit="N/A"/>
+<AverageStatistic ID="2" count="45865" lastSampleTime="1751111155385" max="75" mean="1.8019404774882808" min="0" name="CPUUsageSinceServerStarted" startTime="1751064151079" sumOfSquares="0.0" total="82646" unit="N/A"/>
+<CountStatistic ID="3" count="9775998" lastSampleTime="1751111155385" name="FreeMemory" startTime="1751064151079" unit="N/A"/>
+</Stat>
+<Stat name="Thread Pools">
+<Stat name="AriesThreadPool">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151070" name="CreateCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151070" name="DestroyCount" startTime="1751064151070" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="1" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="1" lowerBound="1" mean="0.0" name="PoolSize" startTime="1751064151070" unit="N/A" upperBound="5" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151070" name="DeclaredThreadHungCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151070" name="ClearedThreadHangCount" startTime="1751064151070" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151070" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="5" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<Stat name="Default">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151070" name="CreateCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151070" name="DestroyCount" startTime="1751064151070" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="20" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="20" lowerBound="20" mean="0.0" name="PoolSize" startTime="1751064151070" unit="N/A" upperBound="20" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151070" name="DeclaredThreadHungCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151070" name="ClearedThreadHangCount" startTime="1751064151070" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151070" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="20" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<Stat name="HAManager.thread.pool">
+<CountStatistic ID="1" count="2" lastSampleTime="1751064151834" name="CreateCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151069" name="DestroyCount" startTime="1751064151069" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="2" integral="2.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="4.254928419764687E-8" name="ActiveCount" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="2" integral="9.4007102E7" lastSampleTime="1751111155385" lowWaterMark="1" lowerBound="2" mean="1.9999674497975888" name="PoolSize" startTime="1751064151069" unit="N/A" upperBound="2" value="2"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151069" name="DeclaredThreadHungCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151069" name="ClearedThreadHangCount" startTime="1751064151069" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151069" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151069" max="0" min="0" name="ActiveTime" startTime="1751064151069" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="100" integral="100.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="2.1274642098823437E-6" name="PercentUsed" startTime="1751064151069" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="2" lastSampleTime="1751064151069" name="MaxPoolSize" startTime="1751064151069" unit="N/A"/>
+</Stat>
+<Stat name="Message Listener">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151069" name="CreateCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151069" name="DestroyCount" startTime="1751064151069" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="10" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="10" lowerBound="10" mean="0.0" name="PoolSize" startTime="1751064151069" unit="N/A" upperBound="50" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151069" name="DeclaredThreadHungCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151069" name="ClearedThreadHangCount" startTime="1751064151069" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151069" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="50" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<Stat name="Object Request Broker">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151070" name="CreateCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151070" name="DestroyCount" startTime="1751064151070" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="10" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="10" lowerBound="10" mean="0.0" name="PoolSize" startTime="1751064151070" unit="N/A" upperBound="50" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151070" name="DeclaredThreadHungCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151070" name="ClearedThreadHangCount" startTime="1751064151070" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151070" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="50" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<Stat name="SIBFAPInboundThreadPool">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151070" name="CreateCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151070" name="DestroyCount" startTime="1751064151070" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="4" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="4" lowerBound="4" mean="0.0" name="PoolSize" startTime="1751064151070" unit="N/A" upperBound="50" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151070" name="DeclaredThreadHungCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151070" name="ClearedThreadHangCount" startTime="1751064151070" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151070" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="50" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<Stat name="SIBFAPThreadPool">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151069" name="CreateCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151069" name="DestroyCount" startTime="1751064151069" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="4" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="4" lowerBound="4" mean="0.0" name="PoolSize" startTime="1751064151069" unit="N/A" upperBound="50" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151069" name="DeclaredThreadHungCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151069" name="ClearedThreadHangCount" startTime="1751064151069" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151069" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151069" max="0" min="0" name="ActiveTime" startTime="1751064151069" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151069" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="50" lastSampleTime="1751064151069" name="MaxPoolSize" startTime="1751064151069" unit="N/A"/>
+</Stat>
+<Stat name="SoapConnectorThreadPool">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151980" name="CreateCount" startTime="1751064151980" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151980" name="DestroyCount" startTime="1751064151980" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151980" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="3" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="3" lowerBound="3" mean="0.0" name="PoolSize" startTime="1751064151980" unit="N/A" upperBound="50" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151980" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151980" name="DeclaredThreadHungCount" startTime="1751064151980" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151980" name="ClearedThreadHangCount" startTime="1751064151980" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151980" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151980" max="0" min="0" name="ActiveTime" startTime="1751064151980" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151980" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="5" lastSampleTime="1751064151980" name="MaxPoolSize" startTime="1751064151980" unit="N/A"/>
+</Stat>
+<Stat name="TCPChannel.DCS">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064151070" name="CreateCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151070" name="DestroyCount" startTime="1751064151070" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="20" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="20" lowerBound="20" mean="0.0" name="PoolSize" startTime="1751064151070" unit="N/A" upperBound="20" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151070" name="DeclaredThreadHungCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151070" name="ClearedThreadHangCount" startTime="1751064151070" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151070" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="20" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<Stat name="WMQJCAResourceAdapter">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152078" name="CreateCount" startTime="1751064152078" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152078" name="DestroyCount" startTime="1751064152078" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="ActiveCount" startTime="1751064152078" unit="N/A" upperBound="0" value="0"/>
+<BoundedRangeStatistic ID="4" highWaterMark="10" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="10" lowerBound="10" mean="0.0" name="PoolSize" startTime="1751064152078" unit="N/A" upperBound="50" value="0"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064152078" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064152078" name="DeclaredThreadHungCount" startTime="1751064152078" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064152078" name="ClearedThreadHangCount" startTime="1751064152078" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064152078" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064152078" max="0" min="0" name="ActiveTime" startTime="1751064152078" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentUsed" startTime="1751064152078" unit="N/A" upperBound="100" value="0"/>
+<CountStatistic ID="11" count="50" lastSampleTime="1751064152078" name="MaxPoolSize" startTime="1751064152078" unit="N/A"/>
+</Stat>
+<Stat name="WebContainer">
+<CountStatistic ID="1" count="3" lastSampleTime="1751072466038" name="CreateCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064151070" name="DestroyCount" startTime="1751064151070" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="3" integral="7.1797577E7" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="1.5274677867340478" name="ActiveCount" startTime="1751064151070" unit="N/A" upperBound="0" value="3"/>
+<BoundedRangeStatistic ID="4" highWaterMark="50" integral="1.31725091E8" lastSampleTime="1751111155385" lowWaterMark="1" lowerBound="50" mean="2.802404226080095" name="PoolSize" startTime="1751064151070" unit="N/A" upperBound="50" value="3"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151070" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064151070" name="DeclaredThreadHungCount" startTime="1751064151070" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064151070" name="ClearedThreadHangCount" startTime="1751064151070" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151070" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064151070" max="0" min="0" name="ActiveTime" startTime="1751064151070" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="6" integral="1.43595142E8" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="3.054935318172385" name="PercentUsed" startTime="1751064151070" unit="N/A" upperBound="100" value="6"/>
+<CountStatistic ID="11" count="50" lastSampleTime="1751064151070" name="MaxPoolSize" startTime="1751064151070" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="5" lastSampleTime="1751072466038" name="CreateCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152078" name="DestroyCount" startTime="1751064151069" unit="N/A"/>
+<BoundedRangeStatistic ID="3" highWaterMark="3" integral="7.179758E7" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="1.5274678180616434" name="ActiveCount" startTime="1751064151069" unit="N/A" upperBound="0" value="3"/>
+<BoundedRangeStatistic ID="4" highWaterMark="50" integral="2.25732195E8" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="4.8023716588068215" name="PoolSize" startTime="1751064151069" unit="N/A" upperBound="0" value="5"/>
+<BoundedRangeStatistic ID="5" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="0.0" name="PercentMaxed" startTime="1751064151069" unit="N/A" upperBound="0" value="0"/>
+<CountStatistic ID="6" count="0" lastSampleTime="1751064152078" name="DeclaredThreadHungCount" startTime="1751064151069" unit="N/A"/>
+<CountStatistic ID="7" count="0" lastSampleTime="1751064152078" name="ClearedThreadHangCount" startTime="1751064151069" unit="N/A"/>
+<RangeStatistic ID="8" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentHungThreadCount" startTime="1751064151069" unit="N/A" value="0"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064152078" max="0" min="0" name="ActiveTime" startTime="1751064151069" totalTime="0" unit="MILLISECOND"/>
+<BoundedRangeStatistic ID="10" highWaterMark="100" integral="1.43595245E8" lastSampleTime="1751111155385" lowWaterMark="0" lowerBound="0" mean="3.0549374444678654" name="PercentUsed" startTime="1751064151069" unit="N/A" upperBound="0" value="1"/>
+<CountStatistic ID="11" count="352" lastSampleTime="1751064152078" name="MaxPoolSize" startTime="1751064151069" unit="N/A"/>
+</Stat>
+<Stat name="Transaction Manager">
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152013" name="GlobalBegunCount" startTime="1751064152013" unit="N/A"/>
+<CountStatistic ID="2" count="0" lastSampleTime="1751064152014" name="GlobalInvolvedCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="3" count="0" lastSampleTime="1751064152014" name="LocalBegunCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="4" count="0" lastSampleTime="1751064152014" name="ActiveCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="5" count="0" lastSampleTime="1751064152014" name="LocalActiveCount" startTime="1751064152014" unit="N/A"/>
+<TimeStatistic ID="6" count="0" lastSampleTime="1751064152014" max="0" min="0" name="GlobalTranTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="7" count="0" lastSampleTime="1751064152014" max="0" min="0" name="LocalTranTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="8" count="0" lastSampleTime="1751064152014" max="0" min="0" name="GlobalBeforeCompletionTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="9" count="0" lastSampleTime="1751064152014" max="0" min="0" name="GlobalPrepareTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="10" count="0" lastSampleTime="1751064152014" max="0" min="0" name="GlobalCommitTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="11" count="0" lastSampleTime="1751064152014" max="0" min="0" name="LocalBeforeCompletionTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="12" count="0" lastSampleTime="1751064152014" max="0" min="0" name="LocalCommitTime" startTime="1751064152014" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="13" count="0" lastSampleTime="1751064152014" name="OptimizationCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152014" name="CommittedCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152014" name="LocalCommittedCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="16" count="0" lastSampleTime="1751064152014" name="RolledbackCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="17" count="0" lastSampleTime="1751064152014" name="LocalRolledbackCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="18" count="0" lastSampleTime="1751064152014" name="GlobalTimeoutCount" startTime="1751064152014" unit="N/A"/>
+<CountStatistic ID="19" count="0" lastSampleTime="1751064152014" name="LocalTimeoutCount" startTime="1751064152014" unit="N/A"/>
+</Stat>
+<Stat name="Web Applications">
+<Stat name="filetransferSecured#filetransfer.war">
+<Stat name="Servlets">
+<Stat name="transfer">
+<Stat name="URLs">
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152405" name="URIRequestCount" startTime="1751064152405" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="URIConcurrentRequests" startTime="1751064152405" unit="N/A" value="0"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152405" max="0" min="0" name="URIServiceTime" startTime="1751064152405" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064152405" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064152405" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152405" name="RequestCount" startTime="1751064152405" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152405" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152405" max="0" min="0" name="ServiceTime" startTime="1751064152405" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152405" name="ErrorCount" startTime="1751064152405" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152405" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152405" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152405" name="RequestCount" startTime="1751064152386" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152386" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152405" max="0" min="0" name="ServiceTime" startTime="1751064152386" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152405" name="ErrorCount" startTime="1751064152386" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152405" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152386" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="1" lastSampleTime="1751064152405" name="LoadedServletCount" startTime="1751064152386" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152386" name="ReloadCount" startTime="1751064152386" unit="N/A"/>
+</Stat>
+<Stat name="ibmasyncrsp#ibmasyncrsp.war">
+<Stat name="Servlets">
+<Stat name="rspservlet">
+<Stat name="URLs">
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152514" name="URIRequestCount" startTime="1751064152514" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="URIConcurrentRequests" startTime="1751064152514" unit="N/A" value="0"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152514" max="0" min="0" name="URIServiceTime" startTime="1751064152514" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064152514" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064152514" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152514" name="RequestCount" startTime="1751064152514" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152514" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152514" max="0" min="0" name="ServiceTime" startTime="1751064152514" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152514" name="ErrorCount" startTime="1751064152514" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152514" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152514" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152514" name="RequestCount" startTime="1751064152504" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152504" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152514" max="0" min="0" name="ServiceTime" startTime="1751064152504" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152514" name="ErrorCount" startTime="1751064152504" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152514" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152504" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="1" lastSampleTime="1751064152514" name="LoadedServletCount" startTime="1751064152504" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152504" name="ReloadCount" startTime="1751064152504" unit="N/A"/>
+</Stat>
+<Stat name="isclite#ISCAdminPortlet.war">
+<Stat name="Portlet Application">
+<Stat name="Details">
+<CountStatistic ID="100" count="4" lastSampleTime="1751064152722" name="Number of loaded portlets" startTime="1751064152720" unit="N/A"/>
+</Stat>
+<CountStatistic ID="100" count="4" lastSampleTime="1751064152722" name="Number of loaded portlets" startTime="1751064152720" unit="N/A"/>
+</Stat>
+<Stat name="Portlets">
+<Stat name="ConsoleIdentityPortlet">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152721" name="Number of portlet requests" startTime="1751064152721" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152721" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet render" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet action" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152721" name="Number of portlet errors" startTime="1751064152721" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="ISCProductDetails">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152721" name="Number of portlet requests" startTime="1751064152721" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152721" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet render" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet action" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152721" name="Number of portlet errors" startTime="1751064152721" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="PortletPref">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152721" name="Number of portlet requests" startTime="1751064152721" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152721" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet render" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet action" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152721" name="Number of portlet errors" startTime="1751064152721" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="WelcomePortlet">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152721" name="Number of portlet requests" startTime="1751064152721" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152721" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet render" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet action" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152721" name="Number of portlet errors" startTime="1751064152721" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152721" name="Number of portlet requests" startTime="1751064152721" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152721" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet render" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of portlet action" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152721" name="Number of portlet errors" startTime="1751064152721" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152721" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="Servlets">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152713" name="RequestCount" startTime="1751064152713" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152713" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152713" max="0" min="0" name="ServiceTime" startTime="1751064152713" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152713" name="ErrorCount" startTime="1751064152713" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152713" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152713" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152713" name="LoadedServletCount" startTime="1751064152713" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152713" name="ReloadCount" startTime="1751064152713" unit="N/A"/>
+</Stat>
+<Stat name="isclite#WIMPortlet.war">
+<Stat name="Portlet Application">
+<Stat name="Details">
+<CountStatistic ID="100" count="2" lastSampleTime="1751064152747" name="Number of loaded portlets" startTime="1751064152747" unit="N/A"/>
+</Stat>
+<CountStatistic ID="100" count="2" lastSampleTime="1751064152747" name="Number of loaded portlets" startTime="1751064152747" unit="N/A"/>
+</Stat>
+<Stat name="Portlets">
+<Stat name="WIM Group Management">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152747" name="Number of portlet requests" startTime="1751064152747" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152747" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of portlet render" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of portlet action" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152747" name="Number of portlet errors" startTime="1751064152747" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="WIM User Management">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152747" name="Number of portlet requests" startTime="1751064152747" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152747" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of portlet render" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of portlet action" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152747" name="Number of portlet errors" startTime="1751064152747" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152747" name="Number of portlet requests" startTime="1751064152747" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152747" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of portlet render" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of portlet action" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152747" name="Number of portlet errors" startTime="1751064152747" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152747" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152747" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="Servlets">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152746" name="RequestCount" startTime="1751064152746" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152746" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152746" max="0" min="0" name="ServiceTime" startTime="1751064152746" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152746" name="ErrorCount" startTime="1751064152746" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152746" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152746" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152746" name="LoadedServletCount" startTime="1751064152746" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152746" name="ReloadCount" startTime="1751064152746" unit="N/A"/>
+</Stat>
+<Stat name="isclite#adminredirector.war">
+<Stat name="Servlets">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152669" name="RequestCount" startTime="1751064152669" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152669" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152669" max="0" min="0" name="ServiceTime" startTime="1751064152669" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152669" name="ErrorCount" startTime="1751064152669" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152668" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152668" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152668" name="LoadedServletCount" startTime="1751064152668" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152669" name="ReloadCount" startTime="1751064152668" unit="N/A"/>
+</Stat>
+<Stat name="isclite#isclite.war">
+<Stat name="Servlets">
+<Stat name="EventInitializer">
+<Stat name="URLs">
+<CountStatistic ID="15" count="0" lastSampleTime="1751064152640" name="URIRequestCount" startTime="1751064152640" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="URIConcurrentRequests" startTime="1751064152640" unit="N/A" value="0"/>
+<TimeStatistic ID="17" count="0" lastSampleTime="1751064152640" max="0" min="0" name="URIServiceTime" startTime="1751064152640" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064152640" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064152640" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152640" name="RequestCount" startTime="1751064152640" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152640" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152640" max="0" min="0" name="ServiceTime" startTime="1751064152640" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152640" name="ErrorCount" startTime="1751064152640" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152640" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152640" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152640" name="RequestCount" startTime="1751064152564" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152564" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152640" max="0" min="0" name="ServiceTime" startTime="1751064152564" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152640" name="ErrorCount" startTime="1751064152564" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152640" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152564" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="1" lastSampleTime="1751064152640" name="LoadedServletCount" startTime="1751064152564" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152564" name="ReloadCount" startTime="1751064152564" unit="N/A"/>
+</Stat>
+<Stat name="isclite#wasportlet.war">
+<Stat name="Portlet Application">
+<Stat name="Details">
+<CountStatistic ID="100" count="1" lastSampleTime="1751064152765" name="Number of loaded portlets" startTime="1751064152765" unit="N/A"/>
+</Stat>
+<CountStatistic ID="100" count="1" lastSampleTime="1751064152765" name="Number of loaded portlets" startTime="1751064152765" unit="N/A"/>
+</Stat>
+<Stat name="Portlets">
+<Stat name="WASAboutPortlet">
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152765" name="Number of portlet requests" startTime="1751064152765" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152765" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of portlet render" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of portlet action" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152765" name="Number of portlet errors" startTime="1751064152765" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="115" count="0" lastSampleTime="1751064152765" name="Number of portlet requests" startTime="1751064152765" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152765" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of portlet render" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of portlet action" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064152765" name="Number of portlet errors" startTime="1751064152765" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152765" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="Servlets">
+<CountStatistic ID="11" count="0" lastSampleTime="1751064152764" name="RequestCount" startTime="1751064152764" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="ConcurrentRequests" startTime="1751064152764" unit="N/A" value="0"/>
+<TimeStatistic ID="13" count="0" lastSampleTime="1751064152764" max="0" min="0" name="ServiceTime" startTime="1751064152764" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064152764" name="ErrorCount" startTime="1751064152764" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064152764" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152764" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="0" lastSampleTime="1751064152764" name="LoadedServletCount" startTime="1751064152764" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152764" name="ReloadCount" startTime="1751064152764" unit="N/A"/>
+</Stat>
+<Stat name="perfServletApp#perfServletApp.war">
+<Stat name="Servlets">
+<Stat name="controller">
+<Stat name="URLs">
+<Stat name="/wasPerfTool/servlet/perfservlet">
+<CountStatistic ID="15" count="3624" lastSampleTime="1751111155384" name="URIRequestCount" startTime="1751064205950" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="1" integral="21363.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="4.550214502048853E-4" name="URIConcurrentRequests" startTime="1751064205950" unit="N/A" value="1"/>
+<TimeStatistic ID="17" count="3623" lastSampleTime="1751111149006" max="148" min="3" name="URIServiceTime" startTime="1751064205950" totalTime="21290" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064205950" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064205950" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="15" count="3624" lastSampleTime="1751111155384" name="URIRequestCount" startTime="1751064205947" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="1" integral="21363.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="4.5502142112968425E-4" name="URIConcurrentRequests" startTime="1751064205947" unit="N/A" value="1"/>
+<TimeStatistic ID="17" count="3623" lastSampleTime="1751111149006" max="148" min="3" name="URIServiceTime" startTime="1751064205947" totalTime="21290" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064205950" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064205947" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="3624" lastSampleTime="1751111155384" name="RequestCount" startTime="1751064205947" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="1" integral="21363.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="4.5502142112968425E-4" name="ConcurrentRequests" startTime="1751064205947" unit="N/A" value="1"/>
+<TimeStatistic ID="13" count="3623" lastSampleTime="1751111149006" max="148" min="3" name="ServiceTime" startTime="1751064205947" totalTime="21290" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064205947" name="ErrorCount" startTime="1751064205947" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064205947" max="0" min="0" name="AsyncContext Response Time" startTime="1751064205947" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<Stat name="perfservlet60">
+<Stat name="URLs">
+<Stat name="/wasPerfTool/servlet/perfservlet60">
+<CountStatistic ID="15" count="3624" lastSampleTime="1751111155384" name="URIRequestCount" startTime="1751064205955" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="1" integral="20563.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="4.379818788432175E-4" name="URIConcurrentRequests" startTime="1751064205954" unit="N/A" value="1"/>
+<TimeStatistic ID="17" count="3623" lastSampleTime="1751111149006" max="142" min="3" name="URIServiceTime" startTime="1751064205955" totalTime="20516" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064205955" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064205955" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="15" count="3624" lastSampleTime="1751111155384" name="URIRequestCount" startTime="1751064205954" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="1" integral="20563.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="4.379818788432175E-4" name="URIConcurrentRequests" startTime="1751064205954" unit="N/A" value="1"/>
+<TimeStatistic ID="17" count="3623" lastSampleTime="1751111149006" max="142" min="3" name="URIServiceTime" startTime="1751064205954" totalTime="20516" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064205955" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064205954" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="3624" lastSampleTime="1751111155384" name="RequestCount" startTime="1751064205953" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="1" integral="20563.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="4.379818695144171E-4" name="ConcurrentRequests" startTime="1751064205953" unit="N/A" value="1"/>
+<TimeStatistic ID="13" count="3623" lastSampleTime="1751111149006" max="142" min="3" name="ServiceTime" startTime="1751064205953" totalTime="20516" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064205953" name="ErrorCount" startTime="1751064205953" unit="N/A"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064205953" max="0" min="0" name="AsyncContext Response Time" startTime="1751064205953" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="11" count="7248" lastSampleTime="1751111155384" name="RequestCount" startTime="1751064152657" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="1" integral="41973.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="8.929907217300238E-4" name="ConcurrentRequests" startTime="1751064152657" unit="N/A" value="2"/>
+<TimeStatistic ID="13" count="7246" lastSampleTime="1751111149006" max="148" min="3" name="ServiceTime" startTime="1751064152657" totalTime="41806" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064205955" name="ErrorCount" startTime="1751064152657" unit="N/A"/>
+<CountStatistic ID="15" count="7248" lastSampleTime="1751111155384" name="URIRequestCount" startTime="1751064205950" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="1" integral="41926.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="8.930032917329037E-4" name="URIConcurrentRequests" startTime="1751064205950" unit="N/A" value="2"/>
+<TimeStatistic ID="17" count="7246" lastSampleTime="1751111149006" max="148" min="3" name="URIServiceTime" startTime="1751064205950" totalTime="41806" unit="MILLISECOND"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064205953" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152657" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064205955" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064205950" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+<CountStatistic ID="1" count="2" lastSampleTime="1751064205954" name="LoadedServletCount" startTime="1751064152657" unit="N/A"/>
+<CountStatistic ID="2" count="1" lastSampleTime="1751064152657" name="ReloadCount" startTime="1751064152657" unit="N/A"/>
+</Stat>
+<CountStatistic ID="1" count="5" lastSampleTime="1751064205955" name="LoadedServletCount" startTime="1751064152386" unit="N/A"/>
+<CountStatistic ID="2" count="8" lastSampleTime="1751064205955" name="ReloadCount" startTime="1751064152386" unit="N/A"/>
+<CountStatistic ID="11" count="7248" lastSampleTime="1751111155384" name="RequestCount" startTime="1751064152405" unit="N/A"/>
+<RangeStatistic ID="12" highWaterMark="1" integral="41973.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="8.929859340833284E-4" name="ConcurrentRequests" startTime="1751064152405" unit="N/A" value="2"/>
+<TimeStatistic ID="13" count="7246" lastSampleTime="1751111149006" max="148" min="3" name="ServiceTime" startTime="1751064152405" totalTime="41806" unit="MILLISECOND"/>
+<CountStatistic ID="14" count="0" lastSampleTime="1751064205955" name="ErrorCount" startTime="1751064152405" unit="N/A"/>
+<CountStatistic ID="15" count="7248" lastSampleTime="1751111155384" name="URIRequestCount" startTime="1751064205950" unit="N/A"/>
+<RangeStatistic ID="16" highWaterMark="1" integral="41926.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="8.930032917329037E-4" name="URIConcurrentRequests" startTime="1751064205950" unit="N/A" value="2"/>
+<TimeStatistic ID="17" count="7246" lastSampleTime="1751111149006" max="148" min="3" name="URIServiceTime" startTime="1751064205950" totalTime="41806" unit="MILLISECOND"/>
+<TimeStatistic ID="18" count="0" lastSampleTime="1751064205953" max="0" min="0" name="AsyncContext Response Time" startTime="1751064152405" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="19" count="0" lastSampleTime="1751064205955" max="0" min="0" name="URL AsyncContext Response Time" startTime="1751064205950" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="100" count="7" lastSampleTime="1751064205955" name="Number of loaded portlets" startTime="1751064152720" unit="N/A"/>
+<CountStatistic ID="115" count="0" lastSampleTime="1751064205955" name="Number of portlet requests" startTime="1751064152721" unit="N/A"/>
+<RangeStatistic ID="116" highWaterMark="0" integral="0.0" lastSampleTime="1751111155385" lowWaterMark="0" mean="0.0" name="Number of concurrent portlet requests" startTime="1751064152721" unit="N/A" value="0"/>
+<TimeStatistic ID="117" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of portlet render" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="118" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of portlet action" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<CountStatistic ID="119" count="0" lastSampleTime="1751064205955" name="Number of portlet errors" startTime="1751064152721" unit="N/A"/>
+<TimeStatistic ID="120" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of a portlet processEvent request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+<TimeStatistic ID="121" count="0" lastSampleTime="1751064152765" max="0" min="0" name="Response time of a portlet serveResource request" startTime="1751064152721" totalTime="0" unit="MILLISECOND"/>
+</Stat>
+</Stat>
+</Server>
+</Node>
+</PerformanceMonitor>
