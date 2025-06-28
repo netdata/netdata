@@ -33,6 +33,7 @@
 
             <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Access Netdata dashboard" />
             <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+            <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The Windows Agent is available for users with paid Netdata subscriptions. Free users will have limited functionality." />
             <Property Id="WixShellExecTarget" Value="http://localhost:19999" />
             <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_X86" />
 
