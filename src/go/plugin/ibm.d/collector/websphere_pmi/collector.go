@@ -178,8 +178,23 @@ type pmiCacheEntry struct {
 
 // PMI XML structures
 type pmiStatsResponse struct {
-	XMLName xml.Name  `xml:"PerformanceMonitor"`
-	Stats   []pmiStat `xml:"Stat"`
+	XMLName        xml.Name   `xml:"PerformanceMonitor"`
+	ResponseStatus string     `xml:"responseStatus,attr"`
+	Version        string     `xml:"version,attr"`
+	Nodes          []pmiNode  `xml:"Node"`
+	Stats          []pmiStat  `xml:"Stat"` // For Liberty/other versions
+}
+
+type pmiNode struct {
+	XMLName xml.Name     `xml:"Node"`
+	Name    string       `xml:"name,attr"`
+	Servers []pmiServer  `xml:"Server"`
+}
+
+type pmiServer struct {
+	XMLName xml.Name   `xml:"Server"`
+	Name    string     `xml:"name,attr"`
+	Stats   []pmiStat  `xml:"Stat"`
 }
 
 type pmiStat struct {
@@ -600,6 +615,16 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 }
 
 func (w *WebSpherePMI) processStats(stats *pmiStatsResponse, mx map[string]int64) {
+	// Process nodes/servers structure (traditional WAS)
+	for _, node := range stats.Nodes {
+		for _, server := range node.Servers {
+			for _, stat := range server.Stats {
+				w.processStat(&stat, "", mx)
+			}
+		}
+	}
+	
+	// Process direct stats (Liberty/other versions)
 	for _, stat := range stats.Stats {
 		w.processStat(&stat, "", mx)
 	}
@@ -776,6 +801,18 @@ func (w *WebSpherePMI) detectWebSphereVersion(stats *pmiStatsResponse) {
 	// Try to detect version from PMI stats
 	if w.wasVersion != "" {
 		return // Already detected
+	}
+
+	// Get version from response attributes
+	if stats.Version != "" {
+		w.wasVersion = stats.Version
+		w.Debugf("detected WebSphere version from response: %s", w.wasVersion)
+	}
+
+	// Check structure to determine edition
+	if len(stats.Nodes) > 0 {
+		w.wasEdition = "traditional"
+		w.Debugf("detected traditional WebSphere Application Server from Node/Server structure")
 	}
 
 	// Look for version information in stats
