@@ -1,0 +1,42 @@
+{
+  "name": "IBM MQ",
+  "description": "Monitor IBM MQ instances.",
+  "options": [
+    {
+      "name": "channel",
+      "type": "string",
+      "description": "The IBM MQ channel to connect to.",
+      "required": true
+    },
+    {
+      "name": "queue_manager",
+      "type": "string",
+      "description": "The name of the Queue Manager.",
+      "required": true
+    },
+    {
+      "name": "host",
+      "type": "string",
+      "description": "The host where IBM MQ is running.",
+      "required": true
+    },
+    {
+      "name": "port",
+      "type": "integer",
+      "description": "The port that IBM MQ has exposed.",
+      "required": true
+    },
+    {
+      "name": "user",
+      "type": "string",
+      "description": "Username for authentication (optional).",
+      "required": false
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "description": "Password for authentication (optional).",
+      "required": false
+    }
+  ]
+}

@@ -23,13 +23,13 @@ func TestWebSpherePMI_VersionDetection(t *testing.T) {
 	}{
 		{
 			name:            "WebSphere 8.5.5.24",
-			xmlFile:         "testdata/traditional-8.5.5.24-pmi-full-port-9284.xml",
+			xmlFile:         "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
 			expectedVersion: "8.5.5.24",
 			expectedEdition: "traditional",
 		},
 		{
 			name:            "WebSphere 9.0.5.24",
-			xmlFile:         "testdata/traditional-9.0.5.x-pmi-full-port-9083.xml",
+			xmlFile:         "../../samples.d/traditional-9.0.5.x-pmi-full-port-9083.xml",
 			expectedVersion: "9.0.5.24",
 			expectedEdition: "traditional",
 		},
@@ -66,14 +66,14 @@ func TestWebSpherePMI_DoubleStatisticParsing(t *testing.T) {
 	}{
 		{
 			name:     "HitRate in 8.5.5.24",
-			xmlFile:  "testdata/traditional-8.5.5.24-pmi-full-port-9284.xml",
+			xmlFile:  "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
 			statPath: "ExtensionRegistryStats.name",
 			statName: "HitRate",
 			expected: "78.37837837837837",
 		},
 		{
 			name:     "HitRate in 9.0.5.24",
-			xmlFile:  "testdata/traditional-9.0.5.x-pmi-full-port-9083.xml",
+			xmlFile:  "../../samples.d/traditional-9.0.5.x-pmi-full-port-9083.xml",
 			statPath: "ExtensionRegistryStats.name",
 			statName: "HitRate",
 			expected: "78.37837837837837",
@@ -133,7 +133,7 @@ func TestWebSpherePMI_JVMMetricsExtraction(t *testing.T) {
 	}{
 		{
 			name:    "JVM metrics from 8.5.5.24",
-			xmlFile: "testdata/traditional-8.5.5.24-pmi-full-port-9284.xml",
+			xmlFile: "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
 			expectedMetrics: map[string]int64{
 				"jvm_heap_used":       54039 * 1024,     // UsedMemory in KB -> bytes
 				"jvm_heap_max":        262144 * 1024,    // HeapSize upperBound in KB -> bytes
@@ -145,7 +145,7 @@ func TestWebSpherePMI_JVMMetricsExtraction(t *testing.T) {
 		},
 		{
 			name:    "JVM metrics from 9.0.5.24",
-			xmlFile: "testdata/traditional-9.0.5.x-pmi-full-port-9083.xml",
+			xmlFile: "../../samples.d/traditional-9.0.5.x-pmi-full-port-9083.xml",
 			expectedMetrics: map[string]int64{
 				"jvm_heap_used":       49695 * 1024,     // UsedMemory in KB -> bytes
 				"jvm_heap_max":        4092928 * 1024,   // HeapSize upperBound in KB -> bytes
@@ -216,11 +216,11 @@ func TestWebSpherePMI_AllElementsParsing(t *testing.T) {
 	}{
 		{
 			name:    "Parse all elements in 8.5.5.24",
-			xmlFile: "testdata/traditional-8.5.5.24-pmi-full-port-9284.xml",
+			xmlFile: "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
 		},
 		{
 			name:    "Parse all elements in 9.0.5.24",
-			xmlFile: "testdata/traditional-9.0.5.x-pmi-full-port-9083.xml",
+			xmlFile: "../../samples.d/traditional-9.0.5.x-pmi-full-port-9083.xml",
 		},
 	}
 
@@ -327,11 +327,11 @@ func TestWebSpherePMI_NoDataLoss(t *testing.T) {
 	}{
 		{
 			name:    "No data loss in 8.5.5.24",
-			xmlFile: "testdata/traditional-8.5.5.24-pmi-full-port-9284.xml",
+			xmlFile: "../../samples.d/traditional-8.5.5.24-pmi-full-port-9284.xml",
 		},
 		{
 			name:    "No data loss in 9.0.5.24",
-			xmlFile: "testdata/traditional-9.0.5.x-pmi-full-port-9083.xml",
+			xmlFile: "../../samples.d/traditional-9.0.5.x-pmi-full-port-9083.xml",
 		},
 	}
 
