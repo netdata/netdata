@@ -580,6 +580,154 @@ func (m *MyModule) collectExtended(mx map[string]int64) error {
 }
 ```
 
+## Floating Point Precision Handling
+
+### Understanding Netdata's Precision System
+
+Netdata's Go collectors must send **integer values** to Netdata, but many metrics are naturally floating-point (percentages, response times, load averages, etc.). Netdata uses a precision system to handle this conversion while preserving decimal places in the database.
+
+**How It Works:**
+
+1. **Collection**: Get floating-point value from source
+2. **Multiply by precision**: Convert to integer for transmission  
+3. **Send to Netdata**: Integer value via protocol
+4. **Chart definition**: Specify division to restore original value
+5. **Database storage**: Netdata stores the restored float value
+
+### Basic Precision Pattern
+
+```go
+const precision = 1000 // Standard precision multiplier
+
+// Step 1: Collect floating point value
+floatValue := 1.345 // seconds, percentage, etc.
+
+// Step 2: Convert to integer for Netdata
+intValue := int64(floatValue * precision) // 1345
+mx["metric_name"] = intValue
+
+// Step 3: Chart definition restores precision
+{
+    ID: "metric_chart",
+    Dims: module.Dims{
+        {ID: "metric_name", Name: "value", Div: precision}, // 1345 / 1000 = 1.345
+    },
+}
+```
+
+### Unit Conversion with Precision
+
+For metrics that need unit conversion (e.g., seconds to milliseconds):
+
+```go
+// Collect: 0.212 seconds
+// Want: milliseconds in chart
+
+// Collection
+mx["gc_time_seconds"] = int64(0.212 * precision) // 212
+
+// Chart definition: convert seconds→milliseconds AND handle precision
+{
+    Dims: module.Dims{
+        {ID: "gc_time_seconds", Name: "gc_time", Mul: 1000, Div: precision},
+        // Result: 212 * 1000 / 1000 = 212 milliseconds ✓
+    },
+}
+```
+
+### Common Precision Patterns
+
+#### Simple Float Values
+```go
+// Values that just need precision preserved
+mx["heap_utilization_percent"] = int64(0.015732 * precision) // 15.732
+mx["cpu_load_percent"] = int64(0.000131 * precision)          // 0.131
+mx["system_load_average"] = int64(3.390000 * precision)       // 3390
+
+// Chart definitions
+{ID: "heap_util", Name: "utilization", Div: precision},     // → 0.015732%
+{ID: "cpu_load", Name: "load", Div: precision},             // → 0.000131%  
+{ID: "sys_load", Name: "load", Div: precision},             // → 3.390000
+```
+
+#### Time Conversions
+```go
+// Seconds to milliseconds
+mx["response_time_seconds"] = int64(0.045 * precision)       // 45
+{ID: "response_time_seconds", Name: "time", Mul: 1000, Div: precision}, // → 45ms
+
+// Seconds to seconds (no conversion, just precision)
+mx["uptime_seconds"] = int64(5091.749 * precision)          // 5091749
+{ID: "uptime_seconds", Name: "uptime", Div: precision},     // → 5091.749s
+```
+
+#### Percentage Handling
+```go
+// Percentages from 0.0-1.0 range
+mx["heap_utilization"] = int64(0.01234 * precision)         // 12.34
+{ID: "heap_utilization", Name: "used", Div: precision},     // → 0.01234% (1.234%)
+
+// Percentages already in 0-100 range  
+mx["cpu_percent"] = int64(85.67 * precision)                // 85670
+{ID: "cpu_percent", Name: "usage", Div: precision},         // → 85.67%
+```
+
+### Anti-Patterns to Avoid
+
+❌ **Double Precision Application**
+```go
+// WRONG: Applying precision twice
+{ID: "metric", Name: "value", Mul: precision}, // Already applied in collection!
+```
+
+❌ **Missing Precision Division**
+```go
+// WRONG: Forgetting to divide by precision
+mx["float_metric"] = int64(1.345 * precision)  // 1345
+{ID: "float_metric", Name: "value"},           // Shows 1345 instead of 1.345!
+```
+
+❌ **Incorrect Unit Conversion**
+```go
+// WRONG: Using precision in multiplier
+{ID: "time_seconds", Name: "time", Mul: 1000 * precision}, // Way too big!
+
+// CORRECT: Separate unit conversion and precision
+{ID: "time_seconds", Name: "time", Mul: 1000, Div: precision}, // ✓
+```
+
+### Precision Best Practices
+
+1. **Use consistent precision**: Most Go collectors use `precision = 1000`
+2. **Apply precision once**: During collection phase only
+3. **Always divide by precision**: In chart definitions for float metrics
+4. **Separate concerns**: Unit conversion (`Mul`) and precision (`Div`) are independent
+5. **Test the math**: Verify the final value matches the original float
+
+### Example: Complete Metric Flow
+
+```go
+// Source data
+jvmUptime := 4389.188 // seconds from JVM
+
+// Collection (applying precision)
+mx["jvm_uptime_seconds"] = int64(jvmUptime * precision) // 4389188
+
+// Chart definition (restoring precision)
+{
+    ID:    "jvm_uptime",
+    Title: "JVM Uptime", 
+    Units: "seconds",
+    Dims: module.Dims{
+        {ID: "jvm_uptime_seconds", Name: "uptime", Div: precision}, // 4389188/1000 = 4389.188
+    },
+}
+
+// Result: Chart shows 4389.188 seconds ✓
+```
+
+This precision system allows Netdata to handle floating-point metrics accurately while maintaining the integer-only protocol requirement.
+
 ## Testing
 
 ### Test Structure
