@@ -14,69 +14,60 @@ metrics:
       name: tcpActiveOpens
       description: TCP connections transitioning from CLOSED to SYN-SENT
       family: IP/TCP/Connections
-      unit: "{transition}"
-      metric_type: monotonic_count
+      unit: "{transition}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.6.0
       name: tcpPassiveOpens
       description: TCP connections transitioning from LISTEN to SYN-RCVD
       family: IP/TCP/Connections
-      unit: "{transition}"
-      metric_type: monotonic_count
+      unit: "{transition}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.17.0
       name: tcpHCInSegs
       description: TCP segments received
       family: IP/TCP/Packets
-      unit: "{packet}"
-      metric_type: monotonic_count
+      unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.18.0
       name: tcpHCOutSegs
       description: TCP segments sent
       family: IP/TCP/Packets
-      unit: "{packet}"
-      metric_type: monotonic_count
+      unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.14.0
       name: tcpInErrs
       description: TCP segments received with errors
       family: IP/TCP/Errors
-      unit: "{error}"
-      metric_type: monotonic_count
+      unit: "{error}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.7.0
       name: tcpAttemptFails
       description: Failed TCP connection attempts
       family: IP/TCP/Errors
-      unit: "{failure}"
-      metric_type: monotonic_count
+      unit: "{failure}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.8.0
       name: tcpEstabResets
       description: TCP connections reset from ESTABLISHED/CLOSE-WAIT
-      family: IP/TCP/Errors
-      unit: "{transition}"
-      metric_type: monotonic_count
+      family: IP/TCP/Resets
+      unit: "{reset}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.15.0
       name: tcpOutRsts
       description: TCP segments sent with RST flag
-      family: IP/TCP/Errors
-      unit: "{reset}"
-      metric_type: monotonic_count
+      family: IP/TCP/Resets
+      unit: "{reset}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.12.0
       name: tcpRetransSegs
       description: TCP segments retransmitted
       family: IP/TCP/Retransmits
-      unit: "{retransmit}"
-      metric_type: monotonic_count
+      unit: "{retransmit}/s"
