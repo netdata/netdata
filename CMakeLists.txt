@@ -3332,7 +3332,6 @@ if(ENABLE_PLUGIN_IBM)
     install(FILES 
             src/go/plugin/ibm.d/config/ibm.d/as400.conf
             src/go/plugin/ibm.d/config/ibm.d/db2.conf
-            src/go/plugin/ibm.d/config/ibm.d/websphere_liberty.conf
             src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
             src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
             COMPONENT plugin-ibm
