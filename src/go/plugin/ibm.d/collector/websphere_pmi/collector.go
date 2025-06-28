@@ -208,6 +208,7 @@ type pmiStat struct {
 	TimeStatistics         []timeStat         `xml:"TimeStatistic"`
 	RangeStatistics        []rangeStat        `xml:"RangeStatistic"`
 	BoundedRangeStatistics []boundedRangeStat `xml:"BoundedRangeStatistic"`
+	DoubleStatistics       []doubleStat       `xml:"DoubleStatistic"`
 	SubStats               []pmiStat          `xml:"Stat"`
 
 	// Keep single references for backward compatibility (no XML tags!)
@@ -215,6 +216,7 @@ type pmiStat struct {
 	TimeStatistic         *timeStat         `xml:"-"`
 	RangeStatistic        *rangeStat        `xml:"-"`
 	BoundedRangeStatistic *boundedRangeStat `xml:"-"`
+	DoubleStatistic       *doubleStat       `xml:"-"`
 }
 
 type pmiValue struct {
@@ -249,6 +251,11 @@ type boundedRangeStat struct {
 	Mean       string `xml:"mean,attr"`
 	LowerBound string `xml:"lowerBound,attr"`
 	UpperBound string `xml:"upperBound,attr"`
+}
+
+type doubleStat struct {
+	Name   string `xml:"name,attr"`
+	Double string `xml:"double,attr"`
 }
 
 func (w *WebSpherePMI) Configuration() any {
@@ -663,6 +670,9 @@ func (s *pmiStat) populateBackwardCompatibility() {
 	if len(s.BoundedRangeStatistics) > 0 {
 		s.BoundedRangeStatistic = &s.BoundedRangeStatistics[0]
 	}
+	if len(s.DoubleStatistics) > 0 {
+		s.DoubleStatistic = &s.DoubleStatistics[0]
+	}
 
 	// Recursively populate for sub-stats
 	for i := range s.SubStats {
@@ -933,8 +943,8 @@ func (w *WebSpherePMI) adjustCollectionBasedOnVersion() {
 
 func (w *WebSpherePMI) addVersionLabelsToCharts() {
 	versionLabels := []module.Label{
-		{Key: "was_version", Value: w.wasVersion},
-		{Key: "was_edition", Value: w.wasEdition},
+		{Key: "websphere_version", Value: w.wasVersion},
+		{Key: "websphere_edition", Value: w.wasEdition},
 	}
 
 	// Add to all existing charts

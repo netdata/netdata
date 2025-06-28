@@ -353,12 +353,18 @@ modules:
           description: Global metrics for the WebSphere instance.
           labels: []
           metrics:
-            - name: websphere_pmi.jvm_heap_memory
-              description: JVM Heap Memory
+            - name: websphere_pmi.jvm_heap_memory_usage
+              description: JVM Heap Memory Usage
               unit: bytes
-              chart_type: area
+              chart_type: stacked
               dimensions:
                 - name: used
+                - name: free
+            - name: websphere_pmi.jvm_heap_memory_config
+              description: JVM Heap Memory Configuration
+              unit: bytes
+              chart_type: line
+              dimensions:
                 - name: committed
                 - name: max
             - name: websphere_pmi.jvm_heap_usage
@@ -367,18 +373,10 @@ modules:
               chart_type: line
               dimensions:
                 - name: usage
-            - name: websphere_pmi.jvm_nonheap_memory
-              description: JVM Non-Heap Memory
-              unit: bytes
-              chart_type: area
-              dimensions:
-                - name: used
-                - name: committed
-                - name: max
             - name: websphere_pmi.jvm_gc_count
               description: JVM Garbage Collection Count
               unit: collections/s
-              chart_type: stacked
+              chart_type: line
               dimensions:
                 - name: collections
             - name: websphere_pmi.jvm_gc_time
@@ -387,19 +385,17 @@ modules:
               chart_type: line
               dimensions:
                 - name: time
-            - name: websphere_pmi.jvm_threads
-              description: JVM Thread Count
-              unit: threads
-              chart_type: line
-              dimensions:
-                - name: live
-                - name: daemon
-            - name: websphere_pmi.jvm_classes
+            - name: websphere_pmi.jvm_classes_loaded
               description: JVM Loaded Classes
               unit: classes
               chart_type: line
               dimensions:
                 - name: loaded
+            - name: websphere_pmi.jvm_classes_unloaded_rate
+              description: JVM Classes Unloaded Rate
+              unit: classes/s
+              chart_type: line
+              dimensions:
                 - name: unloaded
             - name: websphere_pmi.jvm_process_cpu
               description: JVM Process CPU Usage
