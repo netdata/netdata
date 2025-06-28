@@ -73,11 +73,13 @@ modules:
               5. Apply changes and restart if necessary
           - title: Enable PerfServlet
             description: |
-              The PerfServlet must be deployed and accessible. It's typically available at:
+              The PerfServlet must be deployed and accessible. You must provide the complete URL including the full path:
               - Traditional WAS: `http://host:port/wasPerfTool/servlet/perfservlet`
               - Liberty Profile: May require additional configuration
               
-              Verify access by navigating to the URL in a browser.
+              **IMPORTANT**: The collector requires complete URLs with full paths. Do not provide just the host/port - the full path to the PerfServlet endpoint must be included.
+              
+              Verify access by navigating to the complete URL in a browser.
           - title: Configure Security
             description: |
               If security is enabled, you'll need credentials with appropriate permissions to access PMI data.
@@ -102,7 +104,13 @@ modules:
               default_value: 0
               required: false
             - name: url
-              description: The PerfServlet URL for the WebSphere instance.
+              description: |
+                The complete PerfServlet URL for the WebSphere instance, including the full path.
+                
+                **IMPORTANT**: You must provide the complete URL including the full path to the PerfServlet endpoint.
+                The collector does not append paths automatically - the entire URL must be specified.
+                
+                Query string parameters are preserved, allowing admin control features to be passed through.
               default_value: "http://localhost:9080/wasPerfTool/servlet/perfservlet"
               required: true
             - name: username
@@ -255,13 +263,13 @@ modules:
             enabled: true
           list:
             - name: Basic configuration
-              description: Monitor a local WebSphere instance with default settings.
+              description: Monitor a local WebSphere instance with default settings. Note the complete URL with full path.
               config: |
                 jobs:
                   - name: local_websphere
                     url: http://localhost:9080/wasPerfTool/servlet/perfservlet
             - name: HTTPS with authentication
-              description: Monitor a secure WebSphere instance.
+              description: Monitor a secure WebSphere instance. Note the complete URL including the full path.
               config: |
                 jobs:
                   - name: prod_websphere
@@ -270,7 +278,7 @@ modules:
                     password: secret
                     tls_skip_verify: true
             - name: Multiple instances
-              description: Monitor multiple WebSphere servers.
+              description: Monitor multiple WebSphere servers. Each requires the complete URL with full path.
               config: |
                 jobs:
                   - name: websphere_node1
@@ -281,7 +289,7 @@ modules:
                     url: http://node2.example.com:9080/wasPerfTool/servlet/perfservlet
                     node_name: Node02
             - name: Custom statistics level
-              description: Collect all available PMI statistics.
+              description: Collect all available PMI statistics. Complete URL with full path is required.
               config: |
                 jobs:
                   - name: websphere_detailed
@@ -290,7 +298,7 @@ modules:
                     collect_servlet_metrics: true
                     collect_ejb_metrics: true
             - name: Filtered collection
-              description: Collect metrics only for specific resources.
+              description: Collect metrics only for specific resources. Complete URL with full path is required.
               config: |
                 jobs:
                   - name: websphere_filtered
@@ -305,7 +313,7 @@ modules:
             description: |
               If you get connection errors or 404 responses:
               
-              1. Verify the PerfServlet URL is correct
+              1. Verify the PerfServlet URL is correct and complete (including the full path)
               2. Check if PMI is enabled in WebSphere
               3. Ensure the PerfServlet is deployed (it's part of the perfServletApp)
               4. Check WebSphere logs for any errors

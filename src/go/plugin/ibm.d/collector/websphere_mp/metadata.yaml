@@ -66,11 +66,15 @@ modules:
               ```
           - title: Configure metrics endpoint access
             description: |
-              Ensure the /metrics endpoint is accessible and properly secured:
+              Ensure the metrics endpoint is accessible and properly secured:
               ```xml
               <mpMetrics authentication="false" />
               ```
               Or configure authentication for the monitoring user.
+              
+              **IMPORTANT**: The collector requires complete URLs with full paths. When configuring the URL,
+              you must include the complete base URL (e.g., https://server:9443) - the metrics endpoint path
+              will be appended to this base URL.
           - title: Create monitoring user
             description: |
               Create a user with appropriate permissions to access metrics:
@@ -95,7 +99,13 @@ modules:
               default_value: 5
               required: false
             - name: url
-              description: WebSphere Liberty server URL.
+              description: |
+                WebSphere Liberty server base URL.
+                
+                **IMPORTANT**: Provide the complete base URL including protocol, host, and port.
+                The metrics endpoint path (specified in metrics_endpoint) will be appended to this URL.
+                
+                Query string parameters in the base URL are preserved when making requests.
               default_value: https://localhost:9443
               required: true
             - name: timeout
@@ -111,7 +121,11 @@ modules:
               default_value: ""
               required: false
             - name: metrics_endpoint
-              description: MicroProfile Metrics endpoint path.
+              description: |
+                MicroProfile Metrics endpoint path.
+                
+                This path will be appended to the base URL. The collector constructs the complete URL
+                by combining the base URL with this endpoint path.
               default_value: /metrics
               required: false
             - name: collect_jvm_metrics
@@ -140,7 +154,9 @@ modules:
             title: Config
           list:
             - name: Basic MicroProfile server
-              description: Monitor a WebSphere Liberty server with MicroProfile Metrics.
+              description: |
+                Monitor a WebSphere Liberty server with MicroProfile Metrics.
+                Note: The complete URL is formed by combining the base URL with the metrics_endpoint path.
               config: |
                 jobs:
                   - name: liberty_mp_local
@@ -148,7 +164,9 @@ modules:
                     username: admin
                     password: adminpwd
             - name: Multiple servers
-              description: Monitor multiple Liberty servers.
+              description: |
+                Monitor multiple Liberty servers.
+                Each server requires its complete base URL.
               config: |
                 jobs:
                   - name: liberty_mp_prod
@@ -161,7 +179,9 @@ modules:
                     username: monitor
                     password: secret
             - name: With TLS client certificate
-              description: Connect using TLS client certificate authentication.
+              description: |
+                Connect using TLS client certificate authentication.
+                Complete base URL is required.
               config: |
                 jobs:
                   - name: liberty_mp_secure
@@ -170,7 +190,9 @@ modules:
                     tls_key: /path/to/client.key
                     tls_ca: /path/to/ca.crt
             - name: Minimal JVM monitoring
-              description: Collect only JVM metrics.
+              description: |
+                Collect only JVM metrics.
+                Complete base URL is required.
               config: |
                 jobs:
                   - name: liberty_mp_minimal
@@ -185,7 +207,7 @@ modules:
               description: |
                 Unable to connect to WebSphere Liberty server.
               resolution: |
-                1. Verify the URL and port are correct
+                1. Verify the complete base URL (protocol, host, and port) is correct
                 2. Check if Liberty is running
                 3. Ensure MicroProfile Metrics feature is enabled
                 4. Check firewall rules
@@ -201,7 +223,7 @@ modules:
               description: |
                 MicroProfile Metrics endpoint not found.
               resolution: |
-                1. Verify metrics_endpoint path (default: /metrics)
+                1. Verify metrics_endpoint path (default: /metrics) and that the complete URL is correctly formed
                 2. Ensure mpMetrics feature is enabled in server.xml
                 3. Check Liberty version supports MicroProfile Metrics
     alerts: []
