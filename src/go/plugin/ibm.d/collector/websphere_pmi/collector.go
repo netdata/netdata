@@ -735,6 +735,9 @@ func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[stri
 	} else if fullPath == "" {
 		fullPath = stat.Name
 	}
+	
+	// Assign the built path back to the stat so extraction functions can use it
+	stat.Path = fullPath
 
 	// Process based on stat type using processors
 	processors := w.getStatProcessors()
