@@ -735,18 +735,14 @@ void get_system_timezone(void)
     const char *timezone = NULL;
     const char *tz = NULL;
 #ifdef OS_WINDOWS
-    _tzset();
-    size_t s;
-    _get_tzname(&s, buffer, sizeof(buffer) -1, 0 );
-    timezone = buffer;
-
-    /*
     TIME_ZONE_INFORMATION win_tz;
     DWORD tzresult = GetTimeZoneInformation(&win_tz);
     if (tzresult != TIME_ZONE_ID_INVALID) {
-        WideCharToMultiByte(CP_UTF8, 0, win_tz.DaylightName, -1, buffer, FILENAME_MAX, NULL, NULL);
+        WideCharToMultiByte(CP_UTF8, 0, win_tz.StandardName, -1, buffer, FILENAME_MAX, NULL, NULL);
+        if (strlen(buffer)) {
+            timezone = buffer;
+        }
     }
-    */
 #else
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
@@ -843,11 +839,7 @@ void get_system_timezone(void)
         char sign[2], hh[3], mm[3];
 
         t = now_realtime_sec();
-#ifdef OS_WINDOWS
-        tmp = NULL;
-#else
         tmp = localtime_r(&t, &tmbuf);
-#endif
 
         if (tmp != NULL) {
             if (strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
@@ -872,22 +864,6 @@ void get_system_timezone(void)
                     sign[0] == '-' ? -netdata_configured_utc_offset : netdata_configured_utc_offset;
             }
         } else {
-#ifdef OS_WINDOWS
-            long offset;
-            if (!_get_timezone(&offset)) {
-                offset /= 3600;
-            } else {
-                offset = 0;
-            }
-
-            DWORD tzresult = GetTimeZoneInformation(&win_tz);
-            if (tzresult != TIME_ZONE_ID_INVALID) {
-                WideCharToMultiByte(CP_UTF8, 0, win_tz.StandardName, -1, buffer, FILENAME_MAX, NULL, NULL);
-                netdata_configured_abbrev_timezone = strdupz(buffer);
-                netdata_configured_utc_offset = offset;
-                return;
-            }
-#endif
             netdata_configured_abbrev_timezone = strdupz("UTC");
             netdata_configured_utc_offset = 0;
         }
