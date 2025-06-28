@@ -468,21 +468,22 @@ func (w *WebSpherePMI) initSelectors() error {
 }
 
 func (w *WebSpherePMI) buildPMIURL() error {
-	baseURL := strings.TrimRight(w.HTTPConfig.RequestConfig.URL, "/")
-
-	// Check if it's already a full PerfServlet URL
-	if strings.Contains(baseURL, "/wasPerfTool/servlet/perfservlet") {
-		w.pmiURL = baseURL
-		return nil
+	// Require complete URL - no path inference
+	w.pmiURL = strings.TrimSpace(w.HTTPConfig.RequestConfig.URL)
+	
+	if w.pmiURL == "" {
+		return errors.New("url is required")
 	}
 
-	// Build the PerfServlet URL
-	w.pmiURL = baseURL + "/wasPerfTool/servlet/perfservlet"
-
 	// Parse and validate
-	_, err := url.Parse(w.pmiURL)
+	parsedURL, err := url.Parse(w.pmiURL)
 	if err != nil {
 		return fmt.Errorf("invalid PMI URL: %w", err)
+	}
+	
+	// Ensure URL has a path
+	if parsedURL.Path == "" || parsedURL.Path == "/" {
+		return errors.New("url must include the complete path to the PMI servlet (e.g., http://localhost:9080/wasPerfTool/servlet/perfservlet)")
 	}
 
 	return nil
