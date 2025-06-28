@@ -20,6 +20,11 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 				mx["jvm_heap_max"] = v
 				mx["jvm_heap_committed"] = v // PMI doesn't distinguish committed
 
+				// Calculate free memory (committed - used)
+				if used, ok := mx["jvm_heap_used"]; ok {
+					mx["jvm_heap_free"] = v - used
+				}
+
 				// Calculate usage percentage
 				if used, ok := mx["jvm_heap_used"]; ok && v > 0 {
 					mx["jvm_heap_usage_percent"] = (used * precision * 100) / v
@@ -37,6 +42,7 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 	case "FreeMemory":
 		if stat.CountStatistic != nil {
 			if v, err := strconv.ParseInt(stat.CountStatistic.Count, 10, 64); err == nil {
+				mx["jvm_heap_free"] = v
 				if used, ok := mx["jvm_heap_used"]; ok {
 					mx["jvm_heap_max"] = used + v
 					mx["jvm_heap_committed"] = used + v
@@ -62,6 +68,10 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 		if stat.CountStatistic != nil {
 			if v, err := strconv.ParseInt(stat.CountStatistic.Count, 10, 64); err == nil {
 				mx["jvm_threads_live"] = v
+				// Calculate other threads if we have daemon count
+				if daemon, ok := mx["jvm_threads_daemon"]; ok {
+					mx["jvm_threads_other"] = v - daemon
+				}
 			}
 		}
 
@@ -69,6 +79,10 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 		if stat.CountStatistic != nil {
 			if v, err := strconv.ParseInt(stat.CountStatistic.Count, 10, 64); err == nil {
 				mx["jvm_threads_daemon"] = v
+				// Calculate other threads if we have live count
+				if live, ok := mx["jvm_threads_live"]; ok {
+					mx["jvm_threads_other"] = live - v
+				}
 			}
 		}
 
