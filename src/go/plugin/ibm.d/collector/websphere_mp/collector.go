@@ -50,8 +50,8 @@ func New() *WebSphereMicroProfile {
 			MetricsEndpoint: "/metrics",
 
 			// Collection flags
-			CollectJVMMetrics:    true,
-			CollectRESTMetrics:   true,
+			CollectJVMMetrics:  true,
+			CollectRESTMetrics: true,
 
 			// Cardinality limits
 			MaxRESTEndpoints: 50,
@@ -77,14 +77,14 @@ type Config struct {
 	MetricsEndpoint string `yaml:"metrics_endpoint,omitempty" json:"metrics_endpoint"`
 
 	// Collection flags
-	CollectJVMMetrics    bool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics"`
-	CollectRESTMetrics   bool `yaml:"collect_rest_metrics" json:"collect_rest_metrics"`
+	CollectJVMMetrics  bool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics"`
+	CollectRESTMetrics bool `yaml:"collect_rest_metrics" json:"collect_rest_metrics"`
 
 	// Cardinality control
 	MaxRESTEndpoints int `yaml:"max_rest_endpoints,omitempty" json:"max_rest_endpoints"`
 
 	// Filtering
-	CollectRESTMatching   string `yaml:"collect_rest_matching,omitempty" json:"collect_rest_matching"`
+	CollectRESTMatching string `yaml:"collect_rest_matching,omitempty" json:"collect_rest_matching"`
 }
 
 type WebSphereMicroProfile struct {
@@ -108,15 +108,15 @@ type WebSphereMicroProfile struct {
 	sessionChartsCreated    bool
 
 	// Selectors
-	restSelector   matcher.Matcher
+	restSelector matcher.Matcher
 
 	// Cached server info
 	serverVersion string
 	serverType    string // "Liberty MicroProfile"
 
 	// Metric name patterns
-	jvmPattern    *regexp.Regexp
-	restPattern   *regexp.Regexp
+	jvmPattern  *regexp.Regexp
+	restPattern *regexp.Regexp
 }
 
 func (w *WebSphereMicroProfile) Configuration() any {
@@ -171,7 +171,7 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 func (w *WebSphereMicroProfile) buildMetricsURL() error {
 	// Require complete URL - no path inference
 	w.metricsURL = strings.TrimSpace(w.HTTPConfig.RequestConfig.URL)
-	
+
 	if w.metricsURL == "" {
 		return errors.New("url is required")
 	}
@@ -181,7 +181,7 @@ func (w *WebSphereMicroProfile) buildMetricsURL() error {
 	if err != nil {
 		return fmt.Errorf("invalid metrics URL: %w", err)
 	}
-	
+
 	// Ensure URL has a path
 	if parsedURL.Path == "" || parsedURL.Path == "/" {
 		return errors.New("url must include the complete path to the metrics endpoint (e.g., https://localhost:9443/metrics)")

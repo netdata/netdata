@@ -178,38 +178,38 @@ type pmiCacheEntry struct {
 
 // PMI XML structures
 type pmiStatsResponse struct {
-	XMLName        xml.Name   `xml:"PerformanceMonitor"`
-	ResponseStatus string     `xml:"responseStatus,attr"`
-	Version        string     `xml:"version,attr"`
-	Nodes          []pmiNode  `xml:"Node"`
-	Stats          []pmiStat  `xml:"Stat"` // For Liberty/other versions
+	XMLName        xml.Name  `xml:"PerformanceMonitor"`
+	ResponseStatus string    `xml:"responseStatus,attr"`
+	Version        string    `xml:"version,attr"`
+	Nodes          []pmiNode `xml:"Node"`
+	Stats          []pmiStat `xml:"Stat"` // For Liberty/other versions
 }
 
 type pmiNode struct {
-	XMLName xml.Name     `xml:"Node"`
-	Name    string       `xml:"name,attr"`
-	Servers []pmiServer  `xml:"Server"`
+	XMLName xml.Name    `xml:"Node"`
+	Name    string      `xml:"name,attr"`
+	Servers []pmiServer `xml:"Server"`
 }
 
 type pmiServer struct {
-	XMLName xml.Name   `xml:"Server"`
-	Name    string     `xml:"name,attr"`
-	Stats   []pmiStat  `xml:"Stat"`
+	XMLName xml.Name  `xml:"Server"`
+	Name    string    `xml:"name,attr"`
+	Stats   []pmiStat `xml:"Stat"`
 }
 
 type pmiStat struct {
-	XMLName                xml.Name            `xml:"Stat"`
-	Name                   string              `xml:"name,attr"`
-	Type                   string              `xml:"type,attr"`
-	ID                     string              `xml:"id,attr"`
-	Path                   string              `xml:"path,attr"`
-	Value                  *pmiValue           `xml:"Value"`
-	CountStatistics        []countStat         `xml:"CountStatistic"`
-	TimeStatistics         []timeStat          `xml:"TimeStatistic"`
-	RangeStatistics        []rangeStat         `xml:"RangeStatistic"`
-	BoundedRangeStatistics []boundedRangeStat  `xml:"BoundedRangeStatistic"`
-	SubStats               []pmiStat           `xml:"Stat"`
-	
+	XMLName                xml.Name           `xml:"Stat"`
+	Name                   string             `xml:"name,attr"`
+	Type                   string             `xml:"type,attr"`
+	ID                     string             `xml:"id,attr"`
+	Path                   string             `xml:"path,attr"`
+	Value                  *pmiValue          `xml:"Value"`
+	CountStatistics        []countStat        `xml:"CountStatistic"`
+	TimeStatistics         []timeStat         `xml:"TimeStatistic"`
+	RangeStatistics        []rangeStat        `xml:"RangeStatistic"`
+	BoundedRangeStatistics []boundedRangeStat `xml:"BoundedRangeStatistic"`
+	SubStats               []pmiStat          `xml:"Stat"`
+
 	// Keep single references for backward compatibility (no XML tags!)
 	CountStatistic        *countStat        `xml:"-"`
 	TimeStatistic         *timeStat         `xml:"-"`
@@ -304,13 +304,13 @@ func (w *WebSpherePMI) Init(ctx context.Context) error {
 	}
 
 	w.Debugf("initialized websphere_pmi collector: url=%s, stats_type=%s, refresh_rate=%d", w.pmiURL, w.PMIStatsType, w.PMIRefreshRate)
-	w.Debugf("collection flags: JVM=%v, ThreadPool=%v, JDBC=%v, JCA=%v, JMS=%v, WebApp=%v", 
-		*w.CollectJVMMetrics, *w.CollectThreadPoolMetrics, *w.CollectJDBCMetrics, 
+	w.Debugf("collection flags: JVM=%v, ThreadPool=%v, JDBC=%v, JCA=%v, JMS=%v, WebApp=%v",
+		*w.CollectJVMMetrics, *w.CollectThreadPoolMetrics, *w.CollectJDBCMetrics,
 		*w.CollectJCAMetrics, *w.CollectJMSMetrics, *w.CollectWebAppMetrics)
-	w.Debugf("APM flags: Servlet=%v, EJB=%v, JDBCAdvanced=%v", 
+	w.Debugf("APM flags: Servlet=%v, EJB=%v, JDBCAdvanced=%v",
 		*w.CollectServletMetrics, *w.CollectEJBMetrics, *w.CollectJDBCAdvanced)
 	if w.ClusterName != "" || w.CellName != "" || w.NodeName != "" {
-		w.Debugf("identity labels: cluster=%s, cell=%s, node=%s, server_type=%s", 
+		w.Debugf("identity labels: cluster=%s, cell=%s, node=%s, server_type=%s",
 			w.ClusterName, w.CellName, w.NodeName, w.ServerType)
 	}
 
@@ -470,7 +470,7 @@ func (w *WebSpherePMI) initSelectors() error {
 func (w *WebSpherePMI) buildPMIURL() error {
 	// Require complete URL - no path inference
 	w.pmiURL = strings.TrimSpace(w.HTTPConfig.RequestConfig.URL)
-	
+
 	if w.pmiURL == "" {
 		return errors.New("url is required")
 	}
@@ -480,7 +480,7 @@ func (w *WebSpherePMI) buildPMIURL() error {
 	if err != nil {
 		return fmt.Errorf("invalid PMI URL: %w", err)
 	}
-	
+
 	// Ensure URL has a path
 	if parsedURL.Path == "" || parsedURL.Path == "/" {
 		return errors.New("url must include the complete path to the PMI servlet (e.g., http://localhost:9080/wasPerfTool/servlet/perfservlet)")
@@ -598,21 +598,21 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 
 	// Parse XML response with context awareness
 	decoder := xml.NewDecoder(resp.Body)
-	
+
 	// Create a channel for decoding result
 	type decodeResult struct {
 		stats *pmiStatsResponse
 		err   error
 	}
 	resultChan := make(chan decodeResult, 1)
-	
+
 	// Decode in goroutine to respect context cancellation
 	go func() {
 		var s pmiStatsResponse
 		err := decoder.Decode(&s)
 		resultChan <- decodeResult{stats: &s, err: err}
 	}()
-	
+
 	// Wait for either decode completion or context cancellation
 	select {
 	case result := <-resultChan:
@@ -639,7 +639,7 @@ func (w *WebSpherePMI) processStats(stats *pmiStatsResponse, mx map[string]int64
 			}
 		}
 	}
-	
+
 	// Process direct stats (Liberty/other versions)
 	for i := range stats.Stats {
 		stat := &stats.Stats[i]
@@ -663,7 +663,7 @@ func (s *pmiStat) populateBackwardCompatibility() {
 	if len(s.BoundedRangeStatistics) > 0 {
 		s.BoundedRangeStatistic = &s.BoundedRangeStatistics[0]
 	}
-	
+
 	// Recursively populate for sub-stats
 	for i := range s.SubStats {
 		s.SubStats[i].populateBackwardCompatibility()
@@ -672,9 +672,9 @@ func (s *pmiStat) populateBackwardCompatibility() {
 
 // statProcessor defines a function that processes a specific type of stat
 type statProcessor struct {
-	module       string
-	enabled      func() bool
-	processFunc  func(*pmiStat, map[string]int64)
+	module      string
+	enabled     func() bool
+	processFunc func(*pmiStat, map[string]int64)
 }
 
 func (w *WebSpherePMI) getStatProcessors() []statProcessor {
@@ -730,15 +730,15 @@ func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[stri
 	processors := w.getStatProcessors()
 	for _, processor := range processors {
 		// Match both module names and stat names for WebSphere 9.x compatibility
-		if (strings.Contains(fullPath, processor.module) || 
-		    (processor.module == "jvmRuntimeModule" && stat.Name == "JVM Runtime") ||
-		    (processor.module == "threadPoolModule" && stat.Name == "Thread Pools") ||
-		    (processor.module == "connectionPoolModule" && stat.Name == "JDBC Connection Pools") ||
-		    (processor.module == "j2cModule" && stat.Name == "JCA Connection Pools") ||
-		    (processor.module == "webAppModule" && stat.Name == "Web Applications") ||
-		    (processor.module == "servletModule" && stat.Name == "Servlets") ||
-		    (processor.module == "ejbModule" && stat.Name == "Enterprise Beans")) && 
-		   processor.enabled() {
+		if (strings.Contains(fullPath, processor.module) ||
+			(processor.module == "jvmRuntimeModule" && stat.Name == "JVM Runtime") ||
+			(processor.module == "threadPoolModule" && stat.Name == "Thread Pools") ||
+			(processor.module == "connectionPoolModule" && stat.Name == "JDBC Connection Pools") ||
+			(processor.module == "j2cModule" && stat.Name == "JCA Connection Pools") ||
+			(processor.module == "webAppModule" && stat.Name == "Web Applications") ||
+			(processor.module == "servletModule" && stat.Name == "Servlets") ||
+			(processor.module == "ejbModule" && stat.Name == "Enterprise Beans")) &&
+			processor.enabled() {
 			processor.processFunc(stat, mx)
 			break // Only process with the first matching processor
 		}
@@ -841,7 +841,6 @@ func (w *WebSpherePMI) removeNotSeenEntities() {
 	}
 }
 
-
 func (w *WebSpherePMI) logOnce(key, format string, args ...any) {
 	if w.loggedWarnings[key] {
 		return
@@ -899,25 +898,25 @@ func (w *WebSpherePMI) detectWebSphereVersion(stats *pmiStatsResponse) {
 func (w *WebSpherePMI) adjustCollectionBasedOnVersion() {
 	// Version-specific adjustments for known differences
 	// Note: Admin configuration always takes precedence (see setConfigurationDefaults)
-	
+
 	if w.wasEdition == "liberty" {
 		// Liberty has different PMI paths and metrics
 		w.Debugf("adjusting collection for WebSphere Liberty")
-		
+
 		// Liberty doesn't support some traditional metrics by default
 		// But we still attempt collection if admin explicitly enabled them
 		if w.CollectClusterMetrics != nil && *w.CollectClusterMetrics {
 			w.logOnce("liberty_cluster", "cluster metrics collection enabled for Liberty - some metrics may not be available")
 		}
 	}
-	
+
 	// Version-specific feature detection
 	if w.wasVersion != "" {
 		// Extract major version for feature detection
 		parts := strings.Split(w.wasVersion, ".")
 		if len(parts) > 0 {
 			majorVersion := parts[0]
-			
+
 			switch majorVersion {
 			case "7":
 				w.Debugf("WebSphere 7.x detected - some modern metrics may not be available")

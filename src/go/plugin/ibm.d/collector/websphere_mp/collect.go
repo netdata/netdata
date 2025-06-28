@@ -193,15 +193,15 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 	for metricName, value := range metrics {
 		// Convert float to int64 with appropriate handling
 		var intValue int64
-		
+
 		// Bytes and counts are already integers - no precision needed
-		if strings.Contains(metricName, "_bytes") || 
-		   strings.Contains(metricName, "_count") || 
-		   strings.Contains(metricName, "_total") ||
-		   strings.Contains(metricName, "Count") ||
-		   strings.Contains(metricName, "Size") ||
-		   strings.Contains(metricName, "activeThreads") ||
-		   strings.Contains(metricName, "size") {
+		if strings.Contains(metricName, "_bytes") ||
+			strings.Contains(metricName, "_count") ||
+			strings.Contains(metricName, "_total") ||
+			strings.Contains(metricName, "Count") ||
+			strings.Contains(metricName, "Size") ||
+			strings.Contains(metricName, "activeThreads") ||
+			strings.Contains(metricName, "size") {
 			intValue = int64(value)
 		} else {
 			// Apply precision for floating-point values (percentages, seconds, etc.)
@@ -209,9 +209,9 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 		}
 
 		// Check for vendor-specific metrics first (servlet, session, threadpool)
-		if strings.HasPrefix(metricName, "servlet_") || 
-		   strings.HasPrefix(metricName, "session_") || 
-		   strings.HasPrefix(metricName, "threadpool_") {
+		if strings.HasPrefix(metricName, "servlet_") ||
+			strings.HasPrefix(metricName, "session_") ||
+			strings.HasPrefix(metricName, "threadpool_") {
 			w.processVendorMetric(mx, metricName, intValue)
 		} else if w.CollectJVMMetrics && w.jvmPattern.MatchString(metricName) {
 			w.processJVMMetric(mx, metricName, intValue)
@@ -300,7 +300,7 @@ func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName
 	case "gc_time_per_cycle_seconds":
 		mx["gc_time_per_cycle_seconds"] = value
 		return
-	// CPU metrics  
+	// CPU metrics
 	case "cpu_availableProcessors":
 		mx["cpu_availableProcessors"] = value
 		return
@@ -369,11 +369,9 @@ func (w *WebSphereMicroProfile) processRESTMetric(mx map[string]int64, metricNam
 	}
 }
 
-
-
 func (w *WebSphereMicroProfile) processVendorMetric(mx map[string]int64, metricName string, value int64) {
 	// Create charts dynamically when vendor-specific metrics are first discovered
-	
+
 	// Check if this is a threadpool metric and create charts if needed
 	if strings.HasPrefix(metricName, "threadpool_") && !w.threadPoolChartsCreated {
 		w.threadPoolChartsCreated = true
@@ -384,7 +382,7 @@ func (w *WebSphereMicroProfile) processVendorMetric(mx map[string]int64, metricN
 			w.Debugf("created threadpool charts dynamically")
 		}
 	}
-	
+
 	// Check if this is a servlet metric and create charts if needed
 	if strings.HasPrefix(metricName, "servlet_") && !w.servletChartsCreated {
 		w.servletChartsCreated = true
@@ -395,7 +393,7 @@ func (w *WebSphereMicroProfile) processVendorMetric(mx map[string]int64, metricN
 			w.Debugf("created servlet charts dynamically")
 		}
 	}
-	
+
 	// Check if this is a session metric and create charts if needed
 	if strings.HasPrefix(metricName, "session_") && !w.sessionChartsCreated {
 		w.sessionChartsCreated = true

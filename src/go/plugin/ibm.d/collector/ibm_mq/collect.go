@@ -197,93 +197,6 @@ func getPCFChannelResponse(qMgr *ibmmq.MQQueueManager, qObject ibmmq.MQObject, m
 
 	return nil
 }
-	adminQueue, err := openQueue(qMgr, "SYSTEM.ADMIN.COMMAND.QUEUE", ibmmq.MQOO_OUTPUT)
-	if err != nil {
-		return err
-	}
-	defer adminQueue.Close(0)
-
-	replyQueue, err := openQueue(qMgr, "SYSTEM.DEFAULT.MODEL.QUEUE", ibmmq.MQOO_INPUT_EXCLUSIVE)
-	if err != nil {
-		return err
-	}
-	defer replyQueue.Close(0)
-
-	if err := sendPCFChannelInquiry(qMgr, adminQueue, replyQueue.Name, "*"); err != nil {
-		return err
-	}
-
-	return getPCFChannelResponse(qMgr, replyQueue, mx)
-}
-
-func sendPCFChannelInquiry(qMgr *ibmmq.MQQueueManager, qObject ibmmq.MQObject, replyToQueue string, channelToInquire string) error {
-	putmqmd := ibmmq.NewMQMD()
-	pmo := ibmmq.NewMQPMO()
-
-	putmqmd.Format = ibmmq.MQFMT_ADMIN
-	putmqmd.ReplyToQ = replyToQueue
-	putmqmd.MsgType = ibmmq.MQMT_REQUEST
-	pmo.Options = ibmmq.MQPMO_NO_SYNCPOINT | ibmmq.MQPMO_NEW_MSG_ID | ibmmq.MQPMO_NEW_CORREL_ID
-
-	cfh := ibmmq.NewMQCFH()
-	cfh.Command = ibmmq.MQCMD_INQUIRE_CHANNEL_STATUS
-
-	pcfparm := new(ibmmq.PCFParameter)
-	pcfparm.Type = ibmmq.MQCFT_STRING
-	pcfparm.Parameter = ibmmq.MQCACH_CHANNEL_NAME
-	pcfparm.String = []string{channelToInquire}
-	cfh.ParameterCount++
-
-	pcfparm2 := new(ibmmq.PCFParameter)
-	pcfparm2.Type = ibmmq.MQCFT_INTEGER
-	pcfparm2.Parameter = ibmmq.MQIACH_CHANNEL_INSTANCE_TYPE
-	pcfparm2.Int64Value = []int64{int64(ibmmq.MQOT_CURRENT_CHANNEL)}
-	cfh.ParameterCount++
-
-	buf := append(cfh.Bytes(), pcfparm.Bytes()...)
-	buf = append(buf, pcfparm2.Bytes()...)
-
-	return qObject.Put(putmqmd, pmo, buf)
-}
-
-func getPCFChannelResponse(qMgr *ibmmq.MQQueueManager, qObject ibmmq.MQObject, mx map[string]int64) error {
-	getmqmd := ibmmq.NewMQMD()
-	gmo := ibmmq.NewMQGMO()
-	gmo.Options = ibmmq.MQGMO_NO_SYNCPOINT | ibmmq.MQGMO_WAIT | ibmmq.MQGMO_CONVERT
-	gmo.WaitInterval = 3000 // 3 seconds
-
-	buffer := make([]byte, 32768)
-	datalen, err := qObject.Get(getmqmd, gmo, buffer)
-	if err != nil {
-		mqret := err.(*ibmmq.MQReturn)
-		if mqret.MQRC == ibmmq.MQRC_NO_MSG_AVAILABLE {
-			return fmt.Errorf("no response message from command server")
-		}
-		return err
-	}
-
-	responses, err := ibmmq.ParsePCF(buffer[0:datalen])
-	if err != nil {
-		return err
-	}
-
-	for _, pcfResponse := range responses {
-		if pcfResponse.Command == ibmmq.MQCMD_INQUIRE_CHANNEL_STATUS {
-			channelName := pcfResponse.GetString(ibmmq.MQCACH_CHANNEL_NAME)
-			dimPrefix := "ibm_mq.channel_" + channelName[0]
-
-			mx[dimPrefix+"_batches"] = pcfResponse.GetInt64(ibmmq.MQIACH_BATCHES)[0]
-			mx[dimPrefix+"_buffers_rcvd"] = pcfResponse.GetInt64(ibmmq.MQIACH_BUFFERS_RCVD)[0]
-			mx[dimPrefix+"_buffers_sent"] = pcfResponse.GetInt64(ibmmq.MQIACH_BUFFERS_SENT)[0]
-			mx[dimPrefix+"_bytes_rcvd"] = pcfResponse.GetInt64(ibmmq.MQIACH_BYTES_RCVD)[0]
-			mx[dimPrefix+"_bytes_sent"] = pcfResponse.GetInt64(ibmmq.MQIACH_BYTES_SENT)[0]
-			mx[dimPrefix+"_current_msgs"] = pcfResponse.GetInt64(ibmmq.MQIACH_CURRENT_MSGS)[0]
-			mx[dimPrefix+"_msgs"] = pcfResponse.GetInt64(ibmmq.MQIACH_MSGS)[0]
-		}
-	}
-
-	return nil
-}
 
 func openQueue(qMgr *ibmmq.MQQueueManager, queueName string, options int32) (ibmmq.MQObject, error) {
 	mqod := ibmmq.NewMQOD()
@@ -319,4 +232,3 @@ func (c *Collector) collectQueueManagerMetrics(qMgr *ibmmq.MQQueueManager, mx ma
 
 	return nil
 }
-

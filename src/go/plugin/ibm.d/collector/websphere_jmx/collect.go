@@ -944,16 +944,16 @@ func (w *WebSphereJMX) collectJDBCAdvancedMetrics(ctx context.Context, mx map[st
 
 		// Collect advanced metrics
 		poolID := cleanName(name)
-		
+
 		// Time breakdown: query time vs connection hold time
 		mx[fmt.Sprintf("jdbc_%s_query_time", poolID)] = int64(getFloat(pool, "avgQueryTime") * precision)
 		mx[fmt.Sprintf("jdbc_%s_connection_hold_time", poolID)] = int64(getFloat(pool, "avgConnectionHoldTime") * precision)
-		
+
 		// Statement cache metrics
 		mx[fmt.Sprintf("jdbc_%s_stmt_cache_hits", poolID)] = int64(getFloat(pool, "statementCacheHits"))
 		mx[fmt.Sprintf("jdbc_%s_stmt_cache_misses", poolID)] = int64(getFloat(pool, "statementCacheMisses"))
 		mx[fmt.Sprintf("jdbc_%s_stmt_cache_size", poolID)] = int64(getFloat(pool, "statementCacheSize"))
-		
+
 		// Connection reuse
 		mx[fmt.Sprintf("jdbc_%s_connection_reuse_count", poolID)] = int64(getFloat(pool, "connectionReuseCount"))
 	}
