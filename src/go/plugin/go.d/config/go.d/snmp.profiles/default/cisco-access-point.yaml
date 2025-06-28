@@ -24,56 +24,51 @@ metrics:
       - name: cDot11ActiveWirelessClients
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.1
         description: Number of wireless clients currently associating with this device on this interface
-        family: Interfaces/Clients/Wireless
+        family: Interfaces/Wireless/Clients
         unit: "{client}"
       - name: cDot11ActiveBridges
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.2
         description: Number of bridges currently associating with this device on this interface
-        family: Interfaces/Bridges
+        family: Interfaces/Wireless/Bridges
         unit: "{bridge}"
       - name: cDot11ActiveRepeaters
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.3
         description: Number of repeaters currently associating with this device on this interface
-        family: Interfaces/Repeaters
+        family: Interfaces/Wireless/Repeaters
         unit: "{repeater}"
       - name: cDot11AssStatsAssociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.1
-        metric_type: monotonic_count
         description: Number of stations associated with this device on this interface since device re-started
-        family: Interfaces/Stations/Associated
-        unit: "{station}"
+        family: Interfaces/Wireless/Stations/Associated
+        unit: "{station}/s"
       - name: cDot11AssStatsAuthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.2
-        metric_type: monotonic_count
         description: Number of stations authenticated with this device on this interface since device re-started
-        family: Interfaces/Stations/Authenticated
-        unit: "{station}"
+        family: Interfaces/Wireless/Stations/Authenticated
+        unit: "{station}/s"
       - name: cDot11AssStatsRoamedIn
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.3
-        metric_type: monotonic_count
         description: Number of stations roamed from another device to this device on this interface since device re-started
-        family: Interfaces/Stations/Roamed
-        unit: "{station}"
+        family: Interfaces/Wireless/Stations/Roamed
+        unit: "{station}/s"
       - name: cDot11AssStatsRoamedAway
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.4
-        metric_type: monotonic_count
         description: Number of stations roamed away from this device on this interface since device re-started
-        family: Interfaces/Stations/Roamed
-        unit: "{station}"
+        family: Interfaces/Wireless/Stations/Roamed
+        unit: "{station}/s"
       - name: cDot11AssStatsDeauthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.5
-        metric_type: monotonic_count
         description: Number of stations deauthenticated with this device on this interface since device re-started
-        family: Interfaces/Stations/Deauthenticated
-        unit: "{station}"
+        family: Interfaces/Wireless/Stations/Deauthenticated
+        unit: "{station}/s"
       - name: cDot11AssStatsDisassociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.6
-        metric_type: monotonic_count
         description: Number of stations disassociated with this device on this interface since device re-started
-        family: Interfaces/Stations/Disassociated
-        unit: "{station}"
+        family: Interfaces/Wireless/Stations/Disassociated
+        unit: "{station}/s"
     metric_tags:
-      - tag: if_name
+      - tag: interface
+        table: ifXTable
         symbol:
-          name: ifName
           OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
