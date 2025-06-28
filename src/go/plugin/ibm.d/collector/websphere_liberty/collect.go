@@ -167,8 +167,11 @@ func (w *WebSphere) collectLibertyMetrics(ctx context.Context) (*libertyMetrics,
 }
 
 func (w *WebSphere) collectJVM(mx map[string]int64, m *libertyMetrics) {
-	// Heap metrics in bytes
+	// Heap usage metrics (additive)
 	mx["jvm_heap_used"] = m.Heap.Used
+	mx["jvm_heap_free"] = m.Heap.Committed - m.Heap.Used // Calculate free from committed - used
+
+	// Heap limits (separate chart)
 	mx["jvm_heap_committed"] = m.Heap.Committed
 	mx["jvm_heap_max"] = m.Heap.Max
 
@@ -176,9 +179,11 @@ func (w *WebSphere) collectJVM(mx map[string]int64, m *libertyMetrics) {
 	mx["jvm_gc_count"] = m.GC.Count
 	mx["jvm_gc_time"] = m.GC.Time
 
-	// Thread metrics
-	mx["jvm_thread_count"] = m.Thread.Count
+	// Current thread metrics (additive)
 	mx["jvm_thread_daemon"] = m.Thread.Daemon
+	mx["jvm_thread_other"] = m.Thread.Count - m.Thread.Daemon // Calculate other threads
+
+	// Peak threads (separate chart)
 	mx["jvm_thread_peak"] = m.Thread.Peak
 
 	// Class loading metrics
