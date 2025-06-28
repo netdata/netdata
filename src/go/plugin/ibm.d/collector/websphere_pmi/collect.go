@@ -10,42 +10,60 @@ import (
 
 // processJVMStat processes JVM runtime statistics
 func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
+	w.Debugf("processing JVM stat: %s (type: %s)", stat.Name, stat.Type)
+	
 	switch stat.Name {
 	case "HeapSize":
 		if stat.BoundedRangeStatistic != nil {
+			// HeapSize is in KILOBYTES, convert to bytes
 			if v, err := strconv.ParseInt(stat.BoundedRangeStatistic.Current, 10, 64); err == nil {
-				mx["jvm_heap_used"] = v
+				mx["jvm_heap_used"] = v * 1024 // Convert KB to bytes
+			} else if vf, err := strconv.ParseFloat(stat.BoundedRangeStatistic.Current, 64); err == nil {
+				// Handle scientific notation
+				mx["jvm_heap_used"] = int64(vf * 1024)
 			}
+			
 			if v, err := strconv.ParseInt(stat.BoundedRangeStatistic.UpperBound, 10, 64); err == nil {
-				mx["jvm_heap_max"] = v
-				mx["jvm_heap_committed"] = v // PMI doesn't distinguish committed
+				mx["jvm_heap_max"] = v * 1024 // Convert KB to bytes
+				mx["jvm_heap_committed"] = v * 1024 // PMI doesn't distinguish committed
+			} else if vf, err := strconv.ParseFloat(stat.BoundedRangeStatistic.UpperBound, 64); err == nil {
+				// Handle scientific notation
+				mx["jvm_heap_max"] = int64(vf * 1024)
+				mx["jvm_heap_committed"] = int64(vf * 1024)
+			}
 
-				// Calculate free memory (committed - used)
-				if used, ok := mx["jvm_heap_used"]; ok {
-					mx["jvm_heap_free"] = v - used
+			// Calculate free memory (committed - used)
+			if used, ok := mx["jvm_heap_used"]; ok {
+				if committed, ok := mx["jvm_heap_committed"]; ok {
+					mx["jvm_heap_free"] = committed - used
 				}
+			}
 
-				// Calculate usage percentage
-				if used, ok := mx["jvm_heap_used"]; ok && v > 0 {
-					mx["jvm_heap_usage_percent"] = (used * precision * 100) / v
+			// Calculate usage percentage
+			if used, ok := mx["jvm_heap_used"]; ok {
+				if max, ok := mx["jvm_heap_max"]; ok && max > 0 {
+					mx["jvm_heap_usage_percent"] = (used * precision * 100) / max
 				}
 			}
 		}
 
 	case "UsedMemory":
 		if stat.CountStatistic != nil {
+			// UsedMemory is in KILOBYTES, convert to bytes
 			if v, err := strconv.ParseInt(stat.CountStatistic.Count, 10, 64); err == nil {
-				mx["jvm_heap_used"] = v
+				mx["jvm_heap_used"] = v * 1024
 			}
 		}
 
 	case "FreeMemory":
 		if stat.CountStatistic != nil {
+			// FreeMemory is in KILOBYTES, convert to bytes
 			if v, err := strconv.ParseInt(stat.CountStatistic.Count, 10, 64); err == nil {
-				mx["jvm_heap_free"] = v
+				free := v * 1024
+				mx["jvm_heap_free"] = free
 				if used, ok := mx["jvm_heap_used"]; ok {
-					mx["jvm_heap_max"] = used + v
-					mx["jvm_heap_committed"] = used + v
+					mx["jvm_heap_max"] = used + free
+					mx["jvm_heap_committed"] = used + free
 				}
 			}
 		}
@@ -60,7 +78,7 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 	case "UpTime":
 		if stat.CountStatistic != nil {
 			if v, err := strconv.ParseInt(stat.CountStatistic.Count, 10, 64); err == nil {
-				mx["jvm_uptime"] = v / 1000 // Convert ms to seconds
+				mx["jvm_uptime"] = v // Already in seconds, no precision needed
 			}
 		}
 
