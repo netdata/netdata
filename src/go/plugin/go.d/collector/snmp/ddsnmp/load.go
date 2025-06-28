@@ -127,7 +127,8 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		prof.SourceFile, _ = filepath.Abs(filename)
 	}
 
-	// Merge extended profiles here
+	prof.extensionHierarchy = make([]*extensionInfo, 0, len(prof.Definition.Extends))
+
 	for _, name := range prof.Definition.Extends {
 		if slices.Contains(stack, name) {
 			return nil, fmt.Errorf("circular extends detected: '%s' already included (in file: %s)", name, prof.SourceFile)
@@ -142,6 +143,13 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		if err != nil {
 			return nil, err
 		}
+
+		extInfo := &extensionInfo{
+			name:       name,
+			sourceFile: mergedBase.SourceFile,
+			extensions: mergedBase.extensionHierarchy,
+		}
+		prof.extensionHierarchy = append(prof.extensionHierarchy, extInfo)
 
 		prof.merge(mergedBase)
 	}
