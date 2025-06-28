@@ -42,14 +42,36 @@ jobs:
     password: password
 ```
 
+### URL Configuration
+
+The collector supports flexible URL configuration:
+
+**Option 1: Base URL + metrics endpoint (recommended)**
+```yaml
+url: https://localhost:9443
+metrics_endpoint: /metrics    # Default, auto-appended
+```
+
+**Option 2: Full URL with path**
+```yaml
+url: https://localhost:9443/metrics
+# metrics_endpoint automatically detected and used as-is
+```
+
+**Option 3: Custom metrics path**
+```yaml
+url: https://localhost:9443
+metrics_endpoint: /custom/metrics/path
+```
+
 ### All available options
 
 ```yaml
   - name: liberty_mp_example
-    url: https://localhost:9443          # Required
+    url: https://localhost:9443          # Required: base URL or full URL
     username: admin                       # Optional
     password: password                    # Optional
-    metrics_endpoint: /metrics            # Default: /metrics
+    metrics_endpoint: /metrics            # Default: /metrics (auto-appended if needed)
     collect_jvm_metrics: true            # Default: true
     collect_rest_metrics: true           # Default: true
     max_rest_endpoints: 50               # Default: 50 (0 = unlimited)

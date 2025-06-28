@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,13 +51,7 @@ func (w *WebSphereMicroProfile) collect(ctx context.Context) (map[string]int64, 
 }
 
 func (w *WebSphereMicroProfile) collectMicroProfileMetrics(ctx context.Context) (map[string]float64, error) {
-	u, err := url.Parse(w.HTTPConfig.RequestConfig.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	u.Path = w.MetricsEndpoint
-	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", w.metricsURL, nil)
 	if err != nil {
 		return nil, err
 	}

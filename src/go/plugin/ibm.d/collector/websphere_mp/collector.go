@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -93,6 +94,7 @@ type WebSphereMicroProfile struct {
 	charts *module.Charts
 
 	httpClient *http.Client
+	metricsURL string
 
 	// For tracking dynamic metrics
 	seenMetrics      map[string]bool
@@ -125,6 +127,11 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 		w.MetricsEndpoint = "/metrics"
 	}
 
+	// Build metrics URL with smart detection
+	if err := w.buildMetricsURL(); err != nil {
+		return fmt.Errorf("failed to build metrics URL: %w", err)
+	}
+
 	// Validate cardinality limits
 	if w.MaxRESTEndpoints < 0 {
 		w.MaxRESTEndpoints = 0
@@ -150,7 +157,40 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 	}
 	w.httpClient = httpClient
 
-	w.Debugf("initialized websphere_mp collector: url=%s, metrics_endpoint=%s", w.HTTPConfig.RequestConfig.URL, w.MetricsEndpoint)
+	w.Debugf("initialized websphere_mp collector: base_url=%s, metrics_endpoint=%s, final_url=%s", w.HTTPConfig.RequestConfig.URL, w.MetricsEndpoint, w.metricsURL)
+
+	return nil
+}
+
+func (w *WebSphereMicroProfile) buildMetricsURL() error {
+	baseURL := strings.TrimRight(w.HTTPConfig.RequestConfig.URL, "/")
+
+	// Parse the base URL to check if it already contains a metrics path
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	// Check if the URL already contains the metrics endpoint path
+	if strings.HasSuffix(u.Path, w.MetricsEndpoint) {
+		// URL already contains the full path
+		w.metricsURL = baseURL
+		w.Debugf("using full metrics URL as provided: %s", w.metricsURL)
+		return nil
+	}
+
+	// Check if URL has any path that might be the metrics endpoint
+	if u.Path != "" && u.Path != "/" {
+		// URL has a path but it's not our default metrics endpoint
+		// Assume it's a complete custom endpoint
+		w.metricsURL = baseURL
+		w.Debugf("using complete custom metrics URL: %s", w.metricsURL)
+		return nil
+	}
+
+	// Append the metrics endpoint to the base URL
+	w.metricsURL = baseURL + w.MetricsEndpoint
+	w.Debugf("built metrics URL by appending endpoint: %s", w.metricsURL)
 
 	return nil
 }
