@@ -101,6 +101,12 @@ type WebSphereMicroProfile struct {
 	collectedMetrics map[string]bool
 	lastMetricCount  int
 
+	// For tracking chart groups
+	jvmChartsCreated        bool
+	threadPoolChartsCreated bool
+	servletChartsCreated    bool
+	sessionChartsCreated    bool
+
 	// Selectors
 	restSelector   matcher.Matcher
 

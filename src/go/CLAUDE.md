@@ -1422,7 +1422,151 @@ if metricsCount > 50 {
 
 Remember: Netdata's strength lies in comprehensive, high-resolution data collection. When in doubt, collect it!
 
-### RULE #5: Chart Family Hierarchies
+### RULE #5: Dynamic Chart Creation and Data Integrity
+
+**We must send chart definitions to netdata only when the monitored application exposes the relevant metrics. We must send samples to netdata only when the monitored application sends new values (even if they are the same with the old).**
+
+#### Critical Principles:
+
+**CRITICAL: Netdata shows on the dashboard ALL CHARTS even the ones without samples. So, it is important to send them ONLY when the monitored application exposed the relevant metrics.**
+
+**CRITICAL: For netdata monitoring gaps are IMPORTANT! They signify failures at the monitored application. The plugins SHOULD NEVER CACHE and resend to netdata old samples when the application does not send a metric. Missing data collection samples ARE VISUALIZED in netdata and they ARE IMPORTANT for understanding the health of the system. Resending old data fills the gaps with imaginary samples and SHOULD NEVER happen.**
+
+#### Implementation Guidelines:
+
+**1. Dynamic Chart Creation**
+```go
+// GOOD: Create charts only when metrics are discovered
+func (c *Collector) processMetric(metricName string, value int64) {
+    if strings.HasPrefix(metricName, "threadpool_") && !c.threadPoolChartsCreated {
+        c.threadPoolChartsCreated = true
+        charts := newThreadPoolCharts()
+        c.charts.Add(*charts...)
+    }
+    
+    // Process the metric
+    mx[metricName] = value
+}
+
+// BAD: Creating charts upfront for metrics that might not exist
+func (c *Collector) Init() {
+    c.charts = newAllPossibleCharts()  // WRONG! Creates empty charts
+}
+```
+
+**2. Never Cache/Resend Old Values**
+```go
+// GOOD: Only send what the application provides
+func (c *Collector) collect() map[string]int64 {
+    mx := make(map[string]int64)
+    
+    // Get fresh data from application
+    currentMetrics := c.fetchMetricsFromApp()
+    
+    // Send only what we received - no caching of old values
+    for name, value := range currentMetrics {
+        mx[name] = value
+    }
+    
+    return mx  // Gaps will appear if metrics are missing - this is CORRECT
+}
+
+// BAD: Caching old values to fill gaps
+func (c *Collector) collect() map[string]int64 {
+    mx := make(map[string]int64)
+    
+    currentMetrics := c.fetchMetricsFromApp()
+    
+    // WRONG: Don't do this!
+    for name, value := range currentMetrics {
+        c.lastValues[name] = value  // Don't cache
+        mx[name] = value
+    }
+    
+    // WRONG: Don't fill gaps with old data!
+    for name, oldValue := range c.lastValues {
+        if _, exists := mx[name]; !exists {
+            mx[name] = oldValue  // NEVER DO THIS!
+        }
+    }
+    
+    return mx
+}
+```
+
+**3. Respect Application Availability**
+```go
+// GOOD: Let natural gaps show application issues
+func (c *Collector) collectDatabaseMetrics() {
+    databases := c.getDatabaseList()  // May return empty if DB is down
+    
+    for _, db := range databases {
+        if metrics := c.getDBMetrics(db); metrics != nil {
+            // Only add metrics we actually received
+            for name, value := range metrics {
+                mx[name] = value
+            }
+        }
+        // If DB is down, no metrics sent - gap will show in dashboard
+    }
+}
+
+// BAD: Masking application failures
+func (c *Collector) collectDatabaseMetrics() {
+    databases := c.getDatabaseList()
+    
+    if len(databases) == 0 {
+        // WRONG: Don't send fake "0" values when DB is unreachable
+        mx["db_connections"] = 0     // This hides the real problem!
+        mx["db_queries_per_sec"] = 0 // Application failure is masked
+    }
+}
+```
+
+**4. Example: Conditional Feature Support**
+```go
+// GOOD: Feature-based dynamic chart creation
+func (c *Collector) collectAdvancedMetrics() {
+    if !c.advancedChartsCreated {
+        // Try to get advanced metrics
+        advancedData := c.getAdvancedMetrics()
+        if advancedData != nil {
+            // Feature is available - create charts
+            c.advancedChartsCreated = true
+            charts := newAdvancedCharts()
+            c.charts.Add(*charts...)
+        }
+        // If feature unavailable, no charts created - correct behavior
+    }
+    
+    // Collect metrics only if feature is available
+    if advancedData := c.getAdvancedMetrics(); advancedData != nil {
+        for name, value := range advancedData {
+            mx[name] = value
+        }
+    }
+}
+```
+
+#### Why This Matters:
+
+1. **Dashboard Clarity**: Empty charts confuse users about what's actually being monitored
+2. **Gap Visualization**: Missing data points indicate real problems (network issues, application failures, configuration problems)
+3. **Alerting Accuracy**: Alerts on "no data" are meaningful - they detect real outages
+4. **Resource Efficiency**: Don't waste bandwidth/storage on charts that never have data
+5. **User Trust**: Accurate representation builds confidence in monitoring data
+
+#### Anti-Patterns to AVOID:
+
+❌ **Creating charts for all possible metrics upfront**
+❌ **Sending zero values when metrics are unavailable**  
+❌ **Caching old values to fill gaps**
+❌ **Assuming all features are always available**
+❌ **Masking application failures with fake data**
+
+Remember: **Missing data is data.** Gaps in charts tell the story of system reliability and should never be artificially filled.
+
+### RULE #6: Chart Family Hierarchies
 
 **Netdata supports hierarchical families using "/" as a delimiter, creating expandable tree structures in the UI. Use this wisely.**
 
@@ -1495,6 +1639,15 @@ Application
 ```
 
 The goal is logical organization that helps users navigate, not unnecessary nesting that makes charts harder to find.
+
+## Chart Design Rules Summary
+
+1. **Non-Overlapping Dimensions** - Dimensions within a single chart must be additive or comparable
+2. **Chart Types Based on Data Semantics** - Stacked for volume, Area for bidirectional flow, Line for independent metrics
+3. **Incremental Charts and Rate Units** - Specify time units, use raw counters with Incremental algorithm
+4. **Collect Everything Available** - Default to comprehensive collection unless there's compelling reason not to
+5. **Dynamic Chart Creation and Data Integrity** - Create charts only when metrics exist, never cache old values
+6. **Chart Family Hierarchies** - Use logical grouping with "/" delimiter, limit depth to 2-3 levels
 
 ## Best Practices Summary
 

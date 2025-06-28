@@ -22,9 +22,6 @@ const precision = 1000 // Precision multiplier for floating-point values
 var promMetricPattern = regexp.MustCompile(`^([a-zA-Z_:][a-zA-Z0-9_:]*(?:\{[^}]*\})?)?\s+([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)\s*$`)
 
 func (w *WebSphereMicroProfile) collect(ctx context.Context) (map[string]int64, error) {
-	if w.charts == nil || len(*w.charts) == 0 {
-		w.initCharts()
-	}
 
 	// Collect MicroProfile metrics
 	metrics, err := w.collectMicroProfileMetrics(ctx)
@@ -219,6 +216,17 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 }
 
 func (w *WebSphereMicroProfile) processJVMMetric(mx map[string]int64, metricName string, value int64) {
+	// Create JVM charts dynamically when JVM metrics are first discovered
+	if !w.jvmChartsCreated {
+		w.jvmChartsCreated = true
+		charts := newJVMCharts()
+		if err := w.charts.Add(*charts...); err != nil {
+			w.Warningf("failed to add JVM charts: %v", err)
+		} else {
+			w.Debugf("created JVM charts dynamically")
+		}
+	}
+
 	// Map Liberty MicroProfile metrics to base chart dimensions
 	// Based on actual metric names observed in Liberty MicroProfile endpoints
 	switch metricName {
@@ -350,6 +358,41 @@ func (w *WebSphereMicroProfile) processRESTMetric(mx map[string]int64, metricNam
 
 
 func (w *WebSphereMicroProfile) processVendorMetric(mx map[string]int64, metricName string, value int64) {
+	// Create charts dynamically when vendor-specific metrics are first discovered
+	
+	// Check if this is a threadpool metric and create charts if needed
+	if strings.HasPrefix(metricName, "threadpool_") && !w.threadPoolChartsCreated {
+		w.threadPoolChartsCreated = true
+		charts := newThreadPoolCharts()
+		if err := w.charts.Add(*charts...); err != nil {
+			w.Warningf("failed to add threadpool charts: %v", err)
+		} else {
+			w.Debugf("created threadpool charts dynamically")
+		}
+	}
+	
+	// Check if this is a servlet metric and create charts if needed
+	if strings.HasPrefix(metricName, "servlet_") && !w.servletChartsCreated {
+		w.servletChartsCreated = true
+		charts := newServletCharts()
+		if err := w.charts.Add(*charts...); err != nil {
+			w.Warningf("failed to add servlet charts: %v", err)
+		} else {
+			w.Debugf("created servlet charts dynamically")
+		}
+	}
+	
+	// Check if this is a session metric and create charts if needed
+	if strings.HasPrefix(metricName, "session_") && !w.sessionChartsCreated {
+		w.sessionChartsCreated = true
+		charts := newSessionCharts()
+		if err := w.charts.Add(*charts...); err != nil {
+			w.Warningf("failed to add session charts: %v", err)
+		} else {
+			w.Debugf("created session charts dynamically")
+		}
+	}
+
 	// Handle vendor-specific metrics (servlet, session, threadpool)
 	switch metricName {
 	// Threadpool metrics
