@@ -5,6 +5,7 @@ go 1.24.0
 replace github.com/netdata/netdata/go/plugins/plugin/go.d => ./plugin/go.d
 
 replace github.com/netdata/netdata/go/plugins/plugin/ibm.d => ./plugin/ibm.d
+
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 require (
@@ -105,6 +106,8 @@ require (
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
+	github.com/ibm-messaging/mq-golang v3.0.0+incompatible // indirect
+	github.com/ibm-messaging/mq-golang/v5 v5.6.4 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
