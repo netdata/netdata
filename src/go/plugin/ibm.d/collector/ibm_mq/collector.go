@@ -1,10 +1,9 @@
-//go:build ignore
-// +build ignore
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//go:build linux && cgo
 
 package ibm_mq
 
-// #cgo CFLAGS: -I/opt/mqm/inc
-// #cgo LDFLAGS: -L/opt/mqm/lib64 -lmqm
 import "C"
 
 import (
@@ -42,11 +41,15 @@ type Collector struct {
 	conf Config
 	module.Base
 	sync.RWMutex
+	
+	charts *module.Charts
 }
 
 // New creates a new collector.
 func New() *Collector {
-	return &Collector{}
+	return &Collector{
+		charts: baseCharts.Copy(),
+	}
 }
 
 // Init is called once when the collector is created.
@@ -55,34 +58,30 @@ func (c *Collector) Init(ctx context.Context) error {
 }
 
 // Check is called once when the collector is created.
-func (c *Collector) Check(ctx context.Context) (bool, error) {
-	return true, nil
+func (c *Collector) Check(ctx context.Context) error {
+	return nil
+}
+
+// Charts returns the charts.
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
 // Collect is called to collect metrics.
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
-	mx := make(map[string]int64)
-
-	qMgr, err := c.connect()
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
-		return nil
 	}
-	defer qMgr.Disc()
-
-	if err := c.collectQueueMetrics(qMgr, mx); err != nil {
-		c.Error(err)
-	}
-
-	if err := c.collectChannelMetrics(qMgr, mx); err != nil {
-		c.Error(err)
-	}
-
-	if err := c.collectQueueManagerMetrics(qMgr, mx); err != nil {
-		c.Error(err)
-	}
-
 	return mx
+}
+
+// Cleanup is called once when the collector is stopped.
+func (c *Collector) Cleanup(ctx context.Context) {}
+
+// Configuration returns the collector configuration.
+func (c *Collector) Configuration() any {
+	return c.conf
 }
 
 func init() {

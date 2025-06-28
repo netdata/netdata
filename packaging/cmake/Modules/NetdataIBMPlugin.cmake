@@ -3,8 +3,8 @@
 
 # add_ibm_plugin_target: Add target for building ibm.d.plugin with CGO
 #
-# This plugin requires CGO and IBM DB2 headers for compilation.
-# The plugin will download IBM DB2 libraries on first run.
+# This plugin requires CGO and IBM DB2/MQ headers for compilation.
+# The plugin will download IBM libraries on first run.
 macro(add_ibm_plugin_target)
     # Check if we can download IBM headers for build
     find_program(CURL_EXECUTABLE curl)
@@ -19,6 +19,11 @@ macro(add_ibm_plugin_target)
     set(IBM_CLIDRIVER_DIR "${CMAKE_BINARY_DIR}/ibm-clidriver")
     set(IBM_CLIDRIVER_ARCHIVE "${CMAKE_BINARY_DIR}/linuxx64_odbc_cli.tar.gz")
     set(IBM_CLIDRIVER_URL "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz")
+    
+    # Download IBM MQ client libraries to build directory
+    set(IBM_MQ_DIR "${CMAKE_BINARY_DIR}/ibm-mqclient")
+    set(IBM_MQ_ARCHIVE "${CMAKE_BINARY_DIR}/IBM-MQC-Redist-LinuxX64.tar.gz")
+    set(IBM_MQ_URL "https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/9.4.1.0-IBM-MQC-Redist-LinuxX64.tar.gz")
     
     if(NOT EXISTS "${IBM_CLIDRIVER_DIR}/include/sqlcli.h")
         message(STATUS "Downloading IBM DB2 client libraries for ibm.d.plugin build")
@@ -70,6 +75,45 @@ macro(add_ibm_plugin_target)
         file(REMOVE "${IBM_CLIDRIVER_ARCHIVE}")
     endif()
     
+    # Download IBM MQ client libraries if not present
+    if(NOT EXISTS "${IBM_MQ_DIR}/inc/cmqc.h")
+        message(STATUS "Downloading IBM MQ client libraries for ibm.d.plugin build")
+        
+        if(CURL_EXECUTABLE)
+            execute_process(
+                COMMAND ${CURL_EXECUTABLE} -sL -o "${IBM_MQ_ARCHIVE}" "${IBM_MQ_URL}"
+                WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+                RESULT_VARIABLE MQ_DOWNLOAD_RESULT
+            )
+        else()
+            execute_process(
+                COMMAND ${WGET_EXECUTABLE} -q -O "${IBM_MQ_ARCHIVE}" "${IBM_MQ_URL}"
+                WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+                RESULT_VARIABLE MQ_DOWNLOAD_RESULT
+            )
+        endif()
+        
+        if(NOT MQ_DOWNLOAD_RESULT EQUAL 0)
+            message(WARNING "Failed to download IBM MQ client libraries - ibm_mq collector will be disabled")
+            # Don't return here, we can still build with just DB2 support
+        else()
+            # Extract MQ client
+            file(MAKE_DIRECTORY "${IBM_MQ_DIR}")
+            execute_process(
+                COMMAND ${CMAKE_COMMAND} -E tar xzf "${IBM_MQ_ARCHIVE}"
+                WORKING_DIRECTORY "${IBM_MQ_DIR}"
+                RESULT_VARIABLE MQ_EXTRACT_RESULT
+            )
+            
+            if(NOT MQ_EXTRACT_RESULT EQUAL 0)
+                message(WARNING "Failed to extract IBM MQ client libraries - ibm_mq collector will be disabled")
+            endif()
+            
+            # Remove archive
+            file(REMOVE "${IBM_MQ_ARCHIVE}")
+        endif()
+    endif()
+    
     # Find all Go source files
     file(GLOB_RECURSE IBM_PLUGIN_DEPS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/go/*.go")
     list(APPEND IBM_PLUGIN_DEPS
@@ -77,21 +121,35 @@ macro(add_ibm_plugin_target)
         "${CMAKE_SOURCE_DIR}/src/go/go.sum"
     )
     
+    # Set up build paths based on what libraries are available
+    set(IBM_CGO_CFLAGS "-I${IBM_CLIDRIVER_DIR}/include")
+    set(IBM_CGO_LDFLAGS "-L${IBM_CLIDRIVER_DIR}/lib")
+    set(IBM_RPATH_FLAGS "-Wl,-rpath,\$ORIGIN/../../../lib/netdata/ibm-clidriver/lib -Wl,-rpath,${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/ibm-clidriver/lib -Wl,-rpath,/usr/lib/netdata/ibm-clidriver/lib -Wl,-rpath,/opt/netdata/lib/netdata/ibm-clidriver/lib")
+    
+    # Add MQ paths if available
+    if(EXISTS "${IBM_MQ_DIR}/inc/cmqc.h")
+        set(IBM_CGO_CFLAGS "${IBM_CGO_CFLAGS} -I${IBM_MQ_DIR}/inc")
+        set(IBM_CGO_LDFLAGS "${IBM_CGO_LDFLAGS} -L${IBM_MQ_DIR}/lib64")
+        set(IBM_RPATH_FLAGS "${IBM_RPATH_FLAGS} -Wl,-rpath,\$ORIGIN/../../../lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,/usr/lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,/opt/netdata/lib/netdata/ibm-mqclient/lib64")
+        set(MQ_INSTALLATION_PATH "${IBM_MQ_DIR}")
+    else()
+        # If MQ libraries aren't downloaded, try standard paths
+        set(MQ_INSTALLATION_PATH "/opt/mqm")
+    endif()
+    
     # Build with CGO enabled and multiple rpath entries for different installation methods
-    # $ORIGIN/../../../lib/netdata/ibm-clidriver/lib - for relative to plugin location
-    # /opt/netdata/lib/netdata/ibm-clidriver/lib - for static builds
-    # /usr/lib/netdata/ibm-clidriver/lib - for system packages
     add_custom_command(
         OUTPUT ibm.d.plugin
         COMMAND "${CMAKE_COMMAND}" -E env 
             GOROOT=${GO_ROOT} 
             CGO_ENABLED=1 
-            CGO_CFLAGS="-I${IBM_CLIDRIVER_DIR}/include"
-            CGO_LDFLAGS="-L${IBM_CLIDRIVER_DIR}/lib"
-            IBM_DB_HOME="${IBM_CLIDRIVER_DIR}"
-            LD_LIBRARY_PATH="${IBM_CLIDRIVER_DIR}/lib:$LD_LIBRARY_PATH"
+            CGO_CFLAGS=${IBM_CGO_CFLAGS}
+            CGO_LDFLAGS=${IBM_CGO_LDFLAGS}
+            IBM_DB_HOME=${IBM_CLIDRIVER_DIR}
+            LD_LIBRARY_PATH=${IBM_CLIDRIVER_DIR}/lib:${IBM_MQ_DIR}/lib64:$LD_LIBRARY_PATH
+            MQ_INSTALLATION_PATH=${MQ_INSTALLATION_PATH}
             GOPROXY=https://proxy.golang.org,direct 
-            "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS} -extldflags '-Wl,-rpath,\$ORIGIN/../../../lib/netdata/ibm-clidriver/lib -Wl,-rpath,${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/ibm-clidriver/lib'" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
+            "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS} -extldflags '${IBM_RPATH_FLAGS}'" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
         DEPENDS ${IBM_PLUGIN_DEPS}
         COMMENT "Building ibm.d.plugin (with CGO)"
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
