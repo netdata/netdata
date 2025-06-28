@@ -248,7 +248,7 @@ func (d *DB2) detectVersion(ctx context.Context) error {
 
 func (d *DB2) collectGlobalMetrics(ctx context.Context) error {
 	d.Debugf("starting global metrics collection")
-	
+
 	// Service health checks - core functionality
 	if err := d.collectServiceHealthResilience(ctx); err != nil {
 		return err // Service health is critical
