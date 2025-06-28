@@ -885,49 +885,97 @@ fi
 %post plugin-ibm
 
 download_ibm_libs() {
-    DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
-    DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
+    DB2_DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
+    DB2_DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
     
-    # Check if already installed
-    if [ -f "$DRIVER_DIR/lib/libdb2.so" ]; then
-        return 0
+    MQ_CLIENT_DIR="/usr/lib/netdata/ibm-mqclient"
+    MQ_CLIENT_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/9.4.1.0-IBM-MQC-Redist-LinuxX64.tar.gz"
+    
+    DB2_SUCCESS=0
+    MQ_SUCCESS=0
+    
+    # Download DB2 libraries
+    if [ ! -f "$DB2_DRIVER_DIR/lib/libdb2.so" ]; then
+        echo "Downloading IBM DB2 client libraries..."
+        
+        # Create directory
+        mkdir -p "$DB2_DRIVER_DIR"
+        cd "$DB2_DRIVER_DIR"
+        
+        # Download
+        if command -v wget >/dev/null 2>&1; then
+            wget -q -O clidriver.tar.gz "$DB2_DRIVER_URL" || DB2_SUCCESS=1
+        elif command -v curl >/dev/null 2>&1; then
+            curl -sL -o clidriver.tar.gz "$DB2_DRIVER_URL" || DB2_SUCCESS=1
+        else
+            echo "ERROR: Neither wget nor curl found. Cannot download IBM libraries."
+            DB2_SUCCESS=1
+        fi
+        
+        if [ $DB2_SUCCESS -eq 0 ]; then
+            # Extract
+            tar -xzf clidriver.tar.gz || DB2_SUCCESS=1
+            rm -f clidriver.tar.gz
+            
+            # Move clidriver contents to parent directory
+            if [ -d "clidriver" ]; then
+                mv clidriver/* .
+                rmdir clidriver
+            fi
+            
+            echo "IBM DB2 client libraries installed successfully."
+        else
+            echo "WARNING: Failed to download IBM DB2 libraries."
+        fi
+    else
+        echo "IBM DB2 client libraries already installed."
     fi
     
-    echo "Downloading IBM DB2 client libraries..."
-    
-    # Create directory
-    mkdir -p "$DRIVER_DIR"
-    cd "$DRIVER_DIR"
-    
-    # Download
-    if command -v wget >/dev/null 2>&1; then
-        wget -q -O clidriver.tar.gz "$DRIVER_URL" || return 1
-    elif command -v curl >/dev/null 2>&1; then
-        curl -sL -o clidriver.tar.gz "$DRIVER_URL" || return 1
+    # Download MQ libraries
+    if [ ! -f "$MQ_CLIENT_DIR/lib64/libmqm_r.so" ]; then
+        echo "Downloading IBM MQ client libraries..."
+        
+        # Create directory
+        mkdir -p "$MQ_CLIENT_DIR"
+        cd "$MQ_CLIENT_DIR"
+        
+        # Download
+        if command -v wget >/dev/null 2>&1; then
+            wget -q -O mqclient.tar.gz "$MQ_CLIENT_URL" || MQ_SUCCESS=1
+        elif command -v curl >/dev/null 2>&1; then
+            curl -sL -o mqclient.tar.gz "$MQ_CLIENT_URL" || MQ_SUCCESS=1
+        else
+            MQ_SUCCESS=1
+        fi
+        
+        if [ $MQ_SUCCESS -eq 0 ]; then
+            # Extract
+            tar -xzf mqclient.tar.gz || MQ_SUCCESS=1
+            rm -f mqclient.tar.gz
+            
+            echo "IBM MQ client libraries installed successfully."
+        else
+            echo "WARNING: Failed to download IBM MQ libraries."
+        fi
     else
-        echo "ERROR: Neither wget nor curl found. Cannot download IBM libraries."
+        echo "IBM MQ client libraries already installed."
+    fi
+    
+    # Return success if at least one library was downloaded
+    if [ $DB2_SUCCESS -eq 0 ] || [ $MQ_SUCCESS -eq 0 ]; then
+        return 0
+    else
         return 1
     fi
-    
-    # Extract
-    tar -xzf clidriver.tar.gz || return 1
-    rm -f clidriver.tar.gz
-    
-    # Move clidriver contents to parent directory
-    if [ -d "clidriver" ]; then
-        mv clidriver/* .
-        rmdir clidriver
-    fi
-    
-    echo "IBM DB2 client libraries installed successfully."
-    return 0
 }
 
 # Try to download IBM libraries
 if ! download_ibm_libs; then
-    echo "WARNING: Failed to download IBM DB2 libraries."
+    echo "WARNING: Failed to download IBM libraries."
     echo "The ibm.d.plugin will not work until libraries are installed."
-    echo "You can manually download them to: /usr/lib/netdata/ibm-clidriver/"
+    echo "You can manually download them to:"
+    echo "  DB2: /usr/lib/netdata/ibm-clidriver/"
+    echo "  MQ:  /usr/lib/netdata/ibm-mqclient/"
 fi
 
 %files plugin-ibm
