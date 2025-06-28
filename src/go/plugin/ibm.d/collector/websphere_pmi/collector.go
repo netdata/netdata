@@ -210,11 +210,11 @@ type pmiStat struct {
 	BoundedRangeStatistics []boundedRangeStat  `xml:"BoundedRangeStatistic"`
 	SubStats               []pmiStat           `xml:"Stat"`
 	
-	// Keep single references for backward compatibility
-	CountStatistic        *countStat        
-	TimeStatistic         *timeStat         
-	RangeStatistic        *rangeStat        
-	BoundedRangeStatistic *boundedRangeStat 
+	// Keep single references for backward compatibility (no XML tags!)
+	CountStatistic        *countStat        `xml:"-"`
+	TimeStatistic         *timeStat         `xml:"-"`
+	RangeStatistic        *rangeStat        `xml:"-"`
+	BoundedRangeStatistic *boundedRangeStat `xml:"-"`
 }
 
 type pmiValue struct {
