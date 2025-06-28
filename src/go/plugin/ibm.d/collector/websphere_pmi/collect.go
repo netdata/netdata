@@ -11,7 +11,7 @@ import (
 // processJVMStat processes JVM runtime statistics
 func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 	w.Debugf("processing JVM stat: %s (type: %s)", stat.Name, stat.Type)
-	
+
 	// For WebSphere 9.x, if this is the "JVM Runtime" stat itself, process its embedded statistics
 	if stat.Name == "JVM Runtime" {
 		// Process BoundedRangeStatistics
@@ -24,9 +24,9 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 					// Handle scientific notation
 					mx["jvm_heap_used"] = int64(vf * 1024)
 				}
-				
+
 				if v, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
-					mx["jvm_heap_max"] = v * 1024 // Convert KB to bytes
+					mx["jvm_heap_max"] = v * 1024       // Convert KB to bytes
 					mx["jvm_heap_committed"] = v * 1024 // PMI doesn't distinguish committed
 				} else if vf, err := strconv.ParseFloat(brs.UpperBound, 64); err == nil {
 					// Handle scientific notation
@@ -35,7 +35,7 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 				}
 			}
 		}
-		
+
 		// Process CountStatistics
 		for _, cs := range stat.CountStatistics {
 			switch cs.Name {
@@ -60,7 +60,7 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 				}
 			}
 		}
-		
+
 		// Calculate derived metrics
 		if used, ok := mx["jvm_heap_used"]; ok {
 			if max, ok := mx["jvm_heap_max"]; ok && max > 0 {
@@ -79,7 +79,7 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 		}
 		return
 	}
-	
+
 	// Handle individual stat processing for older WebSphere versions
 	switch stat.Name {
 	case "HeapSize":
@@ -91,9 +91,9 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 				// Handle scientific notation
 				mx["jvm_heap_used"] = int64(vf * 1024)
 			}
-			
+
 			if v, err := strconv.ParseInt(stat.BoundedRangeStatistic.UpperBound, 10, 64); err == nil {
-				mx["jvm_heap_max"] = v * 1024 // Convert KB to bytes
+				mx["jvm_heap_max"] = v * 1024       // Convert KB to bytes
 				mx["jvm_heap_committed"] = v * 1024 // PMI doesn't distinguish committed
 			} else if vf, err := strconv.ParseFloat(stat.BoundedRangeStatistic.UpperBound, 64); err == nil {
 				// Handle scientific notation
@@ -642,7 +642,7 @@ func (w *WebSpherePMI) extractPoolName(path, module string) string {
 	// Traditional: server/threadPoolModule/WebContainer
 	// Liberty: server/executor/default
 	parts := strings.Split(path, "/")
-	
+
 	// Handle Liberty-specific paths
 	if w.wasEdition == "liberty" && module == "threadPoolModule" {
 		// Liberty uses executor instead of threadPoolModule
@@ -652,7 +652,7 @@ func (w *WebSpherePMI) extractPoolName(path, module string) string {
 			}
 		}
 	}
-	
+
 	// Traditional path handling
 	for i, part := range parts {
 		if part == module && i+1 < len(parts) {

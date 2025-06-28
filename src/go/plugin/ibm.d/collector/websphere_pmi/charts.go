@@ -530,7 +530,7 @@ func (w *WebSpherePMI) addThreadPoolCharts(pool string) {
 		}
 		// Add version labels if available
 		if w.wasVersion != "" {
-			chart.Labels = append(chart.Labels, 
+			chart.Labels = append(chart.Labels,
 				module.Label{Key: "was_version", Value: w.wasVersion},
 				module.Label{Key: "was_edition", Value: w.wasEdition},
 			)
@@ -571,7 +571,7 @@ func (w *WebSpherePMI) addJDBCPoolCharts(pool string) {
 		}
 		// Add version labels if available
 		if w.wasVersion != "" {
-			chart.Labels = append(chart.Labels, 
+			chart.Labels = append(chart.Labels,
 				module.Label{Key: "was_version", Value: w.wasVersion},
 				module.Label{Key: "was_edition", Value: w.wasEdition},
 			)
@@ -615,7 +615,7 @@ func (w *WebSpherePMI) addJCAPoolCharts(pool string) {
 		}
 		// Add version labels if available
 		if w.wasVersion != "" {
-			chart.Labels = append(chart.Labels, 
+			chart.Labels = append(chart.Labels,
 				module.Label{Key: "was_version", Value: w.wasVersion},
 				module.Label{Key: "was_edition", Value: w.wasEdition},
 			)

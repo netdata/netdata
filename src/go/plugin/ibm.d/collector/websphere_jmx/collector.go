@@ -116,7 +116,7 @@ type Config struct {
 	CollectSessionMetrics     bool `yaml:"collect_session_metrics" json:"collect_session_metrics"`
 	CollectTransactionMetrics bool `yaml:"collect_transaction_metrics" json:"collect_transaction_metrics"`
 	CollectClusterMetrics     bool `yaml:"collect_cluster_metrics" json:"collect_cluster_metrics"`
-	
+
 	// APM Collection flags
 	CollectServletMetrics bool `yaml:"collect_servlet_metrics" json:"collect_servlet_metrics"`
 	CollectEJBMetrics     bool `yaml:"collect_ejb_metrics" json:"collect_ejb_metrics"`
@@ -132,11 +132,11 @@ type Config struct {
 	MaxEJBs            int `yaml:"max_ejbs,omitempty" json:"max_ejbs"`
 
 	// Filtering
-	CollectAppsMatching      string `yaml:"collect_apps_matching,omitempty" json:"collect_apps_matching"`
-	CollectPoolsMatching     string `yaml:"collect_pools_matching,omitempty" json:"collect_pools_matching"`
-	CollectJMSMatching       string `yaml:"collect_jms_matching,omitempty" json:"collect_jms_matching"`
-	CollectServletsMatching  string `yaml:"collect_servlets_matching,omitempty" json:"collect_servlets_matching"`
-	CollectEJBsMatching      string `yaml:"collect_ejbs_matching,omitempty" json:"collect_ejbs_matching"`
+	CollectAppsMatching     string `yaml:"collect_apps_matching,omitempty" json:"collect_apps_matching"`
+	CollectPoolsMatching    string `yaml:"collect_pools_matching,omitempty" json:"collect_pools_matching"`
+	CollectJMSMatching      string `yaml:"collect_jms_matching,omitempty" json:"collect_jms_matching"`
+	CollectServletsMatching string `yaml:"collect_servlets_matching,omitempty" json:"collect_servlets_matching"`
+	CollectEJBsMatching     string `yaml:"collect_ejbs_matching,omitempty" json:"collect_ejbs_matching"`
 
 	// Resilience settings
 	MaxRetries              int     `yaml:"max_retries,omitempty" json:"max_retries"`
