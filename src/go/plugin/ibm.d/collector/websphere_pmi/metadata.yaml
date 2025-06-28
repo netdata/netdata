@@ -30,11 +30,11 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors IBM WebSphere Application Server instances using the Performance Monitoring Infrastructure (PMI) via the PerfServlet interface.
-          
+
           It collects a wide range of metrics including JVM performance, thread pools, JDBC connections, JMS destinations, web applications, and more.
         method_description: |
           The collector connects to WebSphere's PerfServlet endpoint (typically at `/wasPerfTool/servlet/perfservlet`) via HTTP/HTTPS.
-          
+
           It parses the XML response containing PMI counter data to extract performance metrics.
       supported_platforms:
         include:
@@ -57,7 +57,7 @@ modules:
         performance_impact:
           description: |
             The performance impact is minimal on the Netdata side.
-            
+
             On the WebSphere side, PMI data collection has some overhead that depends on the statistics level configured.
     setup:
       prerequisites:
@@ -65,7 +65,7 @@ modules:
           - title: Enable PMI in WebSphere
             description: |
               PMI must be enabled in your WebSphere Application Server. To enable:
-              
+
               1. Open WebSphere Admin Console
               2. Navigate to Monitoring and Tuning > Performance Monitoring Infrastructure (PMI)
               3. Select your server
@@ -76,14 +76,14 @@ modules:
               The PerfServlet must be deployed and accessible. You must provide the complete URL including the full path:
               - Traditional WAS: `http://host:port/wasPerfTool/servlet/perfservlet`
               - Liberty Profile: May require additional configuration
-              
+
               **IMPORTANT**: The collector requires complete URLs with full paths. Do not provide just the host/port - the full path to the PerfServlet endpoint must be included.
-              
+
               Verify access by navigating to the complete URL in a browser.
           - title: Configure Security
             description: |
               If security is enabled, you'll need credentials with appropriate permissions to access PMI data.
-              
+
               The user must have at least Monitor role for the cell/node/server.
       configuration:
         file:
@@ -106,10 +106,10 @@ modules:
             - name: url
               description: |
                 The complete PerfServlet URL for the WebSphere instance, including the full path.
-                
+
                 **IMPORTANT**: You must provide the complete URL including the full path to the PerfServlet endpoint.
                 The collector does not append paths automatically - the entire URL must be specified.
-                
+
                 Query string parameters are preserved, allowing admin control features to be passed through.
               default_value: "http://localhost:9080/wasPerfTool/servlet/perfservlet"
               required: true
@@ -284,7 +284,7 @@ modules:
                   - name: websphere_node1
                     url: http://node1.example.com:9080/wasPerfTool/servlet/perfservlet
                     node_name: Node01
-                    
+
                   - name: websphere_node2
                     url: http://node2.example.com:9080/wasPerfTool/servlet/perfservlet
                     node_name: Node02
@@ -312,7 +312,7 @@ modules:
           - name: Can't access PerfServlet
             description: |
               If you get connection errors or 404 responses:
-              
+
               1. Verify the PerfServlet URL is correct and complete (including the full path)
               2. Check if PMI is enabled in WebSphere
               3. Ensure the PerfServlet is deployed (it's part of the perfServletApp)
@@ -320,14 +320,14 @@ modules:
           - name: Authentication failures
             description: |
               If you get 401/403 errors:
-              
+
               1. Verify the username and password are correct
               2. Ensure the user has Monitor role or higher
               3. Check if security is properly configured in WebSphere
           - name: No metrics collected
             description: |
               If the collector runs but no metrics appear:
-              
+
               1. Check PMI is enabled and set to appropriate level
               2. Verify the XML response from PerfServlet contains data
               3. Check Netdata logs for parsing errors
@@ -335,7 +335,7 @@ modules:
           - name: Missing specific metrics
             description: |
               If some metrics are missing:
-              
+
               1. Check if the corresponding collection flag is enabled
               2. Verify the PMI level includes those statistics
               3. Check cardinality limits aren't being exceeded
