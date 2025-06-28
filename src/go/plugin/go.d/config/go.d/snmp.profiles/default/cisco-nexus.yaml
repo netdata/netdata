@@ -31,7 +31,7 @@ metrics:
       #   name: entSensorValue
       #   description: Most recent measurement seen by the sensor
       #   unit: "TBD"
-      # TODO here there is also precision and scale
+      # TODO: totally wrong, need transformation
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1
         name: entSensorType
         description: Sensor type
@@ -54,8 +54,8 @@ metrics:
           14: dbm
           15: db
     metric_tags:
-      - index: 1
-        tag: sensor_id
+      - tag: sensor_index
+        index: 1
   - MIB: CISCO-ENHANCED-MEMPOOL-MIB # Overrides generic cisco defaults from _cisco-cpu-memory.yaml
     table:
       OID: 1.3.6.1.4.1.9.9.221.1.1.1

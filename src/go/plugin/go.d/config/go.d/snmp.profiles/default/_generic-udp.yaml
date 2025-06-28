@@ -6,26 +6,26 @@ metrics:
       OID: 1.3.6.1.2.1.7.8.0
       name: udpHCInDatagrams
       description: UDP datagrams received
-      family: IP/UDP/Packets
+      family: Network/UDP/Datagram/In
       unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
       OID: 1.3.6.1.2.1.7.9.0
       name: udpHCOutDatagrams
       description: UDP datagrams sent
-      family: IP/UDP/Packets
+      family: Network/UDP/Datagram/Out
       unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
       OID: 1.3.6.1.2.1.7.3.0
       name: udpInErrors
-      description: UDP datagrams received but couldn’t be delivered (not due to missing app)
-      family: IP/UDP/Errors
+      description: UDP datagrams received but couldn't be delivered (not due to missing app)
+      family: Network/UDP/Error/In
       unit: "{error}/s"
   - MIB: UDP-MIB
     symbol:
       OID: 1.3.6.1.2.1.7.2.0
       name: udpNoPorts
       description: UDP datagrams received with no app on the destination port
-      family: IP/UDP/Errors
+      family: Network/UDP/Error/NoPort
       unit: "{error}/s"

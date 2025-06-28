@@ -18,55 +18,47 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.6
         name: slbStatsCreatedConnections
-        metric_type: monotonic_count
         description: Number of TCP and UDP connections created since SLB was configured
-        family: Connections/Created
-        unit: "{connection}"
+        family: SLB/Connection/Created
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.7
         name: slbStatsCreatedHCConnections
-        metric_type: monotonic_count
         description: Number of connections created by SLB since it was configured (64-bit)
-        family: Connections/Created
-        unit: "{connection}"
+        family: SLB/Connection/Created
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.8
         name: slbStatsEstablishedConnections
-        metric_type: monotonic_count
         description: Number of connections established through SLB
-        family: Connections/Established
-        unit: "{connection}"
+        family: SLB/Connection/Established
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.9
         name: slbStatsEstablishedHCConnections
-        metric_type: monotonic_count
         description: Number of connections established through SLB (64-bit)
-        family: Connections/Established
-        unit: "{connection}"
+        family: SLB/Connection/Established
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.10
         name: slbStatsDestroyedConnections
-        metric_type: monotonic_count
         description: Number of TCP and UDP connections destroyed by SLB
-        family: Connections/Destroyed
-        unit: "{connection}"
+        family: SLB/Connection/Destroyed
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.11
         name: slbStatsDestroyedHCConnections
-        metric_type: monotonic_count
         description: Number of TCP and UDP connections destroyed by SLB (64-bit)
-        family: Connections/Destroyed
-        unit: "{connection}"
+        family: SLB/Connection/Destroyed
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.12
         name: slbStatsReassignedConnections
-        metric_type: monotonic_count
         description: Number of TCP and UDP connections reassigned from one real server to another
-        family: Connections/Reassigned
-        unit: "{connection}"
+        family: SLB/Connection/Reassigned
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.161.1.1.1.1.13
         name: slbStatsReassignedHCConnections
-        metric_type: monotonic_count
         description: Number of TCP and UDP connections reassigned from one real server to another (64-bit)
-        family: Connections/Reassigned
-        unit: "{connection}"
+        family: SLB/Connection/Reassigned
+        unit: "{connection}/s"
     metric_tags:
-      - index: 1 # index `slbEntity`
-        tag: slb_entity
+      - tag: slb_entity_index
+        index: 1 # index `slbEntity`
 
   - MIB: CISCO-SLB-EXT-MIB
     table:
@@ -76,176 +68,148 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.3
         name: cslbxStatsCurrConnections
         description: Number of connections currently still open
-        family: Connections/Open
+        family: SLB/Connection/Current
         unit: "{connection}"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.5
         name: cslbxStatsFailedConns
-        metric_type: monotonic_count
         description: Number of connections that were load balanced to real servers that then failed to respond
-        family: Connections/Load Balanced
-        unit: "{connection}"
+        family: SLB/Connection/Failed
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.7
         name: cslbxStatsL4PolicyConns
-        metric_type: monotonic_count
         description: Number of connections made to the virtual servers with only layer 4 configuration
-        family: Connections/Virtual Servers/Layer 4/Total
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer4/Connection
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.26
         name: cslbxStatsL4PolicyHCConns
-        metric_type: monotonic_count
         description: Number of connections made to the virtual servers with only layer 4 configuration (64-bit)
-        family: Connections/Virtual Servers/Layer 4/Total
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer4/Connection
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.8
         name: cslbxStatsL7PolicyConns
-        metric_type: monotonic_count
         description: Number of connections made to the virtual servers with some layer 7 configuration
-        family: Connections/Virtual Servers/Layer 7/Total
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer7/Connection
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.27
         name: cslbxStatsL7PolicyHCConns
-        metric_type: monotonic_count
         description: Number of connections made to the virtual servers with some layer 7 configuration (64-bit)
-        family: Connections/Virtual Servers/Layer 7/Total
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer7/Connection
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.9
         name: cslbxStatsDroppedL4PolicyConns
-        metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with only layer 4 configuration
-        family: Connections/Virtual Servers/Layer 4/Dropped
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer4/Dropped
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.28
         name: cslbxStatsDroppedL4PolicyHCConns
-        metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with only layer 4 configuration (64-bit)
-        family: Connections/Virtual Servers/Layer 4/Dropped
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer4/Dropped
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.10
         name: cslbxStatsDroppedL7PolicyConns
-        metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with some layer 7 policy
-        family: Connections/Virtual Servers/Layer 7/Dropped
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer7/Dropped
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.29
         name: cslbxStatsDroppedL7PolicyHCConns
-        metric_type: monotonic_count
         description: Number of connections dropped by virtual servers with some layer 7 configuration
-        family: Connections/Virtual Servers/Layer 7/Dropped
-        unit: "{connection}"
+        family: SLB/VirtualServer/Layer7/Dropped
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.11
         name: cslbxStatsFtpConns
-        metric_type: monotonic_count
         description: Number of connections made to virtual servers with the FTP service
-        family: Connections/Virtual Servers/FTP
-        unit: "{connection}"
+        family: SLB/VirtualServer/FTP/Connection
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.12
         name: cslbxStatsHttpRedirectConns
-        metric_type: monotonic_count
         description: Number of connections made to HTTP redirect servers
-        family: Connections/HTTP Redirect Servers/Total
-        unit: "{connection}"
+        family: SLB/HTTPRedirect/Connection
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.13
         name: cslbxStatsDroppedRedirectConns
-        metric_type: monotonic_count
         description: Number of connections dropped by HTTP redirect servers
-        family: Connections/HTTP Redirect Servers/Dropped
-        unit: "{connection}"
+        family: SLB/HTTPRedirect/Dropped
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.14
         name: cslbxStatsNoMatchPolicyRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because they failed to match any configured policy
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/NoPolicy
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.30
         name: cslbxStatsNoMatchPolicyHCRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because they failed to match any configured policy (64-bit)
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/NoPolicy
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.15
         name: cslbxStatsNoCfgPolicyRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the matching virtual server was not configured with any policy
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/NoConfig
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.31
         name: cslbxStatsNoCfgPolicyHCRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the matching virtual server was not configured with any policy (64-bit)
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/NoConfig
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.16
         name: cslbxStatsNoActiveServerRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the chosen server farm did not have any active servers
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/NoServer
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.17
         name: cslbxStatsAclDenyRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the the matching client access list was configured to deny access
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/ACL
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.32
         name: cslbxStatsAclDenyHCRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the the matching client access list was configured to deny access (64-bit)
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/ACL
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.18
         name: cslbxStatsMaxParseLenRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the length of an HTTP request or response header exceeded the maximum L7 parse length configured for the matching virtual server
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/ParseLength
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.19
         name: cslbxStatsBadSslFormatRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because some invalid or unrecognized SSL format was detected
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/SSL
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.20
         name: cslbxStatsL7ParserErrorRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because an error occurred while parsing the connection data at Layer 7
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/ParseError
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.21
         name: cslbxStatsVerMismatchRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the Layer 7 configuration was changed while Layer 7 parsing was occurring on the connection
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/VersionMismatch
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.33
         name: cslbxStatsVerMismatchHCRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the Layer 7 configuration was changed while Layer 7 parsing was occurring on the connection (64-bit)
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/VersionMismatch
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.22
         name: cslbxStatsOutOfMemoryRejects
-        metric_type: monotonic_count
         description: Number of connections rejected because the SLB module could not allocate the required memory
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Rejected/Memory
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.23
         name: cslbxStatsTimedOutConnections
-        metric_type: monotonic_count
         description: Number of connections that were terminated because they were idle longer than the configured idle timeout value
-        family: Connections/Rejected
-        unit: "{connection}"
+        family: SLB/Connection/Timeout
+        unit: "{connection}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.24
         name: cslbxStatsTcpChecksumErrorPkts
-        metric_type: monotonic_count
         description: Accumulated number of TCP packets which have checksum error
-        family: Packets/TCP/Errors
-        unit: "{error}"
+        family: Network/TCP/Error/Checksum
+        unit: "{error}/s"
       - OID: 1.3.6.1.4.1.9.9.254.1.1.1.1.25
         name: cslbxStatsIpChecksumErrorPkts
-        metric_type: monotonic_count
         description: Accumulated number of IP packets which have checksum error
-        family: Packets/IP/Errors
-        unit: "{packet}"
+        family: Network/IP/Error/Checksum
+        unit: "{packet}/s"
     metric_tags:
-      - index: 1 # index `slbEntity` of `slbStatsTable`
-        tag: slb_entity
+      - tag: slb_entity_index
+        index: 1 # index `slbEntity` of `slbStatsTable`
