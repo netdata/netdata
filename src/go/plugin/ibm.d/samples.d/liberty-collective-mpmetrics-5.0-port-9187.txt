@@ -1,0 +1,60 @@
+# HELP cpu_processCpuLoad_percent Displays  the "recent cpu usage" for the Java Virtual Machine process. This value is a double in the [0.0,1.0] interval. A value of 0.0 means that none of the CPUs were running threads from the JVM process during the recent period of time observed, while a value of 1.0 means that all CPUs were actively running threads from the JVM 100% of the time during the recent period being observed. Threads from the JVM include the application threads as well as the JVM internal threads. All values betweens 0.0 and 1.0 are possible depending of the activities going on in the JVM process and the whole system. If the Java Virtual Machine recent CPU usage is not available, the method returns a negative value.
+# TYPE cpu_processCpuLoad_percent gauge
+cpu_processCpuLoad_percent{mp_scope="base",} 5.809772913064342E-5
+# HELP classloader_unloadedClasses_total Displays the total number of classes unloaded since the Java virtual machine has started execution.
+# TYPE classloader_unloadedClasses_total counter
+classloader_unloadedClasses_total{mp_scope="base",} 29.0
+# HELP gc_time_per_cycle_seconds The recent average time spent per garbage collection cycle. This metric displays -1 if the garbage collection elapsed time or count is undefined for this collector.
+# TYPE gc_time_per_cycle_seconds gauge
+gc_time_per_cycle_seconds{mp_scope="vendor",name="global",} 0.01937957563977972
+gc_time_per_cycle_seconds{mp_scope="vendor",name="scavenge",} 0.001404140316126062
+# HELP thread_max_count Displays the peak live thread count since the Java virtual machine started or peak was reset. This includes daemon and non-daemon threads.
+# TYPE thread_max_count gauge
+thread_max_count{mp_scope="base",} 102.0
+# HELP cpu_processCpuTime_seconds Displays the CPU time used by the process on which the Java virtual machine is running in seconds.
+# TYPE cpu_processCpuTime_seconds gauge
+cpu_processCpuTime_seconds{mp_scope="base",} 11.899727
+# HELP classloader_loadedClasses_count Displays the number of classes that are currently loaded in the Java virtual machine.
+# TYPE classloader_loadedClasses_count gauge
+classloader_loadedClasses_count{mp_scope="base",} 7973.0
+# HELP memory_committedHeap_bytes Displays the amount of memory in bytes that is committed for the Java virtual machine to use. This amount of memory is guaranteed for the Java virtual machine to use.
+# TYPE memory_committedHeap_bytes gauge
+memory_committedHeap_bytes{mp_scope="base",} 4.58752E7
+# HELP cpu_systemLoadAverage Displays the system load average for the last minute. The system load average is the sum of the number of runnable entities queued to the available processors and the number of runnable entities running on the available processors averaged over a period of time. The way in which the load average is calculated is operating system specific but is typically a damped time-dependent average. If the load average is not available, a negative value is displayed. This attribute is designed to provide a hint about the system load and may be queried frequently. The load average may be unavailable on some platforms where it is expensive to implement this method.
+# TYPE cpu_systemLoadAverage gauge
+cpu_systemLoadAverage{mp_scope="base",} 0.23
+# HELP memory_usedHeap_bytes Displays the amount of used heap memory in bytes.
+# TYPE memory_usedHeap_bytes gauge
+memory_usedHeap_bytes{mp_scope="base",} 2.8304496E7
+# HELP gc_time_seconds Displays the approximate accumulated collection elapsed time in seconds. This attribute displays -1 if the collection elapsed time is undefined for this collector. The Java virtual machine implementation may use a high resolution timer to measure the elapsed time. This attribute may display the same value even if the collection count has been incremented if the collection elapsed time is very short.
+# TYPE gc_time_seconds gauge
+gc_time_seconds{mp_scope="base",name="global",} 0.222
+gc_time_seconds{mp_scope="base",name="scavenge",} 0.071
+# HELP thread_count Displays the current number of live threads including both daemon and non-daemon threads
+# TYPE thread_count gauge
+thread_count{mp_scope="base",} 86.0
+# HELP classloader_loadedClasses_total Displays the total number of classes that have been loaded since the Java virtual machine has started execution.
+# TYPE classloader_loadedClasses_total counter
+classloader_loadedClasses_total{mp_scope="base",} 8002.0
+# HELP memory_heapUtilization_percent The portion of the maximum heap memory that is currently in use. This metric displays -1 if the maximum heap memory size is undefined.
+# TYPE memory_heapUtilization_percent gauge
+memory_heapUtilization_percent{mp_scope="vendor",} 0.0067431880352801146
+# HELP cpu_processCpuUtilization_percent The recent CPU time that is used by the JVM process from all processors that are available to the JVM.
+# TYPE cpu_processCpuUtilization_percent gauge
+cpu_processCpuUtilization_percent{mp_scope="vendor",} 3.9416666666666665E-5
+# HELP gc_total Displays the total number of collections that have occurred. This attribute lists -1 if the collection count is undefined for this collector.
+# TYPE gc_total counter
+gc_total{mp_scope="base",name="global",} 11.0
+gc_total{mp_scope="base",name="scavenge",} 86.0
+# HELP jvm_uptime_seconds Displays the time from the start of the Java virtual machine in seconds.
+# TYPE jvm_uptime_seconds gauge
+jvm_uptime_seconds{mp_scope="base",} 7167.803
+# HELP cpu_availableProcessors Displays the number of processors available to the Java virtual machine. This value may change during a particular invocation of the virtual machine.
+# TYPE cpu_availableProcessors gauge
+cpu_availableProcessors{mp_scope="base",} 16.0
+# HELP memory_maxHeap_bytes Displays the maximum amount of heap memory in bytes that can be used for memory management. This attribute displays -1 if the maximum heap memory size is undefined. This amount of memory is not guaranteed to be available for memory management if it is greater than the amount of committed memory. The Java virtual machine may fail to allocate memory even if the amount of used memory does not exceed this maximum size.
+# TYPE memory_maxHeap_bytes gauge
+memory_maxHeap_bytes{mp_scope="base",} 4.191420416E9
+# HELP thread_daemon_count Displays the current number of live daemon threads.
+# TYPE thread_daemon_count gauge
+thread_daemon_count{mp_scope="base",} 84.0
