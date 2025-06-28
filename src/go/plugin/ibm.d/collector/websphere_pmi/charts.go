@@ -68,16 +68,29 @@ const (
 const precision = 1000 // Standard precision multiplier for floating-point values
 
 var baseCharts = module.Charts{
-	// JVM Heap Memory
+	// JVM Heap Memory Usage
 	{
 		ID:       "jvm_heap_memory",
-		Title:    "JVM Heap Memory",
+		Title:    "JVM Heap Memory Usage",
 		Units:    "bytes",
-		Fam:      "jvm",
+		Fam:      "jvm/memory",
 		Ctx:      "websphere_pmi.jvm_heap_memory",
 		Priority: prioJVMHeap,
+		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "jvm_heap_used", Name: "used"},
+			{ID: "jvm_heap_free", Name: "free"},
+		},
+	},
+	// JVM Heap Memory Limits
+	{
+		ID:       "jvm_heap_limits",
+		Title:    "JVM Heap Memory Limits",
+		Units:    "bytes",
+		Fam:      "jvm/memory",
+		Ctx:      "websphere_pmi.jvm_heap_limits",
+		Priority: prioJVMHeap + 1,
+		Dims: module.Dims{
 			{ID: "jvm_heap_committed", Name: "committed"},
 			{ID: "jvm_heap_max", Name: "max"},
 		},
@@ -94,16 +107,29 @@ var baseCharts = module.Charts{
 		},
 	},
 
-	// JVM Non-Heap Memory
+	// JVM Non-Heap Memory Usage
 	{
 		ID:       "jvm_nonheap_memory",
-		Title:    "JVM Non-Heap Memory",
+		Title:    "JVM Non-Heap Memory Usage",
 		Units:    "bytes",
-		Fam:      "jvm",
+		Fam:      "jvm/memory",
 		Ctx:      "websphere_pmi.jvm_nonheap_memory",
 		Priority: prioJVMNonHeap,
+		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "jvm_nonheap_used", Name: "used"},
+			{ID: "jvm_nonheap_free", Name: "free"},
+		},
+	},
+	// JVM Non-Heap Memory Limits
+	{
+		ID:       "jvm_nonheap_limits",
+		Title:    "JVM Non-Heap Memory Limits",
+		Units:    "bytes",
+		Fam:      "jvm/memory",
+		Ctx:      "websphere_pmi.jvm_nonheap_limits",
+		Priority: prioJVMNonHeap + 1,
+		Dims: module.Dims{
 			{ID: "jvm_nonheap_committed", Name: "committed"},
 			{ID: "jvm_nonheap_max", Name: "max"},
 		},
@@ -139,12 +165,13 @@ var baseCharts = module.Charts{
 		ID:       "jvm_threads",
 		Title:    "JVM Thread Count",
 		Units:    "threads",
-		Fam:      "jvm",
+		Fam:      "jvm/threads",
 		Ctx:      "websphere_pmi.jvm_threads",
 		Priority: prioJVMThreads,
+		Type:     module.Stacked,
 		Dims: module.Dims{
-			{ID: "jvm_threads_live", Name: "live"},
 			{ID: "jvm_threads_daemon", Name: "daemon"},
+			{ID: "jvm_threads_other", Name: "other"},
 		},
 	},
 
