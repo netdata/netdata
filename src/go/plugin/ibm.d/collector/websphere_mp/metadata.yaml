@@ -71,7 +71,6 @@ modules:
               <mpMetrics authentication="false" />
               ```
               Or configure authentication for the monitoring user.
-              
               **IMPORTANT**: The collector requires complete URLs with full paths. When configuring the URL,
               you must include the complete base URL (e.g., https://server:9443) - the metrics endpoint path
               will be appended to this base URL.
@@ -101,10 +100,8 @@ modules:
             - name: url
               description: |
                 WebSphere Liberty server base URL.
-                
                 **IMPORTANT**: Provide the complete base URL including protocol, host, and port.
                 The metrics endpoint path (specified in metrics_endpoint) will be appended to this URL.
-                
                 Query string parameters in the base URL are preserved when making requests.
               default_value: https://localhost:9443
               required: true
@@ -123,7 +120,6 @@ modules:
             - name: metrics_endpoint
               description: |
                 MicroProfile Metrics endpoint path.
-                
                 This path will be appended to the base URL. The collector constructs the complete URL
                 by combining the base URL with this endpoint path.
               default_value: /metrics
