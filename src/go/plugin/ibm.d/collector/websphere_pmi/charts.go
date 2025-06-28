@@ -65,7 +65,7 @@ const (
 	prioJDBCConnectionReuse
 )
 
-const precision = 100
+const precision = 1000 // Standard precision multiplier for floating-point values
 
 var baseCharts = module.Charts{
 	// JVM Heap Memory
