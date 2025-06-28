@@ -198,17 +198,23 @@ type pmiServer struct {
 }
 
 type pmiStat struct {
-	XMLName               xml.Name          `xml:"Stat"`
-	Name                  string            `xml:"name,attr"`
-	Type                  string            `xml:"type,attr"`
-	ID                    string            `xml:"id,attr"`
-	Path                  string            `xml:"path,attr"`
-	Value                 *pmiValue         `xml:"Value"`
-	CountStatistic        *countStat        `xml:"CountStatistic"`
-	TimeStatistic         *timeStat         `xml:"TimeStatistic"`
-	RangeStatistic        *rangeStat        `xml:"RangeStatistic"`
-	BoundedRangeStatistic *boundedRangeStat `xml:"BoundedRangeStatistic"`
-	SubStats              []pmiStat         `xml:"Stat"`
+	XMLName                xml.Name            `xml:"Stat"`
+	Name                   string              `xml:"name,attr"`
+	Type                   string              `xml:"type,attr"`
+	ID                     string              `xml:"id,attr"`
+	Path                   string              `xml:"path,attr"`
+	Value                  *pmiValue           `xml:"Value"`
+	CountStatistics        []countStat         `xml:"CountStatistic"`
+	TimeStatistics         []timeStat          `xml:"TimeStatistic"`
+	RangeStatistics        []rangeStat         `xml:"RangeStatistic"`
+	BoundedRangeStatistics []boundedRangeStat  `xml:"BoundedRangeStatistic"`
+	SubStats               []pmiStat           `xml:"Stat"`
+	
+	// Keep single references for backward compatibility
+	CountStatistic        *countStat        
+	TimeStatistic         *timeStat         
+	RangeStatistic        *rangeStat        
+	BoundedRangeStatistic *boundedRangeStat 
 }
 
 type pmiValue struct {
@@ -216,10 +222,12 @@ type pmiValue struct {
 }
 
 type countStat struct {
+	Name  string `xml:"name,attr"`
 	Count string `xml:"count,attr"`
 }
 
 type timeStat struct {
+	Name  string `xml:"name,attr"`
 	Count string `xml:"count,attr"`
 	Total string `xml:"total,attr"`
 	Mean  string `xml:"mean,attr"`
@@ -228,12 +236,14 @@ type timeStat struct {
 }
 
 type rangeStat struct {
+	Name     string `xml:"name,attr"`
 	Current  string `xml:"current,attr"`
 	Integral string `xml:"integral,attr"`
 	Mean     string `xml:"mean,attr"`
 }
 
 type boundedRangeStat struct {
+	Name       string `xml:"name,attr"`
 	Current    string `xml:"current,attr"`
 	Integral   string `xml:"integral,attr"`
 	Mean       string `xml:"mean,attr"`
@@ -620,17 +630,42 @@ func (w *WebSpherePMI) processStats(stats *pmiStatsResponse, mx map[string]int64
 		w.Debugf("processing node: %s", node.Name)
 		for _, server := range node.Servers {
 			w.Debugf("processing server: %s", server.Name)
-			for _, stat := range server.Stats {
+			for i := range server.Stats {
+				stat := &server.Stats[i]
+				stat.populateBackwardCompatibility()
 				w.Debugf("processing top-level stat: %s (path: %s)", stat.Name, stat.Path)
-				w.processStat(&stat, "", mx)
+				w.processStat(stat, "", mx)
 			}
 		}
 	}
 	
 	// Process direct stats (Liberty/other versions)
-	for _, stat := range stats.Stats {
+	for i := range stats.Stats {
+		stat := &stats.Stats[i]
+		stat.populateBackwardCompatibility()
 		w.Debugf("processing direct stat: %s (path: %s)", stat.Name, stat.Path)
-		w.processStat(&stat, "", mx)
+		w.processStat(stat, "", mx)
+	}
+}
+
+// populateBackwardCompatibility sets the single statistic fields from arrays for backward compatibility
+func (s *pmiStat) populateBackwardCompatibility() {
+	if len(s.CountStatistics) > 0 {
+		s.CountStatistic = &s.CountStatistics[0]
+	}
+	if len(s.TimeStatistics) > 0 {
+		s.TimeStatistic = &s.TimeStatistics[0]
+	}
+	if len(s.RangeStatistics) > 0 {
+		s.RangeStatistic = &s.RangeStatistics[0]
+	}
+	if len(s.BoundedRangeStatistics) > 0 {
+		s.BoundedRangeStatistic = &s.BoundedRangeStatistics[0]
+	}
+	
+	// Recursively populate for sub-stats
+	for i := range s.SubStats {
+		s.SubStats[i].populateBackwardCompatibility()
 	}
 }
 
@@ -704,17 +739,15 @@ func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[stri
 		    (processor.module == "ejbModule" && stat.Name == "Enterprise Beans")) && 
 		   processor.enabled() {
 			processor.processFunc(stat, mx)
-			// Also process the direct sub-stats for WebSphere 9.x
-			for _, subStat := range stat.SubStats {
-				processor.processFunc(&subStat, mx)
-			}
 			break // Only process with the first matching processor
 		}
 	}
 
 	// Process sub-stats recursively
-	for _, subStat := range stat.SubStats {
-		w.processStat(&subStat, fullPath, mx)
+	for i := range stat.SubStats {
+		subStat := &stat.SubStats[i]
+		subStat.populateBackwardCompatibility()
+		w.processStat(subStat, fullPath, mx)
 	}
 }
 
