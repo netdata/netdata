@@ -12,6 +12,75 @@ import (
 func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 	w.Debugf("processing JVM stat: %s (type: %s)", stat.Name, stat.Type)
 	
+	// For WebSphere 9.x, if this is the "JVM Runtime" stat itself, process its embedded statistics
+	if stat.Name == "JVM Runtime" {
+		// Process BoundedRangeStatistics
+		for _, brs := range stat.BoundedRangeStatistics {
+			if brs.Name == "HeapSize" {
+				// HeapSize is in KILOBYTES, convert to bytes
+				if v, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
+					mx["jvm_heap_used"] = v * 1024 // Current value is the used memory
+				} else if vf, err := strconv.ParseFloat(brs.Current, 64); err == nil {
+					// Handle scientific notation
+					mx["jvm_heap_used"] = int64(vf * 1024)
+				}
+				
+				if v, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
+					mx["jvm_heap_max"] = v * 1024 // Convert KB to bytes
+					mx["jvm_heap_committed"] = v * 1024 // PMI doesn't distinguish committed
+				} else if vf, err := strconv.ParseFloat(brs.UpperBound, 64); err == nil {
+					// Handle scientific notation
+					mx["jvm_heap_max"] = int64(vf * 1024)
+					mx["jvm_heap_committed"] = int64(vf * 1024)
+				}
+			}
+		}
+		
+		// Process CountStatistics
+		for _, cs := range stat.CountStatistics {
+			switch cs.Name {
+			case "FreeMemory":
+				// FreeMemory is in KILOBYTES, convert to bytes
+				if v, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+					free := v * 1024
+					mx["jvm_heap_free"] = free
+				}
+			case "UsedMemory":
+				// UsedMemory is in KILOBYTES, convert to bytes
+				if v, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+					mx["jvm_heap_used"] = v * 1024
+				}
+			case "UpTime":
+				if v, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
+					mx["jvm_uptime"] = v // Already in seconds, no precision needed
+				}
+			case "ProcessCpuUsage":
+				if v, err := strconv.ParseFloat(cs.Count, 64); err == nil {
+					mx["jvm_process_cpu_percent"] = int64(v * precision)
+				}
+			}
+		}
+		
+		// Calculate derived metrics
+		if used, ok := mx["jvm_heap_used"]; ok {
+			if max, ok := mx["jvm_heap_max"]; ok && max > 0 {
+				mx["jvm_heap_usage_percent"] = (used * precision * 100) / max
+			}
+			if free, ok := mx["jvm_heap_free"]; ok {
+				// If we have both used and free, ensure max/committed are set
+				total := used + free
+				if _, ok := mx["jvm_heap_max"]; !ok {
+					mx["jvm_heap_max"] = total
+				}
+				if _, ok := mx["jvm_heap_committed"]; !ok {
+					mx["jvm_heap_committed"] = total
+				}
+			}
+		}
+		return
+	}
+	
+	// Handle individual stat processing for older WebSphere versions
 	switch stat.Name {
 	case "HeapSize":
 		if stat.BoundedRangeStatistic != nil {
