@@ -61,6 +61,18 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 			}
 		}
 
+		// Process DoubleStatistics (e.g., HitRate)
+		for _, ds := range stat.DoubleStatistics {
+			w.Debugf("processing DoubleStatistic: %s = %s", ds.Name, ds.Double)
+			switch ds.Name {
+			case "HitRate":
+				// HitRate is a percentage
+				if v, err := strconv.ParseFloat(ds.Double, 64); err == nil {
+					mx["jvm_hit_rate_percent"] = int64(v * precision)
+				}
+			}
+		}
+
 		// Calculate derived metrics
 		if used, ok := mx["jvm_heap_used"]; ok {
 			if max, ok := mx["jvm_heap_max"]; ok && max > 0 {
