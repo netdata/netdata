@@ -7,7 +7,7 @@ The `ibm.d.plugin` is a specialized Netdata plugin for monitoring IBM systems in
 This plugin provides monitoring for:
 - **IBM DB2 databases**: All editions (LUW, z/OS, IBM i, Db2 on Cloud)
 - **IBM AS/400 (IBM i) systems**: System performance, storage, subsystems, job queues
-- **IBM WebSphere Application Server**: JVM metrics, thread pools, connection pools, applications
+- **IBM WebSphere Application Server**: Traditional WAS (PMI), Liberty (MicroProfile), JMX monitoring
 
 Unlike other Netdata collectors, this plugin requires CGO compilation and IBM DB2 client libraries because it uses the native IBM database drivers.
 
@@ -71,8 +71,11 @@ sudo vim /etc/netdata/ibm.d/db2.conf
 # AS/400 collector configuration
 sudo vim /etc/netdata/ibm.d/as400.conf
 
-# WebSphere collector configuration
-sudo vim /etc/netdata/ibm.d/websphere.conf
+# WebSphere PMI collector configuration
+sudo vim /etc/netdata/ibm.d/websphere_pmi.conf
+
+# WebSphere MicroProfile collector configuration  
+sudo vim /etc/netdata/ibm.d/websphere_mp.conf
 ```
 
 ## Manual Build Process
@@ -226,32 +229,55 @@ jobs:
     vnode: 'as400-production'
 ```
 
-### WebSphere Collector
+### WebSphere Collectors
 
-Example `/etc/netdata/ibm.d/websphere.conf`:
+#### PMI Collector (Traditional WAS)
+
+Example `/etc/netdata/ibm.d/websphere_pmi.conf`:
 
 ```yaml
 jobs:
-  - name: liberty_server1
-    url: https://websphere.example.com:9443
-    username: admin
+  - name: was_traditional
+    url: http://websphere.example.com:9080/wasPerfTool/servlet/perfservlet
+    username: wasadmin
     password: adminpwd
+    
+    # PMI statistics level
+    pmi_stats_type: extended
     
     # Metrics selection
     collect_jvm_metrics: true
     collect_threadpool_metrics: true
-    collect_webapp_metrics: true
+    collect_jdbc_metrics: true
     
     # Cardinality control
     max_applications: 30
     max_threadpools: 20
     
-    # Filtering (using wildcards)
-    collect_apps_matching: '*myapp*|*api*'
-    collect_pools_matching: '*Default*|*Custom*'
-    
     # Virtual node assignment
     vnode: 'websphere-cluster1'
+```
+
+#### MicroProfile Collector (Liberty)
+
+Example `/etc/netdata/ibm.d/websphere_mp.conf`:
+
+```yaml
+jobs:
+  - name: liberty_mp
+    url: https://liberty.example.com:9443/metrics
+    username: admin
+    password: adminpwd
+    
+    # Metrics selection
+    collect_jvm_metrics: true
+    collect_rest_metrics: true
+    
+    # Cardinality control
+    max_rest_endpoints: 50
+    
+    # Virtual node assignment
+    vnode: 'liberty-cluster1'
 ```
 
 ## Metrics Collected
@@ -391,7 +417,8 @@ Run collectors in debug mode for troubleshooting:
 # Debug specific collector
 ./ibm.d.plugin -d -m db2
 ./ibm.d.plugin -d -m as400
-./ibm.d.plugin -d -m websphere
+./ibm.d.plugin -d -m websphere_pmi
+./ibm.d.plugin -d -m websphere_mp
 ```
 
 ## Security Considerations
@@ -426,8 +453,9 @@ For encrypted connections:
 dsn: 'DATABASE=sample;HOSTNAME=db2.example.com;PORT=50001;PROTOCOL=TCPIP;UID=user;PWD=pass;SECURITY=SSL;SSLServerCertificate=/path/to/cert.arm'
 ```
 
-**WebSphere TLS:**
+**WebSphere HTTPS/TLS:**
 ```yaml
+# For both PMI and MicroProfile collectors
 tls_ca: /path/to/ca.crt
 tls_cert: /path/to/client.crt
 tls_key: /path/to/client.key

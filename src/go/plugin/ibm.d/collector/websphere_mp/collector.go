@@ -163,40 +163,32 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 	}
 	w.httpClient = httpClient
 
-	w.Debugf("initialized websphere_mp collector: base_url=%s, metrics_endpoint=%s, final_url=%s", w.HTTPConfig.RequestConfig.URL, w.MetricsEndpoint, w.metricsURL)
+	w.Debugf("initialized websphere_mp collector: final_url=%s", w.metricsURL)
 
 	return nil
 }
 
 func (w *WebSphereMicroProfile) buildMetricsURL() error {
-	baseURL := strings.TrimRight(w.HTTPConfig.RequestConfig.URL, "/")
+	// Require complete URL - no path inference
+	w.metricsURL = strings.TrimSpace(w.HTTPConfig.RequestConfig.URL)
+	
+	if w.metricsURL == "" {
+		return errors.New("url is required")
+	}
 
-	// Parse the base URL to check if it already contains a metrics path
-	u, err := url.Parse(baseURL)
+	// Parse and validate
+	parsedURL, err := url.Parse(w.metricsURL)
 	if err != nil {
-		return fmt.Errorf("invalid base URL: %w", err)
+		return fmt.Errorf("invalid metrics URL: %w", err)
+	}
+	
+	// Ensure URL has a path
+	if parsedURL.Path == "" || parsedURL.Path == "/" {
+		return errors.New("url must include the complete path to the metrics endpoint (e.g., https://localhost:9443/metrics)")
 	}
 
-	// Check if the URL already contains the metrics endpoint path
-	if strings.HasSuffix(u.Path, w.MetricsEndpoint) {
-		// URL already contains the full path
-		w.metricsURL = baseURL
-		w.Debugf("using full metrics URL as provided: %s", w.metricsURL)
-		return nil
-	}
-
-	// Check if URL has any path that might be the metrics endpoint
-	if u.Path != "" && u.Path != "/" {
-		// URL has a path but it's not our default metrics endpoint
-		// Assume it's a complete custom endpoint
-		w.metricsURL = baseURL
-		w.Debugf("using complete custom metrics URL: %s", w.metricsURL)
-		return nil
-	}
-
-	// Append the metrics endpoint to the base URL
-	w.metricsURL = baseURL + w.MetricsEndpoint
-	w.Debugf("built metrics URL by appending endpoint: %s", w.metricsURL)
+	// MetricsEndpoint field is now ignored since we require complete URLs
+	w.Debugf("using complete metrics URL as provided: %s", w.metricsURL)
 
 	return nil
 }
