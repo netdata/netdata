@@ -191,8 +191,22 @@ func (w *WebSphereMicroProfile) processMetrics(mx map[string]int64, metrics map[
 	restCount := 0
 
 	for metricName, value := range metrics {
-		// Convert float to int64 with precision
-		intValue := int64(value * precision)
+		// Convert float to int64 with appropriate handling
+		var intValue int64
+		
+		// Bytes and counts are already integers - no precision needed
+		if strings.Contains(metricName, "_bytes") || 
+		   strings.Contains(metricName, "_count") || 
+		   strings.Contains(metricName, "_total") ||
+		   strings.Contains(metricName, "Count") ||
+		   strings.Contains(metricName, "Size") ||
+		   strings.Contains(metricName, "activeThreads") ||
+		   strings.Contains(metricName, "size") {
+			intValue = int64(value)
+		} else {
+			// Apply precision for floating-point values (percentages, seconds, etc.)
+			intValue = int64(value * precision)
+		}
 
 		// Check for vendor-specific metrics first (servlet, session, threadpool)
 		if strings.HasPrefix(metricName, "servlet_") || 
