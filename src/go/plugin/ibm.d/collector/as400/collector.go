@@ -90,7 +90,6 @@ type Config struct {
 	CollectJobQueueMetrics  *bool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics"`
 	CollectActiveJobs       *bool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs"`
 
-
 	// Cardinality limits
 	MaxDisks      int `yaml:"max_disks,omitempty" json:"max_disks"`
 	MaxSubsystems int `yaml:"max_subsystems,omitempty" json:"max_subsystems"`
@@ -533,7 +532,7 @@ func (a *AS400) logVersionInformation() {
 	// Log base version information for user awareness
 	if a.versionMajor > 0 {
 		a.Infof("IBM i %d.%d detected - collector will attempt all configured features with graceful error handling", a.versionMajor, a.versionRelease)
-		
+
 		// Provide informational context about typical version capabilities
 		if a.versionMajor >= 7 {
 			if a.versionRelease >= 5 {
@@ -548,7 +547,7 @@ func (a *AS400) logVersionInformation() {
 		} else {
 			a.Infof("IBM i %d.x has limited SQL services - many features may not be available", a.versionMajor)
 		}
-		
+
 		a.Infof("Note: Admin configuration takes precedence - all enabled features will be attempted regardless of version")
 	} else {
 		a.Infof("IBM i version unknown - collector will attempt all configured features with graceful error handling")
@@ -577,7 +576,7 @@ func (a *AS400) setConfigurationDefaults() {
 	if a.CollectJobQueueMetrics == nil {
 		defaultValue := a.versionMajor >= 7 && a.versionRelease >= 2
 		a.CollectJobQueueMetrics = boolPtr(defaultValue)
-		a.Debugf("CollectJobQueueMetrics not configured, defaulting to %v (based on IBM i %d.%d)", 
+		a.Debugf("CollectJobQueueMetrics not configured, defaulting to %v (based on IBM i %d.%d)",
 			defaultValue, a.versionMajor, a.versionRelease)
 	}
 
@@ -592,4 +591,3 @@ func (a *AS400) setConfigurationDefaults() {
 	a.Infof("Configuration after defaults: DiskMetrics=%v, SubsystemMetrics=%v, JobQueueMetrics=%v, ActiveJobs=%v",
 		*a.CollectDiskMetrics, *a.CollectSubsystemMetrics, *a.CollectJobQueueMetrics, *a.CollectActiveJobs)
 }
-

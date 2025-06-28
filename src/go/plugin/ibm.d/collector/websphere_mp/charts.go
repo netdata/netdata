@@ -14,25 +14,25 @@ import (
 
 const (
 	// Critical JVM metrics
-	prioJVMHeap      = module.Priority + 100  // Memory is most critical
-	prioCPU          = module.Priority + 200  // CPU usage is second most important
-	prioJVMGC        = module.Priority + 300  // GC affects performance
-	prioJVMThreads   = module.Priority + 400  // Thread issues cause hangs
-	
+	prioJVMHeap    = module.Priority + 100 // Memory is most critical
+	prioCPU        = module.Priority + 200 // CPU usage is second most important
+	prioJVMGC      = module.Priority + 300 // GC affects performance
+	prioJVMThreads = module.Priority + 400 // Thread issues cause hangs
+
 	// Application performance metrics
-	prioServlet      = module.Priority + 500  // Request handling performance
-	prioSession      = module.Priority + 600  // Session management
-	prioThreadPool   = module.Priority + 700  // Thread pool saturation
-	
+	prioServlet    = module.Priority + 500 // Request handling performance
+	prioSession    = module.Priority + 600 // Session management
+	prioThreadPool = module.Priority + 700 // Thread pool saturation
+
 	// Less critical metrics
 	prioJVMClasses   = module.Priority + 800  // Class loading issues are rare
 	prioRESTRequests = module.Priority + 900  // REST endpoint specific
 	prioRESTTiming   = module.Priority + 1000 // REST timing details
-	
+
 	// Informational metrics
-	prioMPHealth     = module.Priority + 1100 // Health status
+	prioMPHealth      = module.Priority + 1100 // Health status
 	prioCustomMetrics = module.Priority + 1200 // Custom application metrics
-	prioOtherMetrics = module.Priority + 1300 // Everything else
+	prioOtherMetrics  = module.Priority + 1300 // Everything else
 )
 
 // JVM charts that are commonly available in Liberty MicroProfile
@@ -379,8 +379,6 @@ func (w *WebSphereMicroProfile) createRESTChart(metricID, originalName string) *
 	return w.createGenericChart(metricID, originalName, "rest", prioRESTRequests+100)
 }
 
-
-
 func (w *WebSphereMicroProfile) createMemoryChart(metricID, originalName string) *module.Charts {
 	return &module.Charts{
 		{
@@ -495,7 +493,7 @@ func (w *WebSphereMicroProfile) createOtherChart(metricID, originalName string) 
 	} else if strings.Contains(originalName, "_count") || strings.Contains(originalName, "_total") {
 		units = "count"
 	}
-	
+
 	return &module.Charts{
 		{
 			ID:       "other_" + metricID,

@@ -97,7 +97,6 @@ type Config struct {
 	CollectTableMetrics      *bool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics"`
 	CollectIndexMetrics      *bool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics"`
 
-
 	// Cardinality limits
 	MaxDatabases   int `yaml:"max_databases,omitempty" json:"max_databases"`
 	MaxBufferpools int `yaml:"max_bufferpools,omitempty" json:"max_bufferpools"`
@@ -573,7 +572,7 @@ func (d *DB2) setConfigurationDefaults() {
 	if d.CollectDatabaseMetrics == nil {
 		defaultValue := d.edition == "LUW" || d.edition == "Cloud"
 		d.CollectDatabaseMetrics = boolPtr(defaultValue)
-		d.Debugf("CollectDatabaseMetrics not configured, defaulting to %v (based on DB2 edition: %s)", 
+		d.Debugf("CollectDatabaseMetrics not configured, defaulting to %v (based on DB2 edition: %s)",
 			defaultValue, d.edition)
 	}
 
@@ -581,7 +580,7 @@ func (d *DB2) setConfigurationDefaults() {
 	if d.CollectBufferpoolMetrics == nil {
 		defaultValue := d.edition != "i" // Not available on AS/400
 		d.CollectBufferpoolMetrics = boolPtr(defaultValue)
-		d.Debugf("CollectBufferpoolMetrics not configured, defaulting to %v (based on DB2 edition: %s)", 
+		d.Debugf("CollectBufferpoolMetrics not configured, defaulting to %v (based on DB2 edition: %s)",
 			defaultValue, d.edition)
 	}
 
@@ -596,7 +595,7 @@ func (d *DB2) setConfigurationDefaults() {
 	if d.CollectConnectionMetrics == nil {
 		defaultValue := d.edition == "LUW" || (d.edition == "Cloud" && !d.isDisabled("connection_instances"))
 		d.CollectConnectionMetrics = boolPtr(defaultValue)
-		d.Debugf("CollectConnectionMetrics not configured, defaulting to %v (based on DB2 edition: %s)", 
+		d.Debugf("CollectConnectionMetrics not configured, defaulting to %v (based on DB2 edition: %s)",
 			defaultValue, d.edition)
 	}
 
@@ -631,7 +630,7 @@ func (d *DB2) setConfigurationDefaults() {
 		d.MaxDatabases, d.MaxBufferpools, d.MaxTablespaces)
 	d.Infof("  Cardinality limits: MaxConnections=%d, MaxTables=%d, MaxIndexes=%d",
 		d.MaxConnections, d.MaxTables, d.MaxIndexes)
-	
+
 }
 
 // logVersionInformation logs detected DB2 edition and version for informational purposes only
@@ -640,7 +639,7 @@ func (d *DB2) logVersionInformation() {
 
 	// Log edition and version information for user awareness
 	d.Infof("DB2 %s edition detected - collector will attempt all configured features with graceful error handling", d.edition)
-	
+
 	// Provide informational context about typical edition/version capabilities
 	switch d.edition {
 	case "i": // DB2 for i (AS/400)
@@ -671,10 +670,9 @@ func (d *DB2) logVersionInformation() {
 	default:
 		d.Infof("Unknown DB2 edition '%s' - assuming LUW-like capabilities", d.edition)
 	}
-	
+
 	d.Infof("Note: Admin configuration takes precedence - all enabled features will be attempted regardless of edition/version")
 }
-
 
 // addVersionLabelsToCharts adds DB2 version and edition labels to all charts
 func (d *DB2) addVersionLabelsToCharts() {
