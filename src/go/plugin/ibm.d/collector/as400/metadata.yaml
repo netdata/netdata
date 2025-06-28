@@ -187,7 +187,7 @@ modules:
               default_value: false
               required: false
               detailed_description: |
-                Collects metrics for the top N active jobs by CPU usage. 
+                Collects metrics for the top N active jobs by CPU usage.
                 This is an expensive operation and requires IBM i 7.3 or later.
                 The collector will attempt to use ACTIVE_JOB_INFO if the admin enables this option,
                 regardless of the detected version.
@@ -223,8 +223,8 @@ modules:
               default_value: "/"
               required: false
               detailed_description: |
-                Starting path for IFS directory monitoring. Useful for monitoring specific 
-                subdirectories on large file systems. The collector will only scan directories 
+                Starting path for IFS directory monitoring. Useful for monitoring specific
+                subdirectories on large file systems. The collector will only scan directories
                 under this path when collecting IFS directory usage statistics.
             - name: collect_disks_matching
               description: Pattern to filter disks. Supports wildcards (*, ?) and multiple patterns separated by |.
