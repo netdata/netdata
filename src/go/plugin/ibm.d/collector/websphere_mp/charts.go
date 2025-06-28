@@ -106,8 +106,8 @@ func newBaseCharts() *module.Charts {
 			Priority: prioJVMGC + 1,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "gc_time_seconds", Name: "total", Mul: 1000 * precision},
-				{ID: "gc_time_per_cycle_seconds", Name: "per_cycle", Mul: 1000 * precision},
+				{ID: "gc_time_seconds", Name: "total", Mul: 1000, Div: precision},
+				{ID: "gc_time_per_cycle_seconds", Name: "per_cycle", Mul: 1000, Div: precision},
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func newBaseCharts() *module.Charts {
 			Priority: prioJVMHeap + 3,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "memory_heapUtilization_percent", Name: "utilization", Mul: precision},
+				{ID: "memory_heapUtilization_percent", Name: "utilization", Div: precision},
 			},
 		},
 		{
@@ -156,7 +156,7 @@ func newBaseCharts() *module.Charts {
 			Priority: prioJVMClasses - 100,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "jvm_uptime_seconds", Name: "uptime", Mul: precision},
+				{ID: "jvm_uptime_seconds", Name: "uptime", Div: precision},
 			},
 		},
 		{
@@ -193,8 +193,8 @@ func newBaseCharts() *module.Charts {
 			Priority: prioCPU,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "cpu_processCpuLoad_percent", Name: "process", Div: 100, Mul: precision},
-				{ID: "cpu_processCpuUtilization_percent", Name: "utilization", Mul: precision},
+				{ID: "cpu_processCpuLoad_percent", Name: "process", Div: precision},
+				{ID: "cpu_processCpuUtilization_percent", Name: "utilization", Div: precision},
 			},
 		},
 		{
@@ -206,7 +206,7 @@ func newBaseCharts() *module.Charts {
 			Priority: prioCPU + 1,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "cpu_processCpuTime_seconds", Name: "total", Mul: precision},
+				{ID: "cpu_processCpuTime_seconds", Name: "total", Div: precision},
 			},
 		},
 		{
@@ -230,7 +230,7 @@ func newBaseCharts() *module.Charts {
 			Priority: prioCPU + 3,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "cpu_systemLoadAverage", Name: "1min", Mul: precision},
+				{ID: "cpu_systemLoadAverage", Name: "1min", Div: precision},
 			},
 		},
 		// Thread pool metrics
@@ -281,7 +281,7 @@ func newBaseCharts() *module.Charts {
 			Priority: prioServlet + 1,
 			Type:     module.Line,
 			Dims: module.Dims{
-				{ID: "servlet_request_elapsedTime_per_request_seconds", Name: "avg_response_time", Mul: 1000 * precision},
+				{ID: "servlet_request_elapsedTime_per_request_seconds", Name: "avg_response_time", Mul: 1000, Div: precision},
 			},
 		},
 		// Session metrics
