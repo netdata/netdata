@@ -111,12 +111,16 @@ type WebSphereMicroProfile struct {
 	restSelector matcher.Matcher
 
 	// Cached server info
-	serverVersion string
-	serverType    string // "Liberty MicroProfile"
+	serverVersion   string
+	serverType      string // "Liberty MicroProfile"
+	mpMetricsVersion string // "3.0", "4.0", "5.0", "5.1"
 
 	// Metric name patterns
 	jvmPattern  *regexp.Regexp
 	restPattern *regexp.Regexp
+	
+	// Raw metrics for version detection
+	rawMetrics map[string]float64
 }
 
 func (w *WebSphereMicroProfile) Configuration() any {
@@ -153,8 +157,8 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 	}
 
 	// Initialize metric patterns
-	// Liberty MicroProfile JVM metrics use patterns like: memory_, gc_, thread_, classloader_, jvm_
-	w.jvmPattern = regexp.MustCompile(`^(?:jvm_|base_jvm_|memory_|gc_|thread_|classloader_|cpu_).*`)
+	// Handle both raw MicroProfile metrics and normalized base/vendor metrics
+	w.jvmPattern = regexp.MustCompile(`^(?:base_|vendor_|jvm_|memory_|gc_|thread_|classloader_|cpu_).*`)
 	w.restPattern = regexp.MustCompile(`^(?:REST_request_|base_REST_).*`)
 
 	httpClient, err := web.NewHTTPClient(w.HTTPConfig.ClientConfig)
