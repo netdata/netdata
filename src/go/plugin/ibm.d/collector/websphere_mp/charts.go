@@ -35,18 +35,8 @@ const (
 	prioOtherMetrics = module.Priority + 1300 // Everything else
 )
 
-func (w *WebSphereMicroProfile) initCharts() {
-	// Initialize with all base charts
-	charts := module.Charts{}
-
-	// Always initialize base charts (includes JVM, vendor metrics)
-	// Individual metrics will only be populated if they exist
-	charts = append(charts, *newBaseCharts()...)
-
-	w.charts = &charts
-}
-
-func newBaseCharts() *module.Charts {
+// JVM charts that are commonly available in Liberty MicroProfile
+func newJVMCharts() *module.Charts {
 	return &module.Charts{
 		{
 			ID:       "jvm_memory_heap_usage",
@@ -233,7 +223,12 @@ func newBaseCharts() *module.Charts {
 				{ID: "cpu_systemLoadAverage", Name: "1min", Div: precision},
 			},
 		},
-		// Thread pool metrics
+	}
+}
+
+// Vendor-specific charts - only created when metrics are discovered
+func newThreadPoolCharts() *module.Charts {
+	return &module.Charts{
 		{
 			ID:       "threadpool_usage",
 			Title:    "Thread Pool Usage",
@@ -259,7 +254,11 @@ func newBaseCharts() *module.Charts {
 				{ID: "threadpool_size", Name: "size"},
 			},
 		},
-		// Servlet metrics
+	}
+}
+
+func newServletCharts() *module.Charts {
+	return &module.Charts{
 		{
 			ID:       "servlet_requests",
 			Title:    "Servlet Requests",
@@ -284,7 +283,11 @@ func newBaseCharts() *module.Charts {
 				{ID: "servlet_request_elapsedTime_per_request_seconds", Name: "avg_response_time", Mul: 1000, Div: precision},
 			},
 		},
-		// Session metrics
+	}
+}
+
+func newSessionCharts() *module.Charts {
+	return &module.Charts{
 		{
 			ID:       "session_active",
 			Title:    "Active Sessions",
