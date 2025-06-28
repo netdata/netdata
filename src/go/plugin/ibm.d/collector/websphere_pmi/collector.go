@@ -617,8 +617,11 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 func (w *WebSpherePMI) processStats(stats *pmiStatsResponse, mx map[string]int64) {
 	// Process nodes/servers structure (traditional WAS)
 	for _, node := range stats.Nodes {
+		w.Debugf("processing node: %s", node.Name)
 		for _, server := range node.Servers {
+			w.Debugf("processing server: %s", server.Name)
 			for _, stat := range server.Stats {
+				w.Debugf("processing top-level stat: %s (path: %s)", stat.Name, stat.Path)
 				w.processStat(&stat, "", mx)
 			}
 		}
@@ -626,6 +629,7 @@ func (w *WebSpherePMI) processStats(stats *pmiStatsResponse, mx map[string]int64
 	
 	// Process direct stats (Liberty/other versions)
 	for _, stat := range stats.Stats {
+		w.Debugf("processing direct stat: %s (path: %s)", stat.Name, stat.Path)
 		w.processStat(&stat, "", mx)
 	}
 }
@@ -682,13 +686,28 @@ func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[stri
 	fullPath := stat.Path
 	if fullPath == "" && parentPath != "" {
 		fullPath = parentPath + "/" + stat.Name
+	} else if fullPath == "" {
+		fullPath = stat.Name
 	}
 
 	// Process based on stat type using processors
 	processors := w.getStatProcessors()
 	for _, processor := range processors {
-		if strings.Contains(fullPath, processor.module) && processor.enabled() {
+		// Match both module names and stat names for WebSphere 9.x compatibility
+		if (strings.Contains(fullPath, processor.module) || 
+		    (processor.module == "jvmRuntimeModule" && stat.Name == "JVM Runtime") ||
+		    (processor.module == "threadPoolModule" && stat.Name == "Thread Pools") ||
+		    (processor.module == "connectionPoolModule" && stat.Name == "JDBC Connection Pools") ||
+		    (processor.module == "j2cModule" && stat.Name == "JCA Connection Pools") ||
+		    (processor.module == "webAppModule" && stat.Name == "Web Applications") ||
+		    (processor.module == "servletModule" && stat.Name == "Servlets") ||
+		    (processor.module == "ejbModule" && stat.Name == "Enterprise Beans")) && 
+		   processor.enabled() {
 			processor.processFunc(stat, mx)
+			// Also process the direct sub-stats for WebSphere 9.x
+			for _, subStat := range stat.SubStats {
+				processor.processFunc(&subStat, mx)
+			}
 			break // Only process with the first matching processor
 		}
 	}
