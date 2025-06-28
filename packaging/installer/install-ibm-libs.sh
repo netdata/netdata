@@ -50,7 +50,7 @@ if [ $NEED_DB2 -eq 0 ] && [ $NEED_MQ -eq 0 ]; then
 fi
 
 # Check for root permissions
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: This script must be run as root"
     exit 1
 fi
