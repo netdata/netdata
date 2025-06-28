@@ -1,0 +1,60 @@
+# TYPE base_gc_total counter
+# HELP base_gc_total Displays the total number of collections that have occurred. This attribute lists -1 if the collection count is undefined for this collector.
+base_gc_total{name="global"} 14
+base_gc_total{name="scavenge"} 103
+# TYPE base_cpu_systemLoadAverage gauge
+# HELP base_cpu_systemLoadAverage Displays the system load average for the last minute. The system load average is the sum of the number of runnable entities queued to the available processors and the number of runnable entities running on the available processors averaged over a period of time. The way in which the load average is calculated is operating system specific but is typically a damped time-dependent average. If the load average is not available, a negative value is displayed. This attribute is designed to provide a hint about the system load and may be queried frequently. The load average may be unavailable on some platform where it is expensive to implement this method.
+base_cpu_systemLoadAverage 0.23
+# TYPE base_classloader_loadedClasses_count gauge
+# HELP base_classloader_loadedClasses_count Displays the number of classes that are currently loaded in the Java virtual machine.
+base_classloader_loadedClasses_count 9628
+# TYPE base_thread_count gauge
+# HELP base_thread_count Displays the current number of live threads including both daemon and non-daemon threads.
+base_thread_count 87
+# TYPE base_classloader_unloadedClasses_total counter
+# HELP base_classloader_unloadedClasses_total Displays the total number of classes unloaded since the Java virtual machine has started execution.
+base_classloader_unloadedClasses_total 25
+# TYPE base_cpu_processCpuTime_seconds gauge
+# HELP base_cpu_processCpuTime_seconds Displays the CPU time used by the process on which the Java virtual machine is running.
+base_cpu_processCpuTime_seconds 10.752998
+# TYPE base_gc_time_seconds gauge
+# HELP base_gc_time_seconds Displays the approximate accumulated collection elapsed time in milliseconds. This attribute displays -1 if the collection elapsed time is undefined for this collector. The Java virtual machine implementation may use a high resolution timer to measure the elapsed time. This attribute may display the same value even if the collection count has been incremented if the collection elapsed time is very short.
+base_gc_time_seconds{name="scavenge"} 0.122
+base_gc_time_seconds{name="global"} 0.198
+# TYPE base_jvm_uptime_seconds gauge
+# HELP base_jvm_uptime_seconds Displays the start time of the Java virtual machine in milliseconds. This attribute displays the approximate time when the Java virtual machine started.
+base_jvm_uptime_seconds 4400.981
+# TYPE base_memory_committedHeap_bytes gauge
+# HELP base_memory_committedHeap_bytes Displays the amount of memory in bytes that is committed for the Java virtual machine to use. This amount of memory is guaranteed for the Java virtual machine to use.
+base_memory_committedHeap_bytes 8.5262336E7
+# TYPE base_thread_max_count gauge
+# HELP base_thread_max_count Displays the peak live thread count since the Java virtual machine started or peak was reset. This includes daemon and non-daemon threads.
+base_thread_max_count 103
+# TYPE base_classloader_loadedClasses_total counter
+# HELP base_classloader_loadedClasses_total Displays the total number of classes that have been loaded since the Java virtual machine has started execution.
+base_classloader_loadedClasses_total 9653
+# TYPE base_cpu_availableProcessors gauge
+# HELP base_cpu_availableProcessors Displays the number of processors available to the Java virtual machine. This value may change during a particular invocation of the virtual machine.
+base_cpu_availableProcessors 16
+# TYPE base_thread_daemon_count gauge
+# HELP base_thread_daemon_count Displays the current number of live daemon threads.
+base_thread_daemon_count 85
+# TYPE base_memory_maxHeap_bytes gauge
+# HELP base_memory_maxHeap_bytes Displays the maximum amount of heap memory in bytes that can be used for memory management. This attribute displays -1 if the maximum heap memory size is undefined. This amount of memory is not guaranteed to be available for memory management if it is greater than the amount of committed memory. The Java virtual machine may fail to allocate memory even if the amount of used memory does not exceed this maximum size.
+base_memory_maxHeap_bytes 4.191420416E9
+# TYPE base_cpu_processCpuLoad_percent gauge
+# HELP base_cpu_processCpuLoad_percent Displays the 'recent cpu usage' for the Java Virtual Machine process.
+base_cpu_processCpuLoad_percent 6.302719833901063E-5
+# TYPE base_memory_usedHeap_bytes gauge
+# HELP base_memory_usedHeap_bytes Displays the amount of used heap memory in bytes.
+base_memory_usedHeap_bytes 6.4394672E7
+# TYPE vendor_cpu_processCpuUtilization_percent gauge
+# HELP vendor_cpu_processCpuUtilization_percent The recent CPU time that is used by the JVM process from all processors that are available to the JVM.
+vendor_cpu_processCpuUtilization_percent 6.504650132860939E-5
+# TYPE vendor_memory_heapUtilization_percent gauge
+# HELP vendor_memory_heapUtilization_percent The portion of the maximum heap memory that is currently in use. This metric displays -1 if the maximum heap memory size is undefined.
+vendor_memory_heapUtilization_percent 0.015294064932091985
+# TYPE vendor_gc_time_per_cycle_seconds gauge
+# HELP vendor_gc_time_per_cycle_seconds The recent average time spent per garbage collection cycle. This metric displays -1 if the garbage collection elapsed time or count is undefined for this collector.
+vendor_gc_time_per_cycle_seconds{name="scavenge"} 0.0014226703002213196
+vendor_gc_time_per_cycle_seconds{name="global"} 0.016563909257786807
