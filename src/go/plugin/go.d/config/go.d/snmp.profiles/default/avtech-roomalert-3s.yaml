@@ -16,28 +16,28 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.13.1.1.1.1.0
       name: roomalert.3s.internal_tempf
       description: Internal temperature
-      family: Internal/Temperature
+      family: Sensor/Internal/Temperature/Value
       unit: "degF"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.1.1.2.0
       name: roomalert.3s.internal_tempc
       description: Internal temperature
-      family: Internal/Temperature
+      family: Sensor/Internal/Temperature/Value
       unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.1.0
       name: roomalert.3s.digital_sen1_1
       description: Current temperature
-      family: Digital/Temperature
+      family: Sensor/Digital/Temperature/Value
       unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.2.0
       name: roomalert.3s.digital_sen1_2
       description: Current temperature
-      family: Digital/Temperature
+      family: Sensor/Digital/Temperature/Value
       unit: "degF"
   # - MIB: ROOMALERT3S-MIB
   #   symbol:
@@ -63,20 +63,21 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.6.0
       name: roomalert.3s.digital_sen1_6
       description: Current dew point
-      family: Digital/Dew point
+      family: Sensor/Digital/DewPoint/Value
       unit: "Cel"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.2.1.7.0
       name: roomalert.3s.digital_sen1_7
-      family: Digital/Dew point
+      description: Current dew point
+      family: Sensor/Digital/DewPoint/Value
       unit: "degF"
   - MIB: ROOMALERT3S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.13.1.3.1.0
       name: roomalert.3s.switch_sen1
       description: The reading for switch sensor 1
-      family: Switch
+      family: Sensor/Switch/Status
       unit: "{status}"
       mapping:
         0: open

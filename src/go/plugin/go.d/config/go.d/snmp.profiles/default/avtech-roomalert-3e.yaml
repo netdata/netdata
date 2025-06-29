@@ -16,14 +16,14 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.1.1.0
       name: roomalert.3e.digital_sen1_1
       description: The current temperature reading of the Internal Temperature Sensor
-      family: Internal/Temperature
+      family: Sensor/Internal/Temperature/Value
       unit: "Cel"
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.1.2.0
       name: roomalert.3e.digital_sen1_2
       description: The current temperature reading of the Internal Temperature Sensor
-      family: Internal/Temperature
+      family: Sensor/Internal/Temperature/Value
       unit: "degF"
   #  - MIB: ROOMALERT3E-MIB
   #    symbol:
@@ -35,35 +35,35 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.1.0
       name: roomalert.3e.digital_sen2_1
       description: Current temperature
-      family: Secondary/Temperature
+      family: Sensor/External/Temperature/Value
       unit: "Cel"
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.2.0
       name: roomalert.3e.digital_sen2_2
       description: Current temperature
-      family: Secondary/Temperature
+      family: Sensor/External/Temperature/Value
       unit: "degF"
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.3.0
       name: roomalert.3e.digital_sen2_3
       description: Current relative humidity
-      family: Secondary/Humidity
+      family: Sensor/External/Humidity/Value
       unit: "%"
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.5.0
       name: roomalert.3e.digital_sen2_5
       description: Current heat index
-      family: Secondary/Heat Index
+      family: Sensor/External/HeatIndex/Value
       unit: "Cel"
   - MIB: ROOMALERT3E-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.9.1.1.2.4.0
       name: roomalert.3e.digital_sen2_4
       description: Current heat index
-      family: Secondary/Heat Index
+      family: Sensor/External/HeatIndex/Value
       unit: "degF"
   #  - MIB: ROOMALERT3E-MIB
   #    symbol:
@@ -87,7 +87,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.1.2.1.0
       name: roomalert.3e.switch_sen1
       description: The reading for the switch sensor
-      family: Switch
+      family: Sensor/Switch/Status
       unit: "{status}"
       mapping:
         0: open
@@ -102,7 +102,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.1.0
       name: roomalert.3e.red_led
       description: The status of the red Signal Tower LED
-      family: Signal Tower/LED/Red
+      family: SignalTower/LED/Red/Status
       unit: "{status}"
       mapping:
         0: off
@@ -112,7 +112,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.2.0
       name: roomalert.3e.amber_led
       description: The status of the amber Signal Tower LED
-      family: Signal Tower/LED/Amber
+      family: SignalTower/LED/Amber/Status
       unit: "{status}"
       mapping:
         0: off
@@ -122,7 +122,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.3.0
       name: roomalert.3e.green_led
       description: The status of the green Signal Tower LED
-      family: Signal Tower/LED/Green
+      family: SignalTower/LED/Green/Status
       unit: "{status}"
       mapping:
         0: off
@@ -132,7 +132,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.4.0
       name: roomalert.3e.blue_led
       description: The status of the blue Signal Tower LED
-      family: Signal Tower/LED/Blue
+      family: SignalTower/LED/Blue/Status
       unit: "{status}"
       mapping:
         0: off
@@ -142,7 +142,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.5.0
       name: roomalert.3e.white_led
       description: The status of the white Signal Tower LED
-      family: Signal Tower/LED/White
+      family: SignalTower/LED/White/Status
       unit: "{status}"
       mapping:
         0: off
@@ -152,7 +152,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.6.0
       name: roomalert.3e.alarm1
       description: The status of the Signal Tower alarm1
-      family: Signal Tower/Alarms
+      family: SignalTower/Alarm/1/Status
       unit: "{status}"
       mapping:
         0: off
@@ -162,7 +162,7 @@ metrics:
       OID: 1.3.6.1.4.1.20916.1.9.2.7.0
       name: roomalert.3e.alarm2
       description: The status of the Signal Tower alarm2
-      family: Signal Tower/Alarms
+      family: SignalTower/Alarm/2/Status
       unit: "{status}"
       mapping:
         0: off
