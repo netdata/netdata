@@ -36,8 +36,8 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.2.58.2.0
       name: pduRole
-      description: PDU role, 1 = primary, 0 = secondary
-      family: Role
+      description: PDU role
+      family: PDU/Role/Status
       unit: "{status}"
       mapping:
         0: secondary
@@ -49,7 +49,7 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.2.58.12.0
       name: outOfService
       description: PDU operation status
-      family: Service
+      family: PDU/Service/Status
       unit: "{status}"
       mapping:
         1: out of service
@@ -61,24 +61,27 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.8.1.0
       name: temperatureProbe1
       description: Probe 1 temperature
-      family: Probes
-      unit: "degF/100"
+      family: Sensor/Temperature/Probe1/Value
+      unit: "degF"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.8.2.0
       name: temperatureProbe2
       description: Probe 2 temperature
-      family: Probes
-      unit: "degF/100"
+      family: Sensor/Temperature/Probe2/Value
+      unit: "degF"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.9.1.0
       name: humidityProbe1
       description: Probe 1 humidity
-      family: Humidity
-      unit: "%/100"
+      family: Sensor/Humidity/Probe1/Value
+      unit: "%"
+      scale_factor: 0.01
       # TODO I am not sure for this
 
   - MIB: CPI-UNITY-MIB
@@ -86,8 +89,9 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.9.2.0
       name: humidityProbe2
       description: Probe 1 humidity
-      family: Humidity
-      unit: "%/100"
+      family: Sensor/Humidity/Probe2/Value
+      unit: "%"
+      scale_factor: 0.01
       # TODO I am not sure for this
 
   ### [Legacy] Sensors
@@ -96,24 +100,27 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.13.1.0
       name: line1curr
       description: Line 1 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Line/1/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.13.2.0
       name: line2curr
       description: Line 2 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Line/2/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.13.3.0
       name: line3curr
       description: Line 3 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Line/3/Current
+      unit: "A"
+      scale_factor: 0.01
 
   ### [Legacy] Branch
   - MIB: CPI-UNITY-MIB
@@ -121,103 +128,115 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.1.0
       name: currentxy1
       description: XY1 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Branch/XY1/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.2.0
       name: currentyz1
       description: YZ1 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Branch/YZ1/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.3.0
       name: currentzx1
       description: ZX1 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Branch/ZX1/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.4.0
       name: currentxy2
       description: XY2 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Branch/XY2/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.5.0
       name: currentyz2
       description: YZ2 current draw
-      family: Current
-      unit: "A/100"
+      family: PDU/Branch/YZ2/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.1.6.0
       name: currentzx2
       description: ZX2 current draw
-      family: Current
+      family: PDU/Branch/ZX2/Current
       unit: "A/100"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.1.0
       name: voltagexy1
       description: XY1 voltage in 1/10 volts
-      family: Voltage
-      unit: "V/10"
+      family: PDU/Branch/XY1/Voltage
+      unit: "V"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.2.0
       name: voltageyz1
-    description: YZ1 voltage in 1/10 volts
-    family: Voltage
-    unit: "V/10"
+      description: YZ1 voltage in 1/10 volts
+      family: PDU/Branch/YZ1/Voltage
+      unit: "V"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.3.0
       name: voltagezx1
       description: ZX1 voltage in 1/10 volts
-      family: Voltage
-      unit: "V/10"
+      family: PDU/Branch/ZX1/Voltage
+      unit: "V"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.4.0
       name: voltagexy2
       description: XY2 voltage in 1/10 volts
-      family: Voltage
-      unit: "V/10"
+      family: PDU/Branch/XY2/Voltage
+      unit: "V"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.5.0
       name: voltageyz2
       description: YZ2 voltage in 1/10 volts
-      family: Voltage
-      unit: "V/10"
+      family: PDU/Branch/YZ2/Voltage
+      unit: "V"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.2.6.0
       name: voltagezx2
       description: ZX2 voltage in 1/10 volts
-      family: Voltage
-      unit: "V/10"
+      family: PDU/Branch/ZX2/Voltage
+      unit: "V"
+      scale_factor: 0.1
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.3.1.0
       name: powerxy1
       description: XY1 power consumption in Watts
-      family: Power Consumption
+      family: PDU/Branch/XY1/Power
       unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -225,7 +244,7 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.3.2.0
       name: poweryz1
       description: YZ1 power consumption in Watts
-      family: Power Consumption
+      family: PDU/Branch/YZ1/Power
       unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -233,7 +252,7 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.3.3.0
       name: powerzx1
       description: ZX1 power consumption in Watts
-      family: Power Consumption
+      family: PDU/Branch/ZX1/Power
       unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -241,7 +260,7 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.3.4.0
       name: powerxy2
       description: XY2 power consumption in Watts
-      family: Power Consumption
+      family: PDU/Branch/XY2/Power
       unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -249,7 +268,7 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.3.5.0
       name: poweryz2
       description: YZ2 power consumption in Watts
-      family: Power Consumption
+      family: PDU/Branch/YZ2/Power
       unit: "W"
 
   - MIB: CPI-UNITY-MIB
@@ -257,16 +276,16 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.3.6.0
       name: powerzx2
       description: ZX2 power consumption in Watts
-      family: Power Consumption
+      family: PDU/Branch/ZX2/Power
       unit: "W"
 
-  - MIB: CPI-UNITY-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.30932.1.1.3.4.1.0
-      name: powerFactxy1
-    description: XY1 power factor x 100
-    family: Power Consumption
-    unit: "10*2.{power_factor}"
+  #  - MIB: CPI-UNITY-MIB
+  #    symbol:
+  #      OID: 1.3.6.1.4.1.30932.1.1.3.4.1.0
+  #      name: powerFactxy1
+  #      description: XY1 power factor x 100
+  #      family: PDU/Branch/XY1/PowerFactor
+  #      unit: "10*2.{power_factor}" # TODO: wth is this unit
 
   # - MIB: CPI-UNITY-MIB
   #   symbol:
@@ -310,7 +329,7 @@ metrics:
       name: energyxy1s
       metric_type: monotonic_count
       description: XY1 branch energy accumulated
-      family: Energy
+      family: PDU/Branch/XY1/Energy
       scaling_factor: 0.1
       unit: "da*W"
       # This and the following metrics were da*W*s, but because they are accumulated, it should be /s. s/s = 1 so removing the seconds.
@@ -321,7 +340,7 @@ metrics:
       name: energyyz1s
       metric_type: monotonic_count
       description: YZ1 branch energy accumulated
-      family: Energy
+      family: PDU/Branch/YZ1/Energy
       scaling_factor: 0.1
       unit: "da*W"
 
@@ -331,7 +350,7 @@ metrics:
       name: energyzx1s
       metric_type: monotonic_count
       description: ZX1 branch energy accumulated
-      family: Energy
+      family: PDU/Branch/ZX1/Energy
       scaling_factor: 0.1
       unit: "da*W"
 
@@ -341,7 +360,7 @@ metrics:
       name: energyxy2s
       metric_type: monotonic_count
       description: XY2 branch energy accumulated
-      family: Energy
+      family: PDU/Branch/XY2/Energy
       scaling_factor: 0.1
       unit: "da*W"
 
@@ -351,7 +370,7 @@ metrics:
       name: energyyz2s
       metric_type: monotonic_count
       description: YZ2 branch energy accumulated
-      family: Energy
+      family: PDU/Branch/YZ2/Energy
       scaling_factor: 0.1
       unit: "da*W"
 
@@ -361,7 +380,7 @@ metrics:
       name: energyzx2s
       metric_type: monotonic_count
       description: ZX2 branch energy accumulated
-      family: Energy
+      family: PDU/Branch/ZX2/Energy
       scaling_factor: 0.1
       unit: "da*W"
 
@@ -371,192 +390,216 @@ metrics:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.1.0
       name: outlet1Current
       description: Outlet1 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/1/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.2.0
       name: outlet2Current
       description: Outlet2 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/2/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.3.0
       name: outlet3Current
       description: Outlet3 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/3/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.4.0
       name: outlet4Current
       description: Outlet4 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/4/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.5.0
       name: outlet5Current
       description: Outlet5 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/5/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.6.0
       name: outlet6Current
       description: Outlet6 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/6/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.7.0
       name: outlet7Current
       description: Outlet7 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/7/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.8.0
       name: outlet8Current
       description: Outlet8 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/8/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.9.0
       name: outlet9Current
       description: Outlet9 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/9/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.10.0
       name: outlet10Current
       description: Outlet10 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/10/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.11.0
       name: outlet11Current
       description: Outlet11 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/11/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.12.0
       name: outlet12Current
       description: Outlet12 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/12/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.13.0
       name: outlet13Current
       description: Outlet13 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/13/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.14.0
       name: outlet14Current
       description: Outlet14 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/14/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.15.0
       name: outlet15Current
       description: Outlet15 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/15/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.16.0
       name: outlet16Current
       description: Outlet16 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/16/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.17.0
       name: outlet17Current
       description: Outlet17 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/17/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.18.0
       name: outlet18Current
       description: Outlet18 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/18/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.19.0
       name: outlet19Current
       description: Outlet19 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/19/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.20.0
       name: outlet20Current
       description: Outlet20 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/20/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.21.0
       name: outlet21Current
       description: Outlet21 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/21/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.22.0
       name: outlet22Current
       description: Outlet22 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/22/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.23.0
       name: outlet23Current
       description: Outlet23 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/23/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
       OID: 1.3.6.1.4.1.30932.1.1.3.5.24.0
       name: outlet24Current
       description: Outlet24 current draw
-      family: Outlets/Current
-      unit: "A/100"
+      family: PDU/Outlet/24/Current
+      unit: "A"
+      scale_factor: 0.01
 
   - MIB: CPI-UNITY-MIB
     symbol:
@@ -564,7 +607,7 @@ metrics:
       name: receptacleEnergyoutlet1s
       metric_type: monotonic_count
       description: Outlet1 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/1/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -574,7 +617,7 @@ metrics:
       name: receptacleEnergyoutlet2s
       metric_type: monotonic_count
       description: Outlet2 receptacle energy accumulated
-      family: Energy
+      family: PDU/Outlet/2/Energy
       scaling_factor: 0.1
       unit: "da*W"
 
@@ -584,7 +627,7 @@ metrics:
       name: receptacleEnergyoutlet3s
       metric_type: monotonic_count
       description: Outlet3 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/3/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -594,7 +637,7 @@ metrics:
       name: receptacleEnergyoutlet4s
       metric_type: monotonic_count
       description: Outlet4 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/4/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -604,7 +647,7 @@ metrics:
       name: receptacleEnergyoutlet5s
       metric_type: monotonic_count
       description: Outlet5 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/5/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -614,7 +657,7 @@ metrics:
       name: receptacleEnergyoutlet6s
       metric_type: monotonic_count
       description: Outlet6 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/6/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -624,7 +667,7 @@ metrics:
       name: receptacleEnergyoutlet7s
       metric_type: monotonic_count
       description: Outlet7 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/7/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -634,7 +677,7 @@ metrics:
       name: receptacleEnergyoutlet8s
       metric_type: monotonic_count
       description: Outlet8 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/8/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -644,7 +687,7 @@ metrics:
       name: receptacleEnergyoutlet9s
       metric_type: monotonic_count
       description: Outlet9 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/9/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -654,7 +697,7 @@ metrics:
       name: receptacleEnergyoutlet10s
       metric_type: monotonic_count
       description: Outlet10 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/10/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -664,7 +707,7 @@ metrics:
       name: receptacleEnergyoutlet11s
       metric_type: monotonic_count
       description: Outlet11 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/11/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -674,7 +717,7 @@ metrics:
       name: receptacleEnergyoutlet12s
       metric_type: monotonic_count
       description: Outlet12 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/12/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -684,7 +727,7 @@ metrics:
       name: receptacleEnergyoutlet13s
       metric_type: monotonic_count
       description: Outlet13 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/13/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -694,7 +737,7 @@ metrics:
       name: receptacleEnergyoutlet14s
       metric_type: monotonic_count
       description: Outlet14 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/14/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -704,7 +747,7 @@ metrics:
       name: receptacleEnergyoutlet15s
       metric_type: monotonic_count
       description: Outlet15 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/15/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -714,7 +757,7 @@ metrics:
       name: receptacleEnergyoutlet16s
       metric_type: monotonic_count
       description: Outlet16 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/16/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -724,7 +767,7 @@ metrics:
       name: receptacleEnergyoutlet17s
       metric_type: monotonic_count
       description: Outlet17 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/17/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -734,7 +777,7 @@ metrics:
       name: receptacleEnergyoutlet18s
       metric_type: monotonic_count
       description: Outlet18 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/18/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -744,7 +787,7 @@ metrics:
       name: receptacleEnergyoutlet19s
       metric_type: monotonic_count
       description: Outlet19 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/19/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -754,7 +797,7 @@ metrics:
       name: receptacleEnergyoutlet20s
       metric_type: monotonic_count
       description: Outlet20 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/20/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -764,7 +807,7 @@ metrics:
       name: receptacleEnergyoutlet21s
       metric_type: monotonic_count
       description: Outlet21 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/21/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -774,7 +817,7 @@ metrics:
       name: receptacleEnergyoutlet22s
       metric_type: monotonic_count
       description: Outlet22 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/22/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -784,7 +827,7 @@ metrics:
       name: receptacleEnergyoutlet23s
       metric_type: monotonic_count
       description: Outlet23 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/23/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -794,7 +837,7 @@ metrics:
       name: receptacleEnergyoutlet24s
       metric_type: monotonic_count
       description: Outlet24 receptacle energy accumulated
-      family: Outlets/Energy
+      family: PDU/Outlet/24/Energy
       scale_factor: 0.1
       unit: "da*W"
 
@@ -810,21 +853,21 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.8
         name: cpiPduNumberBranches
         description: Number of branches in the PDU
-        family: PDUs/Branches
+        family: PDU/Branch/Count
         unit: "{branch}"
 
         # Get the number of outlets in the PDU.
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.9
         name: cpiPduNumberOutlets
         description: Number of outlets in the PDU
-        family: PDUs/Outlets
+        family: PDU/Outlet/Count
         unit: "{outlet}"
 
         # Set or get whether the PDU is in-service: inservice(0), outofservice(1)
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.10
         name: cpiPduOutOfService
         description: Whether the PDU is in service
-        family: PDUs/Service
+        family: PDU/Service/Status
         unit: "{status}"
         mapping:
           0: in service
@@ -834,7 +877,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.12
         name: cpiPduUpgrade
         description: Indicator if the PDU firmware is being upgraded
-        family: PDUs/Upgrade
+        family: PDU/Firmware/Upgrade/Status
         unit: "{status}"
         mapping:
           0: no
@@ -844,7 +887,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.13
         name: cpiPduChainRole
         description: Role of the PDU in a daisy chain
-        family: PDUs/Upgrade
+        family: PDU/Chain/Role/Status
         unit: "{status}"
         mapping:
           1: primary
@@ -854,7 +897,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.2.10.1.16
         name: cpiPduTotalPower
         description: Power for the entire PDU
-        family: PDUs/Power
+        family: PDU/Power/Total
         unit: "VA"
     metric_tags:
       - tag: pdu_macaddress
@@ -895,7 +938,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.3
         name: cpiPduEasStatus
         description: Status of the Electronic Access Control system
-        family: Locks
+        family: PDU/Lock/AccessControl/Status
         unit: "{status}"
         mapping:
           0: inactive
@@ -906,7 +949,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.4
         name: cpiPduDoorStatus
         description: Door sensor status, closed or open
-        family: Locks
+        family: PDU/Lock/Door/Status
         unit: "{status}"
         mapping:
           0: closed
@@ -916,7 +959,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.7.100.1.5
         name: cpiPduLockStatus
         description: Lock status, closed or open
-        family: Locks
+        family: PDU/Lock/Status
         unit: "{status}"
         mapping:
           0: closed
@@ -940,17 +983,17 @@ metrics:
         name: cpiPduSensorValue
         # description: Value of the sensor, temperature in degrees Fahrenheit or humidity in percent
         description: Sensor value
-        family: Sensors
+        family: Sensor
         transform: |
           {{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
           {{- $config:= get (dict
-            "1" (dict "name" "temperature" "unit" "degF" "family" "Temperature")
-            "2" (dict "name" "humidity" "unit" "%" "family" "Temperature")
+            "1" (dict "name" "temperature" "unit" "degF" "family" "Sensor/Temperature/Value" "desc" "Temperature reading")
+            "2" (dict "name" "humidity" "unit" "%" "family" "Sensor/Humidity/Value" "desc" "Humidity reading")
             ) $sensorType -}}
 
-            {{- if $config -}}
+          {{- if $config -}}
             {{- setName .Metric (printf "%s_%s" .Metric.Name (get $config "name")) -}}
-            {{- setFamily .Metric (printf "Sensors/%s" (get $config "family")) -}}
+            {{- setFamily .Metric (get $config "family") -}}
             {{- with get $config "desc" -}}{{- setDesc $.Metric . -}}{{- end -}}
             {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
           {{- end -}}
@@ -965,7 +1008,6 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.5.10.1.3
           name: cpiPduSensorName
-        # Get the type of sensor for the entry: temperature(1), humidity(2)
       - tag: sensor_type
         symbol:
           OID: 1.3.6.1.4.1.30932.1.10.1.5.10.1.4
@@ -982,7 +1024,7 @@ metrics:
       # Get current draw in 1/100 amp of the line on the PDU. Convert the value by dividing by 100.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.10.1.3
         name: cpiPduLineCurrent
-        family: Lines/Current
+        family: PDU/Line/Current
         description: Current draw of the line on the PDU
         unit: "A/100"
     metric_tags:
@@ -1004,35 +1046,35 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.3
         name: cpiPduBranchCurrent
         description: Current draw of the branch on the PDU
-        family: Branches/Current
+        family: PDU/Branch/Current
         unit: "A/100"
 
         # Get the maximum current draw in 1/100 amp of the branch on the PDU. Convert the value by dividing by 100.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.4
         name: cpiPduBranchMaxCurrent
         description: Maximum current draw of the branch on the PDU
-        family: Branches/Current
+        family: PDU/Branch/Current/Maximum
         unit: "A/100"
 
         # Get the voltage in 1/10 volts of the branch on the PDU. Convert the value by dividing by 10.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.5
         name: cpiPduBranchVoltage
         description: Voltage in 1/10 volts of the branch on the PDU
-        family: Branches/Voltage
+        family: PDU/Branch/Voltage
         unit: "V/10"
 
         # Get the power in volt-amps for the branch.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.6
         name: cpiPduBranchPower
         description: Power in volt-amps for the branch
-        family: Branches/Power
+        family: PDU/Branch/Power
         unit: "VA"
 
         # Get the power factor for the branch.
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.7
         name: cpiPduBranchPowerFactor
         description: Power factor for the branch
-        family: Branches/Power
+        family: PDU/Branch/PowerFactor
         unit: "10*2.1"
         # TODO don't think this helps
 
@@ -1040,7 +1082,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.8
         name: cpiPduBranchStatus
         description: Alarm status of the branch
-        family: Branches/Alarm
+        family: PDU/Branch/Alarm/Status
         unit: "{status}"
         mapping:
           0: noalarm
@@ -1050,7 +1092,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.3.110.1.9
         name: cpiPduBranchEnergy
         description: Branch energy accumulated in decaVA-secs, divide by 360 to obtain VA-hr
-        family: Branches/Energy
+        family: PDU/Branch/Energy
         scale_factor: 0.1
         unit: "V"
     metric_tags:
@@ -1090,28 +1132,28 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.6
         name: cpiPduOutletCurrent
         description: Current draw in 1/100 amp of the outlet on the PDU
-        family: Outlets/Current
+        family: PDU/Outlet/Current
         unit: "A/100"
 
         # Get the voltage in 1/10 volts of the outlet on the PDU. Convert the value by dividing by 10.
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.7
         name: cpiPduOutletVoltage
         description: Voltage in 1/10 volts of the outlet on the PDU
-        family: Outlets/Voltage
+        family: PDU/Outlet/Voltage
         unit: "V/10"
 
         # The power in Volt-Amps of the outlet on the PDU.
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.8
         name: cpiPduOutletPower
         description: Power in Volt-Amps of the outlet on the PDU
-        family: Outlets/Power
+        family: PDU/Outlet/Power
         unit: "VA"
 
         # Get the alarm status of the outlet: noalarm(0), warning(1), alarm(2)
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.9
         name: cpiPduOutletStatus
         description: Alarm status of the outlet
-        family: Outlets/Alarm
+        family: PDU/Outlet/Alarm/Status
         unit: "{status}"
         mapping:
           0: noalarm
@@ -1121,7 +1163,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30932.1.10.1.4.10.1.10
         name: cpiPduOutletEnergy
         description: Outlet energy accumulated in decaWatt-secs, divide by 360 to obtain Watt-hr
-        family: Outlets/Energy
+        family: PDU/Outlet/Energy
         scale_factor: 0.1
         unit: "W"
     metric_tags:
