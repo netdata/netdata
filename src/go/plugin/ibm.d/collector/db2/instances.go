@@ -88,7 +88,7 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 		return nil
 	}
 
-	// Choose query based on monitoring approach
+	// Choose query based on monitoring approach and column support
 	var query string
 	if d.useMonGetFunctions {
 		// Note: MON_GET_BUFFERPOOL doesn't support FETCH FIRST, so we'll handle limit in post-processing
@@ -97,9 +97,12 @@ func (d *DB2) collectBufferpoolInstances(ctx context.Context) error {
 	} else if d.edition == "Cloud" {
 		query = fmt.Sprintf(queryBufferpoolInstancesCloud, d.MaxBufferpools)
 		d.Debugf("using Cloud-specific bufferpool query for Db2 on Cloud")
-	} else {
+	} else if d.supportsColumnOrganizedTables {
 		query = fmt.Sprintf(queryBufferpoolInstances, d.MaxBufferpools)
-		d.Debugf("using SNAP views for bufferpool instances (legacy approach)")
+		d.Debugf("using SNAP views with column-organized metrics for bufferpool instances")
+	} else {
+		query = fmt.Sprintf(queryBufferpoolInstancesLegacy, d.MaxBufferpools)
+		d.Debugf("using legacy SNAP views without column-organized metrics for bufferpool instances")
 	}
 
 	var currentBP string

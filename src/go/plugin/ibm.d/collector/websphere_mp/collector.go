@@ -89,7 +89,7 @@ type Config struct {
 
 type WebSphereMicroProfile struct {
 	module.Base
-	Config `json:""`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
@@ -128,7 +128,7 @@ func (w *WebSphereMicroProfile) Configuration() any {
 }
 
 func (w *WebSphereMicroProfile) Init(context.Context) error {
-	if w.HTTPConfig.URL == "" {
+	if w.URL == "" {
 		return errors.New("websphere_mp URL is required")
 	}
 
@@ -174,7 +174,7 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 
 func (w *WebSphereMicroProfile) buildMetricsURL() error {
 	// Require complete URL - no path inference
-	w.metricsURL = strings.TrimSpace(w.HTTPConfig.URL)
+	w.metricsURL = strings.TrimSpace(w.URL)
 
 	if w.metricsURL == "" {
 		return errors.New("url is required")
