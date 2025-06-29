@@ -114,6 +114,10 @@ modules:
               description: "Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
               default_value: "*"
               required: false
+            - name: concurrent_scans
+              description: "Number of devices to scan concurrently. Set to 0 for sequential scanning (default behavior). Improves performance when monitoring many devices."
+              default_value: 0
+              required: false
             - name: extra_devices
               description: "Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See \"Configuration Examples\" for details."
               default_value: "[]"
@@ -142,6 +146,13 @@ modules:
                 jobs:
                   - name: smartctl
                     devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+            - name: Concurrent scanning for multiple devices
+              description: |
+                This example demonstrates enabling concurrent scanning to improve performance when monitoring many devices.
+              config: |
+                jobs:
+                  - name: smartctl
+                    concurrent_scans: 4  # Scan up to 4 devices concurrently
             - name: Extra devices
               description: |
                 This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.

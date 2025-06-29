@@ -1412,7 +1412,7 @@ void sql_alert_transitions(
     }
 
     snprintfz(sql, sizeof(sql) - 1, SQL_BUILD_ALERT_TRANSITION, nodes);
-    rc = db_execute(db_meta, sql);
+    rc = db_execute(db_meta, sql, NULL);
     if (rc)
         return;
 
@@ -1519,7 +1519,7 @@ done:
 done_only_drop:
     if (likely(!transition)) {
         (void)snprintfz(sql, sizeof(sql) - 1, "DROP TABLE IF EXISTS v_%p", nodes);
-        (void)db_execute(db_meta, sql);
+        (void)db_execute(db_meta, sql, NULL);
         buffer_free(command);
     }
 }
@@ -1552,7 +1552,7 @@ int sql_get_alert_configuration(
         return added;
 
     snprintfz(sql, sizeof(sql) - 1, SQL_BUILD_CONFIG_TARGET_LIST, configs);
-    rc = db_execute(db_meta, sql);
+    rc = db_execute(db_meta, sql, NULL);
     if (rc)
         return added;
 
@@ -1645,7 +1645,7 @@ int sql_get_alert_configuration(
 
 fail_only_drop:
     (void)snprintfz(sql, sizeof(sql) - 1, "DROP TABLE IF EXISTS c_%p", configs);
-    (void)db_execute(db_meta, sql);
+    (void)db_execute(db_meta, sql, NULL);
     buffer_free(command);
     return added;
 }

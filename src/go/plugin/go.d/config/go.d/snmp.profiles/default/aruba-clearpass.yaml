@@ -1,30 +1,38 @@
 extends:
   - aruba.yaml
 
+metadata:
+  device:
+    fields:
+      type:
+        value: ClearPass
+
 sysobjectid:
   - 1.3.6.1.4.1.14823.1.6.1
 metrics:
   - MIB: HOST-RESOURCES-MIB
     symbol:
-      name: cpu.usage
+      name: hrProcessorLoad
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608
       description: Average percentage of time that this processor was not idle over the last minute
-      family: Aruba/ClearPass/CPU
+      family: CPU/Usage
       unit: "%"
   - MIB: UCD-SNMP-MIB
     symbol:
-      name: memory.total
+      name: memTotalReal
       OID: 1.3.6.1.4.1.2021.4.5.0
       description: Total amount of real physical memory installed on this host
-      family: Aruba/ClearPass/Memory
-      unit: "kBy"
+      family: Memory/Physical/Total
+      unit: "By"
+      scale_factor: 1024
   - MIB: UCD-SNMP-MIB
     symbol:
-      name: memory.free
+      name: memAvailReal
       OID: 1.3.6.1.4.1.2021.4.6.0
       description: Amount of real physical memory currently unused or available
-      family: Aruba/ClearPass/Memory
-      unit: "kBy"
+      family: Memory/Physical/Free
+      unit: "By"
+      scale_factor: 1024
   - MIB: CPPM-MIB
     table:
       name: cppmSystemTable
@@ -33,22 +41,22 @@ metrics:
       - name: cppmSystemMemoryTotal
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.12
         description: Total amount of memory available in bytes in the ClearPass server
-        family: Aruba/ClearPass/Memory
+        family: Memory/Total
         unit: "By"
       - name: cppmSystemMemoryFree
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.13
         description: Amount of free memory in bytes in the ClearPass server
-        family: Aruba/ClearPass/Memory
+        family: Memory/Free
         unit: "By"
       - name: cppmSystemDiskSpaceTotal
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.14
         description: Total amount of disk space available in bytes in the ClearPass server
-        family: Aruba/ClearPass/Storage/Disk
+        family: Storage/Disk/Total
         unit: "By"
       - name: cppmSystemDiskSpaceFree
         OID: 1.3.6.1.4.1.14823.1.6.1.1.1.1.1.15
         description: Amount of free disk space in bytes in the ClearPass server
-        family: Aruba/ClearPass/Storage/Disk
+        family: Storage/Disk/Free
         unit: "By"
     metric_tags:
       - symbol:
@@ -63,28 +71,28 @@ metrics:
       - name: radPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.1
         description: Total time taken for policy evaluation from RADIUS server perspective in milliseconds
-        family: Aruba/ClearPass/RADIUS/Policy Evaluation
+        family: RADIUS/PolicyEvaluation/Time
         unit: "ms"
       - name: radAuthRequestTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.2
         description: Total time taken for RADIUS request end-to-end in milliseconds
-        family: Aruba/ClearPass/RADIUS/Requests
+        family: RADIUS/Request/Time
         unit: "ms"
       - name: radServerCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.3
         description: Successful RADIUS request count
-        family: Aruba/ClearPass/RADIUS/Requests
-        unit: "{success}"
+        family: RADIUS/Request/Success
+        unit: "{request}/s"
       - name: radServerCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.4
         description: Failed RADIUS request count
-        family: Aruba/ClearPass/RADIUS/Requests
-        unit: "{fail}"
+        family: RADIUS/Request/Failed
+        unit: "{request}/s"
       - name: radServerCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.1.1.5
         description: Total RADIUS request count
-        family: Aruba/ClearPass/RADIUS/Requests
-        unit: "{request}"
+        family: RADIUS/Request/Total
+        unit: "{request}/s"
     metric_tags:
       - table: cppmSystemTable
         symbol:
@@ -99,22 +107,22 @@ metrics:
       - name: radAuthCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.3
         description: Total number of successful RADIUS authentications
-        family: Aruba/ClearPass/RADIUS/Authentications
-        unit: "{success}"
+        family: RADIUS/Authentication/Success
+        unit: "{authentication}/s"
       - name: radAuthCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.4
         description: Total number of failed RADIUS authentications
-        family: Aruba/ClearPass/RADIUS/Authentications
-        unit: "{fail}"
+        family: RADIUS/Authentication/Failed
+        unit: "{authentication}/s"
       - name: radAuthCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.5
         description: Total number of RADIUS authentications
-        family: Aruba/ClearPass/RADIUS/Authentications
-        unit: "{authentication}"
+        family: RADIUS/Authentication/Total
+        unit: "{authentication}/s"
       - name: radAuthCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.2.1.6
         description: Time taken to authenticate against an authentication source in milliseconds
-        family: Aruba/ClearPass/RADIUS/Authentications
+        family: RADIUS/Authentication/Time
         unit: "ms"
     metric_tags:
       - symbol:
@@ -129,97 +137,97 @@ metrics:
       - name: psServicePolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.1
         description: Total number of service policies evaluated
-        family: Aruba/ClearPass/Policies/Evaluations
-        unit: "{policy}"
+        family: Policy/Evaluation/Service/Count
+        unit: "{policy}/s"
       - name: psRolemappingPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.2
         description: Total number of role mapping policies evaluated
-        family: Aruba/ClearPass/Policies/Evaluations
-        unit: "{policy}"
+        family: Policy/Evaluation/RoleMapping/Count
+        unit: "{policy}/s"
       - name: psPosturePolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.3
         description: Total number of posture policies evaluated
-        family: Aruba/ClearPass/Policies/Evaluations
-        unit: "{policy}"
+        family: Policy/Evaluation/Posture/Count
+        unit: "{policy}/s"
       - name: psAuditPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.4
         description: Total number of audit policies evaluated
-        family: Aruba/ClearPass/Policies/Evaluations
-        unit: "{policy}"
+        family: Policy/Evaluation/Audit/Count
+        unit: "{policy}/s"
       - name: psRestrictionPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.5
         description: Total number of restriction policies evaluated
-        family: Aruba/ClearPass/Policies/Evaluations
-        unit: "{policy}"
+        family: Policy/Evaluation/Restriction/Count
+        unit: "{policy}/s"
       - name: psEnforcementPolicyEvalCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.6
         description: Total number of enforcement policies evaluated
-        family: Aruba/ClearPass/Policies/Evaluations
-        unit: "{policy}"
+        family: Policy/Evaluation/Enforcement/Count
+        unit: "{policy}/s"
       - name: psAuthCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.14
         description: Total number of successful authentications computed on the Policy Server
-        family: Aruba/ClearPass/Policies/Authorizations
-        unit: "{authentication}"
+        family: Policy/Authentication/Success
+        unit: "{authentication}/s"
       - name: psAuthCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.15
         description: Total number of failed authentications computed on the Policy Server
-        family: Aruba/ClearPass/Policies/Authorizations
-        unit: "{authentication}"
+        family: Policy/Authentication/Failed
+        unit: "{authentication}/s"
       - name: psAuthCounterTotal
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.16
         description: Total number of authentications computed on the Policy Server
-        family: Aruba/ClearPass/Policies/Authentications
-        unit: "{authentication}"
+        family: Policy/Authentication/Total
+        unit: "{authentication}/s"
       - name: dailySuccessAuthCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.17
         description: Total number of successful authentications computed over 24 hours
-        family: Aruba/ClearPass/Policies/Authentications
-        unit: "{authentication}"
+        family: Policy/Authentication/Daily/Success
+        unit: "{authentication}/s"
       - name: dailyFailedAuthCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.18
         description: Total number of failed authentications computed over 24 hours
-        family: Aruba/ClearPass/Policies/Authentications
-        unit: "{authentication}"
+        family: Policy/Authentication/Daily/Failed
+        unit: "{authentication}/s"
       - name: dailyTotalAuthCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.19
         description: Total number of authentications computed over 24 hours
-        family: Aruba/ClearPass/Policies/Authentications
-        unit: "{authentication}"
+        family: Policy/Authentication/Daily/Total
+        unit: "{authentication}/s"
       - name: psServicePolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.7
         description: Time taken for the evaluation of service policies in milliseconds
-        family: Aruba/ClearPass/Policies/Evaluations
+        family: Policy/Evaluation/Service/Time
         unit: "ms"
       - name: psRolemappingPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.8
         description: Time taken for the evaluation of role mapping policies in milliseconds
-        family: Aruba/ClearPass/Policies/Evaluations
+        family: Policy/Evaluation/RoleMapping/Time
         unit: "ms"
       - name: psPosturePolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.9
         description: Time taken for the evaluation of posture policies in milliseconds
-        family: Aruba/ClearPass/Policies/Evaluations
+        family: Policy/Evaluation/Posture/Time
         unit: "ms"
       - name: psAuditPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.10
         description: Time taken for the evaluation of audit policies in milliseconds
-        family: Aruba/ClearPass/Policies/Evaluations
+        family: Policy/Evaluation/Audit/Time
         unit: "ms"
       - name: psRestrictionPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.11
         description: Time taken for the evaluation of restriction policies in milliseconds
-        family: Aruba/ClearPass/Policies/Evaluations
+        family: Policy/Evaluation/Restriction/Time
         unit: "ms"
       - name: psEnforcementPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.12
         description: Time taken for the evaluation of enforcement policies in milliseconds
-        family: Aruba/ClearPass/Policies/Evaluations
+        family: Policy/Evaluation/Enforcement/Time
         unit: "ms"
       - name: psSessionlogTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.3.1.13
         description: Time taken for session logging in milliseconds
-        family: Aruba/ClearPass/Policies/Logging
+        family: Policy/SessionLogging/Time
         unit: "ms"
     metric_tags:
       - table: cppmSystemTable
@@ -235,22 +243,22 @@ metrics:
       - name: psAutzCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.3
         description: Total number of successful Policy authorizations
-        family: Aruba/ClearPass/Policies/Authorization
-        unit: "{authorization}"
+        family: Policy/Authorization/Success
+        unit: "{authorization}/s"
       - name: psAutzCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.4
         description: Total number of failed Policy authorizations
-        family: Aruba/ClearPass/Policies/Authorizations
-        unit: "{authorization}"
+        family: Policy/Authorization/Failed
+        unit: "{authorization}/s"
       - name: psAutzCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.5
         description: Total number of Policy authorizations
-        family: Aruba/ClearPass/Policies/Authorizations
-        unit: "{authorization}"
+        family: Policy/Authorization/Total
+        unit: "{authorization}/s"
       - name: psAutzCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.5.1.6
         description: Time taken for Policy authorizations in milliseconds
-        family: Aruba/ClearPass/Policies/Authorizations
+        family: Policy/Authorization/Time
         unit: "ms"
     metric_tags:
       - symbol:
@@ -265,37 +273,37 @@ metrics:
       - name: tacAuthCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.1
         description: Total number of successful TACACS+ authentications
-        family: Aruba/ClearPass/TACACS/Authentications
-        unit: "{authentication}"
+        family: TACACS/Authentication/Success
+        unit: "{authentication}/s"
       - name: tacAuthCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.2
         description: Total number of failed TACACS+ authentications
-        family: Aruba/ClearPass/TACACS/Authentications
-        unit: "{authentication}"
+        family: TACACS/Authentication/Failed
+        unit: "{authentication}/s"
       - name: tacAuthCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.3
         description: Total number of TACACS+ authentications
-        family: Aruba/ClearPass/TACACS/Authentications
-        unit: "{authentication}"
+        family: TACACS/Authentication/Total
+        unit: "{authentication}/s"
       - name: tacAuthCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.4
         description: Total time taken to perform TACACS+ authentications end-to-end in milliseconds
-        family: Aruba/ClearPass/TACACS/Authentications
+        family: TACACS/Authentication/Time/Total
         unit: "ms"
       - name: tacAuthCounterAuthTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.5
         description: Time taken for TACACS+ authentications in milliseconds
-        family: Aruba/ClearPass/TACACS/Authentications
+        family: TACACS/Authentication/Time
         unit: "ms"
       - name: tacServicePolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.6
         description: Time taken for TACACS+ service policy evaluation in milliseconds
-        family: Aruba/ClearPass/TACACS/Authentications
+        family: TACACS/PolicyEvaluation/Service/Time
         unit: "ms"
       - name: tacPolicyEvalTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.7.1.7
         description: Time taken for TACACS+ policy evaluation in milliseconds
-        family: Aruba/ClearPass/TACACS/Authentications
+        family: TACACS/PolicyEvaluation/Time
         unit: "ms"
     metric_tags:
       - table: cppmSystemTable
@@ -311,22 +319,22 @@ metrics:
       - name: tacAutzCounterSuccess
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.1
         description: Total number of successful TACACS+ authorizations
-        family: Aruba/ClearPass/TACACS/Authorizations
-        unit: "{authorization}"
+        family: TACACS/Authorization/Success
+        unit: "{authorization}/s"
       - name: tacAutzCounterFailure
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.2
         description: Total number of failed TACACS+ authorizations
-        family: Aruba/ClearPass/TACACS/Authorizations
-        unit: "{authorization}"
+        family: TACACS/Authorization/Failed
+        unit: "{authorization}/s"
       - name: tacAutzCounterCount
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.3
         description: Total number of TACACS+ authorizations
-        family: Aruba/ClearPass/TACACS/Authorizations
-        unit: "{authorization}"
+        family: TACACS/Authorization/Total
+        unit: "{authorization}/s"
       - name: tacAutzCounterTime
         OID: 1.3.6.1.4.1.14823.1.6.1.1.2.8.1.4
         description: Total time taken to perform TACACS+ authorization end-to-end in milliseconds
-        family: Aruba/ClearPass/TACACS/Authorizations
+        family: TACACS/Authorization/Time
         unit: "ms"
     metric_tags:
       - table: cppmSystemTable
@@ -342,8 +350,8 @@ metrics:
       - name: nwTrafficTotal
         OID: 1.3.6.1.4.1.14823.1.6.1.1.3.1.1.4
         description: Total network traffic in bytes
-        family: Aruba/ClearPass/Network/Traffic
-        unit: "By"
+        family: Network/Traffic/Total
+        unit: "By/s"
     metric_tags:
       - symbol:
           name: nwAppName

@@ -5,4 +5,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "brother"
+        value: "Brother"

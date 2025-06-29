@@ -3,8 +3,8 @@
 // Default configuration schema
 const DEFAULT_CONFIG = {
     model: {
-        provider: "anthropic",
-        id: "claude-3-haiku-20240307",
+        provider: 'anthropic',
+        id: 'claude-sonnet-4-20250514',
         params: {
             temperature: 0.7,
             topP: 0.9,
@@ -30,15 +30,12 @@ const DEFAULT_CONFIG = {
             enabled: true,
             forgetAfterConclusions: 0
         },
-        cacheControl: {
-            enabled: false,
-            strategy: 'smart'
-        },
+        cacheControl: 'system',
         titleGeneration: {
             enabled: true,
             model: {
-                provider: "google",
-                id: "gemini-1.5-flash-8b",
+                provider: 'google',
+                id: 'gemini-1.5-flash-8b',
                 params: {
                     temperature: 0.7,
                     topP: 0.9,
@@ -51,7 +48,7 @@ const DEFAULT_CONFIG = {
             }
         }
     },
-    mcpServer: "prod_aws_parent0"
+    mcpServer: 'prod_aws_parent0'
 };
 
 // Feature-specific default model parameters
@@ -207,9 +204,12 @@ export function normalizeConfig(config) {
     }
     
     // Cache Control normalization
-    if (!opt.cacheControl || typeof opt.cacheControl !== 'object') {
-        console.warn('[normalizeConfig] cacheControl missing, creating default');
-        opt.cacheControl = { enabled: false, strategy: 'smart' };
+    if (!opt.cacheControl || typeof opt.cacheControl !== 'string') {
+        // Don't warn for missing cacheControl - it's expected for old chats
+        opt.cacheControl = 'all-off';
+    } else if (!['all-off', 'system', 'cached'].includes(opt.cacheControl)) {
+        console.warn('[normalizeConfig] Invalid cacheControl value:', opt.cacheControl, '- using default');
+        opt.cacheControl = 'all-off';
     }
     
     // MCP Server validation happens in app.js where the server list is available
@@ -265,10 +265,14 @@ export function migrateConfig(oldConfig) {
     }
     
     if (oldConfig.cacheControl) {
-        newConfig.optimisation.cacheControl = {
-            enabled: oldConfig.cacheControl.enabled || false,
-            strategy: oldConfig.cacheControl.strategy || 'smart'
-        };
+        // Migrate old cache control format to new format
+        if (oldConfig.cacheControl.enabled) {
+            // If enabled, use cached mode (keeps current strategy behavior)
+            newConfig.optimisation.cacheControl = 'cached';
+        } else {
+            // If disabled, use all-off mode
+            newConfig.optimisation.cacheControl = 'all-off';
+        }
     }
     
     if (oldConfig.mcpServer) {

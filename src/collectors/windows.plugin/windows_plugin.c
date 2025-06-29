@@ -24,6 +24,11 @@ static struct proc_module {
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_GetSystemRAM},
+    {.name = "GetPowerSupply",
+     .dim = "GetPowerSupply",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_GetPowerSupply},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,
@@ -108,10 +113,17 @@ static struct proc_module {
      .func = do_PerflibServices},
 
     {.name = "PerflibExchange",
-        .dim = "PerflibADFS",
-        .enabled = CONFIG_BOOLEAN_YES,
-        .update_every = UPDATE_EVERY_MIN,
-        .func = do_PerflibExchange},
+     .dim = "PerflibADFS",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibExchange},
+
+    {.name = "PerflibNUMA",
+     .dim = "PerflibNUMA",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibNUMA},
+
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}};
 
