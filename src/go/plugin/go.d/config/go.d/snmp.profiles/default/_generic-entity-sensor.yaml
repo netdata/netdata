@@ -39,25 +39,25 @@ metrics:
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         mapping:
           # RFC 6933 Standard Values (1-14)
-          1: "other",
-          2: "unknown",
-          3: "chassis",
-          4: "backplane",
-          5: "container",
-          6: "powerSupply",
-          7: "fan",
-          8: "sensor",
-          9: "module",
-          10: "port",
-          11: "stack",
-          12: "cpu",
-          13: "energyObject",
-          14: "battery",
+          1: other
+          2: unknown
+          3: chassis
+          4: backplane
+          5: container
+          6: powerSupply
+          7: fan
+          8: sensor
+          9: module
+          10: port
+          11: stack
+          12: cpu
+          13: energyObject
+          14: battery
           # Common Cisco Extensions (15-18) - Non-RFC
-          15: "storageDisk",  // e.g., Cisco UCS hard drives
-          16: "memory",       // e.g., RAM DIMMs in Nexus switches
-          17: "software",     // Virtual/logical components (rare)
-          18: "reserved",     // Unassigned (vendor-specific)
+          15: storageDisk  # e.g., Cisco UCS hard drives
+          16: memory       # e.g., RAM DIMMs in Nexus switches
+          17: software     # Virtual/logical components (rare)
+          18: reserved     # Unassigned (vendor-specific)
       - tag: _sensor_desc
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.6
