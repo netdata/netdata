@@ -252,7 +252,7 @@ With each Agent you can:
 9. **Score** – Use a scoring engine to find patterns and correlations across metrics.
 
 > [!NOTE]  
-> Learn more: [Netdata's architecture](https://learn.netdata.cloud/docs/netdata-agent/architecture-overview/)
+> Learn more: [Netdata's architecture](https://learn.netdata.cloud/docs/netdata-agent/#distributed-observability-pipeline)
 
 ## Agent Capabilities
 
