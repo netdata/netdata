@@ -4,6 +4,7 @@ package websphere_pmi
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -64,17 +65,32 @@ func (dc *DynamicCollector) initializeCharts(flatResult *FlattenerResult, charts
 	// Convert to Netdata charts and add to module
 	netdataCharts := dc.correlator.ConvertToNetdataCharts(chartCandidates)
 	
-	// Build mapping structures
+	// Build mapping structures with duplicate prevention
 	for i, candidate := range chartCandidates {
 		chart := (*netdataCharts)[i]
+		
+		// Ensure unique dimension IDs within each chart
+		dimIDSeen := make(map[string]bool)
+		for j, dim := range chart.Dims {
+			baseID := dim.ID
+			uniqueID := baseID
+			counter := 1
+			
+			// If ID already exists, append a counter
+			for dimIDSeen[uniqueID] {
+				uniqueID = fmt.Sprintf("%s_%d", baseID, counter)
+				counter++
+			}
+			
+			dimIDSeen[uniqueID] = true
+			dim.ID = uniqueID
+			
+			// Update the dimension mapping with the unique ID
+			dc.dimensionMap[candidate.Dimensions[j].Metric.Path] = uniqueID
+		}
+		
 		dc.chartMap[candidate.Context] = chart
 		dc.lastChartMapping[candidate.Context] = candidate
-		
-		// Map dimensions to their IDs
-		for j, dim := range candidate.Dimensions {
-			dimID := chart.Dims[j].ID
-			dc.dimensionMap[dim.Metric.Path] = dimID
-		}
 		
 		// Add chart to module charts
 		*charts = append(*charts, chart)
