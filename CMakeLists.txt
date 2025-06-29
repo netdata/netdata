@@ -2064,6 +2064,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
         src/collectors/windows.plugin/perflib-exchange.c
+        src/collectors/windows.plugin/perflib-numa.c
 )
 
 set(PROC_PLUGIN_FILES

@@ -31,16 +31,11 @@ var (
 
 func loadProfiles() {
 	loadOnce.Do(func() {
-		userDirs, stockDirs := getProfilesDirs()
-		extendsPaths := multipath.New(userDirs, stockDirs)
-
+		profilesPaths := getProfilesDirs()
 		seen := make(map[string]bool)
 
-		for _, dir := range extendsPaths {
-			if dir == "" {
-				continue
-			}
-			profiles, err := loadProfilesFromDir(dir, extendsPaths)
+		for _, dir := range profilesPaths {
+			profiles, err := loadProfilesFromDir(dir, profilesPaths)
 			if err != nil {
 				log.Errorf("failed to load dd snmp profiles from '%s': %v", dir, err)
 				continue
@@ -65,7 +60,7 @@ func loadProfiles() {
 		}
 
 		if len(ddProfiles) == 0 {
-			log.Warningf("no dd snmp profiles found in any of the searched directories: %v", extendsPaths)
+			log.Warningf("no dd snmp profiles found in any of the searched directories: %v", profilesPaths)
 		} else {
 			log.Infof("loaded %d dd snmp profiles total", len(ddProfiles))
 		}
@@ -80,6 +75,10 @@ func loadProfilesFromDir(dirpath string, extendsPaths multipath.MultiPath) ([]*P
 			return err
 		}
 		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
+			return nil
+		}
+		// Skip abstract profiles
+		if strings.HasPrefix(d.Name(), "_") {
 			return nil
 		}
 
@@ -128,7 +127,8 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		prof.SourceFile, _ = filepath.Abs(filename)
 	}
 
-	// Merge extended profiles here
+	prof.extensionHierarchy = make([]*extensionInfo, 0, len(prof.Definition.Extends))
+
 	for _, name := range prof.Definition.Extends {
 		if slices.Contains(stack, name) {
 			return nil, fmt.Errorf("circular extends detected: '%s' already included (in file: %s)", name, prof.SourceFile)
@@ -144,17 +144,26 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 			return nil, err
 		}
 
+		extInfo := &extensionInfo{
+			name:       name,
+			sourceFile: mergedBase.SourceFile,
+			extensions: mergedBase.extensionHierarchy,
+		}
+		prof.extensionHierarchy = append(prof.extensionHierarchy, extInfo)
+
 		prof.merge(mergedBase)
 	}
 
 	return &prof, nil
 }
 
-func getProfilesDirs() (userDir, stockDir string) {
+func getProfilesDirs() multipath.MultiPath {
 	if executable.Name == "test" {
 		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-		return "", dir
+		return multipath.New(dir)
 	}
+
+	var userDir, stockDir string
 
 	if userDir = handleDirOnWin(os.Getenv("NETDATA_USER_CONFIG_DIR")); userDir != "" {
 		if dir := filepath.Join(userDir, "go.d/snmp.profiles"); isDirExists(dir) {
@@ -168,13 +177,13 @@ func getProfilesDirs() (userDir, stockDir string) {
 	}
 
 	if userDir != "" || stockDir != "" {
-		return userDir, stockDir
+		return multipath.New(userDir, stockDir)
 	}
 
 	// Development: When running from source (netdata/src/go/plugin/go.d/bin)
 	// Looks for profiles in the local git repository
 	if dir := filepath.Join(executable.Directory, "../config/go.d/snmp.profiles/default"); isDirExists(dir) {
-		return "", dir
+		return multipath.New(dir)
 	}
 
 	possibleDirs := []string{
@@ -199,7 +208,7 @@ func getProfilesDirs() (userDir, stockDir string) {
 		}
 	}
 
-	return userDir, stockDir
+	return multipath.New(userDir, stockDir)
 }
 
 func isDirExists(dir string) bool {

@@ -20,53 +20,68 @@ metadata:
           name: chassisSerialNumberString
 
 metrics:
-  - MIB: CISCO-ENTITY-SENSOR-MIB
+  - MIB: CISCO-ENTITY-SENSOR-MIB   # TODO: this is not Catalyst-specific, need to add to other Cisco devices
     table:
       OID: 1.3.6.1.4.1.9.9.91.1.1.1
       name: entSensorValueTable
     symbols:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
-        name: entSensorValue
-        description: "The most recent measurement seen by the sensor"
-        unit:  "1"
-        family: "Switches/Sensors"
+        name: entSensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
+        description: Most recent measurement obtained by the agent for this sensor
+        unit: "1"
+        family: Sensor/Value
+        transform: |
+          {{- transformEntitySensorValue .Metric -}}
     metric_tags:
-      - symbol:
+      - tag: sensor_index
+        index: 1
+      - tag: _ent_phys_descr
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+      - tag: sensor_type # needed for transform
+        symbol:
           OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1
           name: entSensorType
-        tag: sensor_type
-      - index: 1
-        tag: sensor_id
-  - MIB: CISCO-IF-EXTENSION-MIB
+      - tag: sensor_scale # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.2
+          name: entSensorScale
+      - tag: sensor_precision # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.3
+          name: entSensorPrecision
+  - MIB: CISCO-IF-EXTENSION-MIB # TODO: this is not Catalyst-specific, need to add to other Cisco devices
     table:
       OID: 1.3.6.1.4.1.9.9.276.1.1.1
       name: cieIfPacketStatsTable
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.1
         name: cieIfLastInTime
         description: "Elapsed time in milliseconds since last protocol input packet was received"
+        family: Interfaces/Activity
         unit: "ms"
-        family: "Network/Interfaces/Packets"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.2
         name: cieIfLastOutTime
         description: "Elapsed time in milliseconds since last protocol output packet was transmitted"
+        family: Interfaces/Activity
         unit: "ms"
-        family: "Network/Interfaces/Packets"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.10
         name: cieIfInputQueueDrops
         description: "Number of input packets which were dropped"
-        unit: "{packet}"
-        family: "Network/Interfaces/Packets"
+        family: Interfaces/Drops
+        unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.11
         name: cieIfOutputQueueDrops
         description: "Number of output packets dropped by the interface"
-        unit: "{packet}"
-        family: "Network/Interfaces/Packets"
+        family: Interfaces/Drops
+        unit: "{drop}/s"
     metric_tags:
-      - MIB: IF-MIB
+      - tag: interface
+        MIB: IF-MIB
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
         table: ifXTable
-        tag: interface

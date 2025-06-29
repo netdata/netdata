@@ -458,7 +458,7 @@ done:
     return CMD_STATUS_SUCCESS;
 }
 
-static cmd_status_t cmd_update_node_info(char *args, char **message)
+static cmd_status_t cmd_update_node_info(char *args __maybe_unused, char **message)
 {
     if (aclk_online()) {
         schedule_node_state_update(localhost, 1000);

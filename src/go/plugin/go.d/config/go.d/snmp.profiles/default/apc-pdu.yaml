@@ -7,7 +7,9 @@ metadata:
   device:
     fields:
       type:
-        value: "PDU"
+        value: PDU
+      vendor:
+        value: APC
 
 metrics:
   - MIB: PowerNet-MIB
@@ -16,34 +18,46 @@ metrics:
       name: rPDULoadStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.2
-        name: powernet.rPDULoadStatusLoad
-        description: Load status of the PDU
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - tag: powernet_r_pdu_load_status_index
-        symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.1
-          name: rPDULoadStatusIndex
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
-          name: rPDULoadStatusLoadState
-        tag: powernet_r_pdu_load_status_load_state
+        name: rPDULoadStatusLoad
+        description: Phase/bank load
+        family: PhaseBank/Load/Current
+        unit: "A"
+        scale_factor: 0.1
+      - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
+        name: rPDULoadStatusLoadState
+        description: Phase/bank load state
+        family: PhaseBank/Load/Status
+        unit: "{status}"
         mapping:
           1: phase_load_normal
           2: phase_load_low
           3: phase_load_near_overload
           4: phase_load_overload
+    metric_tags:
+      - tag: powernet_r_pdu_load_status_index
+        symbol:
+          OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.1
+          name: rPDULoadStatusIndex
+
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.3.5.1
       name: rPDUOutletStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.7
-        name: powernet.rPDUOutletStatusLoad
-        description: Load status of the PDU outlet
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        name: rPDUOutletStatusLoad
+        description: Outlet load for an Outlet Monitored Rack PDU
+        family: Outlet/Load/Current
+        unit: "A"
+        scale_factor: 0.1
+      - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
+        name: rPDUOutletStatusOutletState
+        description: Outlet state
+        family: Outlet/Power/Status
+        unit: "{status}"
+        mapping:
+          1: outlet_status_on
+          2: outlet_status_off
     metric_tags:
       - tag: powernet_r_pdu_outlet_status_index
         symbol:
@@ -53,48 +67,53 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.2
           name: rPDUOutletStatusOutletName
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
-          name: rPDUOutletStatusOutletState
-        tag: powernet_r_pdu_outlet_status_outlet_state
-        mapping:
-          1: outlet_status_on
-          2: outlet_status_off
-#  - MIB: PowerNet-MIB
-#    symbol:
-#      OID: 1.3.6.1.4.1.318.1.1.12.4.1.1.0
-#      name: rPDUPowerSupply1Status
-#      mapping:
-#        1: power_supply_one_ok
-#        2: power_supply_one_failed
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
-#  - MIB: PowerNet-MIB
-#    symbol:
-#      OID: 1.3.6.1.4.1.318.1.1.12.4.1.2.0
-#      name: rPDUPowerSupply2Status
-#      mapping:
-#        1: power_supply_two_ok
-#        2: power_supply_two_failed
-#        3: power_supply_two_not_present
-#      TODO: enum in scalar metric is not supported yet (keep this metric and this
-#        comment in profile until it's fixed)
+
+  #  - MIB: PowerNet-MIB
+  #    symbol:
+  #      OID: 1.3.6.1.4.1.318.1.1.12.4.1.1.0
+  #      name: rPDUPowerSupply1Status
+  #      mapping:
+  #        1: power_supply_one_ok
+  #        2: power_supply_one_failed
+  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #        comment in profile until it's fixed)
+  #  - MIB: PowerNet-MIB
+  #    symbol:
+  #      OID: 1.3.6.1.4.1.318.1.1.12.4.1.2.0
+  #      name: rPDUPowerSupply2Status
+  #      mapping:
+  #        1: power_supply_two_ok
+  #        2: power_supply_two_failed
+  #        3: power_supply_two_not_present
+  #      TODO: enum in scalar metric is not supported yet (keep this metric and this
+  #        comment in profile until it's fixed)
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.12.4.1.3.0
-      name: powernet.rPDUPowerSupplyAlarm
+      name: rPDUPowerSupplyAlarm
       description: Alarm status of the PDU power supply
-      unit: "TBD"
+      family: PowerSupply/Alarm/Status
+      unit: "{status}"
+      mapping:
+        1: allAvailablePowerSuppliesOK
+        2: powerSupplyOneFailed
+        3: powerSupplyTwoFailed
+        4: powerSupplyOneandTwoFailed
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.5.2
       name: rPDUStatusBankTable
     symbols:
-      - name: powernet.rPDUStatusBank
-        constant_value_one: true
-        description: Status of the PDU bank
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
+        name: rPDUStatusBankState
+        description: Bank load state
+        family: Bank/Load/Status
+        unit: "{status}"
+        mapping:
+          1: bank_load_normal
+          2: bank_load_low
+          3: bank_load_near_overload
+          4: bank_load_overload
     metric_tags:
       - tag: powernet_r_pdu_status_bank_index
         symbol:
@@ -104,25 +123,22 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.2
           name: rPDUStatusBankNumber
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
-          name: rPDUStatusBankState
-        tag: powernet_r_pdu_status_bank_state
-        mapping:
-          1: bank_load_normal
-          2: bank_load_low
-          3: bank_load_near_overload
-          4: bank_load_overload
+
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.5.4
       name: rPDUStatusPhaseTable
     symbols:
-      - name: powernet.rPDUStatusPhase
-        constant_value_one: true
-        description: Status of the PDU phase
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
+        name: rPDUStatusPhaseState
+        description: Phase Load state
+        family: Phase/Load/Status
+        unit: "{status}"
+        mapping:
+          1: phase_load_normal
+          2: phase_load_low
+          3: phase_load_near_overload
+          4: phase_load_overload
     metric_tags:
       - tag: powernet_r_pdu_status_phase_index
         symbol:
@@ -132,25 +148,22 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.2
           name: rPDUStatusPhaseNumber
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
-          name: rPDUStatusPhaseState
-        tag: powernet_r_pdu_status_phase_state
-        mapping:
-          1: phase_load_normal
-          2: phase_load_low
-          3: phase_load_near_overload
-          4: phase_load_overload
+
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.12.5.6
       name: rPDUStatusOutletTable
     symbols:
-      - name: powernet.rPDUStatusOutlet
-        constant_value_one: true
-        description: Status of the PDU outlet
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
+        name: rPDUStatusOutletState
+        description: Outlet Load state
+        family: Outlet/Load/Status
+        unit: "{status}"
+        mapping:
+          1: outlet_load_normal
+          2: outlet_load_low
+          3: outlet_load_near_overload
+          4: outlet_load_overload
     metric_tags:
       - tag: powernet_r_pdu_status_outlet_index
         symbol:
@@ -160,33 +173,50 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.2
           name: rPDUStatusOutletNumber
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
-          name: rPDUStatusOutletState
-        tag: powernet_r_pdu_status_outlet_state
-        mapping:
-          1: outlet_load_normal
-          2: outlet_load_low
-          3: outlet_load_near_overload
-          4: outlet_load_overload
   - MIB: PowerNet-MIB
     table:
       OID: 1.3.6.1.4.1.318.1.1.26.10.2.2
       name: rPDU2SensorTempHumidityStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.7
-        name: powernet.rPDU2SensorTempHumidityStatusTempF
+        name: rPDU2SensorTempHumidityStatusTempF
         description: Temperature in degrees Fahrenheit
+        family: Sensor/Temperature/Value
         unit: "degF"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.8
-        name: powernet.rPDU2SensorTempHumidityStatusTempC
+        name: rPDU2SensorTempHumidityStatusTempC
         description: Temperature in degrees Celsius
+        family: Sensor/Temperature/Value
         unit: "Cel"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.10
-        name: powernet.rPDU2SensorTempHumidityStatusRelativeHumidity
+        name: rPDU2SensorTempHumidityStatusRelativeHumidity
         description: Relative humidity percentage
+        family: Sensor/Humidity/Value
         unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
+        name: rPDU2SensorTempHumidityStatusTempStatus
+        description: Current state of the temperature probe
+        family: Sensor/Temperature/Status
+        unit: "{status}"
+        mapping:
+          1: not_present
+          2: below_min
+          3: below_low
+          4: normal
+          5: above_high
+          6: above_max
+      - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
+        name: rPDU2SensorTempHumidityStatusHumidityStatus
+        description: Current state of the humidity probe
+        family: Sensor/Humidity/Status
+        unit: "{status}"
+        mapping:
+          1: not_present
+          2: below_min
+          3: below_low
+          4: normal
+          5: above_high
+          6: above_max
     metric_tags:
       - tag: powernet_r_pdu2_sensor_temp_humidity_status_name
         symbol:
@@ -201,28 +231,6 @@ metrics:
           2: temperature_humidity
           3: comms_lost
           4: not_installed
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
-          name: rPDU2SensorTempHumidityStatusTempStatus
-        tag: powernet_r_pdu2_sensor_temp_humidity_status_temp_status
-        mapping:
-          1: not_present
-          2: below_min
-          3: below_low
-          4: normal
-          5: above_high
-          6: above_max
-      - symbol:
-          OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
-          name: rPDU2SensorTempHumidityStatusHumidityStatus
-        tag: powernet_r_pdu2_sensor_temp_humidity_status_humidity_status
-        mapping:
-          1: not_present
-          2: below_min
-          3: below_low
-          4: normal
-          5: above_high
-          6: above_max
 
 metric_tags:
   - tag: powernet_r_pdu_ident_name
