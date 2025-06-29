@@ -194,13 +194,24 @@ func newMetricTransformFuncMap() template.FuncMap {
 			}
 
 			scaleMap := map[string]float64{
-				"1": 1.0, "2": 0.001, "3": 0.000001, "4": 0.000000001,
-				"5": 0.000000000001, "6": 0.000000000000001, "7": 0.000000000000000001,
-				"8": 0.000000000000000000001, "9": 0.000000000000000000000001,
-				"10": 0.1, "11": 0.01, "12": 1000.0, "13": 1000000.0, "14": 1000000000.0,
+				"1":  1e-24, // yocto (10^-24)
+				"2":  1e-21, // zepto (10^-21)
+				"3":  1e-18, // atto (10^-18)
+				"4":  1e-15, // femto (10^-15)
+				"5":  1e-12, // pico (10^-12)
+				"6":  1e-9,  // nano (10^-9)
+				"7":  1e-6,  // micro (10^-6)
+				"8":  1e-3,  // milli (10^-3)
+				"9":  1,     // units (10^0)
+				"10": 1e3,   // kilo (10^3)
+				"11": 1e6,   // mega (10^6)
+				"12": 1e9,   // giga (10^9)
+				"13": 1e12,  // tera (10^12)
 			}
+
 			scale := scaleMap[sensorScale]
-			if scale == 0 {
+			if scale == 0 || scale == 1e-24 {
+				// Workaround for Cisco ASA (MIMIC) temperature bug: treat scale=1 (yocto) as units
 				scale = 1.0
 			}
 
