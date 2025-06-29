@@ -403,19 +403,80 @@ func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
 	
 	// Add instance identifier if available
 	if instance := metric.Labels["instance"]; instance != "" {
+		// Sanitize instance name - replace spaces and special chars with underscore
+		instance = sanitizeDimensionID(instance)
 		parts = append(parts, instance)
 	}
 	
 	// Add metric name (last part of path)
 	pathParts := strings.Split(metric.Path, "/")
 	metricName := pathParts[len(pathParts)-1]
-	parts = append(parts, strings.ToLower(strings.ReplaceAll(metricName, " ", "_")))
+	metricName = sanitizeDimensionID(metricName)
+	parts = append(parts, metricName)
 	
+	// If we still have no parts, use a default
 	if len(parts) == 0 {
 		return "metric"
 	}
 	
-	return strings.Join(parts, "_")
+	// Join parts and ensure uniqueness by adding path hash if needed
+	baseID := strings.Join(parts, "_")
+	
+	// Ensure the ID is valid for Netdata (no spaces, special chars)
+	return sanitizeDimensionID(baseID)
+}
+
+// sanitizeDimensionID removes or replaces invalid characters for Netdata dimension IDs
+func sanitizeDimensionID(id string) string {
+	// Replace spaces and other invalid characters with underscores
+	id = strings.ReplaceAll(id, " ", "_")
+	id = strings.ReplaceAll(id, "-", "_")
+	id = strings.ReplaceAll(id, ".", "_")
+	id = strings.ReplaceAll(id, "/", "_")
+	id = strings.ReplaceAll(id, "\\", "_")
+	id = strings.ReplaceAll(id, "(", "_")
+	id = strings.ReplaceAll(id, ")", "_")
+	id = strings.ReplaceAll(id, "[", "_")
+	id = strings.ReplaceAll(id, "]", "_")
+	id = strings.ReplaceAll(id, "{", "_")
+	id = strings.ReplaceAll(id, "}", "_")
+	id = strings.ReplaceAll(id, "#", "_")
+	id = strings.ReplaceAll(id, "$", "_")
+	id = strings.ReplaceAll(id, "%", "_")
+	id = strings.ReplaceAll(id, "&", "_")
+	id = strings.ReplaceAll(id, "*", "_")
+	id = strings.ReplaceAll(id, "+", "_")
+	id = strings.ReplaceAll(id, "=", "_")
+	id = strings.ReplaceAll(id, ":", "_")
+	id = strings.ReplaceAll(id, ";", "_")
+	id = strings.ReplaceAll(id, "\"", "_")
+	id = strings.ReplaceAll(id, "'", "_")
+	id = strings.ReplaceAll(id, "<", "_")
+	id = strings.ReplaceAll(id, ">", "_")
+	id = strings.ReplaceAll(id, "?", "_")
+	id = strings.ReplaceAll(id, "@", "_")
+	id = strings.ReplaceAll(id, "^", "_")
+	id = strings.ReplaceAll(id, "`", "_")
+	id = strings.ReplaceAll(id, "|", "_")
+	id = strings.ReplaceAll(id, "~", "_")
+	
+	// Convert to lowercase for consistency
+	id = strings.ToLower(id)
+	
+	// Remove multiple consecutive underscores
+	for strings.Contains(id, "__") {
+		id = strings.ReplaceAll(id, "__", "_")
+	}
+	
+	// Trim underscores from start and end
+	id = strings.Trim(id, "_")
+	
+	// If empty after sanitization, return a default
+	if id == "" {
+		return "metric"
+	}
+	
+	return id
 }
 
 // generateDimensionName creates a human-readable dimension name
