@@ -63,13 +63,21 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	cfst.StrucLength = C.MQLONG(p.size())
 	cfst.Parameter = p.parameter
 	cfst.CodedCharSetId = C.MQCCSI_DEFAULT
-	cfst.StringLength = C.MQLONG(len(p.value))
 	
-	// Copy string data
+	// Determine actual string length to copy (truncate if too long)
+	maxStringLen := 256  // Safe buffer size for most MQ string fields
+	actualLen := len(p.value)
+	if actualLen > maxStringLen {
+		actualLen = maxStringLen  // Truncate overlong strings
+	}
+	
+	cfst.StringLength = C.MQLONG(actualLen)
+	
+	// Copy string data with bounds checking
 	stringData := unsafe.Pointer(uintptr(buffer) + C.sizeof_MQCFST)
-	C.memset(stringData, 0, C.size_t(cfst.StringLength))
-	if len(p.value) > 0 {
-		copy((*[256]byte)(stringData)[:len(p.value)], []byte(p.value))
+	C.memset(stringData, 0, C.size_t(actualLen))
+	if actualLen > 0 {
+		copy((*[256]byte)(stringData)[:actualLen], []byte(p.value[:actualLen]))
 	}
 }
 
@@ -128,6 +136,10 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 				break
 			}
 			cfin := (*C.MQCFIN)(unsafe.Pointer(&response[offset]))
+			// Additional check for full structure size
+			if offset+int(cfin.StrucLength) > len(response) {
+				break
+			}
 			attrs[cfin.Parameter] = int32(cfin.Value)
 			offset += int(cfin.StrucLength)
 			
@@ -136,7 +148,12 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 				break
 			}
 			cfst := (*C.MQCFST)(unsafe.Pointer(&response[offset]))
+			// Check full structure size first
 			if offset+int(cfst.StrucLength) > len(response) {
+				break
+			}
+			// Additional check that string data doesn't exceed structure bounds
+			if int(cfst.StringLength) > int(cfst.StrucLength)-int(C.sizeof_MQCFST) {
 				break
 			}
 			
@@ -151,15 +168,23 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 				break
 			}
 			cfil := (*C.MQCFIL)(unsafe.Pointer(&response[offset]))
+			// Check full structure size
+			if offset+int(cfil.StrucLength) > len(response) {
+				break
+			}
 			// Handle integer lists if needed
 			offset += int(cfil.StrucLength)
 			
 		default:
 			// Skip unknown parameter types
-			if offset+4 > len(response) {
+			if offset+8 > len(response) { // Need at least 8 bytes for type + length
 				break
 			}
 			strucLength := *(*C.MQLONG)(unsafe.Pointer(&response[offset+4]))
+			// Validate structure length
+			if strucLength <= 0 || offset+int(strucLength) > len(response) {
+				break
+			}
 			offset += int(strucLength)
 		}
 	}

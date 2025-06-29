@@ -60,8 +60,8 @@ jobs:
     queue_manager: 'APP.QM'
     host: 'localhost'
     port: 1414
-    queue_selector: 'APP.'       # Monitor only queues starting with APP.
-    channel_selector: 'TO.'      # Monitor only channels starting with TO.
+    queue_selector: '^APP\.'     # Monitor only queues starting with APP.
+    channel_selector: '^TO\.'    # Monitor only channels starting with TO.
 ```
 
 ## Configuration Options
@@ -78,8 +78,8 @@ jobs:
 | `collect_queues` | `true` | Enable queue statistics collection |
 | `collect_channels` | `true` | Enable channel statistics collection |
 | `collect_topics` | `false` | Enable topic statistics collection |
-| `queue_selector` | | Filter pattern for queue names |
-| `channel_selector` | | Filter pattern for channel names |
+| `queue_selector` | | Regular expression to filter queue names |
+| `channel_selector` | | Regular expression to filter channel names |
 
 ## Implementation Details
 
