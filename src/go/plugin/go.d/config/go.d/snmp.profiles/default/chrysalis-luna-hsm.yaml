@@ -9,61 +9,71 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.1.0
       name: hsmOperationRequests
-    description: Number of operation requests
-    unit: "{request}"
+      description: Number of operations
+      family: HSM/Operation/Request/Total
+      unit: "{operation}"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.1.2.0
       name: hsmOperationErrors
-    description: Number of operation errors
-    unit: "{error}"
+      description: Number of operation errors
+      family: HSM/Operation/Error/Total
+      unit: "{error}"
+  # - MIB: CHRYSALIS-UTSP-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.12383.3.1.1.3.0
+  #     name: hsmCriticalEvents
+  #   description: Number of critical events
+  #   unit: "{event}"
+  # - MIB: CHRYSALIS-UTSP-MIB
+  #   symbol:
+  #     OID: 1.3.6.1.4.1.12383.3.1.1.4.0
+  #     name: hsmNonCriticalEvents
+  #   description: Number of non critical events
+  #   unit: "{event}"
+  # https://thalesdocs.com/gphsm/luna/7/docs/network/Content/monitoring/snmp/snmp_safenet-chrysalis-UTSP-mib.htm says these two are not implemented on the latest version
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
-      OID: 1.3.6.1.4.1.12383.3.1.1.3.0
-      name: hsmCriticalEvents
-    description: Number of critical events
-    unit: "{event}"
-  - MIB: CHRYSALIS-UTSP-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.12383.3.1.1.4.0
-      name: hsmNonCriticalEvents
-    description: Number of non critical events
-    unit: "{event}"
-# TODO: enum in scalar metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-#  - MIB: CHRYSALIS-UTSP-MIB
-#    symbol:
-#      OID: 1.3.6.1.4.1.12383.3.1.2.1.0
-#      name: ntlsOperStatus
-#      enum:
-#        up: 1
-#        down: 2
-#        unknown: 3
+      OID: 1.3.6.1.4.1.12383.3.1.2.1.0
+      name: ntlsOperStatus
+      description: Current operational status of the NTL service
+      family: HSM/NTLS/Operational/Status
+      unit: "{status}"
+      mapping:
+        1: up
+        2: down
+        3: unknown
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.2.0
       name: ntlsConnectedClients
-    description: Number of connected clients
-    unit: "{client}"
+      description: The current number of connected clients using NTLS
+      family: HSM/NTLS/Client/Connected
+      unit: "{client}"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.3.0
       name: ntlsLinks
-    description: Number of links
-    unit: "{link}"
+      description: The current number of links in NTLS
+      family: HSM/NTLS/Link/Active
+      unit: "{link}"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.4.0
       name: ntlsSuccessfulClientConnections
-    description: Number of successful client connections
-    unit: "{connection}"
+      description: The total number of successful client connections
+      family: HSM/NTLS/Connection/Successful
+      unit: "{connection}/s"
   - MIB: CHRYSALIS-UTSP-MIB
     symbol:
       OID: 1.3.6.1.4.1.12383.3.1.2.5.0
       name: ntlsFailedClientConnections
-    description: Number of failed client connections
-    unit: "{connection}"
+      description: The total number of unsuccessful client connections
+      family: HSM/NTLS/Connection/Failed
+      unit: "{connection}/s"
 # TODO: sending tags for scalar metric is not supported yet (keep this metric and this)
 # - MIB: CHRYSALIS-UTSP-MIB
 #   OID: 1.3.6.1.4.1.12383.3.1.2.6.0
 #   symbol: ntlsCertExpireDay
 #   tag: ntls_cert_expire_day
+# TODO can't find this, maybe remove
