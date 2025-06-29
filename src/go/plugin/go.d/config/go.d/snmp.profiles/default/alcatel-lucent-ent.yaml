@@ -17,14 +17,14 @@ metrics:
       name: healthModuleTable
       OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1
     symbols:
-      - name: cpu.usage
+      - name: healthModuleCpuLatest
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.11
         description: Cpu usage percentage
         family: CPU/Usage
         unit: "%"
     metric_tags:
       - symbol:
-          name: alcatel.ent.healthModuleChassisId
+          name: healthModuleChassisId
           OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.14
         tag: health_module_chassis_id
       - index: 1 # healthModuleSlot
@@ -35,14 +35,14 @@ metrics:
       name: healthModuleTable
       OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1
     symbols:
-      - name: memory.usage
+      - name: healthModuleMemoryLatest
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.8
         description: Memory usage percentage
         family: Memory/Usage
         unit: "%"
     metric_tags:
       - symbol:
-          name: alcatel.ent.healthModuleChassisId
+          name: healthModuleChassisId
           OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.14
         tag: health_module_chassis_id
       - index: 1 # healthModuleSlot
@@ -54,9 +54,9 @@ metrics:
       OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1
     symbols:
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.1
-        name: alcatel.ent.chasEntPhysAdminStatus
+        name: chasEntPhysAdminStatus
         description: The administrative status of the physical entity
-        family: Physical Entities/Status/Administrative
+        family: Hardware/Admin/Status
         unit: "{status}"
         mapping:
           1: unknown
@@ -71,9 +71,9 @@ metrics:
           10: vc_takeover
           11: reset_vc_all
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.2
-        name: alcatel.ent.chasEntPhysOperStatus
+        name: chasEntPhysOperStatus
         description: The operational status of the physical entity
-        family: Physical Entities/Status/Operational
+        family: Hardware/Operational/Status
         unit: "{status}"
         mapping:
           1: up
@@ -87,9 +87,9 @@ metrics:
           9: idle
           10: pwrsave
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.6
-        name: alcatel.ent.chasEntPhysLedStatusOk1
+        name: chasEntPhysLedStatusOk1
         description: Physical entity ok1 LED status
-        family: Physical Entities/Status/LED/ok1
+        family: Hardware/LED/OK1/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -99,9 +99,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.7
-        name: alcatel.ent.chasEntPhysLedStatusOk2
+        name: chasEntPhysLedStatusOk2
         description: Physical entity ok2 LED status
-        family: Physical Entities/Status/LED/ok2
+        family: Hardware/LED/OK2/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -111,9 +111,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.8
-        name: alcatel.ent.chasEntPhysLedStatusPrimaryCMM
+        name: chasEntPhysLedStatusPrimaryCMM
         description: Physical entity primary CMM LED status
-        family: Physical Entities/Status/LED/CMM/Primary
+        family: Hardware/LED/CMMPrimary/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -123,9 +123,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.9
-        name: alcatel.ent.chasEntPhysLedStatusSecondaryCMM
+        name: chasEntPhysLedStatusSecondaryCMM
         description: Physical entity secondary CMM LED status
-        family: Physical Entities/Status/LED/CMM/Secondary
+        family: Hardware/LED/CMMSecondary/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -135,9 +135,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.10
-        name: alcatel.ent.chasEntPhysLedStatusTemperature
+        name: chasEntPhysLedStatusTemperature
         description: Physical entity temperature LED status
-        family: Physical Entities/Status/LED/Temperature
+        family: Hardware/LED/Temperature/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -147,9 +147,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.11
-        name: alcatel.ent.chasEntPhysLedStatusFan
+        name: chasEntPhysLedStatusFan
         description: Physical entity fan LED status
-        family: Physical Entities/Status/LED/Fan
+        family: Hardware/LED/Fan/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -159,9 +159,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.12
-        name: alcatel.ent.chasEntPhysLedStatusBackupPS
+        name: chasEntPhysLedStatusBackupPS
         description: Physical entity backup power supply LED status
-        family: Physical Entities/Status/LED/PSU
+        family: Hardware/LED/PSUBackup/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -171,9 +171,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.13
-        name: alcatel.ent.chasEntPhysLedStatusInternalPS
+        name: chasEntPhysLedStatusInternalPS
         description: Physical entity internal power supply LED status
-        family: Physical Entities/Status/LED/PSU
+        family: Hardware/LED/PSUInternal/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -183,9 +183,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.16
-        name: alcatel.ent.chasEntPhysLedStatusPS
+        name: chasEntPhysLedStatusPS
         description: Physical entity power supply LED status
-        family: Physical Entities/Status/LED/PSU/
+        family: Hardware/LED/PSU/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -195,9 +195,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.14
-        name: alcatel.ent.chasEntPhysLedStatusControl
+        name: chasEntPhysLedStatusControl
         description: Physical entity control LED status
-        family: Physical Entities/Status/LED/Control
+        family: Hardware/LED/Control/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -207,9 +207,9 @@ metrics:
           4: amber_on
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.15
-        name: alcatel.ent.chasEntPhysLedStatusFabric
+        name: chasEntPhysLedStatusFabric
         description: Physical entity fabric LED status
-        family: Physical Entities/Status/LED/Fabric
+        family: Hardware/LED/Fabric/Status
         unit: "{status}"
         mapping:
           0: not_applicable
@@ -223,7 +223,7 @@ metrics:
       # MIB: ENTITY-MIB
       # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalClass
+          name: entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         tag: ent_physical_class
         mapping:
@@ -245,19 +245,19 @@ metrics:
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalName
+          name: entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
         tag: ent_physical_name
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalSerialNum
+          name: entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
         tag: ent_physical_serial_num
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalModelName
+          name: entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
         tag: ent_physical_model_name
 
@@ -266,15 +266,15 @@ metrics:
       name: chasEntTemperatureTable
       OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2
     symbols:
-      - name: alcatel.ent.chasEntTempCurrent
+      - name: chasEntTempCurrent
         OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.1
         description: Current temperature of the physical entity
-        family: Physical Entities/Sensors/Temperature
+        family: Hardware/Temperature/Value
         unit: "Cel"
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.4
-        name: alcatel.ent.chasEntTempStatus
+        name: chasEntTempStatus
         description: Status of the temperature sensor
-        family: Physical Entities/Sensors/Status
+        family: Hardware/Temperature/Status
         unit: "{status}"
         mapping:
           1: unknown
@@ -286,7 +286,7 @@ metrics:
       # MIB: ENTITY-MIB
       # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalClass
+          name: entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
         tag: ent_physical_class
         mapping:
@@ -308,19 +308,19 @@ metrics:
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalName
+          name: entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
         tag: ent_physical_name
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalSerialNum
+          name: entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
         tag: ent_physical_serial_num
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
       - symbol:
-          name: alcatel.ent.entPhysicalModelName
+          name: entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
         tag: ent_physical_model_name
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
@@ -328,15 +328,15 @@ metrics:
       name: alaChasEntPhysFanTable
       OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11
     symbols:
-      - name: alcatel.ent.alaChasEntPhysFanSpeed
+      - name: alaChasEntPhysFanSpeed
         OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.4
         description: Fan speed in revolutions per minute
-        family: Fans/RPM
+        family: Fan/Speed
         unit: "{revolutions}/min"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.2
-          name: alcatel.ent.alaChasEntPhysFanStatus
+          name: alaChasEntPhysFanStatus
         tag: ala_chas_ent_phys_fan_status
         mapping:
           0: no_status
@@ -348,9 +348,9 @@ metrics:
       OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4
     symbols:
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.10
-        name: alcatel.ent.alaChasBpsPowerSupplyOperStatus
+        name: alaChasBpsPowerSupplyOperStatus
         description: Operational status of the power supply
-        family: Power Supply/Status
+        family: PowerSupply/Operational/Status
         unit: "{status}"
         mapping:
           1: up
@@ -358,10 +358,10 @@ metrics:
           3: unknown
     metric_tags:
       - symbol:
-          name: alcatel.ent.alaChasBpsPowerSupplyName
+          name: alaChasBpsPowerSupplyName
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.3
         tag: ala_chas_bps_power_supply_name
       - symbol:
-          name: alcatel.ent.alaChasBpsPowerSupplySerialNum
+          name: alaChasBpsPowerSupplySerialNum
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.8
         tag: ala_chas_bps_power_supply_serial_num
