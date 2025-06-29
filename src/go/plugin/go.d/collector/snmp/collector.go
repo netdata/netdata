@@ -8,13 +8,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/gosnmp/gosnmp"
+
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 //go:embed "config_schema.json"
@@ -34,8 +35,8 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			CreateVnode: true,
-			Community:   "public",
+			CreateVnode:    true,
+			EnableProfiles: true,
 			Options: Options{
 				Port:           161,
 				Retries:        1,
@@ -60,6 +61,9 @@ func New() *Collector {
 		checkMaxReps:  true,
 		collectIfMib:  true,
 		netInterfaces: make(map[string]*netInterface),
+
+		seenScalarMetrics: make(map[string]bool),
+		seenTableMetrics:  make(map[string]bool),
 	}
 }
 
@@ -74,6 +78,7 @@ type Collector struct {
 
 	newSnmpClient func() gosnmp.Handler
 	snmpClient    gosnmp.Handler
+	ddSnmpColl    *ddsnmpcollector.Collector
 
 	netIfaceFilterByName matcher.Matcher
 	netIfaceFilterByType matcher.Matcher
@@ -88,6 +93,9 @@ type Collector struct {
 	customOids []string
 
 	snmpProfiles []*ddsnmp.Profile
+
+	seenScalarMetrics map[string]bool
+	seenTableMetrics  map[string]bool
 }
 
 func (c *Collector) Configuration() any {

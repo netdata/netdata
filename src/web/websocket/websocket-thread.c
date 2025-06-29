@@ -36,7 +36,7 @@ static bool websocket_thread_add_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc) {
     return true;
 }
 
-static void websocket_thread_remove_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc) {
+static void websocket_thread_remove_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc, bool have_lock) {
     internal_fatal(wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );
 
     // Notify the protocol handler that the client is being disconnected
@@ -64,13 +64,15 @@ static void websocket_thread_remove_client(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wth->clients, wsc, prev, next);
 
     // Lock the thread clients
-    spinlock_lock(&wth->clients_spinlock);
+    if(!have_lock)
+        spinlock_lock(&wth->clients_spinlock);
 
     if(wth->clients_current > 0)
         wth->clients_current--;
 
     // Release the thread clients lock
-    spinlock_unlock(&wth->clients_spinlock);
+    if(!have_lock)
+        spinlock_unlock(&wth->clients_spinlock);
 
     websocket_debug(wsc, "Removed and resources freed", wth->id, wsc->id);
     websocket_client_free(wsc);
@@ -265,7 +267,7 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     continue;
                 }
 
-                websocket_thread_remove_client(wth, wsc);
+                websocket_thread_remove_client(wth, wsc, false);
                 break;
             }
 
@@ -382,6 +384,15 @@ void *websocket_thread(void *ptr) {
                 continue;
             }
 
+            // Push client connection info to log stack for all subsequent logs
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_U64(NDF_CONNECTION_ID, wsc->id),
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, wsc->client_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, wsc->client_port),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
             // Check for errors
             if(ev.events & ND_POLL_HUP) {
                 websocket_thread_client_socket_error(wth, wsc, "Client hangup");
@@ -410,7 +421,7 @@ void *websocket_thread(void *ptr) {
                 // Check if this client is waiting to be closed after flushing outgoing data
                 if(wsc->flush_and_remove_client && cbuffer_used_size_unsafe(&wsc->out_buffer) == 0) {
                     // All data flushed - remove client
-                    websocket_thread_remove_client(wth, wsc);
+                    websocket_thread_remove_client(wth, wsc, false);
                 }
             }
         }
@@ -478,7 +489,7 @@ void *websocket_thread(void *ptr) {
 
         websocket_protocol_send_close(wsc, WS_CLOSE_GOING_AWAY, "Server shutting down");
         websocket_write_data(wsc);
-        websocket_thread_remove_client(wth, wsc);
+        websocket_thread_remove_client(wth, wsc, true);
 
         wsc = next;
     }

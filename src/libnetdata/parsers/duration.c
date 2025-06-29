@@ -37,23 +37,60 @@ static const struct duration_unit {
 
     // IMPORTANT: the order of this array is crucial!
     // The array should be sorted from the smaller unit to the biggest unit.
+    // For each multiplier value, the first entry with formatter=true is used for generation.
 
     { .unit = "ns",  .formatter = true,  .multiplier = 1 },                 // UCUM
+    { .unit = "nanosecond",  .formatter = false, .multiplier = 1 },
+    { .unit = "nanoseconds", .formatter = false, .multiplier = 1 },
+    
     { .unit = "us",  .formatter = true,  .multiplier = NSEC_PER_USEC },     // UCUM
+    { .unit = "microsecond",  .formatter = false, .multiplier = NSEC_PER_USEC },
+    { .unit = "microseconds", .formatter = false, .multiplier = NSEC_PER_USEC },
+    
     { .unit = "ms",  .formatter = true,  .multiplier = NSEC_PER_MS },       // UCUM
+    { .unit = "millisecond",  .formatter = false, .multiplier = NSEC_PER_MS },
+    { .unit = "milliseconds", .formatter = false, .multiplier = NSEC_PER_MS },
+    
     { .unit = "s",   .formatter = true,  .multiplier = NSEC_PER_SEC },      // UCUM
+    { .unit = "sec",  .formatter = false, .multiplier = NSEC_PER_SEC },
+    { .unit = "secs", .formatter = false, .multiplier = NSEC_PER_SEC },
+    { .unit = "second",  .formatter = false, .multiplier = NSEC_PER_SEC },
+    { .unit = "seconds", .formatter = false, .multiplier = NSEC_PER_SEC },
+    
     { .unit = "m",   .formatter = true,  .multiplier = NSEC_PER_MIN },      // -
     { .unit = "min", .formatter = false, .multiplier = NSEC_PER_MIN },      // UCUM
+    { .unit = "minute",  .formatter = false, .multiplier = NSEC_PER_MIN },
+    { .unit = "minutes", .formatter = false, .multiplier = NSEC_PER_MIN },
+    
     { .unit = "h",   .formatter = true,  .multiplier = NSEC_PER_HOUR },     // UCUM
+    { .unit = "hr",  .formatter = false, .multiplier = NSEC_PER_HOUR },
+    { .unit = "hrs", .formatter = false, .multiplier = NSEC_PER_HOUR },
+    { .unit = "hour",  .formatter = false, .multiplier = NSEC_PER_HOUR },
+    { .unit = "hours", .formatter = false, .multiplier = NSEC_PER_HOUR },
+    
     { .unit = "d",   .formatter = true,  .multiplier = NSEC_PER_DAY },      // UCUM
+    { .unit = "day",  .formatter = false, .multiplier = NSEC_PER_DAY },
+    { .unit = "days", .formatter = false, .multiplier = NSEC_PER_DAY },
+    
     { .unit = "w",   .formatter = false, .multiplier = NSEC_PER_WEEK },     // -
     { .unit = "wk",  .formatter = false, .multiplier = NSEC_PER_WEEK },     // UCUM
+    { .unit = "week",  .formatter = false, .multiplier = NSEC_PER_WEEK },
+    { .unit = "weeks", .formatter = false, .multiplier = NSEC_PER_WEEK },
+    
     { .unit = "mo",  .formatter = true,  .multiplier = NSEC_PER_MONTH },    // UCUM
     { .unit = "M",   .formatter = false, .multiplier = NSEC_PER_MONTH },    // compatibility
+    { .unit = "month",  .formatter = false, .multiplier = NSEC_PER_MONTH },
+    { .unit = "months", .formatter = false, .multiplier = NSEC_PER_MONTH },
+    
     { .unit = "q",   .formatter = false, .multiplier = NSEC_PER_QUARTER },  // -
+    { .unit = "quarter",  .formatter = false, .multiplier = NSEC_PER_QUARTER },
+    { .unit = "quarters", .formatter = false, .multiplier = NSEC_PER_QUARTER },
+    
     { .unit = "y",   .formatter = true,  .multiplier = NSEC_PER_YEAR },     // -
     { .unit = "Y",   .formatter = false, .multiplier = NSEC_PER_YEAR },     // compatibility
     { .unit = "a",   .formatter = false, .multiplier = NSEC_PER_YEAR },     // UCUM
+    { .unit = "year",  .formatter = false, .multiplier = NSEC_PER_YEAR },
+    { .unit = "years", .formatter = false, .multiplier = NSEC_PER_YEAR }
 };
 
 static inline const struct duration_unit *duration_find_unit(const char *unit) {
@@ -62,7 +99,7 @@ static inline const struct duration_unit *duration_find_unit(const char *unit) {
 
     for (size_t i = 0; i < sizeof(units) / sizeof(units[0]); i++) {
         const struct duration_unit *du = &units[i];
-        if ((uint8_t)unit[0] == (uint8_t)du->unit[0] && strcmp(unit, du->unit) == 0)
+        if (strcasecmp(unit, du->unit) == 0)
             return du;
     }
 
@@ -109,28 +146,43 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
     }
 
     int64_t v = 0;
+    bool found_ago = false;
+    bool parsed_any_duration = false;
 
     while (*s) {
         // Skip leading spaces
         while (isspace((uint8_t)*s)) s++;
+        
+        // If no more content, break out of the loop
+        if (!*s) break;
 
-        // compatibility
-        if(*s == 'n' && strcmp(s, "never") == 0) {
-            *result = 0;
-            return true;
+        // compatibility - case insensitive
+        if(*s == 'n' || *s == 'N') {
+            if(strcasecmp(s, "never") == 0) {
+                *result = 0;
+                return true;
+            }
         }
 
-        if(*s == 'o' && strcmp(s, "off") == 0) {
-            *result = 0;
-            return true;
+        if(*s == 'o' || *s == 'O') {
+            if(strcasecmp(s, "off") == 0) {
+                *result = 0;
+                return true;
+            }
         }
 
         // Parse the number
         const char *number_start = s;
         NETDATA_DOUBLE value = str2ndd(s, (char **)&s);
 
-        // If no valid number found, return default
+        // If no valid number found, check if it's "ago"
         if (s == number_start) {
+            // Maybe it's the "ago" suffix
+            if (strcasecmp(s, "ago") == 0) {
+                found_ago = true;
+                s += 3;  // Skip "ago"
+                break;   // Exit the loop
+            }
             *result = 0;
             return false;
         }
@@ -141,25 +193,101 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
         const char *unit_start = s;
         while (isalpha((uint8_t)*s)) s++;
 
-        char unit[4];
+        char unit[16];  // Increased to handle "microseconds" (12 chars)
         size_t unit_len = s - unit_start;
-        const struct duration_unit *du;
-        if (unit_len == 0)
+        const struct duration_unit *du = NULL;
+        
+        if (unit_len == 0) {
             du = du_def;
+        }
         else {
-            if (unit_len >= sizeof(unit)) unit_len = sizeof(unit) - 1;
-            strncpyz(unit, unit_start, unit_len);
-            du = duration_find_unit(unit);
-            if(!du) {
-                *result = 0;
-                return false;
+            // First check if we have "ago" at the end of the alphabetic sequence
+            if (unit_len >= 3 && strncasecmp(s - 3, "ago", 3) == 0) {
+                // We might have something like "daysago"
+                // Try to parse the unit without "ago"
+                unit_len -= 3;
+                if (unit_len > 0 && unit_len < sizeof(unit)) {
+                    strncpyz(unit, unit_start, unit_len);
+                    du = duration_find_unit(unit);
+                    if (du) {
+                        // Successfully found the unit, mark that we found "ago"
+                        found_ago = true;
+                        s -= 3;  // Back up to just after the unit, before "ago"
+                    }
+                }
+            }
+            
+            // If we didn't find a unit with "ago" suffix, try the whole thing
+            if (!du) {
+                unit_len = s - unit_start;
+                if (unit_len >= sizeof(unit)) unit_len = sizeof(unit) - 1;
+                strncpyz(unit, unit_start, unit_len);
+                
+                // Check if this might be "ago" by itself
+                if (strcasecmp(unit, "ago") == 0) {
+                    // Found "ago" - this ends the duration parsing
+                    found_ago = true;
+                    break;
+                }
+                
+                du = duration_find_unit(unit);
+                if(!du) {
+                    *result = 0;
+                    return false;
+                }
             }
         }
 
         v += (int64_t)round(value * (NETDATA_DOUBLE)du->multiplier);
+        parsed_any_duration = true;
     }
 
     v *= sign;
+
+    // Check for "ago" suffix to negate the result if not already found
+    if (!found_ago) {
+        // Skip any trailing whitespace
+        while (isspace((uint8_t)*s)) s++;
+        
+        // Check if the remaining string is "ago" (case-insensitive)
+        if (*s) {
+            if (strcasecmp(s, "ago") == 0) {
+                found_ago = true;
+                s += 3;  // Skip past "ago"
+            }
+            else {
+                // If there's any other trailing text, it's an error
+                *result = 0;
+                return false;
+            }
+        }
+    }
+    
+    // Apply "ago" negation if found
+    if (found_ago) {
+        // But only if we actually parsed some duration
+        if (!parsed_any_duration) {
+            // "ago" without any duration is an error
+            *result = 0;
+            return false;
+        }
+        
+        // If the original sign was negative, "ago" is redundant
+        // For example: "-7 days ago" means the same as "-7 days"
+        // We keep it negative (don't apply double negative)
+        if (sign > 0) {
+            v = -v;  // Only negate if originally positive
+        }
+        // If sign < 0, v is already negative, so we keep it that way
+        
+        // Check for any trailing content after "ago"
+        while (isspace((uint8_t)*s)) s++;
+        if (*s) {
+            // Extra text after "ago" is an error
+            *result = 0;
+            return false;
+        }
+    }
 
     // Convert the final value from nanoseconds to the desired output unit
     // and apply appropriate rounding
@@ -200,7 +328,7 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
     int64_t nsec = value * du_min->multiplier;
 
     // Iterate through units from largest to smallest
-    for (size_t i = sizeof(units) / sizeof(units[0]) - 1; i > 0 && nsec > 0; i--) {
+    for (ssize_t i = (ssize_t)(sizeof(units) / sizeof(units[0])) - 1; i >= 0 && nsec > 0; i--) {
         const struct duration_unit *du = &units[i];
         if(!units[i].formatter && du != du_min)
             continue;

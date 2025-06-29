@@ -5,6 +5,84 @@
 
 #include "libnetdata/libnetdata.h"
 #include <json-c/json.h>
+#include "mcp-request-id.h"
+
+// MCP tool names - use these constants when referring to tools
+#define MCP_TOOL_LIST_METRICS "list_metrics"
+#define MCP_TOOL_GET_METRICS_DETAILS "get_metrics_details"
+#define MCP_TOOL_LIST_NODES "list_nodes"
+#define MCP_TOOL_GET_NODES_DETAILS "get_nodes_details"
+#define MCP_TOOL_LIST_FUNCTIONS "list_functions"
+#define MCP_TOOL_EXECUTE_FUNCTION "execute_function"
+#define MCP_TOOL_QUERY_METRICS "query_metrics"
+#define MCP_TOOL_FIND_CORRELATED_METRICS "find_correlated_metrics"
+#define MCP_TOOL_FIND_ANOMALOUS_METRICS "find_anomalous_metrics"
+#define MCP_TOOL_FIND_UNSTABLE_METRICS "find_unstable_metrics"
+#define MCP_TOOL_LIST_RAISED_ALERTS "list_raised_alerts"
+#define MCP_TOOL_LIST_ALL_ALERTS "list_running_alerts"
+#define MCP_TOOL_LIST_ALERT_TRANSITIONS "list_alert_transitions"
+
+#define MCP_INFO_TOO_MANY_CONTEXTS_GROUPED_IN_CATEGORIES                                                                \
+    "The response has been grouped into categories to minimize size.\n"                                                 \
+    "Next Steps: repeat the '"MCP_TOOL_LIST_METRICS"' call with a pattern to match what is interesting, "               \
+    "or run '" MCP_TOOL_GET_METRICS_DETAILS "' to get more information for the contexts of interest."
+
+#define MCP_INFO_CONTEXT_ARRAY_RESPONSE \
+    "Next Steps: run the '"MCP_TOOL_GET_METRICS_DETAILS"' tool to get more information for the contexts of interest."
+
+#define MCP_INFO_CONTEXT_NEXT_STEPS \
+    "Next Steps: Query time-series data with the '"MCP_TOOL_QUERY_METRICS"' tool, using different aggregations to inspect different views:\n" \
+    "   - 'group_by: dimension' will aggregate all time-series by the listed dimensions\n" \
+    "   - 'group_by: instance' will aggregate all time-series by the listed instances\n" \
+    "   - 'group_by: label, group_by_label: {label_key}' will aggregate by the listed label values\n" \
+    "\n" \
+    "Dimensions, instances and labels can also be used for filtering in '"MCP_TOOL_QUERY_METRICS"':\n" \
+    "   - 'dimensions: dimension1|dimension2|*dimension*' will select only the time-series with the given dimension\n" \
+    "   - 'instances: instance1|instance2|*instance*' will select only the time-series with the given instance\n" \
+    "   - 'labels' can be specified in two formats:\n" \
+    "      • String format: 'labels: key1:value1|key1:value2|key2:value3' (values with same key are ORed, different keys are ANDed)\n" \
+    "      • Structured format: 'labels: {\"key1\": [\"value1\", \"value2\"], \"key2\": \"value3\"}' (array values are ORed, different keys are ANDed)"
+
+// MCP default values for all tools
+#define MCP_DEFAULT_AFTER_TIME              (-3600) // 1 hour ago
+#define MCP_DEFAULT_BEFORE_TIME             0    // now
+#define MCP_DEFAULT_TIMEOUT_WEIGHTS         300  // 5 minutes
+#define MCP_METADATA_CARDINALITY_LIMIT      50   // For metadata queries
+#define MCP_DATA_CARDINALITY_LIMIT          10   // For data queries
+#define MCP_WEIGHTS_CARDINALITY_LIMIT       50   // For weights queries (minimum is 30)
+#define MCP_METADATA_CARDINALITY_LIMIT_MAX  500  // For metadata queries
+#define MCP_DATA_CARDINALITY_LIMIT_MAX      500  // For data queries
+#define MCP_WEIGHTS_CARDINALITY_LIMIT_MAX   500  // For weights queries
+#define MCP_ALERTS_CARDINALITY_LIMIT        100  // For alert queries
+#define MCP_ALERTS_CARDINALITY_LIMIT_MAX    500  // For alert queries
+
+// MCP query info messages
+#define MCP_QUERY_INFO_SUMMARY_SECTION \
+    "The summary section breaks down the different sources that contribute " \
+    "data to the query. Use this to detect spikes, dives, anomalies (the % of anomalous samples vs the total samples) " \
+    "and evaluate the different groupings that may be beneficial for the task at hand."
+
+#define MCP_QUERY_INFO_DATABASE_SECTION \
+    "The database section provides metadata about the underlying data storage, " \
+    "including retention periods and update frequencies, and data availability " \
+    "across different storage tiers."
+
+#define MCP_QUERY_INFO_VIEW_SECTION \
+    "The view section provides summarized data for the visible time window. " \
+    "For each dimension returned, it contains the minimum, maximum, and average values, " \
+    "the anomaly rate (% of anomalous samples vs total samples) and contribution percentages, " \
+    "across all points."
+
+#define MCP_QUERY_INFO_RESULT_SECTION \
+    "The 'result' section contains the actual time-series data points.\n" \
+    "Each point of each dimension is represented as an array of 3 values:\n" \
+    "  a) the value itself, aggregated as requested\n" \
+    "  b) the point anomaly rate percentage (% of anomalous samples vs total samples)\n" \
+    "  c) the point annotations, a combined bitmap of 1+2+4, where:\n" \
+    "     1 = empty data, value should be ignored\n" \
+    "     2 = counter has been reset or overflown, value may not be accurate\n" \
+    "     4 = partial data, at least one of the sources aggregated had gaps at that time\n" \
+    "Summarized data across the entire time-frame is provided at the 'view' section."
 
 // MCP protocol versions
 typedef enum {
@@ -18,22 +96,26 @@ typedef enum {
 } MCP_PROTOCOL_VERSION;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_PROTOCOL_VERSION);
 
-// JSON-RPC error codes (standard)
-#define MCP_ERROR_PARSE_ERROR      -32700
-#define MCP_ERROR_INVALID_REQUEST  -32600
-#define MCP_ERROR_METHOD_NOT_FOUND -32601
-#define MCP_ERROR_INVALID_PARAMS   -32602
-#define MCP_ERROR_INTERNAL_ERROR   -32603
-// Server error codes (implementation-defined)
-#define MCP_ERROR_SERVER_ERROR_MIN -32099
-#define MCP_ERROR_SERVER_ERROR_MAX -32000
-
 // Content types (for messages and tool responses)
 typedef enum {
     MCP_CONTENT_TYPE_TEXT = 0,
     MCP_CONTENT_TYPE_IMAGE = 1,
     MCP_CONTENT_TYPE_AUDIO = 2, // New in 2025-03-26
 } MCP_CONTENT_TYPE;
+
+// Logging levels (as defined in MCP schema)
+typedef enum {
+    MCP_LOGGING_LEVEL_UNKNOWN = 0,
+    MCP_LOGGING_LEVEL_DEBUG,
+    MCP_LOGGING_LEVEL_INFO,
+    MCP_LOGGING_LEVEL_NOTICE,
+    MCP_LOGGING_LEVEL_WARNING,
+    MCP_LOGGING_LEVEL_ERROR,
+    MCP_LOGGING_LEVEL_CRITICAL,
+    MCP_LOGGING_LEVEL_ALERT,
+    MCP_LOGGING_LEVEL_EMERGENCY
+} MCP_LOGGING_LEVEL;
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_LOGGING_LEVEL);
 
 // Forward declarations for transport-specific types
 struct websocket_server_client;
@@ -63,7 +145,8 @@ typedef enum {
     MCP_RC_INVALID_PARAMS = 2, // Invalid parameters in request
     MCP_RC_NOT_FOUND = 3,      // Resource or method not found
     MCP_RC_INTERNAL_ERROR = 4, // Internal server error
-    MCP_RC_NOT_IMPLEMENTED = 5 // Method not implemented
+    MCP_RC_NOT_IMPLEMENTED = 5, // Method not implemented
+    MCP_RC_BAD_REQUEST = 6      // Bad or malformed request
     // Can add more specific errors as needed
 } MCP_RETURN_CODE;
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(MCP_RETURN_CODE);
@@ -77,6 +160,9 @@ typedef struct mcp_client {
     // Protocol version (detected during initialization)
     MCP_PROTOCOL_VERSION protocol_version;
     
+    // Client state
+    bool ready;                                    // Set to true when client is ready for normal operations
+    
     // Transport-specific context
     union {
         struct websocket_server_client *websocket;  // WebSocket client
@@ -84,16 +170,26 @@ typedef struct mcp_client {
         void *generic;                              // Generic context
     };
     
+    // Authentication and authorization
+    USER_AUTH *user_auth;                          // Pointer to user auth from the underlying transport
+    
     // Client information
     STRING *client_name;                           // Client name (for logging, interned)
     STRING *client_version;                        // Client version (for logging, interned)
+    
+    // Logging configuration
+    MCP_LOGGING_LEVEL logging_level;              // Current logging level set by client
     
     // Response buffers
     BUFFER *result;                                // Pre-allocated buffer for success responses
     BUFFER *error;                                 // Pre-allocated buffer for error messages
     
     // Utility buffers
-    BUFFER *uri;                            // Pre-allocated buffer for URI decoding
+    BUFFER *uri;                                  // Pre-allocated buffer for URI decoding
+    
+    // Request IDs tracking
+    size_t request_id_counter;                     // Counter for generating sequential request IDs
+    Pvoid_t request_ids;                          // JudyL array for mapping internal IDs to client IDs
 } MCP_CLIENT;
 
 // Helper function to convert string version to numeric version
@@ -111,9 +207,8 @@ void mcp_free_client(MCP_CLIENT *mcpc);
 // Helper functions for creating and sending JSON-RPC responses
 
 // Functions to initialize and build MCP responses
-void mcp_init_success_result(MCP_CLIENT *mcpc, uint64_t id);
-MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, uint64_t id, MCP_RETURN_CODE rc);
-void mcp_jsonrpc_error(BUFFER *result, const char *error, uint64_t id, int jsonrpc_code);
+void mcp_init_success_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id);
+MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id, MCP_RETURN_CODE rc);
 
 // Send prepared buffer content as response
 int mcp_send_response_buffer(MCP_CLIENT *mcpc);
@@ -128,7 +223,5 @@ void mcp_initialize_subsystem(void);
 
 // Main MCP entry point - handle a JSON-RPC request (single or batch)
 MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request);
-
-const char *mcp_uri_decode(MCP_CLIENT *mcpc, const char *src);
 
 #endif // NETDATA_MCP_H

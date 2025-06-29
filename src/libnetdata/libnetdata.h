@@ -70,7 +70,8 @@ extern const char *netdata_configured_host_prefix;
 #include "uuid/uuid.h"
 #include "uuid/uuidmap.h"
 #include "http/content_type.h"
-#include "http/http_access.h"
+#include "user-auth/http-access.h"
+#include "user-auth/user-auth.h"
 
 #include "inlined.h"
 #include "parsers/parsers.h"

@@ -1,18 +1,15 @@
 # Backward compatibility shim. Prefer the Cisco Catalyst profile directly
 # Profile for Cisco 3850 devices
 
+sysobjectid: 1.3.6.1.4.1.9.1.1745 # cat38xxstack
+
+# Example sysDescr:
+#   Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc. Compiled Sat 17-Dec-
+
 extends:
   - _base.yaml
   - _cisco-generic.yaml
   - _cisco-catalyst.yaml
-
-sysobjectid: 1.3.6.1.4.1.9.1.1745 # cat38xxstack
-
-device:
-  vendor: "cisco"
-
-# Example sysDescr:
-#   Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc. Compiled Sat 17-Dec-
 
 metadata:
   device:
@@ -23,4 +20,6 @@ metadata:
           OID: 1.3.6.1.4.1.9.3.6.3.0
           name: chassisId
       type:
-        value: "switch"
+        value: Switch
+      vendor:
+        value: Cisco

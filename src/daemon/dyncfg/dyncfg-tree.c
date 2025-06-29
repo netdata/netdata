@@ -144,7 +144,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     }
     buffer_json_object_close(wb); // attention
 
-    buffer_json_agents_v2(wb, NULL, 0, false, false);
+    buffer_json_agents_v2(wb, NULL, 0, false, false, 0);
 
     buffer_json_finalize(wb);
 

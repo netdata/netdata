@@ -45,15 +45,14 @@ static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, voi
         for(REGISTRY_MACHINE_URL *mu = m->machine_urls; mu ; mu = mu->next) {
             int rc = registry_machine_save_url(mu, fp);
             if(rc < 0)
-                return rc;
-
-            ret += rc;
+                return -1;  // Error saving URL
         }
+        return 1;  // Successfully saved 1 machine
     }
 
     // error handling is done at registry_db_save()
 
-    return ret;
+    return -1;  // Error writing machine record
 }
 
 static inline int registry_person_save_url(REGISTRY_PERSON_URL *pu, FILE *fp) {
@@ -91,15 +90,14 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
         for(REGISTRY_PERSON_URL *pu = p->person_urls; pu ;pu = pu->next) {
             int rc = registry_person_save_url(pu, fp);
             if(rc < 0)
-                return rc;
-            else
-                ret += rc;
+                return -1;  // Error saving URL
         }
+        return 1;  // Successfully saved 1 person
     }
 
     // error handling is done at registry_db_save()
 
-    return ret;
+    return -1;  // Error writing person record
 }
 
 // ----------------------------------------------------------------------------
@@ -111,6 +109,19 @@ int registry_db_save(void) {
 
     if(unlikely(!registry_db_should_be_saved()))
         return -2;
+
+    // Implement exponential backoff for save failures
+    if(registry.consecutive_save_failures > 0) {
+        time_t now = now_realtime_sec();
+        time_t backoff_seconds = 60 * (1 << (registry.consecutive_save_failures - 1)); // 60s, 120s, 240s, etc.
+        if(backoff_seconds > 3600) backoff_seconds = 3600; // Cap at 1 hour
+        
+        if((now - registry.last_save_failure) < backoff_seconds) {
+            netdata_log_debug(D_REGISTRY, "REGISTRY: skipping save due to backoff (failed %d times, waiting %ld seconds)", 
+                             registry.consecutive_save_failures, backoff_seconds);
+            return -3;
+        }
+    }
 
     nd_log_limits_unlimited();
 
@@ -125,30 +136,36 @@ int registry_db_save(void) {
     if(!fp) {
         netdata_log_error("REGISTRY: Cannot create file: %s", tmp_filename);
         nd_log_limits_reset();
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
         return -1;
     }
 
     // dictionary_walkthrough_read() has its own locking, so this is safe to do
 
     netdata_log_debug(D_REGISTRY, "REGISTRY: saving all machines");
-    int bytes1 = dictionary_walkthrough_read(registry.machines, registry_machine_save, fp);
-    if(bytes1 < 0) {
-        netdata_log_error("REGISTRY: Cannot save registry machines - return value %d", bytes1);
+    int machines_saved = dictionary_walkthrough_read(registry.machines, registry_machine_save, fp);
+    if(machines_saved < 0) {
+        netdata_log_error("REGISTRY: Cannot save registry machines - return value %d", machines_saved);
         fclose(fp);
         nd_log_limits_reset();
-        return bytes1;
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
+        return machines_saved;
     }
-    netdata_log_debug(D_REGISTRY, "REGISTRY: saving machines took %d bytes", bytes1);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saved %d machines", machines_saved);
 
     netdata_log_debug(D_REGISTRY, "Saving all persons");
-    int bytes2 = dictionary_walkthrough_read(registry.persons, registry_person_save, fp);
-    if(bytes2 < 0) {
-        netdata_log_error("REGISTRY: Cannot save registry persons - return value %d", bytes2);
+    int persons_saved = dictionary_walkthrough_read(registry.persons, registry_person_save, fp);
+    if(persons_saved < 0) {
+        netdata_log_error("REGISTRY: Cannot save registry persons - return value %d", persons_saved);
         fclose(fp);
         nd_log_limits_reset();
-        return bytes2;
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
+        return persons_saved;
     }
-    netdata_log_debug(D_REGISTRY, "REGISTRY: saving persons took %d bytes", bytes2);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: saved %d persons", persons_saved);
 
     // save the totals
     fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
@@ -200,13 +217,17 @@ int registry_db_save(void) {
             // discard the current registry log
             registry_log_recreate();
             registry.log_count = 0;
+            
+            // Reset failure tracking on success
+            registry.consecutive_save_failures = 0;
+            registry.last_save_failure = 0;
         }
     }
 
     // continue operations
     nd_log_limits_reset();
 
-    return -1;
+    return 0;  // Success
 }
 
 // ----------------------------------------------------------------------------

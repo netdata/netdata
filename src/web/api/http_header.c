@@ -113,10 +113,9 @@ static void http_header_x_forwarded_host(struct web_client *w, const char *v, si
 }
 
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
-    char buffer[NI_MAXHOST];
-    strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
-    freez(w->forwarded_for);
-    w->forwarded_for = strdupz(buffer);
+    if(len)
+        strncpyz(w->user_auth.forwarded_for, v,
+                 (len < sizeof(w->user_auth.forwarded_for) - 1 ? len : sizeof(w->user_auth.forwarded_for) - 1));
 }
 
 static void http_header_x_transaction_id(struct web_client *w, const char *v, size_t len) {
@@ -129,7 +128,7 @@ static void http_header_x_netdata_account_id(struct web_client *w, const char *v
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         char buffer[UUID_STR_LEN * 2];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
-        (void) uuid_parse_flexi(buffer, w->auth.cloud_account_id); // will not alter w->cloud_account_id if it fails
+        (void) uuid_parse_flexi(buffer, w->user_auth.cloud_account_id.uuid); // will not alter w->cloud_account_id if it fails
     }
 }
 
@@ -138,32 +137,32 @@ static void http_header_x_netdata_role(struct web_client *w, const char *v, size
         char buffer[100];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
         if (strcasecmp(buffer, "admin") == 0)
-            w->user_role = HTTP_USER_ROLE_ADMIN;
+            w->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
         else if(strcasecmp(buffer, "manager") == 0)
-            w->user_role = HTTP_USER_ROLE_MANAGER;
+            w->user_auth.user_role = HTTP_USER_ROLE_MANAGER;
         else if(strcasecmp(buffer, "troubleshooter") == 0)
-            w->user_role = HTTP_USER_ROLE_TROUBLESHOOTER;
+            w->user_auth.user_role = HTTP_USER_ROLE_TROUBLESHOOTER;
         else if(strcasecmp(buffer, "observer") == 0)
-            w->user_role = HTTP_USER_ROLE_OBSERVER;
+            w->user_auth.user_role = HTTP_USER_ROLE_OBSERVER;
         else if(strcasecmp(buffer, "member") == 0)
-            w->user_role = HTTP_USER_ROLE_MEMBER;
+            w->user_auth.user_role = HTTP_USER_ROLE_MEMBER;
         else if(strcasecmp(buffer, "billing") == 0)
-            w->user_role = HTTP_USER_ROLE_BILLING;
+            w->user_auth.user_role = HTTP_USER_ROLE_BILLING;
         else
-            w->user_role = HTTP_USER_ROLE_MEMBER;
+            w->user_auth.user_role = HTTP_USER_ROLE_MEMBER;
     }
 }
 
 static void http_header_x_netdata_permissions(struct web_client *w, const char *v, size_t len __maybe_unused) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         HTTP_ACCESS access = http_access_from_hex(v);
-        web_client_set_permissions(w, access, w->user_role, WEB_CLIENT_FLAG_AUTH_CLOUD);
+        web_client_set_permissions(w, access, w->user_auth.user_role, USER_AUTH_METHOD_CLOUD);
     }
 }
 
 static void http_header_x_netdata_user_name(struct web_client *w, const char *v, size_t len) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
-        strncpyz(w->auth.client_name, v, (len < sizeof(w->auth.client_name) - 1 ? len : sizeof(w->auth.client_name) - 1));
+        strncpyz(w->user_auth.client_name, v, (len < sizeof(w->user_auth.client_name) - 1 ? len : sizeof(w->user_auth.client_name) - 1));
     }
 }
 
@@ -187,112 +186,103 @@ static void http_header_upgrade(struct web_client *w, const char *v, size_t len 
 }
 
 static void http_header_sec_websocket_key(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(web_client_is_websocket(w)) {
-        // Store the websocket key for later use in the handshake
-        freez(w->websocket.key);
-        w->websocket.key = strdupz(v);
-    }
+    // Store the websocket key for later use in the handshake
+    freez(w->websocket.key);
+    w->websocket.key = strdupz(v);
 }
 
 static void http_header_sec_websocket_version(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(web_client_is_websocket(w)) {
-        // We only support version 13, which will be checked during handshake
-        // No need to store this as we only accept one version
-        if(strcmp(v, "13") != 0) {
-            netdata_log_debug(D_WEB_CLIENT, "%llu: WebSocket version %s not supported, only version 13 is supported", w->id, v);
-            web_client_clear_websocket(w);
-        }
+    // We only support version 13, which will be checked during handshake
+    // No need to store this as we only accept one version
+    if(strcmp(v, "13") != 0) {
+        netdata_log_debug(D_WEB_CLIENT, "%llu: WebSocket version %s not supported, only version 13 is supported", w->id, v);
+        web_client_clear_websocket(w);
     }
 }
 
 static void http_header_sec_websocket_protocol(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(web_client_is_websocket(w)) {
-        // Store the requested protocols for later evaluation during handshake
-        w->websocket.protocol = WEBSOCKET_PROTOCOL_2id(v);
-    }
+    // Store the requested protocols for later evaluation during handshake
+    w->websocket.protocol = WEBSOCKET_PROTOCOL_2id(v);
 }
 
 static void http_header_sec_websocket_extensions(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(web_client_is_websocket(w)) {
-        // Reset extension flags
-        w->websocket.ext_flags = WS_EXTENSION_NONE;
-        
-        // Check if "permessage-deflate" is requested
-        if (strstr(v, "permessage-deflate") != NULL) {
-            // Parse extension parameters
-            char extension_copy[1024];
-            strncpy(extension_copy, v, sizeof(extension_copy) - 1);
-            extension_copy[sizeof(extension_copy) - 1] = '\0';
+    // Reset extension flags
+    w->websocket.ext_flags = WS_EXTENSION_NONE;
 
-            char *token, *saveptr;
-            token = strtok_r(extension_copy, ",", &saveptr);
+    // Check if "permessage-deflate" is requested
+    if (strstr(v, "permessage-deflate") != NULL) {
+        // Parse extension parameters
+        char extension_copy[1024];
+        strncpyz(extension_copy, v, sizeof(extension_copy) - 1);
 
-            while (token) {
-                // Trim leading/trailing spaces
-                char *ext = token;
-                while (*ext && isspace(*ext)) ext++;
-                char *end = ext + strlen(ext) - 1;
-                while (end > ext && isspace(*end)) *end-- = '\0';
+        char *token, *saveptr;
+        token = strtok_r(extension_copy, ",", &saveptr);
 
-                // Check if this is permessage-deflate extension
-                if (strncmp(ext, "permessage-deflate", 18) == 0) {
-                    w->websocket.ext_flags |= WS_EXTENSION_PERMESSAGE_DEFLATE;
+        while (token) {
+            // Trim leading/trailing spaces
+            char *ext = token;
+            while (*ext && isspace(*ext)) ext++;
+            char *end = ext + strlen(ext) - 1;
+            while (end > ext && isspace(*end)) *end-- = '\0';
 
-                    // Parse parameters
-                    char *params = ext + 18;
-                    if (*params == ';') {
-                        params++;
+            // Check if this is permessage-deflate extension
+            if (strncmp(ext, "permessage-deflate", 18) == 0) {
+                w->websocket.ext_flags |= WS_EXTENSION_PERMESSAGE_DEFLATE;
 
-                        char *param, *param_saveptr;
-                        param = strtok_r(params, ";", &param_saveptr);
+                // Parse parameters
+                char *params = ext + 18;
+                if (*params == ';') {
+                    params++;
 
-                        while (param) {
-                            // Trim leading/trailing spaces
-                            while (*param && isspace(*param)) param++;
-                            end = param + strlen(param) - 1;
-                            while (end > param && isspace(*end)) *end-- = '\0';
+                    char *param, *param_saveptr;
+                    param = strtok_r(params, ";", &param_saveptr);
 
-                            // Client no context takeover
-                            if (strcmp(param, "client_no_context_takeover") == 0)
-                                w->websocket.ext_flags |= WS_EXTENSION_CLIENT_NO_CONTEXT_TAKEOVER;
+                    while (param) {
+                        // Trim leading/trailing spaces
+                        while (*param && isspace(*param)) param++;
+                        end = param + strlen(param) - 1;
+                        while (end > param && isspace(*end)) *end-- = '\0';
 
-                            // Server no context takeover
-                            else if (strcmp(param, "server_no_context_takeover") == 0)
-                                w->websocket.ext_flags |= WS_EXTENSION_SERVER_NO_CONTEXT_TAKEOVER;
+                        // Client no context takeover
+                        if (strcmp(param, "client_no_context_takeover") == 0)
+                            w->websocket.ext_flags |= WS_EXTENSION_CLIENT_NO_CONTEXT_TAKEOVER;
 
-                            // Server max window bits
-                            else if (strncmp(param, "server_max_window_bits=", 23) == 0) {
-                                w->websocket.server_max_window_bits = str2u(param + 23);
-                                if(w->websocket.server_max_window_bits >= 8 && w->websocket.server_max_window_bits <= 15)
-                                    w->websocket.ext_flags |= WS_EXTENSION_SERVER_MAX_WINDOW_BITS;
-                            }
-                            // Server max window bits without value
-                            else if (strcmp(param, "server_max_window_bits") == 0) {
+                        // Server no context takeover
+                        else if (strcmp(param, "server_no_context_takeover") == 0)
+                            w->websocket.ext_flags |= WS_EXTENSION_SERVER_NO_CONTEXT_TAKEOVER;
+
+                        // Server max window bits
+                        else if (strncmp(param, "server_max_window_bits=", 23) == 0) {
+                            w->websocket.server_max_window_bits = str2u(param + 23);
+                            if(w->websocket.server_max_window_bits >= 8 && w->websocket.server_max_window_bits <= 15)
                                 w->websocket.ext_flags |= WS_EXTENSION_SERVER_MAX_WINDOW_BITS;
-                                w->websocket.server_max_window_bits = 0; // Default
-                            }
-
-                            // Client max window bits with value
-                            else if (strncmp(param, "client_max_window_bits=", 23) == 0) {
-                                w->websocket.client_max_window_bits = str2u(param + 23);
-                                if(w->websocket.client_max_window_bits >= 8 && w->websocket.client_max_window_bits <= 15)
-                                    w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
-                            }
-                            // Client max window bits without value
-                            else if (strcmp(param, "client_max_window_bits") == 0) {
-                                w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
-                                w->websocket.client_max_window_bits = 0; // Default
-                            }
-
-                            param = strtok_r(NULL, ";", &param_saveptr);
                         }
-                    }
+                        // Server max window bits without value
+                        else if (strcmp(param, "server_max_window_bits") == 0) {
+                            w->websocket.ext_flags |= WS_EXTENSION_SERVER_MAX_WINDOW_BITS;
+                            w->websocket.server_max_window_bits = 0; // Default
+                        }
 
-                    break;  // Found and parsed permessage-deflate
+                        // Client max window bits with value
+                        else if (strncmp(param, "client_max_window_bits=", 23) == 0) {
+                            w->websocket.client_max_window_bits = str2u(param + 23);
+                            if(w->websocket.client_max_window_bits >= 8 && w->websocket.client_max_window_bits <= 15)
+                                w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
+                        }
+                        // Client max window bits without value
+                        else if (strcmp(param, "client_max_window_bits") == 0) {
+                            w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
+                            w->websocket.client_max_window_bits = 0; // Default
+                        }
+
+                        param = strtok_r(NULL, ";", &param_saveptr);
+                    }
                 }
 
-                token = strtok_r(NULL, ",", &saveptr);
+                break;  // Found and parsed permessage-deflate
             }
+
+            token = strtok_r(NULL, ",", &saveptr);
         }
 
         netdata_log_debug(D_WEB_CLIENT, "%llu: Client requested WebSocket extensions: %s, "

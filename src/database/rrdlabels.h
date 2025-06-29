@@ -26,6 +26,8 @@ typedef enum __attribute__ ((__packed__)) rrdlabel_source {
 struct rrdlabels;
 typedef struct rrdlabels RRDLABELS;
 
+void rrdlabels_aral_init(bool with_stats);
+void rrdlabels_aral_destroy(bool with_stats);
 RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);
 void rrdlabels_flush(RRDLABELS *labels);
@@ -33,21 +35,31 @@ void rrdlabels_add(RRDLABELS *labels, const char *name, const char *value, RRDLA
 void rrdlabels_add_pair(RRDLABELS *labels, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb, const char *key);
 void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb);
+void rrdlabels_key_to_buffer_array_or_string_or_null(RRDLABELS *labels, BUFFER *wb);
 void rrdlabels_get_value_strdup_or_null(RRDLABELS *labels, char **value, const char *key);
 void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const char *key, const char *unset);
 bool rrdlabels_exist(RRDLABELS *labels, const char *key);
 size_t rrdlabels_entries(RRDLABELS *labels __maybe_unused);
-size_t rrdlabels_version(RRDLABELS *labels __maybe_unused);
+uint32_t rrdlabels_version(RRDLABELS *labels __maybe_unused);
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key);
 
 void rrdlabels_unmark_all(RRDLABELS *labels);
 void rrdlabels_remove_all_unmarked(RRDLABELS *labels);
 
 int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *data);
+int rrdlabels_walkthrough_read_string(RRDLABELS *labels, int (*callback)(STRING *name, STRING *value, RRDLABEL_SRC ls, void *data), void *data);
 void rrdlabels_log_to_buffer(RRDLABELS *labels, BUFFER *wb);
 bool rrdlabels_match_simple_pattern(RRDLABELS *labels, const char *simple_pattern_txt);
 
 SIMPLE_PATTERN_RESULT rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches);
+
+// Forward declaration for RRDLABELS_AGGREGATED
+struct rrdlabels_aggregated;
+// Full text search through labels - matches if either key OR value matches the pattern
+// If agg is NULL and matches are found, a new aggregated structure is created and returned
+// If agg is not NULL, matches are added to it and it is returned
+// Returns NULL only if no matches found and agg was NULL
+struct rrdlabels_aggregated *rrdlabels_full_text_search(RRDLABELS *labels, SIMPLE_PATTERN *pattern, struct rrdlabels_aggregated *agg, size_t *searches);
 int rrdlabels_to_buffer(RRDLABELS *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them,
                         bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data,
                         void (*name_sanitizer)(char *dst, const char *src, size_t dst_size),
@@ -63,5 +75,7 @@ size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size);
 
 // unfortunately this break when defined in exporting_engine.h
 bool exporting_labels_filter_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data);
+
+int rrdlabels_registry_count(void);
 
 #endif /* NETDATA_RRDLABELS_H */

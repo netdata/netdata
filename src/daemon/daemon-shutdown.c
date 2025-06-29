@@ -24,6 +24,7 @@ void cgroup_netdev_link_destroy(void);
 void bearer_tokens_destroy(void);
 void alerts_by_x_cleanup(void);
 void websocket_threads_join(void);
+void mcp_functions_registry_cleanup(void);
 
 static bool abort_on_fatal = true;
 
@@ -103,6 +104,11 @@ static void *rrdeng_exit_background(void *ptr) {
     return NULL;
 }
 
+static void rrdeng_quiesce_all()
+{
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        rrdeng_quiesce(multidb_ctx[tier]);
+}
 
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
@@ -111,8 +117,12 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
-    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-        rrdeng_quiesce(multidb_ctx[tier], dirty_only);
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        if (dirty_only)
+            rrdeng_flush_dirty(multidb_ctx[tier]);
+        else
+            rrdeng_flush_all(multidb_ctx[tier]);
+    }
 
     struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
     size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
@@ -186,9 +196,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
-    if(!abnormal && dbengine_enabled)
-        // flush all dirty pages asap
+    if(!abnormal && dbengine_enabled) {
+        rrdeng_quiesce_all();
         rrdeng_flush_everything_and_wait(false, false, true);
+    }
 #endif
 
     // notify we are exiting
@@ -300,10 +311,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
 
     websocket_threads_join();
+    watcher_step_complete(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS);
+
     nd_thread_join_threads();
+    watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
+
     sqlite_close_databases();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     sqlite_library_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
 
     // unlink the pid
     if(pidfile && *pidfile && unlink(pidfile) != 0)
@@ -329,6 +344,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_main_spawn_server_cleanup();
 
     fprintf(stderr, "Freeing all RRDHOSTs...\n");
+    mcp_functions_registry_cleanup();
     rrdhost_free_all();
     dyncfg_shutdown();
     rrd_functions_inflight_destroy();
@@ -390,6 +406,9 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     if(strings_referenced)
         fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
                 strings_referenced);
+
+    rrdlabels_aral_destroy(true);
+    fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
 
     fprintf(stderr, "All done, exiting...\n");
 #endif

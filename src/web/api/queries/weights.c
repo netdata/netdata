@@ -125,14 +125,14 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
-    buffer_json_member_add_time_t(wb, "after", after);
-    buffer_json_member_add_time_t(wb, "before", before);
+    buffer_json_member_add_time_t_formatted(wb, "after", after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_time_t(wb, "duration", before - after);
     buffer_json_member_add_uint64(wb, "points", points);
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
-        buffer_json_member_add_time_t(wb, "baseline_after", baseline_after);
-        buffer_json_member_add_time_t(wb, "baseline_before", baseline_before);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_after", baseline_after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_before", baseline_before, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_time_t(wb, "baseline_duration", baseline_before - baseline_after);
         buffer_json_member_add_uint64(wb, "baseline_points", points << shifts);
     }
@@ -306,12 +306,18 @@ struct query_weights_data {
 
     SIMPLE_PATTERN *scope_nodes_sp;
     SIMPLE_PATTERN *scope_contexts_sp;
+    SIMPLE_PATTERN *scope_instances_sp;
+    SIMPLE_PATTERN *scope_labels_sp;
+    SIMPLE_PATTERN *scope_dimensions_sp;
     SIMPLE_PATTERN *nodes_sp;
     SIMPLE_PATTERN *contexts_sp;
     SIMPLE_PATTERN *instances_sp;
     SIMPLE_PATTERN *dimensions_sp;
     SIMPLE_PATTERN *labels_sp;
     SIMPLE_PATTERN *alerts_sp;
+    
+    struct pattern_array *scope_labels_pa;
+    struct pattern_array *labels_pa;
 
     usec_t timeout_us;
     bool timed_out;
@@ -375,6 +381,8 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
     buffer_json_member_add_object(wb, "scope");
     buffer_json_member_add_string(wb, "scope_nodes", qwd->qwr->scope_nodes ? qwd->qwr->scope_nodes : "*");
     buffer_json_member_add_string(wb, "scope_contexts", qwd->qwr->scope_contexts ? qwd->qwr->scope_contexts : "*");
+    buffer_json_member_add_string(wb, "scope_instances", qwd->qwr->scope_instances ? qwd->qwr->scope_instances : "*");
+    buffer_json_member_add_string(wb, "scope_labels", qwd->qwr->scope_labels ? qwd->qwr->scope_labels : "*");
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "selectors");
@@ -387,8 +395,8 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "window");
-    buffer_json_member_add_time_t(wb, "after", qwd->qwr->after);
-    buffer_json_member_add_time_t(wb, "before", qwd->qwr->before);
+    buffer_json_member_add_time_t_formatted(wb, "after", qwd->qwr->after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", qwd->qwr->before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_uint64(wb, "points", qwd->qwr->points);
     if(qwd->qwr->options & RRDR_OPTION_SELECTED_TIER)
         buffer_json_member_add_uint64(wb, "tier", qwd->qwr->tier);
@@ -398,8 +406,8 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
         buffer_json_member_add_object(wb, "baseline");
-        buffer_json_member_add_time_t(wb, "baseline_after", qwd->qwr->baseline_after);
-        buffer_json_member_add_time_t(wb, "baseline_before", qwd->qwr->baseline_before);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_after", qwd->qwr->baseline_after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "baseline_before", qwd->qwr->baseline_before, options & RRDR_OPTION_RFC3339);
         buffer_json_object_close(wb);
     }
 
@@ -433,16 +441,16 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
     buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(group));
 
     buffer_json_member_add_object(wb, "window");
-    buffer_json_member_add_time_t(wb, "after", after);
-    buffer_json_member_add_time_t(wb, "before", before);
+    buffer_json_member_add_time_t_formatted(wb, "after", after, options & RRDR_OPTION_RFC3339);
+    buffer_json_member_add_time_t_formatted(wb, "before", before, options & RRDR_OPTION_RFC3339);
     buffer_json_member_add_time_t(wb, "duration", before - after);
     buffer_json_member_add_uint64(wb, "points", points);
     buffer_json_object_close(wb);
 
     if(method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME) {
         buffer_json_member_add_object(wb, "baseline");
-        buffer_json_member_add_time_t(wb, "after", baseline_after);
-        buffer_json_member_add_time_t(wb, "before", baseline_before);
+        buffer_json_member_add_time_t_formatted(wb, "after", baseline_after, options & RRDR_OPTION_RFC3339);
+        buffer_json_member_add_time_t_formatted(wb, "before", baseline_before, options & RRDR_OPTION_RFC3339);
         buffer_json_member_add_time_t(wb, "duration", baseline_before - baseline_after);
         buffer_json_member_add_uint64(wb, "points", points << shifts);
         buffer_json_object_close(wb);
@@ -934,7 +942,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     buffer_json_object_close(wb); //dictionaries
 
-    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true);
+    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -1071,7 +1079,7 @@ static size_t registered_results_to_json_multinode_group_by(
     dfe_done(aw);
     buffer_json_array_close(wb); // result
 
-    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true);
+    buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
     buffer_json_finalize(wb);
@@ -1516,6 +1524,9 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             .version = 1,
             .scope_nodes = qwd->qwr->scope_nodes,
             .scope_contexts = qwd->qwr->scope_contexts,
+            .scope_instances = qwd->qwr->scope_instances,
+            .scope_labels = qwd->qwr->scope_labels,
+            .scope_dimensions = qwd->qwr->scope_dimensions,
             .nodes = qwd->qwr->nodes,
             .contexts = qwd->qwr->contexts,
             .instances = qwd->qwr->instances,
@@ -1552,6 +1563,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
 
     size_t queries = 0;
     for(size_t d = 0; d < r->d ;d++) {
+        qwd->examined_dimensions++;
+
         if(!rrdr_dimension_should_be_exposed(r->od[d], qwd->qwr->options))
             continue;
 
@@ -1570,8 +1583,9 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             QUERY_CONTEXT *qc = query_context(r->internal.qt, qm->link.query_context_id);
             QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
 
-            register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0, &qv.sp,
-                            NULL, &qwd->stats, qwd->register_zero, qm->duration_ut);
+            register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0,
+                            &r->internal.qt->query.array[d].query_points, NULL,
+                            &qwd->stats, qwd->register_zero, qm->duration_ut);
         }
 
         queries++;
@@ -1670,6 +1684,198 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 }
 
 // ----------------------------------------------------------------------------
+// MCP format output
+
+// Comparator for sorting results by value (descending order - highest scores first)
+static int registered_results_value_compare(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
+    struct register_result *r1 = dictionary_acquired_item_value(*item1);
+    struct register_result *r2 = dictionary_acquired_item_value(*item2);
+    
+    // Sort by value in descending order (highest first)
+    if (r1->value < r2->value) return 1;
+    if (r1->value > r2->value) return -1;
+    return 0;
+}
+
+// Callback for sorted dictionary walkthrough
+struct mcp_output_state {
+    BUFFER *wb;
+    WEIGHTS_METHOD method;
+    size_t count;
+    size_t limit;
+};
+
+static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    struct mcp_output_state *state = (struct mcp_output_state *)data;
+    struct register_result *t = (struct register_result *)value;
+    
+    // Check if we've reached the cardinality limit
+    if (state->count >= state->limit)
+        return -1; // Stop iteration
+        
+    BUFFER *wb = state->wb;
+    
+    buffer_json_add_array_item_array(wb); // Start row array
+    
+    // Add score/value based on method
+    switch(state->method) {
+        case WEIGHTS_METHOD_MC_KS2:
+        case WEIGHTS_METHOD_MC_VOLUME:
+            buffer_json_add_array_item_double(wb, t->value);
+            break;
+            
+        case WEIGHTS_METHOD_ANOMALY_RATE:
+            // For anomaly rate, the value is already a percentage
+            buffer_json_add_array_item_double(wb, t->value);
+            break;
+            
+        case WEIGHTS_METHOD_VALUE:
+            // For CV or other aggregations
+            buffer_json_add_array_item_double(wb, t->value);
+            break;
+    }
+    
+    // Add the 5 statistical values
+    // 1. Min
+    if(storage_point_is_unset(t->highlighted) || storage_point_is_gap(t->highlighted))
+        buffer_json_add_array_item_double(wb, NAN);
+    else
+        buffer_json_add_array_item_double(wb, t->highlighted.min);
+    
+    // 2. Max
+    if(storage_point_is_unset(t->highlighted) || storage_point_is_gap(t->highlighted))
+        buffer_json_add_array_item_double(wb, NAN);
+    else
+        buffer_json_add_array_item_double(wb, t->highlighted.max);
+    
+    // 3. Average
+    if(storage_point_is_unset(t->highlighted) || storage_point_is_gap(t->highlighted) || t->highlighted.count == 0)
+        buffer_json_add_array_item_double(wb, NAN);
+    else
+        buffer_json_add_array_item_double(wb, t->highlighted.sum / (NETDATA_DOUBLE)t->highlighted.count);
+    
+    // 4. Number of samples in window
+    buffer_json_add_array_item_uint64(wb, t->highlighted.count);
+    
+    // 5. Number of anomalous samples in window
+    buffer_json_add_array_item_double(wb, t->highlighted.anomaly_count);
+
+    // Add metadata
+    // Add node name
+    buffer_json_add_array_item_string(wb, rrdhost_hostname(t->host));
+    
+    // Add context
+    buffer_json_add_array_item_string(wb, rrdcontext_acquired_id(t->rca));
+    
+    // Add instance
+    buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(t->ria));
+    
+    // Add dimension
+    buffer_json_add_array_item_string(wb, rrdmetric_acquired_name(t->rma));
+    
+    // Add labels (as object or null)
+    RRDLABELS *labels = rrdinstance_acquired_labels(t->ria);
+    if(labels && rrdlabels_entries(labels) > 0) {
+        buffer_json_add_array_item_object(wb);
+        rrdlabels_to_buffer_json_members(labels, wb);
+        buffer_json_object_close(wb);
+    }
+    else {
+        buffer_json_add_array_item_string(wb, NULL);
+    }
+    
+    buffer_json_array_close(wb); // End row array
+    
+    state->count++;
+    return 0; // Continue iteration
+}
+
+static size_t registered_results_to_json_mcp(
+        DICTIONARY *results, BUFFER *wb,
+        time_t after __maybe_unused, time_t before __maybe_unused,
+        time_t baseline_after __maybe_unused, time_t baseline_before __maybe_unused,
+        size_t points __maybe_unused, WEIGHTS_METHOD method,
+        RRDR_TIME_GROUPING group __maybe_unused, RRDR_OPTIONS options, uint32_t shifts __maybe_unused,
+        size_t examined_dimensions __maybe_unused, struct query_weights_data *qwd,
+        WEIGHTS_STATS *stats __maybe_unused,
+        struct query_versions *versions __maybe_unused) {
+    
+    buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
+    
+    // Add columns array based on method
+    buffer_json_member_add_array(wb, "columns");
+    
+    switch(method) {
+        case WEIGHTS_METHOD_MC_KS2:
+            buffer_json_add_array_item_string(wb, "KS2 Score");
+            break;
+
+        case WEIGHTS_METHOD_MC_VOLUME:
+            buffer_json_add_array_item_string(wb, "Volume Score");
+            break;
+            
+        case WEIGHTS_METHOD_ANOMALY_RATE:
+            buffer_json_add_array_item_string(wb, "Anomaly Rate");
+            break;
+            
+        case WEIGHTS_METHOD_VALUE:
+            buffer_json_add_array_item_string(wb, "Coefficient of Variation");
+            break;
+    }
+    
+    // Common statistical columns for all methods
+    buffer_json_add_array_item_string(wb, "Minimum Sample Value");
+    buffer_json_add_array_item_string(wb, "Maximum Sample Value");
+    buffer_json_add_array_item_string(wb, "Average Sample Value");
+    buffer_json_add_array_item_string(wb, "# of Samples in Window");
+    buffer_json_add_array_item_string(wb, "# of Anomalous Samples in Window");
+
+    // Metadata columns
+    buffer_json_add_array_item_string(wb, "Hostname");
+    buffer_json_add_array_item_string(wb, "Context / Metric Name");
+    buffer_json_add_array_item_string(wb, "Metrics Instance");
+    buffer_json_add_array_item_string(wb, "Dimension");
+    buffer_json_add_array_item_string(wb, "Instance Labels");
+    
+    buffer_json_array_close(wb); // columns
+    
+    // Add results array
+    buffer_json_member_add_array(wb, "results");
+    
+    // Get cardinality limit from query weights data
+    size_t cardinality_limit = qwd && qwd->qwr ? qwd->qwr->cardinality_limit : 50;
+    if (cardinality_limit < 30) cardinality_limit = 30;
+    
+    // Set up state for callback
+    struct mcp_output_state state = {
+        .wb = wb,
+        .method = method,
+        .count = 0,
+        .limit = cardinality_limit
+    };
+    
+    // Walk through dictionary in sorted order (by value descending)
+    dictionary_sorted_walkthrough_rw(results, 'r', registered_results_to_json_mcp_callback, &state, registered_results_value_compare);
+    
+    buffer_json_array_close(wb); // results
+    
+    // Add metadata
+    buffer_json_member_add_object(wb, "metadata");
+    buffer_json_member_add_uint64(wb, "total_time_series_analyzed", examined_dimensions);
+    buffer_json_member_add_uint64(wb, "total_time_series_returned", state.count);
+    buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
+    if (state.count >= cardinality_limit) {
+        buffer_json_member_add_uint64(wb, "cardinality_limit", cardinality_limit);
+        buffer_json_member_add_boolean(wb, "truncated", true);
+    }
+    buffer_json_object_close(wb); // metadata
+    
+    buffer_json_finalize(wb);
+    
+    return state.count;
+}
+
+// ----------------------------------------------------------------------------
 // The main function
 
 static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma) {
@@ -1765,9 +1971,12 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
         return 0;
 
     ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
+                                            qwd->scope_instances_sp,
+                                            qwd->scope_labels_pa,
+                                            qwd->scope_dimensions_sp,
                                             qwd->instances_sp,
                                             NULL,
-                                            qwd->labels_sp,
+                                            qwd->labels_pa,
                                             qwd->alerts_sp,
                                             qwd->dimensions_sp,
                                             true, true, qwd->qwr->version,
@@ -1808,12 +2017,17 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
             .scope_nodes_sp = string_to_simple_pattern(qwr->scope_nodes),
             .scope_contexts_sp = string_to_simple_pattern(qwr->scope_contexts),
+            .scope_instances_sp = string_to_simple_pattern(qwr->scope_instances),
+            .scope_labels_sp = string_to_simple_pattern(qwr->scope_labels),
+            .scope_dimensions_sp = string_to_simple_pattern(qwr->scope_dimensions),
             .nodes_sp = string_to_simple_pattern(qwr->nodes),
             .contexts_sp = string_to_simple_pattern(qwr->contexts),
             .instances_sp = string_to_simple_pattern(qwr->instances),
             .dimensions_sp = string_to_simple_pattern(qwr->dimensions),
             .labels_sp = string_to_simple_pattern(qwr->labels),
             .alerts_sp = string_to_simple_pattern(qwr->alerts),
+            .scope_labels_pa = NULL,
+            .labels_pa = NULL,
             .timeout_us = qwr->timeout_ms * USEC_PER_MS,
             .timed_out = false,
             .examined_dimensions = 0,
@@ -1825,6 +2039,12 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                     .received_ut = now_monotonic_usec(),
             }
     };
+    
+    // Pre-compile pattern arrays for labels
+    if(qwd.scope_labels_sp)
+        qwd.scope_labels_pa = pattern_array_add_simple_pattern(NULL, qwd.scope_labels_sp, ':');
+    if(qwd.labels_sp)
+        qwd.labels_pa = pattern_array_add_simple_pattern(NULL, qwd.labels_sp, ':');
 
     if(!rrdr_relative_window_to_absolute_query(&qwr->after, &qwr->before, NULL, false))
         buffer_no_cacheable(wb);
@@ -1910,6 +2130,10 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         weights_do_node_callback(&qwd, qwr->host, true);
     else {
         if((qwd.qwr->method == WEIGHTS_METHOD_VALUE || qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE) && (qwd.contexts_sp || qwd.scope_contexts_sp)) {
+
+            if(qwd.qwr->format == WEIGHTS_FORMAT_MCP && qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
+                qwd.qwr->options |= RRDR_OPTION_ANOMALY_BIT;
+
             rrdset_weights_multi_dimensional_value(&qwd);
         }
         else {
@@ -1940,7 +2164,9 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     if(!qwd.register_zero)
         qwr->options |= RRDR_OPTION_NONZERO;
 
-    if(!(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE)
+    if(!(qwr->options & RRDR_OPTION_RETURN_RAW) &&
+        qwr->method != WEIGHTS_METHOD_VALUE &&
+        qwr->format != WEIGHTS_FORMAT_MCP)
         spread_results_evenly(qwd.results, &qwd.stats);
 
     usec_t ended_usec = qwd.timings.executed_ut = now_monotonic_usec();
@@ -1970,6 +2196,17 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
                             ended_usec - qwd.timings.received_ut, &qwd.stats);
+            break;
+
+        case WEIGHTS_FORMAT_MCP:
+            added_dimensions =
+                    registered_results_to_json_mcp(
+                            qwd.results, wb,
+                            qwr->after, qwr->before,
+                            qwr->baseline_after, qwr->baseline_before,
+                            qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
+                            qwd.examined_dimensions,
+                            &qwd, &qwd.stats, &qwd.versions);
             break;
 
         default:
@@ -2007,12 +2244,18 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 cleanup:
     simple_pattern_free(qwd.scope_nodes_sp);
     simple_pattern_free(qwd.scope_contexts_sp);
+    simple_pattern_free(qwd.scope_instances_sp);
+    simple_pattern_free(qwd.scope_labels_sp);
+    simple_pattern_free(qwd.scope_dimensions_sp);
     simple_pattern_free(qwd.nodes_sp);
     simple_pattern_free(qwd.contexts_sp);
     simple_pattern_free(qwd.instances_sp);
     simple_pattern_free(qwd.dimensions_sp);
     simple_pattern_free(qwd.labels_sp);
     simple_pattern_free(qwd.alerts_sp);
+    
+    pattern_array_free(qwd.scope_labels_pa);
+    pattern_array_free(qwd.labels_pa);
 
     register_result_destroy(qwd.results);
 

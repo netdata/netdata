@@ -16,7 +16,10 @@ FROM
 `
 
 func (c *Collector) collectLongestRunningQueryTime(mx map[string]int64) error {
-	req, _ := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(c.RequestConfig)
+	if err != nil {
+		return err
+	}
 	req.URL.RawQuery = makeURLQuery(queryLongestQueryTime)
 
 	return c.doHTTP(req, func(column, value string, lineEnd bool) {

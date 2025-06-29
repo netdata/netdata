@@ -46,24 +46,27 @@ When you notice an anomaly in your system, use Metric Correlations with the **An
 ### How to Use Together
 
 ```mermaid
-flowchart TD
-    %% Node styling
-    classDef neutral fill:#f9f9f9,stroke:#000000,color:#000000,stroke-width:2px
-    classDef success fill:#4caf50,stroke:#000000,color:#000000,stroke-width:2px
-    classDef warning fill:#ffeb3b,stroke:#000000,color:#000000,stroke-width:2px
-    classDef danger fill:#f44336,stroke:#000000,color:#000000,stroke-width:2px
+flowchart LR
+    A("**STEP 1**<br/><br/>**Detection**<br/><br/>Spot a spike in the<br/>node anomaly <br/>rate chart<br/><br/>")
+    B("**STEP 2**<br/><br/>**Selection**<br/><br/>Highlight specific<br/>time period<br/><br/><br/>")
+    C("**STEP 3**<br/><br/>**Configuration**<br/><br/>Select **Anomaly Rate<br/>as data type** and<br/>**Volume as method**<br/><br/>")
+    D("**STEP 4**<br/><br/>**Execute**<br/><br/>Click on<br/> **Find Correlations**<br/>to start analysis<br/><br/>")
+    E("**STEP 5**<br/><br/>**Analysis**<br/><br/>Review metrics<br/>with<br/>highest anomaly rates<br/><br/>")
+    F("**STEP 6**<br/><br/>**Resolution**<br/><br/>Examine metrics<br/> to determine<br/>root cause<br/><br/>")
     
-    A[Spot a spike in the<br/>node anomaly rate chart] --> B[Highlight that<br/>time period]
-    B --> C[Select Anomaly Rate<br/>as data type<br/>and Volume as method]
-    C --> D[Click Find Correlations]
-    D --> E[Review metrics with<br/>highest anomaly rates]
-    E --> F[Examine these metrics<br/>in detail to determine<br/>root cause]
+    A --> B --> C --> D --> E --> F
+    
+    %% Style definitions
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
+    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
+    classDef anomaly fill:#f44336,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
     
     %% Apply styles
     class A,B neutral
-    class C,D warning
-    class E success
-    class F danger
+    class C,D process
+    class E complete
+    class F anomaly
 ```
 
 :::tip

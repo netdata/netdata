@@ -526,8 +526,11 @@ int ws_client_process_rx_ws(ws_client *client)
                 if (!rbuf_bytes_available(client->buf_read))
                     return WS_CLIENT_NEED_MORE_BYTES;
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
-                if (!insert)
+                if (!insert) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket buffer full! Cannot process payload of %"PRIu64" bytes (processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes",
+                           remaining, client->rx.payload_processed, client->rx.payload_length, rbuf_get_capacity(client->buf_to_mqtt));
                     return WS_CLIENT_BUFFER_FULL;
+                }
                 size = (size > remaining) ? remaining : size;
                 size = rbuf_pop(client->buf_read, insert, size);
                 rbuf_bump_head(client->buf_to_mqtt, size);
@@ -597,7 +600,8 @@ int ws_client_process_rx_ws(ws_client *client)
             return WS_CLIENT_PARSING_DONE;
         case WS_PAYLOAD_PING_REQ_PAYLOAD:
             if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Ping arrived with payload which is too big!");
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Ping payload too big! Received %"PRIu64" bytes, maximum allowed %zu bytes (buffer capacity: %zu bytes)",
+                       client->rx.payload_length, rbuf_get_capacity(client->buf_read) / 2, rbuf_get_capacity(client->buf_read));
                 return WS_CLIENT_INTERNAL_ERROR;
             }
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);

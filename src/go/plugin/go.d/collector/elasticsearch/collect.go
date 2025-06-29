@@ -212,7 +212,10 @@ func (c *Collector) scrapeLocalIndicesStats(ms *esMetrics) {
 }
 
 func (c *Collector) getClusterName() (string, error) {
-	req, _ := web.NewHTTPRequest(c.RequestConfig)
+	req, err := web.NewHTTPRequest(c.RequestConfig)
+	if err != nil {
+		return "", err
+	}
 
 	var info struct {
 		ClusterName string `json:"cluster_name"`

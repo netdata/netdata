@@ -17,14 +17,14 @@ __attribute__((constructor)) void initialize_group_by_keys(void) {
     }
 }
 
-int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client *w, char *url, size_t version) {
     usec_t received_ut = now_monotonic_usec();
 
     int ret = HTTP_RESP_BAD_REQUEST;
 
     buffer_flush(w->response.data);
 
-    char    *google_version = "0.6",
+    char *google_version = "0.6",
          *google_reqId = "0",
          *google_sig = "0",
          *google_out = "json",
@@ -35,6 +35,9 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
 
     char *scope_nodes = NULL;
     char *scope_contexts = NULL;
+    char *scope_instances = NULL;
+    char *scope_labels = NULL;
+    char *scope_dimensions = NULL;
     char *nodes = NULL;
     char *contexts = NULL;
     char *instances = NULL;
@@ -48,7 +51,9 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     char *alerts = NULL;
     char *time_group_options = NULL;
     char *tier_str = NULL;
+    char *cardinality_limit_str = NULL;
     size_t tier = 0;
+    size_t cardinality_limit = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON2;
     RRDR_OPTIONS options = RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR;
@@ -76,6 +81,9 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
 
         if(!strcmp(name, "scope_nodes")) scope_nodes = value;
         else if(!strcmp(name, "scope_contexts")) scope_contexts = value;
+        else if(!strcmp(name, "scope_instances")) scope_instances = value;
+        else if(!strcmp(name, "scope_labels")) scope_labels = value;
+        else if(!strcmp(name, "scope_dimensions")) scope_dimensions = value;
         else if(!strcmp(name, "nodes")) nodes = value;
         else if(!strcmp(name, "contexts")) contexts = value;
         else if(!strcmp(name, "instances")) instances = value;
@@ -107,6 +115,7 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         else if(!strcmp(name, "time_group_options")) time_group_options = value;
         else if(!strcmp(name, "time_resampling")) resampling_time_str = value;
         else if(!strcmp(name, "tier")) tier_str = value;
+        else if(!strcmp(name, "cardinality_limit")) cardinality_limit_str = value;
         else if(!strcmp(name, "callback")) responseHandler = value;
         else if(!strcmp(name, "filename")) outFileName = value;
         else if(!strcmp(name, "tqx")) {
@@ -186,6 +195,10 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         else
             tier = 0;
     }
+    
+    if(cardinality_limit_str && *cardinality_limit_str) {
+        cardinality_limit = str2ul(cardinality_limit_str);
+    }
 
     time_t    before = (before_str && *before_str)?str2l(before_str):0;
     time_t    after  = (after_str  && *after_str) ?str2l(after_str):-600;
@@ -194,9 +207,12 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
-        .version = 2,
+        .version = version,
         .scope_nodes = scope_nodes,
         .scope_contexts = scope_contexts,
+        .scope_instances = scope_instances,
+        .scope_labels = scope_labels,
+        .scope_dimensions = scope_dimensions,
         .after = after,
         .before = before,
         .host = NULL,
@@ -219,6 +235,7 @@ int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
         .query_source = QUERY_SOURCE_API_DATA,
         .priority = STORAGE_PRIORITY_NORMAL,
         .received_ut = received_ut,
+        .cardinality_limit = cardinality_limit,
 
         .interrupt_callback = web_client_interrupt_callback,
         .interrupt_callback_data = w,
@@ -300,4 +317,12 @@ cleanup:
     query_target_release(qt);
     onewayalloc_destroy(owa);
     return ret;
+}
+
+int api_v2_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v23_data_internal(host, w, url, 2);
+}
+
+int api_v3_data(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_v23_data_internal(host, w, url, 3);
 }

@@ -548,6 +548,7 @@ size_t string_destroy(void) {
     BUFFER *wb = buffer_create(16384, NULL);
     
     fprintf(stderr, "\n========= STRINGS GROUPED BY CREATION STACKTRACE =========\n");
+    size_t total_strings = 0;
 #endif
 
     // Traverse all partitions
@@ -566,6 +567,9 @@ size_t string_destroy(void) {
             while (PValue) {
                 STRING *string = (STRING *)string_idx;
                 if(string) {
+                    fprintf(stderr, " > STRING REMAINING No %zu: %d references on: '%s'\n",
+                            ++total_strings, string->refcount, string2str(string));
+
                     for (int i = 0; i < string->stacktraces.num_stacktraces; i++) {
                         if (string->stacktraces.stacktraces[i]) {
                             Word_t key = (Word_t)string->stacktraces.stacktraces[i];
@@ -685,7 +689,7 @@ size_t string_destroy(void) {
         buffer_flush(wb);
         stacktrace_to_buffer(entries[i].st, wb);
         
-        fprintf(stderr, "\n > STRINGS REMAINING %zu: %zu strings created from:\n%s\n",
+        fprintf(stderr, "\n > STRINGS BACKTRACE %zu: %zu strings created from:\n%s\n",
                 i + 1, entries[i].count, buffer_tostring(wb));
     }
     

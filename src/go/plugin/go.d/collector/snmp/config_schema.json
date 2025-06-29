@@ -342,6 +342,18 @@
             "dimensions"
           ]
         }
+      },
+      "enable_profiles": {
+        "title": "Enable SNMP Profile Collection",
+        "description": "Enable collection of metrics using SNMP profiles.",
+        "type": "boolean",
+        "default": true
+      },
+      "enable_profiles_table_metrics": {
+        "title": "Enable SNMP Table Metrics",
+        "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*",
+        "type": "boolean",
+        "default": false
       }
     },
     "required": [
@@ -356,6 +368,12 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "enable_profiles": {
+      "ui:help": "Profiles provide pre-configured monitoring for specific device models and MIBs, including network interfaces, system information, and device-specific metrics."
+    },
+    "enable_profiles_table_metrics": {
+      "ui:help": "Table metrics include interface statistics, routing tables, and other tabular data."
     },
     "network_interface_filter": {
       "ui:collapsible": true
@@ -457,6 +475,13 @@
           "title": "Charts",
           "fields": [
             "charts"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "enable_profiles",
+            "enable_profiles_table_metrics"
           ]
         }
       ]

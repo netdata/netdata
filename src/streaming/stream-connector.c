@@ -534,7 +534,7 @@ static void *stream_connector_thread(void *ptr) {
     size_t exiting = 0;
     while(exiting <= 5) {
         worker_is_idle();
-        job_id = completion_wait_for_a_job_with_timeout(&sc->completion, job_id, 1000);
+        job_id = completion_wait_for_a_job_with_timeout(&sc->completion, job_id, exiting ? 250 : 1000);
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
 
         if(!service_running(SERVICE_STREAMING_CONNECTOR))

@@ -78,13 +78,13 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
     }
 
     CLEAN_BUFFER *source = buffer_create(100, NULL);
-    web_client_api_request_vX_source_to_buffer(w, source);
+    user_auth_to_source_buffer(&w->user_auth, source);
 
     buffer_flush(w->response.data);
-    int code = rrd_function_run(host, w->response.data, timeout, w->access, cmd,
+    int code = rrd_function_run(host, w->response.data, timeout, w->user_auth.access, cmd,
                                 true, transaction,
                                 NULL, NULL,
-                                web_client_progress_functions_update, w,
+                                web_client_progress_functions_update, NULL,
                                 web_client_interrupt_callback, w,
                                 w->payload, buffer_tostring(source), false);
 

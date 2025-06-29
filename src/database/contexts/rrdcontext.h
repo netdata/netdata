@@ -3,6 +3,9 @@
 #ifndef NETDATA_RRDCONTEXT_H
 #define NETDATA_RRDCONTEXT_H 1
 
+// Forward declaration for pattern_array
+struct pattern_array;
+
 // ----------------------------------------------------------------------------
 // RRDMETRIC
 
@@ -75,6 +78,7 @@ typedef enum {
     RRDCONTEXT_OPTION_DEEPSCAN           = (1 << 6),
     RRDCONTEXT_OPTION_SHOW_UUIDS         = (1 << 7),
     RRDCONTEXT_OPTION_SHOW_HIDDEN        = (1 << 8),
+    RRDCONTEXT_OPTION_RFC3339            = (1 << 9),  // Return timestamps in RFC3339 format
     RRDCONTEXT_OPTION_SKIP_ID            = (1 << 31), // internal use
 } RRDCONTEXT_TO_JSON_OPTIONS;
 
@@ -258,6 +262,9 @@ typedef struct query_target_request {
 
     const char *scope_nodes;
     const char *scope_contexts;
+    const char *scope_instances;
+    const char *scope_labels;
+    const char *scope_dimensions;
 
     // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
@@ -294,6 +301,9 @@ typedef struct query_target_request {
 
     // group by across multiple time-series
     struct group_by_pass group_by[MAX_QUERY_GROUP_BY_PASSES];
+    
+    // limiting cardinality of summary lists
+    size_t cardinality_limit;           // limit the number of items per category in summary
 
     usec_t received_ut;
 
@@ -371,6 +381,7 @@ typedef struct query_target {
         QUERY_DIMENSION *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
+        SIMPLE_PATTERN *scope_pattern;
     } dimensions;
 
     struct {
@@ -378,9 +389,14 @@ typedef struct query_target {
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
+        SIMPLE_PATTERN *scope_pattern;
         SIMPLE_PATTERN *labels_pattern;
+        SIMPLE_PATTERN *scope_labels_pattern;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
+        SIMPLE_PATTERN *scope_chart_label_key_pattern;
+        struct pattern_array *labels_pa;
+        struct pattern_array *scope_labels_pa;
     } instances;
 
     struct {
@@ -617,18 +633,18 @@ struct alert_transitions_facets {
 extern struct alert_transitions_facets alert_transition_facets[];
 
 struct api_v2_contexts_request {
-    char *scope_nodes;
-    char *scope_contexts;
-    char *nodes;
-    char *contexts;
-    char *q;
+    const char *scope_nodes;
+    const char *scope_contexts;
+    const char *nodes;
+    const char *contexts;
+    const char *q;
 
     CONTEXTS_OPTIONS options;
 
     struct {
         CONTEXTS_ALERT_STATUS status;
-        char *alert;
-        char *transition;
+        const char *alert;
+        const char *transition;
         uint32_t last;
 
         const char *facets[ATF_TOTAL_ENTRIES];
@@ -638,6 +654,7 @@ struct api_v2_contexts_request {
     time_t after;
     time_t before;
     time_t timeout_ms;
+    size_t cardinality_limit;
 
     qt_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;
@@ -661,10 +678,11 @@ typedef enum __attribute__ ((__packed__)) {
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
-void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array);
+void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array, CONTEXTS_OPTIONS options);
 void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status);
 void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings);
+void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut);
 
 // ----------------------------------------------------------------------------
 // scope
@@ -683,9 +701,12 @@ ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, S
 
 typedef ssize_t (*weights_add_metric_t)(void *data, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma);
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
+                                            SIMPLE_PATTERN *scope_instances_sp,
+                                            struct pattern_array *scope_labels_pa,
+                                            SIMPLE_PATTERN *scope_dimensions_sp,
                                             SIMPLE_PATTERN *instances_sp,
                                             SIMPLE_PATTERN *chart_label_key_sp,
-                                            SIMPLE_PATTERN *labels_sp,
+                                            struct pattern_array *labels_pa,
                                             SIMPLE_PATTERN *alerts_sp,
                                             SIMPLE_PATTERN *dimensions_sp,
                                             bool match_ids, bool match_names,
@@ -696,8 +717,8 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before);
 
 #define query_matches_retention(after, before, first_entry_s, last_entry_s, update_every_s) \
-    (((first_entry_s) - ((update_every_s) * 2) <= (before)) &&                     \
-     ((last_entry_s)  + ((update_every_s) * 2) >= (after)))
+    (((first_entry_s) - ((update_every_s) * 2L) <= (before)) &&                     \
+     ((last_entry_s)  + ((update_every_s) * 2L) >= (after)))
 
 #define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
 

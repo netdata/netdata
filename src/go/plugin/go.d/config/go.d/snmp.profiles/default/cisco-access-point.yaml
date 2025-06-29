@@ -1,15 +1,20 @@
 extends:
   - cisco.yaml
-sysobjectid:
-  - 1.3.6.1.4.1.9.1.525     # Cisco AIR AP 1210
-  - 1.3.6.1.4.1.9.1.618     # Cisco AIR AP 1130
-  - 1.3.6.1.4.1.9.1.1660    # AIR-SAP1602E-C-K9
-  - 1.3.6.1.4.1.9.1.2371    # Cisco Aironet 1830
+
 metadata:
   device:
     fields:
       type:
-        value: "access_point"
+        value: Access Point
+      vendor:
+        value: Cisco
+
+sysobjectid:
+  - 1.3.6.1.4.1.9.1.525 # Cisco AIR AP 1210
+  - 1.3.6.1.4.1.9.1.618 # Cisco AIR AP 1130
+  - 1.3.6.1.4.1.9.1.1660 # AIR-SAP1602E-C-K9
+  - 1.3.6.1.4.1.9.1.2371 # Cisco Aironet 1830
+
 metrics:
   - MIB: CISCO-DOT11-ASSOCIATION-MIB
     table:
@@ -18,58 +23,52 @@ metrics:
     symbols:
       - name: cDot11ActiveWirelessClients
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.1
-        description: "Number of wireless clients currently associating with this device on this interface."
-        unit: "{wireless_client}"
+        description: Number of wireless clients currently associating with this device on this interface
+        family: Interfaces/Wireless/Client/Active
+        unit: "{client}"
       - name: cDot11ActiveBridges
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.2
-        description: "Number of bridges currently associating with this device on this interface."
+        description: Number of bridges currently associating with this device on this interface
+        family: Interfaces/Wireless/Bridge/Active
         unit: "{bridge}"
       - name: cDot11ActiveRepeaters
         OID: 1.3.6.1.4.1.9.9.273.1.1.2.1.3
-        description: "Number of repeaters currently associating with this device on this interface."
+        description: Number of repeaters currently associating with this device on this interface
+        family: Interfaces/Wireless/Repeater/Active
         unit: "{repeater}"
-    metric_tags:
-      - tag: if_name
-        symbol:
-          name: ifName
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-  - MIB: CISCO-DOT11-ASSOCIATION-MIB
-    table:
-      name: cDot11AssociationStatsTable
-      OID: 1.3.6.1.4.1.9.9.273.1.1.3
-    symbols:
       - name: cDot11AssStatsAssociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.1
-        metric_type: monotonic_count
-        description: "Number of stations associated with this device on this interface since device re-started."
-        unit: "{station}"
+        description: Number of stations associated with this device on this interface since device re-started
+        family: Interfaces/Wireless/Station/Associated
+        unit: "{station}/s"
       - name: cDot11AssStatsAuthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.2
-        metric_type: monotonic_count
-        description: "Number of stations authenticated with this device on this interface since device re-started."
-        unit: "{station}"
+        description: Number of stations authenticated with this device on this interface since device re-started
+        family: Interfaces/Wireless/Station/Authenticated
+        unit: "{station}/s"
       - name: cDot11AssStatsRoamedIn
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.3
-        metric_type: monotonic_count
-        description: "Number of stations roamed from another device to this device on this interface since device re-started."
-        unit: "{station}"
+        description: Number of stations roamed from another device to this device on this interface since device re-started
+        family: Interfaces/Wireless/Station/RoamedIn
+        unit: "{station}/s"
       - name: cDot11AssStatsRoamedAway
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.4
-        metric_type: monotonic_count
-        description: "Number of stations roamed away from this device on this interface since device re-started."
-        unit: "{station}"
+        description: Number of stations roamed away from this device on this interface since device re-started
+        family: Interfaces/Wireless/Station/RoamedOut
+        unit: "{station}/s"
       - name: cDot11AssStatsDeauthenticated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.5
-        metric_type: monotonic_count
-        description: "Number of stations deauthenticated with this device on this interface since device re-started."
-        unit: "{station}"
+        description: Number of stations deauthenticated with this device on this interface since device re-started
+        family: Interfaces/Wireless/Station/Deauthenticated
+        unit: "{station}/s"
       - name: cDot11AssStatsDisassociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.6
-        metric_type: monotonic_count
-        description: "Number of stations disassociated with this device on this interface since device re-started."
-        unit: "{station}"
+        description: Number of stations disassociated with this device on this interface since device re-started
+        family: Interfaces/Wireless/Station/Disassociated
+        unit: "{station}/s"
     metric_tags:
-      - tag: if_name
+      - tag: interface
+        table: ifXTable
         symbol:
-          name: ifName
           OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName

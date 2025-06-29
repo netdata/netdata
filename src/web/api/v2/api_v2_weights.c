@@ -12,8 +12,9 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     RRDR_TIME_GROUPING time_group_method = RRDR_GROUPING_AVERAGE;
     time_t timeout_ms = 0;
     size_t tier = 0;
-    const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *contexts = NULL, *nodes = NULL,
-               *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
+    size_t cardinality_limit = 0;
+    const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *scope_instances = NULL, *scope_labels = NULL, *scope_dimensions = NULL,
+               *contexts = NULL, *nodes = NULL, *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
 
     struct group_by_pass group_by = {
         .group_by = RRDR_GROUP_BY_NONE,
@@ -49,6 +50,9 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
         else if (!strcmp(name, "timeout"))
             timeout_ms = str2l(value);
+            
+        else if (!strcmp(name, "cardinality_limit"))
+            cardinality_limit = str2ul(value);
 
         else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
             time_group_method = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
@@ -67,6 +71,9 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
         else if(api_version >= 2 && !strcmp(name, "scope_nodes")) scope_nodes = value;
         else if(api_version >= 2 && !strcmp(name, "scope_contexts")) scope_contexts = value;
+        else if(api_version >= 2 && !strcmp(name, "scope_instances")) scope_instances = value;
+        else if(api_version >= 2 && !strcmp(name, "scope_labels")) scope_labels = value;
+        else if(api_version >= 2 && !strcmp(name, "scope_dimensions")) scope_dimensions = value;
         else if(api_version >= 2 && !strcmp(name, "nodes")) nodes = value;
         else if(api_version >= 2 && !strcmp(name, "contexts")) contexts = value;
         else if(api_version >= 2 && !strcmp(name, "instances")) instances = value;
@@ -114,6 +121,9 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         .host = (api_version == 1) ? NULL : host,
         .scope_nodes = scope_nodes,
         .scope_contexts = scope_contexts,
+        .scope_instances = scope_instances,
+        .scope_labels = scope_labels,
+        .scope_dimensions = scope_dimensions,
         .nodes = nodes,
         .contexts = contexts,
         .instances = instances,
@@ -137,6 +147,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         .options = options,
         .tier = tier,
         .timeout_ms = timeout_ms,
+        .cardinality_limit = cardinality_limit,
 
         .interrupt_callback = web_client_interrupt_callback,
         .interrupt_callback_data = w,

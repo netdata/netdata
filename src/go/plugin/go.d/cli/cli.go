@@ -14,6 +14,7 @@ import (
 type Option struct {
 	UpdateEvery int
 	Module      string   `short:"m" long:"modules" description:"module name to run" default:"all"`
+	Job         []string `short:"j" long:"job" description:"job name to run"`
 	ConfDir     []string `short:"c" long:"config-dir" description:"config dir to read"`
 	WatchPath   []string `short:"w" long:"watch-path" description:"config path to watch"`
 	Debug       bool     `short:"d" long:"debug" description:"debug mode"`

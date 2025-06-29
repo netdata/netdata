@@ -216,6 +216,12 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m docker
   ```
 
+  To debug a specific job:
+
+  ```bash
+  ./go.d.plugin -d -m docker -j jobName
+  ```
+
 ### Getting Logs
 
 If you're encountering problems with the `docker` collector, follow these steps to retrieve logs and identify potential issues:

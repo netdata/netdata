@@ -1,16 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/**
+ * MCP Initialize Method
+ * 
+ * The initialize method is a core part of the Model Context Protocol (MCP),
+ * serving as the initial handshake between client and server.
+ * 
+ * According to the MCP specification:
+ * 
+ * 1. Purpose:
+ *    - Establishes the protocol version to use for communication
+ *    - Provides information about server capabilities
+ *    - Exchanges client and server metadata
+ *    - Sets up the foundation for subsequent interactions
+ * 
+ * 2. Protocol flow:
+ *    - The client sends an initialize request with its supported protocol version
+ *    - The server responds with its capabilities and selected protocol version
+ *    - After successful initialization, other methods become available
+ * 
+ * 3. Key components in the response:
+ *    - protocolVersion: The protocol version the server will use
+ *    - capabilities: A structured object describing supported features
+ *    - serverInfo: Information about the server implementation
+ * 
+ * This method must be called before any other MCP method, and handles
+ * protocol version negotiation and capability discovery.
+ */
+
 #include "mcp-initialize.h"
 #include "database/rrd-metadata.h"
-#include "database/rrd-retention.h"
 #include "daemon/common.h"
 
 // Initialize handler - provides information about what's available (transport-agnostic)
-MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, uint64_t id) {
-    if (!mcpc) {
-        buffer_strcat(mcpc->error, "Invalid MCP client context");
+MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
+    if (!mcpc)
         return MCP_RC_ERROR;
-    }
 
     // Extract client's requested protocol version
     struct json_object *protocol_version_obj = NULL;
@@ -38,12 +63,7 @@ MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *para
     
     // Use rrdstats_metadata_collect to get infrastructure statistics
     RRDSTATS_METADATA metadata = rrdstats_metadata_collect();
-    
-    // Use rrdstats_retention_collect to get retention information
-    RRDSTATS_RETENTION retention = rrdstats_retention_collect();
 
-    buffer_json_member_add_object(mcpc->result, "result");
-    
     // Add protocol version based on what client requested
     buffer_json_member_add_string(mcpc->result, "protocolVersion", 
                                  MCP_PROTOCOL_VERSION_2str(mcpc->protocol_version));
@@ -63,28 +83,28 @@ MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *para
     buffer_json_member_add_boolean(mcpc->result, "asyncExecution", true);
     buffer_json_member_add_boolean(mcpc->result, "batchExecution", true);
     buffer_json_object_close(mcpc->result); // Close tools
-    
+
     // Resources capabilities
     buffer_json_member_add_object(mcpc->result, "resources");
     buffer_json_member_add_boolean(mcpc->result, "listChanged", true);
     buffer_json_member_add_boolean(mcpc->result, "subscribe", true);
     buffer_json_object_close(mcpc->result); // Close resources
-    
+
     // Prompts capabilities
     buffer_json_member_add_object(mcpc->result, "prompts");
     buffer_json_member_add_boolean(mcpc->result, "listChanged", false);
     buffer_json_object_close(mcpc->result); // Close prompts
-    
+
     // Notification capabilities
     buffer_json_member_add_object(mcpc->result, "notifications");
     buffer_json_member_add_boolean(mcpc->result, "push", true);
     buffer_json_member_add_boolean(mcpc->result, "subscription", true);
     buffer_json_object_close(mcpc->result); // Close notifications
-    
+
     // Add logging capabilities
     buffer_json_member_add_object(mcpc->result, "logging");
     buffer_json_object_close(mcpc->result); // Close logging
-    
+
     // Add version-specific capabilities
     if (mcpc->protocol_version >= MCP_PROTOCOL_VERSION_2025_03_26) {
         // Add completions capability - new in 2025-03-26
@@ -95,155 +115,163 @@ MCP_RETURN_CODE mcp_method_initialize(MCP_CLIENT *mcpc, struct json_object *para
     buffer_json_object_close(mcpc->result); // Close capabilities
     
     // Add dynamic instructions based on server profile
-    char instructions[1024];
+    char instructions[8192];
 
-    const char *common =
-        "Use the resources to identify the systems, components and applications being monitored,\n"
-        "and the alerts that have been configured.\n"
+    const char *instructions_template = 
+        "This is %s.\n"
         "\n"
-        "Use the tools to perform queries on metrics and logs, seek for outliers and anomalies,\n"
-        "perform root cause analysis and get live information about processes, network connections,\n"
-        "containers, VMs, systemd/windows services, sensors, kubernetes clusters, and more.\n"
+        "## NETDATA'S UNIQUE CAPABILITIES\n"
         "\n"
-        "Tools can also help in investigating currently raised alerts and their past transitions.";
+        "### Real-Time Anomaly Detection\n"
+        "Netdata performs ML-based anomaly detection (k-means clustering) on every metric during data collection. "
+        "Each sample includes its anomaly status from when it was originally collected.\n"
+        "\n"
+        "**Critical: Anomaly Rate Interpretation**\n"
+        "- Low percentages often indicate major events, not noise\n"
+        "- Time window context is essential:\n"
+        "  • 1%% over 1 hour = ~36 seconds of anomalies (minor)\n"
+        "  • 1%% over 1 day = ~14 minutes of anomalies (moderate)\n"
+        "  • 1%% over 1 week = ~2 hours of anomalies (potentially major incident)\n"
+        "- Anomalies may be concentrated in time, indicating real events\n"
+        "- Always query actual metrics to see anomaly distribution across data points\n"
+        "- The ML model detected these anomalies in real-time without future knowledge\n"
+        "\n"
+        "## TOOL ARCHITECTURE AND PATTERNS\n"
+        "\n"
+        "### Pattern Matching Rules\n"
+        "**Discovery tools** (list_metrics, list_nodes, list_running_alerts) support patterns on their PRIMARY data:\n"
+        "- `list_metrics`: patterns on metric names (e.g., 'system.*', '*nginx*')\n"
+        "- `list_nodes`: patterns on hostnames (e.g., '*web*', 'prod-*')\n"
+        "- Secondary parameters (nodes, metrics) require EXACT names only\n"
+        "\n"
+        "**Query tools** (query_metrics, find_*_metrics) require EXACT names for ALL parameters:\n"
+        "- No patterns allowed - you must specify exact metric names\n"
+        "- Use discovery tools first to get exact names, then query\n"
+        "\n"
+        "### Tool Combination Strategy\n"
+        "Tools are designed to work together. Use outputs from one tool as inputs to others:\n"
+        "\n"
+        "**Example: Find nodes running specific services**\n"
+        "```\n"
+        "1. list_metrics (pattern: '*redis*') → get exact context names\n"
+        "2. list_nodes (metrics: ['redis.connections', 'redis.memory']) → get only nodes running redis\n"
+        "```\n"
+        "\n"
+        "**Example: Investigate performance issues**\n"
+        "```\n"
+        "1. find_anomalous_metrics (timeframe) → identify problematic metrics\n"
+        "2. query_metrics (exact metric names from step 1) → see detailed data\n"
+        "3. find_correlated_metrics (same timeframe) → what changed significantly during this period\n"
+        "```\n"
+        "\n"
+        "## INVESTIGATION METHODOLOGY\n"
+        "\n"
+        "### Discovery Workflow\n"
+        "Follow the data trail using these interactive tools:\n"
+        "\n"
+        "**For \"What's available\" questions:**\n"
+        "- `list_metrics`: Full-text search (use 'q' parameter) or pattern matching\n"
+        "- `list_nodes`: Search by hostname patterns or filter by exact metric names\n"
+        "- `get_metrics_details`: Get comprehensive information about specific metrics\n"
+        "\n"
+        "**For incident investigation:**\n"
+        "- `find_anomalous_metrics`: Discover ML-detected anomalies in any timeframe\n"
+        "- `find_correlated_metrics`: Find metrics that changed significantly during a time period\n"
+        "  (compares against 4x previous baseline to score changes)\n"
+        "- `list_alert_transitions`: See how alerts changed state during incidents\n"
+        "- `query_metrics`: Get detailed time-series data with per-point anomaly information\n"
+        "\n"
+        "**For current system state:**\n"
+        "- `execute_function`: Get live information (processes, connections, services)\n"
+        "- `list_raised_alerts`: See currently active alerts requiring attention\n"
+        "\n"
+        "### Investigation Flow\n"
+        "1. **Start with discovery**: Use broad searches to identify relevant components\n"
+        "2. **Get exact names**: Convert patterns to exact metric/node names\n"
+        "3. **Query for details**: Use exact names in query tools for deep analysis\n"
+        "4. **Follow connections**: When data reveals related areas, investigate them\n"
+        "5. **Reach conclusions**: Stop when you have sufficient information to answer comprehensively\n"
+        "\n"
+        "### Tool Response Patterns\n"
+        "- **Categorized responses**: When results exceed limits, tools group by category\n"
+        "  Use specific patterns (e.g., 'system.*') to get full details for categories\n"
+        "- **Error guidance**: Tools provide specific instructions when parameters are incorrect\n"
+        "- **Next steps**: Many responses include suggested follow-up actions\n"
+        "- **Batch execution**: Run multiple tools in parallel for efficiency\n"
+        "\n"
+        "## PRACTICAL EXAMPLES\n"
+        "\n"
+        "**Infrastructure discovery:**\n"
+        "```\n"
+        "User: \"What databases are being monitored?\"\n"
+        "1. list_metrics (q: \"*mysql*|*postgres*|*redis*|*mongo*\")\n"
+        "2. get_metrics_details for interesting database contexts\n"
+        "3. list_nodes (metrics: exact database context names) → nodes running databases\n"
+        "```\n"
+        "\n"
+        "**Performance troubleshooting:**\n"
+        "```\n"
+        "User: \"System was slow yesterday 2-4 PM\"\n"
+        "1. find_anomalous_metrics (yesterday 14:00-16:00)\n"
+        "2. query_metrics (exact anomalous metric names) → see concentration patterns\n"
+        "3. find_correlated_metrics (same timeframe) → what changed significantly during this period\n"
+        "4. execute_function (if issues persist) → check current state\n"
+        "```\n"
+        "\n"
+        "**Service-specific analysis:**\n"
+        "```\n"
+        "User: \"How is nginx performing?\"\n"
+        "1. list_metrics (q: \"*nginx*\") → get all nginx-related contexts\n"
+        "2. list_nodes (metrics: nginx contexts) → find nginx servers\n"
+        "3. query_metrics (nginx metrics, specific nodes) → analyze performance\n"
+        "4. list_running_alerts (metrics: nginx contexts) → check for issues\n"
+        "```\n"
+        "\n"
+        "Remember: Netdata's per-second resolution and real-time anomaly detection provide "
+        "unprecedented visibility into system behavior. Use tool combinations to build a "
+        "complete picture from discovery through detailed analysis.\n"
+        "\n"
+        "### Infrastructure-Wide Anomaly Correlation\n"
+        "For multi-node infrastructures, this single query reveals cascading anomalies across all nodes:\n"
+        "\n"
+        "```\n"
+        "query_metrics(\n"
+        "  metric: \"anomaly_detection.dimensions\",\n"
+        "  dimensions: [\"anomalous\"],\n"
+        "  after: <timeframe>,\n"
+        "  before: <timeframe>,\n"
+        "  points: <based_on_duration>,\n"
+        "  time_group: \"max\",\n"
+        "  group_by: [\"node\"],\n"
+        "  aggregation: \"max\"\n"
+        ")\n"
+        "```\n"
+        "\n"
+        "This returns the COUNT of dimensions (time-series) that were anomalous SIMULTANEOUSLY on each node.\n"
+        "\n"
+        "The resulting time-series shows anomaly propagation patterns:\n"
+        "- **Simultaneous spikes across nodes** = External event (network outage, DNS, etc.)\n"
+        "- **Sequential spikes with delays** = Cascading failure showing dependencies\n"
+        "- **Isolated node spikes** = Node-specific issues\n"
+        "\n"
+        "The time-series visualization immediately reveals which nodes were affected and in what order - "
+        "critical for root cause analysis in distributed systems.\n"
+        "\n"
+        "After identifying the cascade pattern, use find_anomalous_metrics on specific nodes/times for details.";
 
-    // Determine server role based on metadata
+    // Determine server role and create complete instructions
     if (metadata.nodes.total > 1) {
-        // This is a parent node with child nodes streaming to it
-        snprintfz(instructions, sizeof(instructions),
-            "This is a Netdata Parent Server hosting metrics and logs for %zu node%s.\n\n%s",
-            metadata.nodes.total, (metadata.nodes.total == 1) ? "" : "s", common);
+        snprintfz(instructions, sizeof(instructions), instructions_template,
+            "a Netdata Parent Server hosting metrics and logs for multiple nodes");
+    } else {
+        snprintfz(instructions, sizeof(instructions), instructions_template,
+            "Netdata on a standalone server");
     }
-    else {
-        // This is a standalone server
-        snprintfz(instructions, sizeof(instructions),
-            "This is Netdata on a Standalone Server.\n\n%s", common);
-    }
-    
+
     buffer_json_member_add_string(mcpc->result, "instructions", instructions);
     
-    // Add _meta field (optional)
+    // Add _meta field (optional) - empty as requested
     buffer_json_member_add_object(mcpc->result, "_meta");
-    buffer_json_member_add_string(mcpc->result, "generator", "netdata");
-    
-    // Get current time and calculate uptimes
-    time_t now = now_realtime_sec();
-    time_t system_uptime_seconds = now_boottime_sec();
-    time_t netdata_uptime_seconds = now - netdata_start_time;
-    
-    buffer_json_member_add_int64(mcpc->result, "timestamp", (int64_t)now);
-    
-    // Add system uptime info - both raw seconds and human-readable format
-    char human_readable[128];
-    duration_snprintf_time_t(human_readable, sizeof(human_readable), system_uptime_seconds);
-    
-    buffer_json_member_add_object(mcpc->result, "system_uptime");
-    buffer_json_member_add_int64(mcpc->result, "seconds", (int64_t)system_uptime_seconds);
-    buffer_json_member_add_string(mcpc->result, "human", human_readable);
-    buffer_json_object_close(mcpc->result); // Close system_uptime
-    
-    // Add netdata uptime info - both raw seconds and human-readable format
-    duration_snprintf_time_t(human_readable, sizeof(human_readable), netdata_uptime_seconds);
-    
-    buffer_json_member_add_object(mcpc->result, "netdata_uptime");
-    buffer_json_member_add_int64(mcpc->result, "seconds", (int64_t)netdata_uptime_seconds);
-    buffer_json_member_add_string(mcpc->result, "human", human_readable);
-    buffer_json_object_close(mcpc->result); // Close netdata_uptime
-
-    // Add infrastructure statistics to metadata
-    buffer_json_member_add_object(mcpc->result, "infrastructure");
-
-    // Add nodes statistics
-    buffer_json_member_add_object(mcpc->result, "nodes");
-    buffer_json_member_add_int64(mcpc->result, "total", metadata.nodes.total);
-    buffer_json_member_add_int64(mcpc->result, "receiving_from_children", metadata.nodes.receiving);
-    buffer_json_member_add_int64(mcpc->result, "sending_to_next_parent", metadata.nodes.sending);
-    buffer_json_member_add_int64(mcpc->result, "archived_but_available_for_queries", metadata.nodes.archived);
-    buffer_json_member_add_string(mcpc->result, "info", "Nodes (or hosts, or servers, or devices) are Netdata Agent installations or virtual Netdata nodes or SNMP devices.");
-    buffer_json_object_close(mcpc->result); // Close nodes
-
-    // Add metrics statistics
-    buffer_json_member_add_object(mcpc->result, "metrics");
-    buffer_json_member_add_int64(mcpc->result, "currently_being_collected", metadata.metrics.collected);
-    buffer_json_member_add_int64(mcpc->result, "total_available_for_queries", metadata.metrics.available);
-    buffer_json_member_add_string(mcpc->result, "info", "Metrics are unique time-series in the Netdata time-series database.");
-    buffer_json_object_close(mcpc->result); // Close metrics
-
-    // Add instances statistics
-    buffer_json_member_add_object(mcpc->result, "instances");
-    buffer_json_member_add_int64(mcpc->result, "currently_being_collected", metadata.instances.collected);
-    buffer_json_member_add_int64(mcpc->result, "total_available_for_queries", metadata.instances.available);
-    buffer_json_member_add_string(mcpc->result, "info", "Instances are collections of metrics referring to a component (system, disk, network interface, application, process, container, etc).");
-    buffer_json_object_close(mcpc->result); // Close instances
-
-    // Add contexts statistics
-    buffer_json_member_add_object(mcpc->result, "contexts");
-    buffer_json_member_add_int64(mcpc->result, "unique_across_all_nodes", metadata.contexts.unique);
-    buffer_json_member_add_string(mcpc->result, "info", "Contexts are distinct charts shown on the Netdata dashboards, like system.cpu (system CPU utilization), or net.net (network interfaces bandwidth). When monitoring applications, the context usually includes the application name.");
-    buffer_json_object_close(mcpc->result); // Close contexts
-
-    // Add retention information
-    if (retention.storage_tiers > 0) {
-        buffer_json_member_add_object(mcpc->result, "retention");
-        buffer_json_member_add_array(mcpc->result, "tiers");
-
-        for (size_t i = 0; i < retention.storage_tiers; i++) {
-            RRD_STORAGE_TIER *tier_info = &retention.tiers[i];
-            
-            // Skip empty tiers
-            if (tier_info->metrics == 0 && tier_info->samples == 0)
-                continue;
-                
-            buffer_json_add_array_item_object(mcpc->result);
-            
-            // Add basic tier info
-            buffer_json_member_add_int64(mcpc->result, "tier", tier_info->tier);
-            buffer_json_member_add_string(mcpc->result, "backend",
-                tier_info->backend == STORAGE_ENGINE_BACKEND_DBENGINE ? "dbengine" : 
-                tier_info->backend == STORAGE_ENGINE_BACKEND_RRDDIM ? "ram" : "unknown");
-            buffer_json_member_add_int64(mcpc->result, "granularity", tier_info->group_seconds);
-            buffer_json_member_add_string(mcpc->result, "granularity_human", tier_info->granularity_human);
-            
-            // Add metrics info
-            buffer_json_member_add_int64(mcpc->result, "metrics", tier_info->metrics);
-            buffer_json_member_add_int64(mcpc->result, "samples", tier_info->samples);
-            
-            // Add storage info when available
-            if (tier_info->disk_max > 0) {
-                buffer_json_member_add_int64(mcpc->result, "disk_used", tier_info->disk_used);
-                buffer_json_member_add_int64(mcpc->result, "disk_max", tier_info->disk_max);
-                // Format disk_percent to have only 2 decimal places
-                double rounded_percent = floor(tier_info->disk_percent * 100.0 + 0.5) / 100.0;
-                buffer_json_member_add_double(mcpc->result, "disk_percent", rounded_percent);
-            }
-            
-            // Add retention info
-            if (tier_info->retention > 0) {
-                buffer_json_member_add_int64(mcpc->result, "first_time_s", tier_info->first_time_s);
-                buffer_json_member_add_int64(mcpc->result, "last_time_s", tier_info->last_time_s);
-                buffer_json_member_add_int64(mcpc->result, "retention", tier_info->retention);
-                buffer_json_member_add_string(mcpc->result, "retention_human", tier_info->retention_human);
-                
-                if (tier_info->requested_retention > 0) {
-                    buffer_json_member_add_int64(mcpc->result, "requested_retention", tier_info->requested_retention);
-                    buffer_json_member_add_string(mcpc->result, "requested_retention_human", tier_info->requested_retention_human);
-                }
-                
-                if (tier_info->expected_retention > 0) {
-                    buffer_json_member_add_int64(mcpc->result, "expected_retention", tier_info->expected_retention);
-                    buffer_json_member_add_string(mcpc->result, "expected_retention_human", tier_info->expected_retention_human);
-                }
-            }
-            
-            buffer_json_object_close(mcpc->result); // Close tier object
-        }
-        
-        buffer_json_array_close(mcpc->result); // Close tiers array
-        buffer_json_member_add_string(mcpc->result, "info", "Metrics retention information for each storage tier in the Netdata database.\nHigher tiers can provide min, max, average, sum and anomaly rate with the same accuracy as tier 0.\nTiers are automatically selected during query.");
-        buffer_json_object_close(mcpc->result); // Close retention
-    }
-
-    buffer_json_object_close(mcpc->result); // Close infrastructure
     buffer_json_object_close(mcpc->result); // Close _meta
     buffer_json_object_close(mcpc->result); // Close result object
     buffer_json_finalize(mcpc->result);     // Finalize JSON

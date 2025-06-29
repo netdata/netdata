@@ -122,7 +122,7 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     web_client_set_conn_cloud(w);
     w->port_acl = HTTP_ACL_ACLK | default_aclk_http_acl;
     w->acl = w->port_acl;
-    web_client_set_permissions(w, HTTP_ACCESS_MAP_OLD_MEMBER, HTTP_USER_ROLE_MEMBER, WEB_CLIENT_FLAG_AUTH_CLOUD);
+    web_client_set_permissions(w, HTTP_ACCESS_MAP_OLD_MEMBER, HTTP_USER_ROLE_MEMBER, USER_AUTH_METHOD_CLOUD);
 
     w->mode = HTTP_REQUEST_MODE_GET;
     w->timings.tv_in = query->created_tv;

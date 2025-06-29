@@ -38,6 +38,7 @@ type Config struct {
 	VarLibDir                 string
 	ModuleRegistry            module.Registry
 	RunModule                 string
+	RunJob                    []string
 	MinUpdateEvery            int
 }
 
@@ -55,6 +56,7 @@ type Agent struct {
 	VarLibDir string
 
 	RunModule      string
+	RunJob         []string
 	MinUpdateEvery int
 
 	ModuleRegistry module.Registry
@@ -78,6 +80,7 @@ func New(cfg Config) *Agent {
 		CollectorsConfigWatchPath: cfg.CollectorsConfigWatchPath,
 		VarLibDir:                 cfg.VarLibDir,
 		RunModule:                 cfg.RunModule,
+		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		ModuleRegistry:            module.DefaultRegistry,
 		Out:                       safewriter.Stdout,
@@ -197,6 +200,9 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr.Out = a.Out
 	jobMgr.VarLibDir = a.VarLibDir
 	jobMgr.Modules = enabledModules
+	if a.RunModule != "" && a.RunModule != "all" {
+		jobMgr.RunJob = a.RunJob
+	}
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 

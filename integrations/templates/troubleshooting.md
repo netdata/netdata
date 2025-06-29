@@ -31,6 +31,12 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m [[ entry.meta.module_name ]]
   ```
 
+  To debug a specific job:
+
+  ```bash
+  ./go.d.plugin -d -m [[ entry.meta.module_name ]] -j jobName
+  ```
+
 [% elif entry.meta.plugin_name == 'python.d.plugin' %]
 - Run the `python.d.plugin` to debug the collector:
 

@@ -296,9 +296,9 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
             socklen_t len = h2o_socket_getpeername(conn->sock, &client);
             char peername[NI_MAXHOST];
             size_t peername_len = h2o_socket_getnumerichost(&client, len, peername);
-            size_t cpy_len = sizeof(w.client_ip) < peername_len ? sizeof(w.client_ip) : peername_len;
-            memcpy(w.client_ip, peername, cpy_len);
-            w.client_ip[cpy_len - 1] = 0;
+            size_t cpy_len = sizeof(w.user_auth.client_ip) < peername_len ? sizeof(w.user_auth.client_ip) : peername_len;
+            memcpy(w.user_auth.client_ip, peername, cpy_len);
+            w.user_auth.client_ip[cpy_len - 1] = 0;
             w.user_agent = conn->user_agent;
 
             rc = stream_receiver_accept_connection(&w, conn->url, conn);

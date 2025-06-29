@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Netdata API",
-    "description": "Real-time performance and health monitoring.",
+    "description": "Real-time performance and health monitoring.\n\n## API Versions\n\nNetdata provides three API versions:\n- **v1**: The original API, focused on single-node operations\n- **v2**: Multi-node API with advanced grouping and aggregation capabilities\n- **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features\n\n### v3 API Endpoints\n\nThe v3 API provides the following endpoints (most reuse v1 or v2 implementations):\n- `/api/v3/data` - Multi-dimensional data queries (uses v2 implementation)\n- `/api/v3/weights` - Metric scoring/correlation (uses v2 implementation)\n- `/api/v3/contexts` - Context metadata (uses v2 implementation)\n- `/api/v3/nodes` - Node information (uses v2 implementation)\n- `/api/v3/q` - Full-text search (uses v2 implementation)\n- `/api/v3/alerts` - Alert information (uses v2 implementation)\n- `/api/v3/alert_transitions` - Alert state transitions (uses v2 implementation)\n- `/api/v3/alert_config` - Alert configuration (uses v2 implementation)\n- `/api/v3/functions` - Available functions (uses v2 implementation)\n- `/api/v3/function` - Execute functions (uses v1 implementation)\n- `/api/v3/info` - Agent information (uses v2 implementation)\n- `/api/v3/node_instances` - Node instance information (uses v2 implementation)\n- `/api/v3/stream_path` - Streaming topology (v3 specific)\n- `/api/v3/versions` - Version information (uses v2 implementation)\n- `/api/v3/badge.svg` - Dynamic badges (uses v1 implementation)\n- `/api/v3/allmetrics` - Export metrics (uses v1 implementation)\n- `/api/v3/context` - Single context info (uses v1 implementation)\n- `/api/v3/variable` - Variable information (uses v1 implementation)\n- `/api/v3/config` - Dynamic configuration (uses v1 implementation)\n- `/api/v3/settings` - Agent settings (v3 specific)\n- `/api/v3/me` - Current user information (v3 specific)\n- `/api/v3/claim` - Agent claiming (v3 specific)\n- Additional management and streaming endpoints\n\nNote: This documentation currently focuses on v1 and v2 endpoints. The v3 endpoints listed above generally accept the same parameters as their v1/v2 counterparts.\n",
     "version": "v1-rolling",
     "contact": {
       "name": "Netdata Agent API",
@@ -84,6 +84,9 @@
           },
           {
             "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/contextsQueryOptions"
           }
         ],
         "responses": {
@@ -93,6 +96,63 @@
               "application/json": {
                 "schema": {
                   "description": "`/api/v2/nodes` response for all nodes hosted by a Netdata Agent.\n",
+                  "type": "object",
+                  "properties": {
+                    "api": {
+                      "$ref": "#/components/schemas/api"
+                    },
+                    "agents": {
+                      "$ref": "#/components/schemas/agents"
+                    },
+                    "versions": {
+                      "$ref": "#/components/schemas/versions"
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/nodeFull"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/nodes": {
+      "get": {
+        "operationId": "getNodes3",
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Nodes Info v3",
+        "description": "Get a list of all nodes hosted by this Netdata Agent.\nThis is the same as `/api/v2/nodes` but may support additional features in the future.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/scopeNodes"
+          },
+          {
+            "$ref": "#/components/parameters/scopeContexts"
+          },
+          {
+            "$ref": "#/components/parameters/filterNodes"
+          },
+          {
+            "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/contextsQueryOptions"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "`/api/v3/nodes` response for all nodes hosted by a Netdata Agent.\n",
                   "type": "object",
                   "properties": {
                     "api": {
@@ -138,6 +198,48 @@
           },
           {
             "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/contextsQueryOptions"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/contexts2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/contexts": {
+      "get": {
+        "operationId": "getContexts3",
+        "tags": [
+          "contexts"
+        ],
+        "summary": "Contexts Info v3",
+        "description": "Get a list of all contexts, across all nodes, hosted by this Netdata Agent.\nThis is the same as `/api/v2/contexts` but may support additional features in the future.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/scopeNodes"
+          },
+          {
+            "$ref": "#/components/parameters/scopeContexts"
+          },
+          {
+            "$ref": "#/components/parameters/filterNodes"
+          },
+          {
+            "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/contextsQueryOptions"
           }
         ],
         "responses": {
@@ -184,6 +286,58 @@
           },
           {
             "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/contextsQueryOptions"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/contexts2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/q": {
+      "get": {
+        "operationId": "q3",
+        "tags": [
+          "contexts"
+        ],
+        "summary": "Full Text Search v3",
+        "description": "Get a list of contexts, across all nodes, hosted by this Netdata Agent, matching a string expression.\nThis is the same as `/api/v2/q` but may support additional features in the future.\n",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "The strings to search for, formatted as a simple pattern",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "simple pattern"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/scopeNodes"
+          },
+          {
+            "$ref": "#/components/parameters/scopeContexts"
+          },
+          {
+            "$ref": "#/components/parameters/filterNodes"
+          },
+          {
+            "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/contextsQueryOptions"
           }
         ],
         "responses": {
@@ -626,7 +780,8 @@
                 "avg",
                 "average",
                 "sum",
-                "percentage"
+                "percentage",
+                "extremes"
               ],
               "default": "average"
             }
@@ -636,6 +791,15 @@
           },
           {
             "$ref": "#/components/parameters/scopeContexts"
+          },
+          {
+            "$ref": "#/components/parameters/scopeInstances"
+          },
+          {
+            "$ref": "#/components/parameters/scopeLabels"
+          },
+          {
+            "$ref": "#/components/parameters/scopeDimensions"
           },
           {
             "$ref": "#/components/parameters/filterNodes"
@@ -681,6 +845,194 @@
           },
           {
             "$ref": "#/components/parameters/dataFormat2"
+          },
+          {
+            "$ref": "#/components/parameters/cardinalityLimit"
+          },
+          {
+            "$ref": "#/components/parameters/timeoutMS"
+          },
+          {
+            "$ref": "#/components/parameters/callback"
+          },
+          {
+            "$ref": "#/components/parameters/filename"
+          },
+          {
+            "$ref": "#/components/parameters/tqx"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The call was successful. The response includes the data in the format requested.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/jsonwrap2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/data_json_formats2"
+                    }
+                  ]
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "format": "according to the format requested."
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string",
+                  "format": "html"
+                }
+              },
+              "application/x-javascript": {
+                "schema": {
+                  "type": "string",
+                  "format": "javascript"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - the body will include a message stating what is wrong.\n"
+          },
+          "500": {
+            "description": "Internal server error. This usually means the server is out of memory.\n"
+          }
+        }
+      }
+    },
+    "/api/v3/data": {
+      "get": {
+        "operationId": "dataQuery3",
+        "tags": [
+          "data"
+        ],
+        "summary": "Data Query v3",
+        "description": "Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.\nThis is the same as `/api/v2/data` but may support additional features in the future.\n",
+        "parameters": [
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "A comma separated list of the groupings required.\nAll possible values can be combined together, except `selected`. If `selected` is given in the list, all others are ignored.\nThe order they are placed in the list is currently ignored.\nThis parameter is also accepted as `group_by[0]` and `group_by[1]` when multiple grouping passes are required.\n",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "dimension",
+                  "instance",
+                  "percentage-of-instance",
+                  "label",
+                  "node",
+                  "context",
+                  "units",
+                  "selected"
+                ]
+              },
+              "default": [
+                "dimension"
+              ]
+            }
+          },
+          {
+            "name": "group_by_label",
+            "in": "query",
+            "description": "A comma separated list of the label keys to group by their values. The order of the labels in the list is respected.\nThis parameter is also accepted as `group_by_label[0]` and `group_by_label[1]` when multiple grouping passes are required.\n",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "comma separated list of label keys to group by",
+              "default": ""
+            }
+          },
+          {
+            "name": "aggregation",
+            "in": "query",
+            "description": "The aggregation function to apply when grouping metrics together.\nWhen option `raw` is given, `average` and `avg` behave like `sum` and the caller is expected to calculate the average.\nThis parameter is also accepted as `aggregation[0]` and `aggregation[1]` when multiple grouping passes are required.\n",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "min",
+                "max",
+                "avg",
+                "average",
+                "sum",
+                "percentage",
+                "extremes"
+              ],
+              "default": "average"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/scopeNodes"
+          },
+          {
+            "$ref": "#/components/parameters/scopeContexts"
+          },
+          {
+            "$ref": "#/components/parameters/scopeInstances"
+          },
+          {
+            "$ref": "#/components/parameters/scopeLabels"
+          },
+          {
+            "$ref": "#/components/parameters/scopeDimensions"
+          },
+          {
+            "$ref": "#/components/parameters/filterNodes"
+          },
+          {
+            "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/filterInstances"
+          },
+          {
+            "$ref": "#/components/parameters/filterLabels"
+          },
+          {
+            "$ref": "#/components/parameters/filterAlerts"
+          },
+          {
+            "$ref": "#/components/parameters/filterDimensions"
+          },
+          {
+            "$ref": "#/components/parameters/after"
+          },
+          {
+            "$ref": "#/components/parameters/before"
+          },
+          {
+            "$ref": "#/components/parameters/points"
+          },
+          {
+            "$ref": "#/components/parameters/tier"
+          },
+          {
+            "$ref": "#/components/parameters/dataQueryOptions"
+          },
+          {
+            "$ref": "#/components/parameters/dataTimeGroup2"
+          },
+          {
+            "$ref": "#/components/parameters/dataTimeGroupOptions2"
+          },
+          {
+            "$ref": "#/components/parameters/dataTimeResampling2"
+          },
+          {
+            "$ref": "#/components/parameters/dataFormat2"
+          },
+          {
+            "$ref": "#/components/parameters/cardinalityLimit"
           },
           {
             "$ref": "#/components/parameters/timeoutMS"
@@ -895,10 +1247,10 @@
             "schema": {
               "type": "string",
               "enum": [
-                "yes",
-                "no"
+                true,
+                false
               ],
-              "default": "no"
+              "default": false
             }
           },
           {
@@ -909,10 +1261,10 @@
             "schema": {
               "type": "string",
               "enum": [
-                "yes",
-                "no"
+                true,
+                false
               ],
-              "default": "yes"
+              "default": true
             }
           },
           {
@@ -923,10 +1275,10 @@
             "schema": {
               "type": "string",
               "enum": [
-                "yes",
-                "no"
+                true,
+                false
               ],
-              "default": "yes"
+              "default": true
             }
           },
           {
@@ -937,10 +1289,10 @@
             "schema": {
               "type": "string",
               "enum": [
-                "yes",
-                "no"
+                true,
+                false
               ],
-              "default": "yes"
+              "default": true
             }
           },
           {
@@ -951,10 +1303,10 @@
             "schema": {
               "type": "string",
               "enum": [
-                "yes",
-                "no"
+                true,
+                false
               ],
-              "default": "yes"
+              "default": true
             }
           },
           {
@@ -1258,6 +1610,15 @@
             "$ref": "#/components/parameters/scopeContexts"
           },
           {
+            "$ref": "#/components/parameters/scopeInstances"
+          },
+          {
+            "$ref": "#/components/parameters/scopeLabels"
+          },
+          {
+            "$ref": "#/components/parameters/scopeDimensions"
+          },
+          {
             "$ref": "#/components/parameters/filterNodes"
           },
           {
@@ -1304,6 +1665,114 @@
           },
           {
             "$ref": "#/components/parameters/dataTimeGroupOptions2"
+          },
+          {
+            "$ref": "#/components/parameters/cardinalityLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON object with weights for each context, chart and dimension.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/weights2"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The given parameters are invalid."
+          },
+          "403": {
+            "description": "metrics correlations are not enabled on this Netdata Agent."
+          },
+          "404": {
+            "description": "No charts could be found, or the method that correlated the metrics did not produce any result.\n"
+          },
+          "504": {
+            "description": "Timeout - the query took too long and has been cancelled."
+          }
+        }
+      }
+    },
+    "/api/v3/weights": {
+      "get": {
+        "operationId": "weights3",
+        "tags": [
+          "weights"
+        ],
+        "summary": "Score or weight all or some of the metrics, across all nodes, according to various algorithms.",
+        "description": "This endpoint goes through all metrics and scores them according to an algorithm.\nThis is the same as `/api/v2/weights` but may support additional features in the future.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/weightMethods"
+          },
+          {
+            "$ref": "#/components/parameters/scopeNodes"
+          },
+          {
+            "$ref": "#/components/parameters/scopeContexts"
+          },
+          {
+            "$ref": "#/components/parameters/scopeInstances"
+          },
+          {
+            "$ref": "#/components/parameters/scopeLabels"
+          },
+          {
+            "$ref": "#/components/parameters/scopeDimensions"
+          },
+          {
+            "$ref": "#/components/parameters/filterNodes"
+          },
+          {
+            "$ref": "#/components/parameters/filterContexts"
+          },
+          {
+            "$ref": "#/components/parameters/filterInstances"
+          },
+          {
+            "$ref": "#/components/parameters/filterLabels"
+          },
+          {
+            "$ref": "#/components/parameters/filterAlerts"
+          },
+          {
+            "$ref": "#/components/parameters/filterDimensions"
+          },
+          {
+            "$ref": "#/components/parameters/baselineAfter"
+          },
+          {
+            "$ref": "#/components/parameters/baselineBefore"
+          },
+          {
+            "$ref": "#/components/parameters/after"
+          },
+          {
+            "$ref": "#/components/parameters/before"
+          },
+          {
+            "$ref": "#/components/parameters/tier"
+          },
+          {
+            "$ref": "#/components/parameters/points"
+          },
+          {
+            "$ref": "#/components/parameters/timeoutMS"
+          },
+          {
+            "$ref": "#/components/parameters/dataQueryOptions"
+          },
+          {
+            "$ref": "#/components/parameters/dataTimeGroup2"
+          },
+          {
+            "$ref": "#/components/parameters/dataTimeGroupOptions2"
+          },
+          {
+            "$ref": "#/components/parameters/cardinalityLimit"
           }
         ],
         "responses": {
@@ -1872,6 +2341,39 @@
           "default": "*"
         }
       },
+      "scopeInstances": {
+        "name": "scope_instances",
+        "in": "query",
+        "description": "A simple pattern limiting the instances scope of the query. The scope controls both data and metadata response. This limits which instances are even considered for the query, including their visibility in the query response metadata. The simple pattern is checked against the instance `id`, the instance `name`, the fully qualified name of the instance `id` and `name`, like `instance@machine_guid`, where `instance` is either its `id` or `name`. Both positive and negative simple pattern expressions are supported.\n",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "simple pattern",
+          "default": "*"
+        }
+      },
+      "scopeLabels": {
+        "name": "scope_labels",
+        "in": "query",
+        "description": "A simple pattern limiting the labels scope of the query. The scope controls both data and metadata response. This limits which instances are even considered for the query based on their labels. The simple pattern is checked against `name:value` of all the labels of all the eligible instances (as filtered by scope nodes, scope contexts, and scope instances). Only instances having labels that match this pattern will be included in the query. Both positive and negative simple pattern expressions are supported.\n",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "simple pattern",
+          "default": "*"
+        }
+      },
+      "scopeDimensions": {
+        "name": "scope_dimensions",
+        "in": "query",
+        "description": "A simple pattern limiting the dimensions scope of the query. The scope controls both data and metadata response. This limits which dimensions are even considered for the query, including their visibility in the query response metadata. The simple pattern is checked against both the dimension `id` and `name`. Both positive and negative simple pattern expressions are supported.\n",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "simple pattern",
+          "default": "*"
+        }
+      },
       "filterNodes": {
         "name": "nodes",
         "in": "query",
@@ -1992,7 +2494,7 @@
       "dataQueryOptions": {
         "name": "options",
         "in": "query",
-        "description": "Options that affect data generation.\n* `jsonwrap` - Wrap the output in a JSON object with metadata about the query.\n* `raw` - change the output so that it is aggregatable across multiple such queries. Supported by `/api/v2` data queries and `json2` format.\n* `minify` - Remove unnecessary spaces and newlines from the output.\n* `debug` - Provide additional information in `jsonwrap` output to help tracing issues.\n* `nonzero` - Do not return dimensions that all their values are zero, to improve the visual appearance of charts. They will still be returned if all the dimensions are entirely zero.\n* `null2zero` - Replace `null` values with `0`.\n* `absolute` or `abs` - Traditionally Netdata returns select dimensions negative to improve visual appearance. This option turns this feature off.\n* `display-absolute` - Only used by badges, to do color calculation using the signed value, but render the value without a sign.\n* `flip` or `reversed` - Order the timestamps array in reverse order (newest to oldest).\n* `min2max` - When flattening multi-dimensional data into a single metric format, use `max - min` instead of `sum`. This is EOL - use `/api/v2` to control aggregation across dimensions.\n* `percentage` - Convert all values into a percentage vs the row total. When enabled, Netdata will query all dimensions, even the ones that have not been selected or are hidden, to find the row total, in order to calculate the percentage of each dimension selected.\n* `seconds` - Output timestamps in seconds instead of dates.\n* `milliseconds` or `ms` - Output timestamps in milliseconds instead of dates.\n* `unaligned` - by default queries are aligned to the the view, so that as time passes past data returned do not change. When a data query will not be used for visualization, `unaligned` can be given to avoid aligning the query time-frame for visual precision.\n* `match-ids`, `match-names`. By default filters match both IDs and names when they are available. Setting either of the two options will disable the other.\n* `anomaly-bit` - query the anomaly information instead of metric values. This is EOL, use `/api/v2` and `json2` format which always returns this information and many more.\n* `jw-anomaly-rates` - return anomaly rates as a separate result set in the same `json` format response. This is EOL, use `/api/v2` and `json2` format which always returns information and many more. \n* `details` - `/api/v2/data` returns in `jsonwrap` the full tree of dimensions that have been matched by the query.\n* `group-by-labels` - `/api/v2/data` returns in `jsonwrap` flattened labels per output dimension. These are used to identify the instances that have been aggregated into each dimension, making it possible to provide a map, like Netdata does for Kubernetes.\n* `natural-points` - return timestamps as found in the database. The result is again fixed-step, but the query engine attempts to align them with the timestamps found in the database.\n* `virtual-points` - return timestamps independent of the database alignment. This is needed aggregating data across multiple Netdata Agents, to ensure that their outputs do not need to be interpolated to be merged.\n* `selected-tier` - use data exclusively from the selected tier given with the `tier` parameter. This option is set automatically when the `tier` parameter is set.\n* `all-dimensions` - In `/api/v1` `jsonwrap` include metadata for all candidate metrics examined. In `/api/v2` this is standard behavior and no option is needed.\n* `label-quotes` - In `csv` output format, enclose each header label in quotes.\n* `objectrows` - Each row of value should be an object, not an array (only for `json` format).\n* `google_json` - Comply with google JSON/JSONP specs (only for `json` format).\n",
+        "description": "Options that affect data generation.\n* `jsonwrap` - Wrap the output in a JSON object with metadata about the query.\n* `raw` - change the output so that it is aggregatable across multiple such queries. Supported by `/api/v2` data queries and `json2` format.\n* `minify` - Remove unnecessary spaces and newlines from the output.\n* `debug` - Provide additional information in `jsonwrap` output to help tracing issues.\n* `nonzero` - Do not return dimensions that all their values are zero, to improve the visual appearance of charts. They will still be returned if all the dimensions are entirely zero.\n* `null2zero` - Replace `null` values with `0`.\n* `absolute` or `abs` - Traditionally Netdata returns select dimensions negative to improve visual appearance. This option turns this feature off.\n* `display-absolute` - Only used by badges, to do color calculation using the signed value, but render the value without a sign.\n* `flip` or `reversed` - Order the timestamps array in reverse order (newest to oldest).\n* `min2max` - When flattening multi-dimensional data into a single metric format, use `max - min` instead of `sum`. This is EOL - use `/api/v2` to control aggregation across dimensions.\n* `percentage` - Convert all values into a percentage vs the row total. When enabled, Netdata will query all dimensions, even the ones that have not been selected or are hidden, to find the row total, in order to calculate the percentage of each dimension selected.\n* `seconds` - Output timestamps in seconds instead of dates.\n* `milliseconds` or `ms` - Output timestamps in milliseconds instead of dates.\n* `unaligned` - by default queries are aligned to the the view, so that as time passes past data returned do not change. When a data query will not be used for visualization, `unaligned` can be given to avoid aligning the query time-frame for visual precision.\n* `match-ids`, `match-names`. By default filters match both IDs and names when they are available. Setting either of the two options will disable the other.\n* `anomaly-bit` - query the anomaly information instead of metric values. This is EOL, use `/api/v2` and `json2` format which always returns this information and many more.\n* `jw-anomaly-rates` - return anomaly rates as a separate result set in the same `json` format response. This is EOL, use `/api/v2` and `json2` format which always returns information and many more. \n* `details` - `/api/v2/data` returns in `jsonwrap` the full tree of dimensions that have been matched by the query.\n* `group-by-labels` - `/api/v2/data` returns in `jsonwrap` flattened labels per output dimension. These are used to identify the instances that have been aggregated into each dimension, making it possible to provide a map, like Netdata does for Kubernetes.\n* `natural-points` - return timestamps as found in the database. The result is again fixed-step, but the query engine attempts to align them with the timestamps found in the database.\n* `virtual-points` - return timestamps independent of the database alignment. This is needed aggregating data across multiple Netdata Agents, to ensure that their outputs do not need to be interpolated to be merged.\n* `selected-tier` - use data exclusively from the selected tier given with the `tier` parameter. This option is set automatically when the `tier` parameter is set.\n* `all-dimensions` - In `/api/v1` `jsonwrap` include metadata for all candidate metrics examined. In `/api/v2` this is standard behavior and no option is needed.\n* `label-quotes` - In `csv` output format, enclose each header label in quotes.\n* `objectrows` - Each row of value should be an object, not an array (only for `json` format).\n* `google_json` - Comply with google JSON/JSONP specs (only for `json` format).\n* `minimal-stats` or `minimal` - Reduce the amount of statistics returned in `jsonwrap` format to save bandwidth.\n* `long-json-keys` or `long-keys` - Use descriptive key names in JSON output instead of abbreviated ones.\n* `mcp-info` - Include additional metadata useful for the Model Context Protocol (MCP) integration.\n* `rfc3339` - Return timestamps in RFC3339 format (e.g., \"2023-01-01T00:00:00Z\") instead of Unix timestamps.\n",
         "required": false,
         "allowEmptyValue": false,
         "schema": {
@@ -2029,7 +2531,13 @@
               "all-dimensions",
               "label-quotes",
               "objectrows",
-              "google_json"
+              "google_json",
+              "minimal-stats",
+              "minimal",
+              "long-json-keys",
+              "long-keys",
+              "mcp-info",
+              "rfc3339"
             ]
           },
           "default": [
@@ -2085,7 +2593,9 @@
             "trimmed-median10",
             "trimmed-median15",
             "trimmed-median20",
-            "trimmed-median25"
+            "trimmed-median25",
+            "ema",
+            "extremes"
           ],
           "default": "average"
         }
@@ -2137,7 +2647,9 @@
             "trimmed-median10",
             "trimmed-median15",
             "trimmed-median20",
-            "trimmed-median25"
+            "trimmed-median25",
+            "ema",
+            "extremes"
           ],
           "default": "average"
         }
@@ -2158,6 +2670,46 @@
         "required": false,
         "schema": {
           "type": "string"
+        }
+      },
+      "cardinalityLimit": {
+        "name": "cardinality_limit",
+        "in": "query",
+        "description": "Limits the number of unique items (contexts, instances, dimensions) returned in the query result. This is useful for preventing excessive memory usage and response sizes when queries match a large number of metrics. The query engine will return the most relevant items up to this limit.\n",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1,
+          "default": 10000
+        }
+      },
+      "contextsQueryOptions": {
+        "name": "options",
+        "in": "query",
+        "description": "Options that affect the output of contexts metadata queries.\n* `minify` - Remove unnecessary spaces and newlines from the output to reduce bandwidth.\n* `debug` - Provide additional debugging information in the response.\n* `config` - Include alert configuration information (used by /api/v2/alert_transitions).\n* `instances` - Include alert/context instance information (used by /api/v2/alerts).\n* `values` - Include latest metric values (used by /api/v2/alerts).\n* `summary` - Include summary counters (used by /api/v2/alerts).\n* `mcp` - Format output for Model Context Protocol (MCP) integration.\n* `dimensions` - Include dimension information for each context.\n* `labels` - Include label information for each context.\n* `priorities` - Include priority information for each context.\n* `titles` - Include title information for each context.\n* `rfc3339` - Return timestamps in RFC3339 format (e.g., \"2023-01-01T00:00:00Z\") instead of Unix timestamps.\n\nNote: Some options like `retention`, `liveness`, `family`, and `units` are automatically included by specific endpoints and cannot be controlled via this parameter.\n",
+        "required": false,
+        "allowEmptyValue": false,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "minify",
+              "debug",
+              "config",
+              "instances",
+              "values",
+              "summary",
+              "mcp",
+              "dimensions",
+              "labels",
+              "priorities",
+              "titles",
+              "rfc3339"
+            ]
+          },
+          "default": []
         }
       },
       "dataTimeResampling1": {
@@ -2296,7 +2848,7 @@
       "contextOptions1": {
         "name": "options",
         "in": "query",
-        "description": "Options that affect data generation.",
+        "description": "Options that affect data generation.\n* `full` or `all` - Include all available information.\n* `charts` - Include chart information.\n* `dimensions` - Include dimension information.\n* `labels` - Include label information.\n* `uuids` - Include UUIDs in the response.\n* `queue` - Include queue information.\n* `flags` - Include internal flags.\n* `deleted` - Include deleted items.\n* `deepscan` - Perform a deep scan for contexts.\n* `rfc3339` - Return timestamps in RFC3339 format instead of Unix timestamps.\n",
         "required": false,
         "schema": {
           "type": "array",
@@ -2312,7 +2864,8 @@
               "queue",
               "flags",
               "deleted",
-              "deepscan"
+              "deepscan",
+              "rfc3339"
             ]
           }
         }

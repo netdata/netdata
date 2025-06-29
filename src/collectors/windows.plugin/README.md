@@ -31,6 +31,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibAD = yes
         # PerflibADCS = yes
         # PerflibADFS = yes
+        # PerflibExchange = yes
 ```
 
 ## Microsoft SQL Server Integration
@@ -72,7 +73,7 @@ These steps must be performed for each SQL Server instance you want to monitor.
 
 If you're using SQL Server authentication (rather than Windows authentication):
 
-1. Open `Microsoft Server Management Studio`
+1. Open `SQL Server Management Studio`
 2. Right-click your server and select `Properties`
 3. Select `Security` in the left panel
 4. Choose `SQL Server and Windows Authentication mode` under `Server authentication`

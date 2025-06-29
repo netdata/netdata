@@ -839,6 +839,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/bitmap/bitmap64.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
+        src/libnetdata/buffer/functions_fields.c
+        src/libnetdata/buffer/functions_fields.h
         src/libnetdata/ringbuffer/ringbuffer.c
         src/libnetdata/ringbuffer/ringbuffer.h
         src/libnetdata/circular_buffer/circular_buffer.c
@@ -876,6 +878,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/inlined.h
         src/libnetdata/json/json.c
         src/libnetdata/json/json.h
+        src/libnetdata/json/json-keys.c
+        src/libnetdata/json/json-keys.h
         src/libnetdata/json/vendored/jsmn.c
         src/libnetdata/json/vendored/jsmn.h
         src/libnetdata/libnetdata.c
@@ -923,8 +927,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/string/utf8.h
         src/libnetdata/worker_utilization/worker_utilization.c
         src/libnetdata/worker_utilization/worker_utilization.h
-        src/libnetdata/http/http_access.c
-        src/libnetdata/http/http_access.h
+        src/libnetdata/user-auth/http-access.c
+        src/libnetdata/user-auth/http-access.h
+        src/libnetdata/user-auth/user-auth.c
+        src/libnetdata/user-auth/user-auth.h
         src/libnetdata/http/http_defs.c
         src/libnetdata/http/http_defs.h
         src/libnetdata/http/content_type.c
@@ -945,6 +951,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/storage-point.h
         src/libnetdata/parsers/parsers.h
         src/libnetdata/parsers/duration.c
+        src/libnetdata/parsers/duration-unittest.c
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c
@@ -1432,6 +1439,10 @@ set(API_PLUGIN_FILES
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
         src/web/api/queries/query.h
+        src/web/api/queries/query-group-by.c
+        src/web/api/queries/query-group-over-time.c
+        src/web/api/queries/query-internal.h
+        src/web/api/queries/query-plan.c
         src/web/api/queries/average/average.c
         src/web/api/queries/average/average.h
         src/web/api/queries/countif/countif.c
@@ -1456,6 +1467,8 @@ set(API_PLUGIN_FILES
         src/web/api/queries/des/des.h
         src/web/api/queries/trimmed_mean/trimmed_mean.c
         src/web/api/queries/trimmed_mean/trimmed_mean.h
+        src/web/api/queries/extremes/extremes.c
+        src/web/api/queries/extremes/extremes.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
@@ -1468,8 +1481,19 @@ set(API_PLUGIN_FILES
         src/web/api/formatters/ssv/ssv.h
         src/web/api/formatters/value/value.c
         src/web/api/formatters/value/value.h
-        src/web/api/formatters/json_wrapper.c
-        src/web/api/formatters/json_wrapper.h
+        src/web/api/formatters/jsonwrap.c
+        src/web/api/formatters/jsonwrap.h
+        src/web/api/formatters/jsonwrap-internal.h
+        src/web/api/formatters/jsonwrap-objects-tree.c
+        src/web/api/formatters/jsonwrap-query-plan.c
+        src/web/api/formatters/jsonwrap-summary-alerts.c
+        src/web/api/formatters/jsonwrap-summary-contexts.c
+        src/web/api/formatters/jsonwrap-summary-dimensions.c
+        src/web/api/formatters/jsonwrap-summary-instances.c
+        src/web/api/formatters/jsonwrap-summary-labels.c
+        src/web/api/formatters/jsonwrap-summary-nodes.c
+        src/web/api/formatters/jsonwrap-v1.c
+        src/web/api/formatters/jsonwrap-v2.c
         src/web/api/formatters/charts2json.c
         src/web/api/formatters/charts2json.h
         src/web/api/formatters/rrdset2json.c
@@ -1579,6 +1603,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-swap.h
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
+        src/collectors/common-contexts/power-supply.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -1628,6 +1653,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
+        src/database/rrdlabels-aggregated.c
+        src/database/rrdlabels-aggregated.h
         src/database/rrd.c
         src/database/rrd.h
         src/database/rrd-metadata.c
@@ -1761,12 +1788,12 @@ set(STATSD_PLUGIN_FILES
 
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
-        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/collectors/systemd-journal.plugin/provider/netdata_provider.c
@@ -1847,26 +1874,45 @@ set(WEB_PLUGIN_FILES
         src/web/api/functions/function-metrics-cardinality.h
         src/web/api/queries/backfill.c
         src/web/api/queries/backfill.h
-        src/web/api/request_source.c
-        src/web/api/request_source.h
         src/web/api/v3/api_v3_stream_info.c
         src/web/api/v3/api_v3_stream_path.c
         src/web/mcp/adapters/mcp-websocket.c
         src/web/mcp/adapters/mcp-websocket.h
-        src/web/mcp/mcp-context.c
-        src/web/mcp/mcp-context.h
         src/web/mcp/mcp-initialize.c
         src/web/mcp/mcp-initialize.h
-        src/web/mcp/mcp-notifications.c
-        src/web/mcp/mcp-notifications.h
         src/web/mcp/mcp-prompts.c
         src/web/mcp/mcp-prompts.h
         src/web/mcp/mcp-resources.c
         src/web/mcp/mcp-resources.h
-        src/web/mcp/mcp-system.c
-        src/web/mcp/mcp-system.h
         src/web/mcp/mcp-tools.c
         src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp-tools-list-metadata.c
+        src/web/mcp/mcp-tools-list-metadata.h
+        src/web/mcp/mcp-tools-execute-function.c
+        src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-execute-function-internal.h
+        src/web/mcp/mcp-tools-execute-function-registry.c
+        src/web/mcp/mcp-tools-execute-function-registry.h
+        src/web/mcp/mcp-tools-query-metrics.c
+        src/web/mcp/mcp-tools-query-metrics.h
+        src/web/mcp/mcp-tools-weights.c
+        src/web/mcp/mcp-tools-weights.h
+        src/web/mcp/mcp-tools-alert-transitions.c
+        src/web/mcp/mcp-tools-alert-transitions.h
+        src/web/mcp/mcp-tools-configured-alerts.c
+        src/web/mcp/mcp-tools-configured-alerts.h
+        src/web/mcp/mcp-params.c
+        src/web/mcp/mcp-params.h
+        src/web/mcp/mcp-request-id.c
+        src/web/mcp/mcp-request-id.h
+        src/web/mcp/mcp-ping.c
+        src/web/mcp/mcp-ping.h
+        src/web/mcp/mcp-logging.c
+        src/web/mcp/mcp-logging.h
+        src/web/mcp/mcp-completion.c
+        src/web/mcp/mcp-completion.h
+        src/web/mcp/mcp-api-key.c
+        src/web/mcp/mcp-api-key.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c
@@ -1998,12 +2044,14 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
+        src/collectors/windows.plugin/GetPowerSupply.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
         src/collectors/windows.plugin/perflib-ad.c
         src/collectors/windows.plugin/perflib-mssql.c
+        src/collectors/windows.plugin/perflib-mssql-queries.h
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c
@@ -2015,6 +2063,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-web-service.c
         src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
+        src/collectors/windows.plugin/perflib-exchange.c
+        src/collectors/windows.plugin/perflib-numa.c
 )
 
 set(PROC_PLUGIN_FILES
@@ -3153,7 +3203,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
-        "$<$<BOOL:${OS_WINDOWS}>:odbc32>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
 
 netdata_add_protobuf(netdata)
@@ -3245,6 +3295,19 @@ if(ENABLE_PLUGIN_GO)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
+
+    # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
+    if (OS_WINDOWS)
+        set(ND_MCP_NAME nd-mcp.exe)
+    else()
+        set(ND_MCP_NAME nd-mcp)
+    endif()
+
+    add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
+    install(PROGRAMS
+            ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
+            COMPONENT plugin-go
+            DESTINATION "${BINDIR}")
 endif()
 
 #

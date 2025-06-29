@@ -269,6 +269,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_EVICT_EXTENT,
     RRDENG_OPCODE_CTX_SHUTDOWN,
     RRDENG_OPCODE_CTX_FLUSH_DIRTY,
+    RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,
     RRDENG_OPCODE_CTX_QUIESCE,
     RRDENG_OPCODE_CTX_POPULATE_MRG,
     RRDENG_OPCODE_SHUTDOWN_EVLOOP,
@@ -387,8 +388,8 @@ struct rrdengine_instance {
     struct {
         uv_rwlock_t rwlock;                         // the linked list of datafiles is protected by this lock
         bool disk_time;                             // true: delete for disk quota, false: delete for retention
-        bool pending_rotate;
-        bool pending_index;
+        bool pending_rotate;                        // Change from event loop
+        bool pending_index;                         // Change from event loop
         struct rrdengine_datafile *first;           // oldest - the newest with ->first->prev
     } datafiles;
 
@@ -424,11 +425,7 @@ struct rrdengine_instance {
     } quiesce;
 
     struct {
-        struct {
-            size_t size;
-            struct completion *array;
-        } populate_mrg;
-
+        struct completion load_mrg;
         bool create_new_datafile_pair;
     } loading;
 

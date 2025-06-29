@@ -55,4 +55,7 @@ bool websocket_decompression_init(struct websocket_server_client *wsc);
 void websocket_decompression_cleanup(struct websocket_server_client *wsc);
 bool websocket_decompression_reset(struct websocket_server_client *wsc);
 
+// Compression function for outbound messages
+bool websocket_client_compress_message(struct websocket_server_client *wsc, const char *data, size_t length);
+
 #endif // NETDATA_WEBSOCKET_COMPRESSION_H

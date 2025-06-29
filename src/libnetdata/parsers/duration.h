@@ -29,4 +29,7 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
 
 bool duration_parse_seconds(const char *str, int *result);
 
+// unit tests
+int duration_unittest(void);
+
 #endif //LIBNETDATA_PARSERS_DURATION_H

@@ -3,6 +3,7 @@
 #include "rrdcontext.h"
 #include "rrdcontext-internal.h"
 #include "rrdcontext-context-registry.h"
+#include "web/mcp/mcp.h"
 
 // The registry - using a raw JudyL array
 // Key: STRING pointer
@@ -126,6 +127,16 @@ size_t rrdcontext_context_registry_unique_count(void) {
 void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *pattern) {
     spinlock_lock(&context_registry_spinlock);
 
+    buffer_json_member_add_object(wb, "info");
+    {
+        buffer_json_member_add_string(wb, "instructions",
+                                      "The following is the list of contexts.\n"
+                                      "You can get additional information for any context by calling,\n"
+                                      "the tool " MCP_TOOL_GET_METRICS_DETAILS " with params:\n"
+                                      "`metrics=context1|context2` to get more information about context1 and context2.\n");
+    }
+    buffer_json_object_close(wb); // info
+
     buffer_json_member_add_array(wb, "header");
     buffer_json_add_array_item_string(wb, "context");
     buffer_json_add_array_item_string(wb, "number_of_nodes_having_it");
@@ -163,15 +174,8 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
     // JudyL array to store unique category STRINGs as keys and counts as values
     Pvoid_t categories_judyl = NULL;
     
-    // Header information
-    buffer_json_member_add_array(wb, "header");
-    buffer_json_add_array_item_string(wb, "category");
-    buffer_json_add_array_item_string(wb, "number_of_contexts");
-    buffer_json_array_close(wb);
-    
-    buffer_json_member_add_array(wb, "categories");
-    
     // First pass: count occurrences of each category
+    size_t contexts_count = 0, contexts_size = 0;
     Word_t index = 0;
     bool first = true;
     Pvoid_t *PValue;
@@ -179,7 +183,9 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
         if (!index || !*PValue) continue;
         
         const char *context_name = string2str((STRING *)index);
-        
+        contexts_size += string_strlen((STRING *)index) + 10;
+        contexts_count++;
+
         // Find the last dot in the context name
         const char *first_dot = strchr(context_name, '.');
         
@@ -214,6 +220,28 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
     }
     
     // Second pass: output the unique categories and their counts
+
+    // Header information
+    buffer_json_member_add_object(wb, "info");
+    {
+        buffer_json_member_add_uint64(wb, "original_contexts_count", contexts_count);
+        buffer_json_member_add_uint64(wb, "original_contexts_size", contexts_size);
+        buffer_json_member_add_string(wb, "instructions",
+                                      "The following list groups metric contexts by prefix.\n"
+                                      "In case the original list of contexts is too big to be processed at once,\n"
+                                      "use the `q` parameter to fetch the contexts in smaller batches.\n"
+                                      "Example: call the " MCP_TOOL_LIST_METRICS " with params:\n"
+                                      "`q=system.*|net.*` to get all system.* and net.* contexts\n");
+    }
+    buffer_json_object_close(wb); // info
+
+    buffer_json_member_add_array(wb, "header");
+    buffer_json_add_array_item_string(wb, "category");
+    buffer_json_add_array_item_string(wb, "number_of_contexts");
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_array(wb, "categories");
+
     index = 0;
     first = true;
     while ((PValue = JudyLFirstThenNext(categories_judyl, &index, &first))) {

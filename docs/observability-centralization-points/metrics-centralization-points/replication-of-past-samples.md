@@ -1,60 +1,141 @@
 # Replication of Past Samples
 
-Replication is triggered when a Netdata Child connects to a Netdata Parent. It replicates the latest samples of collected metrics a Netdata Parent may be missing. The goal of replication is to back-fill samples that were collected between disconnects and reconnects, so that the Netdata Parent does not have gaps on the charts for the time Netdata Children were disconnected.
+:::tip
 
-The same replication mechanism is used between Netdata Parents (the sending Netdata is treated as a Child and the receiving Netdata as a Parent).
+**What You'll Learn**
 
-## Replication Limitations
+How Netdata automatically fills data gaps when Children reconnect to Parents, including replication limitations, configuration options, and monitoring progress.
 
-The current implementation is optimized to replicate small durations and have minimal impact during reconnecting. As a result, it has the following limitations:
+:::
 
-1. Replication can only append samples to metrics. Only missing samples at the end of each time-series are replicated.
+When your Netdata Child reconnects to a Parent after being offline, replication automatically kicks in. Your Parent gets the metric samples it missed while the Child was disconnected, ensuring you don't see gaps in your charts.
 
-2. Only `tier0` samples are replicated. Samples of higher tiers in Netdata are derived from `tier0` samples, and therefore there is no mechanism for ingesting them directly. This means that the maximum retention that can be replicated across Netdata is limited by the samples available in `tier0` of the sending Netdata.
+:::note
 
-3. Only samples of metrics that are currently being collected are replicated. Archived metrics (or even archived nodes) will be replicated when and if they are collected again. Netdata archives metrics 1 hour after they stop being collected, so Netdata Parents may miss data only if Netdata Children are disconnected for more than an hour from their Parents.
+This same process works between Parents too. When Parents sync with each other, one acts as the sender and the other as the receiver.
 
-When multiple Netdata Parents are available, the replication happens in sequence, like in the following diagram.
+:::
+
+## How Replication Works
+
+When multiple Netdata Parents are available, the replication happens in sequence, like in the following diagram:
 
 ```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "actorBkg": "#ffeb3b",
+    "actorBorder": "#000000",
+    "actorTextColor": "#000000",
+    "actorLineColor": "#000000",
+    "signalColor": "#000000",
+    "signalTextColor": "#000000",
+    "labelBoxBkgColor": "#f9f9f9",
+    "labelBoxBorderColor": "#000000",
+    "labelTextColor": "#000000",
+    "loopTextColor": "#000000",
+    "activationBkgColor": "#4caf50",
+    "activationBorderColor": "#000000",
+    "fontFamily": "Arial, sans-serif",
+    "fontSize": "16px"
+  }
+}}%%
 sequenceDiagram
-    Child-->>Parent1: Connect
-    Parent1-->>Child: OK
-    Parent1-->>Parent2: Connect
-    Parent2-->>Parent1: OK
-    Child-->>Parent1: Metric M1 with retention up to Now
-    Parent1-->>Child: M1 stopped at -60sec, replicate up to Now
-    Child-->>Parent1: replicate M1 samples -60sec to Now
-    Child-->>Parent1: streaming M1
-    Parent1-->>Parent2: Metric M1 with retention up to Now
-    Parent2-->>Parent1: M1 stopped at -63sec, replicate up to Now
-    Parent1-->>Parent2: replicate M1 samples -63sec to Now
-    Parent1-->>Parent2: streaming M1
+    participant C as Child
+    participant P1 as Parent 1
+    participant P2 as Parent 2
+    
+    C->>P1: Connect
+    P1->>C: OK
+    P1->>P2: Connect
+    P2->>P1: OK
+    C->>P1: Metric M1 with retention up to Now
+    P1->>C: M1 stopped at -60sec, replicate up to Now
+    C->>P1: replicate M1 samples -60sec to Now
+    C->>P1: streaming M1
+    P1->>P2: Metric M1 with retention up to Now
+    P2->>P1: M1 stopped at -63sec, replicate up to Now
+    P1->>P2: replicate M1 samples -63sec to Now
+    P1->>P2: streaming M1
 ```
+
+### Replication Process
 
 As shown in the diagram:
 
-1. All connections are established immediately after a Netdata child connects to any of the Netdata Parents.
-2. Each pair of connections (Child->Parent1, Parent1->Parent2) complete replication on the receiving side and then initiate replication on the sending side.
-3. Replication pushes data up to Now, and the sending side immediately enters streaming mode, without leaving any gaps on the samples of the receiving side.
-4. On every pair of connections, replication negotiates the retention of the receiving party to back-fill as much data as necessary.
+1. **Connections establish immediately** after a Netdata child connects to any of the Netdata Parents.
+2. **Each connection pair completes replication** (Child→Parent1, Parent1→Parent2) on the receiving side and then initiates replication on the sending side.
+3. **Replication fills gaps up to now**, and the sending side immediately enters streaming mode, without leaving any gaps on the samples of the receiving side.
+4. **Each connection negotiates retention** to back-fill as much data as necessary.
 
-## Configuration options for Replication
+## Understanding Limitations
 
-The following `netdata.conf` configuration parameters affect replication.
+:::important
 
-On the receiving side (Netdata Parent):
+**Key Replication Constraints**
 
-- `[db].replication period` limits the maximum time to be replicated. The default is 1 day. Keep in mind that replication is also limited by the `tier0` retention the sending side has.
+The current implementation is optimized to replicate small durations and have minimal impact during reconnecting. Understanding these limitations helps you plan your monitoring setup effectively.
 
-On the sending side (Netdata Children, or Netdata Parent when parents are clustered):
+:::
 
-- `[db].replication threads` controls how many concurrent threads will be replicating metrics. The default is 1. Usually the performance is about two million samples per second per thread, so increasing this number may allow replication to progress faster between Netdata Parents.
+<details>
+<summary><strong>What Can and Can’t Be Replicated</strong></summary><br/>
 
-- `[db].cleanup obsolete charts after` controls for how much time after metrics stop being collected will not be available for replication. The default is 1 hour (3600 seconds). If you plan to have scheduled maintenance on Netdata Parents of more than 1 hour, we recommend increasing this setting. Keep in mind, however, that increasing this duration in highly ephemeral environments can have an impact on RAM utilization, since metrics will be considered as collected for longer durations.
+1. **Append-only replication**.
+   Replication can only append samples to metrics. Only missing samples at the end of each time-series are replicated.
+
+2. **Tier0 samples only**.
+   Only `tier0` samples are replicated. Samples of higher tiers in Netdata are derived from `tier0` samples, and therefore there is no mechanism for ingesting them directly. This means that the maximum retention that can be replicated across Netdata is limited by the samples available in `tier0` of the sending Netdata.
+
+3. **Active metrics only**.
+   Only samples of metrics that are currently being collected are replicated. Archived metrics (or even archived nodes) will be replicated when and if they are collected again.
+
+:::note
+
+Netdata archives metrics 1 hour after they stop being collected, so Netdata Parents may miss data only if Netdata Children are disconnected for more than an hour from their Parents.
+
+:::
+
+<br/>
+</details>
+
+## Configuration Options
+
+Configure these options in `netdata.conf` on the respective systems.
+
+<details>
+<summary><strong>Receiving Side Configuration (Netdata Parent)</strong></summary><br/>
+
+| Setting                   | Description                                                                                                                      | Default |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------|---------|
+| `[db].replication period` | Sets the maximum time window for replication. Remember, you're also limited by how much tier0 data your Child systems have kept. | 1 day   |
+
+</details>
+
+<details>
+<summary><strong>Sending Side Configuration (Netdata Children or clustered Parents)</strong></summary><br/>
+
+| Setting                              | Description                                                                                                                                                                                                                                                                                                         | Default                   |
+|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `[db].replication threads`           | Controls how many parallel threads handle replication. Each thread can handle about two million samples per second, so more threads can speed up replication between Parents with lots of data.                                                                                                                     | 1 thread                  |
+| `[db].cleanup obsolete charts after` | Controls how long metrics remain available for replication after collection stops. If you expect Parent maintenance to last longer than 1 hour, increase this setting. Just be aware that in dynamic environments with lots of short-lived metrics, this can increase RAM usage since metrics stay "active" longer. | 1 hour<br/>(3600 seconds) |
+
+</details>
 
 ## Monitoring Replication Progress
 
-Inbound and outbound replication progress is reported at the dashboard using the Netdata Function `Streaming`, under the `Top` tab.
+:::note
 
-The same information is exposed via the API endpoint `http://agent-ip:19999/api/v2/node_instances` of both Netdata Parents and Children.
+**Where to Check Replication Status**
+
+You can monitor how replication is progressing through both your dashboard and API endpoints to make sure your data synchronization is working correctly.
+
+:::
+
+### Dashboard Monitoring
+
+Check your replication progress right in your dashboard using the Netdata Function `Netdata-streaming`, under the `Top` tab.
+
+### API Monitoring
+
+You can also get the same information via the API endpoint `http://agent-ip:19999/api/v2/node_instances` on both your Parents and Children.
