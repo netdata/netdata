@@ -3184,8 +3184,11 @@ if(ENABLE_PLUGIN_IBM)
             COMPONENT plugin-ibm
             DESTINATION usr/lib/netdata/conf.d/ibm.d)
     
-    # Install IBM library download script
-    install(PROGRAMS packaging/installer/install-ibm-libs.sh
+    # Configure and install IBM library download script
+    configure_file(packaging/installer/install-ibm-libs.sh.in
+                   packaging/installer/install-ibm-libs.sh @ONLY)
+    
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/packaging/installer/install-ibm-libs.sh
             COMPONENT plugin-ibm
             DESTINATION usr/libexec/netdata)
 endif()
