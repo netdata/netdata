@@ -9,19 +9,15 @@ set -e
 DB2_DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
 MQ_CLIENT_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/9.4.1.0-IBM-MQC-Redist-LinuxX64.tar.gz"
 
-# Determine the correct library directory based on Netdata installation
-if [ -n "${NETDATA_PREFIX}" ]; then
-    # Custom installation prefix
-    BASE_DIR="${NETDATA_PREFIX}/lib/netdata"
-elif [ -d "/opt/netdata" ]; then
-    # Static installation
-    BASE_DIR="/opt/netdata/lib/netdata"
-elif [ -d "/usr/libexec/netdata" ]; then
-    # System package installation
-    BASE_DIR="/usr/lib/netdata"
+# Set installation directory from CMake
+BASE_DIR="@NETDATA_RUNTIME_PREFIX@/usr/lib/netdata"
+
+# Allow override via command line
+if [ -n "$1" ]; then
+    BASE_DIR="$1"
+    echo "Using specified installation directory: $BASE_DIR"
 else
-    # Default to /usr
-    BASE_DIR="/usr/lib/netdata"
+    echo "Using Netdata installation directory: $BASE_DIR"
 fi
 
 DB2_DRIVER_DIR="${BASE_DIR}/ibm-clidriver"
