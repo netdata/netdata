@@ -9,7 +9,6 @@ platform_map:  # map packaging architectures to docker platforms
   armv6l: linux/arm/v6
   armv7l: linux/arm/v7
   i386: linux/386
-  ppc64le: linux/ppc64le
   x86_64: linux/amd64
 arch_order:  # sort order for per-architecture jobs in CI
   - amd64
@@ -21,7 +20,6 @@ arch_order:  # sort order for per-architecture jobs in CI
   - armv7l
   - arm64
   - aarch64
-  - ppc64le
 arch_data:  # Mapping of per-architecture matrix behavior.
   amd64: &amd64
     qemu: false
@@ -38,21 +36,16 @@ arch_data:  # Mapping of per-architecture matrix behavior.
     qemu: false
     runner: *arm-runner
   aarch64: *arm64
-  ppc64le:
-    qemu: true
-    runner: *x86-runner
 static_arches:  # Static build architectures
   - x86_64
   - armv6l
   - armv7l
   - aarch64
-  - ppc64le
 docker_arches:  # Docker build archtiectures
   - amd64
   - i386
   - armv7l
   - arm64
-  - ppc64le
 default_sentry: &default_sentry # Default configuration for Sentry usage
   amd64: false
   x86_64: false
@@ -284,7 +277,8 @@ include:
 
   - &rocky
     distro: rockylinux
-    version: "9"
+    version: "10"
+    base_image: "quay.io/rockylinux/rockylinux:10"
     support_type: Core
     notes: ''
     jsonc_removal: |
@@ -293,19 +287,30 @@ include:
     bundle_sentry: *default_sentry
     packages: &rocky_packages
       type: rpm
-      repo_distro: el/9
+      repo_distro: el/10
       builder_rev: *def_builder_rev
       alt_links:
-        - el/9Server
-        - el/9Client
-        - el/9RedHatVirtualizationHost
+        - el/10Server
+        - el/10Client
+        - el/10RedHatVirtualizationHost
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
   - <<: *rocky
+    version: "9"
+    base_image: rockylinux:9
+    packages:
+      <<: *rocky_packages
+      repo_distro: el/9
+      alt_links:
+        - el/9Server
+        - el/9Client
+        - el/9RedHatVirtualizationHost
+  - <<: *rocky
     version: "8"
+    base_image: rockylinux:8
     packages:
       <<: *rocky_packages
       repo_distro: el/8
@@ -413,7 +418,6 @@ no_include: # Info for platforms not covered in CI
         - linux/amd64
         - linux/arm/v7
         - linux/arm64
-        - linux/ppc64le
 
   - distro: clearlinux
     version: latest
@@ -422,13 +426,15 @@ no_include: # Info for platforms not covered in CI
 
   - &rhel
     distro: rhel
-    version: "9.x"
+    version: "10.x"
     support_type: Core
     notes: ''
     packages:
       arches:
         - x86_64
         - aarch64
+  - <<: *rhel
+    version: "9.x"
   - <<: *rhel
     version: "8.x"
   - <<: *rhel

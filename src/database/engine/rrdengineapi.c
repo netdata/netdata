@@ -1106,7 +1106,8 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     fatal_assert(RRDENG_NR_STATS == 38);
 }
 
-static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
+static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
+{
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     size_t datafiles = 0;
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next)
@@ -1119,44 +1120,20 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
 
     netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using a shared pool of %zd threads...", datafiles, ctx->config.tier, cpus);
 
-    if(datafiles > 2) {
-        struct rrdengine_datafile *datafile;
-
-        datafile = ctx->datafiles.first->prev;
-        if(!(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE))
-            datafile = datafile->prev;
-
-        if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
-            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
-            datafile->populate_mrg.populated = true;
-        }
-
-        datafile = ctx->datafiles.first;
-        if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
-            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
-            datafile->populate_mrg.populated = true;
-        }
-    }
-
-    ctx->loading.populate_mrg.size = 1;
-    ctx->loading.populate_mrg.array = callocz(ctx->loading.populate_mrg.size, sizeof(struct completion));
-
-    for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
-        completion_init(&ctx->loading.populate_mrg.array[i]);
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_POPULATE_MRG, NULL, &ctx->loading.populate_mrg.array[i],
-                       STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    }
+    completion_init(&ctx->loading.load_mrg);
+    rrdeng_enq_cmd(
+        ctx,
+        RRDENG_OPCODE_CTX_POPULATE_MRG,
+        NULL,
+        &ctx->loading.load_mrg,
+        STORAGE_PRIORITY_INTERNAL_DBENGINE,
+        NULL,
+        NULL);
 }
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
-    for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
-        completion_wait_for(&ctx->loading.populate_mrg.array[i]);
-        completion_destroy(&ctx->loading.populate_mrg.array[i]);
-    }
-
-    freez(ctx->loading.populate_mrg.array);
-    ctx->loading.populate_mrg.array = NULL;
-    ctx->loading.populate_mrg.size = 0;
+    completion_wait_for(&ctx->loading.load_mrg);
+    completion_destroy(&ctx->loading.load_mrg);
 
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);

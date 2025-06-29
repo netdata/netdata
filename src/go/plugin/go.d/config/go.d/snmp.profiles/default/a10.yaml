@@ -6,4 +6,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "a10"
+        value: "A10"

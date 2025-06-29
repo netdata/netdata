@@ -129,16 +129,6 @@ metrics:
           2: waiting_for_load
           3: powered_on
           4: overload
-  #  - MIB: MIKROTIK-MIB
-  #    symbol:
-  #      OID: 1.3.6.1.4.1.14988.1.1.3.17
-  #      name: mtxrHlFanSpeed1
-  # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-  #  - MIB: MIKROTIK-MIB
-  #    symbol:
-  #      OID: 1.3.6.1.4.1.14988.1.1.3.18
-  #      name: mtxrHlFanSpeed2
-  # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
@@ -151,16 +141,86 @@ metrics:
       OID: 1.3.6.1.2.1.25.2.3
       name: hrStorageTable
     symbols:
+      # HOST-RESOURCES-MIB reports storage sizes in "allocation units" rather than bytes.
+      # The allocation unit size is defined in hrStorageAllocationUnits (1.3.6.1.2.1.25.2.3.1.4).
+      # MikroTik devices typically use 1024-byte allocation units for all storage types.
+      # The scale_factor multiplies the raw value by 1024 to convert to bytes.
       - OID: 1.3.6.1.2.1.25.2.3.1.5
         name: memory.total
-        description: Size of the storage represented by this entry in allocation units
+        description: Total size of the storage in bytes
         family: MikroTik/Memory
-        unit: "{memory_allocation_unit}"
+        scale_factor: 1024
+        unit: "By"
       - OID: 1.3.6.1.2.1.25.2.3.1.6
         name: memory.used
-        description: Amount of the storage represented by this entry that is allocated
+        description: Amount of storage currently allocated in bytes
         family: MikroTik/Memory
-        unit: "{memory_allocation_unit}"
+        scale_factor: 1024
+        unit: "By"
     metric_tags:
-      - tag: mem
+      - tag: _mem_index
         index: 1
+      - tag: mem
+        symbol:
+          OID: 1.3.6.1.2.1.25.2.3.1.3
+          name: hrStorageDescr
+  # Table metrics - Extended health monitoring (multi-sensor support)
+  - MIB: MIKROTIK-MIB
+    table:
+      OID: 1.3.6.1.4.1.14988.1.1.3.100
+      name: mtxrHlTable
+    symbols:
+      - OID: 1.3.6.1.4.1.14988.1.1.3.100.1.3
+        name: mtxrHlSensorValue
+        description: Sensor value
+        family: Health/Sensors
+        transform: |
+          {{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
+          {{- $config := get (dict 
+              "1" (dict "name" "temperature" "unit" "celsius" "family" "Temperature" 
+                   "desc" "Temperature reading")
+              "2" (dict "name" "fan_speed" "unit" "rpm" "family" "Fan" 
+                   "desc" "Fan rotation speed")
+              "3" (dict "name" "voltage" "unit" "volts" "family" "Power" "divisor" 10.0 
+                   "desc" "Voltage measurement")
+              "4" (dict "name" "current" "unit" "amperes" "family" "Power" "divisor" 10.0 
+                   "desc" "Current draw")
+              "5" (dict "name" "power" "unit" "watts" "family" "Power" "divisor" 10.0 
+                   "desc" "Power consumption")
+              "6" (dict "name" "sensor_status" "family" "Status" 
+                   "mapping" (i64map 0 "absent_or_faulty" 1 "present_and_ok")
+                   "desc" "Component presence and operational status")
+              "7" (dict "name" "sensor_state" "family" "Status" 
+                   "mapping" (i64map 0 "false" 1 "true")
+                   "desc" "Boolean sensor state")
+              "8" (dict "name" "usage_percentage" "unit" "percentage" "family" "Usage" 
+                   "desc" "Resource utilization percentage")
+          ) $sensorType -}}
+
+          {{- if $config -}}
+            {{- setName .Metric (printf "%s_%s" .Metric.Name (get $config "name")) -}}
+            {{- setFamily .Metric (printf "Sensors/%s" (get $config "family")) -}}
+            {{- with get $config "desc" -}}{{- setDesc $.Metric . -}}{{- end -}}
+            {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
+            {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Value) .)) -}}{{- end -}}
+            {{- with get $config "mapping" -}}{{- setMappings $.Metric . -}}{{- end -}}
+          {{- end -}}
+
+          {{- deleteTag .Metric "sensor_type" -}}
+    metric_tags:
+      - tag: sensor_name
+        symbol:
+          OID: 1.3.6.1.4.1.14988.1.1.3.100.1.2
+          name: mtxrHlSensorName
+      - tag: sensor_type
+        symbol:
+          OID: 1.3.6.1.4.1.14988.1.1.3.100.1.4
+          name: mtxrHlSensorUnit
+
+metric_tags:
+  - OID: 1.3.6.1.4.1.14988.1.1.4.1.0
+    symbol: mtxrLicSoftwareId
+    tag: software_id
+  - OID: 1.3.6.1.4.1.14988.1.1.4.4.0
+    symbol: mtxrLicVersion
+    tag: license_version

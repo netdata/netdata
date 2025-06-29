@@ -424,12 +424,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         bool unknown_file = true;
         if (2 == ret) {
             (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                            1, fileno);
+                            1U, fileno);
 
             unknown_file = (strcmp(dent.name, expected_name) != 0);
             if (unknown_file) {
                 (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
-                                1, fileno);
+                                1U, fileno);
                 unknown_file = (strcmp(dent.name, expected_name) != 0);
             }
 
@@ -469,7 +469,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     sizeof(path),
                     "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
                     datafile_ctx(datafile)->config.dbfiles_path,
-                    1,
+                    1U,
                     (unsigned)idx);
 
                 UNLINK_FILE(ctx, path, ret);
@@ -484,7 +484,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     sizeof(path),
                     "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
                     datafile_ctx(datafile)->config.dbfiles_path,
-                    1,
+                    1U,
                     (unsigned)idx);
 
                 UNLINK_FILE(ctx, path, ret);
