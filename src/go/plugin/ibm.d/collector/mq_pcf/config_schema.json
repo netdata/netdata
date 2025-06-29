@@ -65,12 +65,12 @@
     },
     "queue_selector": {
       "title": "Queue name selector",
-      "description": "Pattern to filter which queues to monitor. Uses string contains matching.",
+      "description": "Regular expression to filter which queues to monitor.",
       "type": "string"
     },
     "channel_selector": {
       "title": "Channel name selector", 
-      "description": "Pattern to filter which channels to monitor. Uses string contains matching.",
+      "description": "Regular expression to filter which channels to monitor.",
       "type": "string"
     }
   },
