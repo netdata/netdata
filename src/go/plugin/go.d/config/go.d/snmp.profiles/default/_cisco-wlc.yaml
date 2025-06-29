@@ -15,7 +15,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.1.1.6
         name: bsnAPOperationStatus
         description: Operation State of the AP
-        family: Airespace/AP/Status
+        family: AccessPoint/Operational/Status
         unit: "{status}"
         mapping:
           1: associated
@@ -24,28 +24,28 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.1.1.37
         name: bsnAPAdminStatus
         description: Admin State of the AP
-        family: Airespace/AP/Status
+        family: AccessPoint/Admin/Status
         unit: "{status}"
         mapping:
           1: enable
           2: disable
     metric_tags:
-      - symbol:
+      - tag: ap_mac_address
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        tag: ap_ip_address
 
   # Connected APs 802.11 interfaces metrics
 
@@ -57,7 +57,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.12
         name: bsnAPIfOperStatus
         description: Operational status of the interface
-        family: Airespace/AP/Interfaces/Status
+        family: AccessPoint/Interface/Operational/Status
         unit: "{status}"
         mapping:
           1: down
@@ -65,48 +65,48 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.34
         name: bsnAPIfAdminStatus
         description: Admin status of the interface
-        family: Airespace/AP/Interfaces/Status
+        family: AccessPoint/Interface/Admin/Status
         unit: "{status}"
         mapping:
           1: enable
           2: disable
     metric_tags:
-      - symbol:
+      - tag: ap_if_slot_id
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
           name: bsnAPIfSlotId
-        tag: ap_if_slot_id
-      - symbol:
+      - tag: ap_mac_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_ip_address
 
   - MIB: AIRESPACE-WIRELESS-MIB
     table:
@@ -117,45 +117,45 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.15
         name: bsnApIfNoOfUsers
         description: "Number of users associated with this radio"
-        family: Airespace/AP/Interfaces/Users
+        family: AccessPoint/Interface/User/Count
         unit: "{user}"
     metric_tags:
-      - symbol:
+      - tag: ap_if_slot_id
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
           name: bsnAPIfSlotId
-        tag: ap_if_slot_id
-      - symbol:
+      - tag: ap_mac_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_ip_address
 
   # Load metrics
 
@@ -167,61 +167,61 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.1
         name: bsnAPIfLoadRxUtilization
         description: "Percentage of time the Airespace AP receiver is busy operating on packets"
-        family: Airespace/AP/Receiver/Utilization
+        family: AccessPoint/Radio/Receiver/Utilization
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.2
         name: bsnAPIfLoadTxUtilization
         description: "Percentage of time the Airespace AP transmitter is busy operating on packets"
-        family: Airespace/AP/Transmitter/Utilization
+        family: AccessPoint/Radio/Transmitter/Utilization
         unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.24
         name: bsnAPIfPoorSNRClients
         description: "Number of clients with poor SNR attached to this Airespace AP at the last measurement interval"
-        family: Airespace/AP/Clients
+        family: AccessPoint/Client/PoorSNR
         unit: "{client}"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.3
         name: bsnAPIfLoadChannelUtilization
         description: "Channel utilization"
-        family: Airespace/AP/Channel/Utilization
+        family: AccessPoint/Radio/Channel/Utilization
         unit: "%"
     metric_tags:
-      - symbol:
+      - tag: ap_if_slot_id
+        table: bsnAPIfTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.2.1.1
           name: bsnAPIfSlotId
-        table: bsnAPIfTable
-        tag: ap_if_slot_id
-      - symbol:
+      - table: bsnAPTable
+        tag: ap_mac_address
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.1
           name: bsnAPDot3MacAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_mac_address
-      - symbol:
+      - tag: ap_name
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.3
           name: bsnAPName
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_name
-      - symbol:
+      - tag: ap_location
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.4
           name: bsnAPLocation
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_location
-      - symbol:
+      - tag: ap_ip_address
+        table: bsnAPTable
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.2.1.1.19
           name: bsnApIpAddress
-        table: bsnAPTable
         index_transform: # Keep only MAC address index
           - start: 0
             end: 5
-        tag: ap_ip_address
 
   # WLAN Metrics
 
@@ -233,7 +233,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.6
         name: bsnDot11EssAdminStatus
         description: Administrative Status of ESS(WLAN)
-        family: Airespace/AP/WLAN/Status
+        family: WLAN/Admin/Status
         unit: "{status}"
         mapping:
           0: disable
@@ -241,7 +241,7 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.60
         name: bsnDot11EssRowStatus
         description: Row status type for the bsnDot11EssEntry
-        family: Airespace/AP/WLAN/Status
+        family: WLAN/Row/Status
         unit: "{status}"
         mapping:
           1: active
@@ -253,14 +253,14 @@ metrics:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.38
         name: bsnDot11EssNumberOfMobileStations
         description: Number of mobile stations currently associated with the WLAN
-        family: Airespace/AP/WLAN/Mobile Stations
+        family: WLAN/Station/Count
         unit: "{station}"
     metric_tags:
-      - symbol:
+      - tag: wlan_index
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.1
           name: bsnDot11EssIndex
-        tag: wlan_index
-      - symbol:
+      - tag: ssid
+        symbol:
           OID: 1.3.6.1.4.1.14179.2.1.1.1.2
           name: bsnDot11EssSsid
-        tag: ssid

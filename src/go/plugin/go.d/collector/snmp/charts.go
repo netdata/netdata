@@ -433,10 +433,14 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 }
 
 func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {
-	if m.MetricType == ddprofiledefinition.ProfileMetricTypeGauge {
+	switch m.MetricType {
+	case ddprofiledefinition.ProfileMetricTypeGauge,
+		ddprofiledefinition.ProfileMetricTypeMonotonicCount,
+		ddprofiledefinition.ProfileMetricTypeMonotonicCountAndRate:
 		return module.Absolute
+	default:
+		return module.Incremental
 	}
-	return module.Incremental
 }
 
 func cleanIfaceName(name string) string {
