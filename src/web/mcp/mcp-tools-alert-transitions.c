@@ -171,8 +171,12 @@ MCP_RETURN_CODE mcp_tool_list_alert_transitions_execute(MCP_CLIENT *mcpc, struct
         nodes_pattern = buffer_tostring(nodes_buffer);
     
     // Extract time parameters
-    time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
-    time_t before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
+    time_t after, before;
+    if (!mcp_params_parse_time_window(params, &after, &before, 
+                                      MCP_DEFAULT_AFTER_TIME, MCP_DEFAULT_BEFORE_TIME, 
+                                      false, mcpc->error)) {
+        return MCP_RC_BAD_REQUEST;
+    }
     
     // Extract cardinality limit
     size_t cardinality_limit = mcp_params_extract_size(params, "cardinality_limit", 1, 1, 100, mcpc->error);

@@ -420,19 +420,11 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Removed alerts parameter - not used in query_metrics
     
-    // Time parameters
-    time_t after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
-    time_t before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
-    
-    // Validate time range
-    if (after == 0 && before == 0) {
-        buffer_sprintf(mcpc->error, "Invalid time range: both 'after' and 'before' cannot be zero. Use negative values for relative times (e.g., after=-3600, before=-0 for the last hour) or specific timestamps for absolute times.");
-        return MCP_RC_BAD_REQUEST;
-    }
-    
-    // Check if after is later than before (when both are absolute timestamps)
-    if (after > 0 && before > 0 && after >= before) {
-        buffer_sprintf(mcpc->error, "Invalid time range: 'after' (%lld) must be earlier than 'before' (%lld). The query time range must be at least 1 second.", (long long)after, (long long)before);
+    // Time parameters - parse and validate together
+    time_t after, before;
+    if (!mcp_params_parse_time_window(params, &after, &before, 
+                                      MCP_DEFAULT_AFTER_TIME, MCP_DEFAULT_BEFORE_TIME, 
+                                      false, mcpc->error)) {
         return MCP_RC_BAD_REQUEST;
     }
     

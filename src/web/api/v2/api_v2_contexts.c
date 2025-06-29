@@ -24,9 +24,9 @@ int api_v2_contexts_internal(RRDHOST *host __maybe_unused, struct web_client *w,
             req.scope_nodes = value;
         else if(!strcmp(name, "nodes"))
             req.nodes = value;
-        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "scope_contexts"))
+        else if((mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "scope_contexts"))
             req.scope_contexts = value;
-        else if((mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "contexts"))
+        else if((mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS | CONTEXTS_V2_ALERT_TRANSITIONS)) && !strcmp(name, "contexts"))
             req.contexts = value;
         else if((mode & CONTEXTS_V2_SEARCH) && !strcmp(name, "q"))
             req.q = value;

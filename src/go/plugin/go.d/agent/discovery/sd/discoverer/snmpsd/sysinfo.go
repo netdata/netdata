@@ -39,7 +39,7 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 		Organization: "Unknown",
 	}
 
-	r := strings.NewReplacer("\n", " ", "\r", " ")
+	r := strings.NewReplacer("'", "", "\n", " ", "\r", " ", "\x00", "")
 
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")

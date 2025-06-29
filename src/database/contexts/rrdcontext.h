@@ -717,8 +717,8 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 bool rrdcontext_retention_match(RRDCONTEXT_ACQUIRED *rca, time_t after, time_t before);
 
 #define query_matches_retention(after, before, first_entry_s, last_entry_s, update_every_s) \
-    (((first_entry_s) - ((update_every_s) * 2) <= (before)) &&                     \
-     ((last_entry_s)  + ((update_every_s) * 2) >= (after)))
+    (((first_entry_s) - ((update_every_s) * 2L) <= (before)) &&                     \
+     ((last_entry_s)  + ((update_every_s) * 2L) >= (after)))
 
 #define query_target_aggregatable(qt) ((qt)->window.options & RRDR_OPTION_RETURN_RAW)
 

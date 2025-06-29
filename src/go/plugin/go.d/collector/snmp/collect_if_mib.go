@@ -158,6 +158,8 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		iface.updated = true
 	}
 
+	var valReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ", "\x00", "")
+
 	for _, iface := range c.netInterfaces {
 		if iface.ifName == "" {
 			iface.ifName = iface.ifDescr
@@ -170,6 +172,10 @@ func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
 		if c.netIfaceFilterByName.MatchString(iface.ifName) || c.netIfaceFilterByType.MatchString(typeStr) {
 			continue
 		}
+
+		iface.ifName = valReplacer.Replace(iface.ifName)
+		iface.ifDescr = valReplacer.Replace(iface.ifDescr)
+		iface.ifAlias = valReplacer.Replace(iface.ifAlias)
 
 		if !iface.updated {
 			delete(c.netInterfaces, iface.idx)

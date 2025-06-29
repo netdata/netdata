@@ -1,4 +1,4 @@
-# Netdata AI
+# Netdata AI and Machine Learning
 
 Boost your monitoring and troubleshooting capabilities with Netdata's AI-powered features.
 

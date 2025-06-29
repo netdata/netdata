@@ -53,7 +53,7 @@ to work on these platforms with minimal user effort.
 | Amazon Linux             | 2023           | x86\_64, AArch64                       |                                                                                                                |
 | Amazon Linux             | 2              | x86\_64, AArch64                       |                                                                                                                |
 | CentOS                   | 7.x            | x86\_64                                |                                                                                                                |
-| Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64, POWER8+ | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
+| Docker                   | 19.03 or newer | x86\_64, i386, ARMv7, AArch64          | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64          |                                                                                                                |
 | Fedora                   | 40             | x86\_64, AArch64                       |                                                                                                                |
@@ -166,14 +166,8 @@ We currently provide static builds for the following CPU architectures:
 - ARMv7
 - ARMv6
 - AArch64
-- POWER8+
 
 ## Platform-specific support considerations
-
-### IPMI
-
-Our IPMI collector is based on FreeIPMI. Due to upstream limitations in FreeIPMI, we are unable to support our
-IPMI collector on POWER-based hardware.
 
 ### Systemd
 

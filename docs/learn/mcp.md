@@ -1,5 +1,17 @@
 # Netdata MCP Integration: AI-Powered Infrastructure Analysis
 
+:::info
+
+The Netdata MCP Server preview is live. [Get early access](https://b6yi53u6qjm.typeform.com/to/DQi5ibhE?typeform-source=www.netdata.cloud) or visit our GitHub repository for the latest nd-mcp tools and setup instructions.
+
+:::
+
+:::note
+
+This integration leverages new and evolving AI technologies. While Netdata provides comprehensive infrastructure monitoring capabilities, the AI analysis features **depend on external AI services** and their inherent limitations. The quality and accuracy of AI-generated insights are **subject to the capabilities and constraints of the underlying AI models, not Netdata's monitoring functionality**.
+
+:::
+
 ## What is MCP?
 
 **Model Context Protocol (MCP)** is a new open standard that allows AI assistants to connect directly to your data sources and tools. Think of it as a bridge that lets AI systems access and analyze your real-time infrastructure data instead of just providing generic advice.
@@ -32,11 +44,11 @@ Instead of spending hours analyzing charts during an incident, you can now:
 
 ### Real-World Example
 
-**The Problem**: EMQX message broker goes down, affecting multiple services across your infrastructure.
+**The Problem**: Database server goes down, affecting multiple applications across your infrastructure.
 
 ```mermaid
 flowchart TD
-    A("🚨 EMQX Outage Occurs")
+    A("🚨 Database Outage Occurs")
     
     B("📊 Traditional Approach")
     C("🤖 Netdata + MCP")
@@ -117,17 +129,12 @@ Your AI assistant can:
 
 ## The Future of Infrastructure Monitoring
 
-With Netdata MCP, we're moving toward a future where:
+With Netdata MCP, we're moving toward a future where **AI understands your infrastructure** as well as your best engineers. **Troubleshooting becomes conversational** rather than manual chart analysis, **post-mortems write themselves** with complete root cause analysis, and **your monitoring system becomes a true team member** that helps solve problems.
 
-- **AI understands your infrastructure** as well as your best engineers
-- **Troubleshooting becomes conversational** rather than manual chart analysis
-- **Post-mortems write themselves** with complete root cause analysis
-- **Your monitoring system becomes a team member** that helps solve problems
+:::note
 
-**Join us in pioneering the next generation of intelligent infrastructure monitoring.**
-
-:::tip
-
-**Ready to try it?** Contact us to get early access to MCP integration, or check our GitHub repository for the latest nd-mcp tools and setup instructions.
+This represents our vision for the future of infrastructure monitoring. While we're making significant progress with MCP integration, these capabilities are aspirational goals we're working toward, not current product features. For now, we are building the foundations for the reality we want to create.
 
 :::
+
+**Join us in pioneering the next generation of intelligent infrastructure monitoring.**

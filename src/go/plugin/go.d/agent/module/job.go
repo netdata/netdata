@@ -498,7 +498,7 @@ func (j *Job) sendVnodeHostInfo() {
 		j.vnode.Labels["_hostname"] = j.vnode.Hostname
 	}
 	for k, v := range j.vnode.Labels {
-		j.vnode.Labels[k] = lblReplacer.Replace(v)
+		j.vnode.Labels[k] = lblValueReplacer.Replace(v)
 	}
 
 	j.api.HOSTINFO(netdataapi.HostInfo{
@@ -549,15 +549,15 @@ func (j *Job) createChart(chart *Chart) {
 			if ls == 0 {
 				ls = LabelSourceAuto
 			}
-			j.api.CLABEL(l.Key, lblReplacer.Replace(l.Value), ls)
+			j.api.CLABEL(l.Key, lblValueReplacer.Replace(l.Value), ls)
 		}
 	}
 	for k, v := range j.labels {
 		if !seen[k] {
-			j.api.CLABEL(k, lblReplacer.Replace(v), LabelSourceConf)
+			j.api.CLABEL(k, lblValueReplacer.Replace(v), LabelSourceConf)
 		}
 	}
-	j.api.CLABEL("_collect_job", lblReplacer.Replace(j.Name()), LabelSourceAuto)
+	j.api.CLABEL("_collect_job", lblValueReplacer.Replace(j.Name()), LabelSourceAuto)
 	j.api.CLABELCOMMIT()
 
 	for _, dim := range chart.Dims {
@@ -706,4 +706,9 @@ func cleanPluginName(name string) string {
 	return r.Replace(name)
 }
 
-var lblReplacer = strings.NewReplacer("'", "")
+var lblValueReplacer = strings.NewReplacer(
+	"'", "",
+	"\n", " ",
+	"\r", " ",
+	"\x00", "",
+)

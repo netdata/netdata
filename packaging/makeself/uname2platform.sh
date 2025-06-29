@@ -11,7 +11,6 @@ case "${BUILDARCH}" in
   armv6l) echo "linux/arm/v6" ;;
   armv7l) echo "linux/arm/v7" ;;
   aarch64) echo "linux/arm64/v8" ;;
-  ppc64le) echo "linux/ppc64le" ;;
   *)
     echo "Unknown target architecture '${BUILDARCH}'." >&2
     exit 1

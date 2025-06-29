@@ -2,4 +2,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "aruba"
+        value: "Aruba"

@@ -35,7 +35,7 @@ func New(paths ...string) MultiPath {
 		if dir == "" {
 			continue
 		}
-		if d, err := homedir.Expand(dir); err != nil {
+		if d, err := homedir.Expand(dir); err == nil {
 			dir = d
 		}
 		if !set[dir] {

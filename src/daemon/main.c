@@ -217,6 +217,7 @@ int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
 int eval_unittest(void);
+int duration_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -380,6 +381,7 @@ int netdata_main(int argc, char **argv) {
 
                             if (sqlite_library_init())
                                 return 1;
+                            rrdlabels_aral_init(false);
 
                             if (pluginsd_parser_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
@@ -403,6 +405,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
+                            if (duration_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
                             if (stacktrace_unittest()) return 1;
@@ -410,6 +413,7 @@ int netdata_main(int argc, char **argv) {
                             if (perflibnamestest_main()) return 1;
 #endif
                             sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -446,7 +450,10 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
                             unittest_running = true;
-                            return rrdlabels_unittest();
+                            rrdlabels_aral_init(true);
+                            int rc = rrdlabels_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
                         }
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
@@ -509,6 +516,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "evaltest") == 0) {
                             unittest_running = true;
                             return eval_unittest();
+                        }
+                        else if(strcmp(optarg, "durationtest") == 0) {
+                            unittest_running = true;
+                            return duration_unittest();
                         }
                         else if(strcmp(optarg, "dyncfgtest") == 0) {
                             unittest_running = true;
@@ -868,6 +879,7 @@ int netdata_main(int argc, char **argv) {
 
     analytics_reset();
     get_system_timezone();
+    rrdlabels_aral_init(true);
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("pulse");

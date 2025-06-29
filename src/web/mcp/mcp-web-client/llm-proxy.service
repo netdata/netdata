@@ -1,0 +1,28 @@
+[Unit]
+Description=LLM Proxy Server and MCP Web Client
+After=network.target
+
+[Service]
+Type=simple
+User=llm-proxy
+Group=llm-proxy
+WorkingDirectory=/opt/llm-proxy
+ExecStart=/usr/bin/node /opt/llm-proxy/llm-proxy.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/llm-proxy/logs
+ReadOnlyPaths=/opt/llm-proxy
+
+# Environment
+Environment="NODE_ENV=production"
+
+[Install]
+WantedBy=multi-user.target

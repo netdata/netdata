@@ -49,6 +49,7 @@ static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
 static cmd_status_t cmd_remove_stale_node(char *args, char **message);
 static cmd_status_t cmd_mark_stale_nodes_ephemeral(char *args, char **message);
+static cmd_status_t cmd_update_node_info(char *args, char **message);
 
 static command_info_t command_info_array[] = {
     {"help", "", "Show this help menu.", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                // show help menu
@@ -68,6 +69,7 @@ static command_info_t command_info_array[] = {
         "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL},
     {"remove-stale-node", "<node_id | machine_guid | hostname | ALL_NODES>",
      "Marks one or all disconnected nodes as ephemeral, and removes them\n      so that they are no longer available for queries, from both this\n      Netdata Agent dashboard and Netdata Cloud.", cmd_remove_stale_node, CMD_TYPE_ORTHOGONAL},
+    {"update-node-info", "", "Schedules an node update message for localhost to Netdata Cloud.", cmd_update_node_info, CMD_TYPE_ORTHOGONAL},
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -453,6 +455,19 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
 done:
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_update_node_info(char *args __maybe_unused, char **message)
+{
+    if (aclk_online()) {
+        schedule_node_state_update(localhost, 1000);
+        CLEAN_BUFFER *wb = buffer_create(1024, NULL);
+        buffer_sprintf(wb, "Node info update scheduled for \"%s\"", rrdhost_hostname(localhost));
+        *message = strdupz(buffer_tostring(wb));
+    }
+    else
+        *message = strdupz("Agent is not connected to Netdata Cloud");
     return CMD_STATUS_SUCCESS;
 }
 

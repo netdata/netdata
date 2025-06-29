@@ -18,42 +18,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-type (
-	ProfileMetrics struct {
-		Source         string
-		DeviceMetadata map[string]string
-		Tags           map[string]string
-		Metrics        []Metric
-	}
-	Metric struct {
-		Profile     *ProfileMetrics
-		Name        string
-		Description string
-		Family      string
-		Unit        string
-		MetricType  ddprofiledefinition.ProfileMetricType
-		StaticTags  map[string]string
-		Tags        map[string]string
-		Mappings    map[int64]string
-		IsTable     bool
-		Value       int64
-	}
-)
-
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
 	coll := &Collector{
 		log:         log.With(slog.String("ddsnmp", "collector")),
 		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(10*time.Minute, 1), // 5 min TTL with 100% jitter
-		//doTableMetrics: true,
+		tableCache:  newTableCache(30*time.Minute, 1),
 	}
 
 	for _, prof := range profiles {
 		prof := prof
+		handleCrossTableTagsWithoutMetrics(prof)
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
+
+	coll.globalTagsCollector = newGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
+	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 
 	return coll
 }
@@ -66,7 +49,12 @@ type (
 		missingOIDs map[string]bool
 		tableCache  *tableCache
 
-		doTableMetrics bool
+		globalTagsCollector     *globalTagsCollector
+		deviceMetadataCollector *deviceMetadataCollector
+		scalarCollector         *scalarCollector
+		tableCollector          *tableCollector
+
+		DoTableMetrics bool
 	}
 	profileState struct {
 		profile        *ddsnmp.Profile
@@ -76,8 +64,8 @@ type (
 	}
 )
 
-func (c *Collector) Collect() ([]*ProfileMetrics, error) {
-	var metrics []*ProfileMetrics
+func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	var metrics []*ddsnmp.ProfileMetrics
 	var errs []error
 
 	if expired := c.tableCache.clearExpired(); len(expired) > 0 {
@@ -99,20 +87,19 @@ func (c *Collector) Collect() ([]*ProfileMetrics, error) {
 		c.log.Debugf("collecting metrics: %v", errors.Join(errs...))
 	}
 
-	c.updateMetricFamily(metrics)
-	cleanMetrics(metrics)
+	c.updateMetrics(metrics)
 
 	return metrics, nil
 }
 
-func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
+func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, error) {
 	if !ps.initialized {
-		globalTag, err := c.collectGlobalTags(ps.profile)
+		globalTag, err := c.globalTagsCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect global tags: %w", err)
 		}
 
-		deviceMeta, err := c.collectDeviceMetadata(ps.profile)
+		deviceMeta, err := c.deviceMetadataCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to collect device metadata: %w", err)
 		}
@@ -122,23 +109,23 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 		ps.initialized = true
 	}
 
-	var metrics []Metric
+	var metrics []ddsnmp.Metric
 
-	scalarMetrics, err := c.collectScalarMetrics(ps.profile)
+	scalarMetrics, err := c.scalarCollector.Collect(ps.profile)
 	if err != nil {
 		return nil, err
 	}
 	metrics = append(metrics, scalarMetrics...)
 
-	if c.doTableMetrics {
-		tableMetrics, err := c.collectTableMetrics(ps.profile)
+	if c.DoTableMetrics {
+		tableMetrics, err := c.tableCollector.Collect(ps.profile)
 		if err != nil {
 			return nil, err
 		}
 		metrics = append(metrics, tableMetrics...)
 	}
 
-	pm := &ProfileMetrics{
+	pm := &ddsnmp.ProfileMetrics{
 		Source:         ps.profile.SourceFile,
 		DeviceMetadata: maps.Clone(ps.deviceMetadata),
 		Tags:           maps.Clone(ps.globalTags),
@@ -151,31 +138,17 @@ func (c *Collector) collectProfile(ps *profileState) (*ProfileMetrics, error) {
 	return pm, nil
 }
 
-func (c *Collector) updateMetricFamily(pms []*ProfileMetrics) {
-	// Find device vendor and type from any profile that has them.
-	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
-	// but only device-specific profiles contain vendor/type information.
-	// We need to apply vendor/type to ALL metrics across ALL profiles to ensure consistent
-	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
-	for _, ps := range c.profiles {
-		if !ps.initialized {
-			continue
-		}
-		res, ok := ps.profile.Definition.Metadata["device"]
-		if !ok {
-			continue
-		}
-		dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value
-		if dt == "" || dv == "" {
-			continue
-		}
-		for _, pm := range pms {
-			for i := range pm.Metrics {
-				m := &pm.Metrics[i]
-				m.Family = processMetricFamily(m.Family, dt, dv)
+func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
+	for _, pm := range pms {
+		for i := range pm.Metrics {
+			m := &pm.Metrics[i]
+			m.Description = metricMetaReplacer.Replace(m.Description)
+			m.Family = metricMetaReplacer.Replace(m.Family)
+			m.Unit = metricMetaReplacer.Replace(m.Unit)
+			for k, v := range m.Tags {
+				m.Tags[k] = metricMetaReplacer.Replace(v)
 			}
 		}
-		return
 	}
 }
 
@@ -201,7 +174,7 @@ func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
 }
 
 func processMetricFamily(family, devType, vendor string) string {
-	prefix := strings.TrimPrefix(devType+"s/"+vendor, "s/")
+	prefix := strings.TrimPrefix(devType+"/"+vendor, "/")
 	if prefix == "" {
 		return family
 	}
@@ -211,8 +184,79 @@ func processMetricFamily(family, devType, vendor string) string {
 
 	parts := strings.Split(family, "/")
 	parts = slices.DeleteFunc(parts, func(s string) bool {
-		return strings.EqualFold(s, devType) || strings.EqualFold(s, devType+"s") || strings.EqualFold(s, vendor)
+		return strings.EqualFold(s, devType) ||
+			strings.EqualFold(s, devType+"s") ||
+			strings.EqualFold(s, devType+"es") ||
+			strings.EqualFold(s, vendor)
 	})
 
 	return strings.TrimSuffix(prefix+"/"+strings.Join(parts, "/"), "/")
+}
+
+var metricMetaReplacer = strings.NewReplacer(
+	"'", "",
+	"\n", " ",
+	"\r", " ",
+	"\x00", "",
+)
+
+// handleCrossTableTagsWithoutMetrics ensures tables referenced only by cross-table tags
+// are still walked during collection. Without this, if a table like ifXTable is used
+// only for cross-table tags (e.g., getting interface names) but has no metrics defined,
+// it won't be walked and the tags will be missing. This creates synthetic metric entries
+// for such tables using the longest common OID prefix of the referenced columns.
+func handleCrossTableTagsWithoutMetrics(prof *ddsnmp.Profile) {
+	if prof.Definition == nil {
+		return
+	}
+
+	seenTableNames := make(map[string]bool)
+
+	for _, m := range prof.Definition.Metrics {
+		seenTableNames[m.Table.Name] = true
+	}
+
+	tagCrossTableOnlyOIDs := make(map[string][]string)
+
+	for _, m := range prof.Definition.Metrics {
+		if m.IsScalar() {
+			continue
+		}
+		for _, tag := range m.MetricTags {
+			oid := tag.Symbol.OID
+			if tag.Table == "" || seenTableNames[tag.Table] || oid == "" {
+				continue
+			}
+			tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], oid)
+		}
+	}
+
+	for tableName, oids := range tagCrossTableOnlyOIDs {
+		slices.Sort(oids)
+		oids = slices.Compact(oids)
+
+		prof.Definition.Metrics = append(prof.Definition.Metrics, ddprofiledefinition.MetricsConfig{
+			MIB: fmt.Sprintf("synthetic-%s-MIB", tableName),
+			Table: ddprofiledefinition.SymbolConfig{
+				OID:  longestCommonPrefix(oids),
+				Name: tableName,
+			},
+		})
+	}
+}
+
+func longestCommonPrefix(oids []string) string {
+	if len(oids) == 0 {
+		return ""
+	}
+	prefix := oids[0]
+	for i := 1; i < len(oids); i++ {
+		for !strings.HasPrefix(oids[i], prefix) {
+			prefix = prefix[0 : len(prefix)-1]
+			if len(prefix) == 0 {
+				return ""
+			}
+		}
+	}
+	return strings.TrimSuffix(prefix, ".")
 }
