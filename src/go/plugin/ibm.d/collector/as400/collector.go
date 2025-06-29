@@ -108,7 +108,7 @@ type Config struct {
 
 type AS400 struct {
 	module.Base
-	Config `yaml:",inline" json:""`
+	Config `json:""`
 
 	charts *module.Charts
 

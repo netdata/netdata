@@ -119,7 +119,7 @@ type Config struct {
 
 type DB2 struct {
 	module.Base
-	Config `yaml:",inline" json:""`
+	Config `json:""`
 
 	charts *module.Charts
 

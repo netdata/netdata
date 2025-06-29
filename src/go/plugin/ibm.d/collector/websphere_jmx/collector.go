@@ -147,7 +147,7 @@ type Config struct {
 
 type WebSphereJMX struct {
 	module.Base
-	Config `yaml:",inline" json:""`
+	Config `json:""`
 
 	charts *module.Charts
 

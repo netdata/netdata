@@ -126,7 +126,7 @@ type Config struct {
 	UseDynamicCollection *bool `yaml:"use_dynamic_collection,omitempty" json:"use_dynamic_collection"`
 
 	// HTTP Client settings
-	web.HTTPConfig `yaml:",inline" json:""`
+	web.HTTPConfig `json:""`
 }
 
 type WebSpherePMI struct {
