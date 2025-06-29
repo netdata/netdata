@@ -2,78 +2,73 @@ extends:
   - 3com.yaml
 
 sysobjectid:
-  - 1.3.6.1.4.1.43.45.1.2.*  # 3Com Huawei Products (a3Com.jv-mib.huawei.hwproducts)
+  - 1.3.6.1.4.1.43.45.1.2.* # 3Com Huawei Products (a3Com.jv-mib.huawei.hwproducts)
 
 metrics:
   - MIB: A3COM-HUAWEI-LswDEVM-MIB
     table:
-      name: hwCpuTable  # indexes: hwCpuIndex
+      name: hwCpuTable # indexes: hwCpuIndex
       OID: 1.3.6.1.4.1.43.45.1.6.1.1
     symbols:
-      - name: cpu.usage
+      - name: hwCpuCostRatePer5Sec
         OID: 1.3.6.1.4.1.43.45.1.6.1.1.1.3
         description: Cpu usage percentage
+        family: CPU/Usage
         unit: "%"
     metric_tags:
-      - index: 1
-        tag: cpu
+      - tag: cpu_index
+        index: 1
   - MIB: A3COM-HUAWEI-LswDEVM-MIB
     table:
-      name: hwMemTable  # indexes: hwMemModuleIndex
+      name: hwMemTable # indexes: hwMemModuleIndex
       OID: 1.3.6.1.4.1.43.45.1.6.1.2.1
     symbols:
-      - name: memory.total
+      - name: hwMemSize
         OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.2
         description: Total memory size
+        family: Memory/Total
         unit: "By"
-      - name: memory.free
+      - name: hwMemFree
         OID: 1.3.6.1.4.1.43.45.1.6.1.2.1.1.3
         description: Free memory size
+        family: Memory/Free
         unit: "By"
     metric_tags:
-      - index: 1
-        tag: mem
+      - tag: mem_index
+        index: 1
   - MIB: A3COM-HUAWEI-LswDEVM-MIB
     table:
-      name: hwdevMFanStatusTable  # indexes: hwDevMFanNum
+      name: hwdevMFanStatusTable # indexes: hwDevMFanNum
       OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.1
     symbols:
-      - name: hwdevMFanStatus
-        constant_value_one: true
-        description: Fan status indicator
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - index: 1
-        tag: fan_num
-      - symbol:
-          OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.1.1.2
-          name: hwDevMFanStatus
-        tag: fan_status
+      - OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.1.1.2
+        name: hwDevMFanStatus
+        description: Fan status
+        family: Fan/Status
+        unit: "{status}"
         mapping:
           1: active
           2: deactive
           3: not_installed
           4: unsupported
+    metric_tags:
+      - tag: fan_index
+        index: 1
   - MIB: A3COM-HUAWEI-LswDEVM-MIB
     table:
-      name: hwdevMPowerStatusTable  # indexes: hwDevMPowerNum
+      name: hwdevMPowerStatusTable # indexes: hwDevMPowerNum
       OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.2
     symbols:
-      - name: hwdevMPowerStatus
-        constant_value_one: true
-        description: Power status indicator
-        unit: "TBD"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - index: 1
-        tag: power_num
-      - symbol:
-          OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.2.1.2
-          name: hwDevMPowerStatus
-        tag: power_status
+      - OID: 1.3.6.1.4.1.43.45.1.2.23.1.9.1.2.1.2
+        name: hwDevMPowerStatus
+        description: Power status
+        family: PowerSupply/Status
+        unit: "{status}"
         mapping:
           1: active
           2: deactive
           3: not_installed
           4: unsupported
+    metric_tags:
+      - tag: power_index
+        index: 1
