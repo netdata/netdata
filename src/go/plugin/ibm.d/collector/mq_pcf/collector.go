@@ -50,7 +50,7 @@ type Config struct {
 // Collector is the collector type.
 type Collector struct {
 	module.Base
-	Config `json:""`
+	Config `yaml:",inline" json:""`
 	
 	charts *module.Charts
 	
