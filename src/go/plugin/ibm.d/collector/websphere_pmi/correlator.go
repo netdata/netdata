@@ -77,7 +77,7 @@ type MetricGroup struct {
 	Type           string
 }
 
-// groupMetricsByCorrelation groups metrics using correlation heuristics
+// groupMetricsByCorrelation groups metrics using the new simple correlation approach
 func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []MetricGroup {
 	groupMap := make(map[string]*MetricGroup)
 	
@@ -85,28 +85,20 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 		key := c.generateCorrelationKey(metric)
 		
 		if group, exists := groupMap[key]; exists {
-			// Add to existing group if compatible
-			if c.areMetricsCompatible(group.Metrics[0], metric) {
-				group.Metrics = append(group.Metrics, metric)
-			} else {
-				// Create new group with suffix
-				newKey := key + "_" + c.getMetricTypeSuffix(metric)
-				if _, exists := groupMap[newKey]; !exists {
-					groupMap[newKey] = c.createNewGroup(newKey, metric)
-				} else {
-					groupMap[newKey].Metrics = append(groupMap[newKey].Metrics, metric)
-				}
-			}
+			// Add to existing group - no compatibility check needed since
+			// the correlation key ensures proper grouping
+			group.Metrics = append(group.Metrics, metric)
 		} else {
+			// Create new group
 			groupMap[key] = c.createNewGroup(key, metric)
 		}
 	}
 	
-	// Convert map to slice and filter groups
+	// Convert map to slice and split large groups if needed
 	groups := make([]MetricGroup, 0, len(groupMap))
 	for _, group := range groupMap {
 		if len(group.Metrics) > 0 {
-			// Split large groups
+			// Split large groups if they exceed Netdata's limit
 			if len(group.Metrics) > c.maxDimensionsPerChart {
 				subGroups := c.splitLargeGroup(group)
 				groups = append(groups, subGroups...)
@@ -119,60 +111,34 @@ func (c *CorrelationEngine) groupMetricsByCorrelation(metrics []MetricTuple) []M
 	return groups
 }
 
-// generateCorrelationKey creates a key for grouping related metrics
+// generateCorrelationKey creates a key for grouping related metrics using the new approach.
+// This function strips the metric name from the unique instance to create intentional collisions,
+// allowing related metrics to be grouped into the same chart.
 func (c *CorrelationEngine) generateCorrelationKey(metric MetricTuple) string {
-	parts := strings.Split(metric.Path, "/")
+	// Start with the fully unique instance from the flattener
+	uniqueInstance := metric.UniqueInstance
 	
-	// Extract semantic components
-	var category, subcategory, metricFamily string
+	// Strip the last 3 components (path.type.unit) to get the chart grouping key
+	// Example: websphere_pmi.server_thread_pools_webcontainer_activecount.count.requests
+	//       -> websphere_pmi.server_thread_pools_webcontainer
+	parts := strings.Split(uniqueInstance, ".")
 	
-	// Identify category from labels or path
-	if cat, ok := metric.Labels["category"]; ok {
-		category = cat
-	} else {
-		// Infer from path
-		for _, part := range parts {
-			if c.isKnownCategory(part) {
-				category = c.normalizeCategory(part)
-				break
-			}
-		}
+	if len(parts) >= 3 {
+		// Remove last 3 parts (metric_name, type, unit)
+		chartKey := strings.Join(parts[:len(parts)-3], ".")
+		return chartKey
 	}
 	
-	// Identify subcategory
-	if subcat, ok := metric.Labels["subcategory"]; ok {
-		subcategory = subcat
-	}
-	
-	// Extract metric family (last part of path without instances)
-	metricName := parts[len(parts)-1]
-	metricFamily = c.extractMetricFamily(metricName)
-	
-	// Build correlation key
-	keyParts := []string{"websphere_pmi"}
-	
-	if category != "" {
-		keyParts = append(keyParts, category)
-	}
-	
-	if subcategory != "" {
-		keyParts = append(keyParts, subcategory)
-	}
-	
-	if metricFamily != "" {
-		keyParts = append(keyParts, metricFamily)
-	} else {
-		keyParts = append(keyParts, "metrics")
-	}
-	
-	return strings.Join(keyParts, ".")
+	// Fallback: if structure is unexpected, use the full instance
+	return uniqueInstance
 }
 
 // isKnownCategory checks if a path part represents a known category
 func (c *CorrelationEngine) isKnownCategory(part string) bool {
 	knownCategories := []string{
-		"Thread Pools", "JDBC Connection Pools", "Web Applications", 
-		"JVM Runtime", "Servlets", "Portlets", "server",
+		"Thread Pools", "JDBC Connection Pools", "JCA Connection Pools",
+		"Web Applications", "JVM Runtime", "Servlets", "Portlets", 
+		"server", "Dynamic Caching", "Servlet Session Manager",
 	}
 	
 	for _, cat := range knownCategories {
@@ -275,23 +241,70 @@ func (c *CorrelationEngine) areMetricsAdditive(m1, m2 MetricTuple) bool {
 		return true
 	}
 	
-	// Metrics with same semantic meaning are usually additive
+	// If metrics have different instances, they should NOT be grouped together
+	// Each instance should have its own chart
+	if m1.Labels["instance"] != "" && m2.Labels["instance"] != "" && 
+	   m1.Labels["instance"] != m2.Labels["instance"] {
+		return false
+	}
+	
+	// For metrics without instances, only group if they have the same semantic meaning
+	// AND are from the same component
 	family1 := c.extractMetricFamily(strings.Split(m1.Path, "/")[len(strings.Split(m1.Path, "/"))-1])
 	family2 := c.extractMetricFamily(strings.Split(m2.Path, "/")[len(strings.Split(m2.Path, "/"))-1])
+	
+	// Check if paths indicate same component (not just same metric family)
+	path1Parts := strings.Split(m1.Path, "/")
+	path2Parts := strings.Split(m2.Path, "/")
+	
+	// If paths differ significantly, don't group
+	if len(path1Parts) != len(path2Parts) {
+		return false
+	}
+	
+	// Compare paths up to the metric name
+	for i := 0; i < len(path1Parts)-1; i++ {
+		if path1Parts[i] != path2Parts[i] {
+			return false
+		}
+	}
 	
 	return family1 == family2
 }
 
 // createNewGroup creates a new metric group
 func (c *CorrelationEngine) createNewGroup(key string, metric MetricTuple) *MetricGroup {
+	// Generate chart context by stripping metric name from unique context
+	chartContext := c.generateChartContext(metric)
+	
 	return &MetricGroup{
 		CorrelationKey: key,
-		BaseContext:    key,
+		BaseContext:    chartContext,
 		CommonLabels:   c.extractCommonLabels([]MetricTuple{metric}),
 		Metrics:        []MetricTuple{metric},
 		Unit:           metric.Unit,
 		Type:           c.inferChartType(metric),
 	}
+}
+
+// generateChartContext strips the metric name from the unique context to create chart context
+func (c *CorrelationEngine) generateChartContext(metric MetricTuple) string {
+	// Start with the fully unique context from the flattener
+	uniqueContext := metric.UniqueContext
+	
+	// Strip the last component (metric name) to get the chart context
+	// Example: websphere_pmi.server_thread_pools_webcontainer_activecount
+	//       -> websphere_pmi.server_thread_pools_webcontainer
+	parts := strings.Split(uniqueContext, ".")
+	
+	if len(parts) >= 2 {
+		// Remove last part (metric name)
+		chartContext := strings.Join(parts[:len(parts)-1], ".")
+		return chartContext
+	}
+	
+	// Fallback: if structure is unexpected, use the full context
+	return uniqueContext
 }
 
 // extractCommonLabels finds labels common to all metrics in a group
@@ -322,22 +335,36 @@ func (c *CorrelationEngine) extractCommonLabels(metrics []MetricTuple) map[strin
 
 // inferChartType determines the appropriate chart type
 func (c *CorrelationEngine) inferChartType(metric MetricTuple) string {
-	// Time series are typically line charts
-	if metric.Type == "time" {
-		return "line"
+	metricName := strings.ToLower(metric.Path)
+	
+	// Memory/size metrics should be stacked to show resource usage
+	if strings.Contains(metricName, "memory") || strings.Contains(metricName, "heap") ||
+	   strings.Contains(metricName, "size") || metric.Unit == "bytes" {
+		// Check if this looks like a pair (used/free, etc.)
+		if strings.Contains(metricName, "used") || strings.Contains(metricName, "free") ||
+		   strings.Contains(metricName, "committed") {
+			return "stacked"
+		}
 	}
 	
-	// Utilization/percentage metrics are area charts
-	if metric.Unit == "percent" {
+	// Pool sizes should be stacked
+	if strings.Contains(metricName, "poolsize") || strings.Contains(metricName, "pool size") {
+		return "stacked"
+	}
+	
+	// Bidirectional metrics (in/out, read/write) should be area
+	if strings.Contains(metricName, "sent") || strings.Contains(metricName, "received") ||
+	   strings.Contains(metricName, "read") || strings.Contains(metricName, "write") ||
+	   strings.Contains(metricName, "input") || strings.Contains(metricName, "output") {
 		return "area"
 	}
 	
-	// Count/rate metrics are line charts
-	if strings.Contains(metric.Unit, "requests") {
-		return "line"
+	// Utilization/percentage metrics with potential for stacking
+	if metric.Unit == "percent" || strings.Contains(metricName, "percent") {
+		return "area"
 	}
 	
-	// Default to line
+	// Default to line for independent metrics
 	return "line"
 }
 
@@ -391,7 +418,29 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 		Family:     c.generateChartFamily(group),
 		Priority:   priority,
 		Dimensions: dimensions,
-		Labels:     group.CommonLabels,
+		Labels:     make(map[string]string),
+	}
+	
+	// Add common labels
+	for k, v := range group.CommonLabels {
+		chart.Labels[k] = v
+	}
+	
+	// Add instance label if all metrics share the same instance
+	if len(group.Metrics) > 0 {
+		firstInstance := group.Metrics[0].Labels["instance"]
+		if firstInstance != "" {
+			allSameInstance := true
+			for _, m := range group.Metrics {
+				if m.Labels["instance"] != firstInstance {
+					allSameInstance = false
+					break
+				}
+			}
+			if allSameInstance {
+				chart.Labels["instance"] = firstInstance
+			}
+		}
 	}
 	
 	return chart
@@ -399,31 +448,16 @@ func (c *CorrelationEngine) createChartFromGroup(group MetricGroup, priority int
 
 // generateDimensionID creates a unique dimension ID
 func (c *CorrelationEngine) generateDimensionID(metric MetricTuple) string {
-	parts := []string{}
+	// For metrics in a chart, we need truly unique IDs
+	// Since each chart should now contain metrics from only one instance,
+	// we can use just the metric name as the dimension ID
 	
-	// Add instance identifier if available
-	if instance := metric.Labels["instance"]; instance != "" {
-		// Sanitize instance name - replace spaces and special chars with underscore
-		instance = sanitizeDimensionID(instance)
-		parts = append(parts, instance)
-	}
-	
-	// Add metric name (last part of path)
+	// Extract metric name (last part of path)
 	pathParts := strings.Split(metric.Path, "/")
 	metricName := pathParts[len(pathParts)-1]
-	metricName = sanitizeDimensionID(metricName)
-	parts = append(parts, metricName)
 	
-	// If we still have no parts, use a default
-	if len(parts) == 0 {
-		return "metric"
-	}
-	
-	// Join parts and ensure uniqueness by adding path hash if needed
-	baseID := strings.Join(parts, "_")
-	
-	// Ensure the ID is valid for Netdata (no spaces, special chars)
-	return sanitizeDimensionID(baseID)
+	// Sanitize and return
+	return sanitizeDimensionID(metricName)
 }
 
 // sanitizeDimensionID removes or replaces invalid characters for Netdata dimension IDs
@@ -493,26 +527,76 @@ func (c *CorrelationEngine) generateDimensionName(metric MetricTuple) string {
 
 // generateChartTitle creates a descriptive chart title
 func (c *CorrelationEngine) generateChartTitle(group MetricGroup) string {
-	parts := strings.Split(group.BaseContext, ".")
+	// Start with the category
+	titleParts := []string{}
 	
-	// Extract meaningful parts
-	var category, metricType string
-	if len(parts) >= 2 {
-		category = strings.ReplaceAll(parts[1], "_", " ")
-		category = strings.Title(category)
-	}
-	if len(parts) >= 3 {
-		metricType = strings.ReplaceAll(parts[2], "_", " ")
-		metricType = strings.Title(metricType)
+	if category := group.CommonLabels["category"]; category != "" {
+		titleParts = append(titleParts, strings.Title(strings.ReplaceAll(category, "_", " ")))
 	}
 	
-	if category != "" && metricType != "" {
-		return fmt.Sprintf("%s %s", category, metricType)
-	} else if category != "" {
-		return category
-	} else {
-		return "WebSphere PMI Metrics"
+	// Add subcategory if present
+	if subcategory := group.CommonLabels["subcategory"]; subcategory != "" {
+		titleParts = append(titleParts, strings.Title(strings.ReplaceAll(subcategory, "_", " ")))
 	}
+	
+	// Add instance information in parentheses
+	instanceParts := []string{}
+	for _, label := range []string{"app", "servlet", "portlet", "pool", "datasource", "provider"} {
+		if value := group.CommonLabels[label]; value != "" {
+			instanceParts = append(instanceParts, value)
+		}
+	}
+	
+	// Add primary instance if not already included
+	if instance := group.CommonLabels["instance"]; instance != "" {
+		// Check if instance is not already in the instance parts
+		hasInstance := false
+		for _, part := range instanceParts {
+			if part == instance {
+				hasInstance = true
+				break
+			}
+		}
+		if !hasInstance {
+			instanceParts = append(instanceParts, instance)
+		}
+	}
+	
+	if len(instanceParts) > 0 {
+		titleParts = append(titleParts, fmt.Sprintf("(%s)", strings.Join(instanceParts, " - ")))
+	}
+	
+	// Add metric type
+	if len(group.Metrics) > 0 {
+		metricName := strings.Split(group.Metrics[0].Path, "/")
+		metricType := c.extractMetricFamily(metricName[len(metricName)-1])
+		if metricType != "" {
+			titleParts = append(titleParts, strings.Title(strings.ReplaceAll(metricType, "_", " ")))
+		}
+	}
+	
+	if len(titleParts) > 0 {
+		return strings.Join(titleParts, " ")
+	}
+	return "WebSphere PMI Metrics"
+}
+
+// isMetricType checks if a string represents a known metric type pattern
+func (c *CorrelationEngine) isMetricType(s string) bool {
+	metricTypes := []string{
+		"active_connections", "connection_lifecycle", "wait_times",
+		"requests", "response_times", "errors", "memory", 
+		"garbage_collection", "utilization", "metrics",
+		"active_count", "size", "usage", "count", "time",
+	}
+	
+	s = strings.ToLower(s)
+	for _, mt := range metricTypes {
+		if s == mt || strings.Contains(s, mt) {
+			return true
+		}
+	}
+	return false
 }
 
 // generateChartFamily creates a chart family for grouping
@@ -555,6 +639,17 @@ func (c *CorrelationEngine) ConvertToNetdataCharts(candidates []ChartCandidate) 
 			Ctx:      candidate.Context,
 			Type:     module.ChartType(candidate.Type),
 			Priority: candidate.Priority,
+		}
+		
+		// Convert labels
+		if len(candidate.Labels) > 0 {
+			chart.Labels = make([]module.Label, 0, len(candidate.Labels))
+			for k, v := range candidate.Labels {
+				chart.Labels = append(chart.Labels, module.Label{
+					Key:   k,
+					Value: v,
+				})
+			}
 		}
 		
 		// Add dimensions

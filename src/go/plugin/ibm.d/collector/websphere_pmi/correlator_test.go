@@ -141,7 +141,7 @@ func TestCorrelationEngine_CorrelationKeys(t *testing.T) {
 func TestCorrelationEngine_MetricCompatibility(t *testing.T) {
 	correlator := NewCorrelationEngine()
 
-	// Compatible metrics (same unit, similar semantic)
+	// Incompatible metrics - different pools without instance labels
 	metric1 := MetricTuple{
 		Path: "server/Thread Pools/WebContainer/ActiveCount",
 		Labels: map[string]string{"pool": "WebContainer"},
@@ -153,8 +153,23 @@ func TestCorrelationEngine_MetricCompatibility(t *testing.T) {
 		Unit: "requests", Type: "count",
 	}
 
-	assert.True(t, correlator.areMetricsCompatible(metric1, metric2), 
-		"Metrics with same unit and type should be compatible")
+	// Without instance labels, metrics from different paths should not be compatible
+	assert.False(t, correlator.areMetricsCompatible(metric1, metric2), 
+		"Metrics from different paths without instance labels should NOT be compatible")
+
+	// Compatible metrics from same instance
+	metric1Same := MetricTuple{
+		Path: "server/Thread Pools/WebContainer/ActiveCount",
+		Labels: map[string]string{"pool": "WebContainer", "instance": "WebContainer"},
+		Unit: "requests", Type: "count",
+	}
+	metric2Same := MetricTuple{
+		Path: "server/Thread Pools/WebContainer/CreateCount",
+		Labels: map[string]string{"pool": "WebContainer", "instance": "WebContainer"},
+		Unit: "requests", Type: "count",
+	}
+	assert.True(t, correlator.areMetricsCompatible(metric1Same, metric2Same),
+		"Metrics from same instance with same unit should be compatible")
 
 	// Incompatible metrics (different units)
 	metric3 := MetricTuple{
@@ -355,7 +370,8 @@ func TestCorrelationEngine_RealDataIntegration(t *testing.T) {
 
 	// Should have reasonable number of charts (not too many, not too few)
 	assert.Greater(t, len(*netdataCharts), 5, "Should generate reasonable number of charts")
-	assert.Less(t, len(*netdataCharts), 150, "Should not generate excessive charts")
+	// With instance separation, we generate more charts (one per instance)
+	assert.Less(t, len(*netdataCharts), 500, "Should not generate excessive charts")
 }
 
 func TestCorrelationEngine_MetricFamilyExtraction(t *testing.T) {
@@ -397,10 +413,87 @@ func TestCorrelationEngine_DimensionIDSanitization(t *testing.T) {
 		{"", "metric", "Empty string should return default"},
 		{"UPPERCASE", "uppercase", "Should be lowercase"},
 		{"Message Listener_MaxPoolSize", "message_listener_maxpoolsize", "Real WebSphere example"},
+		{"HAManager.thread.pool", "hamanager_thread_pool", "HAManager thread pool"},
+		{"Object Request Broker", "object_request_broker", "Object Request Broker"},
+		{"Object: ws/com.ibm.workplace/ExtensionRegistryCache", "object_ws_com_ibm_workplace_extensionregistrycache", "Object with colons"},
+		{"PerfServletApp#perfServletApp.war", "perfservletapp_perfservletapp_war", "Servlet app with hash"},
+		{"jdbc/built-in-derby-datasource", "jdbc_built_in_derby_datasource", "JDBC datasource"},
+		{"Number of loaded portlets", "number_of_loaded_portlets", "Metric with spaces"},
 	}
 
 	for _, tc := range testCases {
 		result := sanitizeDimensionID(tc.input)
 		assert.Equal(t, tc.expected, result, tc.description)
+	}
+}
+
+func TestCorrelationEngine_InstanceSeparation(t *testing.T) {
+	engine := NewCorrelationEngine()
+
+	// Test metrics with same name but different instances
+	metrics := []MetricTuple{
+		{
+			Path: "server/Web Applications/PerfServletApp#perfServletApp.war/Number of loaded portlets",
+			Labels: map[string]string{
+				"instance": "PerfServletApp#perfServletApp.war",
+				"app":      "PerfServletApp#perfServletApp.war",
+				"category": "web_apps",
+			},
+			Value: 7,
+			Unit:  "requests",
+			Type:  "count",
+		},
+		{
+			Path: "server/Web Applications/filetransferSecured#filetransfer.war/Number of loaded portlets",
+			Labels: map[string]string{
+				"instance": "filetransferSecured#filetransfer.war",
+				"app":      "filetransferSecured#filetransfer.war",
+				"category": "web_apps",
+			},
+			Value: 4,
+			Unit:  "requests",
+			Type:  "count",
+		},
+		{
+			Path: "server/Web Applications/ibmasyncrsp#ibmasyncrsp.war/Number of loaded portlets",
+			Labels: map[string]string{
+				"instance": "ibmasyncrsp#ibmasyncrsp.war",
+				"app":      "ibmasyncrsp#ibmasyncrsp.war",
+				"category": "web_apps",
+			},
+			Value: 2,
+			Unit:  "requests",
+			Type:  "count",
+		},
+	}
+
+	// Correlate metrics into charts
+	charts := engine.CorrelateMetrics(metrics)
+
+	// Each instance should get its own chart
+	assert.Equal(t, 3, len(charts), "Should have separate chart for each web application")
+
+	// Verify each chart has only one dimension and correct labels
+	for _, chart := range charts {
+		assert.Equal(t, 1, len(chart.Dimensions), "Each instance chart should have only one dimension")
+		assert.NotEmpty(t, chart.Labels["instance"], "Chart should have instance label")
+		
+		// Verify dimension ID is sanitized
+		dimID := chart.Dimensions[0].ID
+		assert.NotContains(t, dimID, "#", "Dimension ID should not contain hash")
+		assert.NotContains(t, dimID, ".", "Dimension ID should not contain dots")
+		assert.NotContains(t, dimID, " ", "Dimension ID should not contain spaces")
+		
+		t.Logf("Chart: %s, Instance: %s, Dimension ID: %s", 
+			chart.Title, chart.Labels["instance"], dimID)
+	}
+
+	// Verify all dimension IDs are unique
+	dimIDs := make(map[string]bool)
+	for _, chart := range charts {
+		for _, dim := range chart.Dimensions {
+			assert.False(t, dimIDs[dim.ID], "Dimension ID %s should be unique", dim.ID)
+			dimIDs[dim.ID] = true
+		}
 	}
 }

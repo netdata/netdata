@@ -15,6 +15,10 @@ type MetricTuple struct {
 	Value  int64             // Metric value
 	Unit   string            // Metric unit (requests, bytes, milliseconds, etc.)
 	Type   string            // Metric type (count, time, bounded_range, range, double)
+	
+	// New fields for fully unique identification
+	UniqueContext  string    // Fully unique context including metric name
+	UniqueInstance string    // Fully unique instance including metric name
 }
 
 // ArrayInfo represents detected array structures
@@ -169,6 +173,8 @@ func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]str
 			labels["category"] = "thread_pools"
 		case "JDBC Connection Pools":
 			labels["category"] = "jdbc_pools"
+		case "JCA Connection Pools":
+			labels["category"] = "jca_pools"
 		case "Web Applications":
 			labels["category"] = "web_apps"
 		case "JVM Runtime":
@@ -187,14 +193,52 @@ func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]str
 				switch prevPart {
 				case "JDBC Connection Pools":
 					labels["provider"] = part
+					labels["instance"] = part
+				case "JCA Connection Pools":
+					labels["adapter"] = part
+					labels["instance"] = part
 				case "Web Applications":
 					labels["app"] = part
+					labels["instance"] = part
 				case "Thread Pools":
 					labels["pool"] = part
+					labels["instance"] = part
 				case "Servlets":
 					labels["servlet"] = part
 				case "Portlets":
 					labels["portlet"] = part
+				case "Dynamic Caching":
+					// For Dynamic Caching, the full object path is the instance
+					// e.g., "Object: ws/com.ibm.workplace/ExtensionRegistryCache"
+					if strings.HasPrefix(part, "Object:") && i+1 < len(pathParts) {
+						// Collect the full object path
+						fullObjectPath := part
+						for j := i + 1; j < len(pathParts); j++ {
+							nextPart := pathParts[j]
+							// Stop at known subcomponents
+							if nextPart == "Object Cache" || nextPart == "Servlet Cache" || 
+							   nextPart == "Counters" || nextPart == "Dependency IDs" {
+								break
+							}
+							fullObjectPath += "/" + nextPart
+						}
+						labels["cache"] = fullObjectPath
+						labels["instance"] = fullObjectPath
+					} else {
+						labels["cache"] = part
+						labels["instance"] = part
+					}
+				case "Servlet Session Manager":
+					labels["session_app"] = part
+					labels["instance"] = part
+				default:
+					// For nested resources like "SIB JMS Resource Adapter/jms/built-in-jms-connectionfactory"
+					if i > 1 && (prevPart == "SIB JMS Resource Adapter" || 
+					            strings.Contains(part, "jms/") || 
+					            strings.Contains(part, "jdbc/")) {
+						labels["resource"] = part
+						labels["instance"] = part
+					}
 				}
 			}
 		}
@@ -234,6 +278,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "count",
 			}
 			f.refineMetricUnit(&metric)
+			
+			// Generate fully unique context and instance
+			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
+			
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -248,6 +296,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Unit:   "milliseconds",
 				Type:   "time",
 			}
+			
+			// Generate fully unique context and instance
+			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
+			
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -263,6 +315,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "bounded_range",
 			}
 			f.refineMetricUnit(&metric)
+			
+			// Generate fully unique context and instance
+			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
+			
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -278,6 +334,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "range",
 			}
 			f.refineMetricUnit(&metric)
+			
+			// Generate fully unique context and instance
+			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
+			
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -293,6 +353,10 @@ func (f *XMLFlattener) extractMetrics(stat *pmiStat, basePath string, labels map
 				Type:   "double",
 			}
 			f.refineMetricUnit(&metric)
+			
+			// Generate fully unique context and instance
+			metric.UniqueContext, metric.UniqueInstance = f.generateUniqueContextAndInstance(&metric)
+			
 			result.Metrics = append(result.Metrics, metric)
 		}
 	}
@@ -337,6 +401,58 @@ func (f *XMLFlattener) refineMetricUnit(metric *MetricTuple) {
 		metric.Unit = "requests/s"
 		return
 	}
+}
+
+// generateUniqueContextAndInstance creates fully unique context and instance paths
+// that include the complete hierarchical structure including the metric name.
+// This ensures zero collisions before the correlator groups metrics.
+func (f *XMLFlattener) generateUniqueContextAndInstance(metric *MetricTuple) (context, instance string) {
+	// Split path into components and sanitize each part separately
+	// This maintains the hierarchical structure for correlation
+	
+	pathParts := strings.Split(metric.Path, "/")
+	sanitizedParts := make([]string, 0, len(pathParts))
+	
+	for _, part := range pathParts {
+		if part != "" { // Skip empty parts
+			sanitizedParts = append(sanitizedParts, sanitizeDimensionID(part))
+		}
+	}
+	
+	// Build the structured path
+	structuredPath := strings.Join(sanitizedParts, ".")
+	
+	// Clean type and unit
+	sanitizedType := sanitizeDimensionID(metric.Type)
+	if sanitizedType == "" {
+		sanitizedType = "unknown_type"
+	}
+	
+	sanitizedUnit := sanitizeDimensionID(metric.Unit)
+	if sanitizedUnit == "" {
+		sanitizedUnit = "unknown_unit"
+	}
+	
+	// Create unique context and instance by including all identifying information
+	uniqueContext := fmt.Sprintf("websphere_pmi.%s", structuredPath)
+	uniqueInstance := fmt.Sprintf("websphere_pmi.%s.%s.%s", 
+		structuredPath, sanitizedType, sanitizedUnit)
+		
+	return uniqueContext, uniqueInstance
+}
+
+// extractObjectName extracts the object name from "Object: ws/com.ibm.workplace/ExtensionRegistryCache"
+func (f *XMLFlattener) extractObjectName(objectSpec string) string {
+	if strings.HasPrefix(objectSpec, "Object:") {
+		name := strings.TrimSpace(objectSpec[7:]) // Remove "Object:" prefix
+		// Take the last component of the path
+		parts := strings.Split(name, "/")
+		if len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+		return name
+	}
+	return objectSpec
 }
 
 // copyLabels creates a deep copy of a label map
