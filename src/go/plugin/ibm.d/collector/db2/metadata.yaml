@@ -97,10 +97,15 @@ modules:
               This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
               See the AS/400 collector documentation for build instructions.
 
-          - title: Install IBM DB2 Client Libraries
+          - title: IBM DB2 Client Libraries
             description: |
-              The IBM DB2 client libraries must be installed on the system where Netdata runs.
-              These are proprietary libraries that must be obtained from IBM.
+              Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0.
+              
+              **Important Restrictions:**
+              - **XA Connections**: Not supported against IBM i servers
+              - **CLIENT Authentication**: Not supported by the IBM Data Server Driver
+              
+              For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
 
           - title: Database User Permissions
             description: |

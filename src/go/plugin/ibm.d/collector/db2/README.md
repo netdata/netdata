@@ -26,9 +26,15 @@ This allows you to:
 
 ## Requirements
 
-- IBM DB2 client libraries installed
+- Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0
 - Database user with SELECT permissions on monitoring views
 - Network connectivity to DB2 database
+
+**Important Driver Restrictions:**
+- **XA Connections**: Not supported against IBM i servers
+- **CLIENT Authentication**: Not supported by the IBM Data Server Driver
+
+For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
 
 ## Metrics
 
@@ -115,6 +121,8 @@ The collector automatically adapts to different DB2 editions:
 - **SQL0204N errors**: Expected on older versions or limited editions. The collector logs which features are disabled.
 - **Missing metrics**: Check logs for feature availability messages. Some metrics are edition/version specific.
 - **Version detection**: The collector logs detected edition and version on startup.
+- **XA transaction failures**: XA connections are not supported against IBM i servers.
+- **Authentication failures**: Use SERVER authentication instead of CLIENT (not supported by IBM Data Server Driver).
 
 ### Logs to Monitor
 

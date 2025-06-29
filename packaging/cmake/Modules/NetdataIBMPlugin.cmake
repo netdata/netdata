@@ -18,7 +18,7 @@ macro(add_ibm_plugin_target)
     # Download IBM DB2 client libraries to build directory
     set(IBM_CLIDRIVER_DIR "${CMAKE_BINARY_DIR}/ibm-clidriver")
     set(IBM_CLIDRIVER_ARCHIVE "${CMAKE_BINARY_DIR}/linuxx64_odbc_cli.tar.gz")
-    set(IBM_CLIDRIVER_URL "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz")
+    set(IBM_CLIDRIVER_URL "https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v12.1.0/linuxx64_odbc_cli.tar.gz")
     
     # Download IBM MQ client libraries to build directory
     set(IBM_MQ_DIR "${CMAKE_BINARY_DIR}/ibm-mqclient")
@@ -129,7 +129,7 @@ macro(add_ibm_plugin_target)
     # Add MQ paths if available
     if(EXISTS "${IBM_MQ_DIR}/inc/cmqc.h")
         set(IBM_CGO_CFLAGS "${IBM_CGO_CFLAGS} -I${IBM_MQ_DIR}/inc")
-        set(IBM_CGO_LDFLAGS "${IBM_CGO_LDFLAGS} -L${IBM_MQ_DIR}/lib64")
+        set(IBM_CGO_LDFLAGS "${IBM_CGO_LDFLAGS} -L${IBM_MQ_DIR}/lib64 -lmqm")
         set(IBM_RPATH_FLAGS "${IBM_RPATH_FLAGS} -Wl,-rpath,\$ORIGIN/../../../lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,/usr/lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,/opt/netdata/lib/netdata/ibm-mqclient/lib64")
         set(MQ_INSTALLATION_PATH "${IBM_MQ_DIR}")
     else()

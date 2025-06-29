@@ -101,20 +101,16 @@ modules:
               This collector is part of the ibm.d.plugin which requires CGO and is not included in the default build.
               You must build the plugin from source with CGO_ENABLED=1.
 
-          - title: Install IBM DB2 Client Libraries
+          - title: IBM DB2 Client Libraries
             description: |
-              The IBM DB2 client libraries must be installed on the system where Netdata runs:
-
-              For Linux systems:
-              ```bash
-              # Download IBM DB2 client from IBM website
-              # Extract and install the client libraries
-              # Set environment variables:
-              export IBM_DB_HOME=/path/to/db2/client
-              export CGO_CFLAGS="-I$IBM_DB_HOME/include"
-              export CGO_LDFLAGS="-L$IBM_DB_HOME/lib"
-              export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
-              ```
+              Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0 to `/usr/lib/netdata/ibm-clidriver/` (or `/opt/netdata/ibm-clidriver/`).
+              
+              **Important Restrictions:**
+              - **License Key Required**: For connections to IBM i servers, you must install a Db2 Connect license key in the driver's license directory according to IBM driver distribution policy
+              - **XA Connections**: Not supported against IBM i servers  
+              - **CLIENT Authentication**: Not supported by the IBM Data Server Driver
+              
+              For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
 
           - title: Configure Database Connection
             description: |

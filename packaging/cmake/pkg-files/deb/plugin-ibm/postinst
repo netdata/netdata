@@ -4,7 +4,7 @@ set -e
 
 download_ibm_libs() {
     DRIVER_DIR="/usr/lib/netdata/ibm-clidriver"
-    DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz"
+    DRIVER_URL="https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v12.1.0/linuxx64_odbc_cli.tar.gz"
     
     # Check if already installed
     if [ -f "$DRIVER_DIR/lib/libdb2.so" ]; then
