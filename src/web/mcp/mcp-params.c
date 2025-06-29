@@ -511,6 +511,85 @@ void mcp_schema_add_size_param(
     buffer_json_object_close(buffer);
 }
 
+// Validate and auto-correct time window parameters
+// Contract: 'after' is relative to 'before', 'before' is relative to 'now'
+// Since we're a monitoring solution, we almost always work in the past
+void mcp_params_validate_time_window(time_t *after, time_t *before, time_t now) {
+    if (!now) now = now_realtime_sec();
+    
+    // Check if both are relative times (within 3 years of zero)
+    bool after_is_relative = (ABS(*after) <= API_RELATIVE_TIME_MAX);
+    bool before_is_relative = (ABS(*before) <= API_RELATIVE_TIME_MAX);
+    
+    if (after_is_relative && before_is_relative) {
+        // Case 1: Both are relative and positive - assistant didn't read instructions
+        if (*after > 0 && *before > 0) {
+            *after = -*after;
+            *before = -*before;
+        }
+        // Case 2: After is positive, before is negative, check if result makes sense
+        else if (*after > 0 && *before <= 0) {
+            // If after + before > 0, the assistant is confused about relative time
+            if (*after + *before > 0) {
+                *after = -*after;
+            }
+        }
+    }
+}
+
+// Parse and validate time window parameters (after and before) together
+// This ensures consistent parsing and validation across all MCP tools
+bool mcp_params_parse_time_window(
+    struct json_object *params,
+    time_t *after,
+    time_t *before,
+    time_t default_after,
+    time_t default_before,
+    bool allow_both_zero,
+    BUFFER *error
+) {
+    if (!after || !before) {
+        if (error) {
+            buffer_flush(error);
+            buffer_strcat(error, "Internal error: after and before pointers cannot be NULL");
+        }
+        return false;
+    }
+    
+    // Parse both time parameters
+    *after = mcp_params_parse_time(params, "after", default_after);
+    *before = mcp_params_parse_time(params, "before", default_before);
+    
+    // Apply validation and auto-correction
+    mcp_params_validate_time_window(after, before, 0);
+    
+    // Basic validation - both cannot be zero (unless explicitly allowed)
+    if (*after == 0 && *before == 0 && !allow_both_zero) {
+        if (error) {
+            buffer_flush(error);
+            buffer_strcat(error, "Invalid time range: both 'after' and 'before' cannot be zero. "
+                                 "Use negative values for relative times (e.g., after=-3600, before=0 for the last hour) "
+                                 "or specific timestamps for absolute times.");
+        }
+        return false;
+    }
+    
+    // Check if after is later than before (when both are absolute timestamps)
+    bool after_is_absolute = (ABS(*after) > API_RELATIVE_TIME_MAX);
+    bool before_is_absolute = (ABS(*before) > API_RELATIVE_TIME_MAX);
+    
+    if (after_is_absolute && before_is_absolute && *after >= *before) {
+        if (error) {
+            buffer_flush(error);
+            buffer_sprintf(error, "Invalid time range: 'after' (%ld) must be earlier than 'before' (%ld) "
+                                  "when both are absolute timestamps.", *after, *before);
+        }
+        return false;
+    }
+    
+    return true;
+}
+
 time_t mcp_params_parse_time(struct json_object *params, const char *name, time_t default_value) {
     if (!params)
         return default_value;
@@ -541,11 +620,25 @@ time_t mcp_params_parse_time(struct json_object *params, const char *name, time_
             return (time_t)(timestamp_ut / USEC_PER_SEC);
         }
 
-        // RFC3339 parsing failed, fall back to parsing as integer
+        // Check for special "now" keyword first
+        if (strcasecmp(val_str, "now") == 0) {
+            return 0;  // "now" means no offset from current time
+        }
+        
+        // Try duration parsing for human-readable durations
+        // This handles human-readable durations like:
+        // - "7d", "7 days", "2h", "30m"
+        // - "7 days ago", "2h ago" (negative)
+        // - Complex expressions: "1d12h", "2h30m ago"
+        int64_t duration_seconds;
+        if (duration_parse(val_str, &duration_seconds, "s", "s")) {
+            return (time_t)duration_seconds;
+        }
+        
+        // Duration parsing failed, fall back to parsing as integer
         // This handles:
         // - Unix timestamps as strings: "1705318200"
         // - Relative times as strings: "-3600", "-86400"
-        // - Special values: "0", "now" (handled by str2l)
         return str2l(val_str);
     }
 
@@ -572,7 +665,8 @@ void mcp_schema_add_time_param(
             buffer_json_member_add_string(
                 buffer, "description",
                 "Unix epoch timestamp in seconds (e.g. 1705318200), "
-                "or number of seconds, "
+                "number of seconds (use NEGATIVE for past times), "
+                "human-readable duration (e.g. '-7d', '-2h', '-30m', '7 days ago'), "
                 "or RFC3339 datetime string");
 
         // Use anyOf for multiple types
@@ -582,7 +676,7 @@ void mcp_schema_add_time_param(
             {
                 buffer_json_member_add_string(buffer, "type", "number");
                 buffer_json_member_add_sprintf(buffer, "description",
-                    "Unix epoch timestamp in seconds (e.g. 1705318200), or number of seconds relative to %s (e.g. -3600 for an hour before %s)",
+                    "Unix epoch timestamp in seconds (e.g. 1705318200), or number of seconds relative to %s (e.g. -3600 for an hour before %s). NOTE: Use NEGATIVE values for past times.",
                     relative_to ? relative_to : "now", relative_to ? relative_to : "now");
             }
             buffer_json_object_close(buffer);
@@ -590,7 +684,9 @@ void mcp_schema_add_time_param(
             buffer_json_add_array_item_object(buffer);
             {
                 buffer_json_member_add_string(buffer, "type", "string");
-                buffer_json_member_add_string(buffer, "description", "RFC3339 datetime string (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\")");
+                buffer_json_member_add_string(buffer, "description", 
+                    "RFC3339 datetime string (e.g., \"2024-01-15T10:30:00Z\", \"2024-01-15T10:30:00-05:00\"), "
+                    "or human-readable duration (e.g., \"-7d\", \"-2h\", \"-30m\", \"7 days ago\", \"now\"). NOTE: Use NEGATIVE values for past times.");
             }
             buffer_json_object_close(buffer);
         }

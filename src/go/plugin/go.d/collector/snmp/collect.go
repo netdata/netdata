@@ -5,11 +5,15 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -30,14 +34,14 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		if c.EnableProfiles {
-			c.snmpProfiles = ddsnmp.Find(c.sysInfo.SysObjectID)
+			c.snmpProfiles = c.setupProfiles()
 		}
 	}
 
 	mx := make(map[string]int64)
 
 	if err := c.collectProfiles(mx); err != nil {
-		return nil, err
+		c.Infof("failed to collect profiles: %v", err)
 	}
 
 	if err := c.collectSysUptime(mx); err != nil {
@@ -92,7 +96,7 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 	hostnames := []string{c.Vnode.Hostname, si.Name, "snmp-device"}
 	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
 
-	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
+	c.Vnode.Hostname = fmt.Sprintf("SNMP-%s(%s)", hostnames[i], c.Hostname)
 
 	labels := make(map[string]string)
 
@@ -116,6 +120,22 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 		Hostname: c.Vnode.Hostname,
 		Labels:   labels,
 	}
+}
+
+func (c *Collector) setupProfiles() []*ddsnmp.Profile {
+	snmpProfiles := ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
+	var profInfo []string
+	for _, prof := range snmpProfiles {
+		if logger.Level.Enabled(slog.LevelDebug) {
+			profInfo = append(profInfo, prof.SourceTree())
+		} else {
+			name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
+			profInfo = append(profInfo, name)
+		}
+	}
+	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)",
+		len(snmpProfiles), strings.Join(profInfo, ", "), c.sysInfo.SysObjectID)
+	return snmpProfiles
 }
 
 func pduToInt(pdu gosnmp.SnmpPDU) (int64, error) {

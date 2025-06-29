@@ -234,6 +234,12 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m nginxunit
   ```
 
+  To debug a specific job:
+
+  ```bash
+  ./go.d.plugin -d -m nginxunit -j jobName
+  ```
+
 ### Getting Logs
 
 If you're encountering problems with the `nginxunit` collector, follow these steps to retrieve logs and identify potential issues:

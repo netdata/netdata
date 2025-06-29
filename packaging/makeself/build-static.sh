@@ -30,30 +30,28 @@ case "${BUILDARCH}" in
         QEMU_CPU="Nehalem-v2"
         TUNING_FLAGS="-march=x86-64"
         GOAMD64="v1"
+        GOARCH="amd64"
         ;;
     armv6l) # Raspberry Pi 1 equivalent
         QEMU_ARCH="arm"
         QEMU_CPU="arm1176"
         TUNING_FLAGS="-march=armv6zk -mtune=arm1176jzf-s"
         GOARM="6"
+        GOARCH="arm"
         ;;
     armv7l) # Baseline ARMv7 CPU
         QEMU_ARCH="arm"
         QEMU_CPU="cortex-a7"
         TUNING_FLAGS="-march=armv7-a"
         GOARM="7"
+        GOARCH="arm"
         ;;
     aarch64) # Baseline ARMv8 CPU
         QEMU_ARCH="aarch64"
         QEMU_CPU="cortex-a53"
         TUNING_FLAGS="-march=armv8-a"
         GOARM64="v8.0"
-        ;;
-    ppc64le) # Baseline POWER8+ CPU
-        QEMU_ARCH="ppc64le"
-        QEMU_CPU="power8nvl"
-        TUNING_FLAGS="-mcpu=power8 -mtune=power9"
-        GOPPC64="power8"
+        GOARCH="arm64"
         ;;
 esac
 
@@ -87,7 +85,7 @@ if [ -t 1 ]; then
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${DEBUG_BUILD_INFRA:+-e DEBUG_BUILD_INFRA=1} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
-    -e TUNING_FLAGS="${TUNING_FLAGS}" \
+    -e TUNING_FLAGS="${TUNING_FLAGS}" ${GOARCH:+-e GOARCH="${GOARCH}"} \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
     ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
@@ -96,7 +94,7 @@ else
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
     ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
-    -e TUNING_FLAGS="${TUNING_FLAGS}" \
+    -e TUNING_FLAGS="${TUNING_FLAGS}" ${GOARCH:+-e GOARCH="${GOARCH}"} \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
     ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"

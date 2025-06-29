@@ -196,7 +196,7 @@ func (c *Collector) collectRespCode() {
 
 	code := c.line.respCode
 	switch {
-	case code >= 100 && code < 300, code == 304, code == 401:
+	case code >= 100 && code < 300, code == 304, code == 401, code == 429:
 		c.mx.ReqSuccess.Inc()
 	case code >= 300 && code < 400:
 		c.mx.ReqRedirect.Inc()

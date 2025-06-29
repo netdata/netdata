@@ -16,7 +16,7 @@ typedef void (*rrd_function_result_callback_t)(BUFFER *wb, int code, void *resul
 typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 typedef void (*rrd_function_cancel_cb_t)(void *data);
 typedef void (*rrd_function_register_canceller_cb_t)(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data);
-typedef void (*rrd_function_progress_cb_t)(void *data, size_t done, size_t all);
+typedef void (*rrd_function_progress_cb_t)(nd_uuid_t *transaction, void *data, size_t done, size_t all);
 typedef void (*rrd_function_progresser_cb_t)(const char *transaction, void *data);
 typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
 
