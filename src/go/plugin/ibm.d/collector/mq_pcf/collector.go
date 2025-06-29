@@ -51,8 +51,8 @@ type Config struct {
 
 // Collector is the collector type.
 type Collector struct {
-	conf Config
 	module.Base
+	Config `yaml:",inline" json:""`
 	
 	charts *module.Charts
 	
@@ -82,62 +82,62 @@ func New() *Collector {
 // Init is called once when the collector is created.
 func (c *Collector) Init(ctx context.Context) error {
 	// Validate required configuration
-	if c.conf.QueueManager == "" {
+	if c.QueueManager == "" {
 		return errors.New("queue_manager is required")
 	}
 	
 	// Set default connection parameters if not specified
-	if c.conf.Host == "" {
-		c.conf.Host = "localhost"
+	if c.Host == "" {
+		c.Host = "localhost"
 	}
-	if c.conf.Port == 0 {
-		c.conf.Port = 1414 // Default MQ port
+	if c.Port == 0 {
+		c.Port = 1414 // Default MQ port
 	}
-	if c.conf.Channel == "" {
-		c.conf.Channel = "SYSTEM.DEF.SVRCONN" // Default server connection channel
+	if c.Channel == "" {
+		c.Channel = "SYSTEM.DEF.SVRCONN" // Default server connection channel
 	}
 	
 	// CRITICAL: Admin configuration MUST always take precedence over auto-detection
 	// Only set defaults for collection options if admin hasn't explicitly configured them
 	
-	if c.conf.CollectQueues == nil {
+	if c.CollectQueues == nil {
 		// Auto-detection: Default to true for queues (basic feature, supported in all versions)
 		defaultValue := true
-		c.conf.CollectQueues = &defaultValue
+		c.CollectQueues = &defaultValue
 	}
 	
-	if c.conf.CollectChannels == nil {
+	if c.CollectChannels == nil {
 		// Auto-detection: Default to true for channels (basic feature, supported in all versions)  
 		defaultValue := true
-		c.conf.CollectChannels = &defaultValue
+		c.CollectChannels = &defaultValue
 	}
 	
-	if c.conf.CollectTopics == nil {
+	if c.CollectTopics == nil {
 		// Auto-detection: Default to false for topics (performance impact, optional feature)
 		// Version detection could be added here later to enable for MQ 8.0+
 		defaultValue := false
-		c.conf.CollectTopics = &defaultValue
+		c.CollectTopics = &defaultValue
 	}
 	
 	// Compile selector regular expressions if provided
-	if c.conf.QueueSelector != "" {
+	if c.QueueSelector != "" {
 		var err error
-		c.queueSelectorRegex, err = regexp.Compile(c.conf.QueueSelector)
+		c.queueSelectorRegex, err = regexp.Compile(c.QueueSelector)
 		if err != nil {
-			return fmt.Errorf("invalid queue_selector regex '%s': %w", c.conf.QueueSelector, err)
+			return fmt.Errorf("invalid queue_selector regex '%s': %w", c.QueueSelector, err)
 		}
 	}
 	
-	if c.conf.ChannelSelector != "" {
+	if c.ChannelSelector != "" {
 		var err error
-		c.channelSelectorRegex, err = regexp.Compile(c.conf.ChannelSelector)
+		c.channelSelectorRegex, err = regexp.Compile(c.ChannelSelector)
 		if err != nil {
-			return fmt.Errorf("invalid channel_selector regex '%s': %w", c.conf.ChannelSelector, err)
+			return fmt.Errorf("invalid channel_selector regex '%s': %w", c.ChannelSelector, err)
 		}
 	}
 	
 	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v", 
-		*c.conf.CollectQueues, *c.conf.CollectChannels, *c.conf.CollectTopics)
+		*c.CollectQueues, *c.CollectChannels, *c.CollectTopics)
 	
 	return nil
 }
@@ -168,7 +168,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 
 // Configuration returns the collector configuration.
 func (c *Collector) Configuration() any {
-	return &c.conf
+	return c.Config
 }
 
 func init() {
