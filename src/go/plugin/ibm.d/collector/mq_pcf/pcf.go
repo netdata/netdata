@@ -63,21 +63,26 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	cfst.StrucLength = C.MQLONG(p.size())
 	cfst.Parameter = p.parameter
 	cfst.CodedCharSetId = C.MQCCSI_DEFAULT
-	
-	// Determine actual string length to copy (truncate if too long)
-	maxStringLen := 256  // Safe buffer size for most MQ string fields
-	actualLen := len(p.value)
-	if actualLen > maxStringLen {
-		actualLen = maxStringLen  // Truncate overlong strings
-	}
-	
-	cfst.StringLength = C.MQLONG(actualLen)
-	
-	// Copy string data with bounds checking
-	stringData := unsafe.Pointer(uintptr(buffer) + C.sizeof_MQCFST)
-	C.memset(stringData, 0, C.size_t(actualLen))
-	if actualLen > 0 {
-		copy((*[256]byte)(stringData)[:actualLen], []byte(p.value[:actualLen]))
+	cfst.StringLength = C.MQLONG(len(p.value))
+
+	// Calculate the actual buffer size for the string data (must match size())
+	paddedLen := (len(p.value) + 3) & ^3
+
+	stringDataPtr := unsafe.Pointer(uintptr(buffer) + C.sizeof_MQCFST)
+
+	// Convert Go string to byte slice
+	goBytes := []byte(p.value)
+
+	// Zero out the entire padded area to ensure proper termination and padding
+	C.memset(stringDataPtr, 0, C.size_t(paddedLen))
+
+	// Copy the actual string value bytes, ensuring we don't write beyond paddedLen
+	if len(goBytes) > 0 {
+		bytesToCopy := len(goBytes)
+		if bytesToCopy > paddedLen {
+			bytesToCopy = paddedLen // Truncate if Go string is too long for the C buffer
+		}
+		C.memcpy(stringDataPtr, unsafe.Pointer(&goBytes[0]), C.size_t(bytesToCopy))
 	}
 }
 
