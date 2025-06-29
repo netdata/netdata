@@ -76,7 +76,7 @@ export async function generateChatTitle(chat, mcpConnection, provider, isAutomat
         // Send request with low temperature for consistent titles
         const temperature = 0.3;
         const llmStartTime = Date.now();
-        const response = await provider.sendMessage(messages, [], temperature);
+        const response = await provider.sendMessage(messages, [], temperature, 'all-off', null, null);
         const llmResponseTime = Date.now() - llmStartTime;
         
         // Process the title response

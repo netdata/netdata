@@ -3,9 +3,6 @@ extends:
 
 sysobjectid: 1.3.6.1.4.1.318.1.*
 
-device:
-  vendor: "apc"
-
 metadata:
   device:
     fields:
@@ -19,6 +16,8 @@ metadata:
           name: upsBasicIdentModel
       type:
         value: "UPS"
+      vendor:
+        value: "APC"
 
 metrics:
   - MIB: PowerNet-MIB
@@ -26,91 +25,98 @@ metrics:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.5.0
       name: upsAdvBatteryNumOfBattPacks
       description: The number of external battery packs connected to the UPS
-      family: UPS/APC/Battery/Packs
+      family: Battery/Pack/Total
       unit: "{pack}"
   - MIB: POWERNET-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.6.0
       name: upsAdvBatteryNumOfBadBattPacks
       description: The number of external battery packs connected to the UPS that are defective
-      family: UPS/APC/Battery/Packs
+      family: Battery/Pack/Defective
       unit: "{pack}"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.4.0
       name: upsAdvBatteryReplaceIndicator
-      description: Indicates whether the UPS batteries need replacing (int 2)
-      family: UPS/APC/Battery/Status
-      unit: "1"
+      description: Indicates whether the UPS batteries need replacing
+      family: Battery/Replace/Status
+      unit: "{status}"
+      mapping:
+        1: noBatteryNeedsReplacing
+        2: batteryNeedsReplacing
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.3.0
       name: upsAdvBatteryRunTimeRemaining
       description: The UPS battery run time remaining before battery exhaustion
-      family: UPS/APC/Battery/TimeOnBattery
+      family: Battery/Runtime/Remaining
       unit: "s"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.2.0
       name: upsAdvBatteryTemperature
-      description: The current internal UPS temperature expressed in Celsius
-      family: UPS/APC/Battery/Temperature
+      description: The current internal UPS temperature
+      family: Battery/Temperature/Value
       unit: "Cel"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.2.1.0
       name: upsAdvBatteryCapacity
-      description: The remaining battery capacity expressed in percent of full capacity
-      family: UPS/APC/Battery/Capacity
+      description: The remaining battery capacity
+      family: Battery/Capacity/Remaining
       unit: "%"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.3.2.0
       name: upsHighPrecExtdBatteryTemperature
-      description: The current internal UPS temperature expressed in tenths of degrees Celsius
-      family: UPS/APC/Battery/Temperature
-      unit: "Cel/10"
+      description: The current internal UPS temperature
+      family: Battery/Temperature/Value
+      unit: "Cel"
+      scale_factor: 0.1
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.2.1.0
       name: upsAdvInputLineVoltage
-      description: The current utility line voltage in VAC
-      family: UPS/APC/Input/Voltage
-      unit: "V"
+      description: The current utility line voltage
+      family: Input/Voltage/Line
+      unit: "VAC"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.3.1.0
       name: upsHighPrecInputLineVoltage
-      description: "The current utility line voltage in tenths of VAC."
-      family: UPS/APC/Input/Voltage
-      unit: "V/10"
+      description: The current utility line voltage
+      family: Input/Voltage/Line
+      unit: "VAC"
+      scale_factor: 0.1
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.2.4.0
       name: upsAdvInputFrequency
-      description: The current input frequency to the UPS system in Hz
-      family: UPS/APC/Input/Frequency
+      description: The current input frequency to the UPS system
+      family: Input/Frequency/Value
       unit: "Hz"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.3.4.0
       name: upsHighPrecInputFrequency
-      description: The current input frequency to the UPS system in tenths of Hz
-      family: UPS/APC/Input/Frequency
-      unit: "Hz/10"
+      description: The current input frequency to the UPS system
+      family: Input/Frequency/Value
+      scale_factor: 0.1
+      unit: "Hz"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.3.4.0
       name: upsHighPrecOutputCurrent
-      description: The current in tenths of amperes drawn by the load on the UPS
-      family: UPS/APC/Input/Current
-      unit: "dA"
+      description: The current drawn by the load on the UPS
+      family: Output/Current/Total
+      scale_factor: 0.1
+      unit: "A"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.3.2.5.0
       name: upsAdvInputLineFailCause
       description: The reason for the occurrence of the last transfer to UPS battery power
-      family: UPS/APC/Input/FailCause
+      family: Input/Failure/Cause
       unit: "{status}"
       mapping:
         1: noTransfer
@@ -127,70 +133,71 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.1.0
       name: upsAdvOutputVoltage
-      description: The output voltage of the UPS system in VAC
-      family: UPS/APC/Output/Voltage
-      unit: "V"
+      description: The output voltage of the UPS system
+      family: Output/Voltage/Total
+      unit: "VAC"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.2.0
       name: upsAdvOutputFrequency
-      description: The current output frequency of the UPS system in Hz
-      family: UPS/APC/Output/Frequency
+      description: The current output frequency of the UPS system
+      family: Output/Frequency/Value
       unit: "Hz"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.3.0
       name: upsAdvOutputLoad
       description: The current UPS load expressed in percent of rated capacity
-      family: UPS/APC/Output/Load
+      family: Output/Load/Percentage
       unit: "%"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.4.0
       name: upsAdvOutputCurrent
-      description: The current in amperes drawn by the load on the UPS
-      family: UPS/APC/Output/Current
+      description: The current drawn by the load on the UPS
+      family: Output/Current/Total
       unit: "A"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.8.0
       name: upsAdvOutputActivePower
-      description: The total output active power of the UPS system in W
-      family: UPS/APC/Output/Power
+      description: The total output active power of the UPS system
+      family: Output/Power/Active
       unit: "W"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.9.0
       name: upsAdvOutputApparentPower
-      description: The total output apparent power of all phases of the UPS system in VA
-      family: UPS/APC/Output/Power
+      description: The total output apparent power of all phases of the UPS system
+      family: Output/Power/Apparent
       unit: "VA"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.4.2.12.0
       name: upsAdvOutputEnergyUsage
-    description: The output energy usage of the UPS in hundredths of kWh
-    family: UPS/APC/Output/Energy
-    unit: "kWh/100"
+      description: The output energy usage of the UPS
+      family: Output/Energy/Used
+      unit: "kWh"
+      scale_factor: 0.01
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.2.1.2.0
       name: upsBasicBatteryTimeOnBattery
       description: The elapsed time since the UPS has switched to battery power
-      family: UPS/APC/Battery/TimeOnBattery
+      family: Battery/Runtime/Elapsed
       unit: "s"
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.1.7.2.3.0
       name: upsAdvTestDiagnosticsResults
-    description: The results of the last UPS diagnostics test performed
-    family: UPS/APC/Test/Status
-    unit: "{status}"
-    mapping:
-      1: ok
-      2: failed
-      3: invalidTest
-      4: testInProgress
+      description: The results of the last UPS diagnostics test performed
+      family: Test/Diagnostic/Status
+      unit: "{status}"
+      mapping:
+        1: ok
+        2: failed
+        3: invalidTest
+        4: testInProgress
   # - MIB: PowerNet-MIB
   #   symbol:
   #     OID: 1.3.6.1.4.1.318.1.1.1.11.1.1.0
@@ -271,8 +278,8 @@ metrics:
       - OID: 1.3.6.1.4.1.318.1.1.1.12.1.2.1.3
         name: upsOutletGroupStatusGroupState
         description: Outlet group state
-        family: UPS/APC/Outlet/Status
-        status: "{status}"
+        family: OutletGroup/Status
+        unit: "{status}"
         mapping:
           1: ups_outlet_group_status_on
           2: ups_outlet_group_status_off
@@ -286,27 +293,25 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.25.1.2.1.6.0
       name: uioSensorStatusTemperatureDegC
-    description: "The sensor's current temperature reading in tenths of degrees Celsius."
-    family: UPS/APC/Temperature
-    unit: "Cel/10"
+      description: The sensor's current temperature reading
+      family: Sensor/Temperature/Value
+      unit: "Cel"
+      scale_factor: 0.1
 metric_tags:
   - tag: model
     OID: 1.3.6.1.4.1.318.1.1.1.1.1.1.0 # The UPS model name (e.g. 'APC Smart-UPS 600', 'Smart-UPS RT 6000 RM XL').
     symbol: upsBasicIdentModel
   - tag: serial_num
     OID: 1.3.6.1.4.1.318.1.1.1.1.2.3.0
-    symbol:
-      upsAdvIdentSerialNumber # An 8-character string identifying the serial number of
+    symbol: upsAdvIdentSerialNumber # An 8-character string identifying the serial number of
     # the UPS internal microprocessor.  This number is set at
     # the factory.  NOTE: This number does NOT correspond to
     # the serial number on the rear of the UPS.
   - tag: firmware_version
     OID: 1.3.6.1.4.1.318.1.1.1.1.2.1.0
-    symbol:
-      upsAdvIdentFirmwareRevision # The firmware revision of the UPS system's microprocessor.
+    symbol: upsAdvIdentFirmwareRevision # The firmware revision of the UPS system's microprocessor.
     # e.g. 452.17.W
-  - OID:
-      1.3.6.1.4.1.318.1.1.1.1.1.2.0 # An 8 byte ID string identifying the UPS.  This object can be set by the administrator.
+  - OID: 1.3.6.1.4.1.318.1.1.1.1.1.2.0 # An 8 byte ID string identifying the UPS.  This object can be set by the administrator.
     # e.g. UP001
     symbol: upsBasicIdentName
     tag: ups_name

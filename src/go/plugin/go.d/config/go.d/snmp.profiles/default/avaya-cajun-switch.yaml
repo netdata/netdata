@@ -1,47 +1,41 @@
 extends:
   - avaya.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.81.17.1.17  # Cajun P330
-  - 1.3.6.1.4.1.81.17.1.18  # Cajun P130
-  - 1.3.6.1.4.1.81.17.1.19  # Cajun P360
-
 metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
+
+sysobjectid:
+  - 1.3.6.1.4.1.81.17.1.17 # Cajun P330
+  - 1.3.6.1.4.1.81.17.1.18 # Cajun P130
+  - 1.3.6.1.4.1.81.17.1.19 # Cajun P360
 
 metrics:
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: cpu.usage
-      OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.6.1  # genCpuCurrentUtilization.1
-    description: Current CPU utilization in percentage if the monitoring is enabled
-    unit: "%"
+      OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.6.1 # genCpuCurrentUtilization.1
+      description: Current CPU utilization in percentage if the monitoring is enabled
+      family: CPU/Usage
+      unit: "%"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
-      OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.1  # genMemUtilizationPercentUsed.1
-    description: Percentage of memory used
-    unit: "%"
+      OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.1 # genMemUtilizationPercentUsed.1
+      description: Percentage of memory used
+      family: Memory/Usage
+      unit: "%"
   - MIB: CONFIG-MIB
     table:
       name: genPortTable
       OID: 1.3.6.1.4.1.81.9.1
     symbols:
-      - name: avaya.genPort
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: avaya.genPortId
-          OID: 1.3.6.1.4.1.81.9.1.1.2
-        tag: avaya_gen_port_id
-      - symbol:
-          name: avaya.genPortFunctionality
-          OID: 1.3.6.1.4.1.81.9.1.1.3
-        tag: avaya_gen_port_functionality
+      - name: avaya.genPortFunctionality
+        OID: 1.3.6.1.4.1.81.9.1.1.3
+        description: Port functionality
+        family: Port/Functionality
         mapping:
           1: private
           2: repeater_aui
@@ -95,6 +89,11 @@ metrics:
           56: s_fp_not_supported
           57: eth10_base_tw_in_pwr
           58: eth100_base_t_xw_in_pwr
+    metric_tags:
+      - symbol:
+          name: avaya.genPortId
+          OID: 1.3.6.1.4.1.81.9.1.1.2
+        tag: avaya_gen_port_id
       - symbol:
           name: avaya.genPortType
           OID: 1.3.6.1.4.1.81.9.1.1.4
@@ -436,7 +435,7 @@ metrics:
       - symbol:
           name: avaya.genPortClassification
           OID: 1.3.6.1.4.1.81.9.1.1.22
-        tag: avaya_gen_port_classification
+        tag: avaya_gen_port_classification # TODO: convert to metric
         mapping:
           1: regular
           2: valuable
@@ -444,7 +443,7 @@ metrics:
       - symbol:
           name: avaya.scEthPortMode
           OID: 1.3.6.1.4.1.81.28.2.1.1.1.28
-        tag: avaya_sc_eth_port_mode
+        tag: avaya_sc_eth_port_mode # TODO: convert to metric
         mapping:
           1: half_duplex
           2: full_duplex_no_pause
@@ -458,7 +457,7 @@ metrics:
       - symbol:
           name: avaya.scEthPortSpeed
           OID: 1.3.6.1.4.1.81.28.2.1.1.1.29
-        tag: avaya_sc_eth_port_speed
+        tag: avaya_sc_eth_port_speed # TODO: convert to metric
         mapping:
           1: ethernet
           2: fast_ethernet
@@ -469,14 +468,14 @@ metrics:
       - symbol:
           OID: 1.3.6.1.4.1.81.9.1.1.10
           name: avaya.genPortAdminStatus
-        tag: avaya_gen_port_admin_status
+        tag: avaya_gen_port_admin_status # TODO: convert to metric
         mapping:
           1: enabled
           2: disabled
       - symbol:
           OID: 1.3.6.1.4.1.81.28.2.1.1.1.27
           name: avaya.scEthPortFunctionalStatus
-        tag: avaya_sc_eth_port_functional_status
+        tag: avaya_sc_eth_port_functional_status # TODO: convert to metric
         mapping:
           1: ok
           2: rld

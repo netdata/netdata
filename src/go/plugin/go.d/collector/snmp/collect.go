@@ -5,6 +5,7 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -122,13 +124,17 @@ func (c *Collector) setupVnode(si *snmpsd.SysInfo) *vnodes.VirtualNode {
 
 func (c *Collector) setupProfiles() []*ddsnmp.Profile {
 	snmpProfiles := ddsnmp.FindProfiles(c.sysInfo.SysObjectID)
-	var names []string
+	var profInfo []string
 	for _, prof := range snmpProfiles {
-		name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
-		names = append(names, name)
+		if logger.Level.Enabled(slog.LevelDebug) {
+			profInfo = append(profInfo, prof.SourceTree())
+		} else {
+			name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
+			profInfo = append(profInfo, name)
+		}
 	}
 	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)",
-		len(snmpProfiles), strings.Join(names, ", "), c.sysInfo.SysObjectID)
+		len(snmpProfiles), strings.Join(profInfo, ", "), c.sysInfo.SysObjectID)
 	return snmpProfiles
 }
 

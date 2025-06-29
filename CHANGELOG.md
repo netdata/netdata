@@ -2,11 +2,40 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.4...HEAD)
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/go-viper/mapstructure/v2 from 2.2.1 to 2.3.0 in /src/go/otel-collector/exporter/journaldexporter [\#20592](https://github.com/netdata/netdata/pull/20592) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/go-viper/mapstructure/v2 from 2.2.1 to 2.3.0 in /src/go/otel-collector/exporter/netdataexporter [\#20591](https://github.com/netdata/netdata/pull/20591) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Regenerate integrations docs [\#20589](https://github.com/netdata/netdata/pull/20589) ([netdatabot](https://github.com/netdatabot))
+- doc: update SCIM doc [\#20588](https://github.com/netdata/netdata/pull/20588) ([juacker](https://github.com/juacker))
+- ddsnmp add pow transform func and allow mapping duplicate values [\#20587](https://github.com/netdata/netdata/pull/20587) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ddsnmp\): correct matching same profile multiple times [\#20586](https://github.com/netdata/netdata/pull/20586) ([ilyam8](https://github.com/ilyam8))
+- remove devType/Vendor/ from ddsnmp metric families [\#20585](https://github.com/netdata/netdata/pull/20585) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ddsnmp\): include table name in config id [\#20584](https://github.com/netdata/netdata/pull/20584) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/ddsnmp\): walk cross-table columns when referenced table has no metrics [\#20583](https://github.com/netdata/netdata/pull/20583) ([ilyam8](https://github.com/ilyam8))
+- Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
+- Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
+- chore\(go.d/snmp-profiles\): skip abstract when loading [\#20576](https://github.com/netdata/netdata/pull/20576) ([ilyam8](https://github.com/ilyam8))
+- improve\(go.d/smartctl\): add Win default path for smartctl executable [\#20574](https://github.com/netdata/netdata/pull/20574) ([ilyam8](https://github.com/ilyam8))
+- NUMA Windows  [\#20573](https://github.com/netdata/netdata/pull/20573) ([thiagoftsm](https://github.com/thiagoftsm))
+- Regenerate integrations docs [\#20571](https://github.com/netdata/netdata/pull/20571) ([netdatabot](https://github.com/netdatabot))
+- Add defines for cleanup statements [\#20570](https://github.com/netdata/netdata/pull/20570) ([stelfrag](https://github.com/stelfrag))
+- improve\(go.d/smartctl\): add configurable concurrent device scanning [\#20569](https://github.com/netdata/netdata/pull/20569) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.10.0 to 9.11.0 in /src/go [\#20568](https://github.com/netdata/netdata/pull/20568) ([dependabot[bot]](https://github.com/apps/dependabot))
+- improve\(go.d/smartctl\): enable direct smartctl execution on non-Linux [\#20567](https://github.com/netdata/netdata/pull/20567) ([ilyam8](https://github.com/ilyam8))
+- Switch install types [\#20564](https://github.com/netdata/netdata/pull/20564) ([kanelatechnical](https://github.com/kanelatechnical))
+- Mcp disclaimer update [\#20563](https://github.com/netdata/netdata/pull/20563) ([kanelatechnical](https://github.com/kanelatechnical))
+- Simplify MRG loading mechanism logic [\#20562](https://github.com/netdata/netdata/pull/20562) ([stelfrag](https://github.com/stelfrag))
+- Additional checks for valid db during db\_execute [\#20560](https://github.com/netdata/netdata/pull/20560) ([stelfrag](https://github.com/stelfrag))
+- Improve SQLite library shutdown handling and initialization state [\#20559](https://github.com/netdata/netdata/pull/20559) ([stelfrag](https://github.com/stelfrag))
+- Add CLI command to schedule update information [\#20558](https://github.com/netdata/netdata/pull/20558) ([stelfrag](https://github.com/stelfrag))
+- Check that there is a valid thread when performing ACLK sync shutdown [\#20555](https://github.com/netdata/netdata/pull/20555) ([stelfrag](https://github.com/stelfrag))
+- Fix save alert config transition on shutdown [\#20553](https://github.com/netdata/netdata/pull/20553) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations docs [\#20552](https://github.com/netdata/netdata/pull/20552) ([netdatabot](https://github.com/netdatabot))
 - MSI parameter [\#20550](https://github.com/netdata/netdata/pull/20550) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add Remove Node guide [\#20549](https://github.com/netdata/netdata/pull/20549) ([kanelatechnical](https://github.com/kanelatechnical))
 - improve\(go.d/snmp-profiles\): add DHCP tags transform to bluecat profile [\#20547](https://github.com/netdata/netdata/pull/20547) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/prometheus/common from 0.64.0 to 0.65.0 in /src/go [\#20545](https://github.com/netdata/netdata/pull/20545) ([dependabot[bot]](https://github.com/apps/dependabot))
 - refactor\(go.d/ddsnmpcollector\): restructure into components [\#20543](https://github.com/netdata/netdata/pull/20543) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +45,7 @@
 - Lock before checking the statement pool [\#20536](https://github.com/netdata/netdata/pull/20536) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump k8s.io/client-go from 0.33.1 to 0.33.2 in /src/go [\#20532](https://github.com/netdata/netdata/pull/20532) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improve\(go.d/snmp\): dd support for non-identifying tags in table metrics [\#20530](https://github.com/netdata/netdata/pull/20530) ([ilyam8](https://github.com/ilyam8))
+- Mcp5 [\#20529](https://github.com/netdata/netdata/pull/20529) ([ktsaou](https://github.com/ktsaou))
 - improve\(go.d/snmp\): add Go template-based metric transformations for SNMP profiles [\#20528](https://github.com/netdata/netdata/pull/20528) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp-profiles\): allow users to add custom SNMP profiles [\#20526](https://github.com/netdata/netdata/pull/20526) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): log device profiles matched by sysObjectID [\#20524](https://github.com/netdata/netdata/pull/20524) ([ilyam8](https://github.com/ilyam8))
@@ -236,6 +266,10 @@
 - Make all threads joinable and join on agent shutdown [\#20228](https://github.com/netdata/netdata/pull/20228) ([stelfrag](https://github.com/stelfrag))
 - ci: ignore changes in src/go/otel-collector/release-config.yaml.in [\#20222](https://github.com/netdata/netdata/pull/20222) ([ilyam8](https://github.com/ilyam8))
 
+## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.5.3...v2.5.4)
+
 ## [v2.5.3](https://github.com/netdata/netdata/tree/v2.5.3) (2025-06-05)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.5.2...v2.5.3)
@@ -431,36 +465,6 @@
 - Series of NFCs to make the code more maintainable. [\#20022](https://github.com/netdata/netdata/pull/20022) ([vkalintiris](https://github.com/vkalintiris))
 - Windows installer + ML \(all\) improved [\#20021](https://github.com/netdata/netdata/pull/20021) ([kanelatechnical](https://github.com/kanelatechnical))
 - SNMP Collector, use custom YAML files for auto single metrics [\#20020](https://github.com/netdata/netdata/pull/20020) ([Ancairon](https://github.com/Ancairon))
-- Improve estimated disk space usage for data file rotation [\#20019](https://github.com/netdata/netdata/pull/20019) ([stelfrag](https://github.com/stelfrag))
-- Additional checks then creating a v2 journal file [\#20018](https://github.com/netdata/netdata/pull/20018) ([stelfrag](https://github.com/stelfrag))
-- Properly clean up install paths after runtime checks in static builds. [\#20017](https://github.com/netdata/netdata/pull/20017) ([Ferroin](https://github.com/Ferroin))
-- blacklist leaked machine guids [\#20016](https://github.com/netdata/netdata/pull/20016) ([ktsaou](https://github.com/ktsaou))
-- agent-events: add deduplicating web server [\#20014](https://github.com/netdata/netdata/pull/20014) ([ktsaou](https://github.com/ktsaou))
-- Validate journal file headers to prevent invalid memory access [\#20013](https://github.com/netdata/netdata/pull/20013) ([stelfrag](https://github.com/stelfrag))
-- added agent-events backend [\#20012](https://github.com/netdata/netdata/pull/20012) ([ktsaou](https://github.com/ktsaou))
-- daemon status 24d [\#20011](https://github.com/netdata/netdata/pull/20011) ([ktsaou](https://github.com/ktsaou))
-- Update synology.md [\#20010](https://github.com/netdata/netdata/pull/20010) ([ycdtosa](https://github.com/ycdtosa))
-- More completely disable our own telemetry in CI. [\#20009](https://github.com/netdata/netdata/pull/20009) ([Ferroin](https://github.com/Ferroin))
-- fix\(go.d/megacli\): handle BBU hardware component is not present [\#20008](https://github.com/netdata/netdata/pull/20008) ([ilyam8](https://github.com/ilyam8))
-- Fix crashes No 3 [\#20007](https://github.com/netdata/netdata/pull/20007) ([ktsaou](https://github.com/ktsaou))
-- Minor changes when handling systemd integration. [\#20006](https://github.com/netdata/netdata/pull/20006) ([vkalintiris](https://github.com/vkalintiris))
-- Deployment Guides Improved [\#20004](https://github.com/netdata/netdata/pull/20004) ([kanelatechnical](https://github.com/kanelatechnical))
-- daemon status 24c [\#20003](https://github.com/netdata/netdata/pull/20003) ([ktsaou](https://github.com/ktsaou))
-- use v4 UUIDs [\#20002](https://github.com/netdata/netdata/pull/20002) ([ktsaou](https://github.com/ktsaou))
-- Update synology.md [\#20001](https://github.com/netdata/netdata/pull/20001) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump golang.org/x/net from 0.37.0 to 0.38.0 in /src/go [\#20000](https://github.com/netdata/netdata/pull/20000) ([dependabot[bot]](https://github.com/apps/dependabot))
-- detect more CI [\#19999](https://github.com/netdata/netdata/pull/19999) ([ktsaou](https://github.com/ktsaou))
-- status file 24 [\#19996](https://github.com/netdata/netdata/pull/19996) ([ktsaou](https://github.com/ktsaou))
-- Improve jv2 load [\#19995](https://github.com/netdata/netdata/pull/19995) ([stelfrag](https://github.com/stelfrag))
-- add kanelatechnical to CODEOWNERS [\#19994](https://github.com/netdata/netdata/pull/19994) ([ilyam8](https://github.com/ilyam8))
-- docs: improve Synology NAS installation documentation clarity [\#19993](https://github.com/netdata/netdata/pull/19993) ([ilyam8](https://github.com/ilyam8))
-- added worker last job id to status file [\#19992](https://github.com/netdata/netdata/pull/19992) ([ktsaou](https://github.com/ktsaou))
-- Improve shutdown and datafile rotation [\#19991](https://github.com/netdata/netdata/pull/19991) ([stelfrag](https://github.com/stelfrag))
-- Windows Services Monitoring [\#19990](https://github.com/netdata/netdata/pull/19990) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update synology.md [\#19989](https://github.com/netdata/netdata/pull/19989) ([ycdtosa](https://github.com/ycdtosa))
-- Regenerate integrations docs [\#19988](https://github.com/netdata/netdata/pull/19988) ([netdatabot](https://github.com/netdatabot))
-- Installation + docker, improvements [\#19987](https://github.com/netdata/netdata/pull/19987) ([kanelatechnical](https://github.com/kanelatechnical))
-- Regenerate integrations docs [\#19986](https://github.com/netdata/netdata/pull/19986) ([netdatabot](https://github.com/netdatabot))
 
 ## [v2.3.2](https://github.com/netdata/netdata/tree/v2.3.2) (2025-04-02)
 
@@ -700,15 +704,15 @@
 
 ## [v1.34.1](https://github.com/netdata/netdata/tree/v1.34.1) (2022-04-15)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/1.34.0...v1.34.1)
-
-## [1.34.0](https://github.com/netdata/netdata/tree/1.34.0) (2022-04-14)
-
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.34.0...1.34.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.34.0...v1.34.1)
 
 ## [v1.34.0](https://github.com/netdata/netdata/tree/v1.34.0) (2022-04-14)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...v1.34.0)
+[Full Changelog](https://github.com/netdata/netdata/compare/1.34.0...v1.34.0)
+
+## [1.34.0](https://github.com/netdata/netdata/tree/1.34.0) (2022-04-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.33.1...1.34.0)
 
 ## [v1.33.1](https://github.com/netdata/netdata/tree/v1.33.1) (2022-02-14)
 

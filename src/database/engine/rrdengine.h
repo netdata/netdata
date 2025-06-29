@@ -425,11 +425,7 @@ struct rrdengine_instance {
     } quiesce;
 
     struct {
-        struct {
-            size_t size;
-            struct completion *array;
-        } populate_mrg;
-
+        struct completion load_mrg;
         bool create_new_datafile_pair;
     } loading;
 

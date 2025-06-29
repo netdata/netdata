@@ -5,8 +5,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "avtech"
+        value: "AVTECH"
 
 sysobjectid:
   - 1.3.6.1.4.1.20916.1.* # avtech products
-

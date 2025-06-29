@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -29,6 +30,7 @@ func FindProfiles(sysObjId string) []*Profile {
 			}
 			if m.MatchString(sysObjId) {
 				profiles = append(profiles, prof.clone())
+				break
 			}
 		}
 	}
@@ -39,16 +41,76 @@ func FindProfiles(sysObjId string) []*Profile {
 	return profiles
 }
 
-type Profile struct {
-	SourceFile string                                 `yaml:"-"`
-	Definition *ddprofiledefinition.ProfileDefinition `yaml:",inline"`
+type (
+	Profile struct {
+		SourceFile         string                                 `yaml:"-"`
+		Definition         *ddprofiledefinition.ProfileDefinition `yaml:",inline"`
+		extensionHierarchy []*extensionInfo
+	}
+	// extensionInfo represents a single extension in the hierarchy
+	extensionInfo struct {
+		name       string           // Extension name (e.g., "_base.yaml")
+		sourceFile string           // Full path to the extension file
+		extensions []*extensionInfo // Nested extensions
+	}
+)
+
+// SourceTree returns a string representation of the profile source and its extension hierarchy
+// Format: "root: [intermediate1: [base], intermediate2]"
+func (p *Profile) SourceTree() string {
+	rootName := stripFileNameExt(p.SourceFile)
+
+	if len(p.extensionHierarchy) == 0 {
+		return rootName
+	}
+
+	extensions := formatExtensions(p.extensionHierarchy)
+	return fmt.Sprintf("%s: %s", rootName, extensions)
+}
+
+func formatExtensions(extensions []*extensionInfo) string {
+	if len(extensions) == 0 {
+		return "[]"
+	}
+
+	var items []string
+	for _, ext := range extensions {
+		name := stripFileNameExt(ext.sourceFile)
+		if len(ext.extensions) > 0 {
+			items = append(items, fmt.Sprintf("%s: %s", name, formatExtensions(ext.extensions)))
+		} else {
+			items = append(items, name)
+		}
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(items, ", "))
 }
 
 func (p *Profile) clone() *Profile {
-	return &Profile{
+	cloned := &Profile{
 		SourceFile: p.SourceFile,
 		Definition: p.Definition.Clone(),
 	}
+	if p.extensionHierarchy != nil {
+		cloned.extensionHierarchy = cloneExtensionHierarchy(p.extensionHierarchy)
+	}
+	return cloned
+}
+
+func cloneExtensionHierarchy(extensions []*extensionInfo) []*extensionInfo {
+	if extensions == nil {
+		return nil
+	}
+
+	cloned := make([]*extensionInfo, len(extensions))
+	for i, ext := range extensions {
+		cloned[i] = &extensionInfo{
+			name:       ext.name,
+			sourceFile: ext.sourceFile,
+			extensions: cloneExtensionHierarchy(ext.extensions),
+		}
+	}
+	return cloned
 }
 
 func (p *Profile) merge(base *Profile) {
@@ -65,10 +127,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, m := range p.Definition.Metrics {
 		switch {
 		case m.IsScalar():
-			seen[m.Symbol.Name] = true
+			seen[m.Symbol.Name+"|"+m.Symbol.OID] = true
 		case m.IsColumn():
-			for _, symbol := range m.Symbols {
-				seen[symbol.Name] = true
+			for _, sym := range m.Symbols {
+				seen[sym.Name] = true
 			}
 		}
 	}
@@ -76,9 +138,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, bm := range base.Definition.Metrics {
 		switch {
 		case bm.IsScalar():
-			if !seen[bm.Symbol.Name] {
+			key := bm.Symbol.Name + "|" + bm.Symbol.OID
+			if !seen[key] {
 				p.Definition.Metrics = append(p.Definition.Metrics, bm)
-				seen[bm.Symbol.Name] = true
+				seen[key] = true
 			}
 		case bm.IsColumn():
 			bm.Symbols = slices.DeleteFunc(bm.Symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
@@ -263,4 +326,8 @@ func generateMetricKey(metric ddprofiledefinition.MetricsConfig) string {
 	parts = append(parts, symbolKeys...)
 
 	return strings.Join(parts, "|")
+}
+
+func stripFileNameExt(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
