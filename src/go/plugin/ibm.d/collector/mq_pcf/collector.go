@@ -10,7 +10,8 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"sync"
+	"fmt"
+	"regexp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -52,7 +53,6 @@ type Config struct {
 type Collector struct {
 	conf Config
 	module.Base
-	sync.RWMutex
 	
 	charts *module.Charts
 	
@@ -65,6 +65,10 @@ type Collector struct {
 	// Version detection
 	version string
 	edition string
+	
+	// Compiled selectors for filtering
+	queueSelectorRegex   *regexp.Regexp
+	channelSelectorRegex *regexp.Regexp
 }
 
 // New creates a new collector.
@@ -113,6 +117,23 @@ func (c *Collector) Init(ctx context.Context) error {
 		// Version detection could be added here later to enable for MQ 8.0+
 		defaultValue := false
 		c.conf.CollectTopics = &defaultValue
+	}
+	
+	// Compile selector regular expressions if provided
+	if c.conf.QueueSelector != "" {
+		var err error
+		c.queueSelectorRegex, err = regexp.Compile(c.conf.QueueSelector)
+		if err != nil {
+			return fmt.Errorf("invalid queue_selector regex '%s': %w", c.conf.QueueSelector, err)
+		}
+	}
+	
+	if c.conf.ChannelSelector != "" {
+		var err error
+		c.channelSelectorRegex, err = regexp.Compile(c.conf.ChannelSelector)
+		if err != nil {
+			return fmt.Errorf("invalid channel_selector regex '%s': %w", c.conf.ChannelSelector, err)
+		}
 	}
 	
 	c.Infof("Collection settings: queues=%v, channels=%v, topics=%v", 
