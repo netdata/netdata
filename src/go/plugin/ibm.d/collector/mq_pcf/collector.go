@@ -168,7 +168,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 
 // Configuration returns the collector configuration.
 func (c *Collector) Configuration() any {
-	return c.conf
+	return &c.conf
 }
 
 func init() {
