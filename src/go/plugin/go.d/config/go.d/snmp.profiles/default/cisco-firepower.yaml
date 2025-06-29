@@ -3,49 +3,57 @@ extends:
   - _generic-if.yaml
   - _cisco-metadata.yaml
   # This profile does not import cisco.yaml on purpose
-sysobjectid:
-  - 1.3.6.1.4.1.9.1.2404           # Cisco FPR 2110td
-  - 1.3.6.1.4.1.9.1.2405           # Cisco FPR 2120td
-  - 1.3.6.1.4.1.9.1.2406           # Cisco FPR 2130td
-  - 1.3.6.1.4.1.9.1.2407           # Cisco FPR 2140td
-  - 1.3.6.1.4.1.9.1.2778           # Cisco FPR 4125 K9
-  - 1.3.6.1.4.1.9.1.2292           # Cisco FPR 4150 K9
-  # Following sysObjectID requires more investigation to be certain if we should include it:
-  # - 1.3.6.1.4.1.9.12.3.1.3.1788    # Cisco FPR 4120
+
 metadata:
   device:
     fields:
       type:
-        value: "firewall"
+        value: Firewall/Firepower
+      vendor:
+        value: Cisco
+
+sysobjectid:
+  - 1.3.6.1.4.1.9.1.2404 # Cisco FPR 2110td
+  - 1.3.6.1.4.1.9.1.2405 # Cisco FPR 2120td
+  - 1.3.6.1.4.1.9.1.2406 # Cisco FPR 2130td
+  - 1.3.6.1.4.1.9.1.2407 # Cisco FPR 2140td
+  - 1.3.6.1.4.1.9.1.2778 # Cisco FPR 4125 K9
+  - 1.3.6.1.4.1.9.1.2292 # Cisco FPR 4150 K9
+  # Following sysObjectID requires more investigation to be certain if we should include it:
+  # - 1.3.6.1.4.1.9.12.3.1.3.1788    # Cisco FPR 4120
+
 metrics:
   - MIB: CISCO-PROCESS-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.109.1.1.1
       name: cpmCPUTotalTable
     symbols:
-      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7  # cpmCPUTotal1minRev
+      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7 # cpmCPUTotal1minRev
         name: cpu.usage
         description: The overall CPU busy percentage in the last 1 minute period.
+        family: CPU/Usage
         unit: "%"
     metric_tags:
-      - index: 1  # cpmCPUTotalIndex
-        tag: cpu
+      - tag: cpu_index
+        index: 1 # cpmCPUTotalIndex
   - MIB: CISCO-FIREPOWER-SM-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.826.1.71.20
       name: cfprSmMonitorTable
     symbols:
-      - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.21  # cfprSmMonitorMemFree
+      - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.21 # cfprSmMonitorMemFree
         name: memory.free
         description: Memory free
+        family: Memory/Free
         unit: "By"
-      - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.23  # cfprSmMonitorMemUsed
+      - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.23 # cfprSmMonitorMemUsed
         name: memory.used
         description: Memory used
+        family: Memory/Used
         unit: "By"
     metric_tags:
-      - index: 1  # cfprSmMonitorInstanceId
-        tag: mem
+      - tag: mem_index
+        index: 1 # cfprSmMonitorInstanceId
   - MIB: CISCO-FIREPOWER-SM-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.826.1.71.20
@@ -54,11 +62,15 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.17
         name: cfprSmMonitorDataDiskAvailable
         description: Data disk available
-        unit: "{disk}"
+        family: Disk/Data/Available
+        unit: "By"
+        scale_factor: 1024
       - OID: 1.3.6.1.4.1.9.9.826.1.71.20.1.18
         name: cfprSmMonitorDataDiskTotal
         description: Data disk total
-        unit: "{disk}"
+        family: Disk/Data/Total
+        unit: "By"
+        scale_factor: 1024
     metric_tags:
       - tag: cfpr_sm_monitor_dn
         symbol:
@@ -69,20 +81,11 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.826.1.20.34
       name: cfprEquipmentFanTable
     symbols:
-      - name: cfprEquipmentFan
-        constant_value_one: true
-        description: Fan equipment presence indicator
-        unit: "{fan}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - tag: cfpr_equipment_fan_dn
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.826.1.20.34.1.2
-          name: cfprEquipmentFanDn
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.826.1.20.34.1.10
-          name: cfprEquipmentFanOperState
-        tag: cfpr_equipment_fan_oper_state
+      - OID: 1.3.6.1.4.1.9.9.826.1.20.34.1.10
+        name: cfprEquipmentFanOperState
+        description: Equipment/Fans
+        family: Fan/Operational/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -114,25 +117,21 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
+    metric_tags:
+      - tag: cfpr_equipment_fan_dn
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.826.1.20.34.1.2
+          name: cfprEquipmentFanDn
   - MIB: CISCO-FIREPOWER-EQUIPMENT-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.826.1.20.109
       name: cfprEquipmentPsuTable
     symbols:
-      - name: cfprEquipmentPsu
-        constant_value_one: true
-        description: Power supply unit equipment presence indicator
-        unit: "{power_supply}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - tag: cfpr_equipment_psu_dn
-        symbol:
-          OID: 1.3.6.1.4.1.9.9.826.1.20.109.1.2
-          name: cfprEquipmentPsuDn
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.826.1.20.109.1.13
-          name: cfprEquipmentPsuPower
-        tag: cfpr_equipment_psu_power
+      - OID: 1.3.6.1.4.1.9.9.826.1.20.109.1.13
+        name: cfprEquipmentPsuPower
+        description: Psu power state
+        family: PowerSupply/Power/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -149,3 +148,8 @@ metrics:
           12: oir_failed
           13: oir_invalid
           100: not_supported
+    metric_tags:
+      - tag: cfpr_equipment_psu_dn
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.826.1.20.109.1.2
+          name: cfprEquipmentPsuDn

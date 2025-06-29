@@ -8,11 +8,15 @@ extends:
   - _juniper-firewall.yaml
   - _juniper-virtualchassis.yaml
   - _juniper.yaml
-sysobjectid:
-  - 1.3.6.1.4.1.2636.1.1.1.2.82      # QFX Switch
-  - 1.3.6.1.4.1.2636.1.1.1.4.82.*    # QFX Switch Variant
+
 metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: Switch
+      vendor:
+        value: Juniper
+
+sysobjectid:
+  - 1.3.6.1.4.1.2636.1.1.1.2.82 # QFX Switch
+  - 1.3.6.1.4.1.2636.1.1.1.4.82.* # QFX Switch Variant

@@ -10,7 +10,7 @@ sysobjectid:
 metadata:
   device:
     fields:
-      vendor:
-        value: "cisco"
       type:
-        value: "server"
+        value: "Server"
+      vendor:
+        value: "Cisco"

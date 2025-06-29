@@ -179,6 +179,7 @@ The following options can be defined globally: update_every.
 | scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
 | device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+| concurrent_scans | Number of devices to scan concurrently. Set to 0 for sequential scanning (default behavior). Improves performance when monitoring many devices. | 0 | no |
 | extra_devices | Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See "Configuration Examples" for details. | [] | no |
 | no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
 
@@ -208,6 +209,21 @@ Allows you to override the default devices poll interval (data collection).
 jobs:
   - name: smartctl
     devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+
+```
+</details>
+
+##### Concurrent scanning for multiple devices
+
+This example demonstrates enabling concurrent scanning to improve performance when monitoring many devices.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: smartctl
+    concurrent_scans: 4  # Scan up to 4 devices concurrently
 
 ```
 </details>

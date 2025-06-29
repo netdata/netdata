@@ -7,4 +7,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "barracuda"
+        value: "Barracuda"

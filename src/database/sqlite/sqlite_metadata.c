@@ -131,6 +131,16 @@ sqlite3 *db_meta = NULL;
 
 // SQL statements
 
+#define SQL_CLEANUP_AGENT_EVENT_LOG "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400"
+
+#define SQL_DELETE_ORPHAN_HEALTH_LOG "DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)"
+
+#define SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL                                                                            \
+    "DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
+
+#define SQL_DELETE_ORPHAN_ALERT_VERSION                                                                                \
+    "DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
+
 #define SQL_STORE_CLAIM_ID                                                                                             \
     "INSERT INTO node_instance "                                                                                       \
     "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, UNIXEPOCH()) "                                     \
@@ -581,7 +591,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     netdata_log_info("     to %s", new_sqlite_database);
 
     // This will remove the -shm and -wal files when we close the database
-    (void) db_execute(database, "select count(*) from sqlite_master limit 0");
+    (void)db_execute(database, "select count(*) from sqlite_master limit 0", NULL);
 
     sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
     if (recover) {
@@ -736,7 +746,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
             (void) sqlite3_close(db_meta);
         }
         return 1;
@@ -751,7 +761,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
             (void) sqlite3_close(db_meta);
         }
         return 1;
@@ -840,7 +850,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
     uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
     buffer_strcat(work_buffer, " ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
-    int rc = db_execute(db_meta, buffer_tostring(work_buffer));
+    int rc = db_execute(db_meta, buffer_tostring(work_buffer), NULL);
     if (likely(!rc))
         st->rrdlabels_last_saved_version = new_version;
 
@@ -854,7 +864,7 @@ void detect_machine_guid_change(nd_uuid_t *host_uuid)
 
     rc = exec_statement_with_uuid(CONVERT_EXISTING_LOCALHOST, host_uuid);
     if (!rc) {
-        if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES)))
+        if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES, NULL)))
             error_report("Failed to remove deleted hosts from node instances");
     }
 }
@@ -1499,9 +1509,9 @@ static void cleanup_health_log(struct meta_config_s *config)
         return;
     }
 
-    (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
-    (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
     worker_is_idle();
 }
 
@@ -1573,7 +1583,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 
         char sql[128];
         snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
-        (void)db_execute(database, sql);
+        (void)db_execute(database, sql, NULL);
     }
 }
 
@@ -1972,7 +1982,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     }
 
     if (local_meta_db)
-        (void) db_execute(local_meta_db, "PRAGMA cache_size=10000");
+        (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
 
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
         sqlite3_close(local_meta_db);
@@ -2017,7 +2027,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worke
     bool load_ml_models = is_worker;
 
     bool host_need_recheck = false;
-    (void)db_execute(db_meta, "BEGIN TRANSACTION");
+    (void)db_execute(db_meta, "BEGIN TRANSACTION", NULL);
 
     rrdset_foreach_reentrant(st, host) {
 
@@ -2095,7 +2105,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worke
     }
     rrdset_foreach_done(st);
 
-    (void)db_execute(db_meta, "COMMIT TRANSACTION");
+    (void)db_execute(db_meta, "COMMIT TRANSACTION", NULL);
     if (host_need_recheck)
         rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
 
@@ -2315,7 +2325,7 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer)
     buffer_strcat(
         work_buffer,
         " ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
-    rc = db_execute(db_meta, buffer_tostring(work_buffer));
+    rc = db_execute(db_meta, buffer_tostring(work_buffer), NULL);
 
     if (unlikely(rc)) {
         error_report("METADATA: 'host:%s': failed to update metadata host labels", rrdhost_hostname(host));
@@ -2356,9 +2366,8 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
 {
     RRDHOST *host;
     size_t host_count = 0;
-    usec_t started_ut;
+    usec_t started_ut = now_monotonic_usec();
     if (!is_worker) {
-        started_ut = now_monotonic_usec();
         dfe_start_reentrant(rrdhost_root_index, host) {
             host_count++;
         }
@@ -2871,7 +2880,7 @@ done:
 
 void cleanup_agent_event_log(void)
 {
-    (void) db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400");
+    (void) db_execute(db_meta, SQL_CLEANUP_AGENT_EVENT_LOG, NULL);
 }
 
 #define SQL_GET_AGENT_EVENT_TYPE_MEDIAN                                                                                \

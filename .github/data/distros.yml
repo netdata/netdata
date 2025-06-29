@@ -277,7 +277,8 @@ include:
 
   - &rocky
     distro: rockylinux
-    version: "9"
+    version: "10"
+    base_image: "quay.io/rockylinux/rockylinux:10"
     support_type: Core
     notes: ''
     jsonc_removal: |
@@ -286,19 +287,30 @@ include:
     bundle_sentry: *default_sentry
     packages: &rocky_packages
       type: rpm
-      repo_distro: el/9
+      repo_distro: el/10
       builder_rev: *def_builder_rev
       alt_links:
-        - el/9Server
-        - el/9Client
-        - el/9RedHatVirtualizationHost
+        - el/10Server
+        - el/10Client
+        - el/10RedHatVirtualizationHost
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
   - <<: *rocky
+    version: "9"
+    base_image: rockylinux:9
+    packages:
+      <<: *rocky_packages
+      repo_distro: el/9
+      alt_links:
+        - el/9Server
+        - el/9Client
+        - el/9RedHatVirtualizationHost
+  - <<: *rocky
     version: "8"
+    base_image: rockylinux:8
     packages:
       <<: *rocky_packages
       repo_distro: el/8
@@ -414,13 +426,15 @@ no_include: # Info for platforms not covered in CI
 
   - &rhel
     distro: rhel
-    version: "9.x"
+    version: "10.x"
     support_type: Core
     notes: ''
     packages:
       arches:
         - x86_64
         - aarch64
+  - <<: *rhel
+    version: "9.x"
   - <<: *rhel
     version: "8.x"
   - <<: *rhel

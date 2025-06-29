@@ -305,26 +305,25 @@ func (tc *tableCache) isConfigCached(cfg ddprofiledefinition.MetricsConfig) bool
 	return ok
 }
 
-// generateConfigID creates a unique identifier for a MetricsConfig based on its symbols
+// generateConfigID creates a unique identifier for a MetricsConfig
 func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) string {
 	var sb strings.Builder
 
-	// Collect all symbol names
+	if cfg.Table.Name != "" {
+		sb.WriteString(cfg.Table.Name)
+	}
+
 	names := make([]string, 0, len(cfg.Symbols))
 	for _, sym := range cfg.Symbols {
 		names = append(names, sym.Name)
 	}
-
-	// Sort to ensure consistent ordering
 	sort.Strings(names)
 
-	// Build the ID
-	for i, name := range names {
-		if i > 0 {
-			sb.WriteByte(',')
-		}
-		sb.WriteString(name)
+	if sb.Len() > 0 && len(names) > 0 {
+		sb.WriteString(",")
 	}
+
+	sb.WriteString(strings.Join(names, ","))
 
 	return sb.String()
 }
