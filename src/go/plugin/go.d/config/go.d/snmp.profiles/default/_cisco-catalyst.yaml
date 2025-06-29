@@ -20,23 +20,39 @@ metadata:
           name: chassisSerialNumberString
 
 metrics:
-  - MIB: CISCO-ENTITY-SENSOR-MIB   # TODO: sensors of different types in one chart, transformation required
+  - MIB: CISCO-ENTITY-SENSOR-MIB   # TODO: this is not Catalyst-specific, need to add to other Cisco devices
     table:
       OID: 1.3.6.1.4.1.9.9.91.1.1.1
       name: entSensorValueTable
     symbols:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
         name: entSensorValue
-        description: "The most recent measurement seen by the sensor"
-        family: Sensors
+        description: Most recent measurement obtained by the agent for this sensor
         unit: "1"
+        family: Sensor/Value
+        transform: |
+          {{- transformEntitySensorValue .Metric -}}
     metric_tags:
-      - tag: sensor_type
+      - tag: sensor_index
+        index: 1
+      - tag: _ent_phys_descr
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+      - tag: sensor_type # needed for transform
         symbol:
           OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1
           name: entSensorType
-      - tag: sensor_id
-        index: 1
+      - tag: sensor_scale # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.2
+          name: entSensorScale
+      - tag: sensor_precision # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.3
+          name: entSensorPrecision
   - MIB: CISCO-IF-EXTENSION-MIB # TODO: this is not Catalyst-specific, need to add to other Cisco devices
     table:
       OID: 1.3.6.1.4.1.9.9.276.1.1.1

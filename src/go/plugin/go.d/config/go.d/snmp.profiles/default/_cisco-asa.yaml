@@ -132,8 +132,20 @@ metrics:
         unit: "1"
         family: Sensor/Value
         transform: |
-          {{- transformEntPhySensor .Metric -}}
+          {{- transformEntitySensorValue .Metric -}}
     metric_tags:
+      - tag: sensor_index
+        index: 1
+      - tag: _ent_phys_descr
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+      - tag: _sensor_desc
+        symbol:
+          OID: 1.3.6.1.2.1.99.1.1.1.6
+          name: entPhySensorUnitsDisplay
       - tag: sensor_type # needed for transform
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
@@ -146,9 +158,3 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.3
           name: entPhySensorPrecision
-      - tag: _sensor_desc
-        symbol:
-          OID: 1.3.6.1.2.1.99.1.1.1.6
-          name: entPhySensorUnitsDisplay
-      - tag: sensor_id
-        index: 1
