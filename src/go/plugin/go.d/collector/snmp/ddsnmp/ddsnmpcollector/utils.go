@@ -15,36 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
-	if len(cfg.Mapping) == 0 {
-		return nil
-	}
-
-	mappings := make(map[int64]string)
-
-	if isMappingKeysNumeric(cfg.Mapping) {
-		for k, v := range cfg.Mapping {
-			intKey, _ := strconv.ParseInt(k, 10, 64)
-			mappings[intKey] = v
-		}
-	} else {
-		for k, v := range cfg.Mapping {
-			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
-				mappings[intVal] = k
-			}
-		}
-	}
-
-	return mappings
-}
-
-func getMetricType(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
-	if sym.MetricType != "" {
-		return sym.MetricType
-	}
-	return getMetricTypeFromPDUType(pdu)
-}
-
 func getMetricTypeFromPDUType(pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
 	switch pdu.Type {
 	case gosnmp.Counter32, gosnmp.Counter64:
@@ -244,26 +214,10 @@ func isInt(s string) bool {
 	return err == nil
 }
 
-func isMappingKeysNumeric(mapping map[string]string) bool {
-	for k := range mapping {
-		if !isInt(k) {
-			return false
-		}
-	}
-	return true
-}
-func cleanMetrics(pms []*ProfileMetrics) {
-	for _, pm := range pms {
-		for i := range pm.Metrics {
-			m := &pm.Metrics[i]
-			m.Description = metricMetaReplacer.Replace(m.Description)
-			m.Family = metricMetaReplacer.Replace(m.Family)
-			m.Unit = metricMetaReplacer.Replace(m.Unit)
-			for k, v := range m.Tags {
-				m.Tags[k] = metricMetaReplacer.Replace(v)
-			}
+func mergeTagsWithEmptyFallback(dest, src map[string]string) {
+	for k, v := range src {
+		if existing, ok := dest[k]; !ok || existing == "" {
+			dest[k] = v
 		}
 	}
 }
-
-var metricMetaReplacer = strings.NewReplacer("'", "", "\n", " ", "\r", " ")

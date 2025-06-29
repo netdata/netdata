@@ -52,7 +52,7 @@ The program `nd-mcp` is the bridge program that converts `stdio` communication t
 
 There may be different paths for it, depending on how you installed Netdata:
 
-- `/usr/bin/nd-mcp`: Linux native packages
+- `/usr/bin/nd-mcp` or `/usr/sbin/nd-mcp`: Linux native packages (together with the `netdata` and `netdatacli` commands)
 - `/opt/netdata/usr/bin/nd-mcp`: Linux static Netdata installations
 - `/usr/local/netdata/usr/bin/nd-mcp`: MacOS installations from source
 - `C:\\Program Files\\Netdata\\usr\\bin\\nd-mcp.exe`: Windows installations

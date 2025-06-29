@@ -41,6 +41,7 @@ struct aclk_sync_config_s {
     uv_timer_t timer_req;
     uv_async_t async;
     bool initialized;
+    bool shutdown_requested;
     mqtt_wss_client client;
     int aclk_queries_running;
     bool run_query_batch;
@@ -206,7 +207,7 @@ static void sql_delete_aclk_table_list(void)
 
     SQLITE_FINALIZE(res);
 
-    int rc = db_execute(db_meta, buffer_tostring(sql));
+    int rc = db_execute(db_meta, buffer_tostring(sql), NULL);
     if (unlikely(rc))
         netdata_log_error("Failed to drop unused ACLK tables");
 
@@ -587,11 +588,11 @@ static void timer_cb(uv_timer_t *handle)
 }
 
 #define MAX_SHUTDOWN_TIMEOUT_SECONDS (5)
+#define SHUTDOWN_SLEEP_INTERVAL_MS (100)
 #define CMD_POOL_SIZE (2048)
 
-#define ACLK_SYNC_SHOULD_BE_RUNNING                                                                                    \
-    (!shutdown_requested || config->aclk_queries_running || config->alert_push_running ||                              \
-     config->aclk_batch_job_is_running)
+#define ACLK_JOBS_ARE_RUNNING                                                                                          \
+    (config->aclk_queries_running || config->alert_push_running || config->aclk_batch_job_is_running)
 
 static void *aclk_synchronization_event_loop(void *arg)
 {
@@ -624,18 +625,16 @@ static void *aclk_synchronization_event_loop(void *arg)
 
     netdata_log_info("Starting ACLK synchronization thread");
 
-    config->initialized = true;
-
     sql_delete_aclk_table_list();
 
     int query_thread_count = (int) netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
     struct notify_timer_cb_data *timer_cb_data;
-    aclk_query_t *query;
 
     // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
+
     // This holds queries that can be dispatched in parallel in ACLK QUERY worker threads
     struct judy_list_t *aclk_query_execute = callocz(1, sizeof(*aclk_query_execute));
     size_t pending_queries = 0;
@@ -645,26 +644,17 @@ static void *aclk_synchronization_event_loop(void *arg)
 
     unsigned cmd_batch_size;
 
+    config->shutdown_requested = false;
+    config->initialized = true;
     completion_mark_complete(&config->start_stop_complete);
-    int shutdown_requested = 0;
-    time_t shutdown_initiated = 0;
 
-    while (likely(ACLK_SYNC_SHOULD_BE_RUNNING)) {
+    while (likely(config->shutdown_requested == false))  {
         enum aclk_database_opcode opcode;
         RRDHOST *host;
         struct aclk_sync_cfg_t *aclk_host_config;
+        aclk_query_t *query;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
-
-        if (unlikely(shutdown_requested)) {
-            nd_log_limit_static_thread_var(erl, 1, 0);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO, "ACLKSYNC: Waiting for pending queries to finish before shutdown");
-            if (now_realtime_sec() - shutdown_initiated > MAX_SHUTDOWN_TIMEOUT_SECONDS) {
-                nd_log_daemon(NDLP_INFO, "ACLKSYNC: Shutdown timeout, forcing exit");
-                break;
-            }
-            continue;
-        }
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -882,8 +872,7 @@ static void *aclk_synchronization_event_loop(void *arg)
                     }
                     break;
                 case ACLK_SYNC_SHUTDOWN:
-                    shutdown_requested = 1;
-                    shutdown_initiated = now_realtime_sec();
+                    config->shutdown_requested = true;
                     mark_pending_req_cancel_all();
                     break;
                 default:
@@ -898,7 +887,15 @@ static void *aclk_synchronization_event_loop(void *arg)
 
     uv_close((uv_handle_t *)&config->async, NULL);
     uv_walk(loop, libuv_close_callback, notify_timer_close_callback);
-    uv_run(loop, UV_RUN_NOWAIT);
+
+    size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+
+    while (ACLK_JOBS_ARE_RUNNING && loop_count > 0) {
+        if (!uv_run(loop, UV_RUN_NOWAIT))
+            break;  // No pending callbacks
+        sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
+        loop_count--;
+    }
 
     (void) uv_loop_close(loop);
 
@@ -915,11 +912,9 @@ static void *aclk_synchronization_event_loop(void *arg)
     }
 
     release_cmd_pool(&config->cmd_pool);
-    completion_mark_complete(&config->start_stop_complete);
-
     worker_unregister();
     service_exits();
-    netdata_log_info("ACLK SYNC: Shutting down ACLK synchronization event loop");
+    completion_mark_complete(&config->start_stop_complete);
     return NULL;
 }
 
@@ -1027,6 +1022,9 @@ static inline bool queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
 
 void aclk_synchronization_shutdown(void)
 {
+    if (!aclk_sync_config.thread)
+        return;
+
     // Send shutdown command, not that the completion is initialized
     // on init and still valid
     aclk_mqtt_client_reset();

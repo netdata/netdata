@@ -131,6 +131,16 @@ sqlite3 *db_meta = NULL;
 
 // SQL statements
 
+#define SQL_CLEANUP_AGENT_EVENT_LOG "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400"
+
+#define SQL_DELETE_ORPHAN_HEALTH_LOG "DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)"
+
+#define SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL                                                                            \
+    "DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
+
+#define SQL_DELETE_ORPHAN_ALERT_VERSION                                                                                \
+    "DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
+
 #define SQL_STORE_CLAIM_ID                                                                                             \
     "INSERT INTO node_instance "                                                                                       \
     "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, UNIXEPOCH()) "                                     \
@@ -581,7 +591,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     netdata_log_info("     to %s", new_sqlite_database);
 
     // This will remove the -shm and -wal files when we close the database
-    (void) db_execute(database, "select count(*) from sqlite_master limit 0");
+    (void)db_execute(database, "select count(*) from sqlite_master limit 0", NULL);
 
     sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
     if (recover) {
@@ -736,7 +746,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
             (void) sqlite3_close(db_meta);
         }
         return 1;
@@ -751,7 +761,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
             sqlite3_free(err_msg);
         }
         else {
-            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void)db_execute(db_meta, "select count(*) from sqlite_master limit 0", NULL);
             (void) sqlite3_close(db_meta);
         }
         return 1;
@@ -830,8 +840,8 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
 
 static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
 {
-    size_t old_version = st->rrdlabels_last_saved_version;
-    size_t new_version = rrdlabels_version(st->rrdlabels);
+    uint32_t old_version = st->rrdlabels_last_saved_version;
+    uint32_t new_version = rrdlabels_version(st->rrdlabels);
 
     if (new_version == old_version)
         return 0;
@@ -840,7 +850,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
     uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
     rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
     buffer_strcat(work_buffer, " ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
-    int rc = db_execute(db_meta, buffer_tostring(work_buffer));
+    int rc = db_execute(db_meta, buffer_tostring(work_buffer), NULL);
     if (likely(!rc))
         st->rrdlabels_last_saved_version = new_version;
 
@@ -854,7 +864,7 @@ void detect_machine_guid_change(nd_uuid_t *host_uuid)
 
     rc = exec_statement_with_uuid(CONVERT_EXISTING_LOCALHOST, host_uuid);
     if (!rc) {
-        if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES)))
+        if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES, NULL)))
             error_report("Failed to remove deleted hosts from node instances");
     }
 }
@@ -1499,9 +1509,9 @@ static void cleanup_health_log(struct meta_config_s *config)
         return;
     }
 
-    (void) db_execute(db_meta,"DELETE FROM health_log WHERE host_id NOT IN (SELECT host_id FROM host)");
-    (void) db_execute(db_meta,"DELETE FROM health_log_detail WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
-    (void) db_execute(db_meta,"DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)");
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG_DETAIL, NULL);
+    (void) db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
     worker_is_idle();
 }
 
@@ -1573,7 +1583,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 
         char sql[128];
         snprintfz(sql, sizeof(sql) - 1, "PRAGMA incremental_vacuum(%d)", do_free_pages);
-        (void)db_execute(database, sql);
+        (void)db_execute(database, sql, NULL);
     }
 }
 
@@ -1972,7 +1982,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     }
 
     if (local_meta_db)
-        (void) db_execute(local_meta_db, "PRAGMA cache_size=10000");
+        (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
 
     if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
         sqlite3_close(local_meta_db);
@@ -2017,7 +2027,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worke
     bool load_ml_models = is_worker;
 
     bool host_need_recheck = false;
-    (void)db_execute(db_meta, "BEGIN TRANSACTION");
+    (void)db_execute(db_meta, "BEGIN TRANSACTION", NULL);
 
     rrdset_foreach_reentrant(st, host) {
 
@@ -2095,7 +2105,7 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worke
     }
     rrdset_foreach_done(st);
 
-    (void)db_execute(db_meta, "COMMIT TRANSACTION");
+    (void)db_execute(db_meta, "COMMIT TRANSACTION", NULL);
     if (host_need_recheck)
         rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
 
@@ -2203,10 +2213,13 @@ static void store_ctx_cleanup_list(struct meta_config_s *config, struct judy_lis
     worker_is_idle();
 }
 
-static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool is_worker)
+static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool is_worker, bool cleanup_only)
 {
     if (!pending_alert_list)
         return;
+
+    if (cleanup_only)
+        goto done;
 
     if (is_worker)
         worker_is_busy(UV_EVENT_STORE_ALERT_TRANSITIONS);
@@ -2228,8 +2241,6 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
         __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
         __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
     }
-    (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
-    freez(pending_alert_list);
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
     nd_log(
@@ -2241,23 +2252,33 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
 
     if (is_worker)
         worker_is_idle();
+
+done:
+    (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
+    freez(pending_alert_list);
 }
 
-static int execute_statement(sqlite3_stmt *stmt)
+static int execute_statement(sqlite3_stmt *stmt, bool only_finalize)
 {
     if (!stmt)
         return SQLITE_OK;
 
-    int rc = sqlite3_step_monitored(stmt);
+    int rc = SQLITE_OK;
+
+    if (unlikely(only_finalize))
+        goto done;
+
+    rc = sqlite3_step_monitored(stmt);
     if (unlikely(rc != SQLITE_DONE))
         nd_log_daemon(NDLP_ERR, "Failed to execute sql statement, rc = %d", rc);
 
+done:
     SQLITE_FINALIZE(stmt);
 
-    return rc;
+    return rc == SQLITE_DONE ? SQLITE_OK : rc;
 }
 
-static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool is_worker)
+static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool is_worker, bool only_finalize)
 {
     if (!pending_sql_statement)
         return;
@@ -2273,7 +2294,7 @@ static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(pending_sql_statement->JudyL, &Index, &first))) {
         sqlite3_stmt *stmt = *Pvalue;
-        execute_statement(stmt);
+        execute_statement(stmt, only_finalize);
     }
     (void) JudyLFreeArray(&pending_sql_statement->JudyL, PJE0);
     freez(pending_sql_statement);
@@ -2304,7 +2325,7 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer)
     buffer_strcat(
         work_buffer,
         " ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
-    rc = db_execute(db_meta, buffer_tostring(work_buffer));
+    rc = db_execute(db_meta, buffer_tostring(work_buffer), NULL);
 
     if (unlikely(rc)) {
         error_report("METADATA: 'host:%s': failed to update metadata host labels", rrdhost_hostname(host));
@@ -2345,9 +2366,8 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
 {
     RRDHOST *host;
     size_t host_count = 0;
-    usec_t started_ut;
+    usec_t started_ut = now_monotonic_usec();
     if (!is_worker) {
-        started_ut = now_monotonic_usec();
         dfe_start_reentrant(rrdhost_root_index, host) {
             host_count++;
         }
@@ -2372,7 +2392,7 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
         if (is_worker)
             worker_is_idle();
 
-        metadata_scan_host(host, work_buffer, true);
+        metadata_scan_host(host, work_buffer, is_worker);
 
         if (!is_worker)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
@@ -2400,9 +2420,9 @@ static void start_metadata_hosts(uv_work_t *req)
     BUFFER *work_buffer = worker->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
-    store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true);
+    store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true, false);
 
-    store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true);
+    store_alert_transitions((struct judy_list_t *)worker->pending_alert_list, true, false);
 
     if (!SHUTDOWN_REQUESTED(config))
         store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
@@ -2609,7 +2629,7 @@ static void *metadata_event_loop(void *arg)
                         *Pvalue = (void *)stmt;
                     else {
                         // Fallback execute immediately
-                        execute_statement(stmt);
+                        execute_statement(stmt, false);
                     }
                     break;
                 case METADATA_SYNC_SHUTDOWN:
@@ -2634,8 +2654,13 @@ static void *metadata_event_loop(void *arg)
     uv_walk(loop, libuv_close_callback, NULL);
 
     size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+
+    // are we waiting for callbacks?
+    bool callbacks_pending = (config->metadata_running || config->ctx_load_running);
+
     while ((config->metadata_running || config->ctx_load_running) && loop_count > 0) {
-        if (!uv_run(loop, UV_RUN_NOWAIT))
+        callbacks_pending = uv_run(loop, UV_RUN_NOWAIT);
+        if (!callbacks_pending)
             break;  // No pending callbacks
         sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
         loop_count--;
@@ -2643,11 +2668,12 @@ static void *metadata_event_loop(void *arg)
 
     (void)uv_loop_close(loop);
 
-    store_hosts_metadata(work_buffer, false);
+    // If we are still waiting for callbacks we timed out, don't run these
+    if (!callbacks_pending)
+        store_hosts_metadata(work_buffer, false);
 
-    store_alert_transitions(pending_alert_list, false);
-
-    store_sql_statements(pending_sql_statement, false);
+    store_alert_transitions(pending_alert_list, false, callbacks_pending);
+    store_sql_statements(pending_sql_statement, false, callbacks_pending);
 
     if (pending_ctx_cleanup_list) {
         Word_t Index = 0;
@@ -2666,7 +2692,7 @@ static void *metadata_event_loop(void *arg)
     buffer_free(work_buffer);
     release_cmd_pool(&config->cmd_pool);
     worker_unregister();
-
+    service_exits();
     completion_mark_complete(&config->start_stop_complete);
 
     return NULL;
@@ -2854,7 +2880,7 @@ done:
 
 void cleanup_agent_event_log(void)
 {
-    (void) db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400");
+    (void) db_execute(db_meta, SQL_CLEANUP_AGENT_EVENT_LOG, NULL);
 }
 
 #define SQL_GET_AGENT_EVENT_TYPE_MEDIAN                                                                                \

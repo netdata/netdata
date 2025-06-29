@@ -105,7 +105,7 @@ void finalize_self_prepared_sql_statements();
 void finalize_all_prepared_sql_statements();
 
 int execute_insert(sqlite3_stmt *res);
-int db_execute(sqlite3 *database, const char *cmd);
+int db_execute(sqlite3 *database, const char *cmd, int *sqlite_rc);
 char *get_database_extented_error(sqlite3 *database, int i, const char *description);
 
 void sql_drop_table(const char *table);

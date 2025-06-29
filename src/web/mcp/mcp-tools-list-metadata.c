@@ -452,8 +452,11 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     time_t after = 0;
     time_t before = 0;
     if (config->params.has_time_range) {
-        after = mcp_params_parse_time(params, "after", MCP_DEFAULT_AFTER_TIME);
-        before = mcp_params_parse_time(params, "before", MCP_DEFAULT_BEFORE_TIME);
+        if (!mcp_params_parse_time_window(params, &after, &before, 
+                                          MCP_DEFAULT_AFTER_TIME, MCP_DEFAULT_BEFORE_TIME, 
+                                          false, mcpc->error)) {
+            return MCP_RC_BAD_REQUEST;
+        }
     }
     
     // Extract cardinality limit if supported
@@ -482,8 +485,8 @@ MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_T
     struct api_v2_contexts_request req = {
         .scope_contexts = metrics_pattern,
         .scope_nodes = nodes_pattern,
-        .contexts = metrics_pattern,
-        .nodes = nodes_pattern,
+        .contexts = NULL,
+        .nodes = NULL,
         .q = q,
         .after = after,
         .before = before,

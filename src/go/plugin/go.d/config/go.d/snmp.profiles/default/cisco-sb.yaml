@@ -3,17 +3,20 @@ extends:
   - _generic-if.yaml
   # This profile does not import cisco.yaml on purpose
 sysobjectid:
-  - 1.3.6.1.4.1.9.6.1.*         # Cisco Small Business
-  - 1.3.6.1.4.1.9.6.1.88.26.1   # Cisco SG200-26
+  - 1.3.6.1.4.1.9.6.1.* # Cisco Small Business
+  - 1.3.6.1.4.1.9.6.1.88.26.1 # Cisco SG200-26
 metadata:
   device:
     fields:
+      type:
+        value: "SMB"
       vendor:
-        value: "cisco"
+        value: "Cisco"
 metrics:
   - MIB: CISCOSB-rndMng
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.9.6.1.101.1.8
-    description: Cpu usage percentage
-    unit: "%"
+      description: Cpu usage percentage
+      family: CPU/Usage
+      unit: "%"

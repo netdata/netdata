@@ -4,14 +4,19 @@ extends:
   - _base.yaml
   - _cisco-generic.yaml
 
-device:
-  vendor: "cisco"
+metadata:
+  device:
+    fields:
+      type:
+        value: Router
+      vendor:
+        value: Cisco
 
 sysobjectid:
-  - 1.3.6.1.4.1.9.1.403  # ciscoASR7401
-  - 1.3.6.1.4.1.9.1.923  # ciscoASR1002
-  - 1.3.6.1.4.1.9.1.924  # ciscoASR1004
-  - 1.3.6.1.4.1.9.1.925  # ciscoASR1006
+  - 1.3.6.1.4.1.9.1.403 # ciscoASR7401
+  - 1.3.6.1.4.1.9.1.923 # ciscoASR1002
+  - 1.3.6.1.4.1.9.1.924 # ciscoASR1004
+  - 1.3.6.1.4.1.9.1.925 # ciscoASR1006
   - 1.3.6.1.4.1.9.1.1017 # ciscoASR9010
   - 1.3.6.1.4.1.9.1.1018 # ciscoASR9006
   - 1.3.6.1.4.1.9.1.1036 # ciscoASR14K4S
@@ -84,9 +89,3 @@ sysobjectid:
   - 1.3.6.1.4.1.9.1.2705 # ciscoASR92020SZM
   - 1.3.6.1.4.1.9.1.3075 # ciscoASR9903
   - 1.3.6.1.4.1.9.1.3090 # ciscoASR9902
-
-metadata:
-  device:
-    fields:
-      type:
-        value: "router"

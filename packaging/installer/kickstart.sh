@@ -23,7 +23,7 @@ DEFAULT_PLUGIN_PACKAGES=""
 REPOCONFIG_DEB_VERSION="5-1"
 REPOCONFIG_RPM_VERSION="5-1"
 START_TIME="$(date +%s)"
-STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64 ppc64le"
+STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64"
 
 # ======================================================================
 # Properly sort out inconsistencies in `$PATH` across distros

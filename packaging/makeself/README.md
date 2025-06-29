@@ -12,9 +12,9 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 | Architecture | Identifier | Notes                            |
 |--------------|------------|----------------------------------|
 | x86_64       | `x86_64`   | 64-bit Intel/AMD processors      |
+| ARMv6        | `armv6l`   | Raspberry Pi 1, some older SBCs  |
 | ARMv7        | `armv7l`   | Raspberry Pi 2/3, many SBCs      |
 | AArch64      | `aarch64`  | ARM 64-bit (Pi 4, newer devices) |
-| POWER8+      | `ppc64le`  | IBM POWER architecture           |
 
 ---
 
@@ -44,11 +44,11 @@ Run the build script with your target [architecture identifier](#supported-archi
 # For ARM 64-bit (AArch64)
 ./packaging/makeself/build-static.sh aarch64
 
+# For ARMv6
+./packaging/makeself/build-static.sh armv6l
+
 # For ARMv7
 ./packaging/makeself/build-static.sh armv7l
-
-# For POWER8+
-./packaging/makeself/build-static.sh ppc64le
 ```
 
 The script will automatically:

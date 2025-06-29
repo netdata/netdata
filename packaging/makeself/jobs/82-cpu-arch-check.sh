@@ -18,10 +18,6 @@ case "${BUILDARCH}" in
     ELF_MACHINE="ARM"
     ELF_CLASS="ELF32"
     ;;
-  ppc64le)
-    ELF_MACHINE="PowerPC64"
-    ELF_CLASS="ELF64"
-    ;;
   x86_64)
     ELF_MACHINE="X86-64"
     ELF_CLASS="ELF64"

@@ -7,8 +7,6 @@ import TabItem from '@theme/TabItem';
 
 We don’t officially support using Docker’s `--user` option or Docker Compose’s `user:` parameter with our images. While they may work, some features could be unavailable. The Agent drops privileges at startup, so most processes don’t run as UID 0 even without these options.  
 
-Additionally, our **POWER8+ Docker images** don’t support the **FreeIPMI collector** due to a technical limitation in FreeIPMI itself, which we can’t work around.
-
 ## Create a new Netdata Agent container
 
 You can create a new Agent container with `docker run` or `docker-compose`, then access the dashboard at `http://NODE:19999`.  
