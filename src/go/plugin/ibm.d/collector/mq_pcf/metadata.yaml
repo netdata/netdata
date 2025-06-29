@@ -91,11 +91,11 @@ modules:
               default_value: false
               required: false
             - name: queue_selector
-              description: Pattern to filter monitored queues (string contains matching).
+              description: Regular expression to filter monitored queues.
               default_value: ""
               required: false
             - name: channel_selector
-              description: Pattern to filter monitored channels (string contains matching).
+              description: Regular expression to filter monitored channels.
               default_value: ""
               required: false
         examples:
@@ -135,8 +135,8 @@ modules:
                     queue_manager: 'APP.QM'
                     host: 'localhost'
                     port: 1414
-                    queue_selector: 'APP.'
-                    channel_selector: 'TO.'
+                    queue_selector: '^APP\.'
+                    channel_selector: '^TO\.'
                     collect_queues: true
                     collect_channels: true
     troubleshooting:

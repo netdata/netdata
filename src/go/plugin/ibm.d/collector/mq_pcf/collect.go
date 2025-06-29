@@ -35,6 +35,7 @@ import (
 
 const (
 	precision = 1000 // Precision multiplier for floating-point values
+	maxMQGetBufferSize = 10 * 1024 * 1024 // 10MB maximum buffer size for MQGET responses
 )
 
 // MQ connection state
@@ -195,7 +196,9 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	var md C.MQMD
 	C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
 	md.Version = C.MQMD_VERSION_2
-	C.set_format(&md, C.CString("MQADMIN "))
+	formatStr := C.CString("MQADMIN ")
+	defer C.free(unsafe.Pointer(formatStr))
+	C.set_format(&md, formatStr)
 	md.MsgType = C.MQMT_REQUEST
 	md.Expiry = 60 // 60 seconds expiry
 	
@@ -254,6 +257,11 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD) ([]byte, error) {
 	
 	if reason != C.MQRC_TRUNCATED_MSG_FAILED {
 		return nil, fmt.Errorf("MQGET length check failed: completion code %d, reason code %d", compCode, reason)
+	}
+	
+	// Defensive check: prevent excessive memory allocation
+	if bufferLength > maxMQGetBufferSize {
+		return nil, fmt.Errorf("PCF response too large (%d bytes), maximum allowed is %d bytes", bufferLength, maxMQGetBufferSize)
 	}
 	
 	// Allocate buffer and get actual message
@@ -463,10 +471,10 @@ func (c *Collector) shouldCollectQueue(queueName string) bool {
 	}
 	
 	// Apply queue selector if configured
-	if c.conf.QueueSelector != "" {
-		matches := strings.Contains(queueName, c.conf.QueueSelector)
+	if c.queueSelectorRegex != nil {
+		matches := c.queueSelectorRegex.MatchString(queueName)
 		if !matches {
-			c.Debugf("Queue %s does not match selector '%s', skipping", queueName, c.conf.QueueSelector)
+			c.Debugf("Queue %s does not match selector pattern '%s', skipping", queueName, c.conf.QueueSelector)
 		}
 		return matches
 	}
@@ -482,10 +490,10 @@ func (c *Collector) shouldCollectChannel(channelName string) bool {
 	}
 	
 	// Apply channel selector if configured
-	if c.conf.ChannelSelector != "" {
-		matches := strings.Contains(channelName, c.conf.ChannelSelector)
+	if c.channelSelectorRegex != nil {
+		matches := c.channelSelectorRegex.MatchString(channelName)
 		if !matches {
-			c.Debugf("Channel %s does not match selector '%s', skipping", channelName, c.conf.ChannelSelector)
+			c.Debugf("Channel %s does not match selector pattern '%s', skipping", channelName, c.conf.ChannelSelector)
 		}
 		return matches
 	}

@@ -207,14 +207,15 @@ var topicChartsTmpl = module.Charts{
 	},
 }
 
-func (c *Collector) newQueueCharts(queueName string) *module.Charts {
-	charts := queueChartsTmpl.Copy()
-	cleanName := c.cleanName(queueName)
+// newInstanceCharts creates charts for a dynamic instance (queue, channel, topic)
+func (c *Collector) newInstanceCharts(tmpl module.Charts, instanceName, labelKey string) *module.Charts {
+	charts := tmpl.Copy()
+	cleanName := c.cleanName(instanceName)
 	
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
-			{Key: "queue", Value: queueName},
+			{Key: labelKey, Value: instanceName},
 		}
 		
 		// Add version labels if available
@@ -231,56 +232,16 @@ func (c *Collector) newQueueCharts(queueName string) *module.Charts {
 	}
 	
 	return charts
+}
+
+func (c *Collector) newQueueCharts(queueName string) *module.Charts {
+	return c.newInstanceCharts(queueChartsTmpl, queueName, "queue")
 }
 
 func (c *Collector) newChannelCharts(channelName string) *module.Charts {
-	charts := channelChartsTmpl.Copy()
-	cleanName := c.cleanName(channelName)
-	
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, cleanName)
-		chart.Labels = []module.Label{
-			{Key: "channel", Value: channelName},
-		}
-		
-		// Add version labels if available
-		if c.version != "" && c.edition != "" {
-			chart.Labels = append(chart.Labels, 
-				module.Label{Key: "mq_version", Value: c.version},
-				module.Label{Key: "mq_edition", Value: c.edition},
-			)
-		}
-		
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, cleanName)
-		}
-	}
-	
-	return charts
+	return c.newInstanceCharts(channelChartsTmpl, channelName, "channel")
 }
 
 func (c *Collector) newTopicCharts(topicName string) *module.Charts {
-	charts := topicChartsTmpl.Copy()
-	cleanName := c.cleanName(topicName)
-	
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, cleanName)
-		chart.Labels = []module.Label{
-			{Key: "topic", Value: topicName},
-		}
-		
-		// Add version labels if available
-		if c.version != "" && c.edition != "" {
-			chart.Labels = append(chart.Labels, 
-				module.Label{Key: "mq_version", Value: c.version},
-				module.Label{Key: "mq_edition", Value: c.edition},
-			)
-		}
-		
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, cleanName)
-		}
-	}
-	
-	return charts
+	return c.newInstanceCharts(topicChartsTmpl, topicName, "topic")
 }
