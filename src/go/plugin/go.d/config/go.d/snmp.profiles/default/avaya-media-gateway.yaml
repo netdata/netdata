@@ -21,14 +21,14 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.5.10 # genCpuAverageUtilization.10
       description: Current average CPU utilization in percentage
-      family: CPU
+      family: CPU/Usage
       unit: "%"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.10 # genMemUtilizationPercentUsed.10
       description: Percentage of memory used
-      family: Memory
+      family: Memory/Usage
       unit: "%"
   - MIB: AVAYA-ENTITY-MIB
     table:
@@ -38,7 +38,7 @@ metrics:
       - OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
         name: avaya.avEntPhyChFruFault
         description: Description of FRU fault
-        family: FRU/Faults
+        family: Hardware/FRU/Fault/Status
         unit: "{status}"
         mapping:
           1: none
@@ -52,7 +52,7 @@ metrics:
       - OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
         name: avaya.avEntPhyChFruOperStat
         description: Operational status of the chassis FRU unit
-        family: FRU/Status
+        family: Hardware/FRU/Operational/Status
         unit: "{status}"
         mapping:
           1: ok
@@ -74,7 +74,7 @@ metrics:
       name: avaya.cmgRemoteSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.3.0
       description: 802.1 priority for signaling traffic on the H.248 link received from the controller
-      family: Signalling Traffic/Remote/Priority
+      family: Network/SignalTraffic/Remote/Priority
       unit: "1"
   # - MIB: G700-MG-MIB
   #   symbol:
@@ -88,21 +88,21 @@ metrics:
       name: avaya.cmgLocalSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.5.0
       description: 802.1 priority for signaling traffic on the H.248 link locally administered
-      family: Signalling Traffic/Local/Priority
+      family: Network/SignalTraffic/Local/Priority
       unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgCurrent802Vlan
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.7.0
       description: Current 802.1 VLAN ID in use for this processor
-      family: VLAN
+      family: Network/VLAN/Current
       unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgH248LinkErrorCode
       OID: 1.3.6.1.4.1.6889.2.9.1.3.4.0
       description: Most recently received H.248 error code affecting the link between media gateway and controller
-      family: Link/Errors
+      family: Network/H248Link/Error/Code
       unit: "{status}"
       mapping:
         0: No error
@@ -166,31 +166,31 @@ metrics:
       - name: avaya.cmgVoipTotalChannels
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.6
         description: Total number of channels available to the VoIP engine
-        family: Media Gateway/VoIP Engines/Channels
+        family: Voice/VoIPEngine/Channel/Total
         unit: "{channel}"
       - name: avaya.cmgVoipChannelsInUse
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.7
         description: Number of channels currently in use at the VoIP engine
-        family: Media Gateway/VoIP Engines/Channels
+        family: Voice/VoIPEngine/Channel/InUse
         unit: "{channel}"
       - name: avaya.cmgVoipAverageOccupancy
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.8
         description: Five-minute average occupancy of the VoIP engine
-        family: Media Gateway/VoIP Engines/Occupancy
+        family: Voice/VoIPEngine/Occupancy
         unit: "%"
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.9
         name: avaya.cmgVoipHyperactivity
         description: Indicates whether hyperactivity has been detected
-        family: Media Gateway/VoIP Engines/Hyperactivity
+        family: Voice/VoIPEngine/Hyperactivity/Status
         unit: "{status}"
         mapping:
           1: normal
           2: hyperactive
           255: unknown
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.10
-        name: avaya.
+        name: avaya.cmgVoipAdminState
         description: Maintenance busy-out state
-        family: Media Gateway/VoIP Engines/Maintenance/Status
+        family: Voice/VoIPEngine/Admin/Status
         unit: "{status}"
         mapping:
           1: busy-out
@@ -200,7 +200,7 @@ metrics:
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.12
         name: avaya.cmgVoipDspStatus
         description: Status of the DSP complex
-        family: Media Gateway/VoIP Engines/DSP/Status
+        family: Voice/VoIPEngine/DSP/Status
         unit: "{status}"
         mapping:
           1: idle
@@ -219,16 +219,16 @@ metrics:
       - name: avaya.cmgDSPCoreTotalChannels
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.2
         description: Total number of channels available to the DSP core
-        family: Media Gateway/VoIP Engines/DSP/Cores/Channels
+        family: Voice/VoIPEngine/DSPCore/Channel/Total
         unit: "{channel}"
       - name: avaya.cmgDSPCoreChannelsInUse
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.3
         description: Number of channels currently in use at the DSP core
-        family: Media Gateway/VoIP Engines/DSP/Cores/Status
+        family: Voice/VoIPEngine/DSPCore/Channel/InUse
         unit: "{channel}"
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4
         name: avaya.cmgDSPCoreAdminState
-        family: Media Gateway/VoIP Engines/DSP/Cores/Admin/Status
+        family: Voice/VoIPEngine/DSPCore/Admin/Status
         unit: "{status}"
         mapping:
           1: busy-out
@@ -237,7 +237,7 @@ metrics:
           255: unknown
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.5
         name: avaya.cmgDSPCoreStatus
-        family: Media Gateway/VoIP Engines/DSP/Cores/Status
+        family: Voice/VoIPEngine/DSPCore/Operational/Status
         unit: "{status}"
         mapping:
           1: idle
@@ -245,7 +245,7 @@ metrics:
           3: fault
       - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.7
         name: avaya.cmgDSPCoreDemandTestResult
-        family: Media Gateway/VoIP Engines/DSP/Cores/Demand Test
+        family: Voice/VoIPEngine/DSPCore/Test/Result
         unit: "{status}"
         mapping:
           1: error_code1
