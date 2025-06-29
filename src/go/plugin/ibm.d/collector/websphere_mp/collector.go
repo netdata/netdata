@@ -66,7 +66,7 @@ func New() *WebSphereMicroProfile {
 type Config struct {
 	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
-	web.HTTPConfig `json:""`
+	web.HTTPConfig `yaml:",inline" json:""`
 
 	// Server identification
 	CellName   string `yaml:"cell_name,omitempty" json:"cell_name"`

@@ -45,14 +45,12 @@ type Config struct {
 	// Filtering
 	QueueSelector   string `yaml:"queue_selector"`
 	ChannelSelector string `yaml:"channel_selector"`
-	
-	module.Module
 }
 
 // Collector is the collector type.
 type Collector struct {
 	module.Base
-	Config `yaml:",inline" json:""`
+	Config `json:""`
 	
 	charts *module.Charts
 	
