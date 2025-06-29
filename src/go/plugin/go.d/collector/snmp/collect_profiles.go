@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
@@ -17,6 +18,7 @@ func (c *Collector) collectProfiles(mx map[string]int64) error {
 	}
 	if c.ddSnmpColl == nil {
 		c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger)
+		c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics
 	}
 
 	pms, err := c.ddSnmpColl.Collect()
@@ -24,60 +26,63 @@ func (c *Collector) collectProfiles(mx map[string]int64) error {
 		return err
 	}
 
-	for _, pm := range pms {
-		c.collectProfileScalarMetrics(mx, pm)
-		c.collectProfileTableMetrics(mx, pm)
-	}
+	c.collectProfileScalarMetrics(mx, pms)
+	c.collectProfileTableMetrics(mx, pms)
 
 	return nil
 }
 
-func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pm *ddsnmpcollector.ProfileMetrics) {
-	for _, m := range pm.Metrics {
-		if m.IsTable || m.Name == "" {
-			continue
-		}
+func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
+	for _, pm := range pms {
+		for _, m := range pm.Metrics {
+			if m.IsTable || m.Name == "" {
+				continue
+			}
 
-		if !c.seenScalarMetrics[m.Name] {
-			c.seenScalarMetrics[m.Name] = true
-			c.addProfileScalarMetricChart(m)
-		}
+			if !c.seenScalarMetrics[m.Name] {
+				c.seenScalarMetrics[m.Name] = true
+				c.addProfileScalarMetricChart(m)
+			}
 
-		if len(m.Mappings) == 0 {
-			id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
-			mx[id] = m.Value
-		} else {
-			for k, v := range m.Mappings {
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
-				mx[id] = metrix.Bool(m.Value == k)
+			if len(m.Mappings) == 0 {
+				id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+				mx[id] = m.Value
+			} else {
+				for k, v := range m.Mappings {
+					id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
+					mx[id] = metrix.Bool(m.Value == k)
+				}
 			}
 		}
 	}
 }
 
-func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pm *ddsnmpcollector.ProfileMetrics) {
+func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
 	seen := make(map[string]bool)
 
-	for _, m := range pm.Metrics {
-		if !m.IsTable || m.Name == "" || len(m.Tags) == 0 {
-			continue
-		}
+	for _, pm := range pms {
+		for _, m := range pm.Metrics {
+			if !m.IsTable || m.Name == "" || len(m.Tags) == 0 {
+				continue
+			}
 
-		key := tableMetricKey(m)
-		seen[key] = true
+			key := tableMetricKey(m)
 
-		if !c.seenTableMetrics[key] {
-			c.seenTableMetrics[key] = true
-			c.addProfileTableMetricChart(m)
-		}
+			seen[key] = true
 
-		if len(m.Mappings) == 0 {
-			id := fmt.Sprintf("snmp_device_prof_%s", key)
-			mx[id] = m.Value
-		} else {
-			for k, v := range m.Mappings {
-				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
-				mx[id] = metrix.Bool(m.Value == k)
+			if !c.seenTableMetrics[key] {
+				c.seenTableMetrics[key] = true
+				c.addProfileTableMetricChart(m)
+			}
+
+			if len(m.Mappings) == 0 {
+				id := fmt.Sprintf("snmp_device_prof_%s", key)
+				mx[id] = m.Value
+			} else {
+				for k, v := range m.Mappings {
+					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
+					mx[id] = metrix.Bool(m.Value == k)
+				}
 			}
 		}
 	}
@@ -89,7 +94,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pm *ddsnmpco
 	}
 }
 
-func tableMetricKey(m ddsnmpcollector.Metric) string {
+func tableMetricKey(m ddsnmp.Metric) string {
 	keys := make([]string, 0, len(m.Tags))
 	for k := range m.Tags {
 		keys = append(keys, k)
@@ -99,10 +104,11 @@ func tableMetricKey(m ddsnmpcollector.Metric) string {
 	var sb strings.Builder
 
 	sb.WriteString(m.Name)
+
 	for _, k := range keys {
-		if v := m.Tags[k]; v != "" {
+		if v := m.Tags[k]; v != "" && !strings.HasPrefix(k, "_") {
 			sb.WriteString("_")
-			sb.WriteString(m.Tags[k])
+			sb.WriteString(v)
 		}
 	}
 

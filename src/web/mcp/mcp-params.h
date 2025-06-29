@@ -134,6 +134,27 @@ time_t mcp_params_parse_time(
     const char *name,
     time_t default_value);
 
+// Validate and auto-correct time window parameters
+// Contract: 'after' is relative to 'before', 'before' is relative to 'now'
+// Handles common AI assistant mistakes:
+// - Both positive relative times → make both negative
+// - Positive after + negative before that results in future time → make after negative
+void mcp_params_validate_time_window(time_t *after, time_t *before, time_t now);
+
+// Parse and validate time window parameters (after and before) together
+// This ensures consistent parsing and validation across all MCP tools
+// Returns true on success, false on error (with error message in error buffer)
+// allow_both_zero: set to true for baseline times that use 0,0 for auto-calculation
+bool mcp_params_parse_time_window(
+    struct json_object *params,
+    time_t *after,
+    time_t *before,
+    time_t default_after,
+    time_t default_before,
+    bool allow_both_zero,
+    BUFFER *error
+);
+
 // Schema generation for individual time parameter
 void mcp_schema_add_time_param(
     BUFFER *buffer,

@@ -9,13 +9,22 @@ extends:
   - _cisco-wlc.yaml
   - _cisco-metadata.yaml
 
-device:
-  vendor: "cisco"
+metadata:
+  device:
+    fields:
+      serial_number:
+        symbol:
+          OID: 1.3.6.1.4.1.14179.1.1.1.4
+          name: agentInventorySerialNumber
+      type:
+        value: "WLC"
+      vendor:
+        value: "Cisco"
 
 sysobjectid:
-  - 1.3.6.1.4.1.9.1.818  # ciscoNMWLCE
-  - 1.3.6.1.4.1.9.1.828  # ciscoAirWlc2106K9
-  - 1.3.6.1.4.1.9.1.926  # cisco520WLC
+  - 1.3.6.1.4.1.9.1.818 # ciscoNMWLCE
+  - 1.3.6.1.4.1.9.1.828 # ciscoAirWlc2106K9
+  - 1.3.6.1.4.1.9.1.926 # cisco520WLC
   - 1.3.6.1.4.1.9.1.1069 # cisco5500Wlc
   - 1.3.6.1.4.1.9.1.1279 # ciscoAirCt2504K9
   - 1.3.6.1.4.1.9.1.1295 # cisco7500Wlc
@@ -28,34 +37,25 @@ sysobjectid:
   - 1.3.6.1.4.1.9.1.2171 # cisco8540Wlc
   - 1.3.6.1.4.1.9.1.2427 # cisco3504WLC
 
-metadata:
-  device:
-    fields:
-      serial_number:
-        symbol:
-          OID: 1.3.6.1.4.1.14179.1.1.1.4
-          name: agentInventorySerialNumber
-      type:
-        value: "WLC"
-
 metrics:
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
       OID: 1.3.6.1.4.1.14179.1.1.5.1 # agentCurrentCPUUtilization
       name: cpu.usage
-    description: Current CPU load of the switch in percentage
-    unit: "%"
+      description: Current CPU load of the switch
+      family: CPU/Load
+      unit: "%"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
       OID: 1.3.6.1.4.1.14179.1.1.5.3 # agentFreeMemory
-      scale_factor: 1000
       name: memory.free
-    description: Free RAM of the switch in Kbytes
-    unit: "kBy"
+      description: Free RAM of the switch
+      family: Memory/RAM/Free
+      unit: "By"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
       OID: 1.3.6.1.4.1.14179.1.1.5.2 # agentTotalMemory
-      scale_factor: 1000
       name: memory.total
-    description: Total RAM of the switch in Kbytes
-    unit: "kBy"
+      description: Total RAM of the switch
+      family: Memory/RAM/Total
+      unit: "By"

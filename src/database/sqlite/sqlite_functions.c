@@ -20,7 +20,7 @@ long long def_journal_size_limit = 16777216;
 
 SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
 
-bool sqlite_online;
+bool sqlite_library_initialized;
 
 SQLITE_API int sqlite3_exec_monitored(
     sqlite3 *db,                               /* An open database */
@@ -189,13 +189,13 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
 // This must be called when the thread terminates
 void finalize_self_prepared_sql_statements()
 {
-    if (!thread_stmt_pool)
-        return;
     spinlock_lock(&JudyL_thread_stmt_lock);
-    Word_t thread_id = thread_stmt_pool->thread_id;
-    finalize_and_free_stmt_list(thread_stmt_pool);
-    thread_stmt_pool = NULL;
-    (void) JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
+    if (thread_stmt_pool) {
+        Word_t thread_id = thread_stmt_pool->thread_id;
+        finalize_and_free_stmt_list(thread_stmt_pool);
+        thread_stmt_pool = NULL;
+        (void)JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
+    }
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
 
@@ -297,10 +297,14 @@ int init_database_batch(sqlite3 *database, const char *batch[], const char *desc
 
 // Return 0 OK
 // Return 1 Failed
-int db_execute(sqlite3 *db, const char *cmd)
+// sqlite_rc - if not NULL, it will be set to the return code of the sqlite3_exec_monitored call
+int db_execute(sqlite3 *db, const char *cmd, int *sqlite_rc)
 {
     int rc;
     int cnt = 0;
+
+    if (unlikely(!db))
+        return 1;
 
     while (cnt < SQL_MAX_RETRY) {
         char *err_msg = NULL;
@@ -323,6 +327,9 @@ int db_execute(sqlite3 *db, const char *cmd)
             mark_database_to_recover(NULL, db, rc);
         break;
     }
+    if (sqlite_rc)
+        *sqlite_rc = rc;
+
     return (rc != SQLITE_OK);
 }
 
@@ -395,7 +402,7 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     if (unlikely(!database))
         return;
 
-    (void) db_execute(database, "PRAGMA optimize");
+    (void)db_execute(database, "PRAGMA optimize", NULL);
 
     netdata_log_info("%s: Closing sqlite database", database_name);
 
@@ -422,6 +429,8 @@ extern sqlite3 *db_context_meta;
 
 void sqlite_close_databases(void)
 {
+    spinlock_lock(&sqlite_spinlock);
+
     // In case we have statements in the main thread
     finalize_self_prepared_sql_statements();
 
@@ -429,12 +438,9 @@ void sqlite_close_databases(void)
     // to do it properly
     finalize_all_prepared_sql_statements();
 
-    spinlock_lock(&sqlite_spinlock);
-    sqlite_online = false;
-    spinlock_unlock(&sqlite_spinlock);
-
     sql_close_database(db_context_meta, "CONTEXT");
     sql_close_database(db_meta, "METADATA");
+    spinlock_unlock(&sqlite_spinlock);
 }
 
 uint64_t get_total_database_space(void)
@@ -478,7 +484,7 @@ int sqlite_library_init(void)
         nd_log_daemon(
             NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
     }
-    sqlite_online = true;
+    sqlite_library_initialized = true;
     spinlock_unlock(&sqlite_spinlock);
 
     return (SQLITE_OK != rc);
@@ -499,6 +505,11 @@ void sqlite_library_shutdown(void)
     } while (bytes);
 #endif
     spinlock_lock(&sqlite_spinlock);
+    if (!sqlite_library_initialized) {
+        spinlock_unlock(&sqlite_spinlock);
+        return;
+    }
+    sqlite_library_initialized = false;
     (void) sqlite3_shutdown();
     spinlock_unlock(&sqlite_spinlock);
 }

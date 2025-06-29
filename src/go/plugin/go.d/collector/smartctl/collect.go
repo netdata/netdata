@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux || freebsd || openbsd || netbsd || dragonfly
-
 package smartctl
 
 import (
@@ -12,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sourcegraph/conc/pool"
 	"github.com/tidwall/gjson"
 )
 
@@ -41,13 +40,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if c.forceDevicePoll || c.isTimeToPollDevices(now) {
 		mx := make(map[string]int64)
 
-		// TODO: make it concurrent
-		for _, d := range c.scannedDevices {
-			if err := c.collectScannedDevice(mx, d); err != nil {
-				c.Warning(err)
-				continue
-			}
-		}
+		c.collectDevices(mx)
 
 		c.forceDevicePoll = false
 		c.lastDevicePollTime = now
@@ -56,9 +49,62 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	return c.mx, nil
 }
+func (c *Collector) collectDevices(mx map[string]int64) {
+	if c.ConcurrentScans > 0 && len(c.scannedDevices) > 1 {
+		if err := c.collectDevicesConcurrently(mx); err != nil {
+			c.Warning(err)
+		}
+		return
+	}
 
-func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
-	resp, err := c.exec.deviceInfo(scanDev.name, scanDev.typ, c.NoCheckPowerMode)
+	for _, d := range c.scannedDevices {
+		if err := c.collectScannedDevice(mx, d); err != nil {
+			c.Warning(err)
+			continue
+		}
+	}
+}
+
+type deviceInfoResult struct {
+	scanDevice *scanDevice
+	response   *gjson.Result
+	err        error
+}
+
+func (c *Collector) collectDevicesConcurrently(mx map[string]int64) error {
+	p := pool.New().WithMaxGoroutines(c.ConcurrentScans)
+	resultsChan := make(chan deviceInfoResult, len(c.scannedDevices))
+
+	for _, dev := range c.scannedDevices {
+		dev := dev
+		p.Go(func() {
+			resp, err := c.exec.deviceInfo(dev.name, dev.typ, c.NoCheckPowerMode)
+			resultsChan <- deviceInfoResult{
+				scanDevice: dev,
+				response:   resp,
+				err:        err,
+			}
+		})
+	}
+
+	p.Wait()
+	close(resultsChan)
+
+	for r := range resultsChan {
+		if err := c.processDeviceResult(mx, r); err != nil {
+			c.Warning(err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoResult) error {
+	scanDev := result.scanDevice
+	resp := result.response
+	err := result.err
+
 	if err != nil {
 		if resp != nil && isDeviceOpenFailedNoSuchDevice(resp) && !scanDev.extra {
 			c.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
@@ -86,6 +132,15 @@ func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevic
 	c.collectSmartDevice(mx, dev)
 
 	return nil
+}
+
+func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
+	resp, err := c.exec.deviceInfo(scanDev.name, scanDev.typ, c.NoCheckPowerMode)
+	return c.processDeviceResult(mx, deviceInfoResult{
+		scanDevice: scanDev,
+		response:   resp,
+		err:        err,
+	})
 }
 
 func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {

@@ -987,6 +987,99 @@ modules:
                 - name: temperature
   - meta:
       plugin_name: windows.plugin
+      module_name: GetPowerSupply
+      monitored_instance:
+        name: Power supply
+        link: "https://learn.microsoft.com/en-us/windows/win32/power/power-management-portal"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "powersupply.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - power supply
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors power supply statistics on Windows systems.
+        method_description: |
+          It uses Windows Internal API to retrieve available data.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          section_name: "[plugin:windows]"
+          name: "netdata.conf"
+          description: "The Netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config Option"
+            enabled: false
+          list:
+            - name: GetPowerSupply
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: power_supply_capacity
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf
+        metric: powersupply.capacity
+        info: percentage of remaining power supply capacity
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Power Supply
+          description: "These metrics refer to Power Supply device."
+          labels:
+            - name: device
+              description: Device name delivered as a Windows path.
+          metrics:
+            - name: powersupply.capacity
+              description: Battery capacity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: capacity
+            - name: powersupply.voltage
+              description: Power supply voltage
+              unit: "V"
+              chart_type: line
+              dimensions:
+                - name: now
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibWebService
       monitored_instance:
         name: IIS
@@ -3094,3 +3187,355 @@ modules:
                 - name: pause_pending
                 - name: paused
                 - name: unknown
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibExchange
+      monitored_instance:
+        name: MS Exchange
+        link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "exchange.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - exchange
+        - mail
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Microsoft Exchange.
+        method_description: |
+          It queries different Exchange objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibExchange
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Windows Exchange
+          description: "These metrics refer to Windows Exchange."
+          labels: []
+          metrics:
+            - name: exchange.transport_queues_active_mail_box_delivery
+              description: Active Mailbox Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_external_active_remote_delivery
+              description: External Active Remote Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_internal_active_remote_delivery
+              description: Internal Active Remote Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_unreachable
+              description: Unreachable Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: unreachable
+            - name: exchange.transport_queues_poison
+              description: Poison Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: unreachable
+            - name: exchange.activesync_ping_cmds_pending
+              description: Ping commands pending in queue.
+              unit: commands
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: exchange.activesync_requests
+              description: HTTP requests received from ASP.NET.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: exchange.activesync_sync_cmds
+              description: Sync commands processed.
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.rpc_active_user_count
+              description: Active unique users in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.rpc_avg_latency
+              description: Average latency.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.rpc_connection_count
+              description: Client connections.
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: exchange.rpc_requests
+              description: Clients requests currently being processed.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.rpc_active_user
+              description: Active unique users in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: users
+            - name: exchange.rpc_connection
+              description: Client connections.
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: exchange.rpc_operations
+              description: RPC operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.rpc_user_count
+              description: RPC users.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: users
+            - name: exchange.owa_current_unique_users
+              description: Unique users currently logged on to Outlook Web App.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: logged-in
+            - name: exchange.owa_requests_total
+              description: Requests handled by Outlook Web App.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: handled
+            - name: exchange.workload_active_tasks
+              description: Workload active tasks.
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.workload_completed_tasks
+              description: Workload completed tasks.
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: completed
+            - name: exchange.workload_queued_tasks
+              description: Workload queued tasks.
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.workload_yielded_tasks
+              description: Workload yielded tasks.
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: yielded
+            - name: exchange.workload_activity_status
+              description: Workload activity status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: paused
+            - name: exchange.http_proxy_avg_auth_latency
+              description: Average time spent authenticating CAS requests.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.http_proxy_avg_cas_processing_latency_sec
+              description: Average latency (sec) of CAS processing time.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.http_proxy_mailbox_proxy_failure_rate
+              description: Percentage of failures between this CAS and MBX servers.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: exchange.http_proxy_mailbox_server_locator_avg_latency_sec
+              description: Average latency of MailboxServerLocator web service calls.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: exchange.http_proxy_outstanding_proxy_requests
+              description: Concurrent outstanding proxy requests.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: exchange.http_proxy_requests
+              description: Number of proxy requests processed each second.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: exchange.autodiscover_requests
+              description: Autodiscover service requests processed
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.avail_service_requests
+              description: Requests serviced
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: serviced
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibNUMA
+      monitored_instance:
+        name: NUMA Architecture
+        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - NUMA
+        - processor
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors NUMA Architecture on Windows.
+        method_description: |
+          It queries NUMA Node Memory from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibNUMA
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: NUMA
+          description: "These metrics refer to memory utilization on NUMA systems."
+          labels:
+            - name: node
+              description: The identifier of the CPU node.
+          metrics:
+            - name: mem.numa_node_mem_usage
+              description: NUMA Node Memory Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: free
+                - name: standby
+                - name: available

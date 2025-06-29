@@ -951,6 +951,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/storage-point.h
         src/libnetdata/parsers/parsers.h
         src/libnetdata/parsers/duration.c
+        src/libnetdata/parsers/duration-unittest.c
         src/libnetdata/os/gettid.c
         src/libnetdata/os/gettid.h
         src/libnetdata/os/adjtimex.c
@@ -1602,6 +1603,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-swap.h
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
+        src/collectors/common-contexts/power-supply.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -1786,12 +1788,12 @@ set(STATSD_PLUGIN_FILES
 
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
         src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
-        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/collectors/systemd-journal.plugin/provider/netdata_provider.c
@@ -2042,6 +2044,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemUptime.c
         src/collectors/windows.plugin/GetSystemRAM.c
         src/collectors/windows.plugin/GetSystemCPU.c
+        src/collectors/windows.plugin/GetPowerSupply.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -2060,6 +2063,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-web-service.c
         src/collectors/windows.plugin/perflib-services.c
         src/collectors/windows.plugin/perflib-hyperv.c
+        src/collectors/windows.plugin/perflib-exchange.c
+        src/collectors/windows.plugin/perflib-numa.c
 )
 
 set(PROC_PLUGIN_FILES
@@ -3198,7 +3203,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
-        "$<$<BOOL:${OS_WINDOWS}>:odbc32>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
 
 netdata_add_protobuf(netdata)
