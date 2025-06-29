@@ -122,6 +122,9 @@ type Config struct {
 	CollectServletsMatching string `yaml:"collect_servlets_matching,omitempty" json:"collect_servlets_matching"`
 	CollectEJBsMatching     string `yaml:"collect_ejbs_matching,omitempty" json:"collect_ejbs_matching"`
 
+	// Dynamic collection system
+	UseDynamicCollection *bool `yaml:"use_dynamic_collection,omitempty" json:"use_dynamic_collection"`
+
 	// HTTP Client settings
 	web.HTTPConfig `yaml:",inline" json:""`
 }
@@ -169,6 +172,10 @@ type WebSpherePMI struct {
 	// WebSphere version information
 	wasVersion string
 	wasEdition string // traditional, liberty
+	
+	// Dynamic collection system
+	dynamicCollector     *DynamicCollector
+	useDynamicCollection bool
 }
 
 type pmiCacheEntry struct {
@@ -557,7 +564,12 @@ func (w *WebSpherePMI) collect(ctx context.Context) (map[string]int64, error) {
 	// Detect WebSphere version on first successful collection
 	w.detectWebSphereVersion(stats)
 
-	// Process and collect metrics
+	// Check if dynamic collection should be used
+	if w.shouldUseDynamicCollection() {
+		return w.collectDynamic(ctx, stats), nil
+	}
+
+	// Process and collect metrics using legacy system
 	mx := make(map[string]int64)
 
 	// Mark all current entities as not seen
@@ -570,6 +582,17 @@ func (w *WebSpherePMI) collect(ctx context.Context) (map[string]int64, error) {
 	w.removeNotSeenEntities()
 
 	return mx, nil
+}
+
+// shouldUseDynamicCollection determines if dynamic collection should be used
+func (w *WebSpherePMI) shouldUseDynamicCollection() bool {
+	// Check explicit configuration
+	if w.UseDynamicCollection != nil {
+		return *w.UseDynamicCollection
+	}
+	
+	// Default: use dynamic collection for better metric coverage
+	return true
 }
 
 func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, error) {
