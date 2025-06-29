@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "IBM MQ PCF collector configuration",
+  "properties": {
+    "update_every": {
+      "title": "Update every",
+      "description": "Data collection frequency in seconds.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 5
+    },
+    "queue_manager": {
+      "title": "Queue manager name",
+      "description": "The name of the IBM MQ queue manager to monitor.",
+      "type": "string"
+    },
+    "channel": {
+      "title": "Server connection channel",
+      "description": "The server connection channel to use for connecting to the queue manager.",
+      "type": "string",
+      "default": "SYSTEM.DEF.SVRCONN"
+    },
+    "host": {
+      "title": "Host",
+      "description": "Hostname or IP address of the queue manager.",
+      "type": "string",
+      "default": "localhost"
+    },
+    "port": {
+      "title": "Port",
+      "description": "Port number of the queue manager listener.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 1414
+    },
+    "user": {
+      "title": "Username",
+      "description": "Username for authentication (optional).",
+      "type": "string"
+    },
+    "password": {
+      "title": "Password",
+      "description": "Password for authentication (optional).",
+      "type": "string"
+    },
+    "collect_queues": {
+      "title": "Collect queue metrics",
+      "description": "Enable collection of queue statistics.",
+      "type": "boolean",
+      "default": true
+    },
+    "collect_channels": {
+      "title": "Collect channel metrics",
+      "description": "Enable collection of channel statistics.",
+      "type": "boolean",
+      "default": true
+    },
+    "collect_topics": {
+      "title": "Collect topic metrics",
+      "description": "Enable collection of topic statistics (may impact performance).",
+      "type": "boolean",
+      "default": false
+    },
+    "queue_selector": {
+      "title": "Queue name selector",
+      "description": "Pattern to filter which queues to monitor. Uses string contains matching.",
+      "type": "string"
+    },
+    "channel_selector": {
+      "title": "Channel name selector", 
+      "description": "Pattern to filter which channels to monitor. Uses string contains matching.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "queue_manager"
+  ],
+  "additionalProperties": false,
+  "patternProperties": {
+    "^name$": {}
+  }
+}
