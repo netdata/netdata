@@ -134,53 +134,18 @@ jobs:
 
 ## Prerequisites
 
-### 1. Install IBM DB2 Client Libraries
+### 1. IBM DB2 Client Libraries
 
-The collector requires IBM DB2 client libraries. You can install one of:
-- IBM Data Server Driver Package (recommended, smallest footprint)
-- IBM Data Server Runtime Client
-- IBM Data Server Client
-- IBM Db2 Community Edition
+Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0 to `/usr/lib/netdata/ibm-clidriver/` (or `/opt/netdata/ibm-clidriver/`).
 
-#### Linux Installation Example:
-```bash
-# Download IBM Data Server Driver Package from IBM
-# (requires free IBM account registration)
-# https://www.ibm.com/support/pages/db2-data-server-drivers
+**Important Restrictions:**
+- **License Key Required**: For connections to IBM i servers, you must install a Db2 Connect license key in the driver's license directory according to IBM driver distribution policy
+- **XA Connections**: Not supported against IBM i servers  
+- **CLIENT Authentication**: Not supported by the IBM Data Server Driver
 
-# Extract the package
-tar -xzf linuxx64_odbc_cli.tar.gz
+For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
 
-# The files will be extracted to a 'clidriver' directory
-```
-
-### 2. Set Environment Variables
-
-The following environment variables must be set for the Netdata service:
-
-```bash
-export IBM_DB_HOME=/path/to/clidriver
-export CGO_CFLAGS="-I$IBM_DB_HOME/include"
-export CGO_LDFLAGS="-L$IBM_DB_HOME/lib -Wl,-rpath,$IBM_DB_HOME/lib"
-export LD_LIBRARY_PATH=$IBM_DB_HOME/lib:$LD_LIBRARY_PATH
-```
-
-For systemd services, add these to the Netdata service file:
-```ini
-[Service]
-Environment="IBM_DB_HOME=/path/to/clidriver"
-Environment="LD_LIBRARY_PATH=/path/to/clidriver/lib"
-```
-
-### 3. Verify Connectivity
-
-Test your connection before configuring Netdata:
-```bash
-# Using the db2cli tool from IBM Data Server Driver
-$IBM_DB_HOME/bin/db2cli validate -dsn "DATABASE=bludb;HOSTNAME=your-host;PORT=your-port;PROTOCOL=TCPIP;UID=your-user;PWD=your-password"
-```
-
-### 4. Database Permissions
+### 2. Database Permissions
 
 Create a monitoring user with SELECT permissions on QSYS2 schema tables:
 ```sql
@@ -201,47 +166,33 @@ GRANT SELECT ON QSYS2.JOB_QUEUE_INFO TO monitor_user;
 
 ### Common Issues
 
-1. **"error loading shared libraries: libdb2.so"**
-   - Ensure `LD_LIBRARY_PATH` includes the DB2 client library path
-   - For systemd services, update the service file with the environment variable
-
-2. **"cgo: C compiler not found"**
-   - Install gcc or build-essential package
-   - The go_ibm_db driver requires CGO
-
-3. **"SQL1042C An unexpected system error occurred"**
-   - Check if the DB2 client version is compatible with your server
+1. **"SQL1042C An unexpected system error occurred"**
    - Verify the SSL certificate path is correct and readable
+   - Check network connectivity to the IBM i system
 
-4. **Certificate errors with SSL connections**
+2. **Certificate errors with SSL connections**
    - Ensure the certificate file has proper permissions (readable by netdata user)
    - Use absolute paths for SSLServerCertificate
    - Verify the certificate is in PEM format
+
+3. **License key errors for IBM i connections**
+   - Install the Db2 Connect license key in `/usr/lib/netdata/ibm-clidriver/license/` (or `/opt/netdata/ibm-clidriver/license/`)
+   - Obtain the license file from IBM Passport Advantage
+
+4. **Authentication failures**
+   - Use SERVER authentication instead of CLIENT (not supported by IBM Data Server Driver)
 
 ### Debug Mode
 
 To troubleshoot connection and data collection issues:
 
-1. Test the DB2 connection using the db2cli tool:
-   ```bash
-   $IBM_DB_HOME/bin/db2cli validate -dsn "DATABASE=;HOSTNAME=your-as400;PORT=446;PROTOCOL=TCPIP;UID=your-user;PWD=your-password"
-   ```
+1. Check if the monitoring user has proper permissions on QSYS2 schema tables
 
-2. Check if the monitoring user has proper permissions
+2. Verify network connectivity to the AS/400 system on port 446
 
-3. Verify network connectivity to the AS/400 system on port 446
+3. For IBM i connections, ensure the Db2 Connect license key is installed
 
-### Verify DB2 Client Installation
-
-Check if the IBM DB2 client libraries are properly installed:
-
-```bash
-# List DB2 client libraries
-ls -la $IBM_DB_HOME/lib/
-
-# Test connectivity with db2cli
-$IBM_DB_HOME/bin/db2cli validate -database "" -host your-as400-host -port 446 -user your-user -passwd your-password
-```
+4. Check Netdata logs for specific error messages and feature availability warnings
 
 ## IBM i Version Compatibility
 
