@@ -18,15 +18,15 @@ metrics:
       name: rPDULoadStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.2
-        name: powernet.rPDULoadStatusLoad
+        name: rPDULoadStatusLoad
         description: Phase/bank load
-        # measured in tenths of Amps.
-        family: Load/Status
-        unit: "A/10"
+        family: PhaseBank/Load/Current
+        unit: "A"
+        scale_factor: 0.1
       - OID: 1.3.6.1.4.1.318.1.1.12.2.3.1.1.3
         name: rPDULoadStatusLoadState
         description: Phase/bank load state
-        family: Load/Status
+        family: PhaseBank/Load/Status
         unit: "{status}"
         mapping:
           1: phase_load_normal
@@ -45,15 +45,15 @@ metrics:
       name: rPDUOutletStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.7
-        name: powernet.rPDUOutletStatusLoad
+        name: rPDUOutletStatusLoad
         description: Outlet load for an Outlet Monitored Rack PDU
-        #  in tenths of Amps.
-        family: Outlets/Load
-        unit: "A/10"
+        family: Outlet/Load/Current
+        unit: "A"
+        scale_factor: 0.1
       - OID: 1.3.6.1.4.1.318.1.1.12.3.5.1.1.4
         name: rPDUOutletStatusOutletState
         description: Outlet state
-        family: Outlets/Status
+        family: Outlet/Power/Status
         unit: "{status}"
         mapping:
           1: outlet_status_on
@@ -90,8 +90,9 @@ metrics:
   - MIB: PowerNet-MIB
     symbol:
       OID: 1.3.6.1.4.1.318.1.1.12.4.1.3.0
-      name: powernet.rPDUPowerSupplyAlarm
+      name: rPDUPowerSupplyAlarm
       description: Alarm status of the PDU power supply
+      family: PowerSupply/Alarm/Status
       unit: "{status}"
       mapping:
         1: allAvailablePowerSuppliesOK
@@ -106,7 +107,8 @@ metrics:
       - OID: 1.3.6.1.4.1.318.1.1.12.5.2.1.3
         name: rPDUStatusBankState
         description: Bank load state
-        family: Banks/Load
+        family: Bank/Load/Status
+        unit: "{status}"
         mapping:
           1: bank_load_normal
           2: bank_load_low
@@ -130,8 +132,8 @@ metrics:
       - OID: 1.3.6.1.4.1.318.1.1.12.5.4.1.3
         name: rPDUStatusPhaseState
         description: Phase Load state
-        family: Phase/Load
-        units: "{status}"
+        family: Phase/Load/Status
+        unit: "{status}"
         mapping:
           1: phase_load_normal
           2: phase_load_low
@@ -155,7 +157,8 @@ metrics:
       - OID: 1.3.6.1.4.1.318.1.1.12.5.6.1.3
         name: rPDUStatusOutletState
         description: Outlet Load state
-        family: Outlets/Status
+        family: Outlet/Load/Status
+        unit: "{status}"
         mapping:
           1: outlet_load_normal
           2: outlet_load_low
@@ -176,24 +179,24 @@ metrics:
       name: rPDU2SensorTempHumidityStatusTable
     symbols:
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.7
-        name: powernet.rPDU2SensorTempHumidityStatusTempF
+        name: rPDU2SensorTempHumidityStatusTempF
         description: Temperature in degrees Fahrenheit
-        family: Sensors/Temperature/Fahrenheit
+        family: Sensor/Temperature/Value
         unit: "degF"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.8
-        name: powernet.rPDU2SensorTempHumidityStatusTempC
+        name: rPDU2SensorTempHumidityStatusTempC
         description: Temperature in degrees Celsius
-        family: Sensors/Temperature/Celsius
+        family: Sensor/Temperature/Value
         unit: "Cel"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.10
-        name: powernet.rPDU2SensorTempHumidityStatusRelativeHumidity
+        name: rPDU2SensorTempHumidityStatusRelativeHumidity
         description: Relative humidity percentage
-        family: Sensors/Humidity/Percent
+        family: Sensor/Humidity/Value
         unit: "%"
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.9
         name: rPDU2SensorTempHumidityStatusTempStatus
         description: Current state of the temperature probe
-        family: Sensors/Temperature/Status
+        family: Sensor/Temperature/Status
         unit: "{status}"
         mapping:
           1: not_present
@@ -205,7 +208,7 @@ metrics:
       - OID: 1.3.6.1.4.1.318.1.1.26.10.2.2.1.11
         name: rPDU2SensorTempHumidityStatusHumidityStatus
         description: Current state of the humidity probe
-        family: Sensors/Humidity/Status
+        family: Sensor/Humidity/Status
         unit: "{status}"
         mapping:
           1: not_present
