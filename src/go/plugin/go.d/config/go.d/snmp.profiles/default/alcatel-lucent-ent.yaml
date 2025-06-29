@@ -23,12 +23,12 @@ metrics:
         family: CPU/Usage
         unit: "%"
     metric_tags:
-      - symbol:
+      - tag: cpu_index
+        index: 1
+      - tag: health_module_chassis_id
+        symbol:
           name: healthModuleChassisId
           OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.14
-        tag: health_module_chassis_id
-      - index: 1 # healthModuleSlot
-        tag: cpu
 
   - MIB: ALCATEL-ENT1-HEALTH-MIB
     table:
@@ -41,12 +41,12 @@ metrics:
         family: Memory/Usage
         unit: "%"
     metric_tags:
-      - symbol:
+      - tag: mem_index
+        index: 1
+      - tag: health_module_chassis_id
+        symbol:
           name: healthModuleChassisId
           OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.14
-        tag: health_module_chassis_id
-      - index: 1 # healthModuleSlot
-        tag: mem
 
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
     table:
@@ -218,14 +218,13 @@ metrics:
           3: green_blink
           4: amber_on
           5: amber_blink
-
     metric_tags:
-      # MIB: ENTITY-MIB
-      # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_class
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
-        tag: ent_physical_class
         mapping:
           1: other
           2: unknown
@@ -242,24 +241,24 @@ metrics:
           13: energy_object
           14: battery
           15: storage_drive
-        # MIB: ENTITY-MIB
-        # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_name
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
-        tag: ent_physical_name
-        # MIB: ENTITY-MIB
-        # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_serial_num
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
-        tag: ent_physical_serial_num
-        # MIB: ENTITY-MIB
-        # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_model_name
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
-        tag: ent_physical_model_name
 
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
     table:
@@ -283,12 +282,12 @@ metrics:
           4: over_first_threshold
           5: over_danger_threshold
     metric_tags:
-      # MIB: ENTITY-MIB
-      # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_class
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalClass
           OID: 1.3.6.1.2.1.47.1.1.1.1.5
-        tag: ent_physical_class
         mapping:
           1: other
           2: unknown
@@ -307,22 +306,24 @@ metrics:
           15: storage_drive
         # MIB: ENTITY-MIB
         # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_name
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalName
           OID: 1.3.6.1.2.1.47.1.1.1.1.7
-        tag: ent_physical_name
-        # MIB: ENTITY-MIB
-        # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_serial_num
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalSerialNum
           OID: 1.3.6.1.2.1.47.1.1.1.1.11
-        tag: ent_physical_serial_num
-        # MIB: ENTITY-MIB
-        # table: entPhysicalTable
-      - symbol:
+      - tag: ent_physical_model_name
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
           name: entPhysicalModelName
           OID: 1.3.6.1.2.1.47.1.1.1.1.13
-        tag: ent_physical_model_name
   - MIB: ALCATEL-ENT1-CHASSIS-MIB
     table:
       name: alaChasEntPhysFanTable
@@ -334,10 +335,10 @@ metrics:
         family: Fan/Speed
         unit: "{revolutions}/min"
     metric_tags:
-      - symbol:
+      - tag: ala_chas_ent_phys_fan_status
+        symbol:
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.2
           name: alaChasEntPhysFanStatus
-        tag: ala_chas_ent_phys_fan_status
         mapping:
           0: no_status
           1: not_running
@@ -357,11 +358,11 @@ metrics:
           2: down
           3: unknown
     metric_tags:
-      - symbol:
+      - tag: ala_chas_bps_power_supply_name
+        symbol:
           name: alaChasBpsPowerSupplyName
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.3
-        tag: ala_chas_bps_power_supply_name
-      - symbol:
+      - tag: ala_chas_bps_power_supply_serial_num
+        symbol:
           name: alaChasBpsPowerSupplySerialNum
           OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.8
-        tag: ala_chas_bps_power_supply_serial_num

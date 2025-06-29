@@ -18,18 +18,18 @@ metrics:
       name: wlsxSysXProcessorTable
       OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9
     symbols:
-      - name: cpu.usage
+      - name: sysXProcessorLoad
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.3
         description: The average, over the last minute, of the percentage of time that this processor was not idle
         family: CPU/Usage
         unit: "%"
     metric_tags:
-      - index: 1
-        tag: cpu
-      - symbol:
+      - tag: cpu_index
+        index: 1
+      - tag: sys_x_processor_descr
+        symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.9.1.2
           name: sysXProcessorDescr
-        tag: sys_x_processor_descr
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSysXStorageTable
@@ -38,56 +38,61 @@ metrics:
       - name: sysXStorageSize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
         description: Size of the storage filesystem
-        family: Storage/Filesystem
-        unit: "MBy"
+        family: Storage/Filesystem/Size
+        unit: "By"
+        scale_factor: 1048576
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         description: Storage filesystem usage
-        family: Storage/Filesystem
-        unit: "MBy"
+        family: Storage/Filesystem/Used
+        unit: "By"
+        scale_factor: 1048576
     metric_tags:
-      - symbol:
+      - tag: sys_x_storage_type
+        symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.2
           name: sysXStorageType
-        tag: sys_x_storage_type
         mapping:
           1: ram
           2: flash_memory
-      - symbol:
+      - tag: sys_x_storage_name
+        symbol:
           OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.5
           name: sysXStorageName
-        tag: sys_x_storage_name
 
   - MIB: WLSX-SWITCH-MIB
     table:
       name: wlsxSysXMemoryTable
       OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11
     symbols:
-      - name: memory.total
+      - name: sysXMemorySize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.2
         description: Total memory in KB
         family: Memory/Total
-        unit: "kBy"
-      - name: memory.used
+        unit: "By"
+        scale_factor: 1024
+      - name: sysXMemoryUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.3
         description: Used memory in KB
         family: Memory/Used
-        unit: "kBy"
-      - name: memory.free
+        unit: "By"
+        scale_factor: 1024
+      - name: sysXMemoryFree
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.11.1.4
         description: Free memory in KB
         family: Memory/Free
-        unit: "kBy"
+        unit: "By"
+        scale_factor: 1024
     metric_tags:
-      - index: 1
-        tag: mem
+      - tag: mem_index
+        index: 1
 
   - MIB: WLSX-SWITCH-MIB
     symbol:
       name: wlsxSwitchTotalNumAccessPoints
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.1.0
       description: Total number of access points connected to this switch
-      family: Access Points
+      family: Wireless/AccessPoint/Connected
       unit: "{ap}"
 
   - MIB: WLSX-SWITCH-MIB
@@ -95,22 +100,22 @@ metrics:
       name: wlsxSwitchTotalNumStationsAssociated
       OID: 1.3.6.1.4.1.14823.2.2.1.1.3.2.0
       description: Total number of stations associated to this switch.
-      family: Stations
+      family: Wireless/Station/Associated
       unit: "{station}"
 
 metric_tags:
-  - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
+  - tag: wlsx_model_name
+    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.2.0
     symbol: wlsxModelName
-    tag: wlsx_model_name
-  - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.4.0
+  - tag: wlsx_switch_role
+    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.4.0
     symbol: wlsxSwitchRole
-    tag: wlsx_switch_role
     mapping:
       1: master
       2: local
       3: standbymaster
       4: branch
       5: md
-  - OID: 1.3.6.1.4.1.14823.2.2.1.1.1.12.0
+  - tag: wlsx_switch_license_serial_number
+    OID: 1.3.6.1.4.1.14823.2.2.1.1.1.12.0
     symbol: wlsxSwitchLicenseSerialNumber
-    tag: wlsx_switch_license_serial_number
