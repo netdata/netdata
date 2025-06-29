@@ -148,7 +148,7 @@ INSTALL_DIR="/opt/netdata/lib/netdata/ibm-clidriver"  # For static installations
 # Download and extract
 sudo mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
-sudo wget https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v11.5.9/linuxx64_odbc_cli.tar.gz
+sudo wget https://public.dhe.ibm.com/ibmdl/export/pub/software/data/db2/drivers/odbc_cli/v12.1.0/linuxx64_odbc_cli.tar.gz
 sudo tar -xzf linuxx64_odbc_cli.tar.gz
 sudo mv clidriver/* .
 sudo rmdir clidriver
