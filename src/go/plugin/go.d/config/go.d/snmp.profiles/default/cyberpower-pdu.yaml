@@ -1,15 +1,15 @@
 extends:
   - _base.yaml
 
-sysobjectid: 1.3.6.1.4.1.3808.1.1.*
-
 metadata:
   device:
     fields:
       vendor:
-        value: "cyberpower"
+        value: Cyberpower
       type:
-        value: "PDU"
+        value: PDU
+
+sysobjectid: 1.3.6.1.4.1.3808.1.1.*
 
 metrics:
   - MIB: CPS-MIB
@@ -19,61 +19,63 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.2
         name: cyberpower.ePDULoadStatusLoad
-        description: "Phase/bank load measured in tenths of Amps"
+        description: "Phase/bank load"
+        family: Load/Current
         unit: "dA"
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.3
+        name: ePDULoadStatusLoadState
+        family: Load/Status
+        unit: "{status}"
+        mapping:
+          1: LoadNormal
+          2: LoadLow
+          3: LoadNearOverload
+          4: LoadOverload
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.6
         name: cyberpower.ePDULoadStatusVoltage
-        description: "Phase/bank voltage measured in tenths of Volts"
+        description: "Phase/bank voltage measured"
+        family: Voltage/Value
         unit: "dV"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.7
         name: cyberpower.ePDULoadStatusActivePower
-        description: "Phase/bank active power measured in watts"
+        description: "Phase/bank active power"
+        family: Power/Active
         unit: "W"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.8
         name: cyberpower.ePDULoadStatusApparentPower
-        description: "Phase/bank apparent power measured in VA"
+        description: "Phase/bank apparent power"
+        family: Power/Apparent
         unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.9
         name: cyberpower.ePDULoadStatusPowerFactor
-        description: "Power factor of the output measured in hundredths"
+        description: "Power factor of the output"
+        family: Power/Factor
         unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.1
           name: ePDULoadStatusIndex
         tag: e_pdu_load_status_index
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.2.3.1.1.3
-          name: ePDULoadStatusLoadState
-        tag: e_pdu_load_status_load_state
-        mapping:
-          1: load_normal
-          2: load_low
-          3: load_near_overload
-          4: load_overload
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1
       name: ePDULoadBankConfigTable
     symbols:
-      - name: cyberpower.ePDULoadBankConfig
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1.1.5
+        name: ePDULoadBankConfigAlarm
+        description: Bank Alarm
+        family: Bank/Alarm/Status
+        unit: "{status}"
+        mapping:
+          1: noLoadAlarm
+          2: underCurrentAlarm
+          3: nearOverCurrentAlarm
+          4: overCurrentAlarm
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1.1.1
           name: ePDULoadBankConfigIndex
         tag: e_pdu_load_bank_config_index
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.2.4.1.1.5
-          name: ePDULoadBankConfigAlarm
-        tag: e_pdu_load_bank_config_alarm
-        mapping:
-          1: no_load_alarm
-          2: under_current_alarm
-          3: near_over_current_alarm
-          4: over_current_alarm
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1
@@ -81,13 +83,32 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.7
         name: cyberpower.ePDUOutletStatusLoad
-        description: "Measured Outlet load for an Outlet Monitored Rack PDU in tenths of Amps"
-        unit: "A"
+        description: "Measured Outlet load for an Outlet Monitored Rack PDU"
+        family: Outlet/Load/Current
+        unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.8
         name: cyberpower.ePDUOutletStatusActivePower
-        description: "Measured Outlet load for an Outlet Monitored Rack PDU in watts"
+        description: "Measured Outlet load for an Outlet Monitored Rack PDU"
+        family: Outlet/Power/Active
         unit: "W"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.4
+        name: ePDUOutletStatusOutletState
+        description: Outlet state
+        family: Outlet/Operational/Status
+        unit: "{status}"
+        mapping:
+          1: outletStatusOn
+          2: outletStatusOff
+      - OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.9
+        name: ePDUOutletStatusAlarm
+        description: Outlet Alarm
+        family: Outlet/Alarm/Status
+        unit: "{status}"
+        mapping:
+          1: noLoadAlarm
+          2: underCurrentAlarm
+          3: nearOverCurrentAlarm
+          4: overCurrentAlarm
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.1
@@ -97,65 +118,57 @@ metrics:
           OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.2
           name: ePDUOutletStatusOutletName
         tag: e_pdu_outlet_status_outlet_name
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.1
+      name: ePDUPowerSupply1Status
+      description: Power Supply 1 Status
+      family: PowerSupply/1/Operational/Status
+      unit: "{status}"
+      mapping:
+        1: powerSupplyOneOk
+        2: powerSupplyOneFailed
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.2
+      name: ePDUPowerSupply2Status
+      description: Power Supply 2 Status
+      family: PowerSupply/2/Operational/Status
+      unit: "{status}"
+      mapping:
+        1: powerSupplyTwoOk
+        2: powerSupplyTwoFailed
+        3: powerSupplyTwoNotPresent
+  - MIB: CPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.3
+      name: ePDUPowerSupplyAlarm
+      description: Power Supply Alarm
+      family: PowerSupply/Alarm/Status
+      mapping:
+        1: allAvailablePowerSuppliesOK
+        2: powerSupplyOneFailed
+        3: powerSupplyTwoFailed
+        4: powerSupplyOneandTwoFailed
+    metric_tags:
       - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.4
-          name: ePDUOutletStatusOutletState
-        tag: e_pdu_outlet_status_outlet_state
-        mapping:
-          1: outlet_status_on
-          2: outlet_status_off
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.3.5.1.1.9
-          name: ePDUOutletStatusAlarm
-        tag: e_pdu_outlet_status_alarm
-        mapping:
-          1: no_load_alarm
-          2: under_current_alarm
-          3: near_over_current_alarm
-          4: over_current_alarm
-  # - MIB: CPS-MIB  # All three metric tags are scalar metrics with enums. Not supported yet.
-  #   table:
-  #     OID: 1.3.6.1.4.1.3808.1.1.3.3.6.1
-  #     name: ePDUOutletBankTable
-  #   symbols:
-  #     - name: ePDUOutletBank
-  #       constant_value_one: true
-  #   metric_tags:
-  #     - symbol:
-  #         OID:
-  #         name: ePDUOutletBankIndex
-  #     - symbol:
-  #         OID: 1.3.6.1.4.1.3808.1.1.3.4.1.1
-  #         name: ePDUPowerSupply1Status
-  #       tag: e_pdu_power_supply1_status
-  #       mapping:
-  #         1: power_supply_one_ok
-  #         2: power_supply_one_failed
-  #     - symbol:
-  #         OID: 1.3.6.1.4.1.3808.1.1.3.4.1.2
-  #         name: ePDUPowerSupply2Status
-  #       tag: e_pdu_power_supply2_status
-  #       mapping:
-  #         1: power_supply_two_ok
-  #         2: power_supply_two_failed
-  #         3: power_supply_two_not_present
-  #     - symbol:
-  #         OID: 1.3.6.1.4.1.3808.1.1.3.4.1.3
-  #         name: ePDUPowerSupplyAlarm
-  #       tag: e_pdu_power_supply_alarm
-  #       mapping:
-  #         1: all_available_power_supplies_ok
-  #         2: power_supply_one_failed
-  #         3: power_supply_two_failed
-  #         4: power_supply_oneand_two_failed
+          OID:
+          name: ePDUOutletBankIndex
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.2
       name: ePDUStatusBankTable
     symbols:
-      - name: cyberpower.ePDUStatusBank
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.3
+        name: ePDUStatusBankState
+        description: Bank load state
+        family: Bank/Load/Status
+        unit: "{status}"
+        mapping:
+          1: bankLoadNormal
+          2: bankLoadLow
+          3: bankLoadNearOverload
+          4: bankLoadOverload
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.1
@@ -165,23 +178,21 @@ metrics:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.2
           name: ePDUStatusBankNumber
         tag: e_pdu_status_bank_number
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.5.2.1.3
-          name: ePDUStatusBankState
-        tag: e_pdu_status_bank_state
-        mapping:
-          1: bank_load_normal
-          2: bank_load_low
-          3: bank_load_near_overload
-          4: bank_load_overload
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.4
       name: ePDUStatusPhaseTable
     symbols:
-      - name: cyberpower.ePDUStatusPhase
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.3
+        name: ePDUStatusPhaseState
+        description: Phase load state
+        family: Phase/Load/Status
+        unit: "{status}"
+        mapping:
+          1: phase_load_normal
+          2: phase_load_low
+          3: phase_load_near_overload
+          4: phase_load_overload
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.1
@@ -191,23 +202,21 @@ metrics:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.2
           name: ePDUStatusPhaseNumber
         tag: e_pdu_status_phase_number
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.5.4.1.3
-          name: ePDUStatusPhaseState
-        tag: e_pdu_status_phase_state
-        mapping:
-          1: phase_load_normal
-          2: phase_load_low
-          3: phase_load_near_overload
-          4: phase_load_overload
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.6
       name: ePDUStatusOutletTable
     symbols:
-      - name: cyberpower.ePDUStatusOutlet
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.3
+        name: ePDUStatusOutletState
+        description: Outlet load state
+        family: Outlet/Load/Status
+        unit: "{status}"
+        mapping:
+          1: outletLoadNormal
+          2: outletLoadLow
+          3: outletLoadNearOverload
+          4: outletLoadOverload
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.1
@@ -217,27 +226,20 @@ metrics:
           OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.2
           name: ePDUStatusOutletNumber
         tag: e_pdu_status_outlet_number
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.3.5.6.1.3
-          name: ePDUStatusOutletState
-        tag: e_pdu_status_outlet_state
-        mapping:
-          1: outlet_load_normal
-          2: outlet_load_low
-          3: outlet_load_near_overload
-          4: outlet_load_overload
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.7
       name: cyberpower.ePDUStatusInputVoltage
-      description: "Input voltage in 0.1 Volt"
-      unit: "V"
+      description: "Input voltage"
+      family: Input/Voltage/Value
+      unit: "dV"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.3.5.8
       name: cyberpower.ePDUStatusInputFrequency
-      description: "Input frequency in 0.1 Hertz"
-      unit: "Hz"
+      description: "Input frequency"
+      family: Input/Frequency/Value
+      unit: "dHz"
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.6.3.4
@@ -245,21 +247,68 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.5
         name: cyberpower.ePDU2DeviceStatusCurrentLoad
-        description: "Power consumption of the Rack PDU load in tenths of amps"
-        unit: "A"
+        description: "Power consumption of the Rack PDU load"
+        family: Rack/Load/Current
+        unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.6
         name: cyberpower.ePDU2DeviceStatusCurrentPeakLoad
-        description: "Peak power consumption of the Rack PDU load in tenths of amps"
-        unit: "A"
+        description: "Peak power consumption of the Rack PDU load"
+        family: Rack/Load/Current/Peak
+        unit: "dA/s"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.15
         name: cyberpower.ePDU2DeviceStatusApparentPower
-        description: "Apparent power consumption of the Rack PDU load in VoltAmps (VA)"
+        description: "Apparent power consumption of the Rack PDU load"
+        family: Rack/Power/Apparent
         unit: "VA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.16
         name: cyberpower.ePDU2DeviceStatusPowerFactor
-        description: "Power factor of the Rack PDU load in hundredths"
+        description: "Power factor of the Rack PDU load"
+        family: Rack/Power/Factor
         unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.17
+        name: ePDU2DeviceStatusRoleType
+        description: Rack PDU role on Daisy Chain group
+        family: Rack/Role/Status
+        unit: "{status}"
+        mapping:
+          1: standalone
+          2: host
+          3: slave
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.4
+        name: ePDU2DeviceStatusLoadState
+        description: Rack PDU load state
+        family: Rack/Load/Status
+        unit: "{status}"
+        mapping:
+          1: noLoadAlarm
+          2: underCurrentAlarm
+          3: nearOverCurrentAlarm
+          4: overCurrentAlarm
+      - symbol:
+        OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.12
+        name: ePDU2DeviceStatusPowerSupplyAlarm
+        description: Rack PDU Power Supply alarm
+        family: Rack/PowerSupply/Alarm/Status
+        unit: "{status}"
+        mapping:
+          1: normal
+          2: alarm
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.13
+        name: ePDU2DeviceStatusPowerSupply1Status
+        description: Rack PDU Power Supply 1 alarm
+        family: Rack/PowerSupply/1/Alarm/Status
+        unit: "{status}"
+        mapping:
+          1: normal
+          2: alarm
+      - OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.14
+        name: ePDU2DeviceStatusPowerSupply2Status
+        description: Rack PDU Power Supply 2 alarm
+        family: Rack/PowerSupply/2/Alarm/Status
+        unit: "{status}"
+        mapping:
+          1: normal
+          2: alarm
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.1
@@ -269,44 +318,6 @@ metrics:
           OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.3
           name: ePDU2DeviceStatusName
         tag: e_pdu2_device_status_name
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.17
-          name: ePDU2DeviceStatusRoleType
-        tag: e_pdu2_device_status_role_type
-        mapping:
-          1: standalone
-          2: host
-          3: slave
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.4
-          name: ePDU2DeviceStatusLoadState
-        tag: e_pdu2_device_status_load_state
-        mapping:
-          1: no_load_alarm
-          2: under_current_alarm
-          3: near_over_current_alarm
-          4: over_current_alarm
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.12
-          name: ePDU2DeviceStatusPowerSupplyAlarm
-        tag: e_pdu2_device_status_power_supply_alarm
-        mapping:
-          1: normal
-          2: alarm
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.13
-          name: ePDU2DeviceStatusPowerSupply1Status
-        tag: e_pdu2_device_status_power_supply1_status
-        mapping:
-          1: normal
-          2: alarm
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.3.4.1.14
-          name: ePDU2DeviceStatusPowerSupply2Status
-        tag: e_pdu2_device_status_power_supply2_status
-        mapping:
-          1: normal
-          2: alarm
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.6.4.4
@@ -314,43 +325,49 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.5
         name: cyberpower.ePDU2PhaseStatusLoad
-        description: "Current draw in tenths of Amps of the load on the Rack PDU phase being queried"
-        unit: "A"
+        description: "Current draw of the load on the Rack PDU phase"
+        family: Rack/Phase/Load/Current
+        unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.6
         name: cyberpower.ePDU2PhaseStatusVoltage
-        description: "Voltage in Volts of the Rack PDU phase being queried"
+        description: "Voltage of the Rack PDU phase"
+        family: Rack/Phase/Voltage/Value
         unit: "V"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.7
         name: cyberpower.ePDU2PhaseStatusPower
-        description: "Load power in watts (kW) consumed on the Rack PDU phase being queried"
-        unit: "W"
+        description: "Load power consumed on the Rack PDU phase"
+        family: Rack/Phase/Power/Active
+        unit: "kW"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.8
         name: cyberpower.ePDU2PhaseStatusApparentPower
-        description: "Load apparent power in hundredths of kiloVoltAmps (kVA) consumed on the Rack PDU phase being queried"
-        unit: "kVA"
+        description: "Load apparent power consumed on the Rack PDU phase"
+        family: Rack/Phase/Power/Apparent
+        unit: "mkVA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.9
         name: cyberpower.ePDU2PhaseStatusPowerFactor
-        description: "Load power factor in hundredths of the Rack PDU phase being queried"
+        description: "Load power factor of the Rack PDU phase"
+        family: Rack/Phase/Power/Factor
         unit: "%"
       - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.10
         name: cyberpower.ePDU2PhaseStatusPeakLoad
         description: "Peak current of the Rack PDU phase load in tenths of Amps"
-        unit: "A"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+        family: Rack/Phase/Load/Current/Peak
+        unit: "dA/s"
+      - OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.4
+        name: ePDU2PhaseStatusLoadState
+        description:
+        family: Rack/Phase/Load/Status
+        mapping:
+          # this was wrong by DD
+          1: lowLoad
+          2: normal
+          3: nearOverload
+          4: overload
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.1
           name: ePDU2PhaseStatusIndex
         tag: e_pdu2_phase_status_index
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.4.4.1.4
-          name: ePDU2PhaseStatusLoadState
-        tag: e_pdu2_phase_status_load_state
-        mapping:
-          1: normal
-          2: low_load
-          3: near_overload
-          4: overload
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.6.5.4
@@ -358,35 +375,44 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.5
         name: cyberpower.ePDU2BankStatusLoad
-        description: "Current draw in tenths of Amps of the load on the Rack PDU bank being queried"
-        unit: "A"
+        description: "Current draw of the load on the Rack PDU bank"
+        family: Rack/Bank/Load/Current
+        unit: "dA"
       - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.6
         name: cyberpower.ePDU2BankStatusPeakLoad
         description: "Peak current of the Rack PDU bank load in tenths of Amps"
-        unit: "A"
+        family: Rack/Bank/Load/Current/Peak
+        unit: "dA/s"
+      - OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.4
+        name: ePDU2BankStatusLoadState
+        description: Load status of the Rack PDU bank
+        family: Rack/Bank/Load/Status
+        # this was wrong by DD
+        mapping:
+          1: lowLoad
+          2: normal
+          3: nearOverload
+          4: overload
     # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.1
           name: ePDU2BankStatusIndex
         tag: e_pdu2_bank_status_index
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.5.4.1.4
-          name: ePDU2BankStatusLoadState
-        tag: e_pdu2_bank_status_load_state
-        mapping:
-          1: normal
-          2: low_load
-          3: near_overload
-          4: overload
+
   - MIB: CPS-MIB
     table:
       OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4
       name: ePDU2OutletSwitchedStatusTable
     symbols:
-      - name: cyberpower.ePDU2OutletSwitchedStatus
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.5
+        name: ePDU2OutletSwitchedStatusState
+        description: Switch state of the Rack PDU switched outlet
+        family: Rack/Outlet/Switched/Status
+        unit: "{status}"
+        mapping:
+          1: outletStatusOn
+          2: outletStatusOff
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.1
@@ -396,30 +422,26 @@ metrics:
           OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.4
           name: ePDU2OutletSwitchedStatusName
         tag: e_pdu2_outlet_switched_status_name
-      - symbol:
-          OID: 1.3.6.1.4.1.3808.1.1.6.6.1.4.1.5
-          name: ePDU2OutletSwitchedStatusState
-        tag: e_pdu2_outlet_switched_status_state
-        mapping:
-          1: outlet_status_on
-          2: outlet_status_off
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.1.0
       name: cyberpower.envirTemperature
-      description: "Environment temperature expressed in 1/10 Fahrenheit"
+      description: "Environment temperature"
+      family: Environment/Temperature/Value
       unit: "degF/10"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.2.6.0
       name: cyberpower.envirTemperatureCelsius
       description: "Environment temperature expressed in Celsius"
+      family: Environment/Temperature/Value
       unit: "Cel"
   - MIB: CPS-MIB
     symbol:
       OID: 1.3.6.1.4.1.3808.1.1.4.3.1.0
       name: cyberpower.envirHumidity
       description: "Environment relative humidity expressed in persentage"
+      family: Environment/Humidity/Value
       unit: "%"
 metric_tags:
   - OID: 1.3.6.1.4.1.3808.1.1.3.1.1.0
