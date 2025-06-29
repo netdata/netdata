@@ -1,4 +1,4 @@
-# Statistics for traffic that satisfies the rules in each configured Destination Class
+# Statistics for traffic that satisfies the rules in each configured Source Class
 
 metrics:
   - MIB: JUNIPER-SCU-MIB
@@ -10,12 +10,12 @@ metrics:
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.4
         name: jnxScuStatsPackets
         description: Number of packets sent out of destination interface that match the source class and address family
-        family: Juniper/SRX/Interfaces/SCU/Packets
+        family: Interfaces/SCU/Packet/Out
         unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.16.1.1.1.5
         name: jnxScuStatsBytes
         description: Number of bytes sent out of destination interface that match the source class and address family
-        family: Juniper/SRX/Interfaces/SCU/Traffic
+        family: Interfaces/SCU/Traffic/Out
         unit: "By"
     metric_tags:
       - symbol:
