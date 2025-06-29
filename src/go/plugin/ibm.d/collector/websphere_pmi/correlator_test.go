@@ -381,3 +381,26 @@ func TestCorrelationEngine_MetricFamilyExtraction(t *testing.T) {
 		assert.Equal(t, tc.expected, result, tc.description)
 	}
 }
+
+func TestCorrelationEngine_DimensionIDSanitization(t *testing.T) {
+	// Test the sanitizeDimensionID function
+	testCases := []struct {
+		input    string
+		expected string
+		description string
+	}{
+		{"Message Listener", "message_listener", "Spaces should be replaced with underscores"},
+		{"WebSphere.Pool-1", "websphere_pool_1", "Dots and dashes should be replaced"},
+		{"Pool#1@Host", "pool_1_host", "Special characters should be replaced"},
+		{"Thread/Pool(WebContainer)", "thread_pool_webcontainer", "Multiple special chars"},
+		{"___multiple___underscores___", "multiple_underscores", "Multiple underscores should be collapsed"},
+		{"", "metric", "Empty string should return default"},
+		{"UPPERCASE", "uppercase", "Should be lowercase"},
+		{"Message Listener_MaxPoolSize", "message_listener_maxpoolsize", "Real WebSphere example"},
+	}
+
+	for _, tc := range testCases {
+		result := sanitizeDimensionID(tc.input)
+		assert.Equal(t, tc.expected, result, tc.description)
+	}
+}
