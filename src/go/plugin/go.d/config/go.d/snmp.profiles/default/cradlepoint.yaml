@@ -65,37 +65,37 @@ metrics:
       - name: cradlepoint.mdmSignalStrength
         OID: 1.3.6.1.4.1.20992.1.2.2.1.4
         description: The cellular modems signal strength, given in dBm's.
-        family: Modems/Signal
+        family: Cellular/Modem/Signal/Strength
         unit: "dBm"
       - name: cradlepoint.mdmECIO
         OID: 1.3.6.1.4.1.20992.1.2.2.1.6
         description: The cellular modems Ec/Io ratio given in dBm's.
-        family: Modems/ECIO
+        family: Cellular/Modem/Signal/ECIO
         unit: "dBm"
       - name: cradlepoint.mdmCINR
         OID: 1.3.6.1.4.1.20992.1.2.2.1.12
         description: The cellular modems CINR ratio given in dBm's.
-        family: Modems/CINR
+        family: Cellular/Modem/Signal/CINR
         unit: "dBm"
       - name: cradlepoint.mdmSINR
         OID: 1.3.6.1.4.1.20992.1.2.2.1.13
         description: The cellular modems SINR ratio given in dBm's.
-        family: Modems/SINR
+        family: Cellular/Modem/Signal/SINR
         unit: "dBm"
       - name: cradlepoint.mdmRSRP
         OID: 1.3.6.1.4.1.20992.1.2.2.1.14
         description: The cellular modems RSRP given in dBm's.
-        family: Modems/RSRP
+        family: Cellular/Modem/Signal/RSRP
         unit: "dBm"
       - name: cradlepoint.mdmRSRQ
         OID: 1.3.6.1.4.1.20992.1.2.2.1.15
         description: The cellular modems RSRQ given in dBm's.
-        family: Modems/RSRQ
+        family: Cellular/Modem/Signal/RSRQ
         unit: "dBm"
       - OID: 1.3.6.1.4.1.20992.1.2.2.1.5
         name: cradlepoint.mdmStatus
         description: Modem Status
-        family: Modems/Status
+        family: Cellular/Modem/Connection/Status
         unit: "{status}"
         mapping:
           1: established
