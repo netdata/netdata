@@ -131,7 +131,7 @@ type Config struct {
 
 type WebSpherePMI struct {
 	module.Base
-	Config `json:""`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
@@ -391,7 +391,7 @@ func (w *WebSpherePMI) setConfigurationDefaults() {
 }
 
 func (w *WebSpherePMI) validateConfig() error {
-	if w.HTTPConfig.URL == "" {
+	if w.URL == "" {
 		return errors.New("url is required")
 	}
 
@@ -483,7 +483,7 @@ func (w *WebSpherePMI) initSelectors() error {
 
 func (w *WebSpherePMI) buildPMIURL() error {
 	// Require complete URL - no path inference
-	w.pmiURL = strings.TrimSpace(w.HTTPConfig.URL)
+	w.pmiURL = strings.TrimSpace(w.URL)
 
 	if w.pmiURL == "" {
 		return errors.New("url is required")

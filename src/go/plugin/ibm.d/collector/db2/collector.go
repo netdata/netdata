@@ -119,7 +119,7 @@ type Config struct {
 
 type DB2 struct {
 	module.Base
-	Config `json:""`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
@@ -155,7 +155,8 @@ type DB2 struct {
 	disabledFeatures map[string]bool // Track disabled features (tables, views, functions)
 
 	// Modern monitoring support
-	useMonGetFunctions bool // Use MON_GET_* functions instead of SNAP* views when available
+	useMonGetFunctions           bool // Use MON_GET_* functions instead of SNAP* views when available
+	supportsColumnOrganizedTables bool // Whether column-organized table metrics are available
 }
 
 type serverInfo struct {
@@ -441,6 +442,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	err := d.collectSingleMetric(ctx, "version_detection_luw", queryDetectVersionLUW, func(value string) {
 		d.edition = "LUW"
 		d.version = value
+		d.parseDB2Version()
 		d.Debugf("detected DB2 LUW edition, version: %s", value)
 	})
 
@@ -467,6 +469,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	err = d.collectSingleMetric(ctx, "version_detection_zos", queryDetectVersionZOS, func(value string) {
 		d.edition = "z/OS"
 		d.version = value
+		d.parseDB2Version()
 		d.Debugf("detected DB2 for z/OS edition")
 	})
 
@@ -514,6 +517,7 @@ func (d *DB2) detectDB2Edition(ctx context.Context) error {
 	d.edition = "LUW"
 	d.version = "Unknown"
 	d.Warningf("could not detect DB2 edition, defaulting to LUW")
+	d.parseDB2Version()
 	d.logVersionInformation()
 	d.addVersionLabelsToCharts()
 
@@ -729,4 +733,54 @@ func (d *DB2) detectMonGetSupport(ctx context.Context) {
 	// MON_GET functions are available and working
 	d.useMonGetFunctions = true
 	d.Infof("MON_GET_* functions detected and available - using modern monitoring approach for better performance")
+}
+
+// detectColumnOrganizedSupport checks if column-organized table metrics are available
+func (d *DB2) detectColumnOrganizedSupport(ctx context.Context) {
+	// Column-organized tables (BLU Acceleration) were introduced in DB2 10.5
+	// However, the feature may not be enabled or available in all installations
+	
+	// First check version requirements
+	if d.edition == "i" {
+		d.Infof("Column-organized tables not available on DB2 for i")
+		d.supportsColumnOrganizedTables = false
+		return
+	}
+	
+	if d.versionMajor > 0 && d.versionMajor < 10 {
+		d.Infof("Column-organized tables require DB2 10.5+, current version %d.%d", d.versionMajor, d.versionMinor)
+		d.supportsColumnOrganizedTables = false
+		return
+	}
+	
+	if d.versionMajor == 10 && d.versionMinor < 5 {
+		d.Infof("Column-organized tables require DB2 10.5+, current version %d.%d", d.versionMajor, d.versionMinor)
+		d.supportsColumnOrganizedTables = false
+		return
+	}
+	
+	// Test if POOL_COL_L_READS column exists in SYSIBMADM.SNAPBP
+	testQuery := `SELECT POOL_COL_L_READS FROM SYSIBMADM.SNAPBP FETCH FIRST 1 ROW ONLY`
+	
+	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
+	defer cancel()
+	
+	var testValue sql.NullInt64
+	err := d.db.QueryRowContext(queryCtx, testQuery).Scan(&testValue)
+	if err != nil {
+		if strings.Contains(err.Error(), "POOL_COL_L_READS") || 
+		   strings.Contains(err.Error(), "column") ||
+		   strings.Contains(err.Error(), "COLUMN") {
+			d.Infof("Column-organized table metrics not available (POOL_COL_L_READS column missing): %v", err)
+			d.supportsColumnOrganizedTables = false
+		} else {
+			d.Warningf("Error testing column-organized table support: %v, assuming not supported", err)
+			d.supportsColumnOrganizedTables = false
+		}
+		return
+	}
+	
+	// Column exists and query succeeded
+	d.supportsColumnOrganizedTables = true
+	d.Infof("Column-organized table metrics detected and available")
 }

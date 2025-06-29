@@ -35,6 +35,9 @@ func (d *DB2) collect(ctx context.Context) (map[string]int64, error) {
 
 		// Check if we can use modern MON_GET_* functions
 		d.detectMonGetSupport(ctx)
+		
+		// Check if column-organized table metrics are available
+		d.detectColumnOrganizedSupport(ctx)
 	}
 
 	// Reset metrics
@@ -392,7 +395,7 @@ func (d *DB2) collectLockMetrics(ctx context.Context) error {
 }
 
 func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
-	// Choose query based on monitoring approach
+	// Choose query based on monitoring approach and column support
 	var query string
 	if d.useMonGetFunctions {
 		query = queryMonGetBufferpoolAggregate
@@ -400,9 +403,12 @@ func (d *DB2) collectBufferpoolAggregateMetrics(ctx context.Context) error {
 
 		// With MON_GET, we need to calculate hit ratios differently
 		return d.collectMonGetBufferpoolAggregate(ctx)
-	} else {
+	} else if d.supportsColumnOrganizedTables {
 		query = queryBufferpoolAggregateMetrics
-		d.Debugf("using SNAP views for bufferpool metrics (legacy approach)")
+		d.Debugf("using SNAP views with column-organized metrics for bufferpool aggregate metrics")
+	} else {
+		query = queryBufferpoolAggregateMetricsLegacy
+		d.Debugf("using legacy SNAP views without column-organized metrics for bufferpool aggregate metrics")
 	}
 
 	return d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
