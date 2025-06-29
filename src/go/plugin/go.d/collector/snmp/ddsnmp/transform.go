@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -175,49 +176,22 @@ func newMetricTransformFuncMap() template.FuncMap {
 			}()
 
 			config := map[string]map[string]interface{}{
-				"1":  {"name": "unspecified", "family": "Generic", "desc": "Unspecified or vendor-specific sensor"},
-				"2":  {"name": "unknown", "family": "Generic", "desc": "Unknown sensor type"},
-				"3":  {"name": "voltage_ac", "unit": "volts", "family": "Power", "desc": "AC voltage"},
-				"4":  {"name": "voltage_dc", "unit": "volts", "family": "Power", "desc": "DC voltage"},
-				"5":  {"name": "current", "unit": "amperes", "family": "Power", "desc": "Current draw"},
-				"6":  {"name": "power", "unit": "watts", "family": "Power", "desc": "Power consumption"},
-				"7":  {"name": "frequency", "unit": "hertz", "family": "Power", "desc": "Frequency"},
-				"8":  {"name": "temperature", "unit": "celsius", "family": "Temperature", "desc": "Temperature reading"},
-				"9":  {"name": "humidity", "unit": "percentage", "family": "Environment", "desc": "Relative humidity"},
-				"10": {"name": "fan_speed", "unit": "rpm", "family": "Fan", "desc": "Fan rotation speed"},
-				"11": {"name": "airflow", "unit": "cmm", "family": "Environment", "desc": "Airflow in cubic meters per minute"},
-				"12": {"name": "sensor_state", "family": "Status", "desc": "Boolean sensor state", "mapping": map[int64]string{
+				"1":  {"name": "unspecified", "family": "Sensor/Generic/Value", "desc": "Unspecified or vendor-specific sensor"},
+				"2":  {"name": "unknown", "family": "Sensor/Unknown/Value", "desc": "Unknown sensor type"},
+				"3":  {"name": "voltage_ac", "unit": "volts", "family": "Sensor/Voltage/AC", "desc": "AC voltage"},
+				"4":  {"name": "voltage_dc", "unit": "volts", "family": "Sensor/Voltage/DC", "desc": "DC voltage"},
+				"5":  {"name": "current", "unit": "amperes", "family": "Sensor/Current/Value", "desc": "Current draw"},
+				"6":  {"name": "power", "unit": "watts", "family": "Sensor/Power/Value", "desc": "Power consumption"},
+				"7":  {"name": "frequency", "unit": "hertz", "family": "Sensor/Frequency/Value", "desc": "Frequency"},
+				"8":  {"name": "temperature", "unit": "celsius", "family": "Sensor/Temperature/Value", "desc": "Temperature reading"},
+				"9":  {"name": "humidity", "unit": "percentage", "family": "Sensor/Humidity/Value", "desc": "Relative humidity"},
+				"10": {"name": "fan_speed", "unit": "rpm", "family": "Sensor/FanSpeed/Value", "desc": "Fan rotation speed"},
+				"11": {"name": "airflow", "unit": "cmm", "family": "Sensor/Airflow/Value", "desc": "Airflow in cubic meters per minute"},
+				"12": {"name": "sensor_state", "family": "Sensor/State/Value", "desc": "Boolean sensor state", "mapping": map[int64]string{
 					0: "false", 1: "true", 2: "true",
 				}},
-				"13": {"name": "special_enum", "family": "Status", "desc": "Vendor-specific enumerated sensor"},
-				"14": {"name": "power_dbm", "unit": "dBm", "family": "Power", "desc": "Power in decibel-milliwatts"},
-			}
-
-			scaleMap := map[string]float64{
-				"1":  1e-24, // yocto (10^-24)
-				"2":  1e-21, // zepto (10^-21)
-				"3":  1e-18, // atto (10^-18)
-				"4":  1e-15, // femto (10^-15)
-				"5":  1e-12, // pico (10^-12)
-				"6":  1e-9,  // nano (10^-9)
-				"7":  1e-6,  // micro (10^-6)
-				"8":  1e-3,  // milli (10^-3)
-				"9":  1,     // units (10^0)
-				"10": 1e3,   // kilo (10^3)
-				"11": 1e6,   // mega (10^6)
-				"12": 1e9,   // giga (10^9)
-				"13": 1e12,  // tera (10^12)
-			}
-
-			scale := scaleMap[sensorScale]
-			if scale == 0 || scale == 1e-24 {
-				// Workaround for Cisco ASA (MIMIC) temperature bug: treat scale=1 (yocto) as units
-				scale = 1.0
-			}
-
-			precision := 0
-			if p, err := strconv.Atoi(sensorPrecision); err == nil {
-				precision = p
+				"13": {"name": "special_enum", "family": "Sensor/Enum/Value", "desc": "Vendor-specific enumerated sensor"},
+				"14": {"name": "power_dbm", "unit": "dBm", "family": "Sensor/Power/Value", "desc": "Power in decibel-milliwatts"},
 			}
 
 			conf, ok := config[sensorType]
@@ -225,26 +199,68 @@ func newMetricTransformFuncMap() template.FuncMap {
 				return ""
 			}
 
-			if name, ok := conf["name"].(string); ok {
-				m.Name = m.Name + "_" + name
-			}
-			if family, ok := conf["family"].(string); ok {
-				m.Family = "Sensors/" + family
-			}
-			if desc, ok := conf["desc"].(string); ok {
-				m.Description = desc
-			}
-			if unit, ok := conf["unit"].(string); ok {
-				m.Unit = unit
-			}
-			if mapping, ok := conf["mapping"].(map[int64]string); ok {
-				m.Mappings = mapping
-			} else {
-				val := float64(m.Value) * scale
-				if precision > 0 {
-					val = val / math.Pow(10, float64(precision))
+			switch m.Name {
+			case "entPhySensorOperStatus":
+				if name, ok := conf["name"].(string); ok {
+					m.Name = m.Name + "_" + name
 				}
-				m.Value = int64(val)
+				if family, ok := conf["family"].(string); ok {
+					m.Family = strings.TrimSuffix(family, "/Value") + "/Status"
+				}
+				m.Mappings = map[int64]string{
+					1: "ok",
+					2: "unavailable",
+					3: "nonoperational",
+				}
+			case "entPhySensorValue", "entSensorValue":
+				scaleMap := map[string]float64{
+					"1":  1e-24, // yocto (10^-24)
+					"2":  1e-21, // zepto (10^-21)
+					"3":  1e-18, // atto (10^-18)
+					"4":  1e-15, // femto (10^-15)
+					"5":  1e-12, // pico (10^-12)
+					"6":  1e-9,  // nano (10^-9)
+					"7":  1e-6,  // micro (10^-6)
+					"8":  1e-3,  // milli (10^-3)
+					"9":  1,     // units (10^0)
+					"10": 1e3,   // kilo (10^3)
+					"11": 1e6,   // mega (10^6)
+					"12": 1e9,   // giga (10^9)
+					"13": 1e12,  // tera (10^12)
+				}
+
+				scale := scaleMap[sensorScale]
+				if scale == 0 || scale == 1e-24 {
+					// Workaround for Cisco ASA (MIMIC) temperature bug: treat scale=1 (yocto) as units
+					scale = 1.0
+				}
+
+				precision := 0
+				if p, err := strconv.Atoi(sensorPrecision); err == nil {
+					precision = p
+				}
+
+				if name, ok := conf["name"].(string); ok {
+					m.Name = m.Name + "_" + name
+				}
+				if family, ok := conf["family"].(string); ok {
+					m.Family = family
+				}
+				if desc, ok := conf["desc"].(string); ok {
+					m.Description = desc
+				}
+				if unit, ok := conf["unit"].(string); ok {
+					m.Unit = unit
+				}
+				if mapping, ok := conf["mapping"].(map[int64]string); ok {
+					m.Mappings = mapping
+				} else {
+					val := float64(m.Value) * scale
+					if precision > 0 {
+						val = val / math.Pow(10, float64(precision))
+					}
+					m.Value = int64(val)
+				}
 			}
 
 			return ""

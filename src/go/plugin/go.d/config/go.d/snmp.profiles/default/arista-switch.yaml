@@ -193,7 +193,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
         name: aristaBgp4V2PeerAdminStatus
         description: BGP FSM Status
-        family: Peers/BGP/Admin/Status
+        family: BPG/Peer/Admin/Status
         unit: "{status}"
         mapping:
           1: halted
@@ -201,7 +201,7 @@ metrics:
       - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
         name: aristaBgp4V2PeerState
         description: BGP peer connection state
-        family: Peers/BGP/Status
+        family: BGP/Peer/Connection/Status
         unit: "{status}"
         mapping:
           1: idle
@@ -211,45 +211,36 @@ metrics:
           5: openconfirm
           6: established
     metric_tags:
-      - symbol:
-          name: aristaBgp4V2PeerLocalPort
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
-        tag: arista_bgp4_v2_peer_local_port
-      - symbol:
+      #      - symbol:
+      #          name: aristaBgp4V2PeerLocalPort
+      #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
+      #        tag: arista_bgp4_v2_peer_local_port
+      - tag: arista_bgp4_v2_peer_local_as
+        symbol:
           name: aristaBgp4V2PeerLocalAs
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
-        tag: arista_bgp4_v2_peer_local_as
-      - symbol:
-          name: aristaBgp4V2PeerRemotePort
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
-        tag: arista_bgp4_v2_peer_remote_port
-      - symbol:
+      #      - symbol:
+      #          name: aristaBgp4V2PeerRemotePort
+      #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
+      #        tag: arista_bgp4_v2_peer_remote_port
+      - tag: arista_bgp4_v2_peer_remote_as
+        symbol:
           name: aristaBgp4V2PeerRemoteAs
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
-        tag: arista_bgp4_v2_peer_remote_as
-      - symbol:
-          name: aristaBgp4V2PeerLocalAddr
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
-          format: ip_address
-        tag: arista_bgp4_v2_peer_local_addr
-      - symbol:
+      - tag: arista_bgp4_v2_peer_local_identifier
+        symbol:
           name: aristaBgp4V2PeerLocalIdentifier
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8
           format: ip_address
-        tag: arista_bgp4_v2_peer_local_identifier
-      - symbol:
+      - tag: arista_bgp4_v2_peer_remote_identifier
+        symbol:
           name: aristaBgp4V2PeerRemoteIdentifier
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11
           format: ip_address
-        tag: arista_bgp4_v2_peer_remote_identifier
-      - symbol:
-          name: aristaBgp4V2PeerDescription
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
-        tag: arista_bgp4_v2_peer_description
-      - symbol:
+      - tag: arista_bgp4_v2_peer_local_addr_type
+        symbol:
           OID: 1.3.6.1.4.1.30065.4.1.1.2.1.2
           name: aristaBgp4V2PeerLocalAddrType
-        tag: arista_bgp4_v2_peer_local_addr_type
         mapping:
           0: unknown
           1: ipv4
@@ -257,6 +248,15 @@ metrics:
           3: ipv4z
           4: ipv6z
           16: dns
+      - tag: _arista_bgp4_v2_peer_description
+        symbol:
+          name: aristaBgp4V2PeerDescription
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
+      - tag: _arista_bgp4_v2_peer_local_addr
+        symbol:
+          name: aristaBgp4V2PeerLocalAddr
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
+          format: ip_address
   # - MIB: ARISTA-IF-MIB
   #   table:
   #     name: aristaIfTable

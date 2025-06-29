@@ -11,8 +11,8 @@ metrics:
       - OID: 1.3.6.1.4.1.30065.3.6.1.1.1.3
         name: aristaIngressQueuePktsDropped
         description: The number of dropped packets due to congestion at the ingress port in an interface
-        family: Queues/Ingress/Packets
-        unit: "{drop}"
+        family: Interfaces/Queue/Ingress/Packet/Dropped
+        unit: "{packet}"
     metric_tags:
       - tag: interface_index
         symbol:
@@ -33,8 +33,8 @@ metrics:
       - OID: 1.3.6.1.4.1.30065.3.6.1.2.1.6
         name: aristaEgressQueuePktsDropped
         description: The number of packets discarded from this egress queue.
-        family: Queues/Egress/Packets
-        unit: "{discard}"
+        family: Interfaces/Queue/Egress/Packet/Dropped
+        unit: "{packet}"
     metric_tags:
       - tag: interface_index
         symbol:
