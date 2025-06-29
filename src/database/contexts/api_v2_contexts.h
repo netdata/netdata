@@ -26,6 +26,7 @@ typedef struct full_text_search_index {
 
 struct contexts_v2_node {
     size_t ni;
+    size_t contexts_matched;
     RRDHOST *host;
 };
 

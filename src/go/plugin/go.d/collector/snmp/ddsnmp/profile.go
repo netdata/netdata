@@ -4,50 +4,20 @@ package ddsnmp
 
 import (
 	"errors"
-	"io/fs"
-	"os"
+	"fmt"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
-	"sync"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-var log = logger.New().With("component", "snmp/ddsnmp")
-
-var (
-	ddProfiles []*Profile
-	loadOnce   sync.Once
-)
-
-func load() {
-	loadOnce.Do(func() {
-		dir := getProfilesDir()
-
-		profiles, err := loadProfiles(dir)
-		if err != nil {
-			log.Errorf("failed to loadProfiles dd snmp profiles: %v", err)
-			return
-		}
-
-		if len(profiles) == 0 {
-			log.Warningf("no dd snmp profiles found in '%s'", dir)
-			return
-		}
-
-		log.Infof("found %d profiles in '%s'", len(profiles), dir)
-		ddProfiles = profiles
-	})
-}
-
+// FindProfiles returns profiles matching the given sysObjectID.
+// Profiles are loaded once on the first call and cached globally.
 func FindProfiles(sysObjId string) []*Profile {
-	load()
+	loadProfiles()
 
 	var profiles []*Profile
 
@@ -60,23 +30,87 @@ func FindProfiles(sysObjId string) []*Profile {
 			}
 			if m.MatchString(sysObjId) {
 				profiles = append(profiles, prof.clone())
+				break
 			}
 		}
 	}
 
+	enrichProfiles(profiles)
+	deduplicateMetricsAcrossProfiles(profiles)
+
 	return profiles
 }
 
-type Profile struct {
-	SourceFile string                                 `yaml:"-"`
-	Definition *ddprofiledefinition.ProfileDefinition `yaml:",inline"`
+type (
+	Profile struct {
+		SourceFile         string                                 `yaml:"-"`
+		Definition         *ddprofiledefinition.ProfileDefinition `yaml:",inline"`
+		extensionHierarchy []*extensionInfo
+	}
+	// extensionInfo represents a single extension in the hierarchy
+	extensionInfo struct {
+		name       string           // Extension name (e.g., "_base.yaml")
+		sourceFile string           // Full path to the extension file
+		extensions []*extensionInfo // Nested extensions
+	}
+)
+
+// SourceTree returns a string representation of the profile source and its extension hierarchy
+// Format: "root: [intermediate1: [base], intermediate2]"
+func (p *Profile) SourceTree() string {
+	rootName := stripFileNameExt(p.SourceFile)
+
+	if len(p.extensionHierarchy) == 0 {
+		return rootName
+	}
+
+	extensions := formatExtensions(p.extensionHierarchy)
+	return fmt.Sprintf("%s: %s", rootName, extensions)
+}
+
+func formatExtensions(extensions []*extensionInfo) string {
+	if len(extensions) == 0 {
+		return "[]"
+	}
+
+	var items []string
+	for _, ext := range extensions {
+		name := stripFileNameExt(ext.sourceFile)
+		if len(ext.extensions) > 0 {
+			items = append(items, fmt.Sprintf("%s: %s", name, formatExtensions(ext.extensions)))
+		} else {
+			items = append(items, name)
+		}
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(items, ", "))
 }
 
 func (p *Profile) clone() *Profile {
-	return &Profile{
+	cloned := &Profile{
 		SourceFile: p.SourceFile,
 		Definition: p.Definition.Clone(),
 	}
+	if p.extensionHierarchy != nil {
+		cloned.extensionHierarchy = cloneExtensionHierarchy(p.extensionHierarchy)
+	}
+	return cloned
+}
+
+func cloneExtensionHierarchy(extensions []*extensionInfo) []*extensionInfo {
+	if extensions == nil {
+		return nil
+	}
+
+	cloned := make([]*extensionInfo, len(extensions))
+	for i, ext := range extensions {
+		cloned[i] = &extensionInfo{
+			name:       ext.name,
+			sourceFile: ext.sourceFile,
+			extensions: cloneExtensionHierarchy(ext.extensions),
+		}
+	}
+	return cloned
 }
 
 func (p *Profile) merge(base *Profile) {
@@ -93,10 +127,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, m := range p.Definition.Metrics {
 		switch {
 		case m.IsScalar():
-			seen[m.Symbol.Name] = true
+			seen[m.Symbol.Name+"|"+m.Symbol.OID] = true
 		case m.IsColumn():
-			for _, symbol := range m.Symbols {
-				seen[symbol.Name] = true
+			for _, sym := range m.Symbols {
+				seen[sym.Name] = true
 			}
 		}
 	}
@@ -104,9 +138,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 	for _, bm := range base.Definition.Metrics {
 		switch {
 		case bm.IsScalar():
-			if !seen[bm.Symbol.Name] {
+			key := bm.Symbol.Name + "|" + bm.Symbol.OID
+			if !seen[key] {
 				p.Definition.Metrics = append(p.Definition.Metrics, bm)
-				seen[bm.Symbol.Name] = true
+				seen[key] = true
 			}
 		case bm.IsColumn():
 			bm.Symbols = slices.DeleteFunc(bm.Symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
@@ -169,91 +204,130 @@ func (p *Profile) validate() error {
 	return nil
 }
 
-func loadProfiles(dirpath string) ([]*Profile, error) {
-	var profiles []*Profile
-
-	if err := filepath.WalkDir(dirpath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !(strings.HasSuffix(d.Name(), ".yaml") || strings.HasSuffix(d.Name(), ".yml")) {
-			return nil
-		}
-
-		profile, err := loadProfile(path)
-		if err != nil {
-			log.Warningf("invalid profile '%s': %v", path, err)
-			return nil
-		}
-
-		if err := profile.validate(); err != nil {
-			log.Warningf("invalid profile '%s': %v", path, err)
-			return nil
-		}
-
-		profiles = append(profiles, profile)
-		return nil
-	}); err != nil {
-		return nil, err
+func (p *Profile) removeConstantMetrics() {
+	if p.Definition == nil {
+		return
 	}
 
-	return profiles, nil
+	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
+		if m.IsScalar() && m.Symbol.ConstantValueOne {
+			return true
+		}
+
+		if m.IsColumn() {
+			m.Symbols = slices.DeleteFunc(m.Symbols, func(s ddprofiledefinition.SymbolConfig) bool {
+				return s.ConstantValueOne
+			})
+		}
+
+		return m.IsColumn() && len(m.Symbols) == 0
+	})
 }
 
-func loadProfile(filename string) (*Profile, error) {
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	var prof Profile
-	if err := yaml.Unmarshal(content, &prof.Definition); err != nil {
-		return nil, err
-	}
-
-	if prof.SourceFile == "" {
-		prof.SourceFile, _ = filepath.Abs(filename)
-	}
-
-	dir := filepath.Dir(filename)
-
-	processedExtends := make(map[string]bool)
-	if err := loadProfileExtensions(&prof, dir, processedExtends); err != nil {
-		return nil, err
-	}
-
-	return &prof, nil
-}
-
-func loadProfileExtensions(profile *Profile, dir string, processedExtends map[string]bool) error {
-	for _, name := range profile.Definition.Extends {
-		if processedExtends[name] {
+func enrichProfiles(profiles []*Profile) {
+	for _, prof := range profiles {
+		if prof.Definition == nil {
 			continue
 		}
-		processedExtends[name] = true
 
-		baseProf, err := loadProfile(filepath.Join(dir, name))
-		if err != nil {
-			return err
+		for i := range prof.Definition.Metrics {
+			metric := &prof.Definition.Metrics[i]
+
+			for j := range metric.MetricTags {
+				tagCfg := &metric.MetricTags[j]
+
+				if tagCfg.Mapping != nil {
+					continue
+				}
+
+				if tagCfg.MappingRef == "ifType" {
+					tagCfg.Mapping = sharedMappings.ifType
+				}
+			}
 		}
-
-		if err := loadProfileExtensions(baseProf, dir, processedExtends); err != nil {
-			return err
-		}
-
-		profile.merge(baseProf)
 	}
-
-	return nil
 }
 
-func getProfilesDir() string {
-	if executable.Name == "test" {
-		dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-		return dir
+func deduplicateMetricsAcrossProfiles(profiles []*Profile) {
+	if len(profiles) < 2 {
+		return
 	}
-	if dir := os.Getenv("NETDATA_STOCK_CONFIG_DIR"); dir != "" {
-		return filepath.Join(dir, "go.d/snmp.profiles/default")
+
+	// Create a slice of indices sorted by priority (non-generic first)
+	type indexedProfile struct {
+		idx       int
+		isGeneric bool
 	}
-	return filepath.Join(executable.Directory, "../../../config/go.d/snmp.profiles/default")
+
+	indexed := make([]indexedProfile, len(profiles))
+	for i, prof := range profiles {
+		indexed[i] = indexedProfile{
+			idx:       i,
+			isGeneric: strings.Contains(strings.ToLower(prof.SourceFile), "generic"),
+		}
+	}
+
+	slices.SortFunc(indexed, func(a, b indexedProfile) int {
+		if a.isGeneric && !b.isGeneric {
+			return 1 // a comes after b
+		}
+		if !a.isGeneric && b.isGeneric {
+			return -1 // a comes before b
+		}
+		// If both are generic or both are non-generic, maintain original order
+		return a.idx - b.idx
+	})
+
+	// Reorder profiles slice according to deduplication priority
+	sortedProfiles := make([]*Profile, len(profiles))
+	for i, ip := range indexed {
+		sortedProfiles[i] = profiles[ip.idx]
+	}
+	copy(profiles, sortedProfiles)
+
+	seenMetrics := make(map[string]bool)
+
+	for _, prof := range profiles {
+		if prof.Definition == nil {
+			continue
+		}
+
+		prof.Definition.Metrics = slices.DeleteFunc(prof.Definition.Metrics, func(metric ddprofiledefinition.MetricsConfig) bool {
+			key := generateMetricKey(metric)
+			if seenMetrics[key] {
+				return true
+			}
+			seenMetrics[key] = true
+			return false
+		})
+	}
+}
+
+func generateMetricKey(metric ddprofiledefinition.MetricsConfig) string {
+	var parts []string
+
+	if metric.IsScalar() {
+		parts = append(parts, "scalar")
+		parts = append(parts, metric.Symbol.OID)
+		parts = append(parts, metric.Symbol.Name)
+		return strings.Join(parts, "|")
+	}
+
+	parts = append(parts, "table")
+	parts = append(parts, metric.Table.OID)
+	parts = append(parts, metric.Table.Name)
+
+	symbolKeys := make([]string, 0, len(metric.Symbols))
+	for _, sym := range metric.Symbols {
+		symbolKey := fmt.Sprintf("%s:%s", sym.OID, sym.Name)
+		symbolKeys = append(symbolKeys, symbolKey)
+	}
+	sort.Strings(symbolKeys)
+	parts = append(parts, symbolKeys...)
+
+	return strings.Join(parts, "|")
+}
+
+func stripFileNameExt(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }

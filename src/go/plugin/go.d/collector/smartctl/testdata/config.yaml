@@ -2,6 +2,7 @@ update_every: 123
 timeout: 123.123
 scan_every: 123.123
 poll_devices_every: 123.123
+concurrent_scans: 123
 no_check_power_mode: "ok"
 device_selector: "ok"
 extra_devices:

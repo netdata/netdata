@@ -288,6 +288,10 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
             // Try to parse string as number
             char *endptr;
             const char *str = json_object_get_string(value);
+            if (!str) {
+                // NULL string cannot be converted to number, fall back to string comparison
+                goto string_compare;
+            }
             val_num = strtod(str, &endptr);
             if (endptr == str || *endptr != '\0') {
                 // Not a valid number, do string comparison
@@ -332,7 +336,7 @@ string_compare:
     {
         // String comparisons (including when condition is string or as fallback)
         const char *val_str = json_object_get_string(value);
-        const char *cond_str = condition->v_str;
+        const char *cond_str = (condition->v_type == COND_VALUE_STRING) ? condition->v_str : NULL;
 
         // Handle NULL condition string
         if (!cond_str) {
@@ -881,15 +885,7 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
         0, 0, SIZE_MAX, false);
     
     // Time-based parameters for functions with history
-    mcp_schema_add_time_param(
-        buffer, "after", "Start time",
-        "Start time for query window (timestamp in seconds or RFC3339 datetime string)",
-        "now", 0, false);
-    
-    mcp_schema_add_time_param(
-        buffer, "before", "End time",
-        "End time for query window (timestamp in seconds or RFC3339 datetime string)",
-        "now", 0, false);
+    mcp_schema_add_time_params(buffer, "query window", false);
     
     mcp_schema_add_string_param(
         buffer, "cursor", "Pagination cursor",
@@ -2047,8 +2043,10 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
     // Parse optional filtering parameters
     
     // Parse time-based parameters
-    data->request.after = mcp_params_parse_time(params, "after", 0);
-    data->request.before = mcp_params_parse_time(params, "before", 0);
+    if (!mcp_params_parse_time_window(params, &data->request.after, &data->request.before, 
+                                      0, 0, true, mcpc->error)) {
+        return MCP_RC_BAD_REQUEST;
+    }
     
     // Check if timeframe parameters are required but missing (will be validated later with registry entry)
     
@@ -2411,7 +2409,7 @@ static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data,
                 
                 // Check for pattern matching with wildcards (except for "*" column which is full-text search)
                 if (cond->op == OP_MATCH && cond->pattern && strcmp(cond->column_name, "*") != 0) {
-                    const char *pattern_str = cond->v_str;
+                    const char *pattern_str = (cond->v_type == COND_VALUE_STRING) ? cond->v_str : NULL;
                     if (pattern_str && (strchr(pattern_str, '*') || strchr(pattern_str, '?'))) {
                         invalid_wildcard_patterns = true;
                         if (buffer_strlen(invalid_conditions) > 0)

@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Netdata MCP LLM Client</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
+    <!-- IBM Plex Sans Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,16 +26,21 @@
             <aside class="chat-sidebar" id="chatSidebar">
                 <div class="sidebar-header">
                     <h2>Chats</h2>
-                    <button id="newChatBtn" class="btn btn-primary btn-small">+ New</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="newChatBtn" class="btn btn-primary btn-small">+ New</button>
+                        <button id="toggleSidebarBtn" class="btn-icon" data-tooltip="Toggle Sidebar">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="chat-sessions" id="chatSessions"></div>
                 <div class="sidebar-footer">
-                    <button id="themeToggle" class="btn-icon" title="Toggle Theme">
-                        <span class="theme-icon-light">🌙</span>
-                        <span class="theme-icon-dark">☀️</span>
+                    <button id="themeToggle" class="btn-icon" data-tooltip="Toggle Theme">
+                        <span class="theme-icon-light"><i class="fas fa-moon"></i></span>
+                        <span class="theme-icon-dark"><i class="fas fa-sun"></i></span>
                     </button>
-                    <button id="settingsBtn" class="btn-icon" title="Settings">
-                        ⚙️
+                    <button id="settingsBtn" class="btn-icon" data-tooltip="Settings">
+                        <i class="fas fa-cog"></i>
                     </button>
                 </div>
             </aside>
@@ -34,50 +48,17 @@
 
             <!-- Main Chat Area -->
             <main class="chat-main" id="chatMain">
-                <div class="chat-header" id="chatHeader">
-                    <div class="chat-info">
-                        <div>
-                            <h3 class="chat-title" id="chatTitle">Select or create a chat</h3>
-                            <div class="chat-meta">
-                                <span class="chat-mcp" id="chatMcp"></span>
-                                <span class="chat-llm" id="chatLlm"></span>
-                            </div>
-                        </div>
-                        <div class="chat-controls">
-                            <!-- Temperature Control -->
-                            <div class="temperature-control compact" id="temperatureControl" style="display: flex;">
-                                <span class="temperature-label">Temperature</span>
-                                <div class="temperature-controls">
-                                    <input type="range" class="temperature-slider" id="temperatureSlider" 
-                                           min="0" max="2" step="0.1" value="0.7">
-                                    <span class="temperature-value" id="temperatureValue">0.7</span>
-                                </div>
-                            </div>
-                            <!-- Context Window Indicator -->
-                            <div class="context-window-indicator compact" id="contextWindowIndicator" style="display: flex;">
-                                <span class="context-label">Context Window</span>
-                                <div class="context-window-bar">
-                                    <div class="context-window-fill" id="contextWindowFill" style="width: 0%"></div>
-                                    <span class="context-window-stats" id="contextWindowStats">0 / 4k</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="chat-content" id="chatContent">
-                    <div class="chat-messages" id="chatMessages"></div>
-                    <div class="resize-handle resize-handle-horizontal" id="chatInputResize"></div>
-                    <div class="chat-input-container" id="chatInputContainer">
-                        <button id="reconnectMcpBtn" class="btn btn-primary" style="display: none;">Reconnect MCP Server</button>
-                        <div class="chat-input-wrapper">
-                            <textarea 
-                                id="chatInput" 
-                                class="chat-input" 
-                                placeholder="Select or create a chat to start messaging..."
-                                rows="3"
-                                disabled
-                            ></textarea>
-                            <button id="sendMessageBtn" class="btn btn-send" disabled>Send</button>
+                <!-- This will be the container for all chat DOMs -->
+                <div class="chat-containers" id="chatContainers">
+                    <!-- Individual chat containers will be dynamically created here -->
+                    <!-- Default welcome screen when no chat is selected -->
+                    <div class="welcome-screen" id="welcomeScreen">
+                        <div class="welcome-content">
+                            <h2>Welcome to Netdata MCP LLM Client</h2>
+                            <p>Select an existing chat or create a new one to get started</p>
+                            <button class="btn btn-primary" onclick="app.createNewChatDirectly()">
+                                <i class="fas fa-plus"></i> Create New Chat
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -86,15 +67,23 @@
 
             <!-- Communication Log -->
             <aside class="log-panel" id="logPanel">
+                <!-- Expand button when collapsed -->
+                <button id="expandLogBtn" class="btn-icon expand-log-btn" data-tooltip="Show Communication Log" style="display: none;">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
                 <div class="log-header">
-                    <h3>Communication Log</h3>
-                    <button id="toggleLogBtn" class="btn-icon" title="Toggle Log">
-                        ◀
+                    <button id="toggleLogBtn" class="btn-icon" data-tooltip="Toggle Log">
+                        <i class="fas fa-chevron-right"></i>
                     </button>
+                    <h3>Communication Log</h3>
                 </div>
                 <div class="log-controls">
-                    <button id="clearLogBtn" class="btn btn-small">Clear</button>
-                    <button id="downloadLogBtn" class="btn btn-small">Download</button>
+                    <button id="clearLogBtn" class="btn-icon" data-tooltip="Clear log">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button id="downloadLogBtn" class="btn-icon" data-tooltip="Download log">
+                        <i class="fas fa-download"></i>
+                    </button>
                 </div>
                 <div class="log-content" id="logContent"></div>
             </aside>
@@ -107,36 +96,21 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Settings</h2>
-                <button class="btn-icon modal-close" id="closeSettingsBtn">✕</button>
+                <button class="btn-icon modal-close" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
-                <div class="settings-tabs">
-                    <button class="tab-btn active" data-tab="mcp-servers">MCP Servers</button>
-                    <button class="tab-btn" data-tab="llm-providers">LLM Providers</button>
-                </div>
-                
-                <!-- MCP Servers Tab -->
-                <div class="tab-content active" id="mcp-servers-tab">
-                    <div class="config-section">
-                        <h3>MCP Servers</h3>
-                        <div class="config-list" id="mcpServersList"></div>
-                        <button id="addMcpServerBtn" class="btn btn-primary">+ Add MCP Server</button>
-                    </div>
-                </div>
-                
-                <!-- LLM Providers Tab -->
-                <div class="tab-content" id="llm-providers-tab">
-                    <div class="config-section">
-                        <h3>LLM Providers</h3>
-                        <div class="config-list" id="llmProvidersList"></div>
-                        <button id="addLlmProviderBtn" class="btn btn-primary">+ Add LLM Provider</button>
-                    </div>
+                <!-- MCP Servers (no tabs needed anymore) -->
+                <div class="config-section">
+                    <h3>MCP Servers</h3>
+                    <div class="config-list" id="mcpServersList"></div>
+                    <button id="addMcpServerBtn" class="btn btn-primary">+ Add MCP Server</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- New Chat Modal -->
+    <!-- New Chat Modal - No longer used, kept for potential future use -->
+    <!-- 
     <div class="modal" id="newChatModal">
         <div class="modal-backdrop" id="newChatBackdrop"></div>
         <div class="modal-content modal-small">
@@ -145,12 +119,6 @@
                 <button class="btn-icon modal-close" id="closeNewChatBtn">✕</button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label for="newChatMcpServer">MCP Server*</label>
-                    <select id="newChatMcpServer" required>
-                        <option value="">Select MCP Server</option>
-                    </select>
-                </div>
                 <div class="form-group">
                     <label for="newChatLlmProvider">LLM Provider*</label>
                     <select id="newChatLlmProvider" required>
@@ -165,6 +133,12 @@
                     <small>Choose a model for this chat. You can change it later.</small>
                 </div>
                 <div class="form-group">
+                    <label for="newChatMcpServer">MCP Server*</label>
+                    <select id="newChatMcpServer" required>
+                        <option value="">Select MCP Server</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="newChatTitle">Chat Title (optional)</label>
                     <input type="text" id="newChatTitle" placeholder="Auto-generated if empty">
                 </div>
@@ -175,6 +149,7 @@
             </div>
         </div>
     </div>
+    -->
 
     <!-- Add MCP Server Modal -->
     <div class="modal" id="addMcpModal">
@@ -182,7 +157,7 @@
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2>Add MCP Server</h2>
-                <button class="btn-icon modal-close" id="closeAddMcpBtn">✕</button>
+                <button class="btn-icon modal-close" id="closeAddMcpBtn"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -208,7 +183,7 @@
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2>Add LLM Provider</h2>
-                <button class="btn-icon modal-close" id="closeAddLlmBtn">✕</button>
+                <button class="btn-icon modal-close" id="closeAddLlmBtn"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -238,7 +213,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edit System Prompt</h2>
-                <button class="btn-icon modal-close" id="closeSystemPromptBtn">✕</button>
+                <button class="btn-icon modal-close" id="closeSystemPromptBtn"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -257,10 +232,46 @@
         </div>
     </div>
 
+    <!-- No Models Available Modal -->
+    <div class="modal" id="noModelsModal">
+        <div class="modal-backdrop no-close" id="noModelsBackdrop"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2><i class="fas fa-robot"></i> No LLM Models Available</h2>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div style="font-size: 48px; margin: 20px 0;"><i class="fas fa-plug"></i></div>
+                <p style="font-size: 16px; margin-bottom: 10px;">
+                    <strong>The LLM proxy server is not accessible.</strong>
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                    This application needs to connect to an LLM proxy server to access AI models.
+                </p>
+                <div style="background: var(--hover-color); padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600;">To fix this:</p>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        <li>Ensure the LLM proxy is running at: <code id="noModelsProxyUrl" style="font-family: monospace; background: var(--background-color); padding: 2px 4px; border-radius: 3px;">http://localhost:8081</code></li>
+                        <li>Check that you have API keys configured in the proxy</li>
+                        <li>Verify there are no network or firewall issues</li>
+                    </ol>
+                </div>
+                <p style="font-size: 14px; color: var(--text-secondary);">
+                    Once the proxy is running with configured API keys, click Retry to continue.
+                </p>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button id="retryModelsBtn" class="btn btn-primary">
+                    <span><i class="fas fa-sync-alt"></i></span>
+                    <span>Retry</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="debug-messages.js"></script>
     <script src="mcp-client.js"></script>
     <script src="llm-providers.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -63,6 +63,7 @@ func New() *Collector {
 		netInterfaces: make(map[string]*netInterface),
 
 		seenScalarMetrics: make(map[string]bool),
+		seenTableMetrics:  make(map[string]bool),
 	}
 }
 
@@ -94,6 +95,7 @@ type Collector struct {
 	snmpProfiles []*ddsnmp.Profile
 
 	seenScalarMetrics map[string]bool
+	seenTableMetrics  map[string]bool
 }
 
 func (c *Collector) Configuration() any {

@@ -59,6 +59,11 @@
         "type": "string",
         "sensitive": true
       },
+      "bearer_token_file": {
+        "title": "Bearer Token File",
+        "description": "Path to a file containing a bearer token for HTTP authentication.",
+        "type": "string"
+      },
       "proxy_url": {
         "title": "Proxy URL",
         "description": "The URL of the proxy server.",
@@ -134,6 +139,10 @@
       "ui:widget": "hidden"
     },
     "method": {
+      "ui:widget": "hidden"
+    },
+    "bearer_token_file": {
+      "ui:help": "The token is sent in the Authorization header as `Bearer <token>`. **Takes priority over basic authentication**.",
       "ui:widget": "hidden"
     },
     "autodetection_retry": {
