@@ -7,274 +7,290 @@ metrics:
       name: jnxCosIfsetQstatTable
     metric_type: monotonic_count
     symbols:
-    # The total number of packets queued at the output queue.
+      # Queue Packets
+      # Queued
       - OID: 1.3.6.1.4.1.2636.3.15.10.1.3
         name: jnxCosIfsetQstatQedPkts
         description: The total number of packets queued at the output queue
+        family: Interfaces/COS/Queue/Packet/Queued
         unit: "{packet}"
-    # Number of bytes queued at the output queue.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.5
-        name: jnxCosIfsetQstatQedBytes
-        description: Number of bytes queued at the output queue
-        unit: "By"
-    # Number of packets transmitted on the queue.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.7
-        name: jnxCosIfsetQstatTxedPkts
-        description: Number of packets transmitted on the queue
-        unit: "{packet}"
-    # Number of bytes transmitted on the queue.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.9
-        name: jnxCosIfsetQstatTxedBytes
-        description: Number of bytes transmitted on the queue
-        unit: "By"
-    # The number of packets tail dropped at the output queue.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.11
-        name: jnxCosIfsetQstatTailDropPkts
-        description: The number of packets tail dropped at the output queue
-        unit: "{packet}"
-    # Total number of packets dropped due to RED (Random Early Detection) at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.13
-        name: jnxCosIfsetQstatTotalRedDropPkts
-        description: Total number of packets dropped due to RED at the output on the given interface
-        unit: "{packet}"
-    # The total number of low PLP non TCP packets RED-dropped.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.15
-        name: jnxCosIfsetQstatLpNonTcpRedDropPkts
-        description: The total number of low PLP non TCP packets RED-dropped
-        unit: "{packet}"
-    # The total number of low PLP TCP packets RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.17
-        name: jnxCosIfsetQstatLpTcpRedDropPkts
-        description: The total number of low PLP TCP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of high PLP non TCP packets RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.19
-        name: jnxCosIfsetQstatHpNonTcpRedDropPkts
-        description: The total number of high PLP non TCP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of high PLP TCP packets RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.21
-        name: jnxCosIfsetQstatHpTcpRedDropPkts
-        description: The total number of high PLP TCP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of bytes RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.23
-        name: jnxCosIfsetQstatTotalRedDropBytes
-        description: The total number of bytes RED-dropped at the output on the given interface
-        unit: "By"
-    # The total number of low PLP non TCP bytes RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.25
-        name: jnxCosIfsetQstatLpNonTcpRedDropBytes
-        description: The total number of low PLP non TCP bytes RED-dropped at the output on the given interface
-        unit: "By"
-    # The total number of low PLP TCP bytes RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.27
-        name: jnxCosIfsetQstatLpTcpRedDropBytes
-        description: The total number of low PLP TCP bytes RED-dropped at the output on the given interface
-        unit: "By"
-    # The total number of high PLP non TCP bytes RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.29
-        name: jnxCosIfsetQstatHpNonTcpRedDropBytes
-        description: The total number of high PLP non TCP bytes RED-dropped at the output on the given interface
-        unit: "By"
-    # The total number of high PLP TCP bytes RED-dropped at the output queue on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.31
-        name: jnxCosIfsetQstatHpTcpRedDropBytes
-        description: The total number of high PLP TCP bytes RED-dropped at the output queue on the given interface
-        unit: "By"
-    # The total number of low PLP packets RED-droppped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.33
-        name: jnxCosIfsetQstatLpRedDropPkts
-        description: The total number of low PLP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of medium-low PLP packets RED-droppped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.35
-        name: jnxCosIfsetQstatMLpRedDropPkts
-        description: The total number of medium-low PLP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of medium-high PLP packets RED-droppped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.37
-        name: jnxCosIfsetQstatMHpRedDropPkts
-        description: The total number of medium-high PLP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of high PLP packets RED-droppped at the output on the given interface.  
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.39
-        name: jnxCosIfsetQstatHpRedDropPkts
-        description: The total number of high PLP packets RED-dropped at the output on the given interface
-        unit: "{packet}"
-    # The total number of low PLP TCP bytes RED-dropped at the output queue on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.41
-        name: jnxCosIfsetQstatLpRedDropBytes
-        description: The total number of low PLP TCP bytes RED-dropped at the output queue on the given interface
-        unit: "By"
-    # The total number of medium-low PLP TCP bytes RED-dropped at the output queue on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.43
-        name: jnxCosIfsetQstatMLpRedDropBytes
-        description: The total number of medium-low PLP TCP bytes RED-dropped at the output queue on the given interface
-        unit: "By"
-    # The total number of medium-high PLP TCP bytes RED-dropped at the output queue on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.45
-        name: jnxCosIfsetQstatMHpRedDropBytes
-        description: The total number of medium-high PLP TCP bytes RED-dropped at the output queue on the given interface
-        unit: "By"
-    # The total number of high PLP TCP bytes RED-dropped at the output queue on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.47
-        name: jnxCosIfsetQstatHpRedDropBytes
-        description: The total number of high PLP TCP bytes RED-dropped at the output queue on the given interface
-        unit: "By"
-    # The total number of rate-limit dropped packets at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.49
-        name: jnxCosIfsetQstatRateLimitDropPkts
-        description: The total number of rate-limit dropped packets at the output on the given interface
-        unit: "{packet}"
-    # The total number of rate-limit dropped bytes at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.51
-        name: jnxCosIfsetQstatRateLimitDropBytes
-        description: The total number of rate-limit dropped bytes at the output on the given interface
-        unit: "By"
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.2636.3.15.9.1.2
-          name: jnxCosIfsetDescr
-        table: jnxCosIfTable
-        tag: interface
-        index_transform:
-          - start: 0
-            end: 0
-      - symbol:
-          OID: 1.3.6.1.4.1.2636.3.15.10.1.2
-          name: jnxCosIfsetQstatQueueNr
-        tag: queue_number
-  - MIB: JUNIPER-COS-MIB
-    table:
-      OID: 1.3.6.1.4.1.2636.3.15.10
-      name: jnxCosIfsetQstatTable
-    metric_type: gauge
-    symbols:
-    # The rate (expressed in packets per second) at which packets were queued at the output queue.
       - OID: 1.3.6.1.4.1.2636.3.15.10.1.4
         name: jnxCosIfsetQstatQedPktRate
         description: The rate at which packets were queued at the output queue
-        unit: "1.s"
-    # The rate (expressed in bytes per second) at which bytes were queued at the output queue.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.6
-        name: jnxCosIfsetQstatQedByteRate
-        description: The rate at which bytes were queued at the output queue
-        unit: "By/s"
-    # The output queue's packet transmit rate, expressed in packets per second.
+        family: Interfaces/COS/Queue/Packet/Queued
+        unit: "{packet}/s"
+      # Transmitted
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.7
+        name: jnxCosIfsetQstatTxedPkts
+        description: Number of packets transmitted on the queue
+        family: Interfaces/COS/Queue/Packet/Transmitted
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.15.10.1.8
         name: jnxCosIfsetQstatTxedPktRate
         description: The output queue's packet transmit rate
-        unit: "1.s"
-    # The queue's current transmit rate in bytes per second.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.10
-        name: jnxCosIfsetQstatTxedByteRate
-        description: The queue's current transmit rate in bytes per second
-        unit: "By/s"
-    # The tail drop packet rate (expressed in packets per second) for the queue.
+        family: Interfaces/COS/Queue/Packet/Transmitted
+        unit: "{packet}/s"
+
+      # Tail Drop
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.11
+        name: jnxCosIfsetQstatTailDropPkts
+        description: The number of packets tail dropped at the output queue
+        family: Interfaces/COS/TailDrop/Packet/Dropped
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.15.10.1.12
         name: jnxCosIfsetQstatTailDropPktRate
         description: The tail drop packet rate for the queue
-        unit: "1.s"
-    # The most recent estimate of per-second RED-dropped packets at the output queue on the given interface
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.14
-        name: jnxCosIfsetQstatTotalRedDropPktRate
-        description: The most recent estimate of per-second RED-dropped packets at the output queue on the given interface
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which low PLP non TCP packets were RED-dropped.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.16
-        name: jnxCosIfsetQstatLpNonTcpRDropPktRate
-        description: The rate at which low PLP non TCP packets were RED-dropped
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which low PLP TCP packets were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.18
-        name: jnxCosIfsetQstatLpTcpRedDropPktRate
-        description: The rate at which low PLP TCP packets were RED-dropped at the output on the given interface
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which high PLP non TCP packets were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.20
-        name: jnxCosIfsetQstatHpNonTcpRDropPktRate
-        description: The rate at which high PLP non TCP packets were RED-dropped at the output on the given interface
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which high PLP TCP packets were RED-dropped at the output.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.22
-        name: jnxCosIfsetQstatHpTcpRedDropPktRate
-        description: The rate at which high PLP TCP packets were RED-dropped at the output
-        unit: "1.s"
-    # The rate (expressed in bytes per second) at which bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.24
-        name: jnxCosIfsetQstatTotalRedDropByteRate
-        description: The rate at which bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    # The rate (expressed in bytes per second) at which low PLP non TCP bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.26
-        name: jnxCosIfsetQstatLpNonTcpRDropByteRate
-        description: The rate at which low PLP non TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    # The rate (expressed in bytes per second) at which low PLP TCP bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.28
-        name: jnxCosIfsetQstatLpTcpRedDropByteRate
-        description: The rate at which low PLP TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    # The rate (expressed in bytes per second) at which high PLP non TCP bytes were RED-dropped at the output queue on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.30
-        name: jnxCosIfsetQstatHpNonTcpRDropByteRate
-        description: The rate at which high PLP non TCP bytes were RED-dropped at the output queue on the given interface
-        unit: "By/s"
-    # The rate (expressed in bytes per second) at which high PLP TCP bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.32
-        name: jnxCosIfsetQstatHpTcpRedDropByteRate
-        description: The rate at which high PLP TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    # The rate (expressed in packets per second) at which low PLP packets were RED-dropped at the output.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.34
-        name: jnxCosIfsetQstatLpRedDropPktRate
-        description: The rate at which low PLP packets were RED-dropped at the output
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which medium-low PLP packets were RED-dropped at the output.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.36
-        name: jnxCosIfsetQstatMLpRedDropPktRate
-        description: The rate at which medium-low PLP packets were RED-dropped at the output
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which medium-high PLP packets were RED-dropped at the output
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.38
-        name: jnxCosIfsetQstatMHpRedDropPktRate
-        description: The rate at which medium-high PLP packets were RED-dropped at the output
-        unit: "1.s"
-    # The rate (expressed in packets per second) at which high PLP packets were RED-dropped at the output.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.40
-        name: jnxCosIfsetQstatHpRedDropPktRate
-        description: The rate at which high PLP packets were RED-dropped at the output
-        unit: "1.s"
-    # The rate (expressed in bytes per second) at which low PLP TCP bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.42
-        name: jnxCosIfsetQstatLpRedDropByteRate
-        description: The rate at which low PLP TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    # The rate (expressed in bytes per second) at which medium-low PLP TCP bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.44
-        name: jnxCosIfsetQstatMLpRedDropByteRate
-        description: The rate at which medium-low PLP TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    #  The rate (expressed in bytes per second) at which medium-high PLP TCP bytes were RED-dropped at the output on the given interface.  
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.46
-        name: jnxCosIfsetQstatMHpRedDropByteRate
-        description: The rate at which medium-high PLP TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    #  The rate (expressed in bytes per second) at which high PLP TCP bytes were RED-dropped at the output on the given interface.
-      - OID: 1.3.6.1.4.1.2636.3.15.10.1.48
-        name: jnxCosIfsetQstatHpRedDropByteRate
-        description: The rate at which high PLP TCP bytes were RED-dropped at the output on the given interface
-        unit: "By/s"
-    #  The rate (expressed in bytes per second) at which packets are rate-limit dropped at the output on the given interface.
+        family: Interfaces/COS/TailDrop/Packet/Dropped
+        unit: "{packets}/s"
+
+      # Rate Limit
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.49
+        name: jnxCosIfsetQstatRateLimitDropPkts
+        description: The total number of rate-limit dropped packets at the output on the given interface
+        family: Interfaces/COS/RateLimit/Packet/Dropped
+        unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.15.10.1.50
         name: jnxCosIfsetQstatRateLimitDropPktRate
         description: The rate at which packets are rate-limit dropped at the output on the given interface
-        unit: "1.s"
-    # The rate (expressed in bytes per second) at which bytes are rate-limit dropped at the output on the given interface.
+        family: Interfaces/COS/RateLimit/Packet/Dropped
+        unit: "{packet}/s"
+
+      # RED Drops
+      # Total
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.13
+        name: jnxCosIfsetQstatTotalRedDropPkts
+        description: Total number of packets dropped due to RED at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/Total
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.14
+        name: jnxCosIfsetQstatTotalRedDropPktRate
+        description: The most recent estimate of per-second RED-dropped packets at the output queue on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/Total
+        unit: "{packet}/s"
+
+      # Low PLP
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.33
+        name: jnxCosIfsetQstatLpRedDropPkts
+        description: The total number of low PLP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/LowPLP/Total
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.34
+        name: jnxCosIfsetQstatLpRedDropPktRate
+        description: The rate at which low PLP packets were RED-dropped at the output
+        family: Interfaces/COS/RED/Packet/Dropped/LowPLP/Total
+        unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.15
+        name: jnxCosIfsetQstatLpNonTcpRedDropPkts
+        description: The total number of low PLP non TCP packets RED-dropped
+        family: Interfaces/COS/RED/Packet/Dropped/LowPLP/NonTCP
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.16
+        name: jnxCosIfsetQstatLpNonTcpRDropPktRate
+        description: The rate at which low PLP non TCP packets were RED-dropped
+        family: Interfaces/COS/RED/Packet/Dropped/LowPLP/NonTCP
+        unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.17
+        name: jnxCosIfsetQstatLpTcpRedDropPkts
+        description: The total number of low PLP TCP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/LowPLP/TCP
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.18
+        name: jnxCosIfsetQstatLpTcpRedDropPktRate
+        description: The rate at which low PLP TCP packets were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/LowPLP/TCP
+        unit: "{packet}/s"
+
+      # Medium-Low PLP
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.35
+        name: jnxCosIfsetQstatMLpRedDropPkts
+        description: The total number of medium-low PLP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/MediumLowPLP/Total
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.36
+        name: jnxCosIfsetQstatMLpRedDropPktRate
+        description: The rate at which medium-low PLP packets were RED-dropped at the output
+        family: Interfaces/COS/RED/Packet/Dropped/MediumLowPLP/Total
+        unit: "{packet}/s"
+
+      # Medium-High PLP
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.37
+        name: jnxCosIfsetQstatMHpRedDropPkts
+        description: The total number of medium-high PLP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/MediumHighPLP/Total
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.38
+        name: jnxCosIfsetQstatMHpRedDropPktRate
+        description: The rate at which medium-high PLP packets were RED-dropped at the output
+        family: Interfaces/COS/RED/Packet/Dropped/MediumHighPLP/Total
+        unit: "{packet}/s"
+
+      # High PLP
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.39
+        name: jnxCosIfsetQstatHpRedDropPkts
+        description: The total number of high PLP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/HighPLP/Total
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.40
+        name: jnxCosIfsetQstatHpRedDropPktRate
+        description: The rate at which high PLP packets were RED-dropped at the output
+        family: Interfaces/COS/RED/Packet/Dropped/HighPLP/Total
+        unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.19
+        name: jnxCosIfsetQstatHpNonTcpRedDropPkts
+        description: The total number of high PLP non TCP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/HighPLP/NonTCP
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.20
+        name: jnxCosIfsetQstatHpNonTcpRDropPktRate
+        description: The rate at which high PLP non TCP packets were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/HighPLP/NonTCP
+        unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.21
+        name: jnxCosIfsetQstatHpTcpRedDropPkts
+        description: The total number of high PLP TCP packets RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Packet/Dropped/HighPLP/TCP
+        unit: "{packet}"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.22
+        name: jnxCosIfsetQstatHpTcpRedDropPktRate
+        description: The rate at which high PLP TCP packets were RED-dropped at the output
+        family: Interfaces/COS/RED/Packet/Dropped/HighPLP/TCP
+        unit: "{packet}/s"
+
+      # Queue Traffic
+      # Queued
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.5
+        name: jnxCosIfsetQstatQedBytes
+        description: Number of bytes queued at the output queue
+        family: Interfaces/COS/Queue/Traffic/Queued
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.6
+        name: jnxCosIfsetQstatQedByteRate
+        description: The rate at which bytes were queued at the output queue
+        family: Interfaces/COS/Queue/Traffic/Queued
+        unit: "By/s"
+      # Transmitted
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.9
+        name: jnxCosIfsetQstatTxedBytes
+        description: Number of bytes transmitted on the queue
+        family: Interfaces/COS/Queue/Traffic/Transmitted
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.10
+        name: jnxCosIfsetQstatTxedByteRate
+        description: The queue's current transmit rate in bytes per second
+        family: Interfaces/COS/Queue/Traffic/Transmitted
+        unit: "By/s"
+
+      # Rate Limit Traffic
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.51
+        name: jnxCosIfsetQstatRateLimitDropBytes
+        description: The total number of rate-limit dropped bytes at the output on the given interface
+        family: Interfaces/COS/RateLimit/Traffic/Dropped
+        unit: "By"
       - OID: 1.3.6.1.4.1.2636.3.15.10.1.52
         name: jnxCosIfsetQstatRateLimitDropByteRate
         description: The rate at which bytes are rate-limit dropped at the output on the given interface
+        family: Interfaces/COS/RateLimit/Traffic/Dropped
+        unit: "By/s"
+
+      # RED Dropped Traffic
+      # Total
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.23
+        name: jnxCosIfsetQstatTotalRedDropBytes
+        description: The total number of bytes RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/Total
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.24
+        name: jnxCosIfsetQstatTotalRedDropByteRate
+        description: The rate at which bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/Total
+        unit: "By/s"
+
+      # Low PLP Traffic
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.41
+        name: jnxCosIfsetQstatLpRedDropBytes
+        description: The total number of low PLP bytes RED-dropped at the output queue on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/LowPLP/Total
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.42
+        name: jnxCosIfsetQstatLpRedDropByteRate
+        description: The rate at which low PLP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/LowPLP/Total
+        unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.25
+        name: jnxCosIfsetQstatLpNonTcpRedDropBytes
+        description: The total number of low PLP non TCP bytes RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/LowPLP/NonTCP
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.26
+        name: jnxCosIfsetQstatLpNonTcpRDropByteRate
+        description: The rate at which low PLP non TCP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/LowPLP/NonTCP
+        unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.27
+        name: jnxCosIfsetQstatLpTcpRedDropBytes
+        description: The total number of low PLP TCP bytes RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/LowPLP/TCP
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.28
+        name: jnxCosIfsetQstatLpTcpRedDropByteRate
+        description: The rate at which low PLP TCP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/LowPLP/TCP
+        unit: "By/s"
+
+      # Medium-Low PLP Traffic
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.43
+        name: jnxCosIfsetQstatMLpRedDropBytes
+        description: The total number of medium-low PLP bytes RED-dropped at the output queue on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/MediumLowPLP/Total
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.44
+        name: jnxCosIfsetQstatMLpRedDropByteRate
+        description: The rate at which medium-low PLP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/MediumLowPLP/Total
+        unit: "By/s"
+
+      # Medium-High PLP Traffic
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.45
+        name: jnxCosIfsetQstatMHpRedDropBytes
+        description: The total number of medium-high PLP bytes RED-dropped at the output queue on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/MediumHighPLP/Total
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.46
+        name: jnxCosIfsetQstatMHpRedDropByteRate
+        description: The rate at which medium-high PLP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/MediumHighPLP/Total
+        unit: "By/s"
+
+      # High PLP Traffic
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.47
+        name: jnxCosIfsetQstatHpRedDropBytes
+        description: The total number of high PLP bytes RED-dropped at the output queue on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/HighPLP/Total
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.48
+        name: jnxCosIfsetQstatHpRedDropByteRate
+        description: The rate at which high PLP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/HighPLP/Total
+        unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.29
+        name: jnxCosIfsetQstatHpNonTcpRedDropBytes
+        description: The total number of high PLP non TCP bytes RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/HighPLP/NonTCP
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.30
+        name: jnxCosIfsetQstatHpNonTcpRDropByteRate
+        description: The rate at which high PLP non TCP bytes were RED-dropped at the output queue on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/HighPLP/NonTCP
+        unit: "By/s"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.31
+        name: jnxCosIfsetQstatHpTcpRedDropBytes
+        description: The total number of high PLP TCP bytes RED-dropped at the output queue on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/HighPLP/TCP
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2636.3.15.10.1.32
+        name: jnxCosIfsetQstatHpTcpRedDropByteRate
+        description: The rate at which high PLP TCP bytes were RED-dropped at the output on the given interface
+        family: Interfaces/COS/RED/Traffic/Dropped/HighPLP/TCP
         unit: "By/s"
     metric_tags:
       - symbol:
