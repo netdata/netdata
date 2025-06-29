@@ -131,7 +131,7 @@ type Config struct {
 
 type WebSpherePMI struct {
 	module.Base
-	Config `yaml:",inline" json:""`
+	Config `json:""`
 
 	charts *module.Charts
 
