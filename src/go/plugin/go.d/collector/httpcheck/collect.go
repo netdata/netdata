@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -97,9 +99,22 @@ func (c *Collector) collectOKResponse(mx *metrics, resp *http.Response) {
 
 	mx.ResponseLength = len(bs)
 
-	if c.reResponse != nil && !c.reResponse.Match(bs) {
-		mx.Status.BadContent = true
-		return
+	if c.reResponse != nil {
+		matched := c.reResponse.Match(bs)
+
+		if logger.Level.Enabled(slog.LevelDebug) {
+			c.Debugf("response validation: pattern=%s, matched=%v, bodySize=%d", c.reResponse, matched, len(bs))
+			if len(bs) <= 1024 {
+				c.Debugf("response body: %s", string(bs))
+			} else {
+				c.Debugf("response body (first 1024 bytes): %s...", string(bs[:1024]))
+			}
+		}
+
+		if !matched {
+			mx.Status.BadContent = true
+			return
+		}
 	}
 
 	if ok := c.checkHeader(resp); !ok {

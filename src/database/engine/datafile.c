@@ -385,7 +385,7 @@ static int scan_data_files_cmp(const void *a, const void *b)
 static int scan_data_files(struct rrdengine_instance *ctx)
 {
     int ret, matched_files, failed_to_load, i;
-    unsigned tier, no;
+    unsigned tier, fileno;
     uv_fs_t req;
     uv_dirent_t dent;
     struct rrdengine_datafile **datafiles, *datafile;
@@ -401,13 +401,44 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
     netdata_log_info("DBENGINE: found %d files in path %s", ret, ctx->config.dbfiles_path);
 
+    Pvoid_t datafiles_JudyL = NULL;
+    Pvoid_t journafile_JudyL = NULL;
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
+    bool validate_files = true;
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
-        ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &no);
+        ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
+
+        // This is a datafile
         if (2 == ret) {
-            datafile = datafile_alloc_and_init(ctx, tier, no);
+            datafile = datafile_alloc_and_init(ctx, tier, fileno);
             datafiles[matched_files++] = datafile;
+            Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
+            if (!Pvalue || Pvalue == PJERR)
+                validate_files = false;
+            continue;
         }
+
+        // Check for journal v1 or v2
+        char expected_name[RRDENG_PATH_MAX];
+        ret = sscanf(dent.name, WALFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL WALFILE_EXTENSION, &tier, &fileno);
+        bool unknown_file = true;
+        if (2 == ret) {
+            (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+                            1U, fileno);
+
+            unknown_file = (strcmp(dent.name, expected_name) != 0);
+            if (unknown_file) {
+                (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
+                                1U, fileno);
+                unknown_file = (strcmp(dent.name, expected_name) != 0);
+            }
+
+            if (!unknown_file)
+                (void) JudyLIns(&journafile_JudyL, (Word_t)fileno, PJE0);
+        }
+
+        if (unknown_file)
+            nd_log_daemon(NDLP_WARNING, "Unknown file detected : \"%s/%s\"", ctx->config.dbfiles_path, dent.name);
     }
     uv_fs_req_cleanup(&req);
 
@@ -422,6 +453,56 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
 
     ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
+
+    // Remove journal files that do not have a matching data file
+    // by scanning the judy array of the journal files
+    if (validate_files) {
+        bool first_then_next = true;
+        Word_t idx = 0;
+        Pvoid_t *PValue;
+        size_t deleted_journals = 0;
+        while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
+            char path[RRDENG_PATH_MAX];
+            if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
+                (void)snprintfz(
+                    path,
+                    sizeof(path),
+                    "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+                    datafile_ctx(datafile)->config.dbfiles_path,
+                    1U,
+                    (unsigned)idx);
+
+                UNLINK_FILE(ctx, path, ret);
+                if (ret == 0) {
+                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
+                    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+                    deleted_journals++;
+                }
+
+                (void)snprintfz(
+                    path,
+                    sizeof(path),
+                    "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
+                    datafile_ctx(datafile)->config.dbfiles_path,
+                    1U,
+                    (unsigned)idx);
+
+                UNLINK_FILE(ctx, path, ret);
+                if (ret == 0) {
+                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
+                    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+                    deleted_journals++;
+                }
+            }
+        }
+
+        if (deleted_journals)
+            netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
+    }
+
+    (void) JudyLFreeArray(&journafile_JudyL, NULL);
+    (void) JudyLFreeArray(&datafiles_JudyL, NULL);
+
 
     netdata_log_info("DBENGINE: loading %d data/journal of tier %d...", matched_files, ctx->config.tier);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {

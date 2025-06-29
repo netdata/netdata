@@ -4,9 +4,12 @@ package snmp
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 const (
@@ -20,7 +23,7 @@ const (
 	prioNetIfaceOperStatus
 	prioSysUptime
 
-	priosnmp
+	prioProfileChart
 )
 
 var netIfaceChartsTmpl = module.Charts{
@@ -33,20 +36,6 @@ var netIfaceChartsTmpl = module.Charts{
 	netIfaceAdminStatusChartTmpl.Copy(),
 	netIfaceOperStatusChartTmpl.Copy(),
 }
-
-var (
-	snmpChartTemplate = module.Chart{
-		ID:       "%s",
-		Title:    "%s",
-		Units:    "%s",
-		Fam:      "%s",
-		Ctx:      "snmp.%s",
-		Priority: priosnmp,
-		Dims: module.Dims{
-			{ID: "%s", Name: "%s"},
-		},
-	}
-)
 
 var (
 	netIfaceTrafficChartTmpl = module.Chart{
@@ -194,44 +183,6 @@ func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 	}
 }
 
-func (c *Collector) addSNMPChart(processedMetric processedMetric) {
-	if processedMetric.tableName == "" {
-		chart := snmpChartTemplate.Copy()
-
-		chart.ID = fmt.Sprintf(chart.ID, processedMetric.name)
-		if processedMetric.description == "" {
-			chart.Title = fmt.Sprintf(chart.Title, "TBD Description")
-		} else {
-			chart.Title = fmt.Sprintf(chart.Title, processedMetric.description)
-		}
-		if processedMetric.unit == "" {
-			chart.Units = fmt.Sprintf(chart.Units, "TBD unit")
-		} else {
-			chart.Units = fmt.Sprintf(chart.Units, processedMetric.unit)
-		}
-		chart.Ctx = fmt.Sprintf(chart.Ctx, processedMetric.name)
-		chart.Fam = fmt.Sprintf(chart.Fam, processedMetric.name)
-
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, processedMetric.name)
-			dim.Name = fmt.Sprintf(dim.Name, processedMetric.name)
-		}
-
-		if err := c.Charts().Add(chart); err != nil {
-			c.Warning(err)
-		}
-	}
-}
-
-func (c *Collector) removeSNMPChart(name string) {
-	for _, chart := range *c.Charts() {
-		if chart.ID == name {
-			chart.MarkRemove()
-			chart.MarkNotCreated()
-		}
-	}
-}
-
 func (c *Collector) removeNetIfaceCharts(iface *netInterface) {
 	px := fmt.Sprintf("snmp_device_net_iface_%s_", cleanIfaceName(iface.ifName))
 	for _, chart := range *c.Charts() {
@@ -251,11 +202,6 @@ func (c *Collector) addSysUptimeChart() {
 	if err := c.Charts().Add(chart); err != nil {
 		c.Warning(err)
 	}
-}
-
-func cleanIfaceName(name string) string {
-	r := strings.NewReplacer(".", "_", " ", "_")
-	return r.Replace(name)
 }
 
 func newUserInputCharts(configs []ChartConfig) (*module.Charts, error) {
@@ -362,4 +308,142 @@ func newUserInputChart(cfg ChartConfig) (*module.Chart, error) {
 	}
 
 	return chart, nil
+}
+
+func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
+	if m.Name == "" {
+		return
+	}
+
+	r := strings.NewReplacer(".", "_", " ", "_")
+	chart := &module.Chart{
+		ID:       fmt.Sprintf("snmp_device_prof_%s", r.Replace(m.Name)),
+		Title:    m.Description,
+		Units:    m.Unit,
+		Fam:      m.Family,
+		Ctx:      fmt.Sprintf("snmp.device_prof_%s", r.Replace(m.Name)),
+		Priority: prioProfileChart,
+	}
+	if chart.Title == "" {
+		chart.Title = fmt.Sprintf("SNMP metric %s", m.Name)
+	}
+	if chart.Units == "" {
+		chart.Units = "1"
+	}
+	if chart.Fam == "" {
+		chart.Fam = m.Name
+	}
+	if chart.Units == "bit/s" {
+		chart.Type = module.Area
+	}
+
+	tags := map[string]string{
+		"vendor":  c.sysInfo.Organization,
+		"sysName": c.sysInfo.Name,
+	}
+
+	maps.Copy(tags, m.Profile.Tags)
+	for k, v := range tags {
+		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+	}
+
+	if len(m.Mappings) > 0 {
+		seen := make(map[string]bool)
+		for _, v := range m.Mappings {
+			if !seen[v] {
+				seen[v] = true
+				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+			}
+		}
+	} else {
+		id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+		chart.Dims = module.Dims{
+			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
+		}
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
+	if m.Name == "" {
+		return
+	}
+
+	key := tableMetricKey(m)
+
+	r := strings.NewReplacer(".", "_", " ", "_")
+	chart := &module.Chart{
+		ID:       fmt.Sprintf("snmp_device_prof_%s", r.Replace(key)),
+		Title:    m.Description,
+		Units:    m.Unit,
+		Fam:      m.Family,
+		Ctx:      fmt.Sprintf("snmp.device_prof_%s", r.Replace(m.Name)),
+		Priority: prioProfileChart,
+	}
+	if chart.Title == "" {
+		chart.Title = fmt.Sprintf("SNMP metric %s", m.Name)
+	}
+	if chart.Units == "" {
+		chart.Units = "1"
+	}
+	if chart.Fam == "" {
+		chart.Fam = m.Name
+	}
+	if chart.Units == "bit/s" {
+		chart.Type = module.Area
+	}
+
+	tags := map[string]string{
+		"vendor":  c.sysInfo.Organization,
+		"sysName": c.sysInfo.Name,
+	}
+	maps.Copy(tags, m.Profile.Tags)
+	for k, v := range m.Tags {
+		newKey := strings.TrimPrefix(k, "_")
+		tags[newKey] = v
+	}
+
+	for k, v := range tags {
+		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+	}
+
+	if len(m.Mappings) > 0 {
+		seen := make(map[string]bool)
+		for _, v := range m.Mappings {
+			if !seen[v] {
+				seen[v] = true
+				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+			}
+		}
+	} else {
+		id := fmt.Sprintf("snmp_device_prof_%s", key)
+		chart.Dims = module.Dims{
+			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
+		}
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
+	}
+}
+
+func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {
+	switch m.MetricType {
+	case ddprofiledefinition.ProfileMetricTypeGauge,
+		ddprofiledefinition.ProfileMetricTypeMonotonicCount,
+		ddprofiledefinition.ProfileMetricTypeMonotonicCountAndRate:
+		return module.Absolute
+	default:
+		return module.Incremental
+	}
+}
+
+func cleanIfaceName(name string) string {
+	r := strings.NewReplacer(".", "_", " ", "_")
+	return r.Replace(name)
 }

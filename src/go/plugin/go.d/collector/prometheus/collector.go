@@ -55,7 +55,6 @@ type Config struct {
 	Name               string        `yaml:"name,omitempty" json:"name"`
 	Application        string        `yaml:"app,omitempty" json:"app"`
 	LabelPrefix        string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	BearerTokenFile    string        `yaml:"bearer_token_file,omitempty" json:"bearer_token_file"`
 	Selector           selector.Expr `yaml:"selector,omitempty" json:"selector"`
 	ExpectedPrefix     string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
 	MaxTS              int           `yaml:"max_time_series" json:"max_time_series"`

@@ -4,8 +4,13 @@ extends:
   - _base.yaml
   - _cisco-asa.yaml
 
-device:
-  vendor: "cisco"
+metadata:
+  device:
+    fields:
+      type:
+        value: Firewall
+      vendor:
+        value: Cisco
 
 sysobjectid:
   - 1.3.6.1.4.1.9.1.669 # ciscoASA5510
@@ -64,6 +69,7 @@ sysobjectid:
   - 1.3.6.1.4.1.9.1.1335 # ciscoASASm1K7sy
   - 1.3.6.1.4.1.9.1.1336 # ciscoASASm1K7
   - 1.3.6.1.4.1.9.1.1407 # ciscoASA5512
+  - 1.3.6.1.4.1.9.1.1408 # ciscoASA5525
   - 1.3.6.1.4.1.9.1.1409 # ciscoASA5545
   - 1.3.6.1.4.1.9.1.1410 # ciscoASA5555
   - 1.3.6.1.4.1.9.1.1411 # ciscoASA5512sc
@@ -133,9 +139,3 @@ sysobjectid:
   - 1.3.6.1.4.1.9.1.2304 # ciscoASA5506Htd
   - 1.3.6.1.4.1.9.1.2305 # ciscoASA5508td
   - 1.3.6.1.4.1.9.1.2306 # ciscoASA5516td
-
-metadata:
-  device:
-    fields:
-      type:
-        value: "firewall"

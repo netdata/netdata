@@ -165,16 +165,24 @@ static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     return LIBUV_WORKERS_RELAXED;
 }
 
+// This needs to be called from event loop thread only (callback)
 static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx)
 {
     internal_fatal(rrdeng_main.tid != gettid_cached(), "check_and_schedule_db_rotation() can only be run from the event loop thread");
+
+    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED)) {
+        if (ctx->datafiles.pending_index == false) {
+            ctx->datafiles.pending_index = true;
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        }
+    }
 
     if (ctx->datafiles.pending_rotate) {
         nd_log_daemon(NDLP_DEBUG, "DBENGINE: tier %d is already pending rotation", ctx->config.tier);
         return;
     }
 
-    if(ctx_is_available_for_queries(ctx) && rrdeng_ctx_tier_cap_exceeded(ctx)) {
+    if(rrdeng_ctx_tier_cap_exceeded(ctx)) {
         ctx->datafiles.pending_rotate = true;
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     }
@@ -670,8 +678,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
     spinlock_unlock(&datafile->writers.spinlock);
 
     if(datafile->fileno != ctx_last_fileno_get(ctx) && still_running)
-        // we just finished a flushing on a datafile that is not the active one
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -682,7 +689,7 @@ static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_da
     bool ret = false;
     spinlock_lock(&datafile->writers.spinlock);
 
-    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx))
+    if(datafile->pos > rrdeng_target_data_file_size(ctx))
         ret = true;
 
     spinlock_unlock(&datafile->writers.spinlock);
@@ -716,8 +723,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
         if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx, true) == 0)
-            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
-                           NULL);
+            __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
         netdata_mutex_unlock(&mutex);
 
@@ -935,9 +941,6 @@ done:
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     __atomic_store_n(&ctx->atomic.now_deleting_files, false, __ATOMIC_RELAXED);
 
-    if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED))
-       rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-
     check_and_schedule_db_rotation(ctx);
 }
 
@@ -966,7 +969,7 @@ struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struc
     return next_datafile;
 }
 
-time_t find_uuid_first_time(
+static time_t find_uuid_first_time(
     struct rrdengine_instance *ctx,
     struct rrdengine_datafile *datafile,
     struct uuid_first_time_s *uuid_first_entry_list,
@@ -987,6 +990,7 @@ time_t find_uuid_first_time(
     size_t binary_match = 0;
     size_t not_matching_bsearches = 0;
 
+    bool agent_shutdown = false;
     while (datafile) {
         struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
         if (!j2_header) {
@@ -994,45 +998,59 @@ time_t find_uuid_first_time(
             continue;
         }
 
-        time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+        bool any_matching = false;
 
-        if(journal_start_time_s < global_first_time_s)
+        time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+
+        if (journal_start_time_s < global_first_time_s)
             global_first_time_s = journal_start_time_s;
 
-        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
+        struct journal_metric_list *uuid_list =
+            (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
         struct uuid_first_time_s *uuid_original_entry;
 
         size_t journal_metric_count = j2_header->metric_count;
         char file_path[RRDENG_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
-        if(no_signal_received) {
+        if (no_signal_received) {
+            size_t journal_search_start = 0; // Start of remaining search space
+            any_matching = false;
             for (size_t index = 0; index < count; ++index) {
                 uuid_original_entry = &uuid_first_entry_list[index];
 
-                // Check here if we should skip this
                 if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
                     continue;
 
-                struct journal_metric_list *live_entry = bsearch(
-                    uuid_original_entry->uuid,
-                    uuid_list,
-                    journal_metric_count,
-                    sizeof(*uuid_list),
-                    journal_metric_uuid_compare);
+                any_matching = true;
+                struct journal_metric_list *live_entry = &uuid_list[journal_search_start];
+                // Check if we avoid bsearch
+                if (journal_metric_uuid_compare(uuid_original_entry->uuid, live_entry->uuid) != 0) {
+                    live_entry = bsearch(
+                        uuid_original_entry->uuid,
+                        uuid_list + journal_search_start,
+                        journal_metric_count - journal_search_start,
+                        sizeof(*uuid_list),
+                        journal_metric_uuid_compare);
 
-                if (!live_entry) {
-                    // Not found in this journal
-                    not_matching_bsearches++;
-                    continue;
+                    if (!live_entry) {
+                        not_matching_bsearches++;
+                        continue;
+                    }
+                }
+
+                size_t found_index = live_entry - uuid_list;
+                journal_search_start = found_index + 1; // Next search starts after this match
+
+                if (journal_search_start >= journal_metric_count) {
+                    not_matching_bsearches += (count - index - 1);
+                    break;
                 }
 
                 uuid_original_entry->pages_found += live_entry->entries;
                 uuid_original_entry->df_matched++;
 
                 time_t old_first_time_s = uuid_original_entry->first_time_s;
-
-                // Calculate first / last for this match
                 time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
                 uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
 
@@ -1040,16 +1058,33 @@ time_t find_uuid_first_time(
                     uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
 
                 binary_match++;
+
+                if (unlikely(!ctx_is_available_for_queries(ctx))) {
+                    agent_shutdown = true;
+                    break;
+                }
             }
         } else {
-            nd_log_daemon(
-                NDLP_ERR, "DBENGINE: journalfile \"%s\" is corrupted, skipping it", file_path);
+            nd_log_daemon(NDLP_ERR, "DBENGINE: journalfile \"%s\" is corrupted, skipping it", file_path);
+        }
+        journalfile_v2_data_release(datafile->journalfile);
+
+        if (agent_shutdown) {
+            datafile_release(datafile, DATAFILE_ACQUIRE_RETENTION);
+            break;
         }
 
         journalfile_count++;
-        journalfile_v2_data_release(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
+        if (!any_matching) {
+            if (datafile)
+                datafile_release(datafile, DATAFILE_ACQUIRE_RETENTION);
+            break;
+        }
     }
+
+    if (agent_shutdown)
+        return global_first_time_s;
 
     // Let's scan the open cache for almost exact match
     size_t open_cache_count = 0;
@@ -1174,15 +1209,28 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     global_first_time_s = find_uuid_first_time(ctx, first_datafile_remaining, uuid_first_entry_list, added);
 
+    if (!ctx_is_available_for_queries(ctx)) {
+        for (size_t index = 0; index < added; ++index) {
+            uuid_first_t_entry = &uuid_first_entry_list[index];
+            mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+        }
+        goto done;
+    }
+
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
-    netdata_log_info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
-         ctx->config.tier, added);
+    netdata_log_info("DBENGINE: updating tier %d metrics registry retention for %zu metrics", ctx->config.tier, added);
 
     size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
+
+        if (!ctx_is_available_for_queries(ctx)) {
+            mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+            continue;
+        }
+
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
 
             time_t old_first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
@@ -1223,7 +1271,9 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             }
         }
     }
-    freez(uuid_first_entry_list);
+
+    if (!ctx_is_available_for_queries(ctx))
+        goto done;
 
     internal_error(zero_disk_retention,
                    "DBENGINE: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention tier %d metrics from metrics registry",
@@ -1231,6 +1281,9 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     if(global_first_time_s != LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, global_first_time_s, __ATOMIC_RELAXED);
+
+done:
+    freez(uuid_first_entry_list);
 
     if(worker)
         worker_is_idle();
@@ -1273,6 +1326,13 @@ void datafile_delete(
 
     if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
+
+//    if (!ctx_is_available_for_queries(ctx)) {
+//        // agent is shutting down, we cannot continue
+//        if(worker)
+//            worker_is_idle();
+//        return;
+//    }
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
     netdata_log_info("DBENGINE: deleting data file \"%s/"
@@ -1735,6 +1795,9 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
 static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void *data, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
 
+    if (unlikely(!ctx_is_available_for_queries(ctx)))
+        return data;
+
     worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     struct rrdengine_datafile *datafile = NULL;
     char path[RRDENG_PATH_MAX];
@@ -2023,11 +2086,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         dbengine_initialize_structures();
 
         int retries = 0;
-//        int create_uv_thread_rc = create_uv_thread(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main, &retries);
         rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
-
-//        if (!rrdeng_main.thread)
-//            nd_log_daemon(NDLP_ERR, "Failed to create DBENGINE thread, error %s, after %d retries", uv_err_name(create_uv_thread_rc), retries);
 
         fatal_assert(0 != rrdeng_main.thread);
 
@@ -2124,6 +2183,7 @@ void *dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_EVICT_MAIN,                               "evict init");
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
     worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_DIRTY,                          "ctx flush dirty");
+    worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,                      "ctx flush all");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
 
@@ -2248,6 +2308,7 @@ void *dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_JOURNAL_INDEX: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
+                    // We no longer have an indexing command pending
                     ctx->datafiles.pending_index = false;
                     if (NOT_INDEXING_FILES(ctx) && ctx_is_available_for_queries(ctx)) {
                         __atomic_store_n(&ctx->atomic.migration_to_v2_running, true, __ATOMIC_RELAXED);
@@ -2283,13 +2344,19 @@ void *dbengine_event_loop(void* arg) {
                     break;
                 }
 
+                case RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY: {
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    work_dispatch(ctx, NULL, NULL, opcode,
+                                  flush_all_hot_and_dirty_pages_of_section_tp_worker,
+                                  after_flush_all_hot_and_dirty_pages_of_section);
+                    break;
+                }
+
                 case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
                     struct rrdengine_instance *ctx = cmd.ctx;
+                    nd_log_daemon(NDLP_INFO, "DBENGINE: Tier %d is shutting down — query processing disabled", ctx->config.tier);
                     __atomic_store_n(&ctx->quiesce.enabled, true, __ATOMIC_RELEASE);
-                    work_dispatch(ctx, NULL, NULL, opcode,
-                                      flush_all_hot_and_dirty_pages_of_section_tp_worker,
-                                      after_flush_all_hot_and_dirty_pages_of_section);
                     break;
                 }
 

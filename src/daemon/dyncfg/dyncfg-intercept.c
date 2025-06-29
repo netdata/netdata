@@ -239,7 +239,7 @@ static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute
     dfe_done(df);
 
     if(rfe->progress.cb)
-        rfe->progress.cb(rfe->progress.data, done, all);
+        rfe->progress.cb(rfe->transaction, rfe->progress.data, done, all);
 
     dfe_start_reentrant(dyncfg_globals.nodes, df) {
         if(df->template == template && df->type == DYNCFG_TYPE_JOB) {
@@ -253,7 +253,7 @@ static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute
             dyncfg_echo(df_dfe.item, df, df_dfe.name, cmd_to_send_to_plugin);
 
             if(rfe->progress.cb)
-                rfe->progress.cb(rfe->progress.data, ++done, all);
+                rfe->progress.cb(rfe->transaction, rfe->progress.data, ++done, all);
         }
     }
     dfe_done(df);

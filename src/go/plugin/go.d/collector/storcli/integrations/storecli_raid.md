@@ -228,6 +228,12 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m storcli
   ```
 
+  To debug a specific job:
+
+  ```bash
+  ./go.d.plugin -d -m storcli -j jobName
+  ```
+
 ### Getting Logs
 
 If you're encountering problems with the `storcli` collector, follow these steps to retrieve logs and identify potential issues:

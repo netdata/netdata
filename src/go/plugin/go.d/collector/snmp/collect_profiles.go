@@ -4,162 +4,113 @@ package snmp
 
 import (
 	"fmt"
-	"log"
+	"sort"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
-
-type processedMetric struct {
-	oid         string
-	name        string
-	value       interface{}
-	metricType  gosnmp.Asn1BER
-	tableName   string
-	unit        string
-	description string
-}
 
 func (c *Collector) collectProfiles(mx map[string]int64) error {
 	if len(c.snmpProfiles) == 0 {
 		return nil
 	}
-
-	metricMap := map[string]processedMetric{}
-
-	for _, prof := range c.snmpProfiles {
-		results, err := parseMetrics(prof.Definition.Metrics)
-		if err != nil {
-			return err
-		}
-
-		for _, oid := range results.OIDs {
-			response, err := c.snmpClient.Get([]string{oid})
-			if err != nil {
-				return err
-			}
-			for _, metric := range results.parsedMetrics {
-				switch s := metric.(type) {
-				case parsedSymbolMetric:
-					if s.baseoid == oid {
-						metricMap[oid] = processedMetric{
-							oid:         oid,
-							name:        s.name,
-							value:       response.Variables[0].Value,
-							metricType:  response.Variables[0].Type,
-							unit:        s.unit,
-							description: s.description,
-						}
-					}
-				}
-			}
-		}
-
-		for _, oid := range results.nextOIDs {
-			if len(oid) == 0 {
-				continue
-			}
-
-			tableRows, err := c.walkOIDTree(oid)
-			if err != nil {
-				return fmt.Errorf("error walking OID tree: %v, oid %s", err, oid)
-			}
-
-			for _, metric := range results.parsedMetrics {
-				switch s := metric.(type) {
-				case parsedTableMetric:
-					if s.rowOID == oid {
-						for key, value := range tableRows {
-							value.name = s.name
-							value.tableName = s.tableName
-							tableRows[key] = value
-						}
-						metricMap = mergeProcessedMetricMaps(metricMap, tableRows)
-					}
-				}
-			}
-		}
+	if c.ddSnmpColl == nil {
+		c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger)
+		c.ddSnmpColl.DoTableMetrics = c.EnableProfilesTableMetrics
 	}
 
-	c.makeChartsFromMetricMap(mx, metricMap)
+	pms, err := c.ddSnmpColl.Collect()
+	if err != nil {
+		return err
+	}
+
+	c.collectProfileScalarMetrics(mx, pms)
+	c.collectProfileTableMetrics(mx, pms)
 
 	return nil
 }
 
-func (c *Collector) walkOIDTree(baseOID string) (map[string]processedMetric, error) {
-	tableRows := make(map[string]processedMetric)
+func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
+	for _, pm := range pms {
+		for _, m := range pm.Metrics {
+			if m.IsTable || m.Name == "" {
+				continue
+			}
 
-	currentOID := baseOID
-	for {
-		result, err := c.snmpClient.GetNext([]string{currentOID})
-		if err != nil {
-			return tableRows, fmt.Errorf("snmpgetnext failed: %v", err)
-		}
-		if len(result.Variables) == 0 {
-			log.Println("No OID returned, ending walk.")
-			return tableRows, nil
-		}
-		pdu := result.Variables[0]
+			if !c.seenScalarMetrics[m.Name] {
+				c.seenScalarMetrics[m.Name] = true
+				c.addProfileScalarMetricChart(m)
+			}
 
-		nextOID := strings.Replace(pdu.Name, ".", "", 1) //remove dot at the start of the OID
-
-		// If the next OID does not start with the base OID, we've reached the end of the subtree.
-		if !strings.HasPrefix(nextOID, baseOID) {
-			return tableRows, nil
-		}
-
-		metricType := pdu.Type
-		value := fmt.Sprintf("%v", pdu.Value)
-
-		tableRows[nextOID] = processedMetric{
-			oid:        nextOID,
-			value:      value,
-			metricType: metricType,
-		}
-
-		currentOID = nextOID
-	}
-}
-
-func (c *Collector) makeChartsFromMetricMap(mx map[string]int64, metricMap map[string]processedMetric) {
-	seen := make(map[string]bool)
-
-	for _, metric := range metricMap {
-		if metric.tableName == "" {
-			switch s := metric.value.(type) {
-			case int:
-				name := metric.name
-				if name == "" {
-					continue
+			if len(m.Mappings) == 0 {
+				id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+				mx[id] = m.Value
+			} else {
+				for k, v := range m.Mappings {
+					id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
+					mx[id] = metrix.Bool(m.Value == k)
 				}
-
-				seen[name] = true
-
-				if !c.seenMetrics[name] {
-					c.seenMetrics[name] = true
-					c.addSNMPChart(metric)
-				}
-
-				mx[metric.name] = int64(s)
 			}
 		}
-
 	}
-	for name := range c.seenMetrics {
-		if !seen[name] {
-			delete(c.seenMetrics, name)
-			c.removeSNMPChart(name)
+}
+
+func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
+	seen := make(map[string]bool)
+
+	for _, pm := range pms {
+		for _, m := range pm.Metrics {
+			if !m.IsTable || m.Name == "" || len(m.Tags) == 0 {
+				continue
+			}
+
+			key := tableMetricKey(m)
+
+			seen[key] = true
+
+			if !c.seenTableMetrics[key] {
+				c.seenTableMetrics[key] = true
+				c.addProfileTableMetricChart(m)
+			}
+
+			if len(m.Mappings) == 0 {
+				id := fmt.Sprintf("snmp_device_prof_%s", key)
+				mx[id] = m.Value
+			} else {
+				for k, v := range m.Mappings {
+					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
+					mx[id] = metrix.Bool(m.Value == k)
+				}
+			}
+		}
+	}
+
+	for key := range c.seenTableMetrics {
+		if !seen[key] {
+			delete(c.seenTableMetrics, key)
 		}
 	}
 }
 
-func mergeProcessedMetricMaps(m1 map[string]processedMetric, m2 map[string]processedMetric) map[string]processedMetric {
-	merged := make(map[string]processedMetric)
-	for k, v := range m1 {
-		merged[k] = v
+func tableMetricKey(m ddsnmp.Metric) string {
+	keys := make([]string, 0, len(m.Tags))
+	for k := range m.Tags {
+		keys = append(keys, k)
 	}
-	for key, value := range m2 {
-		merged[key] = value
+	sort.Strings(keys)
+
+	var sb strings.Builder
+
+	sb.WriteString(m.Name)
+
+	for _, k := range keys {
+		if v := m.Tags[k]; v != "" && !strings.HasPrefix(k, "_") {
+			sb.WriteString("_")
+			sb.WriteString(v)
+		}
 	}
-	return merged
+
+	return sb.String()
 }

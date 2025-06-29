@@ -288,6 +288,10 @@ static bool value_matches_condition(struct json_object *value, const CONDITION *
             // Try to parse string as number
             char *endptr;
             const char *str = json_object_get_string(value);
+            if (!str) {
+                // NULL string cannot be converted to number, fall back to string comparison
+                goto string_compare;
+            }
             val_num = strtod(str, &endptr);
             if (endptr == str || *endptr != '\0') {
                 // Not a valid number, do string comparison
@@ -332,7 +336,7 @@ string_compare:
     {
         // String comparisons (including when condition is string or as fallback)
         const char *val_str = json_object_get_string(value);
-        const char *cond_str = condition->v_str;
+        const char *cond_str = (condition->v_type == COND_VALUE_STRING) ? condition->v_str : NULL;
 
         // Handle NULL condition string
         if (!cond_str) {
@@ -876,30 +880,17 @@ void mcp_tool_execute_function_schema(BUFFER *buffer) {
     buffer_json_object_close(buffer); // sort_order
 
     mcp_schema_add_size_param(
-        buffer, "limit", "Row limit",
-        "Maximum number of rows to return",
+        buffer, "limit", "Limit",
+        "Number of entries to return",
         0, 0, SIZE_MAX, false);
     
     // Time-based parameters for functions with history
-    mcp_schema_add_time_param(
-        buffer, "after", "Start time",
-        "Start time for query window (timestamp in seconds or RFC3339 datetime string)",
-        "now", 0, false);
-    
-    mcp_schema_add_time_param(
-        buffer, "before", "End time",
-        "End time for query window (timestamp in seconds or RFC3339 datetime string)",
-        "now", 0, false);
+    mcp_schema_add_time_params(buffer, "query window", false);
     
     mcp_schema_add_string_param(
         buffer, "cursor", "Pagination cursor",
         "Opaque cursor for pagination (follows MCP standard)",
         NULL, false);
-    
-    mcp_schema_add_size_param(
-        buffer, "limit", "Entries to return",
-        "Number of entries to return",
-        0, 0, SIZE_MAX, false);
     
     buffer_json_member_add_object(buffer, "direction");
     {
@@ -1527,8 +1518,8 @@ static void build_function_name_with_params(BUFFER *dest, const char *function_n
         buffer_sprintf(dest, " %s:%llu", string2str(entry->pagination.key), (unsigned long long)data->request.anchor);
     }
     
-    if (entry->has_last && data->request.last > 0) {
-        buffer_sprintf(dest, " last:%zu", data->request.last);
+    if (entry->has_last && data->request.limit > 0) {
+        buffer_sprintf(dest, " last:%zu", data->request.limit);
     }
     
     if (entry->has_direction && data->request.direction && *data->request.direction) {
@@ -1735,8 +1726,8 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
         buffer_json_member_add_uint64(payload, string2str(entry->pagination.key), data->request.anchor);
     }
     
-    if (entry->has_last && data->request.last > 0) {
-        buffer_json_member_add_uint64(payload, "last", data->request.last);
+    if (entry->has_last && data->request.limit > 0) {
+        buffer_json_member_add_uint64(payload, "last", data->request.limit);
     }
     
     if (entry->has_direction && data->request.direction) {
@@ -2052,8 +2043,10 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
     // Parse optional filtering parameters
     
     // Parse time-based parameters
-    data->request.after = mcp_params_parse_time(params, "after", 0);
-    data->request.before = mcp_params_parse_time(params, "before", 0);
+    if (!mcp_params_parse_time_window(params, &data->request.after, &data->request.before, 
+                                      0, 0, true, mcpc->error)) {
+        return MCP_RC_BAD_REQUEST;
+    }
     
     // Check if timeframe parameters are required but missing (will be validated later with registry entry)
     
@@ -2074,7 +2067,8 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
         return MCP_RC_BAD_REQUEST;
     }
     
-    data->request.last = (size_t)mcp_params_extract_size(params, "limit", 0, 0, SIZE_MAX, mcpc->error);
+    // Extract limit parameter (used for both history and non-history functions)
+    data->request.limit = (size_t)mcp_params_extract_size(params, "limit", 0, 0, SIZE_MAX, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
         return MCP_RC_BAD_REQUEST;
     }
@@ -2145,15 +2139,7 @@ static MCP_RETURN_CODE mcp_parse_function_request(MCP_FUNCTION_DATA *data, MCP_C
         }
     }
     
-    // limit
-    data->request.limit = 0; // 0 means no limit
-    if (json_object_object_get_ex(params, "limit", &obj) && 
-        json_object_is_type(obj, json_type_int)) {
-        int limit = json_object_get_int(obj);
-        if (limit > 0) {
-            data->request.limit = (size_t)limit;
-        }
-    }
+    // limit is already extracted above for all function types
     
     // conditions array - parse it early
     if (json_object_object_get_ex(params, "conditions", &obj) && 
@@ -2389,8 +2375,7 @@ static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data,
     // Check 1: Functions with has_history=false should not receive time parameters
     if (!registry_entry->has_history) {
         if (data->request.after > 0 || data->request.before > 0 || 
-            data->request.anchor > 0 || data->request.direction || 
-            data->request.last > 0) {
+            data->request.anchor > 0 || data->request.direction) {
             invalid_timeframe_on_non_history = true;
         }
     }
@@ -2424,7 +2409,7 @@ static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data,
                 
                 // Check for pattern matching with wildcards (except for "*" column which is full-text search)
                 if (cond->op == OP_MATCH && cond->pattern && strcmp(cond->column_name, "*") != 0) {
-                    const char *pattern_str = cond->v_str;
+                    const char *pattern_str = (cond->v_type == COND_VALUE_STRING) ? cond->v_str : NULL;
                     if (pattern_str && (strchr(pattern_str, '*') || strchr(pattern_str, '?'))) {
                         invalid_wildcard_patterns = true;
                         if (buffer_strlen(invalid_conditions) > 0)
@@ -2555,7 +2540,7 @@ static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data,
         if (invalid_timeframe_on_non_history) {
             buffer_strcat(message, "❌ TIMEFRAME PARAMETERS NOT SUPPORTED\n");
             buffer_strcat(message, "   Problem: This function does not support time-based parameters\n");
-            buffer_strcat(message, "   Invalid parameters: after, before, cursor, direction, limit\n");
+            buffer_strcat(message, "   Invalid parameters: after, before, cursor, direction\n");
             buffer_strcat(message, "   Solution: Remove all timeframe parameters from your request\n\n");
         }
         

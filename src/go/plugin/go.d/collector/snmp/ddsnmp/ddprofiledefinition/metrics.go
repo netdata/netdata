@@ -9,6 +9,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"text/template"
 )
 
 // ProfileMetricType metric type used to override default type of the metric
@@ -78,17 +79,22 @@ type SymbolConfig struct {
 	//   When empty, by default, the metric type is derived from SNMP OID value type.
 	//   Valid `metric_type` types: `gauge`, `rate`, `monotonic_count`, `monotonic_count_and_rate`
 	//   Deprecated types: `counter` (use `rate` instead), percent (use `scale_factor` instead)
-	MetricType  ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
-	Unit        string            `yaml:"unit,omitempty" json:"unit,omitempty"`
-	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
+	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
+
+	Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Family      string `yaml:"family,omitempty" json:"family,omitempty"`
+
+	Mapping           map[string]string  `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
+	TransformCompiled *template.Template `yaml:"-" json:"-"`
 }
 
 // Clone creates a duplicate of this SymbolConfig
 func (s SymbolConfig) Clone() SymbolConfig {
-	// SymbolConfig has no mutable members, so simple assignment copies it.
-	// (technically this is false - regexes in go are mutable SOLELY through the
-	// .Longest() method. But we never use that, so we ignore it here)
-	return s
+	ss := s
+	ss.Mapping = maps.Clone(ss.Mapping)
+	return ss
 }
 
 // MetricTagConfig holds metric tag info
@@ -97,6 +103,8 @@ type MetricTagConfig struct {
 
 	// Table config
 	Index uint `yaml:"index,omitempty" json:"index,omitempty"`
+
+	Table string `yaml:"table,omitempty" json:"table,omitempty"`
 
 	// DEPRECATED: Use .Symbol instead
 	Column SymbolConfig `yaml:"column,omitempty" json:"-"`
@@ -111,7 +119,8 @@ type MetricTagConfig struct {
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
-	Mapping ListMap[string] `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	MappingRef string          `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
+	Mapping    ListMap[string] `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 
 	// Regex
 	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead
