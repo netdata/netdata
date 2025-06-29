@@ -128,7 +128,7 @@ func (w *WebSphereMicroProfile) Configuration() any {
 }
 
 func (w *WebSphereMicroProfile) Init(context.Context) error {
-	if w.HTTPConfig.RequestConfig.URL == "" {
+	if w.HTTPConfig.URL == "" {
 		return errors.New("websphere_mp URL is required")
 	}
 
@@ -174,7 +174,7 @@ func (w *WebSphereMicroProfile) Init(context.Context) error {
 
 func (w *WebSphereMicroProfile) buildMetricsURL() error {
 	// Require complete URL - no path inference
-	w.metricsURL = strings.TrimSpace(w.HTTPConfig.RequestConfig.URL)
+	w.metricsURL = strings.TrimSpace(w.HTTPConfig.URL)
 
 	if w.metricsURL == "" {
 		return errors.New("url is required")
