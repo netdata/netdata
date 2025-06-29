@@ -151,10 +151,7 @@ export class MessageOptimizer {
                     enabled: false,
                     forgetAfterConclusions: 1
                 },
-                cacheControl: {
-                    enabled: false,
-                    strategy: 'smart'
-                },
+                cacheControl: 'all-off',
                 titleGeneration: {
                     enabled: true,
                     model: null
@@ -229,16 +226,13 @@ export class MessageOptimizer {
             }
 
             // Validate cache control settings
-            if (opt.cacheControl) {
-                const cc = opt.cacheControl;
-                if (cc.enabled !== undefined && typeof cc.enabled !== 'boolean') {
-                    throw new Error('[MessageOptimizer] cacheControl.enabled must be boolean');
+            if (opt.cacheControl !== undefined) {
+                if (typeof opt.cacheControl !== 'string') {
+                    throw new Error('[MessageOptimizer] cacheControl must be a string');
                 }
-                if (cc.strategy !== undefined) {
-                    const validStrategies = ['aggressive', 'smart', 'minimal'];
-                    if (!validStrategies.includes(cc.strategy)) {
-                        throw new Error(`[MessageOptimizer] cacheControl.strategy must be one of: ${validStrategies.join(', ')}`);
-                    }
+                const validModes = ['all-off', 'system', 'cached'];
+                if (!validModes.includes(opt.cacheControl)) {
+                    throw new Error(`[MessageOptimizer] cacheControl must be one of: ${validModes.join(', ')}`);
                 }
             }
 
@@ -294,7 +288,7 @@ export class MessageOptimizer {
             toolsFiltered: 0,
             toolsSummarized: 0,
             messagesSummarized: 0,
-            cacheStrategy: this.settings.optimisation.cacheControl.strategy
+            cacheMode: this.settings.optimisation.cacheControl
         };
 
         try {
@@ -564,13 +558,10 @@ export class MessageOptimizer {
                 return null;
             }
             
-            const filteredMsg = {
+            return {
                 ...msg,
                 content: filteredContent
             };
-            
-            
-            return filteredMsg;
         }
         
         return msg;
@@ -658,45 +649,42 @@ export class MessageOptimizer {
      * @returns {number} - Cache control index (-1 for no cache)
      */
     determineCacheControl(messages, freezeCache, lastCacheIndex) {
-        if (!this.settings.optimisation.cacheControl.enabled) {
-            return -1;
-        }
+        const cacheMode = this.settings.optimisation.cacheControl;
         
-        // For Anthropic models, cache control and tool memory are mutually exclusive
-        // When tool memory filters out old tools, cached content would be wasted
-        if (this.settings.model.provider === 'anthropic' && 
-            this.settings.optimisation.toolMemory.enabled) {
-            // console.log('[MessageOptimizer] Cache control disabled - tool memory is enabled for Anthropic');
-            return -1;
+        // Handle different cache control modes
+        switch (cacheMode) {
+            case 'all-off':
+                return -1; // No cache control
+                
+            case 'system':
+                return -1; // System prompt caching handled by provider, no message-level cache
+                
+            case 'cached':
+                // Use smart strategy logic for message-level caching
+                // System prompt caching is handled by provider
+                break;
+                
+            default:
+                console.warn('[MessageOptimizer] Unknown cache control mode:', cacheMode);
+                return -1;
         }
 
+        // Only 'cached' mode continues here - apply smart strategy
         if (freezeCache && lastCacheIndex !== null) {
             // console.log(`[MessageOptimizer] Using frozen cache index: ${lastCacheIndex}`);
             return lastCacheIndex;
         }
 
-        const strategy = this.settings.optimisation.cacheControl.strategy;
-        // console.log(`[MessageOptimizer] Applying cache strategy: ${strategy}`);
-
-        switch (strategy) {
-            case 'aggressive':
-                return Math.max(0, messages.length - 2);
-                
-            case 'minimal':
-                return 0;
-                
-            case 'smart':
-            default:
-                // Cache up to 70% of messages, avoiding recent tool results
-                const seventyPercent = Math.floor(messages.length * 0.7);
-                
-                for (let i = seventyPercent; i >= 0; i--) {
-                    if (messages[i] && messages[i].role !== 'tool-results') {
-                        return i;
-                    }
-                }
-                return 0;
+        // Apply smart strategy for 'cached' mode
+        // Cache up to 70% of messages, avoiding recent tool results
+        const seventyPercent = Math.floor(messages.length * 0.7);
+        
+        for (let i = seventyPercent; i >= 0; i--) {
+            if (messages[i] && messages[i].role !== 'tool-results') {
+                return i;
+            }
         }
+        return 0;
     }
 
     /**

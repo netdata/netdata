@@ -1,5 +1,12 @@
 extends:
   - aruba.yaml
+
+metadata:
+  device:
+    fields:
+      type:
+        value: "Switch"
+
 sysobjectid:
   - 1.3.6.1.4.1.47196.4.1.1.1.*
   - 1.3.6.1.4.1.47196.4.1.1.1.1
@@ -14,31 +21,27 @@ sysobjectid:
   - 1.3.6.1.4.1.47196.4.1.1.1.150
   - 1.3.6.1.4.1.47196.4.1.1.1.304
   - 1.3.6.1.4.1.47196.4.1.1.1.405
-metadata:
-  device:
-    fields:
-      type:
-        value: "switch"
+
 metrics:
   # - MIB: HOST-RESOURCES-MIB
   #   symbol:
-  #     name: memory.total
+  #     name: hrStorageSize
   #     OID: 1.3.6.1.2.1.25.2.3.1.5.1 # hrStorageSize.1
   #     description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits.
   #     unit: "{logical_storage_area}"
   # - MIB: HOST-RESOURCES-MIB
   #   symbol:
-  #     name: memory.used
+  #     name: hrStorageUsed
   #     OID: 1.3.6.1.2.1.25.2.3.1.6.1 # hrStorageUsed.1
   #     description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
   #     unit: "{logical_storage_area}"
   # TODO This is not yet supported by the collector
   - MIB: HOST-RESOURCES-MIB
     symbol:
-      name: cpu.usage
+      name: hrProcessorLoad
       OID: 1.3.6.1.2.1.25.3.3.1.2.196608 # hrProcessorLoad.196608
       description: The average, over the last minute, of the percentage of time that this processor was not idle
-      family: Aruba/Switch/CPU
+      family: CPU/Usage
       unit: "%"
   - MIB: ARUBAWIRED-TEMPSENSOR-MIB
     table:
@@ -48,7 +51,7 @@ metrics:
       - name: arubaWiredTempSensorTemperature
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.3.1.1.7
         description: Current temperature value read from the temperature sensor
-        family: Aruba/Switch/Sensors
+        family: Sensor/Temperature/Value
         unit: "Cel"
     metric_tags:
       - symbol:
@@ -68,13 +71,13 @@ metrics:
       - name: arubaWiredPSUInstantaneousPower
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.7
         description: Total instantaneous power supplied by the power supply in Watts.
-        family: Aruba/Switch/Power Supply
+        family: PowerSupply/Power/Output
         unit: "W"
       - name: arubaWiredPSUNumberFailures
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.2.1.1.9
         description: Number of failures the power supply has experienced since the most recent insertion of the power supply and boot of the system.
-        family: Aruba/Switch/Power Supply
-        unit: "{failure}"
+        family: PowerSupply/Failure/Count
+        unit: "{failure}/s"
     metric_tags:
       - symbol:
           name: arubaWiredPSUName
@@ -133,8 +136,19 @@ metrics:
       - name: arubaWiredFanRPM
         OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.8
         description: Current RPM read for the fan.
-        family: Aruba/Switch/Fans
-        unit: "1.min"
+        family: Fan/Speed
+        unit: "{revolution}/min"
+      - OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.5
+        name: arubaWiredFanState
+        description: Current status for the fan
+        family: Fan/Status
+        unit: "{status}"
+        mapping:
+          1: unknown
+          2: empty
+          3: uninitialized
+          4: ok
+          5: fault
     metric_tags:
       - symbol:
           name: arubaWiredFanName
@@ -152,8 +166,3 @@ metrics:
           name: arubaWiredFanAirflowDirection
           OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.9
         tag: aruba_wired_fan_airflow_direction
-# TODO: find mapping and make it a metric
-#      - symbol:
-#          OID: 1.3.6.1.4.1.47196.4.1.1.3.11.5.1.1.5
-#          name: arubaWiredFanState
-#        tag: aruba_wired_fan_state

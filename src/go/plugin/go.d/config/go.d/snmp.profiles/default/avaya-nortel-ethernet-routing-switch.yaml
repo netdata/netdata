@@ -3,59 +3,57 @@ extends:
   - _generic-if.yaml
   - avaya.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.45.3.71.10 # 4526T
-
 metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
+
+sysobjectid:
+  - 1.3.6.1.4.1.45.3.71.10 # 4526T
 
 metrics:
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.5.3.10.0 # s5ChasUtilCPUUsageLast1Minute.3.10.0
-    description: Percentage of time the CPU has been busy over the last 1 minute
-    unit: "%"
+      description: Percentage of time the CPU has been busy over the last 1 minute
+      family: CPU/Usage
+      unit: "%"
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.12.3.10.0 # s5ChasUtilMemoryTotalMB.3.10.0
-    description: Total RAM of unit
-    unit: "MBy"
+      description: Total RAM of unit
+      family: Memory/Total
+      unit: "By"
+      scale_factor: 104857
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.13.3.10.0 # s5ChasUtilMemoryAvailableMB.3.10.0
-    description: Available RAM of unit
-    unit: "MBy"
+      description: Available RAM of unit
+      family: Memory/Free
+      unit: "By"
+      scale_factor: 104857
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: avaya.s5ChasTmpSnrTmpValue
       OID: 1.3.6.1.4.1.45.1.6.3.7.1.1.5.5.10.0 # s5ChasTmpSnrTmpValue.5.10.0
-    description: Current temperature value of the temperature sensor measured in units of a half degree centigrade
-    unit: "{half_degree_Celsius}"
+      description: Current temperature value of the temperature sensor measured in units of a half degree centigrade
+      family: Environment/Temperature/Value
+      unit: "Cel"
+      scale_factor: 0.5
   - MIB: S5-CHASSIS-MIB
     table:
       name: s5ChasComTable
       OID: 1.3.6.1.4.1.45.1.6.3.3.1
     symbols:
-      - name: avaya.s5ChasCom
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: avaya.s5ChasComDescr
-          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.5
-        tag: avaya_s5_chas_com_descr
-        description: Description of the component or sub-component
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.9
-          name: avaya.s5ChasComAdminState
-        tag: avaya_s5_chas_com_admin_state
+      - OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.9
+        name: avaya.s5ChasComAdminState
+        description: Desired state of the component or sub-component
+        family: Hardware/Chassis/Component/Admin/Status
+        unit: "{status}"
         mapping:
           1: other
           2: not_avail
@@ -63,12 +61,11 @@ metrics:
           4: enable
           5: reset
           6: test
-        description: Desired state of the component or sub-component
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.10
-          name: avaya.s5ChasComOperState
-        tag: avaya_s5_chas_com_oper_state
+      - OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.10
+        name: avaya.s5ChasComOperState
+        description: Current operational state of the component or sub-component
+        family: Hardware/Chassis/Component/Operational/Status
+        unit: "{status}"
         mapping:
           1: other
           2: not_avail
@@ -82,16 +79,18 @@ metrics:
           10: fatal_err
           11: not_config
           12: obsoleted
-        description: Current operational state of the component or sub-component
-        unit: "TBD"
+    metric_tags:
+      - symbol:
+          name: avaya.s5ChasComDescr
+          OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.5
+        tag: avaya_s5_chas_com_descr
+
 metric_tags:
   - OID: 1.3.6.1.4.1.45.1.6.3.1.5.0
     symbol: s5ChasVer
     tag: avaya_s5_chas_ver
     description: Version of the chassis in the form major.minor.maintenance letters
-    unit: "TBD"
   - OID: 1.3.6.1.4.1.45.1.6.3.1.6.0
     symbol: s5ChasSerNum
     tag: avaya_s5_chas_ser_num
     description: Serial number of the chassis
-    unit: "TBD"

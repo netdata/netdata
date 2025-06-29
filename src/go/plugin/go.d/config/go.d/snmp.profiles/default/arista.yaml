@@ -21,35 +21,8 @@ extends:
   - _generic-bgp4.yaml
   - _generic-tcp.yaml
   - _generic-udp.yaml
+  - _generic-entity-sensor.yaml
 
 # The OID `1.3.6.1.4.1.30065.1`/`aristaProducts` is the root object identifier from
 # which sysObjectID values are assigned. Values are defined in ARISTA-PRODUCTS-MIB.
 sysobjectid: 1.3.6.1.4.1.30065.1.*
-
-device:
-  vendor: "arista"
-
-metrics:
-  ### Sensor
-
-  # This table contains one row per physical sensor.
-  - MIB: ENTITY-SENSOR-MIB
-    table:
-      OID: 1.3.6.1.2.1.99.1.1.1
-      name: entPhySensorTable
-    symbols:
-      - OID: 1.3.6.1.2.1.99.1.1.1.4
-        name: entPhySensorValue
-        description: The most recent measurement obtained by the agent for this sensor
-        unit: "TBD"
-      - OID: 1.3.6.1.2.1.99.1.1.1.5
-        name: entPhySensorOperStatus
-        description: The operational status of the sensor
-        unit: "{sensor}"
-    metric_tags:
-      - tag: sensor_type
-        symbol:
-          OID: 1.3.6.1.2.1.99.1.1.1.1
-          name: entPhySensorType
-      - index: 1
-        tag: sensor_id

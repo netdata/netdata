@@ -1578,7 +1578,7 @@ static int parse_disconnect_varhdr(struct mqtt_ng_client *client)
                 return MQTT_NG_CLIENT_PARSE_DONE;
             }
             BUF_READ_CHECK_AT_LEAST(parser->received_data, 1);
-            rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.connack.reason_code, 1);
+            rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.disconnect.reason_code, 1);
             if (parser->mqtt_fixed_hdr_remaining_length == 1)
                 return MQTT_NG_CLIENT_PARSE_DONE;
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;

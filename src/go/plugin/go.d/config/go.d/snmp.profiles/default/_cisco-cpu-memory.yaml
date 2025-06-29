@@ -6,30 +6,39 @@ metrics:
       OID: 1.3.6.1.4.1.9.9.109.1.1.1
       name: cpmCPUTotalTable
     symbols:
-      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7  # cpmCPUTotal1minRev
-        name: cpu.usage
+      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7
+        name: cpmCPUTotal1minRev
         description: The overall CPU busy percentage in the last 1 minute period
+        family: CPU/Usage
         unit: "%"
-        family: "CPU"
     metric_tags:
-      - index: 1  # cpmCPUTotalIndex
-        tag: cpu
+      - tag: cpu
+        index: 1
 
   - MIB: CISCO-MEMORY-POOL-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.48.1.1
       name: ciscoMemoryPoolTable
     symbols:
-      - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5  # ciscoMemoryPoolUsed
-        name: memory.used
-        description: Indicates the number of bytes from the memory pool that are currently in use by applications on the managed device
+      - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5
+        name: ciscoMemoryPoolUsed
+        description: Number of bytes from the memory pool currently in use
+        family: MemoryPool/Used
         unit: "By"
-        family: "Memory"
-      - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6  # ciscoMemoryPoolFree
-        name: memory.free
-        description: Indicates the number of bytes from the memory pool that are currently unused on the managed device. Note that the sum of ciscoMemoryPoolUsed and ciscoMemoryPoolFree is the total amount of memory in the pool
+      - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
+        name: ciscoMemoryPoolFree
+        description: Number of bytes from the memory pool currently unused
+        family: MemoryPool/Free
         unit: "By"
-        family: "Memory"
+      - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
+        name: ciscoMemoryPoolLargestFree
+        description: Largest number of contiguous bytes from the memory pool currently unused
+        family: MemoryPool/LargestFree
+        unit: "By"
     metric_tags:
-      - index: 1  # ciscoMemoryPoolType
-        tag: mem
+      - tag: mem_pool_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.48.1.1.1.2
+          name: ciscoMemoryPoolName
+      - tag: mem_pool_index
+        index: 1

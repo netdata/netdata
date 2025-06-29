@@ -15,6 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger) *Collector {
@@ -28,6 +29,7 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 
 	for _, prof := range profiles {
 		prof := prof
+		handleCrossTableTagsWithoutMetrics(prof)
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
 
@@ -137,35 +139,6 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 }
 
 func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
-	// Find device vendor and type from any profile that has them.
-	// Multiple profiles can be loaded for a single device (e.g., base profiles, generic MIB profiles),
-	// but only device-specific profiles contain vendor/type information.
-	// We need to apply vendor/type to ALL metrics across ALL profiles to ensure consistent
-	// metric family naming (e.g., "interface/stats" → "router/cisco/interface/stats").
-	for _, ps := range c.profiles {
-		if !ps.initialized {
-			continue
-		}
-		if ps.profile.Definition == nil {
-			continue
-		}
-		res, ok := ps.profile.Definition.Metadata["device"]
-		if !ok {
-			continue
-		}
-		dt, dv := res.Fields["type"].Value, res.Fields["vendor"].Value
-		if dt == "" || dv == "" {
-			continue
-		}
-		for _, pm := range pms {
-			for i := range pm.Metrics {
-				m := &pm.Metrics[i]
-				m.Family = processMetricFamily(m.Family, dt, dv)
-			}
-		}
-		break
-	}
-
 	for _, pm := range pms {
 		for i := range pm.Metrics {
 			m := &pm.Metrics[i]
@@ -226,3 +199,64 @@ var metricMetaReplacer = strings.NewReplacer(
 	"\r", " ",
 	"\x00", "",
 )
+
+// handleCrossTableTagsWithoutMetrics ensures tables referenced only by cross-table tags
+// are still walked during collection. Without this, if a table like ifXTable is used
+// only for cross-table tags (e.g., getting interface names) but has no metrics defined,
+// it won't be walked and the tags will be missing. This creates synthetic metric entries
+// for such tables using the longest common OID prefix of the referenced columns.
+func handleCrossTableTagsWithoutMetrics(prof *ddsnmp.Profile) {
+	if prof.Definition == nil {
+		return
+	}
+
+	seenTableNames := make(map[string]bool)
+
+	for _, m := range prof.Definition.Metrics {
+		seenTableNames[m.Table.Name] = true
+	}
+
+	tagCrossTableOnlyOIDs := make(map[string][]string)
+
+	for _, m := range prof.Definition.Metrics {
+		if m.IsScalar() {
+			continue
+		}
+		for _, tag := range m.MetricTags {
+			oid := tag.Symbol.OID
+			if tag.Table == "" || seenTableNames[tag.Table] || oid == "" {
+				continue
+			}
+			tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], oid)
+		}
+	}
+
+	for tableName, oids := range tagCrossTableOnlyOIDs {
+		slices.Sort(oids)
+		oids = slices.Compact(oids)
+
+		prof.Definition.Metrics = append(prof.Definition.Metrics, ddprofiledefinition.MetricsConfig{
+			MIB: fmt.Sprintf("synthetic-%s-MIB", tableName),
+			Table: ddprofiledefinition.SymbolConfig{
+				OID:  longestCommonPrefix(oids),
+				Name: tableName,
+			},
+		})
+	}
+}
+
+func longestCommonPrefix(oids []string) string {
+	if len(oids) == 0 {
+		return ""
+	}
+	prefix := oids[0]
+	for i := 1; i < len(oids); i++ {
+		for !strings.HasPrefix(oids[i], prefix) {
+			prefix = prefix[0 : len(prefix)-1]
+			if len(prefix) == 0 {
+				return ""
+			}
+		}
+	}
+	return strings.TrimSuffix(prefix, ".")
+}

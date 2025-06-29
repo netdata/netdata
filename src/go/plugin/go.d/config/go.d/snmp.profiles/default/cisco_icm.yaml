@@ -5,5 +5,10 @@ extends:
 
 sysobjectid: 1.3.6.1.4.1.9.1.693
 
-device:
-  vendor: "cisco"
+metadata:
+  device:
+    fields:
+      type:
+        value: "ICM"
+      vendor:
+        value: "Cisco"

@@ -11,10 +11,6 @@ extends:
   - _generic-tcp.yaml
   - _generic-udp.yaml
   - _generic-ip.yaml
-  - _checkpoint-firewall-cpu-memory.yaml
-
-device:
-  vendor: "checkpoint"
 
 sysobjectid: 1.3.6.1.4.1.2620.1.*
 
@@ -22,33 +18,33 @@ metadata:
   device:
     fields:
       vendor:
-        value: "checkpoint"
+        value: "Checkpoint"
       serial_number:
         symbol:
           MIB: CHECKPOINT-MIB
           OID: 1.3.6.1.4.1.2620.1.6.16.3.0
-          name: svnApplianceSerialNumber  # Appliance Serial Number
+          name: svnApplianceSerialNumber # Appliance Serial Number
           # Example: 1711BA4008
       version:
         symbol:
           OID: 1.3.6.1.4.1.2620.1.6.4.1.0
-          name: svnVersion  # SVN version
+          name: svnVersion # SVN version
           # Example: R80.10
           # Reference to R80.10 here https://supportcenter.checkpoint.com/supportcenter/portal?eventSubmit_doGoviewsolutiondetails=&solutionid=sk111841
       product_name:
         symbol:
           OID: 1.3.6.1.4.1.2620.1.6.1.0
-          name: svnProdName  # Product name
+          name: svnProdName # Product name
           # Example: SVN Foundation
       model:
         symbol:
           OID: 1.3.6.1.4.1.2620.1.6.16.7.0
-          name: svnApplianceProductName  # Appliance Product Name
+          name: svnApplianceProductName # Appliance Product Name
           # Example: Check Point 3200
       os_name:
         symbol:
           OID: 1.3.6.1.4.1.2620.1.6.5.1.0
-          name: osName  # OS name
+          name: osName # OS name
       os_version:
         symbol:
           OID: 1.3.6.1.4.1.2620.1.2.1.1.0
@@ -61,42 +57,47 @@ metadata:
           #       .1.3.6.1.4.1.2620.1.6.5.3.0 (osMinorVer) = 6
           #       In this example, the OS Version is 2.6, at the moment it's not possible to add metadata based on 2 OIDs
       type:
-        value: "firewall"
-
+        value: "Firewall"
 
 metrics:
-    # CPU
+  # CPU
   - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.5
+      name: multiProcTable
+    # TODO, MIB does not have description for these in order to evaluate units
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.2
+        name: multiProcUserTime
+        description: "Processor user time"
+        family: CPU/Time/User
+        unit: "%"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.3
+        name: multiProcSystemTime
+        description: "Processor system time"
+        family: CPU/Time/System
+        unit: "%"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.4
+        name: multiProcIdleTime
+        description: "Processor idle time"
+        family: CPU/Time/Idle
+        unit: "%"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
+        name: multiProcUsage
+        description: "Processor usage"
+        family: CPU/Usage
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.5.1.1
           name: multiProcIndex
         tag: cpu_core
-    symbols:
-      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.2
-        name: multiProcUserTime
-        description: "Processor user time"
-        unit: "{processor}"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.3
-        name: multiProcSystemTime
-        description: "Processor system time"
-        unit: "{processor}"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.4
-        name: multiProcIdleTime
-        description: "Processor idle time"
-        unit: "{processor}"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.5.1.5
-        name: multiProcUsage
-        description: "Processor usage"
-        unit: "%"
-    table:
-      OID: 1.3.6.1.4.1.2620.1.6.7.5
-      name: multiProcTable
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.2.7.0
       name: procNum
       description: "Number of processors"
+      family: CPU/Count
       unit: "{processor}"
     # Memory
   - MIB: CHECKPOINT-MIB
@@ -105,6 +106,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.3.0
       name: memTotalReal64
       description: "Total real memory"
+      family: Memory/Real/Total
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -112,6 +114,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.4.0
       name: memActiveReal64
       description: "Active real memory"
+      family: Memory/Real/Active
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -119,6 +122,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.5.0
       name: memFreeReal64
       description: "Free real memory"
+      family: Memory/Real/Free
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -126,6 +130,7 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.1.0
       name: memTotalVirtual64
       description: "Total virtual memory"
+      family: Memory/Virtual/Total
       unit: "By"
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
@@ -133,10 +138,45 @@ metrics:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.2.0
       name: memActiveVirtual64
       description: "Active virtual memory"
+      family: Memory/Virtual/Active
       unit: "By"
     # Disk
   - MIB: CHECKPOINT-MIB
     metric_type: gauge
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.6
+      name: multiDiskTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.3
+        name: multiDiskSize
+        description: "Disk size"
+        family: Disk/Size/Total
+        unit: "GBy"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
+        name: multiDiskUsed
+        description: "Disk used"
+        family: Disk/Size/Used
+        unit: "GBy"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
+        name: multiDiskFreeTotalBytes
+        description: "Disk free total bytes"
+        family: Disk/Size/Free
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
+        name: multiDiskFreeAvailableBytes
+        description: "Disk free available bytes"
+        family: Disk/Size/Available
+        unit: "By"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
+        name: multiDiskFreeTotalPercent
+        description: "Disk free total percent"
+        family: Disk/Free/Percentage
+        unit: "%"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
+        name: multiDiskFreeAvailablePercent
+        description: "Disk free available percent"
+        family: Disk/Available/Percentage
+        unit: "%"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.6.1.1
@@ -146,76 +186,27 @@ metrics:
           OID: 1.3.6.1.4.1.2620.1.6.7.6.1.2
           name: multiDiskName
         tag: disk_name
-    symbols:
-      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.3
-        name: multiDiskSize
-        description: "Disk size"
-        unit: "GBy"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
-        name: multiDiskUsed
-        description: "Disk used"
-        unit: "GBy"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
-        name: multiDiskFreeTotalBytes
-        description: "Disk free total bytes"
-        unit: "By"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
-        name: multiDiskFreeAvailableBytes
-        description: "Disk free available bytes"
-        unit: "By"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
-        name: multiDiskFreeTotalPercent
-        description: "Disk free total percent"
-        unit: "%"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
-        name: multiDiskFreeAvailablePercent
-        description: "Disk free available percent"
-        unit: "%"
-    table:
-      OID: 1.3.6.1.4.1.2620.1.6.7.6
-      name: multiDiskTable
     # Appliances
   - MIB: CHECKPOINT-MIB
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
-          name: fanSpeedSensorIndex
-        tag: sensor_index
-      - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.2
-          name: fanSpeedSensorName
-        tag: sensor_name
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.8.2
+      name: fanSpeedSensorTable
     symbols:
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.3
         name: fanSpeedSensorValue
         description: "Sensor value"
-        unit: "TBD"
+        family: Sensor/FanSpeed/Value
+        unit: "{revolution}/s"
       - OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
         name: fanSpeedSensorStatus
         description: "Sensor is out of range true(1), false(0), reading error(2)"
-        unit: "TBD"
-    table:
-      OID: 1.3.6.1.4.1.2620.1.6.7.8.2
-      name: fanSpeedSensorTable
-  - MIB: CHECKPOINT-MIB
-    table:
-      OID: 1.3.6.1.4.1.2620.1.6.7.8.2
-      name: fanSpeedSensorTable
-    symbols:
-      - name: fanSpeedSensor
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.6
-          name: fanSpeedSensorStatus
-        tag: fan_speed_sensor_status
-        # mapping from description:
-        #   Sensor is out of range TRUE(1), FALSE(0), READING ERROR(2)
+        family: Sensor/FanSpeed/Status
+        unit: "{status}"
         mapping:
-          0: false
-          1: true
-          2: reading_error
+          0: "false"
+          1: "true"
+          2: reading error
+    metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
           name: fanSpeedSensorIndex
@@ -225,6 +216,24 @@ metrics:
           name: fanSpeedSensorName
         tag: sensor_name
   - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.8.1
+      name: tempertureSensorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.3
+        name: tempertureSensorValue
+        description: "Sensor value"
+        family: Sensor/Temperature/Value
+        unit: "Cel"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
+        name: tempertureSensorStatus
+        description: "Sensor is out of range true(1), false(0), reading error(2)"
+        family: Sensor/Temperature/Status
+        unit: "{status}"
+        mapping:
+          0: "false"
+          1: "true"
+          2: reading error
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.1
@@ -234,49 +243,39 @@ metrics:
           OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.2
           name: tempertureSensorName
         tag: sensor_name
-    symbols:
-      - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.3
-        name: tempertureSensorValue
-        description: "Sensor value"
-        unit: "TBD"
-      - OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.6
-        name: tempertureSensorStatus
-        description: "Sensor is out of range true(1), false(0), reading error(2)"
-        unit: "TBD"
-    table:
-      OID: 1.3.6.1.4.1.2620.1.6.7.8.1
-      name: tempertureSensorTable
     # Network
   - MIB: CHECKPOINT-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.4.0
       name: fwAccepted
       description: "Number of accepted packets"
-      unit: "{packet}"
+      family: Firewall/Packet/Accepted
+      unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.6.0
       name: fwDropped
       description: "Number of dropped packets"
-      unit: "{packet}"
+      family: Firewall/Packet/Dropped
+      unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
-    metric_type: monotonic_count
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.5.0
       name: fwRejected
       description: "Number of rejected packets"
-      unit: "{packet}"
+      family: Firewall/Packet/Rejected
+      unit: "{packet}/s"
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.25.3.0
       name: fwNumConn
       description: "Number of connections"
+      family: Firewall/Connection/Active
       unit: "{connection}"
   - MIB: CHECKPOINT-MIB
     symbol:
       OID: 1.3.6.1.4.1.2620.1.1.25.4.0
       name: fwPeakNumConn
       description: "Peak number of connections"
-      unit: "{connection}"
+      family: Firewall/Connection/Peak
+      unit: "{connection}/s"

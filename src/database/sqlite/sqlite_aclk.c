@@ -207,7 +207,7 @@ static void sql_delete_aclk_table_list(void)
 
     SQLITE_FINALIZE(res);
 
-    int rc = db_execute(db_meta, buffer_tostring(sql));
+    int rc = db_execute(db_meta, buffer_tostring(sql), NULL);
     if (unlikely(rc))
         netdata_log_error("Failed to drop unused ACLK tables");
 
@@ -1022,6 +1022,9 @@ static inline bool queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
 
 void aclk_synchronization_shutdown(void)
 {
+    if (!aclk_sync_config.thread)
+        return;
+
     // Send shutdown command, not that the completion is initialized
     // on init and still valid
     aclk_mqtt_client_reset();

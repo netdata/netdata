@@ -11,7 +11,7 @@ metadata:
   device:
     fields:
       type:
-        value: "switch"
+        value: "Switch"
 
 sysobjectid:
   - 1.3.6.1.4.1.30065.1.3011.7010.427.48
@@ -164,88 +164,45 @@ sysobjectid:
   - 1.3.6.1.4.1.30065.1.3011.7280.877.48.972
 
 metrics:
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.total
-      OID: 1.3.6.1.2.1.25.2.3.1.5.1
-    description: "The size of the storage represented by this entry, in units of hrStorageAllocationUnits."
-    unit: "By"
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      name: memory.used
-      OID: 1.3.6.1.2.1.25.2.3.1.6.100
-    description: "The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits."
-    unit: "By"
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     name: memory.total
+  #     OID: 1.3.6.1.2.1.25.2.3.1.5.1
+  #   description: "The size of the storage represented by this entry, in units of hrStorageAllocationUnits."
+  #   unit: "By"
+  # - MIB: HOST-RESOURCES-MIB
+  #   symbol:
+  #     name: memory.used
+  #     OID: 1.3.6.1.2.1.25.2.3.1.6.100
+  #   description: "The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits."
+  #   unit: "By"
+  # TODO, metrics that have dynamic units are not supported
+
   - MIB: HOST-RESOURCES-MIB
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
-    description: "The average, over the last minute, of the percentage of time that this processor was not idle."
-    unit: "%"
+      description: The average, over the last minute, of the percentage of time that this processor was not idle
+      family: CPU/Usage
+      unit: "%"
   - MIB: ARISTA-BGP4V2-MIB
     table:
       name: aristaBgp4V2PeerTable
       OID: 1.3.6.1.4.1.30065.4.1.1.2
     symbols:
-      - name: aristaBgp4V2PeerLocalPort
-        OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
-        description: "The local port for the TCP connection between the BGP peers."
-        unit: "{port}"
-      - name: aristaBgp4V2PeerLocalAs
-        OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
-        description: "The AS that this peering session is representing itself as to the remote peer."
-        unit: "1"
-      - name: aristaBgp4V2PeerRemotePort
-        OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
-        description: "The remote port for the TCP connection between the BGP peers."
-        unit: "{port}"
-      - name: aristaBgp4V2PeerRemoteAs
-        OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
-        description: "The remote autonomous system number received in the BGP OPEN message."
-        unit: "1"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: aristaBgp4V2PeerLocalAddr
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
-          format: ip_address
-        tag: arista_bgp4_v2_peer_local_addr
-      - symbol:
-          name: aristaBgp4V2PeerLocalIdentifier
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8
-          format: ip_address
-        tag: arista_bgp4_v2_peer_local_identifier
-      - symbol:
-          name: aristaBgp4V2PeerRemoteIdentifier
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11
-          format: ip_address
-        tag: arista_bgp4_v2_peer_remote_identifier
-      - symbol:
-          name: aristaBgp4V2PeerDescription
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
-        tag: arista_bgp4_v2_peer_description
-      - symbol:
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.2
-          name: aristaBgp4V2PeerLocalAddrType
-        tag: arista_bgp4_v2_peer_local_addr_type
-        mapping:
-          0: unknown
-          1: ipv4
-          2: ipv6
-          3: ipv4z
-          4: ipv6z
-          16: dns
-      - symbol:
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
-          name: aristaBgp4V2PeerAdminStatus
-        tag: arista_bgp4_v2_peer_admin_status
+      - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
+        name: aristaBgp4V2PeerAdminStatus
+        description: BGP FSM Status
+        family: BPG/Peer/Admin/Status
+        unit: "{status}"
         mapping:
           1: halted
           2: running
-      - symbol:
-          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
-          name: aristaBgp4V2PeerState
-        tag: arista_bgp4_v2_peer_state
+      - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
+        name: aristaBgp4V2PeerState
+        description: BGP peer connection state
+        family: BGP/Peer/Connection/Status
+        unit: "{status}"
         mapping:
           1: idle
           2: connect
@@ -253,35 +210,83 @@ metrics:
           4: opensent
           5: openconfirm
           6: established
-  - MIB: ARISTA-IF-MIB
-    table:
-      name: aristaIfTable
-      OID: 1.3.6.1.4.1.30065.3.15.1.1
-    symbols:
-      - name: aristaIfInPktRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.3
-        description: "The rate, in packets per second, of packets inbound on this interface, averaged over aristaIfRateInterval."
-        unit: "{packet}"
-      - name: aristaIfOutPktRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.4
-        description: "The rate, in packets per second, of packets outbound on this interface, averaged over aristaIfRateInterval."
-        unit: "{packet}"
-      - name: aristaIfInOctetRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.5
-        description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."
-        unit: "By/s"
-      - name: aristaIfOutOctetRate
-        OID: 1.3.6.1.4.1.30065.3.15.1.1.1.6
-        description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."
-        unit: "By/s"
     metric_tags:
-      - symbol:
-          name: aristaIfRateInterval
-          OID: 1.3.6.1.4.1.30065.3.15.1.1.1.2
-        tag: arista_if_rate_interval
-      - MIB: IF-MIB
+      #      - symbol:
+      #          name: aristaBgp4V2PeerLocalPort
+      #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.6
+      #        tag: arista_bgp4_v2_peer_local_port
+      - tag: arista_bgp4_v2_peer_local_as
         symbol:
-          OID: 1.3.6.1.2.1.31.1.1.1.1
-          name: ifName
-        table: ifXTable
-        tag: if_name
+          name: aristaBgp4V2PeerLocalAs
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7
+      #      - symbol:
+      #          name: aristaBgp4V2PeerRemotePort
+      #          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.9
+      #        tag: arista_bgp4_v2_peer_remote_port
+      - tag: arista_bgp4_v2_peer_remote_as
+        symbol:
+          name: aristaBgp4V2PeerRemoteAs
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10
+      - tag: arista_bgp4_v2_peer_local_identifier
+        symbol:
+          name: aristaBgp4V2PeerLocalIdentifier
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8
+          format: ip_address
+      - tag: arista_bgp4_v2_peer_remote_identifier
+        symbol:
+          name: aristaBgp4V2PeerRemoteIdentifier
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11
+          format: ip_address
+      - tag: arista_bgp4_v2_peer_local_addr_type
+        symbol:
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.2
+          name: aristaBgp4V2PeerLocalAddrType
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      - tag: _arista_bgp4_v2_peer_description
+        symbol:
+          name: aristaBgp4V2PeerDescription
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14
+      - tag: _arista_bgp4_v2_peer_local_addr
+        symbol:
+          name: aristaBgp4V2PeerLocalAddr
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3
+          format: ip_address
+  # - MIB: ARISTA-IF-MIB
+  #   table:
+  #     name: aristaIfTable
+  #     OID: 1.3.6.1.4.1.30065.3.15.1.1
+  #   symbols:
+  #     - name: aristaIfInPktRate
+  #       OID: 1.3.6.1.4.1.30065.3.15.1.1.1.3
+  #       description: "The rate, in packets per second, of packets inbound on this interface, averaged over aristaIfRateInterval."
+  #       unit: "{packet}"
+  #     - name: aristaIfOutPktRate
+  #       OID: 1.3.6.1.4.1.30065.3.15.1.1.1.4
+  #       description: "The rate, in packets per second, of packets outbound on this interface, averaged over aristaIfRateInterval."
+  #       unit: "{packet}"
+  #     - name: aristaIfInOctetRate
+  #       OID: 1.3.6.1.4.1.30065.3.15.1.1.1.5
+  #       description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."
+  #       unit: "By/s"
+  #     - name: aristaIfOutOctetRate
+  #       OID: 1.3.6.1.4.1.30065.3.15.1.1.1.6
+  #       description: "The rate, in octets per second, of data inbound on this interface, averaged over aristaIfRateInterval."
+  #       unit: "By/s"
+  #   metric_tags:
+  #     - symbol:
+  #         name: aristaIfRateInterval
+  #         OID: 1.3.6.1.4.1.30065.3.15.1.1.1.2
+  #       tag: arista_if_rate_interval
+  #     - MIB: IF-MIB
+  #       symbol:
+  #         OID: 1.3.6.1.2.1.31.1.1.1.1
+  #         name: ifName
+  #       table: ifXTable
+  #       tag: if_name
+  # TODO, metrics are averaged by another metric, we can't support this atm

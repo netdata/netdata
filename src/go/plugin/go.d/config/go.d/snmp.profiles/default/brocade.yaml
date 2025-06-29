@@ -6,4 +6,4 @@ metadata:
   device:
     fields:
       vendor:
-        value: "brocade"
+        value: "Brocade"
