@@ -71,7 +71,7 @@ metrics:
       name: wlsxSysExtPacketLossPercent
       OID: 1.3.6.1.4.1.14823.2.2.1.2.1.32.0
       description: Packet loss percentage
-      family: Network/Packet/Loss
+      family: Packet/Loss/Percentage
       unit: "%"
   - MIB: WLSX-SWITCH-MIB
     table:
@@ -81,12 +81,12 @@ metrics:
       - name: sysXStorageSize
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.3
         description: Size of the storage filesystem in MB
-        family: Storage/Size
+        family: Storage/Size/Total
         unit: "MBy"
       - name: sysXStorageUsed
         OID: 1.3.6.1.4.1.14823.2.2.1.1.1.10.1.4
         description: Size of the storage filesystem in MB
-        family: Storage/Used
+        family: Storage/Size/Used
         unit: "MBy"
     metric_tags:
       - symbol:
@@ -108,12 +108,12 @@ metrics:
       - name: apChannelNoise
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.13
         description: Noise on the channel
-        family: AccessPoint/Channel/Noise
+        family: Wireless/AccessPoint/Channel/Noise
         unit: "dB"
       - name: apSignalToNoiseRatio
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.3.1.14
         description: Signal to noise ratio for the BSSID
-        family: AccessPoint/Signal/SNR
+        family: Wireless/AccessPoint/Signal/SNR
         unit: "dB"
     metric_tags:
       - symbol:
@@ -154,82 +154,82 @@ metrics:
       - name: apChannelFrameRetryRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.3
         description: Number of retry packets as a percentage of the total packets transmitted and received on this channel
-        family: AccessPoint/Channel/Frame/RetryRate
+        family: Wireless/AccessPoint/Channel/Frame/Retry
         unit: "%"
       - name: apChannelFrameLowSpeedRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.4
         description: Number of low data rate packets as a percentage of the total packets transmitted and received on this channel
-        family: AccessPoint/Channel/Frame/LowSpeedRate
+        family: Wireless/AccessPoint/Channel/Frame/LowSpeed
         unit: "%"
       - name: apChannelFrameNonUnicastRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.5
         description: Number of broadcast and multicast packets as a percentage of the total packets transmitted on this channel
-        family: AccessPoint/Channel/Frame/NonUnicastRate
+        family: Wireless/AccessPoint/Channel/Frame/NonUnicast
         unit: "%"
       - name: apChannelFrameFragmentationRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.6
         description: Number of fragments as a percentage of the total packets transmitted on this channel
-        family: AccessPoint/Channel/Frame/FragmentationRate
+        family: Wireless/AccessPoint/Channel/Frame/Fragmentation
         unit: "%"
       - name: apChannelFrameReceiveErrorRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.7
         description: Number of error packets as a percentage of the total packets received on this channel
-        family: AccessPoint/Channel/Frame/ErrorRate
+        family: Wireless/AccessPoint/Channel/Frame/Error
         unit: "%"
       - name: apBSSTxPackets
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.8
         description: Total packets transmitted by the ap on this BSSID
-        family: AccessPoint/BSS/Packet/Out
+        family: Wireless/AccessPoint/BSS/Packet/Out
         unit: "{packet}/s"
       - name: apBSSRxPackets
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.10
         description: Total packets received by the ap on this BSSID
-        family: AccessPoint/BSS/Packet/In
+        family: Wireless/AccessPoint/BSS/Packet/In
         unit: "{packet}/s"
       - name: apChannelBwRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.2
         description: Bandwidth rate in Kbps of the apChannel
-        family: AccessPoint/Channel/Bandwidth
+        family: Wireless/AccessPoint/Channel/Bandwidth
         unit: "kbit/s"
       - name: apBSSTxBytes
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.9
         description: Total bytes transmitted by the ap on this BSSID
-        family: AccessPoint/BSS/Traffic/Out
+        family: Wireless/AccessPoint/BSS/Traffic/Out
         unit: "By/s"
       - name: apBSSRxBytes
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.11
         description: Total bytes received by the ap on this BSSID
-        family: AccessPoint/BSS/Traffic/In
+        family: Wireless/AccessPoint/BSS/Traffic/In
         unit: "By/s"
       - name: apBSSBwRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.12
         description: Bandwidth rate in Kbps of the ap on this BSSID
-        family: AccessPoint/BSS/Bandwidth
+        family: Wireless/AccessPoint/BSS/Bandwidth
         unit: "kbit/s"
       - name: apBSSFrameRetryRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.13
         description: Frame retry rate on this BSSID
-        family: AccessPoint/BSS/Frame/RetryRate
+        family: Wireless/AccessPoint/BSS/Frame/Retry
         unit: "%"
       - name: apBSSFrameLowSpeedRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.14
         description: Frame low speed rate on this BSSID
-        family: AccessPoint/BSS/Frame/LowSpeedRate
+        family: Wireless/AccessPoint/BSS/Frame/LowSpeed
         unit: "%"
       - name: apBSSFrameNonUnicastRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.15
         description: Frame non unicast packet rate on this BSSID
-        family: AccessPoint/BSS/Frame/NonUnicastRate
+        family: Wireless/AccessPoint/BSS/Frame/NonUnicast
         unit: "%"
       - name: apBSSFrameFragmentationRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.16
         description: Frame fragmentation rate on this BSSID
-        family: AccessPoint/BSS/Frame/FragmentationRate
+        family: Wireless/AccessPoint/BSS/Frame/Fragmentation
         unit: "%"
       - name: apBSSFrameReceiveErrorRate
         OID: 1.3.6.1.4.1.14823.2.2.1.1.3.5.1.17
         description: Frame receive error rate on this BSSID
-        family: AccessPoint/BSS/Frame/ErrorRate
+        family: Wireless/AccessPoint/BSS/Frame/Error
         unit: "%"
     metric_tags:
       - symbol:
@@ -332,17 +332,17 @@ metrics:
       - name: wlanStaTransmitRate
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.10
         description: Transmit rate with which the station is associated with this system
-        family: Station/TransmitRate
+        family: Wireless/Station/Transmit
         unit: "bit/s"
       - name: wlanStaRSSI
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.14
         description: Signal to noise ratio for the station
-        family: Station/Signal/RSSI
+        family: Wireless/Station/Signal/RSSI
         unit: "dB"
       - name: wlanStaUpTime
         OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.15
         description: Time since the station associated to the current BSSID
-        family: Station/Uptime
+        family: Wireless/Station/Uptime
         unit: "cs"
       # - name: wlanStaTransmitRateCode
       #   OID: 1.3.6.1.4.1.14823.2.2.1.5.2.2.1.1.17
@@ -413,12 +413,12 @@ metrics:
       - name: wlanStaTxBytes64
         OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.25
         description: Number of bytes transmitted by this station, 64-bit value
-        family: Station/Traffic/Out
+        family: Wireless/Station/Traffic/Out
         unit: "By"
       - name: wlanStaRxBytes64
         OID: 1.3.6.1.4.1.14823.2.2.1.5.3.2.1.1.26
         description: Number of bytes received by this station, 64-bit value
-        family: Station/Traffic/In
+        family: Wireless/Station/Traffic/In
         unit: "By"
     metric_tags:
       - symbol:
