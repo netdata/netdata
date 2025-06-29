@@ -68,21 +68,21 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	}
 	
 	// Collect queue metrics (respect admin configuration)
-	if c.conf.CollectQueues != nil && *c.conf.CollectQueues {
+	if c.CollectQueues != nil && *c.CollectQueues {
 		if err := c.collectQueueMetrics(ctx, mx); err != nil {
 			c.Warningf("failed to collect queue metrics: %v", err)
 		}
 	}
 	
 	// Collect channel metrics (respect admin configuration)
-	if c.conf.CollectChannels != nil && *c.conf.CollectChannels {
+	if c.CollectChannels != nil && *c.CollectChannels {
 		if err := c.collectChannelMetrics(ctx, mx); err != nil {
 			c.Warningf("failed to collect channel metrics: %v", err)
 		}
 	}
 	
 	// Collect topic metrics (respect admin configuration)
-	if c.conf.CollectTopics != nil && *c.conf.CollectTopics {
+	if c.CollectTopics != nil && *c.CollectTopics {
 		if err := c.collectTopicMetrics(ctx, mx); err != nil {
 			c.Warningf("failed to collect topic metrics: %v", err)
 		}
@@ -104,7 +104,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	c.mqConn = &mqConnection{}
 	
 	// Build connection string: HOST(port)/CHANNEL/QueueManager
-	connStr := fmt.Sprintf("%s(%d)/%s/%s", c.conf.Host, c.conf.Port, c.conf.Channel, c.conf.QueueManager)
+	connStr := fmt.Sprintf("%s(%d)/%s/%s", c.Host, c.Port, c.Channel, c.QueueManager)
 	cConnStr := C.CString(connStr)
 	defer C.free(unsafe.Pointer(cConnStr))
 	
@@ -116,7 +116,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	
 	if compCode != C.MQCC_OK {
 		return fmt.Errorf("MQCONN failed: completion code %d, reason code %d (check queue manager '%s' is running and accessible on %s:%d)", 
-			compCode, reason, c.conf.QueueManager, c.conf.Host, c.conf.Port)
+			compCode, reason, c.QueueManager, c.Host, c.Port)
 	}
 	
 	// Open system command input queue for PCF commands
@@ -137,7 +137,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	
 	c.mqConn.connected = true
 	c.Infof("Successfully connected to queue manager %s on %s:%d via channel %s", 
-		c.conf.QueueManager, c.conf.Host, c.conf.Port, c.conf.Channel)
+		c.QueueManager, c.Host, c.Port, c.Channel)
 	
 	return nil
 }
@@ -156,7 +156,7 @@ func (c *Collector) disconnect() {
 	
 	if c.mqConn.hConn != C.MQHC_UNUSABLE_HCONN {
 		C.MQDISC(&c.mqConn.hConn, &compCode, &reason)
-		c.Debugf("Disconnected from queue manager %s", c.conf.QueueManager)
+		c.Debugf("Disconnected from queue manager %s", c.QueueManager)
 	}
 	
 	c.mqConn.connected = false
@@ -474,7 +474,7 @@ func (c *Collector) shouldCollectQueue(queueName string) bool {
 	if c.queueSelectorRegex != nil {
 		matches := c.queueSelectorRegex.MatchString(queueName)
 		if !matches {
-			c.Debugf("Queue %s does not match selector pattern '%s', skipping", queueName, c.conf.QueueSelector)
+			c.Debugf("Queue %s does not match selector pattern '%s', skipping", queueName, c.QueueSelector)
 		}
 		return matches
 	}
@@ -493,7 +493,7 @@ func (c *Collector) shouldCollectChannel(channelName string) bool {
 	if c.channelSelectorRegex != nil {
 		matches := c.channelSelectorRegex.MatchString(channelName)
 		if !matches {
-			c.Debugf("Channel %s does not match selector pattern '%s', skipping", channelName, c.conf.ChannelSelector)
+			c.Debugf("Channel %s does not match selector pattern '%s', skipping", channelName, c.ChannelSelector)
 		}
 		return matches
 	}
