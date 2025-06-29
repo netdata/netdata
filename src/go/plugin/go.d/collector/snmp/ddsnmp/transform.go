@@ -140,28 +140,30 @@ func newMetricTransformFuncMap() template.FuncMap {
 		"pow": func(base float64, exp int) float64 {
 			return math.Pow(base, float64(exp))
 		},
-		"transformEntPhySensor": func(m *Metric) string {
+		"transformEntitySensorValue": func(m *Metric) string {
 			/*
-				transformEntPhySensor applies standardized normalization to metrics
-				from the ENTITY-SENSOR-MIB's entPhySensorTable:
+				transformEntitySensorValue normalizes metrics from ENTITY-SENSOR-MIB and
+				CISCO-ENTITY-SENSOR-MIB.
 
-				OID base: .1.3.6.1.2.1.99.1.1
-				Spec: https://datatracker.ietf.org/doc/html/rfc3433
-				Applies to: entPhySensorValue (.1.3.6.1.2.1.99.1.1.1.4)
+				Supported MIBs:
+				  - ENTITY-SENSOR-MIB (RFC 3433):       .1.3.6.1.2.1.99.1.1
+				  - CISCO-ENTITY-SENSOR-MIB:            .1.3.6.1.4.1.9.9.91.1.1.1
 
-				Uses the following tags:
-				  - sensor_type      (entPhySensorType: integer value 1–12)
-				  - sensor_scale     (entPhySensorScale: integer value 1–14)
-				  - sensor_precision (entPhySensorPrecision: integer)
+				Expected metric:
+				  - entPhySensorValue / entSensorValue: .*.1.4
 
-				This function:
-				  - Assigns proper name, unit, family, description
+				Required metric tags:
+				  - sensor_type      (entPhySensorType / entSensorType)
+				  - sensor_scale     (entPhySensorScale / entSensorScale)
+				  - sensor_precision (entPhySensorPrecision / entSensorPrecision)
+
+				What it does:
+				  - Sets a descriptive name, unit, family, and description
 				  - Applies scaling using sensor_scale and sensor_precision
-				  - Optionally maps values to human-readable labels (e.g., "true"/"false")
-
-				This supports multiple vendors implementing ENTITY-SENSOR-MIB:
-				  Cisco, Juniper, HPE, Dell, Supermicro, etc.
+				  - Applies value mappings for boolean/enumerated types
+				  - Works across vendors (Cisco, Juniper, HPE, Dell, etc.)
 			*/
+
 			sensorType := m.Tags["sensor_type"]
 			sensorScale := m.Tags["sensor_scale"]
 			sensorPrecision := m.Tags["sensor_precision"]
@@ -187,6 +189,8 @@ func newMetricTransformFuncMap() template.FuncMap {
 				"12": {"name": "sensor_state", "family": "Status", "desc": "Boolean sensor state", "mapping": map[int64]string{
 					0: "false", 1: "true", 2: "true",
 				}},
+				"13": {"name": "special_enum", "family": "Status", "desc": "Vendor-specific enumerated sensor"},
+				"14": {"name": "power_dbm", "unit": "dBm", "family": "Power", "desc": "Power in decibel-milliwatts"},
 			}
 
 			scaleMap := map[string]float64{
