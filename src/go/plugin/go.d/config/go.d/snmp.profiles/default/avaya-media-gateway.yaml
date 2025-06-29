@@ -5,6 +5,12 @@ extends:
   - _generic-ospf.yaml
   - avaya.yaml
 
+metadata:
+  device:
+    fields:
+      type:
+        value: "Media Gateway"
+
 sysobjectid:
   - 1.3.6.1.4.1.6889.1.45.103.8 # G450 Media Gateway
   - 1.3.6.1.4.1.6889.1.45.103.41 # G430 Media Gateway
@@ -15,37 +21,25 @@ metrics:
       name: cpu.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.1.1.1.5.10 # genCpuAverageUtilization.10
       description: Current average CPU utilization in percentage
+      family: CPU/Usage
       unit: "%"
   - MIB: UTILIZATION-MANAGEMENT-MIB
     symbol:
       name: memory.usage
       OID: 1.3.6.1.4.1.6889.2.1.11.1.2.6.1.3.10 # genMemUtilizationPercentUsed.10
       description: Percentage of memory used
+      family: Memory/Usage
       unit: "%"
   - MIB: AVAYA-ENTITY-MIB
     table:
       name: avEntPhyChFruTable
       OID: 1.3.6.1.4.1.6889.2.1.99.5.1
     symbols:
-      - name: avaya.avEntPhyChFru
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - index: 1
-        tag: avaya_ent_physical_index
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
-          name: avaya.avEntPhyChFruOperStat
-        tag: avaya_av_ent_phy_ch_fru_oper_stat
-        mapping:
-          1: ok
-          2: fault
-          3: not_present
-          255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
-          name: avaya.avEntPhyChFruFault
-        tag: avaya_av_ent_phy_ch_fru_fault
+      - OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.2
+        name: avaya.avEntPhyChFruFault
+        description: Description of FRU fault
+        family: Hardware/FRU/Fault/Status
+        unit: "{status}"
         mapping:
           1: none
           2: mulfunction
@@ -55,42 +49,115 @@ metrics:
           6: multiple_fan_fault
           7: bad_expansion_cable
           255: unknown
-  - MIB: G700-MG-MIB
-    symbol:
-      name: avaya.cmgRemoteSigDscp
-      OID: 1.3.6.1.4.1.6889.2.9.1.2.2.2.0
-      description: DiffServ code point for signaling traffic on the H.248 link received from the controller
-      unit: "1"
+      - OID: 1.3.6.1.4.1.6889.2.1.99.5.1.1.1
+        name: avaya.avEntPhyChFruOperStat
+        description: Operational status of the chassis FRU unit
+        family: Hardware/FRU/Operational/Status
+        unit: "{status}"
+        mapping:
+          1: ok
+          2: fault
+          3: not_present
+          255: unknown
+    metric_tags:
+      - index: 1
+        tag: avaya_ent_physical_index
+  # - MIB: G700-MG-MIB
+  #   symbol:
+  #     name: avaya.cmgRemoteSigDscp
+  #     OID: 1.3.6.1.4.1.6889.2.9.1.2.2.2.0
+  #     description: DiffServ code point for signaling traffic on the H.248 link received from the controller
+  #     unit: "1"
+  # TODO we don't have mapping for this
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgRemoteSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.3.0
       description: 802.1 priority for signaling traffic on the H.248 link received from the controller
-      unit: "{priority_level}"
-  - MIB: G700-MG-MIB
-    symbol:
-      name: avaya.cmgLocalSigDscp
-      OID: 1.3.6.1.4.1.6889.2.9.1.2.2.4.0
-      description: DiffServ code point for signaling traffic on the H.248 link locally administered
+      family: Network/SignalTraffic/Remote/Priority
       unit: "1"
+  # - MIB: G700-MG-MIB
+  #   symbol:
+  #     name: avaya.cmgLocalSigDscp
+  #     OID: 1.3.6.1.4.1.6889.2.9.1.2.2.4.0
+  #     description: DiffServ code point for signaling traffic on the H.248 link locally administered
+  #     unit: "1"
+  # TODO we don't have mapping for this
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgLocalSig802Priority
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.5.0
       description: 802.1 priority for signaling traffic on the H.248 link locally administered
-      unit: "{priority_level}"
+      family: Network/SignalTraffic/Local/Priority
+      unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgCurrent802Vlan
       OID: 1.3.6.1.4.1.6889.2.9.1.2.2.7.0
-      description: Current 802.1 VLAN ID in use
-      unit: "{vlan_id}"
+      description: Current 802.1 VLAN ID in use for this processor
+      family: Network/VLAN/Current
+      unit: "1"
   - MIB: G700-MG-MIB
     symbol:
       name: avaya.cmgH248LinkErrorCode
       OID: 1.3.6.1.4.1.6889.2.9.1.3.4.0
       description: Most recently received H.248 error code affecting the link between media gateway and controller
-      unit: "{error_code}"
+      family: Network/H248Link/Error/Code
+      unit: "{status}"
+      mapping:
+        0: No error
+        400: Syntax error in message
+        403: Syntax error in TransactionRequest
+        406: Version not supported
+        410: Incorrect identifier
+        411: The transaction refers to an unknown ContextId
+        412: No ContextIDs available
+        421: Unknown action or illegal combination of actions
+        422: Syntax error in action
+        430: Unknown TerminationID
+        431: No TerminationID matched a wildcard
+        432: Out of TerminationIDs or No TerminationID available
+        433: TerminationID is already in a Context
+        434: Max number of Terminations in a Context exceeded
+        440: Unsupported or unknown package
+        441: Missing remote or local descriptor
+        442: Syntax error in command
+        443: Unknown command
+        444: Unsupported or unknown descriptor
+        445: Unsupported property
+        446: Unsupported or unknown parameter
+        447: Descriptor not legal in this command
+        448: Descriptor appears twice in a command
+        450: No such property in this package
+        451: No such event in this package
+        452: No such signal in this package
+        453: No such statistic in this package
+        454: No such parameter value in this package
+        455: Parameter illegal in this descriptor
+        456: Parameter or property appears twice in this descriptor
+        457: Missing parameter in signal or event
+        471: Implied add for multiplex failure
+        500: Internal software failure in the media gateway
+        501: Not implemented
+        502: Not ready
+        503: Service unavailable
+        504: Command received from unauthorized entity
+        505: Transaction Request received before ServiceChange Reply received
+        510: Insufficient resources
+        512: Gateway unequipped to detect requested event
+        513: Gateway unequipped to generate requested signal
+        514: Gateway cannot send the specified announcement
+        515: Unsupported media type
+        517: Unsupported or invalid mode
+        518: Event buffer full
+        519: Out of space to store digit map
+        520: Digit map undefined in MG
+        521: Termination is 'Service Changing'
+        526: Insufficient bandwidth
+        529: Internal hardware failure in MG
+        530: Temporary network failure
+        531: Permanent network failure
+        581: Does not exist
   - MIB: G700-MG-MIB
     table:
       name: cmgVoipEngineTable
@@ -99,46 +166,51 @@ metrics:
       - name: avaya.cmgVoipTotalChannels
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.6
         description: Total number of channels available to the VoIP engine
+        family: Voice/VoIPEngine/Channel/Total
         unit: "{channel}"
       - name: avaya.cmgVoipChannelsInUse
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.7
         description: Number of channels currently in use at the VoIP engine
+        family: Voice/VoIPEngine/Channel/InUse
         unit: "{channel}"
       - name: avaya.cmgVoipAverageOccupancy
         OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.8
         description: Five-minute average occupancy of the VoIP engine
+        family: Voice/VoIPEngine/Occupancy
         unit: "%"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: avaya.cmgVoipCurrentIpAddress
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.4
-        tag: avaya_cmg_voip_current_ip_address
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.9
-          name: avaya.cmgVoipHyperactivity
-        tag: avaya_cmg_voip_hyperactivity
+      - OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.9
+        name: avaya.cmgVoipHyperactivity
+        description: Indicates whether hyperactivity has been detected
+        family: Voice/VoIPEngine/Hyperactivity/Status
+        unit: "{status}"
         mapping:
           1: normal
           2: hyperactive
           255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.10
-          name: avaya.cmgVoipAdminState
-        tag: avaya_cmg_voip_admin_state
+      - OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.10
+        name: avaya.cmgVoipAdminState
+        description: Maintenance busy-out state
+        family: Voice/VoIPEngine/Admin/Status
+        unit: "{status}"
         mapping:
           1: busy-out
           2: release
           3: camp-on
           255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.12
-          name: avaya.cmgVoipDspStatus
-        tag: avaya_cmg_voip_dsp_status
+      - OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.12
+        name: avaya.cmgVoipDspStatus
+        description: Status of the DSP complex
+        family: Voice/VoIPEngine/DSP/Status
+        unit: "{status}"
         mapping:
           1: idle
           2: in_use
           3: fault
+    metric_tags:
+      - symbol:
+          name: avaya.cmgVoipCurrentIpAddress
+          OID: 1.3.6.1.4.1.6889.2.9.1.4.5.1.4
+        tag: avaya_cmg_voip_current_ip_address
   - MIB: G700-MG-MIB
     table:
       name: cmgVoipDSPCoreTable
@@ -147,34 +219,34 @@ metrics:
       - name: avaya.cmgDSPCoreTotalChannels
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.2
         description: Total number of channels available to the DSP core
+        family: Voice/VoIPEngine/DSPCore/Channel/Total
         unit: "{channel}"
       - name: avaya.cmgDSPCoreChannelsInUse
         OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.3
         description: Number of channels currently in use at the DSP core
+        family: Voice/VoIPEngine/DSPCore/Channel/InUse
         unit: "{channel}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4
-          name: avaya.cmgDSPCoreAdminState
-        tag: avaya_cmg_dsp_core_admin_state
+      - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.4
+        name: avaya.cmgDSPCoreAdminState
+        family: Voice/VoIPEngine/DSPCore/Admin/Status
+        unit: "{status}"
         mapping:
           1: busy-out
           2: release
           3: camp-on
           255: unknown
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.5
-          name: avaya.cmgDSPCoreStatus
-        tag: avaya_cmg_dsp_core_status
+      - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.5
+        name: avaya.cmgDSPCoreStatus
+        family: Voice/VoIPEngine/DSPCore/Operational/Status
+        unit: "{status}"
         mapping:
           1: idle
           2: in_use
           3: fault
-      - symbol:
-          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.7
-          name: avaya.cmgDSPCoreDemandTestResult
-        tag: avaya_cmg_dsp_core_demand_test_result
+      - OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.7
+        name: avaya.cmgDSPCoreDemandTestResult
+        family: Voice/VoIPEngine/DSPCore/Test/Result
+        unit: "{status}"
         mapping:
           1: error_code1
           2: error_code2
@@ -184,6 +256,11 @@ metrics:
           6: error_code6
           7: not_responding
           255: pass
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.6889.2.9.1.4.6.1.1
+          name: avaya.cmgDSPCoreCoreId
+        tag: avaya_cmg_dsp_core_id
 metric_tags:
   - OID: 1.3.6.1.4.1.6889.2.9.1.1.1.0
     symbol: cmgHWType

@@ -2,52 +2,32 @@ extends:
   - _base.yaml
   - _generic-if.yaml
   # This profile does not import cisco.yaml on purpose
+
 sysobjectid:
-  - 1.3.6.1.4.1.9.1.1683           # UCS C240
-  - 1.3.6.1.4.1.9.1.2178           # UCS C220 M4
-  - 1.3.6.1.4.1.9.1.2492           # UCS C220 M5
-  - 1.3.6.1.4.1.9.12.3.1.3.1062    # UCS 6248UP
+  - 1.3.6.1.4.1.9.1.1683 # UCS C240
+  - 1.3.6.1.4.1.9.1.2178 # UCS C220 M4
+  - 1.3.6.1.4.1.9.1.2492 # UCS C220 M5
+  - 1.3.6.1.4.1.9.12.3.1.3.1062 # UCS 6248UP
+
 metadata:
   device:
     fields:
+      type:
+        value: "UCS"
       vendor:
-        value: "cisco"
+        value: "Cisco"
+
 metrics:
   - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
     table:
       name: cucsComputeBoardTable
       OID: 1.3.6.1.4.1.9.9.719.1.9.6
     symbols:
-      - name: cucsComputeBoard
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: cucsComputeBoardDn
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.2
-        tag: cucs_compute_board_dn
-      - symbol:
-          name: cucsComputeBoardModel
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.6
-        tag: cucs_compute_board_model
-        description: "Cisco UCS compute:Board:model managed object property"
-        unit: "TBD"
-      - symbol:
-          name: cucsComputeBoardSerial
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.14
-        tag: cucs_compute_board_serial
-        description: "Cisco UCS compute:Board:serial managed object property"
-        unit: "TBD"
-      - symbol:
-          name: cucsComputeBoardVendor
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.16
-        tag: cucs_compute_board_vendor
-        description: "Cisco UCS compute:Board:vendor managed object property"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.7
-          name: cucsComputeBoardOperPower
-        tag: cucs_compute_board_oper_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.7
+        name: cucsComputeBoardOperPower
+        description: Operational power state of the board
+        family: Board/Power/Operational/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -62,12 +42,11 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "Oper power state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.8
-          name: cucsComputeBoardOperState
-        tag: cucs_compute_board_oper_state
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.8
+        name: cucsComputeBoardOperState
+        description: Operational state of the board
+        family: Board/Operational/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -101,51 +80,49 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operational state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.9
-          name: cucsComputeBoardOperability
-        tag: cucs_compute_board_operability
-        mapping:
-          0: unknown
-          1: operable
-          2: inoperable
-          3: degraded
-          4: powered_off
-          5: power_problem
-          6: removed
-          7: voltage_problem
-          8: thermal_problem
-          9: performance_problem
-          10: accessibility_problem
-          11: identity_unestablishable
-          12: bios_post_timeout
-          13: disabled
-          14: malformed_fru
-          15: backplane_port_problem
-          16: chassis_intrusion
-          51: fabric_conn_problem
-          52: fabric_unsupported_conn
-          81: config
-          82: equipment_problem
-          83: decomissioning
-          84: chassis_limit_exceeded
-          100: not_supported
-          101: discovery
-          102: discovery_failed
-          103: identify
-          104: post_failure
-          105: upgrade_problem
-          106: peer_comm_problem
-          107: auto_upgrade
-          108: link_activate_blocked
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.9
+        name: cucsComputeBoardOperability
         description: "Operability state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.10
-          name: cucsComputeBoardPerf
-        tag: cucs_compute_board_perf
+        family: Board/Operability/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: operable
+          2: inoperable
+          3: degraded
+          4: powered_off
+          5: power_problem
+          6: removed
+          7: voltage_problem
+          8: thermal_problem
+          9: performance_problem
+          10: accessibility_problem
+          11: identity_unestablishable
+          12: bios_post_timeout
+          13: disabled
+          14: malformed_fru
+          15: backplane_port_problem
+          16: chassis_intrusion
+          51: fabric_conn_problem
+          52: fabric_unsupported_conn
+          81: config
+          82: equipment_problem
+          83: decomissioning
+          84: chassis_limit_exceeded
+          100: not_supported
+          101: discovery
+          102: discovery_failed
+          103: identify
+          104: post_failure
+          105: upgrade_problem
+          106: peer_comm_problem
+          107: auto_upgrade
+          108: link_activate_blocked
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.10
+        name: cucsComputeBoardPerf
+        description: "Performance state of the board"
+        family: Board/Performance/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: ok
@@ -156,12 +133,11 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "Performance state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.11
-          name: cucsComputeBoardPower
-        tag: cucs_compute_board_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.11
+        name: cucsComputeBoardPower
+        description: "Power state of the board"
+        family: Board/Power/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -176,12 +152,11 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "Power state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.12
-          name: cucsComputeBoardPresence
-        tag: cucs_compute_board_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.12
+        name: cucsComputeBoardPresence
+        description: "Presence state of the board"
+        family: Board/Presence/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -203,28 +178,11 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "Presence state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.15
-          name: cucsComputeBoardThermal
-        tag: cucs_compute_board_thermal
-        mapping:
-          0: unknown
-          1: ok
-          2: upper_non_recoverable
-          3: upper_critical
-          4: upper_non_critical
-          5: lower_non_critical
-          6: lower_critical
-          7: lower_non_recoverable
-          100: not_supported
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.15
+        name: cucsComputeBoardThermal
         description: "Thermal state of the board"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.17
-          name: cucsComputeBoardVoltage
-        tag: cucs_compute_board_voltage
+        family: Board/Thermal/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: ok
@@ -235,8 +193,39 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.17
+        name: cucsComputeBoardVoltage
         description: "Voltage state of the board"
-        unit: "TBD"
+        family: Board/Voltage/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: ok
+          2: upper_non_recoverable
+          3: upper_critical
+          4: upper_non_critical
+          5: lower_non_critical
+          6: lower_critical
+          7: lower_non_recoverable
+          100: not_supported
+    metric_tags:
+      - symbol:
+          name: cucsComputeBoardDn
+          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.2
+        tag: cucs_compute_board_dn
+      - symbol:
+          name: cucsComputeBoardModel
+          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.6
+        tag: cucs_compute_board_model
+      - symbol:
+          name: cucsComputeBoardSerial
+          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.14
+        tag: cucs_compute_board_serial
+      - symbol:
+          name: cucsComputeBoardVendor
+          OID: 1.3.6.1.4.1.9.9.719.1.9.6.1.16
+        tag: cucs_compute_board_vendor
+
   - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
     table:
       name: cucsComputeMbPowerStatsTable
@@ -245,32 +234,24 @@ metrics:
       - name: cucsComputeMbPowerStatsConsumedPower
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.4
         description: "Consumed power"
+        family: Board/Power/Consumption
         unit: "W"
       - name: cucsComputeMbPowerStatsInputCurrent
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.8
         description: "Input current"
+        family: Board/Power/Current
         unit: "A"
       - name: cucsComputeMbPowerStatsInputVoltage
         OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.12
         description: "Input voltage"
+        family: Board/Power/Voltage
         unit: "V"
     metric_tags:
       - symbol:
-          name: cucsComputeMbPowerStatsDn
+          name: cucsComputeMbPowerStatFlex Flashn
           OID: 1.3.6.1.4.1.9.9.719.1.9.14.1.2
         tag: cucs_compute_mb_power_stats_dn
-  - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
-    table:
-      name: cucsComputeRackUnitTable
-      OID: 1.3.6.1.4.1.9.9.719.1.9.35
-    symbols:
-      - name: memory.free
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.9  # cucsComputeRackUnitAvailableMemory
-      - name: memory.total
-        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.49  # cucsComputeRackUnitTotalMemory
-    metric_tags:
-      - index: 1
-        tag: mem
+
   - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
     table:
       name: cucsComputeRackUnitTable
@@ -278,70 +259,19 @@ metrics:
     symbols:
       - name: cucsComputeRackUnitAvailableMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.9
-        description: "Available memory"
+        description: "Rack unit available memory"
+        family: RackUnit/Memory/Available
         unit: "By"
       - name: cucsComputeRackUnitTotalMemory
         OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.49
-        description: "Total memory"
+        description: "Rack Unit total memory"
+        family: RackUnit/Memory/Total
         unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: cucsComputeRackUnitDn
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.2
-        tag: cucs_compute_rack_unit_dn
-      - symbol:
-          name: cucsComputeRackUnitModel
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.32
-        tag: cucs_compute_rack_unit_model
-        description: "Cisco UCS compute:RackUnit:model managed object property"
-        unit: "TBD"
-      - symbol:
-          name: cucsComputeRackUnitName
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.33
-        tag: cucs_compute_rack_unit_name
-        description: "Cisco UCS compute:RackUnit:name managed object property"
-        unit: "TBD"
-      - symbol:
-          name: cucsComputeRackUnitNumOfCores
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.35
-        tag: cucs_compute_rack_unit_num_of_cores
-        description: "Number of cores"
-        unit: "{core}"
-      - symbol:
-          name: cucsComputeRackUnitNumOfCpus
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
-        tag: cucs_compute_rack_unit_num_of_cpus
-        description: "Number of cpus"
-        unit: "{cpu}"
-      - symbol:
-          name: cucsComputeRackUnitNumOfThreads
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
-        tag: cucs_compute_rack_unit_num_of_threads
-        description: "Number of threads"
-        unit: "{thread}"
-      - symbol:
-          name: cucsComputeRackUnitSerial
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.47
-        tag: cucs_compute_rack_unit_serial
-        description: "Cisco UCS compute:RackUnit:serial managed object property"
-        unit: "TBD"
-      - symbol:
-          name: cucsComputeRackUnitUuid
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.50
-        tag: cucs_compute_rack_unit_uuid
-        description: "Cisco UCS compute:RackUnit:uuid managed object property"
-        unit: "TBD"
-      - symbol:
-          name: cucsComputeRackUnitVendor
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.51
-        tag: cucs_compute_rack_unit_vendor
-        description: "Cisco UCS compute:RackUnit:vendor managed object property"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.4
-          name: cucsComputeRackUnitAdminPower
-        tag: cucs_compute_rack_unit_admin_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.4
+        name: cucsComputeRackUnitAdminPower
+        description: "Admin power state of the rack unit"
+        family: RackUnit/Admin/Power
+        unit: "{status}"
         mapping:
           2: cycle_immediate
           3: cycle_wait
@@ -356,22 +286,20 @@ metrics:
           31: admin_up
           32: admin_down
           33: ipmi_reset
-        description: "Admin power state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.5
-          name: cucsComputeRackUnitAdminState
-        tag: cucs_compute_rack_unit_admin_state
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.5
+        name: cucsComputeRackUnitAdminState
+        description: "Admin state of the rack unit"
+        family: RackUnit/Admin/State
+        unit: "{status}"
         mapping:
           1: in_service
           2: out_of_service
           3: in_maintenance
-        description: "Admin state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.7
-          name: cucsComputeRackUnitAssociation
-        tag: cucs_compute_rack_unit_association
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.7
+        name: cucsComputeRackUnitAssociation
+        description: "Association state of the rack unit"
+        family: RackUnit/Association/Status
+        unit: "{status}"
         mapping:
           0: none
           1: establishing
@@ -379,33 +307,30 @@ metrics:
           3: removing
           4: failed
           5: throttled
-        description: "Association state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.8
-          name: cucsComputeRackUnitAvailability
-        tag: cucs_compute_rack_unit_availability
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.8
+        name: cucsComputeRackUnitAvailability
+        description: "Availability state of the rack unit"
+        family: RackUnit/Availability/Status
+        unit: "{status}"
         mapping:
           0: unavailable
           1: available
-        description: "Availability state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.10
-          name: cucsComputeRackUnitCheckPoint
-        tag: cucs_compute_rack_unit_check_point
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.10
+        name: cucsComputeRackUnitCheckPoint
+        description: "Checkpoint state of the rack unit"
+        family: RackUnit/Checkpoint/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: removing
           2: shallow_checkpoint
           3: deep_checkpoint
           4: discovered
-        description: "Checkpoint state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.40
-          name: cucsComputeRackUnitOperPower
-        tag: cucs_compute_rack_unit_oper_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.40
+        name: cucsComputeRackUnitOperPower
+        description: "Operational power state of the rack unit"
+        family: RackUnit/Power/Operational
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -420,12 +345,11 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "Operational power state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.42
-          name: cucsComputeRackUnitOperState
-        tag: cucs_compute_rack_unit_oper_state
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.42
+        name: cucsComputeRackUnitOperState
+        description: "Operational state of the rack unit"
+        family: RackUnit/Operational/Status
+        unit: "{status}"
         mapping:
           0: indeterminate
           1: unassociated
@@ -460,12 +384,11 @@ metrics:
           210: pending_reboot
           211: pending_reassociation
           212: svnic_not_present
-        description: "Operational state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.43
-          name: cucsComputeRackUnitOperability
-        tag: cucs_compute_rack_unit_operability
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.43
+        name: cucsComputeRackUnitOperability
+        description: "Operability state of the rack unit"
+        family: RackUnit/Operability/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -499,12 +422,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operability state of the rack unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.45
-          name: cucsComputeRackUnitPresence
-        tag: cucs_compute_rack_unit_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.45
+        name: cucsComputeRackUnitPresence
+        description: "Presence state of the rack unit"
+        family: RackUnit/Presence/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -522,8 +444,48 @@ metrics:
           40: unauthorized
           101: equipped_unsupported
           102: equipped_deprecated
-        description: "Presence state of the rack unit"
-        unit: "TBD"
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.35
+        name: cucsComputeRackUnitNumOfCores
+        description: "Number of cores"
+        family: RackUnit/CPU/Cores
+        unit: "{core}"
+      - OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.36
+        name: cucsComputeRackUnitNumOfCpus
+        description: "Number of cpus"
+        family: RackUnit/CPU/Count
+        unit: "{cpu}"
+      - symbol:
+        name: cucsComputeRackUnitNumOfThreads
+        OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.39
+        description: "Number of threads"
+        family: RackUnit/CPU/Threads
+        unit: "{thread}"
+    metric_tags:
+      - symbol:
+          name: cucsComputeRackUnitDn
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.2
+        tag: cucs_compute_rack_unit_dn
+      - symbol:
+          name: cucsComputeRackUnitModel
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.32
+        tag: cucs_compute_rack_unit_model
+      - symbol:
+          name: cucsComputeRackUnitName
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.33
+        tag: cucs_compute_rack_unit_name
+      - symbol:
+          name: cucsComputeRackUnitSerial
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.47
+        tag: cucs_compute_rack_unit_serial
+      - symbol:
+          name: cucsComputeRackUnitUuid
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.50
+        tag: cucs_compute_rack_unit_uuid
+      - symbol:
+          name: cucsComputeRackUnitVendor
+          OID: 1.3.6.1.4.1.9.9.719.1.9.35.1.51
+        tag: cucs_compute_rack_unit_vendor
+
   - MIB: CISCO-UNIFIED-COMPUTING-COMPUTE-MIB
     table:
       name: cucsComputeRackUnitMbTempStatsTable
@@ -532,22 +494,26 @@ metrics:
       - name: cucsComputeRackUnitMbTempStatsAmbientTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.4
         description: "Ambient temperature"
+        family: RackUnit/Temperature/Ambient
         unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsFrontTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.8
         description: "Front temperature"
+        family: RackUnit/Temperature/Front
         unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsIoh1Temp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.13
         description: "Ioh1 temperature"
+        family: RackUnit/Temperature/IOH1
         unit: "Cel"
       - name: cucsComputeRackUnitMbTempStatsRearTemp
         OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.21
         description: "Rear temperature"
+        family: RackUnit/Temperature/Rear
         unit: "Cel"
     metric_tags:
       - symbol:
-          name: cucsComputeRackUnitMbTempStatsDn
+          name: cucsComputeRackUnitMbTempStatFlex Flashn
           OID: 1.3.6.1.4.1.9.9.719.1.9.44.1.2
         tag: cucs_compute_rack_unit_mb_temp_stats_dn
   - MIB: CISCO-UNIFIED-COMPUTING-EQUIPMENT-MIB
@@ -555,9 +521,142 @@ metrics:
       name: cucsEquipmentFanTable
       OID: 1.3.6.1.4.1.9.9.719.1.15.12
     symbols:
-      - name: cucsEquipmentFan
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.9
+        name: cucsEquipmentFanOperState
+        description: "Operational state of the fan"
+        family: Fan/Operational/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: operable
+          2: inoperable
+          3: degraded
+          4: powered_off
+          5: power_problem
+          6: removed
+          7: voltage_problem
+          8: thermal_problem
+          9: performance_problem
+          10: accessibility_problem
+          11: identity_unestablishable
+          12: bios_post_timeout
+          13: disabled
+          14: malformed_fru
+          15: backplane_port_problem
+          16: chassis_intrusion
+          51: fabric_conn_problem
+          52: fabric_unsupported_conn
+          81: config
+          82: equipment_problem
+          83: decomissioning
+          84: chassis_limit_exceeded
+          100: not_supported
+          101: discovery
+          102: discovery_failed
+          103: identify
+          104: post_failure
+          105: upgrade_problem
+          106: peer_comm_problem
+          107: auto_upgrade
+          108: link_activate_blocked
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.10
+        name: cucsEquipmentFanOperability
+        description: "Operability state of the fan"
+        family: Fan/Operability/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: operable
+          2: inoperable
+          3: degraded
+          4: powered_off
+          5: power_problem
+          6: removed
+          7: voltage_problem
+          8: thermal_problem
+          9: performance_problem
+          10: accessibility_problem
+          11: identity_unestablishable
+          12: bios_post_timeout
+          13: disabled
+          14: malformed_fru
+          15: backplane_port_problem
+          16: chassis_intrusion
+          51: fabric_conn_problem
+          52: fabric_unsupported_conn
+          81: config
+          82: equipment_problem
+          83: decomissioning
+          84: chassis_limit_exceeded
+          100: not_supported
+          101: discovery
+          102: discovery_failed
+          103: identify
+          104: post_failure
+          105: upgrade_problem
+          106: peer_comm_problem
+          107: auto_upgrade
+          108: link_activate_blocked
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.11
+        name: cucsEquipmentFanPerf
+        description: "Performance state of the fan"
+        family: Fan/Performance/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: ok
+          2: upper_non_recoverable
+          3: upper_critical
+          4: upper_non_critical
+          5: lower_non_critical
+          6: lower_critical
+          7: lower_non_recoverable
+          100: not_supported
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.12
+        name: cucsEquipmentFanPower
+        description: "Power state of the fan"
+        family: Fan/Power/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: on
+          2: test
+          3: off
+          4: online
+          5: offline
+          6: offduty
+          7: degraded
+          8: power_save
+          9: error
+          10: ok
+          11: failed
+          100: not_supported
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.13
+        name: cucsEquipmentFanPresence
+        description: "Presence state of the fan"
+        family: Fan/Presence/Status
+        unit: "{status}"
+        mapping:
+          0: unknown
+          1: empty
+          10: equipped
+          11: missing
+          12: mismatch
+          13: equipped_not_primary
+          14: equipped_slave
+          15: mismatch_slave
+          16: missing_slave
+          20: equipped_identity_unestablishable
+          21: mismatch_identity_unestablishable
+          22: equipped_with_malformed_fru
+          30: inaccessible
+          40: unauthorized
+          100: not_supported
+          101: equipped_unsupported
+          102: equipped_disc_not_started
+          103: equipped_disc_in_progress
+          104: equipped_disc_error
+          105: equipped_disc_unknown
     metric_tags:
       - symbol:
           name: cucsEquipmentFanDn
@@ -571,12 +670,17 @@ metrics:
           0: chassis
           1: switch
           2: fex
-        description: "Type of the fan"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.9
-          name: cucsEquipmentFanOperState
-        tag: cucs_equipment_fan_oper_state
+
+  - MIB: CISCO-UNIFIED-COMPUTING-EQUIPMENT-MIB
+    table:
+      name: cucsEquipmentPsuTable
+      OID: 1.3.6.1.4.1.9.9.719.1.15.56
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.7
+        name: cucsEquipmentPsuOperState
+        description: "Operational state of the psu"
+        family: PowerSupply/Operational/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -610,12 +714,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operational state of the fan"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.10
-          name: cucsEquipmentFanOperability
-        tag: cucs_equipment_fan_operability
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.8
+        name: cucsEquipmentPsuOperability
+        description: "Operability state of the psu"
+        family: PowerSupply/Operability/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -649,12 +752,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operability state of the fan"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.11
-          name: cucsEquipmentFanPerf
-        tag: cucs_equipment_fan_perf
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.9
+        name: cucsEquipmentPsuPerf
+        description: "Performance state of the psu"
+        family: PowerSupply/Performance/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: ok
@@ -665,12 +767,11 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "Performance state of the fan"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.12
-          name: cucsEquipmentFanPower
-        tag: cucs_equipment_fan_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.10
+        name: cucsEquipmentPsuPower
+        description: "Power state of the psu"
+        family: PowerSupply/Power/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -685,12 +786,11 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "Power state of the fan"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.12.1.13
-          name: cucsEquipmentFanPresence
-        tag: cucs_equipment_fan_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.11
+        name: cucsEquipmentPsuPresence
+        description: "Presence state of the psu"
+        family: PowerSupply/Presence/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -712,16 +812,6 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "Presence state of the fan"
-        unit: "TBD"
-  - MIB: CISCO-UNIFIED-COMPUTING-EQUIPMENT-MIB
-    table:
-      name: cucsEquipmentPsuTable
-      OID: 1.3.6.1.4.1.9.9.719.1.15.56
-    symbols:
-      - name: cucsEquipmentPsu
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsEquipmentPsuDn
@@ -731,24 +821,30 @@ metrics:
           name: cucsEquipmentPsuModel
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.6
         tag: cucs_equipment_psu_model
-        description: "Cisco UCS equipment:Psu:model managed object property"
-        unit: "TBD"
       - symbol:
           name: cucsEquipmentPsuRevision
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.12
         tag: cucs_equipment_psu_revision
-        description: "Cisco UCS equipment:Psu:revision managed object property"
-        unit: "TBD"
       - symbol:
           name: cucsEquipmentPsuSerial
           OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.13
         tag: cucs_equipment_psu_serial
-        description: "Cisco UCS equipment:Psu:serial managed object property"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.7
-          name: cucsEquipmentPsuOperState
-        tag: cucs_equipment_psu_oper_state
+
+  - MIB: CISCO-UNIFIED-COMPUTING-MEMORY-MIB
+    table:
+      name: cucsMemoryUnitTable
+      OID: 1.3.6.1.4.1.9.9.719.1.30.11
+    symbols:
+      - name: cucsMemoryUnitCapacity
+        OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.6
+        description: "Capacity of the memory unit"
+        family: Memory/Capacity
+        unit: "By"
+      - OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.13
+        name: cucsMemoryUnitOperState
+        description: "Operational state of the memory unit"
+        family: Memory/Operational/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -782,12 +878,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operational state of the psu"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.8
-          name: cucsEquipmentPsuOperability
-        tag: cucs_equipment_psu_operability
+      - OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.14
+        name: cucsMemoryUnitOperability
+        description: "Operability state of the memory unit"
+        family: Memory/Operability/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -821,12 +916,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operability state of the psu"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.9
-          name: cucsEquipmentPsuPerf
-        tag: cucs_equipment_psu_perf
+      - OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.15
+        name: cucsMemoryUnitPerf
+        description: "Performance state of the memory unit"
+        family: Memory/Performance/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: ok
@@ -837,12 +931,11 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "Performance state of the psu"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.10
-          name: cucsEquipmentPsuPower
-        tag: cucs_equipment_psu_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.16
+        name: cucsMemoryUnitPower
+        description: "Power state of the memory unit"
+        family: Memory/Power/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -857,12 +950,11 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "Power state of the psu"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.15.56.1.11
-          name: cucsEquipmentPsuPresence
-        tag: cucs_equipment_psu_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.17
+        name: cucsMemoryUnitPresence
+        description: "Presence state of the memory unit"
+        family: Memory/Presence/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -884,18 +976,6 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "Presence state of the psu"
-        unit: "TBD"
-  - MIB: CISCO-UNIFIED-COMPUTING-MEMORY-MIB
-    table:
-      name: cucsMemoryUnitTable
-      OID: 1.3.6.1.4.1.9.9.719.1.30.11
-    symbols:
-      - name: cucsMemoryUnitCapacity
-        OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.6
-        description: "Capacity of the memory unit"
-        unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsMemoryUnitDn
@@ -905,8 +985,6 @@ metrics:
           name: cucsMemoryUnitLocation
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.11
         tag: cucs_memory_unit_location
-        description: "Location of the memory unit"
-        unit: "TBD"
       - symbol:
           name: cucsMemoryUnitType
           OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.23
@@ -927,7 +1005,7 @@ metrics:
           12: eprom
           13: cdram
           14: n3dram
-          15: sdram
+          15: Flex Flashram
           16: sgram
           17: rdram
           18: ddr
@@ -936,12 +1014,67 @@ metrics:
           24: ddr3
           25: fbd2
           26: ddr4
-        description: "Type of the memory unit"
-        unit: "TBD"
+
+  - MIB: CISCO-UNIFIED-COMPUTING-MEMORY-MIB
+    table:
+      name: cucsMemoryUnitEnvStatsTable
+      OID: 1.3.6.1.4.1.9.9.719.1.30.12
+    symbols:
+      - name: cucsMemoryUnitEnvStatsTemperature
+        OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.6
+        description: "Temperature"
+        family: Memory/Temperature
+        unit: "Cel"
+    metric_tags:
       - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.13
-          name: cucsMemoryUnitOperState
-        tag: cucs_memory_unit_oper_state
+          name: cucsMemoryUnitEnvStatFlex Flashn
+          OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.2
+        tag: cucs_memory_unit_env_stats_dn
+
+  - MIB: CISCO-UNIFIED-COMPUTING-PROCESSOR-MIB
+    table:
+      name: cucsProcessorEnvStatsTable
+      OID: 1.3.6.1.4.1.9.9.719.1.41.2
+    symbols:
+      - name: cucsProcessorEnvStatsTemperature
+        OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.10
+        description: "Temperature"
+        family: Processor/Temperature
+        unit: "Cel"
+    metric_tags:
+      - symbol:
+          name: cucsProcessorEnvStatFlex Flashn
+          OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.2
+        tag: cucs_processor_env_stats_dn
+
+  - MIB: CISCO-UNIFIED-COMPUTING-PROCESSOR-MIB
+    table:
+      name: cucsProcessorUnitTable
+      OID: 1.3.6.1.4.1.9.9.719.1.41.9
+    symbols:
+      - name: cucsProcessorUnit
+        constant_value_one: true
+      # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.5
+        name: cucsProcessorUnitCores
+        description: "Number of cores"
+        family: Processor/Cores/Total
+        unit: "{core}"
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.6
+        name: cucsProcessorUnitCoresEnabled
+        description: "Number of cores enabled"
+        family: Processor/Cores/Enabled
+        unit: "{core}"
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.20
+        name: cucsProcessorUnitThreads
+        description: "Number of threads"
+        family: Processor/Threads
+        unit: "{thread}"
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.9
+        name: cucsProcessorUnitOperState
+        description: "Operational state of the processor unit"
+        family: Processor/Operational/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -975,12 +1108,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operational state of the memory unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.14
-          name: cucsMemoryUnitOperability
-        tag: cucs_memory_unit_operability
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.10
+        name: cucsProcessorUnitOperability
+        description: "Operability state of the processor unit"
+        family: Processor/Operability/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -1014,12 +1146,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operability state of the memory unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.15
-          name: cucsMemoryUnitPerf
-        tag: cucs_memory_unit_perf
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.11
+        name: cucsProcessorUnitPerf
+        description: "Performance state of the processor unit"
+        family: Processor/Performance/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: ok
@@ -1030,12 +1161,11 @@ metrics:
           6: lower_critical
           7: lower_non_recoverable
           100: not_supported
-        description: "Performance state of the memory unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.16
-          name: cucsMemoryUnitPower
-        tag: cucs_memory_unit_power
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.12
+        name: cucsProcessorUnitPower
+        description: "Power state of the processor unit"
+        family: Processor/Power/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: on
@@ -1050,12 +1180,11 @@ metrics:
           10: ok
           11: failed
           100: not_supported
-        description: "Power state of the memory unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.30.11.1.17
-          name: cucsMemoryUnitPresence
-        tag: cucs_memory_unit_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.13
+        name: cucsProcessorUnitPresence
+        description: "Presence state of the processor unit"
+        family: Processor/Presence/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -1077,44 +1206,6 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "Presence state of the memory unit"
-        unit: "TBD"
-  - MIB: CISCO-UNIFIED-COMPUTING-MEMORY-MIB
-    table:
-      name: cucsMemoryUnitEnvStatsTable
-      OID: 1.3.6.1.4.1.9.9.719.1.30.12
-    symbols:
-      - name: cucsMemoryUnitEnvStatsTemperature
-        OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.6
-        description: "Temperature"
-        unit: "Cel"
-    metric_tags:
-      - symbol:
-          name: cucsMemoryUnitEnvStatsDn
-          OID: 1.3.6.1.4.1.9.9.719.1.30.12.1.2
-        tag: cucs_memory_unit_env_stats_dn
-  - MIB: CISCO-UNIFIED-COMPUTING-PROCESSOR-MIB
-    table:
-      name: cucsProcessorEnvStatsTable
-      OID: 1.3.6.1.4.1.9.9.719.1.41.2
-    symbols:
-      - name: cucsProcessorEnvStatsTemperature
-        OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.10
-        description: "Temperature"
-        unit: "Cel"
-    metric_tags:
-      - symbol:
-          name: cucsProcessorEnvStatsDn
-          OID: 1.3.6.1.4.1.9.9.719.1.41.2.1.2
-        tag: cucs_processor_env_stats_dn
-  - MIB: CISCO-UNIFIED-COMPUTING-PROCESSOR-MIB
-    table:
-      name: cucsProcessorUnitTable
-      OID: 1.3.6.1.4.1.9.9.719.1.41.9
-    symbols:
-      - name: cucsProcessorUnit
-        constant_value_one: true
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
     metric_tags:
       - symbol:
           name: cucsProcessorUnitDn
@@ -1133,179 +1224,15 @@ metrics:
           178: pentium4
           179: xeon
           181: xeon_mp
-        description: "Architecture of the processor unit"
-        unit: "TBD"
-      - symbol:
-          name: cucsProcessorUnitCores
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.5
-        tag: cucs_processor_unit_cores
-        description: "Number of cores"
-        unit: "\"{core}\""
-      - symbol:
-          name: cucsProcessorUnitCoresEnabled
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.6
-        tag: cucs_processor_unit_cores_enabled
-        description: "Number of cores enabled"
-        unit: "\"{core}\""
       - symbol:
           name: cucsProcessorUnitModel
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.8
         tag: cucs_processor_unit_model
-        description: "Model of the processor unit"
-        unit: "TBD"
-      - symbol:
-          name: cucsProcessorUnitThreads
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.20
-        tag: cucs_processor_unit_threads
-        description: "Number of threads"
-        unit: "{thread}"
       - symbol:
           name: cucsProcessorUnitVendor
           OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.21
         tag: cucs_processor_unit_vendor
-        description: "Vendor of the processor unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.9
-          name: cucsProcessorUnitOperState
-        tag: cucs_processor_unit_oper_state
-        mapping:
-          0: unknown
-          1: operable
-          2: inoperable
-          3: degraded
-          4: powered_off
-          5: power_problem
-          6: removed
-          7: voltage_problem
-          8: thermal_problem
-          9: performance_problem
-          10: accessibility_problem
-          11: identity_unestablishable
-          12: bios_post_timeout
-          13: disabled
-          14: malformed_fru
-          15: backplane_port_problem
-          16: chassis_intrusion
-          51: fabric_conn_problem
-          52: fabric_unsupported_conn
-          81: config
-          82: equipment_problem
-          83: decomissioning
-          84: chassis_limit_exceeded
-          100: not_supported
-          101: discovery
-          102: discovery_failed
-          103: identify
-          104: post_failure
-          105: upgrade_problem
-          106: peer_comm_problem
-          107: auto_upgrade
-          108: link_activate_blocked
-        description: "Operational state of the processor unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.10
-          name: cucsProcessorUnitOperability
-        tag: cucs_processor_unit_operability
-        mapping:
-          0: unknown
-          1: operable
-          2: inoperable
-          3: degraded
-          4: powered_off
-          5: power_problem
-          6: removed
-          7: voltage_problem
-          8: thermal_problem
-          9: performance_problem
-          10: accessibility_problem
-          11: identity_unestablishable
-          12: bios_post_timeout
-          13: disabled
-          14: malformed_fru
-          15: backplane_port_problem
-          16: chassis_intrusion
-          51: fabric_conn_problem
-          52: fabric_unsupported_conn
-          81: config
-          82: equipment_problem
-          83: decomissioning
-          84: chassis_limit_exceeded
-          100: not_supported
-          101: discovery
-          102: discovery_failed
-          103: identify
-          104: post_failure
-          105: upgrade_problem
-          106: peer_comm_problem
-          107: auto_upgrade
-          108: link_activate_blocked
-        description: "Operability state of the processor unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.11
-          name: cucsProcessorUnitPerf
-        tag: cucs_processor_unit_perf
-        mapping:
-          0: unknown
-          1: ok
-          2: upper_non_recoverable
-          3: upper_critical
-          4: upper_non_critical
-          5: lower_non_critical
-          6: lower_critical
-          7: lower_non_recoverable
-          100: not_supported
-        description: "Performance state of the processor unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.12
-          name: cucsProcessorUnitPower
-        tag: cucs_processor_unit_power
-        mapping:
-          0: unknown
-          1: on
-          2: test
-          3: off
-          4: online
-          5: offline
-          6: offduty
-          7: degraded
-          8: power_save
-          9: error
-          10: ok
-          11: failed
-          100: not_supported
-        description: "Power state of the processor unit"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.41.9.1.13
-          name: cucsProcessorUnitPresence
-        tag: cucs_processor_unit_presence
-        mapping:
-          0: unknown
-          1: empty
-          10: equipped
-          11: missing
-          12: mismatch
-          13: equipped_not_primary
-          14: equipped_slave
-          15: mismatch_slave
-          16: missing_slave
-          20: equipped_identity_unestablishable
-          21: mismatch_identity_unestablishable
-          22: equipped_with_malformed_fru
-          30: inaccessible
-          40: unauthorized
-          100: not_supported
-          101: equipped_unsupported
-          102: equipped_disc_not_started
-          103: equipped_disc_in_progress
-          104: equipped_disc_error
-          105: equipped_disc_unknown
-        description: "Presence state of the processor unit"
-        unit: "TBD"
+
   - MIB: CISCO-UNIFIED-COMPUTING-STORAGE-MIB
     table:
       name: cucsStorageFlexFlashCardTable
@@ -1314,71 +1241,48 @@ metrics:
       - name: cucsStorageFlexFlashCardReadIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.19
         description: "Read io error count"
+        family: Storage/FlexFlash/Error/Read
         unit: "{error}"
       - name: cucsStorageFlexFlashCardSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.22
         description: "Size of the flex flash card"
+        family: Storage/FlexFlash/Capacity
         unit: "By"
       - name: cucsStorageFlexFlashCardWriteIOErrorCount
         OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.26
         description: "Write io error count"
+        family: Storage/FlexFlash/Error/Write
         unit: "{error}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: cucsStorageFlexFlashCardDn
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.2
-        tag: cucs_storage_flex_flash_card_dn
-      - symbol:
-          name: cucsStorageFlexFlashCardCardMode
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.6
-        tag: cucs_storage_flex_flash_card_mode
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.6
+        name: cucsStorageFlexFlashCardCardMode
+        description: "Mode of the flex flash card"
+        family: Storage/FlexFlash/Mode/Status
+        unit: "{status}"
         mapping:
           0: ff_phy_drive_unpaired_primary
           1: ff_phy_drive_primary
           2: ff_phy_drive_secondary_act
           3: ff_phy_drive_secondary_unhealthy
-        description: "Mode of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashCardCardType
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.7
-        tag: cucs_storage_flex_flash_card_card_type
-        description: "Type of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashCardConnectionProtocol
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.8
-        tag: cucs_storage_flex_flash_card_connection_protocol
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.8
+        name: cucsStorageFlexFlashCardConnectionProtocol
+        description: "Connection protocol of the flex flash card"
+        family: Storage/FlexFlash/Protocol/Type
+        unit: "{status}"
         mapping:
           0: unspecified
           1: sas
           2: sata
           3: nvme
-        description: "Connection protocol of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashCardRevision
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.20
-        tag: cucs_storage_flex_flash_card_revision
-        description: "Revision of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashCardSerial
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.21
-        tag: cucs_storage_flex_flash_card_serial
-        description: "Serial of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashCardDrivesEnabled
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.29
-        tag: cucs_storage_flex_flash_card_drives_enabled
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.29
+        name: cucsStorageFlexFlashCardDrivesEnabled
         description: "Number of drives enabled"
+        family: Storage/FlexFlash/Drive/Enabled
         unit: "{drive}"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.5
-          name: cucsStorageFlexFlashCardCardHealth
-        tag: cucs_storage_flex_flash_card_card_health
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.5
+        name: cucsStorageFlexFlashCardCardHealth
+        description: "Health state of the flex flash card"
+        family: Storage/FlexFlash/Health/Status
+        unit: "{status}"
         mapping:
           0: ff_phy_health_na
           1: ff_phy_health_ok
@@ -1386,12 +1290,11 @@ metrics:
           3: ff_phy_unhealthy_other
           4: ff_phy_raid_sync_in_progress
           5: ff_phy_raid_out_of_sync
-        description: "Health state of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.17
-          name: cucsStorageFlexFlashCardOperability
-        tag: cucs_storage_flex_flash_card_operability
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.17
+        name: cucsStorageFlexFlashCardOperability
+        description: "Operability state of the flex flash card"
+        family: Storage/FlexFlash/Operability/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -1425,12 +1328,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operability state of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.18
-          name: cucsStorageFlexFlashCardPresence
-        tag: cucs_storage_flex_flash_card_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.18
+        name: cucsStorageFlexFlashCardPresence
+        description: "Presence state of the flex flash card"
+        family: Storage/FlexFlash/Presence/Status
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -1452,12 +1354,11 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "Presence state of the flex flash card"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.27
-          name: cucsStorageFlexFlashCardCardState
-        tag: cucs_storage_flex_flash_card_card_state
+      - name: cucsStorageFlexFlashCardCardState
+        OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.27
+        description: "State of the flex flash card"
+        family: Storage/FlexFlash/Status
+        unit: "{status}"
         mapping:
           0: undefined
           1: configured
@@ -1466,19 +1367,35 @@ metrics:
           4: ignored
           5: failed
           6: unknown
-        description: "State of the flex flash card"
-        unit: "TBD"
       - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.28
-          name: cucsStorageFlexFlashCardCardSync
-        tag: cucs_storage_flex_flash_card_card_sync
+        OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.28
+        name: cucsStorageFlexFlashCardCardSync
+        description: "Sync state of the flex flash card"
+        family: Storage/FlexFlash/Sync/Status
+        unit: "{status}"
         mapping:
           0: na
           1: manual
           2: auto
           3: unknown
-        description: "Sync state of the flex flash card"
-        unit: "TBD"
+    metric_tags:
+      - symbol:
+          name: cucsStorageFlexFlashCardDn
+          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.2
+        tag: cucs_storage_flex_flash_card_dn
+      - symbol:
+          name: cucsStorageFlexFlashCardCardType
+          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.7
+        tag: cucs_storage_flex_flash_card_card_type
+      - symbol:
+          name: cucsStorageFlexFlashCardRevision
+          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.20
+        tag: cucs_storage_flex_flash_card_revision
+      - symbol:
+          name: cucsStorageFlexFlashCardSerial
+          OID: 1.3.6.1.4.1.9.9.719.1.45.34.1.21
+        tag: cucs_storage_flex_flash_card_serial
+
   - MIB: CISCO-UNIFIED-COMPUTING-STORAGE-MIB
     table:
       name: cucsStorageFlexFlashDriveTable
@@ -1487,89 +1404,34 @@ metrics:
       - name: cucsStorageFlexFlashDriveSize
         OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.18
         description: "Size of the flex flash drive"
+        family: Storage/FlexFlash/Drive/Capacity
         unit: "By"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          name: cucsStorageFlexFlashDriveDn
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.2
-        tag: cucs_storage_flex_flash_drive_dn
-      - symbol:
-          name: cucsStorageFlexFlashDriveConnectionProtocol
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.5
-        tag: cucs_storage_flex_flash_drive_connection_protocol
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.5
+        name: cucsStorageFlexFlashDriveConnectionProtocol
+        description: "Connection protocol of the flex flash drive"
+        family: Storage/FlexFlash/Drive/Protocol
+        unit: "{status}"
         mapping:
           0: unspecified
           1: sas
           2: sata
           3: nvme
-        description: "Connection protocol of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashDriveDriveType
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.8
-        tag: cucs_storage_flex_flash_drive_drive_type
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.8
+        name: cucsStorageFlexFlashDriveDriveType
+        description: "Type of the flex flash drive"
+        family: Storage/FlexFlash/Drive/Type
+        unit: "{status}"
         mapping:
           0: unknown
           1: scu
           2: huu
           3: hv
           4: drivers
-        description: "Type of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashDriveModel
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.10
-        tag: cucs_storage_flex_flash_drive_model
-        description: "Model of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashDriveName
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.11
-        tag: cucs_storage_flex_flash_drive_name
-        description: "Name of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashDriveVisible
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.21
-        tag: cucs_storage_flex_flash_drive_visible
-        mapping:
-          0: no
-          1: yes
-        description: "Visibility state of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashDriveRemovable
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.22
-        tag: cucs_storage_flex_flash_drive_removable
-        mapping:
-          0: na
-          1: yes
-          2: no
-        description: "Removable state of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          name: cucsStorageFlexFlashDriveRWType
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.23
-        tag: cucs_storage_flex_flash_drive_rw_type
-        mapping:
-          0: read_write
-          1: read_only
-        description: "Read/write type of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.7
-          name: cucsStorageFlexFlashDriveDriveState
-        tag: cucs_storage_flex_flash_drive_state
-        mapping:
-          0: nonraid
-          1: raid
-        description: "Drive state of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.14
-          name: cucsStorageFlexFlashDriveOperability
-        tag: cucs_storage_flex_flash_drive_operability
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.14
+        name: cucsStorageFlexFlashDriveOperability
+        description: "Operability state of the flex flash drive"
+        family: Storage/FlexFlash/Drive/Operability
+        unit: "{status}"
         mapping:
           0: unknown
           1: operable
@@ -1603,12 +1465,11 @@ metrics:
           106: peer_comm_problem
           107: auto_upgrade
           108: link_activate_blocked
-        description: "Operability state of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.15
-          name: cucsStorageFlexFlashDrivePresence
-        tag: cucs_storage_flex_flash_drive_presence
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.15
+        name: cucsStorageFlexFlashDrivePresence
+        description: "Presence state of the flex flash drive"
+        family: Storage/FlexFlash/Drive/Presence
+        unit: "{status}"
         mapping:
           0: unknown
           1: empty
@@ -1630,12 +1491,11 @@ metrics:
           103: equipped_disc_in_progress
           104: equipped_disc_error
           105: equipped_disc_unknown
-        description: "Presence state of the flex flash drive"
-        unit: "TBD"
-      - symbol:
-          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.25
-          name: cucsStorageFlexFlashDriveOperationState
-        tag: cucs_storage_flex_flash_drive_operation_state
+      - OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.25
+        name: cucsStorageFlexFlashDriveOperationState
+        description: "Operation state of the flex flash drive"
+        family: Storage/FlexFlash/Drive/Operation
+        unit: "{status}"
         mapping:
           0: partition_non_mirrored
           1: partition_mirrored
@@ -1655,5 +1515,45 @@ metrics:
           15: partition_non_mirrored_updating_success
           16: partition_non_mirrored_erasing_success
           17: unknown
-        description: "Operation state of the flex flash drive"
-        unit: "TBD"
+    metric_tags:
+      - symbol:
+          name: cucsStorageFlexFlashDriveDn
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.2
+        tag: cucs_storage_flex_flash_drive_dn
+      - symbol:
+          name: cucsStorageFlexFlashDriveModel
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.10
+        tag: cucs_storage_flex_flash_drive_model
+      - symbol:
+          name: cucsStorageFlexFlashDriveName
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.11
+        tag: cucs_storage_flex_flash_drive_name
+      - symbol:
+          name: cucsStorageFlexFlashDriveVisible
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.21
+        tag: cucs_storage_flex_flash_drive_visible
+        mapping:
+          0: no
+          1: yes
+      - symbol:
+          name: cucsStorageFlexFlashDriveRemovable
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.22
+        tag: cucs_storage_flex_flash_drive_removable
+        mapping:
+          0: na
+          1: yes
+          2: no
+      - symbol:
+          name: cucsStorageFlexFlashDriveRWType
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.23
+        tag: cucs_storage_flex_flash_drive_rw_type
+        mapping:
+          0: read_write
+          1: read_only
+      - symbol:
+          OID: 1.3.6.1.4.1.9.9.719.1.45.36.1.7
+          name: cucsStorageFlexFlashDriveDriveState
+        tag: cucs_storage_flex_flash_drive_state
+        mapping:
+          0: nonraid
+          1: raid

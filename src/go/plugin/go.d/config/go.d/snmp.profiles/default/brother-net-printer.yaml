@@ -1,55 +1,76 @@
 extends:
   - brother.yaml
-sysobjectid:
-  - 1.3.6.1.4.1.2435.2.3.9.1
+
 metadata:
   device:
     fields:
       type:
-        value: "printer"
+        value: "Printer"
+
+sysobjectid:
+  - 1.3.6.1.4.1.2435.2.3.9.1
 metrics:
   - MIB: BROTHER-MIB
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.9.0
       name: brJamPlace
-    description: Location of jam
-    unit: "{jam_location}"
+      description: Location of jam
+      family: Printer/Jam/Location/Status
+      unit: "{status}"
+      mapping:
+        0: No Jam
+        1: Trays
+        2: Inside
+        3: Rear
+        4: Duplex unit
   - MIB: BROTHER-MIB
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.1.0
       name: brToner1Low
-    description: Black toner status
-    unit: "{status}"
+      description: Black toner status
+      family: Printer/Toner/Black/Status
+      unit: "{status}"
+      mapping:
+        0: Toner Full
+        1: Toner Low
+        2: No Toner Cartridge
+        3: Toner Empty
   - MIB: BROTHER-MIB
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.2.0
       name: brToner2Low
-    description: Cyan toner status
-    unit: "{status}"
+      description: Cyan toner status
+      family: Printer/Toner/Cyan/Status
+      unit: "{status}"
+      mapping:
+        0: Toner Ready
+        1: Toner Low
+        2: No Toner Cartridge
+        3: Toner Empty
   - MIB: BROTHER-MIB
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.3.0
       name: brToner3Low
-    description: Magenta toner status
-    unit: "{status}"
+      description: Magenta toner status
+      family: Printer/Toner/Magenta/Status
+      unit: "{status}"
+      mapping:
+        0: Toner Ready
+        1: Toner Low
+        2: No Toner Cartridge
+        3: Toner Empty
   - MIB: BROTHER-MIB
     symbol:
       OID: 1.3.6.1.4.1.2435.2.3.9.1.1.2.10.4.0
       name: brToner4Low
-    description: Yellow toner status
-    unit: "{status}"
-  - MIB: BROTHER-MIB
-    table:
-      name: brErrorHistoryTable
-      OID: 1.3.6.1.4.1.2435.2.3.9.4.2.1.5.5.51.2
-    symbols:
-      - name: brErrorHistory
-        constant_value_one: true
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.2435.2.3.9.4.2.1.5.5.51.2.1.2
-          name: brErrorHistoryDescription
-        tag: br_error_history_description
+      description: Yellow toner status
+      family: Printer/Toner/Yellow/Status
+      unit: "{status}"
+      mapping:
+        0: Toner Ready
+        1: Toner Low
+        2: No Toner Cartridge
+        3: Toner Empty
 metric_tags:
   - OID: 1.3.6.1.4.1.2435.2.3.9.4.2.1.5.5.1.0
     symbol: brInfoSerialNumber

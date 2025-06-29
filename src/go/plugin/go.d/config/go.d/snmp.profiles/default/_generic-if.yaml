@@ -66,7 +66,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.2
           name: ifDescr
-      - tag: if_type
+      - tag: _if_type
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
@@ -134,7 +134,7 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.2
           name: ifDescr
-      - tag: if_type
+      - tag: _if_type
         table: ifTable
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.3

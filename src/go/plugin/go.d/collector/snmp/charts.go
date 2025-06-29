@@ -333,7 +333,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	if chart.Fam == "" {
 		chart.Fam = m.Name
 	}
-	if chart.Units == "bits/s" {
+	if chart.Units == "bit/s" {
 		chart.Type = module.Area
 	}
 
@@ -348,9 +348,13 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	}
 
 	if len(m.Mappings) > 0 {
+		seen := make(map[string]bool)
 		for _, v := range m.Mappings {
-			id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
-			chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+			if !seen[v] {
+				seen[v] = true
+				id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, v)
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+			}
 		}
 	} else {
 		id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
@@ -389,22 +393,32 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	if chart.Fam == "" {
 		chart.Fam = m.Name
 	}
+	if chart.Units == "bit/s" {
+		chart.Type = module.Area
+	}
 
 	tags := map[string]string{
 		"vendor":  c.sysInfo.Organization,
 		"sysName": c.sysInfo.Name,
 	}
 	maps.Copy(tags, m.Profile.Tags)
-	maps.Copy(tags, m.Tags)
+	for k, v := range m.Tags {
+		newKey := strings.TrimPrefix(k, "_")
+		tags[newKey] = v
+	}
 
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
 	}
 
 	if len(m.Mappings) > 0 {
+		seen := make(map[string]bool)
 		for _, v := range m.Mappings {
-			id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
-			chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+			if !seen[v] {
+				seen[v] = true
+				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: v, Algo: module.Absolute})
+			}
 		}
 	} else {
 		id := fmt.Sprintf("snmp_device_prof_%s", key)
@@ -419,10 +433,14 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 }
 
 func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {
-	if m.MetricType == ddprofiledefinition.ProfileMetricTypeGauge {
+	switch m.MetricType {
+	case ddprofiledefinition.ProfileMetricTypeGauge,
+		ddprofiledefinition.ProfileMetricTypeMonotonicCount,
+		ddprofiledefinition.ProfileMetricTypeMonotonicCountAndRate:
 		return module.Absolute
+	default:
+		return module.Incremental
 	}
-	return module.Incremental
 }
 
 func cleanIfaceName(name string) string {

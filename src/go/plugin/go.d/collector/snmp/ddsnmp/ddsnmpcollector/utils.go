@@ -3,7 +3,6 @@
 package ddsnmpcollector
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -13,39 +12,8 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
-
-func convSymMappingToNumeric(cfg ddprofiledefinition.SymbolConfig) map[int64]string {
-	if len(cfg.Mapping) == 0 {
-		return nil
-	}
-
-	mappings := make(map[int64]string)
-
-	if isMappingKeysNumeric(cfg.Mapping) {
-		for k, v := range cfg.Mapping {
-			intKey, _ := strconv.ParseInt(k, 10, 64)
-			mappings[intKey] = v
-		}
-	} else {
-		for k, v := range cfg.Mapping {
-			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
-				mappings[intVal] = k
-			}
-		}
-	}
-
-	return mappings
-}
-
-func getMetricType(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
-	if sym.MetricType != "" {
-		return sym.MetricType
-	}
-	return getMetricTypeFromPDUType(pdu)
-}
 
 func getMetricTypeFromPDUType(pdu gosnmp.SnmpPDU) ddprofiledefinition.ProfileMetricType {
 	switch pdu.Type {
@@ -246,36 +214,10 @@ func isInt(s string) bool {
 	return err == nil
 }
 
-func isMappingKeysNumeric(mapping map[string]string) bool {
-	for k := range mapping {
-		if !isInt(k) {
-			return false
-		}
-	}
-	return true
-}
-
 func mergeTagsWithEmptyFallback(dest, src map[string]string) {
 	for k, v := range src {
 		if existing, ok := dest[k]; !ok || existing == "" {
 			dest[k] = v
 		}
 	}
-}
-
-func applyTransform(metric *ddsnmp.Metric, sym ddprofiledefinition.SymbolConfig) error {
-	if sym.TransformCompiled == nil {
-		return nil
-	}
-
-	type transformCtx struct{ Metric *ddsnmp.Metric }
-
-	ctx := &transformCtx{Metric: metric}
-
-	var buf bytes.Buffer
-	if err := sym.TransformCompiled.Execute(&buf, ctx); err != nil {
-		return fmt.Errorf("failed to execute transform template: %w", err)
-	}
-
-	return nil
 }

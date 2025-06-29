@@ -6,7 +6,7 @@ metadata:
   device:
     fields:
       vendor:
-        value: "3com"
+        value: "3Com-Huawei"
 
 sysobjectid:
-  - 1.3.6.1.4.1.43.1.*  # 3Com products
+  - 1.3.6.1.4.1.43.1.* # 3Com products

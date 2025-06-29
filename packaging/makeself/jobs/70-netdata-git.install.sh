@@ -27,15 +27,26 @@ NETDATA_BUILD_DIR="$(build_path netdata)"
 export NETDATA_BUILD_DIR
 
 case "${BUILDARCH}" in
-    *) export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
+    armv6l)
+        export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
+        export INSTALLER_ARGS="--disable-plugin-systemd-journal"
+        ;;
+    *)
+        export NETDATA_CMAKE_OPTIONS="-DENABLE_LIBBACKTRACE=On"
+        export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal"
+        ;;
 esac
+
+export RUSTFLAGS="-C target-feature=+crt-static"
 
 run ./netdata-installer.sh \
   --install-prefix "${NETDATA_INSTALL_PARENT}" \
   --dont-wait \
   --dont-start-it \
   --disable-exporting-mongodb \
+  --enable-plugin-systemd-journal \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
   --enable-lto \
+  ${INSTALLER_ARGS:+${INSTALLER_ARGS}} \
   ${EXTRA_INSTALL_FLAGS:+${EXTRA_INSTALL_FLAGS}} \
