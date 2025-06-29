@@ -391,7 +391,7 @@ func (w *WebSpherePMI) setConfigurationDefaults() {
 }
 
 func (w *WebSpherePMI) validateConfig() error {
-	if w.HTTPConfig.RequestConfig.URL == "" {
+	if w.HTTPConfig.URL == "" {
 		return errors.New("url is required")
 	}
 
@@ -483,7 +483,7 @@ func (w *WebSpherePMI) initSelectors() error {
 
 func (w *WebSpherePMI) buildPMIURL() error {
 	// Require complete URL - no path inference
-	w.pmiURL = strings.TrimSpace(w.HTTPConfig.RequestConfig.URL)
+	w.pmiURL = strings.TrimSpace(w.HTTPConfig.URL)
 
 	if w.pmiURL == "" {
 		return errors.New("url is required")
@@ -606,8 +606,8 @@ func (w *WebSpherePMI) fetchPMIStats(ctx context.Context) (*pmiStatsResponse, er
 	}
 
 	// Add authentication if configured
-	if w.HTTPConfig.RequestConfig.Username != "" && w.HTTPConfig.RequestConfig.Password != "" {
-		req.SetBasicAuth(w.HTTPConfig.RequestConfig.Username, w.HTTPConfig.RequestConfig.Password)
+	if w.HTTPConfig.Username != "" && w.HTTPConfig.Password != "" {
+		req.SetBasicAuth(w.HTTPConfig.Username, w.HTTPConfig.Password)
 	}
 
 	// Execute request
