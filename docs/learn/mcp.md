@@ -1,140 +1,244 @@
-# Netdata MCP Integration: AI-Powered Infrastructure Analysis
+# Netdata MCP
 
-:::info
+All Netdata Agents and Parents are Model Context Protocol (MCP) servers, enabling AI assistants to interact with your infrastructure monitoring data.
 
-The Netdata MCP Server preview is live. [Get early access](https://b6yi53u6qjm.typeform.com/to/DQi5ibhE?typeform-source=www.netdata.cloud) or visit our GitHub repository for the latest nd-mcp tools and setup instructions.
+Every Netdata Agent and Parent includes an MCP server that:
 
-:::
+- Implements the protocol as WebSocket for transport
+- Provides read-only access to metrics, logs, alerts, and live system information
+- Requires no additional installation - it's part of Netdata
 
-:::note
+## Visibility Scope
 
-This integration leverages new and evolving AI technologies. While Netdata provides comprehensive infrastructure monitoring capabilities, the AI analysis features **depend on external AI services** and their inherent limitations. The quality and accuracy of AI-generated insights are **subject to the capabilities and constraints of the underlying AI models, not Netdata's monitoring functionality**.
+Netdata provides comprehensive access to all available observability data through MCP, including complete metadata:
 
-:::
+- **Node Discovery** - Hardware specifications, operating system details, version information, streaming topology, and associated metadata
+- **Metrics Discovery** - Full-text search capabilities across contexts, instances, dimensions, and labels
+- **Function Discovery** - Access to system functions including `processes`, `network-connections`, `streaming`, `systemd-journal`, `windows-events`, etc.
+- **Alert Discovery** - Real-time visibility into active and raised alerts
+- **Metrics Queries** - Complex aggregations and groupings with ML-powered anomaly detection
+- **Metrics Scoring** - Root cause analysis leveraging anomaly detection and metric correlations
+- **Alert History** - Complete alert transition logs and state changes
+- **Function Execution** - Execute Netdata functions on any connected node (requires Netdata Parent)
+- **Log Exploration** - Access logs from any connected node (requires Netdata Parent)
 
-## What is MCP?
+For sensitive features currently protected by Netdata Cloud SSO, a temporary MCP API key is generated on each Netdata instance. When included in the MCP connection string, this key unlocks access to sensitive data and protected functions (like `systemd-journal`, `windows-events` and `processes`). This temporary API key mechanism will eventually be replaced with a new authentication system integrated with Netdata Cloud.
 
-**Model Context Protocol (MCP)** is a new open standard that allows AI assistants to connect directly to your data sources and tools. Think of it as a bridge that lets AI systems access and analyze your real-time infrastructure data instead of just providing generic advice.
+AI assistants have different visibility depending on where they connect:
 
-:::note
+- **Netdata Cloud**: (coming soon) Full visibility across all nodes in your infrastructure
+- **Netdata Parent Node**: Visibility across all child nodes connected to that parent
+- **Netdata Child/Standalone Node**: Visibility only into that specific node
 
-**Learn More**: MCP is an open standard created by Anthropic. For technical details about the protocol specification, visit [Anthropic's MCP documentation](https://modelcontextprotocol.io/).
+## Finding the nd-mcp Bridge
 
-:::
+AI clients like Claude Desktop run locally on your computer and use `stdio` communication. Since your Netdata runs remotely on a server, you need a bridge to convert `stdio` to WebSocket communication.
 
-## How Netdata is Pioneering AI-Powered Monitoring
+The `nd-mcp` bridge needs to be available on your desktop or laptop where your AI client runs. Since most users run Netdata on remote servers rather than their local machines, you have two options:
 
-Netdata is **one of the first monitoring platforms** to integrate MCP, placing us among the pioneers in AI-powered infrastructure analysis. We've built a direct connection between advanced AI models (like Claude) and your Netdata monitoring data, creating an intelligent troubleshooting partner that understands your specific infrastructure.
+1. **If you have Netdata installed locally** - Use the existing nd-mcp
+2. **If Netdata is only on remote servers** - Build nd-mcp on your desktop/laptop
 
-### What Makes This Revolutionary
+### Option 1: Using Existing nd-mcp
 
-**Traditional monitoring**: You look at charts and graphs, manually correlating data across different services to find problems.
+If you have Netdata installed on your desktop/laptop, find the existing bridge:
 
-**Netdata with MCP**: AI analyzes your actual monitoring data in real-time, automatically correlates anomalies across your entire infrastructure, and provides expert-level post-mortem analysis.
+#### Linux
 
-## What This Changes for You
+```bash
+# Try these locations in order:
+which nd-mcp
+ls -la /usr/sbin/nd-mcp
+ls -la /usr/bin/nd-mcp
+ls -la /opt/netdata/usr/bin/nd-mcp
+ls -la /usr/local/bin/nd-mcp
+ls -la /usr/local/netdata/usr/bin/nd-mcp
 
-### Instant Expert Analysis
-
-Instead of spending hours analyzing charts during an incident, you can now:
-
-- **Ask natural questions**: "What caused the outage between 13:00-13:30 UTC?"
-- **Get comprehensive post-mortems**: AI analyzes your metrics, identifies root causes, and maps dependency chains
-- **Understand complex correlations**: AI detects which services were affected and why
-
-### Real-World Example
-
-**The Problem**: Database server goes down, affecting multiple applications across your infrastructure.
-
-```mermaid
-flowchart TD
-    A("🚨 Database Outage Occurs")
-    
-    B("📊 Traditional Approach")
-    C("🤖 Netdata + MCP")
-    
-    D("Manual dashboard review<br/>⏱️ Hours of analysis")
-    E("AI analyzes all metrics<br/>⚡ Instant correlation")
-    
-    F("❌ Slow resolution<br/>Missed dependencies")
-    G("✅ Fast resolution<br/>Complete root cause")
-    
-    A --> B
-    A --> C
-    B --> D
-    C --> E
-    D --> F
-    E --> G
-    
-    %% Styling
-    classDef problem fill:#ffeb3b,stroke:#333,stroke-width:2px
-    classDef traditional fill:#ff7043,stroke:#333,stroke-width:2px
-    classDef ai fill:#42a5f5,stroke:#333,stroke-width:2px
-    classDef outcome fill:#f5f5f5,stroke:#333,stroke-width:2px
-    
-    class A problem
-    class B,D traditional
-    class C,E ai
-    class F,G outcome
+# Or search for it:
+find / -name "nd-mcp" 2>/dev/null
 ```
 
-### Advanced Anomaly Detection
+Common locations:
 
-Your AI assistant can:
+- **Native packages (apt, yum, etc.)**: `/usr/sbin/nd-mcp` or `/usr/bin/nd-mcp`
+- **Static installations**: `/opt/netdata/usr/bin/nd-mcp`
+- **Built from source**: `/usr/local/netdata/usr/bin/nd-mcp`
 
-- **Detect anomaly patterns** across your entire infrastructure
-- **Identify cascade failures** before they become critical
-- **Explain complex service dependencies** in plain language
-- **Predict which services will be affected** by specific component failures
+#### macOS
 
-## Current Capabilities
+```bash
+# Try these locations:
+which nd-mcp
+ls -la /usr/local/bin/nd-mcp
+ls -la /usr/local/netdata/usr/bin/nd-mcp
+ls -la /opt/homebrew/bin/nd-mcp
 
-### What You Can Do Today
+# Or search for it:
+find / -name "nd-mcp" 2>/dev/null
+```
 
-| Capability                  | What You Get                                                                                                                                                                                                                                     | Key Benefits                                                                                             |
-|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| **Infrastructure Analysis** | **Post-mortem analysis** of incidents with **root cause identification**, **real-time anomaly correlation** across all your services, **service dependency mapping** and impact analysis, **performance bottleneck identification**              | Understand complex incidents in minutes instead of hours, identify cascading failures before they spread |
-| **Intelligent Querying**    | Ask questions about your infrastructure in **natural language**, get **explanations of complex metrics** and their relationships, understand **streaming configurations** and network topologies, analyze **resource usage patterns** and trends | No more manual chart correlation - just ask and get expert-level insights                                |
-| **Expert Troubleshooting**  | **AI-powered investigation** of performance issues, **automated correlation** of events across your infrastructure, **context-aware recommendations** based on your specific setup                                                               | Get the analysis that would normally require a senior engineer, available 24/7                           |
+#### Windows
 
-### How to Get Started
+```powershell
+# Check common locations:
+dir "C:\Program Files\Netdata\usr\bin\nd-mcp.exe"
+dir "C:\Netdata\usr\bin\nd-mcp.exe"
+# Or search for it:
+where nd-mcp.exe
+```
 
-1. **Install Netdata nightly build** (required for MCP support)
-2. **Set up the MCP bridge** using our nd-mcp tool
-3. **Connect your AI assistant** (Claude Desktop recommended)
-4. **Start asking questions** about your infrastructure
+### Option 2: Building nd-mcp for Your Desktop
 
-:::note
+If you don't have Netdata installed loca you can build just the nd-mcp bridge. Netdata provides three implementations - choose the one that best fits your environment:
 
-**Current Version**: MCP integration works with both individual Netdata agents and parent agents that aggregate data from multiple nodes. When connected to a parent, AI can analyze data across all nodes that stream to that parent.
+1. **Go bridge** (recommended) - [Go bridge source code](https://github.com/netdata/netdata/tree/master/src/web/mcp/bridges/stdio-golang)
+   - Produces a single binary with no dependencies
+   - Creates executable named `nd-mcp` (`nd-mcp.exe` on windows)
+   - Includes both `build.sh` and `build.bat` (for Windows)
 
-:::
+2. **Node.js bridge** - [Node.js bridge source code](https://github.com/netdata/netdata/tree/master/src/web/mcp/bridges/stdio-nodejs)
+   - Good if you already have Node.js installed
+   - Creates script named `nd-mcp.js`
+   - Includes `build.sh`
 
-## What's Coming Next
+3. **Python bridge** - [Python bridge source code](https://github.com/netdata/netdata/tree/master/src/web/mcp/bridges/stdio-python)
+   - Good if you already have Python installed
+   - Creates script named `nd-mcp.py`
+   - Includes `build.sh`
 
-### Netdata Cloud Integration
+To build:
 
-**The next major step**: MCP will integrate directly with Netdata Cloud, giving you access to your complete infrastructure data:
+```bash
+# Clone the Netdata repository
+git clone https://github.com/netdata/netdata.git
+cd netdata
 
-- **Organization-wide analysis** across all your monitored infrastructure
-- **Cross-room correlation** for complex distributed systems
-- **Complete infrastructure visibility** through AI analysis
-- **Team-wide insights** from your centralized monitoring data
+# Choose your preferred implementation
+cd src/web/mcp/bridges/stdio-golang/  # or stdio-nodejs/ or stdio-python/
 
-### Beyond Single Nodes
+# Build the bridge
+./build.sh  # On Windows with the Go version, use build.bat
 
-**Current capability**: MCP integration works with individual Netdata agents and parent agents that aggregate multiple nodes.
+# The executable will be created with different names:
+# - Go: nd-mcp
+# - Node.js: nd-mcp.js
+# - Python: nd-mcp.py
 
-**Coming soon**: Direct access to your Netdata Cloud data, enabling AI analysis across your entire infrastructure ecosystem with full organizational context.
+# Test the bridge with your Netdata instance (replace localhost with your Netdata IP)
+./nd-mcp ws://localhost:19999/mcp      # Go bridge
+./nd-mcp.js ws://localhost:19999/mcp   # Node.js bridge  
+./nd-mcp.py ws://localhost:19999/mcp   # Python bridge
 
-## The Future of Infrastructure Monitoring
+# You should see:
+# nd-mcp: Connecting to ws://localhost:19999/mcp...
+# nd-mcp: Connected
+# Press Ctrl+C to stop the test
 
-With Netdata MCP, we're moving toward a future where **AI understands your infrastructure** as well as your best engineers. **Troubleshooting becomes conversational** rather than manual chart analysis, **post-mortems write themselves** with complete root cause analysis, and **your monitoring system becomes a true team member** that helps solve problems.
+# Get the absolute path for your AI client configuration
+pwd  # Shows current directory
+# Example output: /home/user/netdata/src/web/mcp/bridges/stdio-golang
+# Your nd-mcp path would be: /home/user/netdata/src/web/mcp/bridges/stdio-golang/nd-mcp
+```
 
-:::note
+**Important**: When configuring your AI client, use the full absolute path to the executable:
 
-This represents our vision for the future of infrastructure monitoring. While we're making significant progress with MCP integration, these capabilities are aspirational goals we're working toward, not current product features. For now, we are building the foundations for the reality we want to create.
+- Go bridge: `/path/to/bridges/stdio-golang/nd-mcp`
+- Node.js bridge: `/path/to/bridges/stdio-nodejs/nd-mcp.js`
+- Python bridge: `/path/to/bridges/stdio-python/nd-mcp.py`
 
-:::
+### Verify the Bridge Works
 
-**Join us in pioneering the next generation of intelligent infrastructure monitoring.**
+Once you have nd-mcp (either from existing installation or built), test it:
+
+```bash
+# Test connection to your Netdata instance (replace YOUR_NETDATA_IP with actual IP)
+/path/to/nd-mcp ws://YOUR_NETDATA_IP:19999/mcp
+
+# You should see:
+# nd-mcp: Connecting to ws://YOUR_NETDATA_IP:19999/mcp...
+# nd-mcp: Connected
+# Press Ctrl+C to stop the test
+```
+
+## Finding Your API Key
+
+To access sensitive functions like logs and live system information, you need an API key. Netdata automatically generates an API key on startup. The key is stored in a file on the Netdata server you want to connect to.
+
+You need the API key of the Netdata you will connect to (usually a Netdata Parent).
+
+**Note**: This temporary API key mechanism will eventually be replaced by integration with Netdata Cloud.
+
+### Find the API Key File
+
+```bash
+# Try the default location first:
+sudo cat /var/lib/netdata/mcp_dev_preview_api_key
+
+# For static installations:
+sudo cat /opt/netdata/var/lib/netdata/mcp_dev_preview_api_key
+
+# If not found, search for it:
+sudo find / -name "mcp_dev_preview_api_key" 2>/dev/null
+```
+
+### Copy the API Key
+
+The file contains a UUID that looks like:
+
+```
+a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+Copy this entire string - you'll need it for your AI client configuration.
+
+### No API Key File?
+
+If the file doesn't exist:
+
+1. Ensure you have a recent version of Netdata
+2. Restart Netdata: `sudo systemctl restart netdata`
+3. Check the file again after restart
+
+## AI Client Configuration
+
+Most AI clients use a similar configuration format:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "command": "/usr/sbin/nd-mcp",
+      "args": [
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+Replace:
+
+- `/usr/sbin/nd-mcp` - With your actual nd-mcp path
+- `IP_OF_YOUR_NETDATA`: Your Netdata instance IP/hostname
+- `YOUR_API_KEY`: The API key from the file mentioned above
+
+### Multiple MCP Servers
+
+You can configure multiple Netdata instances:
+
+```json
+{
+  "mcpServers": {
+    "netdata-production": {
+      "command": "/usr/sbin/nd-mcp",
+      "args": ["ws://prod-parent:19999/mcp?api_key=PROD_KEY"]
+    },
+    "netdata-testing": {
+      "command": "/usr/sbin/nd-mcp",
+      "args": ["ws://test-parent:19999/mcp?api_key=TEST_KEY"]
+    }
+  }
+}
+```
+
+Note: Most AI clients have difficulty choosing between multiple MCP servers. You may need to enable/disable them manually.

@@ -1,54 +1,203 @@
-# Netdata AI and Machine Learning
+# AI and Machine Learning
 
-Boost your monitoring and troubleshooting capabilities with Netdata's AI-powered features.
+Netdata provides powerful AI-driven capabilities to transform how you monitor and troubleshoot your infrastructure, with more innovations coming soon.
 
-Netdata AI helps you **detect anomalies, understand metric relationships, and resolve issues quickly** with intelligent assistance all designed to make your infrastructure management smarter, faster, and bulletproof.
+## What's Available Today
 
-## What Can Netdata AI Do For You?
+### 1. AI Chat with Netdata
 
-Netdata AI combines powerful machine learning capabilities with intuitive interfaces to help you:
+**Available Now** - Chat with your infrastructure using natural language
 
-1. **Detect anomalies automatically** before they escalate into critical issues
-2. **Understand relationships** between metrics during troubleshooting
-3. **Get expert guidance** when resolving alerts and performance problems
+Ask questions about your infrastructure like you're talking to a colleague. Get instant answers about performance, find specific logs, identify top resource consumers, or investigate issues - all through simple conversation. No more complex queries or dashboard hunting.
 
-## Machine Learning and Anomaly Detection
+**Key capabilities**:
 
-Our ML-powered anomaly detection works silently in the background, monitoring your metrics and identifying unusual patterns.
+- **Natural language queries** - "Which servers have high CPU usage?" or "Show database errors from last hour" or "What is wrong with my infrastructure now", or "Do a post-mortem analysis of the outage we had yesteday", or "Show me all network dependencies of process X"
+- **Multi-node visibility** - Analyzes your entire infrastructure through Netdata Parents
+- **Flexible AI options** - Use your existing AI tools or our standalone web chat
 
-| Feature                          | What It Does For You                                                         |
-|----------------------------------|------------------------------------------------------------------------------|
-| **Unsupervised Learning**        | Works automatically without requiring manual training or labeling of data    |
-| **Multiple Model Consensus**     | Reduces false positives by 99% by requiring agreement across multiple models |
-| **Real-time Anomaly Bits**       | Flags unusual metrics instantly, with zero storage overhead                  |
-| **Anomaly Rate Visualization**   | Highlights anomalous time periods in your dashboard for quick investigation  |
-| **Node-Level Anomaly Detection** | Identifies when your entire system is behaving unusually                     |
-| **Metric Correlations**          | Helps you find relationships between metrics to pinpoint root causes         |
+<details>
+<summary><strong>How it works</strong></summary>
 
-Learn more in the [Machine Learning and Anomaly Detection](/src/ml/README.md) documentation.
+- **MCP integration** - You chat with an LLM, that has access to your observability data, via Model Context Protocol (MCP)
+- **Choice of AI providers** - Claude, GPT-4, Gemini, and others
+- **Two deployment options** - Use an existing AI client that supports MCP, or use a web page chat we created for it (LLM is pay-per-use with API keys)
+- **Real-time data access** - Query live metrics, logs, processes, network connections, and system state
+- **Secure connection** - LLM has access to your data via the LLM client
 
-## Netdata Assistant
+</details>
 
-When alerts trigger or anomalies emerge, Netdata Assistant serves as your AI-powered troubleshooting companion.
+**Access**: Available now for all Netdata Agent deployments (Standalone and Parents)
 
-| Feature                    | What It Does For You                                                  |
-|----------------------------|-----------------------------------------------------------------------|
-| **Alert Context**          | Explains what each alert means and why you should care about it       |
-| **Guided Troubleshooting** | Offers step-by-step instructions tailored to your specific situation  |
-| **Persistent Window**      | Follows you throughout your dashboards as you investigate issues      |
-| **Curated Resources**      | Provides links to relevant documentation to deepen your understanding |
-| **Time-Saving**            | Eliminates the need for searching documentation or online forums      |
+[Explore AI Chat →](./chat-with-netdata-mcp)
 
-Learn more about [Netdata Assistant](/docs/netdata-assistant.md) and how it helps streamline your troubleshooting workflow.
+---
 
-## Getting Started
+### 2. AI DevOps Copilot
 
-Netdata AI features are enabled by default with the standard installation. The machine learning capabilities require the `dbengine` database mode, which is the default setting.
+**Available Now** - Transform observability into action with CLI AI assistants
 
-To start exploring:
+Combine the power of AI with system automation. CLI-based AI assistants like Claude Code and Gemini CLI can access your Netdata metrics and execute commands, enabling intelligent infrastructure optimization, automated troubleshooting, and configuration management - all driven by real observability data.
 
-1. **Anomaly Detection**: Check the [Anomaly Advisor tab](/docs/dashboards-and-charts/anomaly-advisor-tab.md) to see detected anomalies
-2. **Metric Correlations**: Use the Metric Correlations button in the dashboard to analyze relationships between metrics
-3. **Netdata Assistant**: Click the Assistant button in the Alerts tab when troubleshooting alerts
+**Key capabilities**:
 
-These AI features work seamlessly with Netdata's other capabilities, enhancing your overall monitoring and troubleshooting experience without requiring any AI expertise.
+- **Observability-driven automation** - AI analyzes metrics and executes fixes
+- **Infrastructure optimization** - Automatic tuning based on performance data
+- **Intelligent troubleshooting** - From problem detection to resolution
+- **Configuration management** - AI-generated configs based on actual usage
+
+<details>
+<summary><strong>How it works</strong></summary>
+
+- **MCP-enabled CLI tools** - Claude Code, Gemini CLI, and others
+- **Bidirectional integration** - Read metrics, execute commands
+- **Context-aware decisions** - AI understands your infrastructure state
+- **Safe execution** - Review AI suggestions before implementation
+- **Team collaboration** - Share configurations via version control
+
+</details>
+
+**Access**: Available now with MCP-supported CLI AI tools
+
+[Explore AI DevOps Copilot →](./ai-devops-copilot/ai-devops-copilot)
+
+---
+
+### 3. AI Insights
+
+**Preview (Netdata Cloud Feature)** - Strategic infrastructure analysis in minutes
+
+Transform past data into actionable insights with AI-generated reports. Perfect for capacity planning, performance reviews, and executive briefings. Get comprehensive analysis of your infrastructure trends, optimization opportunities, and future requirements - all in professionally formatted PDFs.
+
+**Four report types**:
+
+- **Infrastructure Summary** - Complete system health and incident analysis
+- **Capacity Planning** - Growth projections and resource recommendations
+- **Performance Optimization** - Bottleneck identification and tuning suggestions
+- **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
+
+<details>
+<summary><strong>How it works</strong></summary>
+
+- **2-3 minute generation** - Analyzes historical data comprehensively
+- **PDF downloads** - Professional reports ready for sharing
+- **Embedded visualizations** - Charts and graphs from your actual data
+- **Executive-ready** - Clear summaries with technical details included
+- **Secure processing** - Data analyzed then immediately discarded
+
+</details>
+
+**Access**:
+
+- Business subscriptions: Unlimited reports
+- Free trial users: Full access during trial
+- Community users: 10 free reports ([request early access](https://discord.gg/mPZ6WZKKG2))
+
+[Explore AI Reports →](./ai-insights)
+
+---
+
+### 4. Anomaly Advisor
+
+**Available to All** - Revolutionary troubleshooting that finds root causes in minutes
+
+Stop guessing what went wrong. The Anomaly Advisor instantly shows you how problems cascade across your infrastructure and ranks every metric by anomaly severity. Root causes typically appear in the top 20-30 results, turning hours of investigation into minutes of discovery.
+
+**Revolutionary approach**:
+
+- **See cascading effects** - Watch anomalies propagate across systems
+- **Automatic ranking** - Every metric scored and sorted by anomaly severity
+- **No expertise required** - Works even on unfamiliar systems
+
+<details>
+<summary><strong>How it works</strong></summary>
+
+- **Data-driven analysis** - No hypotheses needed, the data reveals the story
+- **Influence tracking** - Shows what influenced and what was influenced
+- **Time window analysis** - Highlight any incident period for investigation
+- **Scale-agnostic** - Works identically from 10 to 10,000 nodes
+- **Visual propagation** - See anomaly clusters and cascades instantly
+
+</details>
+
+**Find it**: Anomalies tab in any Netdata dashboard
+
+[Learn more about Anomaly Advisor →](./anomaly-advisor)
+
+---
+
+### 5. Machine Learning Anomaly Detection
+
+**Available to All** - Continuous anomaly detection on every metric
+
+The foundation of Netdata's AI capabilities. Machine learning models run locally on every agent, continuously learning normal patterns and detecting anomalies in real-time. Zero configuration required - it just works, protecting your infrastructure 24/7.
+
+**Automatic protection**:
+
+- **Every metric monitored** - ML analyzes all metrics continuously
+- **Visual anomaly indicators** - Purple ribbons on every chart show anomaly rates
+- **Historical anomaly data** - ML scores saved with metrics for past analysis
+- **Zero configuration** - Starts working immediately after installation
+
+<details>
+<summary><strong>How it works</strong></summary>
+
+- **Local ML engine** - Runs on every Netdata Agent, no cloud dependency
+- **Multiple models** - Consensus approach reduces noise and false positives by 99%
+- **Integrated storage** - Anomaly scores saved in the database with metrics
+- **Historical queries** - Query past anomaly rates just like any other metric
+- **Visual integration** - Purple anomaly ribbons appear on all charts automatically
+- **Minimal overhead** - Designed for production environments
+- **Privacy by design** - Your data never leaves your infrastructure
+
+</details>
+
+**Access**: Free for everyone - enabled by default
+
+[Explore Machine Learning →](./machine-learning-anomaly-detection)
+
+## Coming Soon
+
+### AI Chat with Netdata (Netdata Cloud version)
+
+**In Development** - Chat with your entire infrastructure through Netdata Cloud
+
+Soon, Netdata Cloud will become an MCP server itself. This means you'll be able to chat with your entire infrastructure without setting up local MCP bridges. Get the same natural language capabilities with the added benefits of Cloud's global view, team collaboration, and seamless access from anywhere.
+
+**What to expect**:
+
+- Direct MCP integration with Netdata Cloud
+- Chat with all your infrastructure from one place
+- No local bridge setup required
+- Team collaboration on AI conversations
+- Access from any device, anywhere
+
+---
+
+### AI Alert Assistant
+
+**In Development (Netdata Cloud)** - Real-time AI help when alerts fire
+
+When critical alerts trigger, you'll get instant AI analysis of the situation. The Alert Assistant will identify likely root causes, provide specific troubleshooting steps, and guide you through resolution - all tailored to your specific infrastructure and alert context.
+
+**What to expect**:
+
+- Automatic activation when viewing alerts
+- Root cause analysis with confidence scores
+- Step-by-step remediation guidance
+- Integration with your runbooks and procedures
+
+---
+
+### AI Weekly Digest
+
+**In Development (Netdata Cloud)** - Your infrastructure insights delivered weekly
+
+Stay informed without information overload. The AI Weekly Digest will analyze your infrastructure's performance over the past week and deliver a concise summary of what matters most - trends, issues resolved, optimization opportunities, and what to watch next week.
+
+**What to expect**:
+
+- Weekly email summaries customized for your role
+- Key metrics and trend analysis
+- Proactive recommendations for the week ahead
+- Highlights of resolved and ongoing issues
