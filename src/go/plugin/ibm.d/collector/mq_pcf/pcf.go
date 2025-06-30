@@ -5,6 +5,7 @@
 package mq_pcf
 
 // #include <cmqc.h>
+// #include <cmqxc.h>
 // #include <cmqcfc.h>
 // #include <string.h>
 // #include <stdlib.h>

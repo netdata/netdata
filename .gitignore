@@ -197,3 +197,6 @@ packaging/tools/agent-events/go.mod
 packaging/tools/agent-events/go.sum
 
 **/.claude/settings.local.json
+build-ibm.sh
+compile.sh
+run-ibm.sh
