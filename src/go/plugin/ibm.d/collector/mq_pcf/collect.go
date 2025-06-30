@@ -843,11 +843,19 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 		return fmt.Errorf("failed to parse queue status response for %s: %w", queueName, err)
 	}
 	
-	// Extract metrics
+	
+	// Extract metrics - always set depth as it's critical
 	if depth, ok := attrs[C.MQIA_CURRENT_Q_DEPTH]; ok {
 		mx[fmt.Sprintf("queue_%s_depth", cleanName)] = int64(depth.(int32))
+	} else {
+		// Queue depth should always be available from INQUIRE_Q_STATUS
+		c.Warningf("MQIA_CURRENT_Q_DEPTH (%d) not found for queue %s - setting to 0", C.MQIA_CURRENT_Q_DEPTH, queueName)
+		mx[fmt.Sprintf("queue_%s_depth", cleanName)] = 0
 	}
 	
+	// Note: MQIA_MSG_ENQ_COUNT and MQIA_MSG_DEQ_COUNT are not returned by INQUIRE_Q_STATUS
+	// These would need MQCMD_INQUIRE_Q or reset queue statistics to be enabled
+	// For now, we don't set these metrics if not available
 	if enqueued, ok := attrs[C.MQIA_MSG_ENQ_COUNT]; ok {
 		mx[fmt.Sprintf("queue_%s_enqueued", cleanName)] = int64(enqueued.(int32))
 	}
@@ -857,6 +865,7 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 	}
 	
 	// Extract oldest message age if available (seconds)
+	// This metric might also not be available in INQUIRE_Q_STATUS
 	if oldestAge, ok := attrs[MQIA_OLDEST_MSG_AGE]; ok {
 		mx[fmt.Sprintf("queue_%s_oldest_message_age", cleanName)] = int64(oldestAge.(int32))
 	}
