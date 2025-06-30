@@ -535,6 +535,7 @@ int main(int argc, char *argv[]) {
     char buf[BUFLEN];
     unsigned int first_ups_count = 0;
     const char *query[] = { "UPS" };
+    const char *nut_value;
 
     nd_log_initialize_for_external_plugins(PLUGIN_UPSD_NAME);
     netdata_threads_init_for_external_plugins(0);
@@ -589,7 +590,6 @@ int main(int argc, char *argv[]) {
         printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' %u %u\n",
                clean_name(buf, sizeof(buf), ups_name), NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
 
-        const char *nut_value;
         if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
             printf("CLABEL battery_type '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
         if ((nut_value = nut_get_var(&ups2, ups_name, "device.model")))
