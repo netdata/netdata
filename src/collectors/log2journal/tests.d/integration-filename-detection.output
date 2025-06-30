@@ -1,0 +1,4 @@
+MESSAGE===> /var/log/app.log <==
+
+MESSAGE=test log line for filename detection
+
