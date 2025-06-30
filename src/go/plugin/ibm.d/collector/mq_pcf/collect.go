@@ -5,6 +5,7 @@
 package mq_pcf
 
 // #include <cmqc.h>
+// #include <cmqxc.h>
 // #include <cmqcfc.h>
 // #include <string.h>
 // #include <stdlib.h>
@@ -103,19 +104,79 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	
 	c.mqConn = &mqConnection{}
 	
-	// Build connection string: HOST(port)/CHANNEL/QueueManager
-	connStr := fmt.Sprintf("%s(%d)/%s/%s", c.Host, c.Port, c.Channel, c.QueueManager)
-	cConnStr := C.CString(connStr)
-	defer C.free(unsafe.Pointer(cConnStr))
+	// Use MQCONNX for client connections
+	// Allocate structures in C memory to avoid Go pointer issues
+	cno := (*C.MQCNO)(C.malloc(C.sizeof_MQCNO))
+	defer C.free(unsafe.Pointer(cno))
+	C.memset(unsafe.Pointer(cno), 0, C.sizeof_MQCNO)
+	cno.Version = C.MQCNO_VERSION_4
+	cno.Options = C.MQCNO_CLIENT_BINDING
+	
+	// Set up client connection channel
+	cd := (*C.MQCD)(C.malloc(C.sizeof_MQCD))
+	defer C.free(unsafe.Pointer(cd))
+	C.memset(unsafe.Pointer(cd), 0, C.sizeof_MQCD)
+	cd.ChannelType = C.MQCHT_CLNTCONN
+	cd.Version = C.MQCD_VERSION_6
+	cd.TransportType = C.MQXPT_TCP
+	
+	// Set channel name
+	channelName := c.Channel
+	if channelName == "" {
+		channelName = "SYSTEM.DEF.SVRCONN"
+	}
+	cChannelName := C.CString(channelName)
+	defer C.free(unsafe.Pointer(cChannelName))
+	C.strncpy((*C.char)(unsafe.Pointer(&cd.ChannelName)), cChannelName, C.MQ_CHANNEL_NAME_LENGTH)
+	
+	// Set connection name (host and port)
+	connName := fmt.Sprintf("%s(%d)", c.Host, c.Port)
+	cConnName := C.CString(connName)
+	defer C.free(unsafe.Pointer(cConnName))
+	C.strncpy((*C.char)(unsafe.Pointer(&cd.ConnectionName)), cConnName, C.MQ_CONN_NAME_LENGTH)
+	
+	// Set user credentials if provided
+	if c.User != "" {
+		cUser := C.CString(c.User)
+		defer C.free(unsafe.Pointer(cUser))
+		C.strncpy((*C.char)(unsafe.Pointer(&cd.UserIdentifier)), cUser, C.MQ_USER_ID_LENGTH)
+	}
+	
+	// Set up connection options to use the channel definition
+	cno.ClientConnPtr = C.MQPTR(unsafe.Pointer(cd))
+	
+	// Set up authentication if password is provided
+	var cspUser, cspPassword *C.char
+	if c.Password != "" {
+		csp := (*C.MQCSP)(C.malloc(C.sizeof_MQCSP))
+		defer C.free(unsafe.Pointer(csp))
+		C.memset(unsafe.Pointer(csp), 0, C.sizeof_MQCSP)
+		csp.AuthenticationType = C.MQCSP_AUTH_USER_ID_AND_PWD
+		cspUser = C.CString(c.User)
+		defer C.free(unsafe.Pointer(cspUser))
+		csp.CSPUserIdPtr = C.MQPTR(unsafe.Pointer(cspUser))
+		csp.CSPUserIdLength = C.MQLONG(len(c.User))
+		cspPassword = C.CString(c.Password)
+		defer C.free(unsafe.Pointer(cspPassword))
+		csp.CSPPasswordPtr = C.MQPTR(unsafe.Pointer(cspPassword))
+		csp.CSPPasswordLength = C.MQLONG(len(c.Password))
+		
+		cno.Version = C.MQCNO_VERSION_5
+		cno.SecurityParmsPtr = (*C.MQCSP)(unsafe.Pointer(csp))
+	}
+	
+	// Queue manager name
+	qmName := C.CString(c.QueueManager)
+	defer C.free(unsafe.Pointer(qmName))
 	
 	var compCode C.MQLONG
 	var reason C.MQLONG
 	
 	// Connect to queue manager
-	C.MQCONN(cConnStr, &c.mqConn.hConn, &compCode, &reason)
+	C.MQCONNX(qmName, cno, &c.mqConn.hConn, &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
-		return fmt.Errorf("MQCONN failed: completion code %d, reason code %d (check queue manager '%s' is running and accessible on %s:%d)", 
+		return fmt.Errorf("MQCONNX failed: completion code %d, reason code %d (check queue manager '%s' is running and accessible on %s:%d)", 
 			compCode, reason, c.QueueManager, c.Host, c.Port)
 	}
 	

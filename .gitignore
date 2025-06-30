@@ -203,3 +203,6 @@ packaging/tools/agent-events/go.sum
 .mcp.json
 .users_cache.json
 .channels_cache_v2.json
+build-ibm.sh
+compile.sh
+run-ibm.sh
