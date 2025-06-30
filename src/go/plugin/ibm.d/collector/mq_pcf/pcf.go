@@ -149,8 +149,8 @@ func newIntListParameter(param C.MQLONG, values []int32) pcfParameter {
 }
 
 func (p *intListParameter) size() C.size_t {
-	// MQCFIL structure size + integer values
-	return C.sizeof_MQCFIL + C.size_t(len(p.values)*4)
+	// MQCFIL fixed part (16 bytes) + integer values
+	return 16 + C.size_t(len(p.values)*4)
 }
 
 func (p *intListParameter) marshal(buffer unsafe.Pointer) {
@@ -160,9 +160,9 @@ func (p *intListParameter) marshal(buffer unsafe.Pointer) {
 	cfil.Parameter = p.parameter
 	cfil.Count = C.MQLONG(len(p.values))
 	
-	// Copy integer values
+	// Copy integer values - start after the fixed 16-byte header
 	if len(p.values) > 0 {
-		valuesPtr := (*C.MQLONG)(unsafe.Pointer(uintptr(buffer) + C.sizeof_MQCFIL))
+		valuesPtr := (*C.MQLONG)(unsafe.Pointer(uintptr(buffer) + 16))
 		for i, val := range p.values {
 			*(*C.MQLONG)(unsafe.Pointer(uintptr(unsafe.Pointer(valuesPtr)) + uintptr(i*4))) = C.MQLONG(val)
 		}
