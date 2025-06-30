@@ -674,6 +674,8 @@ int main(int argc, char *argv[]) {
             if (streq("END", answer[0][0]))
                 break;
 
+            this_ups_count++;
+
             const char *ups_name = answer[0][1];
             const char *clean_ups_name = clean_name(buf, sizeof(buf), ups_name);
 
