@@ -508,6 +508,8 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 		
 		// Check if this is the last message in the sequence
 		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
+		c.Debugf("getPCFResponse: Received message %d, Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
+			len(allResponses)/int(bufferLength), cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
 		if cfh.Control == C.MQCFC_LAST {
 			break
 		}
@@ -682,11 +684,13 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 	// Send INQUIRE_Q command with generic queue name
-	// Note: We only send the queue name parameter for listing
+	// Try using MQIACF_ALL to get all attributes
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, "*"),
+		newIntListParameter(C.MQIACF_Q_ATTRS, []int32{C.MQIACF_ALL}),
 	}
 	
+	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_NAME='*' and Q_ATTRS=[MQIACF_ALL]")
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send INQUIRE_Q: %w", err)
@@ -708,6 +712,7 @@ func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
 		newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
 	}
 	
+	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_NAME='*'")
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send INQUIRE_CHANNEL: %w", err)
