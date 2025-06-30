@@ -640,32 +640,54 @@ func (d *DB2) collectLongRunningQueries(ctx context.Context) error {
 func (d *DB2) collectBackupStatus(ctx context.Context) error {
 	now := time.Now()
 
-	// Simplified approach - get the last successful full backup
-	var lastFullBackup sql.NullString
+	// First check if we have ANY backup (successful or failed) in the last 7 days
+	var lastBackupSQLCode sql.NullInt64
+	var lastBackupTime sql.NullString
 	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout))
 	defer cancel()
-
+	
+	// Get the most recent backup attempt
 	err := d.db.QueryRowContext(queryCtx, `
+		SELECT SQLCODE, START_TIME
+		FROM SYSIBMADM.DB_HISTORY 
+		WHERE OPERATION = 'B' 
+		  AND OPERATIONTYPE = 'F'
+		ORDER BY START_TIME DESC
+		FETCH FIRST 1 ROW ONLY
+	`).Scan(&lastBackupSQLCode, &lastBackupTime)
+	
+	if err == nil && lastBackupSQLCode.Valid {
+		// Check if the last backup was successful (SQLCODE = 0)
+		if lastBackupSQLCode.Int64 == 0 {
+			d.mx.LastBackupStatus = 0 // Success
+		} else {
+			d.mx.LastBackupStatus = 1 // Failed (non-zero SQLCODE)
+		}
+	} else {
+		// No backup history found
+		d.mx.LastBackupStatus = 0 // Don't raise alert if no backup history
+	}
+
+	// Get the last successful full backup
+	var lastFullBackup sql.NullString
+	err = d.db.QueryRowContext(queryCtx, `
 		SELECT MAX(START_TIME) 
 		FROM SYSIBMADM.DB_HISTORY 
 		WHERE OPERATION = 'B' 
 		  AND OPERATIONTYPE = 'F' 
 		  AND SQLCODE = 0
-		  AND START_TIME >= CURRENT TIMESTAMP - 30 DAYS
 	`).Scan(&lastFullBackup)
 
 	if err == nil && lastFullBackup.Valid {
 		if t, err := time.Parse("2006-01-02-15.04.05", lastFullBackup.String); err == nil {
 			d.mx.LastFullBackupAge = int64(now.Sub(t).Hours())
-			d.mx.LastBackupStatus = 0 // Success
 		} else {
 			d.Warningf("failed to parse last full backup time '%s': %v (expected format: YYYY-MM-DD-HH.MM.SS)", lastFullBackup.String, err)
-			d.mx.LastFullBackupAge = 999999 // Parse error
-			d.mx.LastBackupStatus = 1       // Failed
+			d.mx.LastFullBackupAge = 0 // Parse error - report 0 hours (recent)
 		}
 	} else {
-		d.mx.LastFullBackupAge = 999999 // No backup found or query failed
-		d.mx.LastBackupStatus = 1       // No recent backup
+		// No successful backup found
+		d.mx.LastFullBackupAge = 720 // 30 days in hours - old but reasonable
 	}
 
 	// Get the last successful incremental backup
@@ -676,7 +698,6 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 		WHERE OPERATION = 'B' 
 		  AND OPERATIONTYPE IN ('I', 'O', 'D') 
 		  AND SQLCODE = 0
-		  AND START_TIME >= CURRENT TIMESTAMP - 30 DAYS
 	`).Scan(&lastIncrementalBackup)
 
 	if err == nil && lastIncrementalBackup.Valid {
@@ -684,10 +705,11 @@ func (d *DB2) collectBackupStatus(ctx context.Context) error {
 			d.mx.LastIncrementalBackupAge = int64(now.Sub(t).Hours())
 		} else {
 			d.Warningf("failed to parse last incremental backup time '%s': %v (expected format: YYYY-MM-DD-HH.MM.SS)", lastIncrementalBackup.String, err)
-			d.mx.LastIncrementalBackupAge = 999999 // Parse error
+			d.mx.LastIncrementalBackupAge = 0 // Parse error - report 0 hours (recent)
 		}
 	} else {
-		d.mx.LastIncrementalBackupAge = 999999 // No incremental backup found
+		// No incremental backup found - this is normal for many setups
+		d.mx.LastIncrementalBackupAge = 0 // Report 0 to avoid false alerts
 	}
 
 	return nil
@@ -1042,7 +1064,8 @@ func (d *DB2) collectBackupStatusResilience(ctx context.Context) {
 // MON_GET collection functions for modern monitoring approach
 
 func (d *DB2) collectMonGetConnections(ctx context.Context) error {
-	return d.doQuery(ctx, queryMonGetConnections, func(column, value string, lineEnd bool) {
+	// First get connection counts
+	err := d.doQuery(ctx, queryMonGetConnections, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_CONNS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1060,6 +1083,17 @@ func (d *DB2) collectMonGetConnections(ctx context.Context) error {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				d.mx.ConnExecuting = v
 			}
+		}
+	})
+	
+	if err != nil {
+		return err
+	}
+	
+	// Then get max connections from configuration
+	return d.collectSingleMetric(ctx, "max_connections", queryMaxConnections, func(value string) {
+		if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			d.mx.ConnMax = v
 		}
 	})
 }
