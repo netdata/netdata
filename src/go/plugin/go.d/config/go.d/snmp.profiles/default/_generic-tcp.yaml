@@ -6,68 +6,68 @@ metrics:
       OID: 1.3.6.1.2.1.6.9.0
       name: tcpCurrEstab
       description: Current TCP connections in ESTABLISHED or CLOSE-WAIT state
-      family: Network/TCP/Connection/Current
+      family: Network/TCP/Connection/Active/Count
       unit: "{connection}"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.5.0
       name: tcpActiveOpens
       description: TCP connections transitioning from CLOSED to SYN-SENT
-      family: Network/TCP/Connection/ActiveOpen
+      family: Network/TCP/Connection/Open/Active/Count
       unit: "{transition}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.6.0
       name: tcpPassiveOpens
       description: TCP connections transitioning from LISTEN to SYN-RCVD
-      family: Network/TCP/Connection/PassiveOpen
+      family: Network/TCP/Connection/Open/Passive/Count
       unit: "{transition}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.17.0
       name: tcpHCInSegs
       description: TCP segments received
-      family: Network/TCP/Segment/In
+      family: Network/TCP/Segment/Total/In
       unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.18.0
       name: tcpHCOutSegs
       description: TCP segments sent
-      family: Network/TCP/Segment/Out
+      family: Network/TCP/Segment/Total/Out
       unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.14.0
       name: tcpInErrs
       description: TCP segments received with errors
-      family: Network/TCP/Error/In
+      family: Network/TCP/Segment/Error/In
       unit: "{error}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.7.0
       name: tcpAttemptFails
       description: Failed TCP connection attempts
-      family: Network/TCP/Connection/Failed
+      family: Network/TCP/Connection/Failure/Count
       unit: "{failure}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.8.0
       name: tcpEstabResets
       description: TCP connections reset from ESTABLISHED/CLOSE-WAIT
-      family: Network/TCP/Reset/Connection
+      family: Network/TCP/Connection/Reset/Count
       unit: "{reset}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.15.0
       name: tcpOutRsts
       description: TCP segments sent with RST flag
-      family: Network/TCP/Reset/Out
+      family: Network/TCP/Segment/Reset/Out
       unit: "{reset}/s"
   - MIB: TCP-MIB
     symbol:
       OID: 1.3.6.1.2.1.6.12.0
       name: tcpRetransSegs
       description: TCP segments retransmitted
-      family: Network/TCP/Retransmit/Out
+      family: Network/TCP/Segment/Retransmit/Out
       unit: "{retransmit}/s"
