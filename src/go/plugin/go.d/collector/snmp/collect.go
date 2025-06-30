@@ -27,10 +27,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		c.sysInfo = si
-		c.addSysUptimeChart()
 
 		if c.CreateVnode {
 			c.vnode = c.setupVnode(si)
+		}
+
+		if !c.DisableLegacyCollection {
+			c.addSysUptimeChart()
 		}
 
 		if c.DisableLegacyCollection || c.EnableProfiles {

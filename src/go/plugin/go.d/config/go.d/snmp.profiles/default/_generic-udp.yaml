@@ -10,8 +10,22 @@ metrics:
       unit: "{packet}/s"
   - MIB: UDP-MIB
     symbol:
+      OID: 1.3.6.1.2.1.7.1.0
+      name: udpInDatagrams
+      description: UDP datagrams received
+      family: Network/UDP/Datagram/Total/In
+      unit: "{packet}/s"
+  - MIB: UDP-MIB
+    symbol:
       OID: 1.3.6.1.2.1.7.9.0
       name: udpHCOutDatagrams
+      description: UDP datagrams sent
+      family: Network/UDP/Datagram/Total/Out
+      unit: "{packet}/s"
+  - MIB: UDP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.7.4.0
+      name: udpOutDatagrams
       description: UDP datagrams sent
       family: Network/UDP/Datagram/Total/Out
       unit: "{packet}/s"
