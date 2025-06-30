@@ -2014,7 +2014,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 }
 #endif
 
-static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worker)
+static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, BUFFER *work_buffer, bool is_worker)
 {
     static bool skip_models = false;
     RRDSET *st;
@@ -2030,6 +2030,9 @@ static void metadata_scan_host(RRDHOST *host, BUFFER *work_buffer, bool is_worke
     (void)db_execute(db_meta, "BEGIN TRANSACTION", NULL);
 
     rrdset_foreach_reentrant(st, host) {
+
+        if (SHUTDOWN_REQUESTED(config))
+            break;
 
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
 
@@ -2362,7 +2365,7 @@ void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer)
         store_host_and_system_info(host);
 }
 
-static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
+static void store_hosts_metadata(struct meta_config_s *config, BUFFER *work_buffer, bool is_worker)
 {
     RRDHOST *host;
     size_t host_count = 0;
@@ -2384,15 +2387,20 @@ static void store_hosts_metadata(BUFFER *work_buffer, bool is_worker)
             continue;
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_UPDATE);
+
+        if (SHUTDOWN_REQUESTED(config))
+            break;
+
         if (is_worker)
             worker_is_busy(UV_EVENT_STORE_HOST);
 
         // store labels, claim_id, host and system info (if needed)
         store_host_info_and_metadata(host, work_buffer);
+
         if (is_worker)
             worker_is_idle();
 
-        metadata_scan_host(host, work_buffer, is_worker);
+        metadata_scan_host(config, host, work_buffer, is_worker);
 
         if (!is_worker)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
@@ -2429,7 +2437,7 @@ static void start_metadata_hosts(uv_work_t *req)
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
-    store_hosts_metadata(work_buffer, true);
+    store_hosts_metadata(config, work_buffer, true);
 
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
@@ -2489,10 +2497,11 @@ static void *metadata_event_loop(void *arg)
     struct judy_list_t *pending_sql_statement = NULL;
 
     config->initialized = true;
+    __atomic_store_n(&config->shutdown_requested, false, __ATOMIC_RELAXED);
     nd_log_daemon(NDLP_INFO, "METADATA: Synchronization thread is up and running");
     completion_mark_complete(&config->start_stop_complete);
 
-    while (likely(config->shutdown_requested == false))  {
+    while (likely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED) == false))  {
         nd_uuid_t *uuid;
         RRDHOST *host = NULL;
         ALARM_ENTRY *ae = NULL;
@@ -2633,7 +2642,7 @@ static void *metadata_event_loop(void *arg)
                     }
                     break;
                 case METADATA_SYNC_SHUTDOWN:
-                    config->shutdown_requested = true;
+                    __atomic_store_n(&config->shutdown_requested, true, __ATOMIC_RELAXED);
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *)cmd.param[0];
@@ -2668,12 +2677,8 @@ static void *metadata_event_loop(void *arg)
 
     (void)uv_loop_close(loop);
 
-    // If we are still waiting for callbacks we timed out, don't run these
-    if (!callbacks_pending)
-        store_hosts_metadata(work_buffer, false);
-
-    store_alert_transitions(pending_alert_list, false, callbacks_pending);
-    store_sql_statements(pending_sql_statement, false, callbacks_pending);
+    store_alert_transitions(pending_alert_list, false, true);
+    store_sql_statements(pending_sql_statement, false, true);
 
     if (pending_ctx_cleanup_list) {
         Word_t Index = 0;
