@@ -278,6 +278,33 @@ func (c *Collector) disconnect() {
 }
 
 func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) ([]byte, error) {
+	// First, open a dynamic reply queue
+	var replyOd C.MQOD
+	C.memset(unsafe.Pointer(&replyOd), 0, C.sizeof_MQOD)
+	C.set_od_struc_id(&replyOd)
+	replyOd.Version = C.MQOD_VERSION_1
+	modelQueueName := C.CString("SYSTEM.DEFAULT.MODEL.QUEUE")
+	defer C.free(unsafe.Pointer(modelQueueName))
+	C.set_object_name(&replyOd, modelQueueName)
+	replyOd.ObjectType = C.MQOT_Q
+	
+	// Set dynamic queue name pattern
+	dynQueueName := C.CString("AMQ.*")
+	defer C.free(unsafe.Pointer(dynQueueName))
+	C.memset(unsafe.Pointer(&replyOd.DynamicQName), ' ', 48)
+	C.memcpy(unsafe.Pointer(&replyOd.DynamicQName), unsafe.Pointer(dynQueueName), C.strlen(dynQueueName))
+	
+	var hReplyObj C.MQHOBJ
+	var openOptions C.MQLONG = C.MQOO_INPUT_AS_Q_DEF | C.MQOO_FAIL_IF_QUIESCING
+	var compCode C.MQLONG
+	var reason C.MQLONG
+	
+	C.MQOPEN(c.mqConn.hConn, C.PMQVOID(unsafe.Pointer(&replyOd)), openOptions, &hReplyObj, &compCode, &reason)
+	if compCode != C.MQCC_OK {
+		return nil, fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", compCode, reason)
+	}
+	defer C.MQCLOSE(c.mqConn.hConn, &hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
+	
 	// Calculate message size
 	msgSize := int(C.sizeof_MQCFH)
 	for _, param := range parameters {
@@ -323,21 +350,14 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	md.Priority = C.MQPRI_PRIORITY_AS_Q_DEF
 	md.Persistence = C.MQPER_NOT_PERSISTENT
 	
-	// Set a reply queue using MQRFH2 model or create a temporary queue
-	// For now, let's use the SYSTEM.DEFAULT.MODEL.QUEUE
-	replyToQ := C.CString("MQPCF.*")
-	defer C.free(unsafe.Pointer(replyToQ))
-	C.memset(unsafe.Pointer(&md.ReplyToQ), ' ', 48)
-	C.memcpy(unsafe.Pointer(&md.ReplyToQ), unsafe.Pointer(replyToQ), C.strlen(replyToQ))
+	// Use the actual dynamic queue name that was created
+	C.memcpy(unsafe.Pointer(&md.ReplyToQ), unsafe.Pointer(&replyOd.ObjectName), 48)
 	
 	var pmo C.MQPMO
 	C.memset(unsafe.Pointer(&pmo), 0, C.sizeof_MQPMO)
 	C.set_pmo_struc_id(&pmo)
 	pmo.Version = C.MQPMO_VERSION_1
 	pmo.Options = C.MQPMO_NO_SYNCPOINT | C.MQPMO_FAIL_IF_QUIESCING
-	
-	var compCode C.MQLONG
-	var reason C.MQLONG
 	
 	C.MQPUT(c.mqConn.hConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
 	
@@ -346,36 +366,12 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	}
 	
 	// Get response from reply queue
-	return c.getPCFResponse(&md)
+	return c.getPCFResponse(&md, hReplyObj)
 }
 
-func (c *Collector) getPCFResponse(requestMd *C.MQMD) ([]byte, error) {
-	// Open the model queue to create a temporary reply queue
-	var od C.MQOD
-	C.memset(unsafe.Pointer(&od), 0, C.sizeof_MQOD)
-	C.set_od_struc_id(&od)
-	od.Version = C.MQOD_VERSION_1
-	modelQueueName := C.CString("SYSTEM.DEFAULT.MODEL.QUEUE")
-	defer C.free(unsafe.Pointer(modelQueueName))
-	C.set_object_name(&od, modelQueueName)
-	od.ObjectType = C.MQOT_Q
-	
-	// Set dynamic queue name pattern
-	dynQueueName := C.CString("MQPCF.*")
-	defer C.free(unsafe.Pointer(dynQueueName))
-	C.memset(unsafe.Pointer(&od.DynamicQName), ' ', 48)
-	C.memcpy(unsafe.Pointer(&od.DynamicQName), unsafe.Pointer(dynQueueName), C.strlen(dynQueueName))
-	
-	var hReplyObj C.MQHOBJ
-	var openOptions C.MQLONG = C.MQOO_INPUT_AS_Q_DEF | C.MQOO_FAIL_IF_QUIESCING
+func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byte, error) {
 	var compCode C.MQLONG
 	var reason C.MQLONG
-	
-	C.MQOPEN(c.mqConn.hConn, C.PMQVOID(unsafe.Pointer(&od)), openOptions, &hReplyObj, &compCode, &reason)
-	if compCode != C.MQCC_OK {
-		return nil, fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", compCode, reason)
-	}
-	defer C.MQCLOSE(c.mqConn.hConn, &hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
 	
 	// Get message
 	var md C.MQMD
