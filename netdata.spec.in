@@ -404,6 +404,7 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 	-DENABLE_PLUGIN_DEBUGFS=On \
 	-DENABLE_PLUGIN_GO=On \
+	-DENABLE_PLUGIN_IBM=Off \
 	-DENABLE_PLUGIN_PYTHON=On \
 	-DENABLE_PLUGIN_CHARTS=On \
 	-DENABLE_PLUGIN_LOCAL_LISTENERS=On \
@@ -851,6 +852,44 @@ fi
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d
+
+%package plugin-ibm
+Summary: The IBM ecosystem metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+
+%description plugin-ibm
+This plugin adds IBM ecosystem collectors (AS/400, DB2, WebSphere) to the Netdata Agent.
+It requires IBM DB2 client libraries to be installed separately.
+
+%pre plugin-ibm
+
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%post plugin-ibm
+# Run the IBM library installation script
+if [ -x %{_libexecdir}/%{name}/install-ibm-libs.sh ]; then
+    %{_libexecdir}/%{name}/install-ibm-libs.sh || {
+        echo "WARNING: Failed to download IBM libraries."
+        echo "The ibm.d.plugin will not work until libraries are installed."
+        echo "You can run the following command manually to install them:"
+        echo "  %{_libexecdir}/%{name}/install-ibm-libs.sh"
+    }
+else
+    echo "WARNING: IBM library installation script not found."
+    echo "The ibm.d.plugin will not work until libraries are installed."
+fi
+
+%files plugin-ibm
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/ibm.d.plugin
+%attr(0755,root,root) %{_libexecdir}/%{name}/install-ibm-libs.sh
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/ibm.d.conf
+%{_libdir}/%{name}/conf.d/ibm.d
 
 %package plugin-apps
 Summary: The per-application metrics collection plugin for the Netdata Agent
