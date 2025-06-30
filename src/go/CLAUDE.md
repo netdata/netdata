@@ -728,6 +728,220 @@ mx["jvm_uptime_seconds"] = int64(jvmUptime * precision) // 4389188
 
 This precision system allows Netdata to handle floating-point metrics accurately while maintaining the integer-only protocol requirement.
 
+## Core Data Collection Principles
+
+### 1. Missing Data is Data - Never Fill Gaps
+
+**CRITICAL**: For Netdata, the absence of data collection samples is crucial. Netdata visualizes gaps in data collection, marking missing points as empty. This happens automatically when collectors DO NOT SEND samples at the predefined collection interval.
+
+#### The Golden Rule
+**When data collection fails, DO NOT SEND ANY VALUE. Skip the metric entirely.**
+
+#### Common Anti-Patterns to AVOID
+
+❌ **Caching and resending old values**
+```go
+// WRONG: Don't cache and resend old values when collection fails
+func (c *Collector) collect() map[string]int64 {
+    mx := make(map[string]int64)
+    
+    value, err := c.getCurrentValue()
+    if err != nil {
+        // WRONG: Sending cached value masks the failure!
+        mx["metric"] = c.lastValue
+        return mx
+    }
+    
+    c.lastValue = value  // WRONG: Don't cache for gap-filling
+    mx["metric"] = value
+    return mx
+}
+```
+
+❌ **Sending artificial values on failure**
+```go
+// WRONG: Don't send zero or -1 when collection fails
+func (c *Collector) collect() map[string]int64 {
+    mx := make(map[string]int64)
+    
+    value, err := c.getCurrentValue()
+    if err != nil {
+        mx["metric"] = 0    // WRONG: Zero is not a gap!
+        mx["metric"] = -1   // WRONG: -1 is not a gap!
+        return mx
+    }
+    
+    mx["metric"] = value
+    return mx
+}
+```
+
+✅ **CORRECT: Skip metrics that couldn't be collected**
+```go
+// CORRECT: Simply don't send metrics that failed to collect
+func (c *Collector) collect() map[string]int64 {
+    mx := make(map[string]int64)
+    
+    value, err := c.getCurrentValue()
+    if err != nil {
+        c.Warningf("failed to collect metric: %v", err)
+        // DON'T add the metric to mx - let Netdata show the gap
+        return mx  // Return without the failed metric
+    }
+    
+    mx["metric"] = value
+    return mx
+}
+```
+
+#### Exception: Event-Based Metrics
+
+The ONLY exception is for metrics derived from events (logs, message queues, etc.) where sparse data is expected:
+
+```go
+// ACCEPTABLE for event-based metrics only
+func (c *Collector) collectEventCounters() map[string]int64 {
+    mx := make(map[string]int64)
+    
+    // For counters from events, the last value remains valid
+    // because absence of events means the counter hasn't changed
+    if !c.hasNewEvents() {
+        mx["event_counter"] = c.lastEventCounter  // OK for event-based
+        return mx
+    }
+    
+    c.lastEventCounter = c.processEvents()
+    mx["event_counter"] = c.lastEventCounter
+    return mx
+}
+```
+
+### 2. Connection Management Best Practices
+
+#### Persistent Connections
+
+**IDEAL**: Connect ONCE and maintain the connection for the collector's lifetime.
+
+```go
+func (c *Collector) Init() error {
+    // Establish connection during initialization
+    conn, err := c.connect()
+    if err != nil {
+        return fmt.Errorf("initial connection failed: %w", err)
+    }
+    c.conn = conn
+    return nil
+}
+
+func (c *Collector) collect() (map[string]int64, error) {
+    // Reuse the persistent connection
+    data, err := c.conn.Query()
+    if err != nil {
+        // Log and attempt reconnection
+        c.Errorf("query failed, attempting reconnection: %v", err)
+        if err := c.reconnect(); err != nil {
+            return nil, err
+        }
+        // Retry query after reconnection
+        data, err = c.conn.Query()
+        if err != nil {
+            return nil, err
+        }
+    }
+    // Process data...
+}
+```
+
+#### Reconnection Strategy
+
+When reconnection is necessary:
+1. **Always log the error** - Users need to know about connection issues
+2. **Implement backoff** - Don't hammer the target with reconnection attempts
+3. **Maintain connection state** - Track connection health
+
+```go
+func (c *Collector) reconnect() error {
+    // Clean up old connection
+    if c.conn != nil {
+        c.conn.Close()
+        c.conn = nil
+    }
+    
+    // Implement exponential backoff
+    backoff := time.Second
+    maxBackoff := time.Minute
+    
+    for attempts := 0; attempts < 5; attempts++ {
+        conn, err := c.connect()
+        if err == nil {
+            c.conn = conn
+            c.Infof("reconnected successfully after %d attempts", attempts+1)
+            return nil
+        }
+        
+        c.Warningf("reconnection attempt %d failed: %v", attempts+1, err)
+        
+        time.Sleep(backoff)
+        backoff *= 2
+        if backoff > maxBackoff {
+            backoff = maxBackoff
+        }
+    }
+    
+    return errors.New("failed to reconnect after 5 attempts")
+}
+```
+
+### 3. Minimize Application Impact
+
+#### Resource Reuse
+
+**CRITICAL**: Reuse temporary objects between collection cycles. Don't create new temporary resources for each collection.
+
+❌ **BAD: Creating temporary resources per collection**
+```go
+// WRONG: Creates a new temporary queue for each collection
+func (c *Collector) collect() (map[string]int64, error) {
+    // WRONG: New temporary queue every time!
+    tempQueue := c.mq.CreateTemporaryQueue()
+    defer c.mq.DeleteQueue(tempQueue)
+    
+    response := c.mq.QueryMetrics(tempQueue)
+    // Process response...
+}
+```
+
+✅ **GOOD: Reuse temporary resources**
+```go
+// CORRECT: Create temporary resources once and reuse
+func (c *Collector) Init() error {
+    // Create temporary queue once during initialization
+    c.responseQueue = c.mq.CreateTemporaryQueue()
+    return nil
+}
+
+func (c *Collector) collect() (map[string]int64, error) {
+    // Reuse the same temporary queue
+    response := c.mq.QueryMetrics(c.responseQueue)
+    // Process response...
+}
+
+func (c *Collector) Cleanup() {
+    // Clean up temporary resources only on shutdown
+    if c.responseQueue != "" {
+        c.mq.DeleteQueue(c.responseQueue)
+    }
+}
+```
+
+#### Best Practices Summary
+
+1. **One connection per collector** - Not per collection cycle
+2. **One set of temporary resources** - Created at init, cleaned at shutdown
+3. **Minimal queries** - Batch requests when possible
+4. **Respect rate limits** - Don't overload the monitored application
+5. **Clean shutdown** - Always clean up resources in Cleanup()
+
 ## Testing
 
 ### Test Structure
