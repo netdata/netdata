@@ -20,6 +20,19 @@ import (
 // PCF constants that may not be available in all MQ versions
 // These constants are defined here to avoid CGO compilation errors
 const (
+	// PCF command constants for name discovery
+	MQCMD_INQUIRE_Q_NAMES       = C.MQLONG(18) // Queue name discovery command
+	MQCMD_INQUIRE_CHANNEL_NAMES = C.MQLONG(20) // Channel name discovery command
+	
+	// PCF parameter constants for name queries
+	MQCACF_Q_NAMES              = C.MQLONG(3011) // Queue names parameter
+	MQCACF_SENDER_CHANNEL_NAMES = C.MQLONG(3019) // Sender channel names parameter
+	MQCACF_SERVER_CHANNEL_NAMES = C.MQLONG(3020) // Server channel names parameter
+	
+	// PCF attribute selector constants
+	MQIACF_Q_ATTRS              = C.MQLONG(1002) // Queue attributes selector
+	MQIACF_CHANNEL_ATTRS        = C.MQLONG(1015) // Channel attributes selector
+	
 	// Queue Manager CPU and Memory constants (MQ 8.0+)
 	MQIACF_Q_MGR_CPU_LOAD    = C.MQLONG(3024) // Queue Manager CPU load percentage
 	MQIACF_Q_MGR_MEMORY_USAGE = C.MQLONG(3025) // Queue Manager memory usage in bytes
@@ -220,9 +233,14 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 				break
 			}
 			
-			// Extract string value
-			stringData := (*[256]byte)(unsafe.Pointer(uintptr(unsafe.Pointer(&response[offset])) + C.sizeof_MQCFST))
-			value := string(stringData[:cfst.StringLength])
+			// Extract string value using a slice for robustness
+			stringDataStart := offset + int(C.sizeof_MQCFST)
+			stringDataEnd := stringDataStart + int(cfst.StringLength)
+			if stringDataEnd > len(response) {
+				// This should ideally be caught by the StrucLength check, but as a safeguard
+				break
+			}
+			value := string(response[stringDataStart:stringDataEnd])
 			attrs[cfst.Parameter] = strings.TrimSpace(value)
 			offset += int(cfst.StrucLength)
 			
