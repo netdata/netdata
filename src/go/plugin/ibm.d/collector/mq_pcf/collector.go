@@ -67,6 +67,9 @@ type Collector struct {
 	// Compiled selectors for filtering
 	queueSelectorRegex   *regexp.Regexp
 	channelSelectorRegex *regexp.Regexp
+	
+	// Debug counters
+	pcfCommandCount int
 }
 
 // New creates a new collector.
@@ -161,6 +164,7 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 
 // Cleanup is called once when the collector is stopped.
 func (c *Collector) Cleanup(ctx context.Context) {
+	c.Debugf("Cleanup() called - this should only happen when collector stops!")
 	c.disconnect()
 }
 
