@@ -284,7 +284,6 @@ func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{},
 	offset := C.sizeof_MQCFH
 	c.Debugf("Starting parameter parsing, offset=%d, response len=%d", offset, len(response))
 	for i := 0; i < int(cfh.ParameterCount) && offset < len(response); i++ {
-		c.Debugf("Parsing parameter %d at offset %d", i, offset)
 		paramType := *(*C.MQLONG)(unsafe.Pointer(&response[offset]))
 		
 		switch paramType {
