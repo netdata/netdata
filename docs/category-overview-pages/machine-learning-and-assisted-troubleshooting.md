@@ -131,7 +131,7 @@ To start exploring:
 1. **Netdata AI: Alert Assistant & Infrastructure Insights**: Access both Alert Assistant and Strategic Reports via Netdata Cloud
 2. **MCP Integration**: [Request early access](https://b6yi53u6qjm.typeform.com/to/DQi5ibhE?typeform-source=www.netdata.cloud) for natural language queries
 3. **Anomaly Detection**: Check the [Anomaly Advisor tab](/docs/dashboards-and-charts/anomaly-advisor-tab.md) to see detected anomalies
-4. **Metric Correlations**: Use the Metric Correlations button in the dashboard to analyze relationships between metrics
+4. **Metric Correlations**: Use the [Metric Correlations](/docs/metric-correlations.md) button in the dashboard to analyze relationships between metrics
 
 :::tip
 
