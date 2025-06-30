@@ -129,7 +129,7 @@ macro(add_ibm_plugin_target)
     # Add MQ paths if available
     if(EXISTS "${IBM_MQ_DIR}/inc/cmqc.h")
         set(IBM_CGO_CFLAGS "${IBM_CGO_CFLAGS} -I${IBM_MQ_DIR}/inc")
-        set(IBM_CGO_LDFLAGS "${IBM_CGO_LDFLAGS} -L${IBM_MQ_DIR}/lib64 -lmqm")
+        set(IBM_CGO_LDFLAGS "${IBM_CGO_LDFLAGS} -L${IBM_MQ_DIR}/lib64 -lmqic_r")
         set(IBM_RPATH_FLAGS "${IBM_RPATH_FLAGS} -Wl,-rpath,\$ORIGIN/../../../lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,/usr/lib/netdata/ibm-mqclient/lib64 -Wl,-rpath,/opt/netdata/lib/netdata/ibm-mqclient/lib64")
         set(MQ_INSTALLATION_PATH "${IBM_MQ_DIR}")
     else()
