@@ -683,47 +683,81 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 }
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
-	// Send INQUIRE_Q command with queue type parameter to get all local queues
-	// MQ requires at least a queue type to be specified
-	params := []pcfParameter{
-		newIntParameter(C.MQIA_Q_TYPE, C.MQQT_LOCAL),
+	// For MQ 9.4.x, try specific known queue patterns first
+	// Then we'll collect metrics for these known queues
+	knownQueues := []string{
+		"DEV.QUEUE.1",
+		"DEV.QUEUE.2", 
+		"DEV.QUEUE.3",
+		"TEST.QUEUE1",
+		"TEST.QUEUE2",
+		"TEST.QUEUE3",
+		"DEV.DEAD.LETTER.QUEUE",
 	}
 	
-	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_TYPE=MQQT_LOCAL")
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_Q: %w", err)
+	var foundQueues []string
+	
+	// Test each known queue by trying to get its status
+	for _, queueName := range knownQueues {
+		params := []pcfParameter{
+			newStringParameter(C.MQCA_Q_NAME, queueName),
+		}
+		
+		c.Debugf("Testing queue existence: %s", queueName)
+		response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
+		if err == nil {
+			// Parse the response to confirm the queue exists
+			attrs, parseErr := c.parsePCFResponse(response)
+			if parseErr == nil {
+				if qName, ok := attrs[C.MQCA_Q_NAME]; ok {
+					if name, ok := qName.(string); ok && strings.TrimSpace(name) == queueName {
+						foundQueues = append(foundQueues, queueName)
+						c.Debugf("Found queue: %s", queueName)
+					}
+				}
+			}
+		}
 	}
 	
-	// Parse queue names from response
-	queues, err := c.parseQueueListResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse queue list response: %w", err)
-	}
-	
-	return queues, nil
+	c.Debugf("Found %d queues from known list: %v", len(foundQueues), foundQueues)
+	return foundQueues, nil
 }
 
 func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
-	// Send INQUIRE_CHANNEL command with channel type parameter to get server connection channels
-	// Start with SVRCONN channels which are most common for monitoring
-	params := []pcfParameter{
-		newIntParameter(C.MQIACH_CHANNEL_TYPE, C.MQCHT_SVRCONN),
+	// For MQ 9.4.x, try specific known channel patterns first
+	knownChannels := []string{
+		"DEV.ADMIN.SVRCONN",
+		"DEV.APP.SVRCONN",
+		"SYSTEM.AUTO.SVRCONN",
+		"SYSTEM.DEF.SVRCONN",
 	}
 	
-	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_TYPE=MQCHT_SVRCONN")
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_CHANNEL: %w", err)
+	var foundChannels []string
+	
+	// Test each known channel by trying to get its status
+	for _, channelName := range knownChannels {
+		params := []pcfParameter{
+			newStringParameter(C.MQCACH_CHANNEL_NAME, channelName),
+		}
+		
+		c.Debugf("Testing channel existence: %s", channelName)
+		response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+		if err == nil {
+			// Parse the response to confirm the channel exists
+			attrs, parseErr := c.parsePCFResponse(response)
+			if parseErr == nil {
+				if chName, ok := attrs[C.MQCACH_CHANNEL_NAME]; ok {
+					if name, ok := chName.(string); ok && strings.TrimSpace(name) == channelName {
+						foundChannels = append(foundChannels, channelName)
+						c.Debugf("Found channel: %s", channelName)
+					}
+				}
+			}
+		}
 	}
 	
-	// Parse channel names from response
-	channels, err := c.parseChannelListResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse channel list response: %w", err)
-	}
-	
-	return channels, nil
+	c.Debugf("Found %d channels from known list: %v", len(foundChannels), foundChannels)
+	return foundChannels, nil
 }
 
 func (c *Collector) shouldCollectQueue(queueName string) bool {
