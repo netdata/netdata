@@ -375,35 +375,6 @@ const char *nut_get_var(UPSCONN_t *conn, const char *ups_name, const char *var_n
     return answer[0][3];
 }
 
-int nut_list_ups(UPSCONN_t *ups, size_t *numa, char ***answer) {
-    assert(ups);
-    assert(numa);
-    assert(answer);
-
-    int rc;
-    static bool started = false;
-    const char *query[] = { "UPS" };
-
-    if (!started) {
-        rc = upscli_list_start(ups, LENGTHOF(query), query);
-        assert(rc != -1);
-        started = true;
-    }
-
-    rc = upscli_list_next(ups, LENGTHOF(query), query, numa, answer);
-    assert(rc != -1);
-
-    // Unfortunately, list_ups_next() will emit the list delimiter
-    // "END LIST UPS" as its last iteration before returning 0. We don't
-    // need it, so let's skip processing on that item.
-    if (streq("END", answer[0][0])) {
-        started = false;
-        return 0;
-    }
-
-    return 1;
-}
-
 // This function parses the 'ups.status' variable and emits the Netdata metrics
 // for each status, printing 1 for each set status and 0 otherwise.
 static inline void print_ups_status_metrics(const char *ups_name, const char *value) {
@@ -541,6 +512,7 @@ int main(int argc, char *argv[]) {
     UPSCONN_t ups1, ups2;
     char buf[BUFLEN];
     unsigned int first_ups_count = 0;
+    const char *query[] = { "UPS" };
 
     nd_log_initialize_for_external_plugins(PLUGIN_UPSD_NAME);
     netdata_threads_init_for_external_plugins(0);
@@ -568,8 +540,15 @@ int main(int argc, char *argv[]) {
     // Set stdout to block-buffered, to make printf() faster.
     setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
 
-    while (nut_list_ups(&ups1, &numa, (char***)&answer)) {
+    upscli_list_start(&ups1, LENGTHOF(query), query);
+    while (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer)) {
         first_ups_count++;
+
+        // Unfortunately, list_ups_next() will emit the list delimiter
+        // "END LIST UPS" as its last iteration before returning 0. We don't
+        // need it, so let's skip processing on that item.
+        if (streq("END", answer[0][0]))
+            break;
 
         // The output of nut_list_ups() will be something like:
         //  { { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> } }
@@ -672,8 +651,16 @@ int main(int argc, char *argv[]) {
             break;
 
         unsigned int this_ups_count = 0;
-        while (nut_list_ups(&ups1, &numa, (char***)&answer)) {
+
+        upscli_list_start(&ups1, LENGTHOF(query), query);
+        while (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer)) {
             this_ups_count++;
+
+            // Unfortunately, list_ups_next() will emit the list delimiter
+            // "END LIST UPS" as its last iteration before returning 0. We don't
+            // need it, so let's skip processing on that item.
+            if (streq("END", answer[0][0]))
+                break;
 
             const char *ups_name = answer[0][1];
             const char *clean_ups_name = clean_name(buf, sizeof(buf), ups_name);
