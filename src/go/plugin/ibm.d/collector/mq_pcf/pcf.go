@@ -135,6 +135,40 @@ func (p *intParameter) marshal(buffer unsafe.Pointer) {
 	cfin.Value = C.MQLONG(p.value)
 }
 
+// Integer list parameter
+type intListParameter struct {
+	parameter C.MQLONG
+	values    []int32
+}
+
+func newIntListParameter(param C.MQLONG, values []int32) pcfParameter {
+	return &intListParameter{
+		parameter: param,
+		values:    values,
+	}
+}
+
+func (p *intListParameter) size() C.size_t {
+	// MQCFIL structure size + integer values
+	return C.sizeof_MQCFIL + C.size_t(len(p.values)*4)
+}
+
+func (p *intListParameter) marshal(buffer unsafe.Pointer) {
+	cfil := (*C.MQCFIL)(buffer)
+	cfil.Type = C.MQCFT_INTEGER_LIST
+	cfil.StrucLength = C.MQLONG(p.size())
+	cfil.Parameter = p.parameter
+	cfil.Count = C.MQLONG(len(p.values))
+	
+	// Copy integer values
+	if len(p.values) > 0 {
+		valuesPtr := (*C.MQLONG)(unsafe.Pointer(uintptr(buffer) + C.sizeof_MQCFIL))
+		for i, val := range p.values {
+			*(*C.MQLONG)(unsafe.Pointer(uintptr(unsafe.Pointer(valuesPtr)) + uintptr(i*4))) = C.MQLONG(val)
+		}
+	}
+}
+
 // Parse PCF response into a map of attributes
 func (c *Collector) parsePCFResponse(response []byte) (map[C.MQLONG]interface{}, error) {
 	if len(response) < int(C.sizeof_MQCFH) {
