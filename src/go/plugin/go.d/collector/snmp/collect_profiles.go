@@ -77,7 +77,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 
 			if len(m.Mappings) == 0 {
 				id := fmt.Sprintf("snmp_device_prof_%s", key)
-				mx[id] = m.Value
+				mx[id] += m.Value
 			} else {
 				for k, v := range m.Mappings {
 					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, v)
