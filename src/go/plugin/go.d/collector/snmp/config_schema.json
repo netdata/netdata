@@ -354,6 +354,12 @@
         "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*",
         "type": "boolean",
         "default": false
+      },
+      "disable_legacy_collection": {
+        "title": "Disable Legacy SNMP Collection",
+        "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
+        "type": "boolean",
+        "default": false
       }
     },
     "required": [
@@ -481,7 +487,8 @@
           "title": "Profiles",
           "fields": [
             "enable_profiles",
-            "enable_profiles_table_metrics"
+            "enable_profiles_table_metrics",
+            "disable_legacy_collection"
           ]
         }
       ]

@@ -33,7 +33,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			c.vnode = c.setupVnode(si)
 		}
 
-		if c.EnableProfiles {
+		if c.DisableLegacyCollection || c.EnableProfiles {
 			c.snmpProfiles = c.setupProfiles()
 		}
 	}
@@ -44,19 +44,21 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.Infof("failed to collect profiles: %v", err)
 	}
 
-	if err := c.collectSysUptime(mx); err != nil {
-		return nil, err
-	}
-
-	if c.collectIfMib {
-		if err := c.collectNetworkInterfaces(mx); err != nil {
+	if !c.DisableLegacyCollection {
+		if err := c.collectSysUptime(mx); err != nil {
 			return nil, err
 		}
-	}
 
-	if len(c.customOids) > 0 {
-		if err := c.collectOIDs(mx); err != nil {
-			return nil, err
+		if c.collectIfMib {
+			if err := c.collectNetworkInterfaces(mx); err != nil {
+				return nil, err
+			}
+		}
+
+		if len(c.customOids) > 0 {
+			if err := c.collectOIDs(mx); err != nil {
+				return nil, err
+			}
 		}
 	}
 
