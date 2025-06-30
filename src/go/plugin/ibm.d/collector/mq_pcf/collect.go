@@ -683,14 +683,13 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 }
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
-	// Send INQUIRE_Q command with generic queue name
-	// Try using MQIACF_ALL to get all attributes
+	// Send INQUIRE_Q command with queue type parameter to get all local queues
+	// MQ requires at least a queue type to be specified
 	params := []pcfParameter{
-		newStringParameter(C.MQCA_Q_NAME, "*"),
-		newIntListParameter(C.MQIACF_Q_ATTRS, []int32{C.MQIACF_ALL}),
+		newIntParameter(C.MQIA_Q_TYPE, C.MQQT_LOCAL),
 	}
 	
-	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_NAME='*' and Q_ATTRS=[MQIACF_ALL]")
+	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_TYPE=MQQT_LOCAL")
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send INQUIRE_Q: %w", err)
@@ -706,13 +705,13 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 }
 
 func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
-	// Send INQUIRE_CHANNEL command with generic channel name
-	// Note: We only send the channel name parameter for listing
+	// Send INQUIRE_CHANNEL command with channel type parameter to get server connection channels
+	// Start with SVRCONN channels which are most common for monitoring
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
+		newIntParameter(C.MQIACH_CHANNEL_TYPE, C.MQCHT_SVRCONN),
 	}
 	
-	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_NAME='*'")
+	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_TYPE=MQCHT_SVRCONN")
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send INQUIRE_CHANNEL: %w", err)
