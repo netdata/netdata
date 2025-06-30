@@ -65,7 +65,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -80,6 +79,8 @@ const (
 type mqConnection struct {
 	hConn      C.MQHCONN    // Connection handle
 	hObj       C.MQHOBJ     // Object handle for admin queue
+	hReplyObj  C.MQHOBJ     // Object handle for persistent reply queue
+	replyQueueName [48]C.char // Store the actual reply queue name
 	connected  bool
 }
 
@@ -253,9 +254,48 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 		return fmt.Errorf("MQOPEN failed: completion code %d, reason code %d (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", openCompCode, openReason)
 	}
 	
+	c.Debugf("Admin queue opened successfully, now creating persistent reply queue")
+	
+	// Create a persistent dynamic reply queue for all PCF commands
+	var replyOd C.MQOD
+	C.memset(unsafe.Pointer(&replyOd), 0, C.sizeof_MQOD)
+	C.set_od_struc_id(&replyOd)
+	replyOd.Version = C.MQOD_VERSION_1
+	modelQueueName := C.CString("SYSTEM.DEFAULT.MODEL.QUEUE")
+	defer C.free(unsafe.Pointer(modelQueueName))
+	C.set_object_name(&replyOd, modelQueueName)
+	replyOd.ObjectType = C.MQOT_Q
+	
+	// Set dynamic queue name pattern - use a unique pattern to avoid conflicts
+	dynQueueName := C.CString("NETDATA.PCF.*")
+	defer C.free(unsafe.Pointer(dynQueueName))
+	C.memset(unsafe.Pointer(&replyOd.DynamicQName), ' ', 48)
+	C.memcpy(unsafe.Pointer(&replyOd.DynamicQName), unsafe.Pointer(dynQueueName), C.strlen(dynQueueName))
+	
+	var replyOpenOptions C.MQLONG = C.MQOO_INPUT_AS_Q_DEF | C.MQOO_FAIL_IF_QUIESCING
+	
+	C.MQOPEN(c.mqConn.hConn, C.PMQVOID(unsafe.Pointer(&replyOd)), replyOpenOptions, &c.mqConn.hReplyObj, &compCode, &reason)
+	if compCode != C.MQCC_OK {
+		// Save the actual error codes before disconnect
+		replyOpenCompCode := compCode
+		replyOpenReason := reason
+		
+		// Close admin queue
+		C.MQCLOSE(c.mqConn.hConn, &c.mqConn.hObj, C.MQCO_NONE, &compCode, &reason)
+		
+		var discCompCode, discReason C.MQLONG
+		C.MQDISC(&c.mqConn.hConn, &discCompCode, &discReason)
+		return fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", replyOpenCompCode, replyOpenReason)
+	}
+	
+	// Store the actual reply queue name for use in PCF commands
+	C.memcpy(unsafe.Pointer(&c.mqConn.replyQueueName), unsafe.Pointer(&replyOd.ObjectName), 48)
+	
 	c.mqConn.connected = true
 	c.Infof("Successfully connected to queue manager %s on %s:%d via channel %s", 
 		c.QueueManager, c.Host, c.Port, c.Channel)
+	actualReplyQueueName := C.GoStringN((*C.char)(unsafe.Pointer(&c.mqConn.replyQueueName[0])), 48)
+	c.Debugf("Created persistent reply queue: %s", strings.TrimSpace(actualReplyQueueName))
 	
 	return nil
 }
@@ -270,6 +310,14 @@ func (c *Collector) disconnect() {
 	
 	var compCode C.MQLONG
 	var reason C.MQLONG
+	
+	// Close the persistent reply queue
+	if c.mqConn.hReplyObj != C.MQHO_UNUSABLE_HOBJ {
+		C.MQCLOSE(c.mqConn.hConn, &c.mqConn.hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
+		if compCode != C.MQCC_OK {
+			c.Warningf("Failed to close reply queue: completion code %d, reason code %d", compCode, reason)
+		}
+	}
 	
 	if c.mqConn.hObj != C.MQHO_UNUSABLE_HOBJ {
 		C.MQCLOSE(c.mqConn.hConn, &c.mqConn.hObj, C.MQCO_NONE, &compCode, &reason)
@@ -303,55 +351,19 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 		return nil, fmt.Errorf("connection handle is invalid")
 	}
 	
+	// Check if reply queue handle is still valid
+	if c.mqConn.hReplyObj == C.MQHO_UNUSABLE_HOBJ {
+		c.mqConn.connected = false
+		return nil, fmt.Errorf("reply queue handle is invalid")
+	}
+	
 	// Debug: log connection handle value and reply queue details
 	c.pcfCommandCount++
-	c.Debugf("PCF command #%d: Connection handle: %v, admin queue handle: %v", c.pcfCommandCount, c.mqConn.hConn, c.mqConn.hObj)
+	c.Debugf("PCF command #%d: Connection handle: %v, admin queue: %v, reply queue: %v", 
+		c.pcfCommandCount, c.mqConn.hConn, c.mqConn.hObj, c.mqConn.hReplyObj)
 	
-	// First, open a dynamic reply queue
-	var replyOd C.MQOD
-	C.memset(unsafe.Pointer(&replyOd), 0, C.sizeof_MQOD)
-	C.set_od_struc_id(&replyOd)
-	replyOd.Version = C.MQOD_VERSION_1
-	modelQueueName := C.CString("SYSTEM.DEFAULT.MODEL.QUEUE")
-	defer C.free(unsafe.Pointer(modelQueueName))
-	C.set_object_name(&replyOd, modelQueueName)
-	replyOd.ObjectType = C.MQOT_Q
-	
-	// Set dynamic queue name pattern - use a unique pattern to avoid conflicts
-	dynQueueName := C.CString("NETDATA.PCF.*")
-	defer C.free(unsafe.Pointer(dynQueueName))
-	C.memset(unsafe.Pointer(&replyOd.DynamicQName), ' ', 48)
-	C.memcpy(unsafe.Pointer(&replyOd.DynamicQName), unsafe.Pointer(dynQueueName), C.strlen(dynQueueName))
-	
-	var hReplyObj C.MQHOBJ
-	var openOptions C.MQLONG = C.MQOO_INPUT_AS_Q_DEF | C.MQOO_FAIL_IF_QUIESCING
 	var compCode C.MQLONG
 	var reason C.MQLONG
-	
-	// Capture the connection handle to use in defer
-	currentHConn := c.mqConn.hConn
-	
-	C.MQOPEN(currentHConn, C.PMQVOID(unsafe.Pointer(&replyOd)), openOptions, &hReplyObj, &compCode, &reason)
-	if compCode != C.MQCC_OK {
-		// If connection handle error, mark connection as failed
-		if reason == C.MQRC_HCONN_ERROR {
-			c.mqConn.connected = false
-		}
-		return nil, fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", compCode, reason)
-	}
-	defer func() {
-		var closeCompCode, closeReason C.MQLONG
-		// Use the captured handle to avoid issues if connection is recreated
-		C.MQCLOSE(currentHConn, &hReplyObj, C.MQCO_DELETE_PURGE, &closeCompCode, &closeReason)
-		if closeCompCode != C.MQCC_OK {
-			c.Debugf("Failed to close reply queue: completion code %d, reason code %d", closeCompCode, closeReason)
-			// If connection handle error during close, mark connection as failed
-			if closeReason == C.MQRC_HCONN_ERROR {
-				c.mqConn.connected = false
-				c.Errorf("MQCLOSE failed with HCONN_ERROR - connection handle is now invalid")
-			}
-		}
-	}()
 	
 	// Calculate message size
 	msgSize := int(C.sizeof_MQCFH)
@@ -398,8 +410,8 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	md.Priority = C.MQPRI_PRIORITY_AS_Q_DEF
 	md.Persistence = C.MQPER_NOT_PERSISTENT
 	
-	// Use the actual dynamic queue name that was created
-	C.memcpy(unsafe.Pointer(&md.ReplyToQ), unsafe.Pointer(&replyOd.ObjectName), 48)
+	// Use the persistent reply queue name
+	C.memcpy(unsafe.Pointer(&md.ReplyToQ), unsafe.Pointer(&c.mqConn.replyQueueName), 48)
 	
 	var pmo C.MQPMO
 	C.memset(unsafe.Pointer(&pmo), 0, C.sizeof_MQPMO)
@@ -407,7 +419,7 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	pmo.Version = C.MQPMO_VERSION_1
 	pmo.Options = C.MQPMO_NO_SYNCPOINT | C.MQPMO_FAIL_IF_QUIESCING
 	
-	C.MQPUT(currentHConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
+	C.MQPUT(c.mqConn.hConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
 		// If connection handle error, mark connection as failed
@@ -418,12 +430,8 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 		return nil, fmt.Errorf("MQPUT failed: completion code %d, reason code %d", compCode, reason)
 	}
 	
-	// Get response from reply queue
-	response, err := c.getPCFResponse(&md, hReplyObj)
-	
-	// Add a small delay to allow MQ to clean up resources
-	// This helps prevent MQRC_HCONN_ERROR after multiple rapid operations
-	time.Sleep(50 * time.Millisecond)
+	// Get response from persistent reply queue
+	response, err := c.getPCFResponse(&md, c.mqConn.hReplyObj)
 	
 	return response, err
 }
@@ -642,6 +650,7 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 	// Send INQUIRE_Q command with generic queue name
+	// Note: We only send the queue name parameter for listing
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, "*"),
 	}
@@ -662,6 +671,7 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 
 func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
 	// Send INQUIRE_CHANNEL command with generic channel name
+	// Note: We only send the channel name parameter for listing
 	params := []pcfParameter{
 		newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
 	}
