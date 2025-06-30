@@ -366,7 +366,7 @@ const (
 	queryActiveConnections    = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'CONNECTED'`
 	queryExecutingConnections = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'UOWEXEC'`
 	queryIdleConnections      = `SELECT COUNT(*) FROM SYSIBMADM.APPLICATIONS WHERE APPL_STATUS = 'CONNECTED' AND UOW_COMP_STATUS = 'NONE'`
-	queryMaxConnections       = `SELECT MAX(APPLS_CUR_CONS) FROM SYSIBMADM.SNAPDB`
+	queryMaxConnections       = `SELECT COALESCE(NULLIF(VALUE, 'AUTOMATIC'), '40') FROM SYSIBMADM.DBCFG WHERE NAME = 'maxappls'`
 
 	// Core lock metrics - should be available on most DB2 editions
 	queryLockWaits         = `SELECT SUM(LOCK_WAITS) FROM SYSIBMADM.SNAPDB`
