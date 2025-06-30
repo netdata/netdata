@@ -602,10 +602,10 @@ int main(int argc, char *argv[]) {
             printf("CLABEL device_type '%s' %u\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
 
         // CLABEL name value source
+        // CLABEL_COMMIT
         printf("CLABEL ups_name '%s' %u\n"
-               "CLABEL _collect_plugin '" PLUGIN_UPSD_NAME "' %u\n"
                "CLABEL_COMMIT\n",
-               ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+               ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
 
         // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
         printf("DIMENSION on_line '' '' '' %u\n", NETDATA_PLUGIN_PRECISION);
@@ -661,10 +661,10 @@ int main(int argc, char *argv[]) {
                 printf("CLABEL 'device_type' '%s' '%u'\n", nut_value, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
 
             // CLABEL name value source
+            // CLABEL_COMMIT
             printf("CLABEL 'ups_name' '%s' %u\n"
-                   "CLABEL '_collect_plugin' '" PLUGIN_UPSD_NAME "' %u\n"
                    "CLABEL_COMMIT\n",
-                   ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
+                   ups_name, NETDATA_PLUGIN_CLABEL_SOURCE_AUTO);
  
             // DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
             printf("DIMENSION '%s' '' '' '' %u\n", chart->chart_dimension, NETDATA_PLUGIN_PRECISION);
