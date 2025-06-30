@@ -293,11 +293,13 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	C.memset(unsafe.Pointer(cfh), 0, C.sizeof_MQCFH)
 	cfh.Type = C.MQCFT_COMMAND
 	cfh.StrucLength = C.MQCFH_STRUC_LENGTH
-	cfh.Version = C.MQCFH_VERSION_3
+	cfh.Version = C.MQCFH_VERSION_1
 	cfh.Command = command
 	cfh.MsgSeqNumber = 1
 	cfh.Control = C.MQCFC_LAST
 	cfh.ParameterCount = C.MQLONG(len(parameters))
+	
+	c.Debugf("Sending PCF command %d with %d parameters, message size %d", command, len(parameters), msgSize)
 	
 	// Add parameters
 	offset := int(C.sizeof_MQCFH)
@@ -310,21 +312,29 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	var md C.MQMD
 	C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
 	C.set_md_struc_id(&md)
-	md.Version = C.MQMD_VERSION_2
+	md.Version = C.MQMD_VERSION_1
 	formatStr := C.CString("MQADMIN")
 	defer C.free(unsafe.Pointer(formatStr))
 	C.set_format(&md, formatStr)
 	md.MsgType = C.MQMT_REQUEST
-	md.Expiry = 60 // 60 seconds expiry
+	md.Expiry = C.MQEI_UNLIMITED // No expiry
+	md.Encoding = C.MQENC_NATIVE
+	md.CodedCharSetId = C.MQCCSI_Q_MGR
+	md.Priority = C.MQPRI_PRIORITY_AS_Q_DEF
+	md.Persistence = C.MQPER_NOT_PERSISTENT
+	
+	// Set a reply queue using MQRFH2 model or create a temporary queue
+	// For now, let's use the SYSTEM.DEFAULT.MODEL.QUEUE
+	replyToQ := C.CString("MQPCF.*")
+	defer C.free(unsafe.Pointer(replyToQ))
+	C.memset(unsafe.Pointer(&md.ReplyToQ), ' ', 48)
+	C.memcpy(unsafe.Pointer(&md.ReplyToQ), unsafe.Pointer(replyToQ), C.strlen(replyToQ))
 	
 	var pmo C.MQPMO
 	C.memset(unsafe.Pointer(&pmo), 0, C.sizeof_MQPMO)
 	C.set_pmo_struc_id(&pmo)
-	pmo.Version = C.MQPMO_VERSION_2
-	pmo.Options = C.MQPMO_NEW_MSG_ID | C.MQPMO_NEW_CORREL_ID | C.MQPMO_FAIL_IF_QUIESCING
-	
-	var compCode C.MQLONG
-	var reason C.MQLONG
+	pmo.Version = C.MQPMO_VERSION_1
+	pmo.Options = C.MQPMO_NO_SYNCPOINT | C.MQPMO_FAIL_IF_QUIESCING
 	
 	C.MQPUT(c.mqConn.hConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
 	
@@ -337,18 +347,24 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 }
 
 func (c *Collector) getPCFResponse(requestMd *C.MQMD) ([]byte, error) {
-	// Open system command reply queue
+	// Open the model queue to create a temporary reply queue
 	var od C.MQOD
 	C.memset(unsafe.Pointer(&od), 0, C.sizeof_MQOD)
 	C.set_od_struc_id(&od)
 	od.Version = C.MQOD_VERSION_1
-	replyQueueName := C.CString("SYSTEM.ADMIN.COMMAND.REPLY.MODEL")
-	defer C.free(unsafe.Pointer(replyQueueName))
-	C.set_object_name(&od, replyQueueName)
+	modelQueueName := C.CString("SYSTEM.DEFAULT.MODEL.QUEUE")
+	defer C.free(unsafe.Pointer(modelQueueName))
+	C.set_object_name(&od, modelQueueName)
 	od.ObjectType = C.MQOT_Q
 	
+	// Set dynamic queue name pattern
+	dynQueueName := C.CString("MQPCF.*")
+	defer C.free(unsafe.Pointer(dynQueueName))
+	C.memset(unsafe.Pointer(&od.DynamicQName), ' ', 48)
+	C.memcpy(unsafe.Pointer(&od.DynamicQName), unsafe.Pointer(dynQueueName), C.strlen(dynQueueName))
+	
 	var hReplyObj C.MQHOBJ
-	var openOptions C.MQLONG = C.MQOO_INPUT_SHARED | C.MQOO_FAIL_IF_QUIESCING
+	var openOptions C.MQLONG = C.MQOO_INPUT_AS_Q_DEF | C.MQOO_FAIL_IF_QUIESCING
 	var compCode C.MQLONG
 	var reason C.MQLONG
 	
@@ -356,19 +372,19 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD) ([]byte, error) {
 	if compCode != C.MQCC_OK {
 		return nil, fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", compCode, reason)
 	}
-	defer C.MQCLOSE(c.mqConn.hConn, &hReplyObj, C.MQCO_NONE, &compCode, &reason)
+	defer C.MQCLOSE(c.mqConn.hConn, &hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
 	
 	// Get message
 	var md C.MQMD
 	C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
 	C.set_md_struc_id(&md)
-	md.Version = C.MQMD_VERSION_2
+	md.Version = C.MQMD_VERSION_1
 	C.copy_msg_id(&md, requestMd)
 	
 	var gmo C.MQGMO
 	C.memset(unsafe.Pointer(&gmo), 0, C.sizeof_MQGMO)
 	C.set_gmo_struc_id(&gmo)
-	gmo.Version = C.MQGMO_VERSION_2
+	gmo.Version = C.MQGMO_VERSION_1
 	gmo.Options = C.MQGMO_WAIT | C.MQGMO_FAIL_IF_QUIESCING | C.MQGMO_CONVERT
 	gmo.WaitInterval = 5000 // 5 seconds timeout
 	
