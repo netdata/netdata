@@ -15,12 +15,9 @@
 
 #define PLUGIN_UPSD_NAME "upsd.plugin"
 
-// https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins#operation
 #define NETDATA_PLUGIN_EXIT_AND_RESTART 0
-// https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins#disable
 #define NETDATA_PLUGIN_EXIT_AND_DISABLE 1
 
-// https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins/#clabel
 #define NETDATA_PLUGIN_CLABEL_SOURCE_AUTO   1
 #define NETDATA_PLUGIN_CLABEL_SOURCE_MANUAL 2
 #define NETDATA_PLUGIN_CLABEL_SOURCE_K8     4
