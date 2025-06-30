@@ -31,8 +31,22 @@ metrics:
       unit: "{packet}/s"
   - MIB: TCP-MIB
     symbol:
+      OID: 1.3.6.1.2.1.6.10.0
+      name: tcpInSegs
+      description: TCP segments received
+      family: Network/TCP/Segment/Total/In
+      unit: "{packet}/s"
+  - MIB: TCP-MIB
+    symbol:
       OID: 1.3.6.1.2.1.6.18.0
       name: tcpHCOutSegs
+      description: TCP segments sent
+      family: Network/TCP/Segment/Total/Out
+      unit: "{packet}/s"
+  - MIB: TCP-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.6.11.0
+      name: tcpOutSegs
       description: TCP segments sent
       family: Network/TCP/Segment/Total/Out
       unit: "{packet}/s"
