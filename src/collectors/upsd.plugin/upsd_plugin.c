@@ -507,6 +507,7 @@ static inline void print_ups_status_metrics(const char *ups_name, const char *va
 }
 
 int main(int argc, char *argv[]) {
+    int rc;
     size_t numa;
     char **answer[1];
     UPSCONN_t ups1, ups2;
@@ -524,8 +525,7 @@ int main(int argc, char *argv[]) {
     // this plugin, since it cannot offer any metrics.
     if (-1 == upscli_init(0, NULL, NULL, NULL)) {
         netdata_log_error("failed to initialize libupsclient");
-        puts("DISABLE");
-        exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
+        return NETDATA_PLUGIN_EXIT_AND_DISABLE;
     }
 
     // TODO: get address/port from configuration file
@@ -533,20 +533,23 @@ int main(int argc, char *argv[]) {
         (-1 == upscli_connect(&ups2, "127.0.0.1", 3493, 0))) {
         upscli_cleanup();
         netdata_log_error("failed to connect to upsd at 127.0.0.1:3493");
-        puts("DISABLE");
-        exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
+        return NETDATA_PLUGIN_EXIT_AND_DISABLE;
     }
 
     // Set stdout to block-buffered, to make printf() faster.
     setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
 
-    if (upscli_list_start(&ups1, LENGTHOF(query), query) == -1)
-        netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
+    rc = upscli_list_start(&ups1, LENGTHOF(query), query);
+    if (unlikely(-1 == rc)) {
+        netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+        return NETDATA_PLUGIN_EXIT_AND_DISABLE;
+    }
 
     for (;;) {
-        if (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer) == -1) {
-            netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
-            exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
+        rc = upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer);
+        if (unlikely(-1 == rc)) {
+            netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+            return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
 
         // Unfortunately, list_ups_next() will emit the list delimiter
@@ -659,13 +662,17 @@ int main(int argc, char *argv[]) {
 
         unsigned int this_ups_count = 0;
 
-        if (upscli_list_start(&ups1, LENGTHOF(query), query) == -1)
-            netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
+        rc = upscli_list_start(&ups1, LENGTHOF(query), query);
+        if (unlikely(-1 == rc)) {
+            netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+            return NETDATA_PLUGIN_EXIT_AND_DISABLE;
+        }
 
         for (;;) {
-            if (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer) == -1) {
-                netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
-                exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
+            rc = upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer);
+            if (unlikely(-1 == rc)) {
+                netdata_log_error("failed to list UPSes from upsd: %s", upscli_upserror(&ups1));
+                return NETDATA_PLUGIN_EXIT_AND_DISABLE;
             }
 
             // Unfortunately, list_ups_next() will emit the list delimiter
@@ -715,15 +722,13 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Flush the data out of the stream buffer to ensure netdata gets it immediately.
-        // https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins#the-output-of-the-plugin
-        fflush(stdout);
-
         // stdout, stderr are connected to pipes.
         // So, if they are closed then netdata must have exited.
+        // Flush the data out of the stream buffer to ensure netdata gets it immediately.
+        fflush(stdout);
         if (ferror(stdout) && errno == EPIPE) {
-            netdata_log_error("fflush(3)");
-            return EXIT_FAILURE;
+            netdata_log_error("failed to fflush(3) upsd data: %s", strerror(errno));
+            return NETDATA_PLUGIN_EXIT_AND_DISABLE;
         }
 
         // If the last UPS count does not match the current UPS count, then there's a real
