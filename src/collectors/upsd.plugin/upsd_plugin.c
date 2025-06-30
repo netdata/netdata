@@ -23,6 +23,30 @@
 #define NETDATA_PLUGIN_CLABEL_SOURCE_K8     4
 #define NETDATA_PLUGIN_CLABEL_SOURCE_AGENT  8
 
+#define NETDATA_CHART_PRIO_UPSD_UPS_LOAD      70000
+#define NETDATA_CHART_PRIO_UPSD_UPS_LOADUSAGE 70001
+#define NETDATA_CHART_PRIO_UPSD_UPS_STATUS    70002
+#define NETDATA_CHART_PRIO_UPSD_UPS_TEMP      70003
+
+#define NETDATA_CHART_PRIO_UPSD_BATT_CHARGE      70004
+#define NETDATA_CHART_PRIO_UPSD_BATT_RUNTIME     70005
+#define NETDATA_CHART_PRIO_UPSD_BATT_VOLTAGE     70006
+#define NETDATA_CHART_PRIO_UPSD_BATT_VOLTAGE_NOM 70007
+
+#define NETDATA_CHART_PRIO_UPSD_INPT_VOLTAGE       70008
+#define NETDATA_CHART_PRIO_UPSD_INPT_VOLTAGE_NOM   70009
+#define NETDATA_CHART_PRIO_UPSD_INPT_CURRENT       70010
+#define NETDATA_CHART_PRIO_UPSD_INPT_CURRENT_NOM   70011
+#define NETDATA_CHART_PRIO_UPSD_INPT_FREQUENCY     70012
+#define NETDATA_CHART_PRIO_UPSD_INPT_FREQUENCY_NOM 70013
+
+#define NETDATA_CHART_PRIO_UPSD_OUPT_VOLTAGE       70014
+#define NETDATA_CHART_PRIO_UPSD_OUPT_VOLTAGE_NOM   70015
+#define NETDATA_CHART_PRIO_UPSD_OUPT_CURRENT       70016
+#define NETDATA_CHART_PRIO_UPSD_OUPT_CURRENT_NOM   70017
+#define NETDATA_CHART_PRIO_UPSD_OUPT_FREQUENCY     70018
+#define NETDATA_CHART_PRIO_UPSD_OUPT_FREQUENCY_NOM 70019
+
 #define NETDATA_PLUGIN_PRECISION 100
 
 #define BUFLEN 64
@@ -73,7 +97,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "ups",
         .chart_context = "upsd.ups_load",
         .chart_type = "area",
-        .chart_priority = 70000,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_UPS_LOAD,
         .chart_dimension = "load",
     },
     {
@@ -84,7 +108,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "ups",
         .chart_context = "upsd.ups_load_usage",
         .chart_type = "line",
-        .chart_priority = 70001,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_UPS_LOADUSAGE,
         .chart_dimension = "load_usage",
     },
     {
@@ -95,7 +119,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "ups",
         .chart_context = "upsd.ups_temperature",
         .chart_type = "line",
-        .chart_priority = 70003,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_UPS_TEMP,
         .chart_dimension = "temperature",
     },
     {
@@ -106,7 +130,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "battery",
         .chart_context = "upsd.ups_battery_charge",
         .chart_type = "area",
-        .chart_priority = 70004,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_BATT_CHARGE,
         .chart_dimension = "charge",
     },
     {
@@ -117,7 +141,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "battery",
         .chart_context = "upsd.ups_battery_estimated_runtime",
         .chart_type = "line",
-        .chart_priority = 70005,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_BATT_RUNTIME,
         .chart_dimension = "runtime",
     },
     {
@@ -128,7 +152,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "battery",
         .chart_context = "upsd.ups_battery_voltage",
         .chart_type = "line",
-        .chart_priority = 70006,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_BATT_VOLTAGE,
         .chart_dimension = "voltage",
     },
     {
@@ -139,7 +163,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "battery",
         .chart_context = "upsd.ups_battery_voltage_nominal",
         .chart_type = "line",
-        .chart_priority = 70007,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_BATT_VOLTAGE_NOM,
         .chart_dimension = "nominal_voltage",
     },
     {
@@ -150,7 +174,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "input",
         .chart_context = "upsd.ups_input_voltage",
         .chart_type = "line",
-        .chart_priority = 70008,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_INPT_VOLTAGE,
         .chart_dimension = "voltage",
     },
     {
@@ -161,7 +185,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "input",
         .chart_context = "upsd.ups_input_voltage_nominal",
         .chart_type = "line",
-        .chart_priority = 70009,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_INPT_VOLTAGE_NOM,
         .chart_dimension = "nominal_voltage",
     },
     {
@@ -172,7 +196,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "input",
         .chart_context = "upsd.ups_input_current",
         .chart_type = "line",
-        .chart_priority = 70010,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_INPT_CURRENT,
         .chart_dimension = "current",
     },
     {
@@ -183,7 +207,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "input",
         .chart_context = "upsd.ups_input_current_nominal",
         .chart_type = "line",
-        .chart_priority = 70011,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_INPT_CURRENT_NOM,
         .chart_dimension = "nominal_current",
     },
     {
@@ -194,7 +218,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "input",
         .chart_context = "upsd.ups_input_frequency",
         .chart_type = "line",
-        .chart_priority = 70012,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_INPT_FREQUENCY,
         .chart_dimension = "frequency",
     },
     {
@@ -205,7 +229,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "input",
         .chart_context = "upsd.ups_input_frequency_nominal",
         .chart_type = "line",
-        .chart_priority = 70013,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_INPT_FREQUENCY_NOM,
         .chart_dimension = "nominal_frequency",
     },
     {
@@ -216,7 +240,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "output",
         .chart_context = "upsd.ups_output_voltage",
         .chart_type = "line",
-        .chart_priority = 70014,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_OUPT_VOLTAGE,
         .chart_dimension = "voltage",
     },
     {
@@ -227,7 +251,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "output",
         .chart_context = "upsd.ups_output_voltage_nominal",
         .chart_type = "line",
-        .chart_priority = 70015,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_OUPT_VOLTAGE_NOM,
         .chart_dimension = "nominal_voltage",
     },
     {
@@ -238,7 +262,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "output",
         .chart_context = "upsd.ups_output_current",
         .chart_type = "line",
-        .chart_priority = 70016,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_OUPT_CURRENT,
         .chart_dimension = "current",
     },
     {
@@ -249,7 +273,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "output",
         .chart_context = "upsd.ups_output_current_nominal",
         .chart_type = "line",
-        .chart_priority = 70017,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_OUPT_CURRENT_NOM,
         .chart_dimension = "nominal_current",
     },
     {
@@ -260,7 +284,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "output",
         .chart_context = "upsd.ups_output_frequency",
         .chart_type = "line",
-        .chart_priority = 70018,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_OUPT_FREQUENCY,
         .chart_dimension = "frequency",
     },
     {
@@ -271,7 +295,7 @@ const struct nd_chart nd_charts[] = {
         .chart_family = "output",
         .chart_context = "upsd.ups_output_frequency_nominal",
         .chart_type = "line",
-        .chart_priority = 70019,
+        .chart_priority = NETDATA_CHART_PRIO_UPSD_OUPT_FREQUENCY_NOM,
         .chart_dimension = "nominal_frequency",
     },
     { 0 },
@@ -563,7 +587,7 @@ int main(int argc, char *argv[]) {
 
         // CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
         printf("CHART 'upsd_%s.status' '' 'UPS status' 'status' 'ups' 'upsd.ups_status' 'line' %u %u\n",
-               clean_name(buf, sizeof(buf), ups_name), 70002, netdata_update_every);
+               clean_name(buf, sizeof(buf), ups_name), NETDATA_CHART_PRIO_UPSD_UPS_STATUS, netdata_update_every);
 
         const char *nut_value;
         if ((nut_value = nut_get_var(&ups2, ups_name, "battery.type")))
