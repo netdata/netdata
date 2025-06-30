@@ -80,6 +80,8 @@ var baseCharts = module.Charts{
 }
 
 // Template charts for queue instances
+// Note: Currently only queue depth is available from INQUIRE_Q_STATUS
+// Enqueue/dequeue counts would require INQUIRE_Q or statistics to be enabled
 var queueChartsTmpl = module.Charts{
 	{
 		ID:       "queue_%s_depth",
@@ -92,30 +94,31 @@ var queueChartsTmpl = module.Charts{
 			{ID: "queue_%s_depth", Name: "depth"},
 		},
 	},
-	{
-		ID:       "queue_%s_messages",
-		Title:    "Queue Message Rate",
-		Units:    "messages/s",
-		Fam:      "queues",
-		Ctx:      "mq_pcf.queue_messages",
-		Priority: prioQueueMessages,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "queue_%s_enqueued", Name: "enqueued", Algo: module.Incremental},
-			{ID: "queue_%s_dequeued", Name: "dequeued", Algo: module.Incremental},
-		},
-	},
-	{
-		ID:       "queue_%s_oldest_message_age",
-		Title:    "Queue Oldest Message Age",
-		Units:    "seconds",
-		Fam:      "queues",
-		Ctx:      "mq_pcf.queue_oldest_message_age",
-		Priority: prioQueueAge,
-		Dims: module.Dims{
-			{ID: "queue_%s_oldest_message_age", Name: "age"},
-		},
-	},
+	// TODO: Enable these charts when we implement INQUIRE_Q based collection
+	// {
+	// 	ID:       "queue_%s_messages",
+	// 	Title:    "Queue Message Rate",
+	// 	Units:    "messages/s",
+	// 	Fam:      "queues",
+	// 	Ctx:      "mq_pcf.queue_messages",
+	// 	Priority: prioQueueMessages,
+	// 	Type:     module.Line,
+	// 	Dims: module.Dims{
+	// 		{ID: "queue_%s_enqueued", Name: "enqueued", Algo: module.Incremental},
+	// 		{ID: "queue_%s_dequeued", Name: "dequeued", Algo: module.Incremental},
+	// 	},
+	// },
+	// {
+	// 	ID:       "queue_%s_oldest_message_age",
+	// 	Title:    "Queue Oldest Message Age",
+	// 	Units:    "seconds",
+	// 	Fam:      "queues",
+	// 	Ctx:      "mq_pcf.queue_oldest_message_age",
+	// 	Priority: prioQueueAge,
+	// 	Dims: module.Dims{
+	// 		{ID: "queue_%s_oldest_message_age", Name: "age"},
+	// 	},
+	// },
 }
 
 // Template charts for channel instances
