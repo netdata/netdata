@@ -7,17 +7,19 @@ metrics:
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.18
         name: fgVpnTunEntInOctets
         description: Number of bytes received on tunnel
-        family: Fortinet/Fortigate/VPN/Tunnels/Traffic
-        unit: "By"
+        family: VPN/Tunnel/Traffic/In
+        unit: "bits/s"
+        scale_factor: 8
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.19
         name: fgVpnTunEntOutOctets
         description: Number of bytes sent out on tunnel
-        family: Fortinet/Fortigate/VPN/Tunnels/Traffic
-        unit: "By"
+        family: VPN/Tunnel/Traffic/Out
+        unit: "bits/s"
+        scale_factor: 8
       - OID: 1.3.6.1.4.1.12356.101.12.2.2.1.20
         name: fgVpnTunEntStatus
         description: Current status of tunnel (up or down)
-        family: Fortinet/Fortigate/VPN/Tunnels/Status
+        family: VPN/Tunnel/Operational/Status
         unit: "{status}"
         mapping:
           1: down
