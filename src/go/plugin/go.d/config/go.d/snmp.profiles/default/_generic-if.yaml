@@ -37,7 +37,7 @@ metrics:
       - OID: 1.3.6.1.2.1.2.2.1.7
         name: ifAdminStatus
         description: Current administrative state of the interface
-        family: Interfaces/Admin/Status
+        family: Interfaces/Status/Admin
         unit: "{status}"
         mapping:
           1: up
@@ -46,7 +46,7 @@ metrics:
       - OID: 1.3.6.1.2.1.2.2.1.8
         name: ifOperStatus
         description: Current operational state of the interface
-        family: Interfaces/Operational/Status
+        family: Interfaces/Status/Operational
         unit: "{status}"
         mapping:
           1: up

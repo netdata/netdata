@@ -35,15 +35,15 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.6
           name: entPhySensorUnitsDisplay
-      - tag: sensor_type # needed for transform
+      - tag: rm:sensor_type # needed for transform
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.1
           name: entPhySensorType
-      - tag: sensor_scale # needed for transform
+      - tag: rm:sensor_scale # needed for transform
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.2
           name: entPhySensorScale
-      - tag: sensor_precision # needed for transform
+      - tag: rm:sensor_precision # needed for transform
         symbol:
           OID: 1.3.6.1.2.1.99.1.1.1.3
           name: entPhySensorPrecision

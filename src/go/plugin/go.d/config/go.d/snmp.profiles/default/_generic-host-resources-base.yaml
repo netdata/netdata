@@ -1,88 +1,89 @@
 # Generic Resource metrics for devices
 
-# Currently covers basic uptime and system process count along with storage stats
-# TODO: add device table
+
+# https://www.net-snmp.org/docs/mibs/host.html
 
 metrics:
-  #
-  # General System Information
-  #
-  - MIB: HOST-RESOURCES-MIB
-    symbol:
-      OID: 1.3.6.1.2.1.25.1.1.0
-      name: hrSystemUptime
-    description: The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
-    unit: "cs"
+  # Scalar Objects (https://www.net-snmp.org/docs/mibs/host.html#scalar_current)
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.5.0
       name: hrSystemNumUsers
-    description: The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a single act of user authentication and possibly subject to collective job control.
-    unit: "{session}"
+      description: The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a single act of user authentication and possibly subject to collective job control.
+      family: System/User/Session/Active
+      unit: "{session}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.6.0
       name: hrSystemProcesses
-    description: The number of process contexts currently loaded or running on this system.
-    unit: "{process}"
+      description: The number of process contexts currently loaded or running on this system.
+      family: System/Process/Active
+      unit: "{process}"
   - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.25.1.7.0
       name: hrSystemMaxProcesses
-    description: The maximum number of process contexts this system can support. If there is no fixed maximum, the value should be zero. On systems that have a fixed maximum, this object can help diagnose failures that occur when this maximum is reached.
-    unit: "{process}"
+      description: The maximum number of process contexts this system can support. If there is no fixed maximum, the value should be zero. On systems that have a fixed maximum, this object can help diagnose failures that occur when this maximum is reached.
+      family: System/Process/Maximum
+      unit: "{process}"
 
-  #
-  # Storage Devices
-  #
-  - MIB: HOST-RESOURCES-MIB
-    table:
-      OID: 1.3.6.1.2.1.25.2.3
-      name: hrStorageTable
-    symbols:
-      - OID: 1.3.6.1.2.1.25.2.3.1.4
-        name: hrStorageAllocationUnits
-        description: The size, in bytes, of the data objects allocated from this pool. If this entry is monitoring sectors, blocks, buffers, or packets, for example, this number will commonly be greater than one. Otherwise this number will typically be one.
-        unit: "By"
-      - OID: 1.3.6.1.2.1.25.2.3.1.5
-        name: hrStorageSize
-        description: The size of the storage represented by this entry, in units of hrStorageAllocationUnits. This object is writable to allow remote configuration of the size of the storage area in those cases where such an operation makes sense and is possible on the underlying system. For example, the amount of main memory allocated to a buffer pool might be modified or the amount of disk space allocated to virtual memory might be modified.
-        unit: "{storage_unit}"
-      - OID: 1.3.6.1.2.1.25.2.3.1.6
-        name: hrStorageUsed
-        description: The amount of the storage represented by this entry that is allocated, in units of hrStorageAllocationUnits.
-        unit: "{storage_unit}"
-      - OID: 1.3.6.1.2.1.25.2.3.1.7
-        name: hrStorageAllocationFailures
-        description: The number of requests for storage represented by this entry that could not be honored due to not enough storage. It should be noted that as this object has a SYNTAX of Counter32, that it does not have a defined initial value. However, it is recommended that this object be initialized to zero, even though management stations must not depend on such an initialization.
-        unit: "{request}"
+  # Table Objects
 
-    metric_tags:
-      - tag: storagedesc
-        symbol:
-          OID: 1.3.6.1.2.1.25.2.3.1.3
-          name: hrStorageDescr
-      - tag: storagetype
-        symbol:
-          OID: 1.3.6.1.2.1.25.2.3.1.2
-          name: hrStorageType
-
-  #
-  # Processor Load
-  #
+  # CPU hrProcessorTable (https://www.net-snmp.org/docs/mibs/host.html#hrProcessorTable)
   - MIB: HOST-RESOURCES-MIB
     table:
       OID: 1.3.6.1.2.1.25.3.3
       name: hrProcessorTable
     symbols:
       - OID: 1.3.6.1.2.1.25.3.3.1.2
-        name: hrProcessorLoad
-        description: The average, over the last minute, of the percentage of time that this processor was not idle. Implementations may approximate this one minute smoothing period if necessary.
+        name: cpu.usage
+        description: The average, over the last minute, of the percentage of time that this processor was not idle.
+        family: CPU/Usage
         unit: "%"
     metric_tags:
-      - index: 1  # hrDeviceIndex
-        tag: hr_device_index
-      - tag: processorid
+      - tag: cpu_index
+        index: 1
+      - tag: _cpu_descr
+        table: hrDeviceTable
         symbol:
-          OID: 1.3.6.1.2.1.25.3.3.1.1
-          name: hrProcessorFrwID
+          OID: 1.3.6.1.2.1.25.3.2.1.3
+          name: hrDeviceDescr
+
+
+  # Storage hrStorageTable (https://www.net-snmp.org/docs/mibs/host.html#hrStorageTable)
+  # This table includes disk partitions, file systems, ram (for some architectures this is further segmented into
+  # regular memory, extended memory, and so on), backing store for virtual memory (`swap space').
+  - MIB: HOST-RESOURCES-MIB
+    table:
+      OID: 1.3.6.1.2.1.25.2.3
+      name: hrStorageTable
+    symbols:
+      - OID: 1.3.6.1.2.1.25.2.3.1.5
+        name: hrStorageSize
+        description: Total size of the storage area
+        family: Storage/Total
+        unit: "By"
+        transform: |
+          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
+          {{- $factor := int64 $unit -}}
+          {{- setValue .Metric (mul .Metric.Value $factor) -}}
+      - OID: 1.3.6.1.2.1.25.2.3.1.6
+        name: hrStorageUsed
+        description: Amount of storage used
+        family: Storage/Used
+        unit: "By"
+        transform: |
+          {{- $unit := index .Metric.Tags "rm:storage_alloc_unit" | default "1" -}}
+          {{- $factor := int64 $unit -}}
+          {{- setValue .Metric (mul .Metric.Value $factor) -}}
+    metric_tags:
+      - tag: storage_index
+        index: 1
+      - tag: _storage_descr
+        symbol:
+          OID: 1.3.6.1.2.1.25.2.3.1.3
+          name: hrDeviceDescr
+      - tag: rm:storage_alloc_unit # Needed for transformation
+        symbol:
+          OID: 1.3.6.1.2.1.25.2.3.1.4
+          name: hrStorageAllocationUnits
