@@ -439,53 +439,85 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byte, error) {
 	var compCode C.MQLONG
 	var reason C.MQLONG
+	var allResponses []byte
 	
-	// Get message
-	var md C.MQMD
-	C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
-	C.set_md_struc_id(&md)
-	md.Version = C.MQMD_VERSION_1
-	C.copy_msg_id(&md, requestMd)
-	
-	var gmo C.MQGMO
-	C.memset(unsafe.Pointer(&gmo), 0, C.sizeof_MQGMO)
-	C.set_gmo_struc_id(&gmo)
-	gmo.Version = C.MQGMO_VERSION_1
-	gmo.Options = C.MQGMO_WAIT | C.MQGMO_FAIL_IF_QUIESCING | C.MQGMO_CONVERT
-	gmo.WaitInterval = 5000 // 5 seconds timeout
-	
-	// Get message length first
-	var bufferLength C.MQLONG = 0
-	C.MQGET(c.mqConn.hConn, hReplyObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), bufferLength, nil, &bufferLength, &compCode, &reason)
-	
-	if reason != C.MQRC_TRUNCATED_MSG_FAILED {
-		// If connection handle error, mark connection as failed
-		if reason == C.MQRC_HCONN_ERROR {
-			c.mqConn.connected = false
-			c.Errorf("MQGET (length check) failed with HCONN_ERROR - connection handle is now invalid")
+	// For wildcard queries, MQ may return multiple response messages
+	for {
+		// Get message
+		var md C.MQMD
+		C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
+		C.set_md_struc_id(&md)
+		md.Version = C.MQMD_VERSION_1
+		C.copy_msg_id(&md, requestMd)
+		
+		var gmo C.MQGMO
+		C.memset(unsafe.Pointer(&gmo), 0, C.sizeof_MQGMO)
+		C.set_gmo_struc_id(&gmo)
+		gmo.Version = C.MQGMO_VERSION_1
+		gmo.Options = C.MQGMO_WAIT | C.MQGMO_FAIL_IF_QUIESCING | C.MQGMO_CONVERT
+		gmo.WaitInterval = 1000 // 1 second timeout for subsequent messages
+		
+		// Get message length first
+		var bufferLength C.MQLONG = 0
+		C.MQGET(c.mqConn.hConn, hReplyObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), bufferLength, nil, &bufferLength, &compCode, &reason)
+		
+		if reason == C.MQRC_NO_MSG_AVAILABLE {
+			// No more messages, return what we have
+			break
 		}
-		return nil, fmt.Errorf("MQGET length check failed: completion code %d, reason code %d", compCode, reason)
-	}
-	
-	// Defensive check: prevent excessive memory allocation
-	if bufferLength > maxMQGetBufferSize {
-		return nil, fmt.Errorf("PCF response too large (%d bytes), maximum allowed is %d bytes", bufferLength, maxMQGetBufferSize)
-	}
-	
-	// Allocate buffer and get actual message
-	buffer := make([]byte, bufferLength)
-	C.MQGET(c.mqConn.hConn, hReplyObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), bufferLength, C.PMQVOID(unsafe.Pointer(&buffer[0])), &bufferLength, &compCode, &reason)
-	
-	if compCode != C.MQCC_OK {
-		// If connection handle error, mark connection as failed
-		if reason == C.MQRC_HCONN_ERROR {
-			c.mqConn.connected = false
-			c.Errorf("MQGET (read) failed with HCONN_ERROR - connection handle is now invalid")
+		
+		if reason != C.MQRC_TRUNCATED_MSG_FAILED {
+			// If connection handle error, mark connection as failed
+			if reason == C.MQRC_HCONN_ERROR {
+				c.mqConn.connected = false
+				c.Errorf("MQGET (length check) failed with HCONN_ERROR - connection handle is now invalid")
+			}
+			// For the first message, this is an error
+			if len(allResponses) == 0 {
+				return nil, fmt.Errorf("MQGET length check failed: completion code %d, reason code %d", compCode, reason)
+			}
+			// For subsequent messages, just return what we have
+			break
 		}
-		return nil, fmt.Errorf("MQGET failed: completion code %d, reason code %d", compCode, reason)
+		
+		// Defensive check: prevent excessive memory allocation
+		if bufferLength > maxMQGetBufferSize {
+			return nil, fmt.Errorf("PCF response too large (%d bytes), maximum allowed is %d bytes", bufferLength, maxMQGetBufferSize)
+		}
+		
+		// Allocate buffer and get actual message
+		buffer := make([]byte, bufferLength)
+		C.MQGET(c.mqConn.hConn, hReplyObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), bufferLength, C.PMQVOID(unsafe.Pointer(&buffer[0])), &bufferLength, &compCode, &reason)
+		
+		if compCode != C.MQCC_OK {
+			// If connection handle error, mark connection as failed
+			if reason == C.MQRC_HCONN_ERROR {
+				c.mqConn.connected = false
+				c.Errorf("MQGET (read) failed with HCONN_ERROR - connection handle is now invalid")
+			}
+			// For the first message, this is an error
+			if len(allResponses) == 0 {
+				return nil, fmt.Errorf("MQGET failed: completion code %d, reason code %d", compCode, reason)
+			}
+			// For subsequent messages, just return what we have
+			break
+		}
+		
+		// Append this response to our collection
+		allResponses = append(allResponses, buffer[:bufferLength]...)
+		
+		// Check if this is the last message in the sequence
+		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
+		if cfh.Control == C.MQCFC_LAST {
+			break
+		}
 	}
 	
-	return buffer[:bufferLength], nil
+	if len(allResponses) == 0 {
+		return nil, fmt.Errorf("no PCF response messages received")
+	}
+	
+	return allResponses, nil
 }
 
 func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[string]int64) error {
