@@ -315,13 +315,28 @@ metrics:
     metric_tags:
       - tag: interface_index
         index: 2
+      - tag: ipversion
+        index: 1
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
       - tag: _interface
         table: ifXTable
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+        index_transform:
+          - start: 1
+            end: 1
       - tag: _interface
         table: ifTable
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.2
           name: ifDescr
+        index_transform:
+          - start: 1
+            end: 1
