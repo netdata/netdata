@@ -253,7 +253,7 @@ type rangeStat struct {
 
 type boundedRangeStat struct {
 	Name       string `xml:"name,attr"`
-	Current    string `xml:"current,attr"`
+	Current    string `xml:"value,attr"`
 	Integral   string `xml:"integral,attr"`
 	Mean       string `xml:"mean,attr"`
 	LowerBound string `xml:"lowerBound,attr"`
@@ -775,6 +775,7 @@ func (w *WebSpherePMI) processStat(stat *pmiStat, parentPath string, mx map[stri
 			(processor.module == "servletModule" && stat.Name == "Servlets") ||
 			(processor.module == "ejbModule" && stat.Name == "Enterprise Beans")) &&
 			processor.enabled() {
+			w.Debugf("Processing stat '%s' with %s processor", stat.Name, processor.module)
 			processor.processFunc(stat, mx)
 			break // Only process with the first matching processor
 		}
