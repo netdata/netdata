@@ -90,6 +90,12 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		return nil, fmt.Errorf("failed to connect to queue manager: %w", err)
 	}
 	
+	// Initialize metrics to avoid null values
+	mx["qmgr_status"] = 0
+	mx["qmgr_cpu_usage"] = 0
+	mx["qmgr_memory_usage"] = 0
+	mx["qmgr_log_usage"] = 0
+	
 	// Detect version on first connection
 	if c.version == "" {
 		if err := c.detectVersion(ctx); err != nil {
@@ -278,6 +284,16 @@ func (c *Collector) disconnect() {
 }
 
 func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) ([]byte, error) {
+	// Validate connection before sending command
+	if c.mqConn == nil || !c.mqConn.connected {
+		return nil, fmt.Errorf("not connected to queue manager")
+	}
+	
+	// Check if connection handle is still valid
+	if c.mqConn.hConn == C.MQHC_UNUSABLE_HCONN {
+		return nil, fmt.Errorf("connection handle is invalid")
+	}
+	
 	// First, open a dynamic reply queue
 	var replyOd C.MQOD
 	C.memset(unsafe.Pointer(&replyOd), 0, C.sizeof_MQOD)
@@ -301,6 +317,10 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	
 	C.MQOPEN(c.mqConn.hConn, C.PMQVOID(unsafe.Pointer(&replyOd)), openOptions, &hReplyObj, &compCode, &reason)
 	if compCode != C.MQCC_OK {
+		// If connection handle error, mark connection as failed
+		if reason == C.MQRC_HCONN_ERROR {
+			c.mqConn.connected = false
+		}
 		return nil, fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", compCode, reason)
 	}
 	defer C.MQCLOSE(c.mqConn.hConn, &hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
@@ -412,10 +432,16 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 }
 
 func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[string]int64) error {
-	// Send PCF command to inquire queue manager status
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR_STATUS, nil)
+	// For now, try a simple MQCMD_INQUIRE_Q_MGR to get basic status
+	// Note: CPU, memory, and log usage metrics might not be available through PCF
+	// in all MQ versions - they might require resource statistics monitoring
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_Q_MGR_STATUS: %w", err)
+		// Connection issues - mark status as down
+		mx["qmgr_status"] = 0
+		// Return error but don't fail the whole collection
+		c.Debugf("Queue manager inquiry failed: %v", err)
+		return nil
 	}
 	
 	// Parse response
@@ -427,6 +453,7 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	// Extract metrics - set basic status (1 = running, 0 = unknown)
 	mx["qmgr_status"] = 1
 	
+	// Try different attribute IDs that might contain the metrics
 	// Extract CPU usage if available (percentage * precision)
 	if cpuLoad, ok := attrs[MQIACF_Q_MGR_CPU_LOAD]; ok {
 		mx["qmgr_cpu_usage"] = int64(cpuLoad.(int32)) * precision / 100
@@ -440,6 +467,12 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	// Extract log usage if available (percentage * precision)
 	if logUsage, ok := attrs[MQIACF_Q_MGR_LOG_USAGE]; ok {
 		mx["qmgr_log_usage"] = int64(logUsage.(int32)) * precision / 100
+	}
+	
+	// Log all available attributes for debugging
+	c.Debugf("Available queue manager attributes:")
+	for key, value := range attrs {
+		c.Debugf("  Attribute %d: %v", key, value)
 	}
 	
 	// Log successful collection for debugging
