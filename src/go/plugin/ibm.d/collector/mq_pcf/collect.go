@@ -12,11 +12,23 @@ package mq_pcf
 //
 // // Helper functions to work around CGO type issues
 // void set_object_name(MQOD* od, const char* name) {
-//     strncpy(od->ObjectName, name, sizeof(od->ObjectName));
+//     // MQ expects names to be padded with spaces, not nulls
+//     memset(od->ObjectName, ' ', sizeof(od->ObjectName));
+//     size_t len = strlen(name);
+//     if (len > sizeof(od->ObjectName)) {
+//         len = sizeof(od->ObjectName);
+//     }
+//     memcpy(od->ObjectName, name, len);
 // }
 //
 // void set_format(MQMD* md, const char* format) {
-//     strncpy(md->Format, format, sizeof(md->Format));
+//     // MQ expects format to be exactly 8 chars, padded with spaces
+//     memset(md->Format, ' ', sizeof(md->Format));
+//     size_t len = strlen(format);
+//     if (len > sizeof(md->Format)) {
+//         len = sizeof(md->Format);
+//     }
+//     memcpy(md->Format, format, len);
 // }
 //
 // void copy_msg_id(MQMD* dest, MQMD* src) {
@@ -25,6 +37,26 @@ package mq_pcf
 //
 // void set_csp_struc_id(MQCSP* csp) {
 //     memcpy(csp->StrucId, MQCSP_STRUC_ID, sizeof(csp->StrucId));
+// }
+//
+// void set_cno_struc_id(MQCNO* cno) {
+//     memcpy(cno->StrucId, MQCNO_STRUC_ID, sizeof(cno->StrucId));
+// }
+//
+// void set_od_struc_id(MQOD* od) {
+//     memcpy(od->StrucId, MQOD_STRUC_ID, sizeof(od->StrucId));
+// }
+//
+// void set_md_struc_id(MQMD* md) {
+//     memcpy(md->StrucId, MQMD_STRUC_ID, sizeof(md->StrucId));
+// }
+//
+// void set_pmo_struc_id(MQPMO* pmo) {
+//     memcpy(pmo->StrucId, MQPMO_STRUC_ID, sizeof(pmo->StrucId));
+// }
+//
+// void set_gmo_struc_id(MQGMO* gmo) {
+//     memcpy(gmo->StrucId, MQGMO_STRUC_ID, sizeof(gmo->StrucId));
 // }
 //
 import "C"
@@ -113,6 +145,7 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	cno := (*C.MQCNO)(C.malloc(C.sizeof_MQCNO))
 	defer C.free(unsafe.Pointer(cno))
 	C.memset(unsafe.Pointer(cno), 0, C.sizeof_MQCNO)
+	C.set_cno_struc_id(cno)
 	cno.Version = C.MQCNO_VERSION_4
 	cno.Options = C.MQCNO_CLIENT_BINDING
 	
@@ -186,20 +219,34 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 			compCode, reason, c.QueueManager, c.Host, c.Port)
 	}
 	
+	c.Debugf("MQCONNX successful - handle: %v", c.mqConn.hConn)
+	
 	// Open system command input queue for PCF commands
 	var od C.MQOD
 	C.memset(unsafe.Pointer(&od), 0, C.sizeof_MQOD)
+	C.set_od_struc_id(&od)
 	od.Version = C.MQOD_VERSION_1
-	C.set_object_name(&od, C.CString("SYSTEM.ADMIN.COMMAND.QUEUE"))
+	queueName := C.CString("SYSTEM.ADMIN.COMMAND.QUEUE")
+	defer C.free(unsafe.Pointer(queueName))
+	C.set_object_name(&od, queueName)
 	od.ObjectType = C.MQOT_Q
 	
 	var openOptions C.MQLONG = C.MQOO_OUTPUT | C.MQOO_FAIL_IF_QUIESCING
 	
+	// Reset completion and reason codes before MQOPEN
+	compCode = C.MQCC_FAILED
+	reason = C.MQRC_UNEXPECTED_ERROR
+	
 	C.MQOPEN(c.mqConn.hConn, C.PMQVOID(unsafe.Pointer(&od)), openOptions, &c.mqConn.hObj, &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
-		C.MQDISC(&c.mqConn.hConn, &compCode, &reason)
-		return fmt.Errorf("MQOPEN failed: completion code %d, reason code %d (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", compCode, reason)
+		// Save the actual error codes before disconnect
+		openCompCode := compCode
+		openReason := reason
+		
+		var discCompCode, discReason C.MQLONG
+		C.MQDISC(&c.mqConn.hConn, &discCompCode, &discReason)
+		return fmt.Errorf("MQOPEN failed: completion code %d, reason code %d (check PCF permissions for SYSTEM.ADMIN.COMMAND.QUEUE)", openCompCode, openReason)
 	}
 	
 	c.mqConn.connected = true
@@ -262,8 +309,9 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	// Send message
 	var md C.MQMD
 	C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
+	C.set_md_struc_id(&md)
 	md.Version = C.MQMD_VERSION_2
-	formatStr := C.CString("MQADMIN ")
+	formatStr := C.CString("MQADMIN")
 	defer C.free(unsafe.Pointer(formatStr))
 	C.set_format(&md, formatStr)
 	md.MsgType = C.MQMT_REQUEST
@@ -271,6 +319,7 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	
 	var pmo C.MQPMO
 	C.memset(unsafe.Pointer(&pmo), 0, C.sizeof_MQPMO)
+	C.set_pmo_struc_id(&pmo)
 	pmo.Version = C.MQPMO_VERSION_2
 	pmo.Options = C.MQPMO_NEW_MSG_ID | C.MQPMO_NEW_CORREL_ID | C.MQPMO_FAIL_IF_QUIESCING
 	
@@ -291,8 +340,11 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD) ([]byte, error) {
 	// Open system command reply queue
 	var od C.MQOD
 	C.memset(unsafe.Pointer(&od), 0, C.sizeof_MQOD)
+	C.set_od_struc_id(&od)
 	od.Version = C.MQOD_VERSION_1
-	C.set_object_name(&od, C.CString("SYSTEM.ADMIN.COMMAND.REPLY.MODEL"))
+	replyQueueName := C.CString("SYSTEM.ADMIN.COMMAND.REPLY.MODEL")
+	defer C.free(unsafe.Pointer(replyQueueName))
+	C.set_object_name(&od, replyQueueName)
 	od.ObjectType = C.MQOT_Q
 	
 	var hReplyObj C.MQHOBJ
@@ -309,11 +361,13 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD) ([]byte, error) {
 	// Get message
 	var md C.MQMD
 	C.memset(unsafe.Pointer(&md), 0, C.sizeof_MQMD)
+	C.set_md_struc_id(&md)
 	md.Version = C.MQMD_VERSION_2
 	C.copy_msg_id(&md, requestMd)
 	
 	var gmo C.MQGMO
 	C.memset(unsafe.Pointer(&gmo), 0, C.sizeof_MQGMO)
+	C.set_gmo_struc_id(&gmo)
 	gmo.Version = C.MQGMO_VERSION_2
 	gmo.Options = C.MQGMO_WAIT | C.MQGMO_FAIL_IF_QUIESCING | C.MQGMO_CONVERT
 	gmo.WaitInterval = 5000 // 5 seconds timeout
