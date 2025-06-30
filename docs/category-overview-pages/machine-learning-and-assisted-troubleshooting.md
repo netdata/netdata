@@ -70,7 +70,7 @@ Together, these approaches ensure you have intelligent assistance for both emerg
 
 - Available in Netdata Cloud for Business users and Free Trial participants
 - Works with any infrastructure where you've deployed Netdata agents
-- Everyone gets 10 reports to generate for free
+- The quota for the first 10 reports are free
 Community users can get early access via [Discord](https://discord.gg/t95Vfx2zyg) or email to product@netdata.cloud
 
 Learn more about [Netdata AI: Infrastructure Insights](/docs/netdata-insights.md).
