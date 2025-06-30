@@ -540,15 +540,22 @@ int main(int argc, char *argv[]) {
     // Set stdout to block-buffered, to make printf() faster.
     setvbuf(stdout, NULL, _IOFBF, BUFSIZ);
 
-    upscli_list_start(&ups1, LENGTHOF(query), query);
-    while (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer)) {
-        first_ups_count++;
+    if (upscli_list_start(&ups1, LENGTHOF(query), query) == -1)
+        netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
+
+    for (;;) {
+        if (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer) == -1) {
+            netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
+            exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
+        }
 
         // Unfortunately, list_ups_next() will emit the list delimiter
         // "END LIST UPS" as its last iteration before returning 0. We don't
         // need it, so let's skip processing on that item.
         if (streq("END", answer[0][0]))
             break;
+
+        first_ups_count++;
 
         // The output of nut_list_ups() will be something like:
         //  { { [0] = "UPS", [1] = <UPS name>, [2] = <UPS description> } }
@@ -652,9 +659,14 @@ int main(int argc, char *argv[]) {
 
         unsigned int this_ups_count = 0;
 
-        upscli_list_start(&ups1, LENGTHOF(query), query);
-        while (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer)) {
-            this_ups_count++;
+        if (upscli_list_start(&ups1, LENGTHOF(query), query) == -1)
+            netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
+
+        for (;;) {
+            if (upscli_list_next(&ups1, LENGTHOF(query), query, &numa, (char***)&answer) == -1) {
+                netdata_log_error("failed to list UPSes from Network UPS Tools: %s", upscli_upserror(&ups1));
+                exit(NETDATA_PLUGIN_EXIT_AND_DISABLE);
+            }
 
             // Unfortunately, list_ups_next() will emit the list delimiter
             // "END LIST UPS" as its last iteration before returning 0. We don't
