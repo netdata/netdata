@@ -146,6 +146,12 @@ func (c *Collector) updateMetrics(pms []*ddsnmp.ProfileMetrics) {
 			m.Family = metricMetaReplacer.Replace(m.Family)
 			m.Unit = metricMetaReplacer.Replace(m.Unit)
 			for k, v := range m.Tags {
+				// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
+				// and should not appear in the final exported metric.
+				if strings.HasPrefix(k, "rm:") {
+					delete(m.Tags, k)
+					continue
+				}
 				m.Tags[k] = metricMetaReplacer.Replace(v)
 			}
 		}

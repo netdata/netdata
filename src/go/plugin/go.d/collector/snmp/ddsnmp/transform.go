@@ -165,15 +165,9 @@ func newMetricTransformFuncMap() template.FuncMap {
 				  - Works across vendors (Cisco, Juniper, HPE, Dell, etc.)
 			*/
 
-			sensorType := m.Tags["sensor_type"]
-			sensorScale := m.Tags["sensor_scale"]
-			sensorPrecision := m.Tags["sensor_precision"]
-
-			defer func() {
-				delete(m.Tags, "sensor_type")
-				delete(m.Tags, "sensor_scale")
-				delete(m.Tags, "sensor_precision")
-			}()
+			sensorType := m.Tags["rm:sensor_type"]
+			sensorScale := m.Tags["rm:sensor_scale"]
+			sensorPrecision := m.Tags["rm:sensor_precision"]
 
 			config := map[string]map[string]interface{}{
 				"1":  {"name": "unspecified", "family": "Sensor/Generic/Value", "desc": "Unspecified or vendor-specific sensor"},
