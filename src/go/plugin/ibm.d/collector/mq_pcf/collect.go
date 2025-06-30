@@ -65,6 +65,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -83,6 +84,7 @@ type mqConnection struct {
 }
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	c.Debugf("collect() called - connection status: %v", c.mqConn != nil && c.mqConn.connected)
 	mx := make(map[string]int64)
 	
 	// Connect to queue manager if not connected
@@ -90,11 +92,6 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		return nil, fmt.Errorf("failed to connect to queue manager: %w", err)
 	}
 	
-	// Initialize metrics to avoid null values
-	mx["qmgr_status"] = 0
-	mx["qmgr_cpu_usage"] = 0
-	mx["qmgr_memory_usage"] = 0
-	mx["qmgr_log_usage"] = 0
 	
 	// Detect version on first connection
 	if c.version == "" {
@@ -131,6 +128,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 	
+	c.Debugf("collect() finished - connection still valid: %v", c.mqConn != nil && c.mqConn.connected)
 	return mx, nil
 }
 
@@ -267,16 +265,26 @@ func (c *Collector) disconnect() {
 		return
 	}
 	
+	c.Debugf("Disconnecting from queue manager %s after %d PCF commands", c.QueueManager, c.pcfCommandCount)
+	c.pcfCommandCount = 0
+	
 	var compCode C.MQLONG
 	var reason C.MQLONG
 	
 	if c.mqConn.hObj != C.MQHO_UNUSABLE_HOBJ {
 		C.MQCLOSE(c.mqConn.hConn, &c.mqConn.hObj, C.MQCO_NONE, &compCode, &reason)
+		if compCode != C.MQCC_OK {
+			c.Warningf("Failed to close admin queue: completion code %d, reason code %d", compCode, reason)
+		}
 	}
 	
 	if c.mqConn.hConn != C.MQHC_UNUSABLE_HCONN {
 		C.MQDISC(&c.mqConn.hConn, &compCode, &reason)
-		c.Debugf("Disconnected from queue manager %s", c.QueueManager)
+		if compCode != C.MQCC_OK {
+			c.Warningf("Failed to disconnect: completion code %d, reason code %d", compCode, reason)
+		} else {
+			c.Debugf("Successfully disconnected from queue manager %s", c.QueueManager)
+		}
 	}
 	
 	c.mqConn.connected = false
@@ -291,8 +299,13 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	
 	// Check if connection handle is still valid
 	if c.mqConn.hConn == C.MQHC_UNUSABLE_HCONN {
+		c.mqConn.connected = false
 		return nil, fmt.Errorf("connection handle is invalid")
 	}
+	
+	// Debug: log connection handle value and reply queue details
+	c.pcfCommandCount++
+	c.Debugf("PCF command #%d: Connection handle: %v, admin queue handle: %v", c.pcfCommandCount, c.mqConn.hConn, c.mqConn.hObj)
 	
 	// First, open a dynamic reply queue
 	var replyOd C.MQOD
@@ -304,8 +317,8 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	C.set_object_name(&replyOd, modelQueueName)
 	replyOd.ObjectType = C.MQOT_Q
 	
-	// Set dynamic queue name pattern
-	dynQueueName := C.CString("AMQ.*")
+	// Set dynamic queue name pattern - use a unique pattern to avoid conflicts
+	dynQueueName := C.CString("NETDATA.PCF.*")
 	defer C.free(unsafe.Pointer(dynQueueName))
 	C.memset(unsafe.Pointer(&replyOd.DynamicQName), ' ', 48)
 	C.memcpy(unsafe.Pointer(&replyOd.DynamicQName), unsafe.Pointer(dynQueueName), C.strlen(dynQueueName))
@@ -315,7 +328,10 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	var compCode C.MQLONG
 	var reason C.MQLONG
 	
-	C.MQOPEN(c.mqConn.hConn, C.PMQVOID(unsafe.Pointer(&replyOd)), openOptions, &hReplyObj, &compCode, &reason)
+	// Capture the connection handle to use in defer
+	currentHConn := c.mqConn.hConn
+	
+	C.MQOPEN(currentHConn, C.PMQVOID(unsafe.Pointer(&replyOd)), openOptions, &hReplyObj, &compCode, &reason)
 	if compCode != C.MQCC_OK {
 		// If connection handle error, mark connection as failed
 		if reason == C.MQRC_HCONN_ERROR {
@@ -323,7 +339,19 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 		}
 		return nil, fmt.Errorf("MQOPEN reply queue failed: completion code %d, reason code %d", compCode, reason)
 	}
-	defer C.MQCLOSE(c.mqConn.hConn, &hReplyObj, C.MQCO_DELETE_PURGE, &compCode, &reason)
+	defer func() {
+		var closeCompCode, closeReason C.MQLONG
+		// Use the captured handle to avoid issues if connection is recreated
+		C.MQCLOSE(currentHConn, &hReplyObj, C.MQCO_DELETE_PURGE, &closeCompCode, &closeReason)
+		if closeCompCode != C.MQCC_OK {
+			c.Debugf("Failed to close reply queue: completion code %d, reason code %d", closeCompCode, closeReason)
+			// If connection handle error during close, mark connection as failed
+			if closeReason == C.MQRC_HCONN_ERROR {
+				c.mqConn.connected = false
+				c.Errorf("MQCLOSE failed with HCONN_ERROR - connection handle is now invalid")
+			}
+		}
+	}()
 	
 	// Calculate message size
 	msgSize := int(C.sizeof_MQCFH)
@@ -379,14 +407,25 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	pmo.Version = C.MQPMO_VERSION_1
 	pmo.Options = C.MQPMO_NO_SYNCPOINT | C.MQPMO_FAIL_IF_QUIESCING
 	
-	C.MQPUT(c.mqConn.hConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
+	C.MQPUT(currentHConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
+		// If connection handle error, mark connection as failed
+		if reason == C.MQRC_HCONN_ERROR {
+			c.mqConn.connected = false
+			c.Errorf("MQPUT failed with HCONN_ERROR - connection handle is now invalid")
+		}
 		return nil, fmt.Errorf("MQPUT failed: completion code %d, reason code %d", compCode, reason)
 	}
 	
 	// Get response from reply queue
-	return c.getPCFResponse(&md, hReplyObj)
+	response, err := c.getPCFResponse(&md, hReplyObj)
+	
+	// Add a small delay to allow MQ to clean up resources
+	// This helps prevent MQRC_HCONN_ERROR after multiple rapid operations
+	time.Sleep(50 * time.Millisecond)
+	
+	return response, err
 }
 
 func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byte, error) {
@@ -412,6 +451,11 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 	C.MQGET(c.mqConn.hConn, hReplyObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), bufferLength, nil, &bufferLength, &compCode, &reason)
 	
 	if reason != C.MQRC_TRUNCATED_MSG_FAILED {
+		// If connection handle error, mark connection as failed
+		if reason == C.MQRC_HCONN_ERROR {
+			c.mqConn.connected = false
+			c.Errorf("MQGET (length check) failed with HCONN_ERROR - connection handle is now invalid")
+		}
 		return nil, fmt.Errorf("MQGET length check failed: completion code %d, reason code %d", compCode, reason)
 	}
 	
@@ -425,6 +469,11 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 	C.MQGET(c.mqConn.hConn, hReplyObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&gmo)), bufferLength, C.PMQVOID(unsafe.Pointer(&buffer[0])), &bufferLength, &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
+		// If connection handle error, mark connection as failed
+		if reason == C.MQRC_HCONN_ERROR {
+			c.mqConn.connected = false
+			c.Errorf("MQGET (read) failed with HCONN_ERROR - connection handle is now invalid")
+		}
 		return nil, fmt.Errorf("MQGET failed: completion code %d, reason code %d", compCode, reason)
 	}
 	
@@ -437,8 +486,7 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	// in all MQ versions - they might require resource statistics monitoring
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
 	if err != nil {
-		// Connection issues - mark status as down
-		mx["qmgr_status"] = 0
+		// Don't set status to 0 - leave it unset (null) to indicate we couldn't collect it
 		// Return error but don't fail the whole collection
 		c.Debugf("Queue manager inquiry failed: %v", err)
 		return nil
