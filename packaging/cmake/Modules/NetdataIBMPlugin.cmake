@@ -114,11 +114,12 @@ macro(add_ibm_plugin_target)
         endif()
     endif()
     
-    # Find all Go source files
-    file(GLOB_RECURSE IBM_PLUGIN_DEPS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/go/*.go")
+    # Find all Go source files - resolve symlinks for consistent dependency tracking
+    get_filename_component(RESOLVED_SOURCE_DIR "${CMAKE_SOURCE_DIR}" REALPATH)
+    file(GLOB_RECURSE IBM_PLUGIN_DEPS CONFIGURE_DEPENDS "${RESOLVED_SOURCE_DIR}/src/go/*.go")
     list(APPEND IBM_PLUGIN_DEPS
-        "${CMAKE_SOURCE_DIR}/src/go/go.mod"
-        "${CMAKE_SOURCE_DIR}/src/go/go.sum"
+        "${RESOLVED_SOURCE_DIR}/src/go/go.mod"
+        "${RESOLVED_SOURCE_DIR}/src/go/go.sum"
     )
     
     # Set up build paths based on what libraries are available
@@ -152,7 +153,7 @@ macro(add_ibm_plugin_target)
             "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS} -extldflags '${IBM_RPATH_FLAGS}'" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
         DEPENDS ${IBM_PLUGIN_DEPS}
         COMMENT "Building ibm.d.plugin (with CGO)"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
+        WORKING_DIRECTORY "${RESOLVED_SOURCE_DIR}/src/go"
         VERBATIM
     )
     
