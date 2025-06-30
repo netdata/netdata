@@ -65,6 +65,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -85,61 +86,73 @@ type mqConnection struct {
 }
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	collectStart := time.Now()
 	c.Debugf("collect() called - connection status: %v", c.mqConn != nil && c.mqConn.connected)
 	mx := make(map[string]int64)
 	
 	// Connect to queue manager if not connected
+	connectStart := time.Now()
 	if err := c.ensureConnection(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect to queue manager: %w", err)
 	}
-	
+	connectDuration := time.Since(connectStart)
+	c.Debugf("Connection setup took %v", connectDuration)
 	
 	// Detect version on first connection
 	if c.version == "" {
+		versionStart := time.Now()
 		if err := c.detectVersion(ctx); err != nil {
 			c.Warningf("failed to detect MQ version: %v", err)
 		} else {
 			c.addVersionLabelsToCharts()
 		}
+		c.Debugf("Version detection took %v", time.Since(versionStart))
 	}
 	
 	// Collect queue manager metrics
+	qmgrStart := time.Now()
 	if err := c.collectQueueManagerMetrics(ctx, mx); err != nil {
 		c.Warningf("failed to collect queue manager metrics: %v", err)
 	}
+	c.Debugf("Queue manager metrics collection took %v", time.Since(qmgrStart))
 	
 	// Collect queue metrics (respect admin configuration)
 	if c.CollectQueues != nil && *c.CollectQueues {
+		queueStart := time.Now()
 		if err := c.collectQueueMetrics(ctx, mx); err != nil {
 			c.Warningf("failed to collect queue metrics: %v", err)
 		}
+		c.Debugf("Queue metrics collection took %v", time.Since(queueStart))
 	}
 	
 	// Collect channel metrics (respect admin configuration)
 	if c.CollectChannels != nil && *c.CollectChannels {
+		channelStart := time.Now()
 		if err := c.collectChannelMetrics(ctx, mx); err != nil {
 			c.Warningf("failed to collect channel metrics: %v", err)
 		}
+		c.Debugf("Channel metrics collection took %v", time.Since(channelStart))
 	}
 	
 	// Collect topic metrics (respect admin configuration)
 	if c.CollectTopics != nil && *c.CollectTopics {
+		topicStart := time.Now()
 		if err := c.collectTopicMetrics(ctx, mx); err != nil {
 			c.Warningf("failed to collect topic metrics: %v", err)
 		}
+		c.Debugf("Topic metrics collection took %v", time.Since(topicStart))
 	}
 	
-	c.Debugf("collect() finished - connection still valid: %v", c.mqConn != nil && c.mqConn.connected)
+	totalDuration := time.Since(collectStart)
+	c.Debugf("collect() finished in %v - connection still valid: %v", totalDuration, c.mqConn != nil && c.mqConn.connected)
 	return mx, nil
 }
 
 func (c *Collector) ensureConnection(ctx context.Context) error {
-	if c.mqConn != nil && c.mqConn.connected {
-		return nil // Already connected
-	}
-	
-	// Clean up any existing connection
+	// MQ is configured with DISCINT(0) which means immediate disconnect on idle
+	// Always reconnect for each collection cycle to handle this properly
 	if c.mqConn != nil {
+		c.Debugf("Cleaning up previous connection for fresh reconnect")
 		c.disconnect()
 	}
 	
@@ -186,6 +199,9 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 	
 	// Set up connection options to use the channel definition
 	cno.ClientConnPtr = C.MQPTR(unsafe.Pointer(cd))
+	
+	// Set connection options for better stability
+	cno.Options = C.MQCNO_RECONNECT | C.MQCNO_HANDLE_SHARE_BLOCK
 	
 	// Set up authentication if password is provided
 	var cspUser, cspPassword *C.char
@@ -339,22 +355,33 @@ func (c *Collector) disconnect() {
 	c.mqConn = nil
 }
 
-func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) ([]byte, error) {
-	// Validate connection before sending command
+func (c *Collector) validateConnection() error {
 	if c.mqConn == nil || !c.mqConn.connected {
-		return nil, fmt.Errorf("not connected to queue manager")
+		return fmt.Errorf("not connected to queue manager")
 	}
 	
 	// Check if connection handle is still valid
 	if c.mqConn.hConn == C.MQHC_UNUSABLE_HCONN {
 		c.mqConn.connected = false
-		return nil, fmt.Errorf("connection handle is invalid")
+		return fmt.Errorf("connection handle is invalid")
 	}
 	
 	// Check if reply queue handle is still valid
 	if c.mqConn.hReplyObj == C.MQHO_UNUSABLE_HOBJ {
 		c.mqConn.connected = false
-		return nil, fmt.Errorf("reply queue handle is invalid")
+		return fmt.Errorf("reply queue handle is invalid")
+	}
+	
+	// For now, just validate handles - connection will be tested on first PCF command
+	// A more advanced health check could be added later if needed
+	
+	return nil
+}
+
+func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) ([]byte, error) {
+	// Validate connection before sending command
+	if err := c.validateConnection(); err != nil {
+		return nil, err
 	}
 	
 	// Debug: log connection handle value and reply queue details
@@ -526,7 +553,11 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	// For now, try a simple MQCMD_INQUIRE_Q_MGR to get basic status
 	// Note: CPU, memory, and log usage metrics might not be available through PCF
 	// in all MQ versions - they might require resource statistics monitoring
+	start := time.Now()
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
+	sendDuration := time.Since(start)
+	c.Debugf("PCF command MQCMD_INQUIRE_Q_MGR took %v", sendDuration)
+	
 	if err != nil {
 		// Don't set status to 0 - leave it unset (null) to indicate we couldn't collect it
 		// Return error but don't fail the whole collection
@@ -534,8 +565,12 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 		return nil
 	}
 	
-	// Parse response
+	// Parse response with timing
+	parseStart := time.Now()
 	attrs, err := c.parsePCFResponse(response)
+	parseDuration := time.Since(parseStart)
+	c.Debugf("PCF response parsing took %v", parseDuration)
+	
 	if err != nil {
 		return fmt.Errorf("failed to parse queue manager status response: %w", err)
 	}
@@ -559,13 +594,7 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 		mx["qmgr_log_usage"] = int64(logUsage.(int32)) * precision / 100
 	}
 	
-	// Log all available attributes for debugging
-	c.Debugf("Available queue manager attributes:")
-	for key, value := range attrs {
-		c.Debugf("  Attribute %d: %v", key, value)
-	}
-	
-	// Log successful collection for debugging
+	// Log successful collection for debugging (removed expensive attribute loop)
 	c.Debugf("Collected queue manager metrics, response had %d attributes", len(attrs))
 	
 	return nil
@@ -683,16 +712,40 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 }
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
-	// Use MQCMD_INQUIRE_Q with attribute selector to specify which queue attributes we want
-	// This tells MQ which attributes to return, not which queues to filter
-	params := []pcfParameter{
-		newIntListParameter(1002, []int32{20}), // MQIACF_Q_ATTRS with MQIA_Q_TYPE (20)
-	}
+	// Try different approaches to queue discovery in order of preference
 	
-	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_ATTRS selector")
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
+	// First: try MQCMD_INQUIRE_Q with no parameters (get all queues)
+	c.Debugf("Trying MQCMD_INQUIRE_Q with no parameters")
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_Q: %w", err)
+		c.Debugf("MQCMD_INQUIRE_Q with no parameters failed: %v", err)
+		
+		// Second: try with wildcard name only
+		c.Debugf("Trying MQCMD_INQUIRE_Q with Q_NAME='*' only")
+		params := []pcfParameter{
+			newStringParameter(C.MQCA_Q_NAME, "*"),
+		}
+		response, err = c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
+		if err != nil {
+			c.Debugf("MQCMD_INQUIRE_Q with wildcard failed: %v", err)
+			
+			// Third: try INQUIRE_Q_NAMES
+			c.Debugf("Trying MQCMD_INQUIRE_Q_NAMES with no parameters")
+			response, err = c.sendPCFCommand(MQCMD_INQUIRE_Q_NAMES, nil)
+			if err != nil {
+				c.Debugf("MQCMD_INQUIRE_Q_NAMES with no parameters failed: %v", err)
+				
+				// Fourth: try INQUIRE_Q_NAMES with wildcard
+				c.Debugf("Trying MQCMD_INQUIRE_Q_NAMES with Q_NAME='*'")
+				params = []pcfParameter{
+					newStringParameter(C.MQCA_Q_NAME, "*"),
+				}
+				response, err = c.sendPCFCommand(MQCMD_INQUIRE_Q_NAMES, params)
+				if err != nil {
+					return nil, fmt.Errorf("all queue discovery methods failed: %w", err)
+				}
+			}
+		}
 	}
 	
 	// Parse response using the existing parseQueueListResponse function
@@ -706,16 +759,40 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 }
 
 func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
-	// Use MQCMD_INQUIRE_CHANNEL with attribute selector to specify which channel attributes we want
-	// This tells MQ which attributes to return, not which channels to filter
-	params := []pcfParameter{
-		newIntListParameter(1015, []int32{1511}), // MQIACF_CHANNEL_ATTRS with MQIACH_CHANNEL_TYPE (1511)
-	}
+	// Try different approaches to channel discovery in order of preference
 	
-	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_ATTRS selector")
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+	// First: try MQCMD_INQUIRE_CHANNEL with no parameters (get all channels)
+	c.Debugf("Trying MQCMD_INQUIRE_CHANNEL with no parameters")
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_CHANNEL: %w", err)
+		c.Debugf("MQCMD_INQUIRE_CHANNEL with no parameters failed: %v", err)
+		
+		// Second: try with wildcard name only
+		c.Debugf("Trying MQCMD_INQUIRE_CHANNEL with CHANNEL_NAME='*'")
+		params := []pcfParameter{
+			newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
+		}
+		response, err = c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
+		if err != nil {
+			c.Debugf("MQCMD_INQUIRE_CHANNEL with wildcard failed: %v", err)
+			
+			// Third: try INQUIRE_CHANNEL_NAMES
+			c.Debugf("Trying MQCMD_INQUIRE_CHANNEL_NAMES with no parameters")
+			response, err = c.sendPCFCommand(MQCMD_INQUIRE_CHANNEL_NAMES, nil)
+			if err != nil {
+				c.Debugf("MQCMD_INQUIRE_CHANNEL_NAMES with no parameters failed: %v", err)
+				
+				// Fourth: try INQUIRE_CHANNEL_NAMES with wildcard
+				c.Debugf("Trying MQCMD_INQUIRE_CHANNEL_NAMES with CHANNEL_NAME='*'")
+				params = []pcfParameter{
+					newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
+				}
+				response, err = c.sendPCFCommand(MQCMD_INQUIRE_CHANNEL_NAMES, params)
+				if err != nil {
+					return nil, fmt.Errorf("all channel discovery methods failed: %w", err)
+				}
+			}
+		}
 	}
 	
 	// Parse response using the existing parseChannelListResponse function
