@@ -48,160 +48,330 @@ metadata:
           OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           match_pattern: 'NetApp Release\s+(\d+(?:\.\d+)*)'  # First part of the version composed of digits and `.`
-                                                             # Example: 9.7P14 => 9.7
+          # Example: 9.7P14 => 9.7
           match_value: '$1'
 
 
 metrics:
   - MIB: NETAPP-MIB
-    OID: 1.3.6.1.4.1.789.1.2.3.8.0
-    name: cfInterconnectStatus  # The current status of the interconnect. The partialFailure(3) status indicates that
-                                # one of the links in the interconnect hardware is down.
-    description: The current status of the interconnect
-    unit: "{status}"
+    symbol:
+      OID: 1.3.6.1.4.1.789.1.2.3.8.0
+      name: cfInterconnectStatus
+      # The current status of the interconnect.
+      # The partialFailure(3) status indicates that one of the links in the interconnect hardware is down.
+      description: The current status of the interconnect
+      family: ClusterFailover/Interconnect/Status
+      unit: "{status}"
   - MIB: NETAPP-MIB
-    OID: 1.3.6.1.4.1.789.1.2.2.23.0
-    name: miscCacheAge  # Age in minutes of the oldest read-only blocks in the buffer cache.
-                        # This indicates how fast read operations are cycling through system memory;
-                        # when the appliance is reading very large files (larger than the machine's memory size),
-                        # buffer cache age will be very low.
-    description: Age in minutes of the oldest read-only blocks in the buffer cache
-    unit: "min"
+    symbol:
+      OID: 1.3.6.1.4.1.789.1.2.2.23.0
+      name: miscCacheAge
+      # Age in minutes of the oldest read-only blocks in the buffer cache.
+      # This indicates how fast read operations are cycling through system memory;
+      # when the appliance is reading very large files (larger than the machine's memory size),
+      # buffer cache age will be very low.
+      description: Age in minutes of the oldest read-only blocks in the buffer cache
+      family: Cache/Buffer/Age
+      unit: "min"
   - MIB: NETAPP-MIB
-    OID: 1.3.6.1.4.1.789.1.8.3.6.36.0
-    name: ncHttpActiveCliConns  # Number of currently active TCP/IP connections to HTTP clients
-    description: Number of currently active TCP/IP connections to HTTP clients
-    unit: "{connection}"
+    symbol:
+      OID: 1.3.6.1.4.1.789.1.8.3.6.36.0
+      name: ncHttpActiveCliConns
+      description: Number of currently active TCP/IP connections to HTTP clients
+      family: Network/HTTP/Connection/Active
+      unit: "{connection}"
 
   - MIB: NETAPP-MIB
-    OID: 1.3.6.1.4.1.789.1.26.8.0
-    name: extcache64Hits  # Indicates number of wafl buffers read from the external cache
-    metric_type: monotonic_count
-    description: Number of wafl buffers read from the external cache
-    unit: "{buffer}"
+    symbol:
+      OID: 1.3.6.1.4.1.789.1.26.8.0
+      name: extcache64Hits
+      description: Number of wafl buffers read from the external cache
+      family: Cache/External/Hit/Count
+      unit: "{buffer}/s"
 
-  # Snap vaults
-
+  # Snap vaults (https://oidref.com/1.3.6.1.4.1.789.1.19.11.1.15)
   - MIB: NETAPP-MIB
     table:
       OID: 1.3.6.1.4.1.789.1.19.11
       name: snapvaultStatusTable
     symbols:
+      - OID: 1.3.6.1.4.1.789.1.19.11.1.11
+        name: svTotalTransMBs
+        family: SnapVault/Transfer/Throughput/Total
+        description: Transfer size
+        unit: "By/s"
+        scale_factor: 1048576
+      - OID: 1.3.6.1.4.1.789.1.19.11.1.7
+        name: svTotalSuccesses
+        family: SnapVault/Transfer/Success/Count
+        description: Successful transfers
+        unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.19.11.1.9
         name: svTotalFailures
-    metric_type: monotonic_count
+        family: SnapVault/Transfer/Failure/Count
+        description: Failed or aborted transfers
+        unit: "{transfer}/s"
+      - OID: 1.3.6.1.4.1.789.1.19.11.1.6
+        name: svLag
+        family: SnapVault/Sync/Lag
+        description: Shows how far away the destination is from the source.
+        unit: "cs"
+      - OID: 1.3.6.1.4.1.789.1.19.11.1.4
+        name: svStatus
+        family: SnapVault/Transfer/Status
+        description: Current transfer status
+        unit: "{status}"
+        mapping:
+          1: idle
+          2: transferring
+          3: pending
+          4: aborting
+          6: quiescing
+          7: resyncing
+          12: paused
+      - OID: 1.3.6.1.4.1.789.1.19.11.1.5
+        name: svState
+        family: SnapVault/Relationship/Status
+        description: Current state of the SnapVault relationship
+        unit: "{status}"
+        mapping:
+          1: uninitialized
+          2: snapvaulted
+          3: brokenOff
+          4: quiesced
+          5: source
+          6: unknown
+          7: restoring
     metric_tags:
-      - tag: index
+      - tag: sv_index
         symbol:
           OID: 1.3.6.1.4.1.789.1.19.11.1.1
           name: svIndex
-      - tag: destination
+      - tag: _sv_src
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.19.11.1.2
+          name: svSrc
+      - tag: _sv_dest
         symbol:
           OID: 1.3.6.1.4.1.789.1.19.11.1.3
           name: svDst
-      - tag: state
-        symbol:
-          OID: 1.3.6.1.4.1.789.1.19.11.1.5
-          name: svState
-    description: Total number of failed snapvault transfers
-    unit: "{transfers}"
 
-  # Snap mirrors
-
+  # Snap mirrors (https://oidref.com/1.3.6.1.4.1.789.1.9.20.1.2)
   - MIB: NETAPP-MIB
     table:
       OID: 1.3.6.1.4.1.789.1.9.20
       name: snapmirrorStatusTable
     metric_type: gauge
     symbols:
-      - OID: 1.3.6.1.4.1.789.1.9.20.1.6
-        name: snapmirrorLag # SNMP type is TimeTicks
-    metric_tags:
-      - tag: index
-        symbol:
-          OID: 1.3.6.1.4.1.789.1.9.20.1.1
-          name: snapmirrorIndex
-      - tag: state
-        symbol:
-          OID: 1.3.6.1.4.1.789.1.9.20.1.5
-          name: snapmirrorState
-    description: How far behind from the source the destination is
-    unit: "cs"
-
-  - MIB: NETAPP-MIB
-    table:
-      OID: 1.3.6.1.4.1.789.1.9.20
-      name: snapmirrorStatusTable
-    metric_type: monotonic_count
-    symbols:
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.11
+        name: snapmirrorTotalTransMBs
+        family: SnapMirror/Transfer/Throughput/Total
+        description: Transfer size
+        unit: "By/s"
+        scale_factor: 1048576
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.7
+        name: snapmirrorTotalSuccesses
+        family: SnapMirror/Transfer/Success/Count
+        description: Successful transfers
+        unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.9
         name: snapmirrorTotalFailures
+        family: SnapMirror/Transfer/Failure/Count
+        description: Failed or aborted transfers
+        unit: "{transfer}/s"
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.6
+        name: snapmirrorLag
+        description: How far behind from the source the destination is
+        family: SnapMirror/Sync/Lag
+        unit: "cs"
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.4
+        name: snapmirrorStatus
+        family: SnapMirror/Transfer/Status
+        description: Current transfer status of the SnapMirror
+        unit: "{status}"
+        mapping:
+          1: uninitialized
+          2: snapmirrored
+          3: brokenOff
+          4: quiesced
+          5: source
+          6: unknown
+      - OID: 1.3.6.1.4.1.789.1.9.20.1.5
+        name: snapmirrorState
+        family: SnapMirror/Status
+        description: Current state of the SnapMirror
+        unit: "{status}"
+        mapping:
+          1: idle
+          2: transferring
+          3: pending
+          4: aborting
+          5: migrating
+          6: quiescing
+          7: resyncing
+          8: waiting
+          9: syncing
+          10: inSync
     metric_tags:
-      - tag: index
+      - tag: sm_index
         symbol:
           OID: 1.3.6.1.4.1.789.1.9.20.1.1
           name: snapmirrorIndex
-      - tag: state
+      - tag: _sm_dest
         symbol:
-          OID: 1.3.6.1.4.1.789.1.9.20.1.5
-          name: snapmirrorState
-    description: Total number of failed snapmirror transfers
-    unit: "{transfers}"
+          OID: 1.3.6.1.4.1.789.1.9.20.1.3
+          name: snapmirrorDst
 
-  # Disk filesystems
-
+  # Disk filesystems (http://oidref.com/1.3.6.1.4.1.789.1.5.4.1)
   - MIB: NETAPP-MIB
     table:
       OID: 1.3.6.1.4.1.789.1.5.4
       name: dfTable
     metric_type: gauge
     symbols:
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.20
+        name: dfStatus
+        description: The status of the file system
+        family: FileSystem/Status
+        unit: "{status}"
+        mapping:
+          1: unmounted
+          2: mounted
+          3: frozen
+          4: destroying
+          5: creating
+          6: mounting
+          7: unmounting
+          8: nofsinfo
+          9: replaying
+          10: replayed
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.21
+        name: dfMirrorStatus
+        description: The status of the file system
+        family: FileSystem/Mirror/Status
+        unit: "{status}"
+        mapping:
+          1: invalid
+          2: uninitialized
+          3: needcpcheck
+          4: cpcheckwait
+          5: unmirrored
+          6: normal
+          7: degraded
+          8: resyncing
+          9: failed
+          10: limbo
       - OID: 1.3.6.1.4.1.789.1.5.4.1.14
         name: dfHighTotalKBytes
-        description: Total capacity in KBytes for the referenced file system (most significant 32 bits)
-        unit: "kBy"
+        description: Total capacity for the referenced file system
+        family: FileSystem/Space/Total
+        unit: "By"
+        scale_factor: 1024
+      - OID: 1.3.6.1.4.1.789.1.5.4.1.16
+        name: dfHighUsedKBytes
+        description: The total disk space that is in use on the referenced file system
+        family: FileSystem/Space/Used
+        unit: "By"
+        scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.18
         name: dfHighAvailKBytes
-        description: Total disk space in KBytes that is free for use on the referenced file system (most significant 32 bits)
-        unit: "kBy"
+        description: Total disk space that is free for use on the referenced file system
+        family: FileSystem/Space/Available
+        unit: "By"
+        scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.7
         name: dfInodesUsed
         description: Total number of inodes in use on the referenced file system
+        family: FileSystem/Inode/Used
         unit: "{inode}"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.8
         name: dfInodesFree
         description: Total number of inodes that are available for use on the referenced file system
+        family: FileSystem/Inode/Free
         unit: "{inode}"
     metric_tags:
-      - tag: index
+      - tag: df_index
         symbol:
           OID: 1.3.6.1.4.1.789.1.5.4.1.1
           name: dfIndex
-      - tag: filesystem
+      - tag: df_filesystem
         symbol:
           OID: 1.3.6.1.4.1.789.1.5.4.1.2
           name: dfFileSys
+      - tag: df_type
+        symbol:
+          OID: 1.3.6.1.4.1.789.1.5.4.1.23
+          name: dfType
 
-  # Network interfaces
-
+  # Network interfaces (http://oidref.com/1.3.6.1.4.1.789.1.22.1.2.1)
   - MIB: NETAPP-MIB
     table:
       OID: 1.3.6.1.4.1.789.1.22.1.2
       name: netifTable
-    metric_type: monotonic_count_and_rate
     symbols:
-      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.3
-        name: ifHighInOctets
-        description: Total number of octets received on the interface including framing characters (most significant 32 bits)
-        unit: "By"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.25
+        name: if64InOctets
+        description: The total number of octets received on the interface, including framing characters
+        family: Interfaces/Traffic/Total/In
+        unit: "bits/s"
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.31
+        name: if64OutOctets
+        description: The total number of octets transmitted out of the interface, including framing characters
+        family: Interfaces/Traffic/Total/Out
+        unit: "bits/s"
+        scale_factor: 8
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.26
+        name: if64InUcastPkts
+        description: The number of unicast packets delivered to a higher-layer protocol
+        family: Interfaces/Packet/Unicast/In
+        unit: "packets/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.32
+        name: if64OutUcastPkts
+        description: The total number of unicast packets requested to be transmitted
+        family: Interfaces/Packet/Unicast/Out
+        unit: "packets/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.27
+        name: if64InNUcastPkts
+        description: The number of non-unicast (broadcast/multicast) packets delivered to a higher-layer protocol
+        family: Interfaces/Packet/NonUnicast/In
+        unit: "packets/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.33
+        name: if64OutNUcastPkts
+        description: The total number of non-unicast packets requested to be transmitted
+        family: Interfaces/Packet/NonUnicast/Out
+        unit: "packets/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.28
+        name: if64InDiscards
+        description: The number of inbound packets discarded even though no errors were detected
+        family: Interfaces/Discard/In
+        unit: "packets/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.34
+        name: if64OutDiscards
+        description: The number of outbound packets discarded even though no errors were detected
+        family: Interfaces/Discard/Out
+        unit: "packets/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.29
+        name: if64InErrors
+        description: The number of inbound packets containing errors preventing delivery to higher-layer protocol
+        family: Interfaces/Error/Total/In
+        unit: "errors/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.35
+        name: if64OutErrors
+        description: The number of outbound packets that could not be transmitted due to errors
+        family: Interfaces/Error/Total/Out
+        unit: "errors/s"
+      - OID: 1.3.6.1.4.1.789.1.22.1.2.1.30
+        name: if64InUnknownProtos
+        description: The number of packets discarded due to unknown or unsupported protocol
+        family: Interfaces/Error/UnknownProtocol/In
+        unit: "packets/s"
     metric_tags:
-      - tag: index
+      - tag: interface_index
         symbol:
           OID: 1.3.6.1.4.1.789.1.22.1.2.1.1
           name: netifIndex
-      - tag: interface
+      - tag: _interface
         symbol:
-          # A DisplayString that represents the manufacturer, product name and hardware version.
-          # Will be normalized to something like 'netgear_ifX300_v1'.
           OID: 1.3.6.1.4.1.789.1.22.1.2.1.2
           name: netifDescr

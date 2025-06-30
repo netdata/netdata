@@ -7,7 +7,7 @@ metrics:
       OID: 1.3.6.1.2.1.2.1.0
       name: ifNumber
       description: Number of network interfaces regardless of their current state present on this system
-      family: Interfaces/Total
+      family: Interfaces/Count/Total
       unit: "{interface}"
   - MIB: IF-MIB
     table:
@@ -17,12 +17,12 @@ metrics:
       - OID: 1.3.6.1.2.1.2.2.1.14
         name: ifInErrors
         description: Number of inbound packets that contained errors preventing them from being deliverable to a higher-layer protocol
-        family: Interfaces/Error/In
+        family: Interfaces/Error/Total/In
         unit: "{error}/s"
       - OID: 1.3.6.1.2.1.2.2.1.20
         name: ifOutErrors
         description: Number of outbound packets that could not be transmitted because of errors
-        family: Interfaces/Error/Out
+        family: Interfaces/Error/Total/Out
         unit: "{error}/s"
       - OID: 1.3.6.1.2.1.2.2.1.13
         name: ifInDiscards
@@ -79,13 +79,13 @@ metrics:
       - OID: 1.3.6.1.2.1.31.1.1.1.6
         name: ifHCInOctets
         description: Total number of octets received on the interface including framing characters
-        family: Interfaces/Traffic/In
+        family: Interfaces/Traffic/Total/In
         unit: "bit/s"
         scale_factor: 8 # octets => bits
       - OID: 1.3.6.1.2.1.31.1.1.1.10
         name: ifHCOutOctets
         description: Total number of octets transmitted out of the interface including framing characters
-        family: Interfaces/Traffic/Out
+        family: Interfaces/Traffic/Total/Out
         unit: "bit/s"
         scale_factor: 8 # octets => bits
       - OID: 1.3.6.1.2.1.31.1.1.1.7
@@ -122,8 +122,8 @@ metrics:
         name: ifHighSpeed
         description: Estimate of the interface's current bandwidth
         family: Interfaces/Speed
-        scale_factor: 1000000 # Megabits => bits
         unit: bit/s
+        scale_factor: 1000000 # Megabits => bits
     metric_tags:
       - tag: interface
         symbol:

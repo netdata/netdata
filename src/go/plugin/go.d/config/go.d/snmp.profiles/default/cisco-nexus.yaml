@@ -22,40 +22,40 @@ sysobjectid:
   - 1.3.6.1.4.1.9.12.3.1.3.*
 
 metrics:
-  - MIB: CISCO-ENTITY-SENSOR-MIB
+  - MIB: CISCO-ENTITY-SENSOR-MIB   # TODO: put in abstract profile
     table:
       OID: 1.3.6.1.4.1.9.9.91.1.1.1
       name: entSensorValueTable
     symbols:
-      # - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
-      #   name: entSensorValue
-      #   description: Most recent measurement seen by the sensor
-      #   unit: "TBD"
-      # TODO: totally wrong, need transformation
-      - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1
-        name: entSensorType
-        description: Sensor type
-        family: Sensors/Type
-        unit: "{status}"
-        mapping:
-          1: other
-          2: unknown
-          3: volts_ac
-          4: volts_dc
-          5: amperes
-          6: watts
-          7: hertz
-          8: celsius
-          9: percent_rh
-          10: rpm
-          11: cmm
-          12: truthvalue
-          13: special_enum
-          14: dbm
-          15: db
+      - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
+        name: entSensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
+        description: Most recent measurement obtained by the agent for this sensor
+        unit: "1"
+        family: Sensor/Value
+        transform: |
+          {{- transformEntitySensorValue .Metric -}}
     metric_tags:
       - tag: sensor_index
         index: 1
+      - tag: _ent_phys_descr
+        MIB: ENTITY-MIB
+        table: entPhysicalTable
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2
+          name: entPhysicalDescr
+      - tag: rm:sensor_type # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.1
+          name: entSensorType
+      - tag: rm:sensor_scale # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.2
+          name: entSensorScale
+      - tag: rm:sensor_precision # needed for transform
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.3
+          name: entSensorPrecision
+
   - MIB: CISCO-ENHANCED-MEMPOOL-MIB # Overrides generic cisco defaults from _cisco-cpu-memory.yaml
     table:
       OID: 1.3.6.1.4.1.9.9.221.1.1.1
