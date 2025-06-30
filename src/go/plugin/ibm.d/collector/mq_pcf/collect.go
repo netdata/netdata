@@ -683,37 +683,22 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 }
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
-	// Use the correct PCF command for listing queue names (from IBM samples)
+	// Use MQCMD_INQUIRE_Q with attribute selector to specify which queue attributes we want
+	// This tells MQ which attributes to return, not which queues to filter
 	params := []pcfParameter{
-		newStringParameter(C.MQCA_Q_NAME, "*"),
-		newIntParameter(C.MQIA_Q_TYPE, C.MQQT_ALL),
+		newIntListParameter(1002, []int32{2016}), // MQIACF_Q_ATTRS with MQCA_Q_NAME (2016)
 	}
 	
-	c.Debugf("Sending MQCMD_INQUIRE_Q_NAMES with Q_NAME='*' and Q_TYPE=MQQT_ALL")
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_NAMES, params)
+	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_ATTRS selector")
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_Q_NAMES: %w", err)
+		return nil, fmt.Errorf("failed to send INQUIRE_Q: %w", err)
 	}
 	
-	// Parse response - INQUIRE_Q_NAMES returns a different format
-	// It returns MQCACF_Q_NAMES parameter with string array
-	attrs, err := c.parsePCFResponse(response)
+	// Parse response using the existing parseQueueListResponse function
+	queues, err := c.parseQueueListResponse(response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse queue names response: %w", err)
-	}
-	
-	var queues []string
-	if queueNames, ok := attrs[C.MQCACF_Q_NAMES]; ok {
-		// The response contains an array of queue names
-		c.Debugf("Raw queue names from PCF: %v (type: %T)", queueNames, queueNames)
-		// Note: We may need to handle this differently - let's see what we get
-		if nameStr, ok := queueNames.(string); ok {
-			// If it's a single string, split it
-			queues = strings.Fields(nameStr)
-		} else {
-			// For now, return empty and debug what we actually get
-			c.Debugf("Unexpected queue names format: %v", queueNames)
-		}
+		return nil, fmt.Errorf("failed to parse queue list response: %w", err)
 	}
 	
 	c.Debugf("Found %d queues: %v", len(queues), queues)
@@ -721,46 +706,22 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 }
 
 func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
-	// Use the correct PCF command for listing channel names (from IBM samples)
+	// Use MQCMD_INQUIRE_CHANNEL with attribute selector to specify which channel attributes we want
+	// This tells MQ which attributes to return, not which channels to filter
 	params := []pcfParameter{
-		newStringParameter(C.MQCACH_CHANNEL_NAME, "*"),
-		newIntParameter(C.MQIACH_CHANNEL_TYPE, C.MQCHT_ALL),
+		newIntListParameter(1015, []int32{3501}), // MQIACF_CHANNEL_ATTRS with MQCACH_CHANNEL_NAME (3501)
 	}
 	
-	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL_NAMES with CHANNEL_NAME='*' and CHANNEL_TYPE=MQCHT_ALL")
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL_NAMES, params)
+	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_ATTRS selector")
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_CHANNEL_NAMES: %w", err)
+		return nil, fmt.Errorf("failed to send INQUIRE_CHANNEL: %w", err)
 	}
 	
-	// Parse response - INQUIRE_CHANNEL_NAMES returns different constants based on channel type
-	// Check multiple possible channel name constants
-	attrs, err := c.parsePCFResponse(response)
+	// Parse response using the existing parseChannelListResponse function
+	channels, err := c.parseChannelListResponse(response)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse channel names response: %w", err)
-	}
-	
-	var channels []string
-	
-	// Channel names are returned in different constants based on channel type
-	channelTypeConstants := []C.MQLONG{
-		3019, // MQCACF_SENDER_CHANNEL_NAMES
-		3020, // MQCACF_SERVER_CHANNEL_NAMES  
-		3021, // MQCACF_REQUESTER_CHANNEL_NAMES
-		3022, // MQCACF_RECEIVER_CHANNEL_NAMES
-	}
-	
-	for _, constant := range channelTypeConstants {
-		if channelNames, ok := attrs[constant]; ok {
-			c.Debugf("Found channel names in constant %d: %v (type: %T)", constant, channelNames, channelNames)
-			if nameStr, ok := channelNames.(string); ok {
-				// If it's a single string, split it
-				channelList := strings.Fields(nameStr)
-				channels = append(channels, channelList...)
-			} else {
-				c.Debugf("Unexpected channel names format for constant %d: %v", constant, channelNames)
-			}
-		}
+		return nil, fmt.Errorf("failed to parse channel list response: %w", err)
 	}
 	
 	c.Debugf("Found %d channels: %v", len(channels), channels)
