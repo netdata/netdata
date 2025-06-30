@@ -23,6 +23,10 @@ package mq_pcf
 //     memcpy(dest->CorrelId, src->MsgId, sizeof(src->MsgId));
 // }
 //
+// void set_csp_struc_id(MQCSP* csp) {
+//     memcpy(csp->StrucId, MQCSP_STRUC_ID, sizeof(csp->StrucId));
+// }
+//
 import "C"
 
 import (
@@ -151,6 +155,8 @@ func (c *Collector) ensureConnection(ctx context.Context) error {
 		csp := (*C.MQCSP)(C.malloc(C.sizeof_MQCSP))
 		defer C.free(unsafe.Pointer(csp))
 		C.memset(unsafe.Pointer(csp), 0, C.sizeof_MQCSP)
+		C.set_csp_struc_id(csp)
+		csp.Version = C.MQCSP_VERSION_1
 		csp.AuthenticationType = C.MQCSP_AUTH_USER_ID_AND_PWD
 		cspUser = C.CString(c.User)
 		defer C.free(unsafe.Pointer(cspUser))
