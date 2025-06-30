@@ -53,7 +53,14 @@ func newStringParameter(param C.MQLONG, value string) pcfParameter {
 
 func (p *stringParameter) size() C.size_t {
 	// MQCFST structure size + string length (padded to 4-byte boundary)
+	// For MQ object names (queues, channels), we need to pad to 48 characters
 	strLen := len(p.value)
+	
+	// Check if this is an MQ object name parameter
+	if p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME {
+		strLen = 48
+	}
+	
 	paddedLen := (strLen + 3) & ^3 // Round up to multiple of 4
 	return C.sizeof_MQCFST + C.size_t(paddedLen)
 }
@@ -64,24 +71,40 @@ func (p *stringParameter) marshal(buffer unsafe.Pointer) {
 	cfst.StrucLength = C.MQLONG(p.size())
 	cfst.Parameter = p.parameter
 	cfst.CodedCharSetId = C.MQCCSI_DEFAULT
-	cfst.StringLength = C.MQLONG(len(p.value))
+	
+	// For MQ object names, we need special handling
+	strLen := len(p.value)
+	isObjectName := p.parameter == C.MQCA_Q_NAME || p.parameter == C.MQCACH_CHANNEL_NAME
+	
+	if isObjectName {
+		// MQ object names are always 48 characters
+		cfst.StringLength = 48
+		strLen = 48
+	} else {
+		cfst.StringLength = C.MQLONG(len(p.value))
+	}
 
 	// Calculate the actual buffer size for the string data (must match size())
-	paddedLen := (len(p.value) + 3) & ^3
+	paddedLen := (strLen + 3) & ^3
 
 	stringDataPtr := unsafe.Pointer(uintptr(buffer) + C.sizeof_MQCFST)
+
+	// For MQ object names, fill with spaces first
+	if isObjectName {
+		C.memset(stringDataPtr, ' ', C.size_t(paddedLen))
+	} else {
+		// Zero out the entire padded area to ensure proper termination and padding
+		C.memset(stringDataPtr, 0, C.size_t(paddedLen))
+	}
 
 	// Convert Go string to byte slice
 	goBytes := []byte(p.value)
 
-	// Zero out the entire padded area to ensure proper termination and padding
-	C.memset(stringDataPtr, 0, C.size_t(paddedLen))
-
-	// Copy the actual string value bytes, ensuring we don't write beyond paddedLen
+	// Copy the actual string value bytes
 	if len(goBytes) > 0 {
 		bytesToCopy := len(goBytes)
-		if bytesToCopy > paddedLen {
-			bytesToCopy = paddedLen // Truncate if Go string is too long for the C buffer
+		if bytesToCopy > strLen {
+			bytesToCopy = strLen // Truncate if Go string is too long
 		}
 		C.memcpy(stringDataPtr, unsafe.Pointer(&goBytes[0]), C.size_t(bytesToCopy))
 	}
