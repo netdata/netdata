@@ -10,19 +10,35 @@ import (
 
 // processJVMStat processes JVM runtime statistics
 func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
-	w.Debugf("processing JVM stat: %s (type: %s)", stat.Name, stat.Type)
+	w.Debugf("processJVMStat called for stat: %s (type: %s, path: %s)", stat.Name, stat.Type, stat.Path)
 
 	// For WebSphere 9.x, if this is the "JVM Runtime" stat itself, process its embedded statistics
 	if stat.Name == "JVM Runtime" {
+		// Debug: Log what statistics are available
+		w.Debugf("JVM Runtime stat has: %d BoundedRangeStatistics, %d CountStatistics, %d DoubleStatistics",
+			len(stat.BoundedRangeStatistics), len(stat.CountStatistics), len(stat.DoubleStatistics))
+		
 		// Process BoundedRangeStatistics
 		for _, brs := range stat.BoundedRangeStatistics {
+			w.Debugf("BoundedRangeStatistic: name=%s, current=%s, upperBound=%s, lowerBound=%s", 
+				brs.Name, brs.Current, brs.UpperBound, brs.LowerBound)
+			
 			if brs.Name == "HeapSize" {
 				// HeapSize is in KILOBYTES, convert to bytes
+				if brs.Current == "" {
+					w.Debugf("HeapSize current value is empty")
+					continue
+				}
+				
 				if v, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
 					mx["jvm_heap_used"] = v * 1024 // Current value is the used memory
+					w.Debugf("HeapSize parsed successfully: %d KB", v)
 				} else if vf, err := strconv.ParseFloat(brs.Current, 64); err == nil {
 					// Handle scientific notation
 					mx["jvm_heap_used"] = int64(vf * 1024)
+					w.Debugf("HeapSize parsed as float: %f KB", vf)
+				} else {
+					w.Debugf("Failed to parse HeapSize current value: %s, error: %v", brs.Current, err)
 				}
 
 				if v, err := strconv.ParseInt(brs.UpperBound, 10, 64); err == nil {
@@ -38,17 +54,25 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 
 		// Process CountStatistics
 		for _, cs := range stat.CountStatistics {
+			w.Debugf("CountStatistic: %s = %s", cs.Name, cs.Count)
 			switch cs.Name {
 			case "FreeMemory":
 				// FreeMemory is in KILOBYTES, convert to bytes
 				if v, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
 					free := v * 1024
 					mx["jvm_heap_free"] = free
+					w.Debugf("Set jvm_heap_free = %d", free)
+				} else {
+					w.Debugf("Failed to parse FreeMemory: %v", err)
 				}
 			case "UsedMemory":
 				// UsedMemory is in KILOBYTES, convert to bytes
 				if v, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
-					mx["jvm_heap_used"] = v * 1024
+					used := v * 1024
+					mx["jvm_heap_used"] = used
+					w.Debugf("Set jvm_heap_used = %d", used)
+				} else {
+					w.Debugf("Failed to parse UsedMemory: %v", err)
 				}
 			case "UpTime":
 				if v, err := strconv.ParseInt(cs.Count, 10, 64); err == nil {
@@ -95,13 +119,23 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 	// Handle individual stat processing for older WebSphere versions
 	switch stat.Name {
 	case "HeapSize":
+		w.Debugf("Processing HeapSize stat (older WebSphere)")
 		if stat.BoundedRangeStatistic != nil {
+			w.Debugf("BoundedRangeStatistic for HeapSize: current=%s, upperBound=%s, lowerBound=%s",
+				stat.BoundedRangeStatistic.Current, stat.BoundedRangeStatistic.UpperBound, stat.BoundedRangeStatistic.LowerBound)
+			
 			// HeapSize is in KILOBYTES, convert to bytes
-			if v, err := strconv.ParseInt(stat.BoundedRangeStatistic.Current, 10, 64); err == nil {
+			if stat.BoundedRangeStatistic.Current == "" {
+				w.Debugf("HeapSize current value is empty")
+			} else if v, err := strconv.ParseInt(stat.BoundedRangeStatistic.Current, 10, 64); err == nil {
 				mx["jvm_heap_used"] = v * 1024 // Convert KB to bytes
+				w.Debugf("HeapSize parsed successfully: %d KB", v)
 			} else if vf, err := strconv.ParseFloat(stat.BoundedRangeStatistic.Current, 64); err == nil {
 				// Handle scientific notation
 				mx["jvm_heap_used"] = int64(vf * 1024)
+				w.Debugf("HeapSize parsed as float: %f KB", vf)
+			} else {
+				w.Debugf("Failed to parse HeapSize current value: %s, error: %v", stat.BoundedRangeStatistic.Current, err)
 			}
 
 			if v, err := strconv.ParseInt(stat.BoundedRangeStatistic.UpperBound, 10, 64); err == nil {
