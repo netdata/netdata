@@ -686,7 +686,7 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 	// Use MQCMD_INQUIRE_Q with attribute selector to specify which queue attributes we want
 	// This tells MQ which attributes to return, not which queues to filter
 	params := []pcfParameter{
-		newIntListParameter(1002, []int32{2016}), // MQIACF_Q_ATTRS with MQCA_Q_NAME (2016)
+		newIntListParameter(1002, []int32{20}), // MQIACF_Q_ATTRS with MQIA_Q_TYPE (20)
 	}
 	
 	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_ATTRS selector")
@@ -709,7 +709,7 @@ func (c *Collector) getChannelList(ctx context.Context) ([]string, error) {
 	// Use MQCMD_INQUIRE_CHANNEL with attribute selector to specify which channel attributes we want
 	// This tells MQ which attributes to return, not which channels to filter
 	params := []pcfParameter{
-		newIntListParameter(1015, []int32{3501}), // MQIACF_CHANNEL_ATTRS with MQCACH_CHANNEL_NAME (3501)
+		newIntListParameter(1015, []int32{1511}), // MQIACF_CHANNEL_ATTRS with MQIACH_CHANNEL_TYPE (1511)
 	}
 	
 	c.Debugf("Sending MQCMD_INQUIRE_CHANNEL with CHANNEL_ATTRS selector")
