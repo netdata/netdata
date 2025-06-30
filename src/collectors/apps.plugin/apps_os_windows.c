@@ -449,7 +449,6 @@
 #include <wchar.h>
 #include <psapi.h>
 #include <tchar.h>
-#include <strsafe.h>
 
 WCHAR* GetProcessCommandLine(HANDLE hProcess);
 
