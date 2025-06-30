@@ -336,6 +336,9 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	pmo.Version = C.MQPMO_VERSION_1
 	pmo.Options = C.MQPMO_NO_SYNCPOINT | C.MQPMO_FAIL_IF_QUIESCING
 	
+	var compCode C.MQLONG
+	var reason C.MQLONG
+	
 	C.MQPUT(c.mqConn.hConn, c.mqConn.hObj, C.PMQVOID(unsafe.Pointer(&md)), C.PMQVOID(unsafe.Pointer(&pmo)), C.MQLONG(msgSize), C.PMQVOID(msgBuffer), &compCode, &reason)
 	
 	if compCode != C.MQCC_OK {
