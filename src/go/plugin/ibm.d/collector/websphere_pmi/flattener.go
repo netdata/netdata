@@ -166,25 +166,29 @@ func (f *XMLFlattener) getStatSignature(stat *pmiStat) string {
 func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]string) {
 	pathParts := strings.Split(path, "/")
 	
-	// Add category labels based on known WebSphere structures
+	// Skip 'server' from the path to get natural hierarchy
+	cleanParts := []string{}
+	for _, part := range pathParts {
+		if part != "server" && part != "" {
+			cleanParts = append(cleanParts, part)
+		}
+	}
+	
+	// The first non-server part becomes the category
+	if len(cleanParts) > 0 {
+		// Use the first level as category (normalized)
+		labels["category"] = f.normalizeForLabel(cleanParts[0])
+	}
+	
+	// For specific patterns, add instance labels
 	for i, part := range pathParts {
 		switch part {
-		case "Thread Pools":
-			labels["category"] = "thread_pools"
-		case "JDBC Connection Pools":
-			labels["category"] = "jdbc_pools"
-		case "JCA Connection Pools":
-			labels["category"] = "jca_pools"
-		case "Web Applications":
-			labels["category"] = "web_apps"
-		case "JVM Runtime":
-			labels["category"] = "jvm"
 		case "Servlets":
 			labels["subcategory"] = "servlets"
 		case "Portlets":
 			labels["subcategory"] = "portlets"
 		case "server":
-			// This is the main server stat container
+			// Skip the server level entirely
 			continue
 		default:
 			// For provider names, app names, etc.
@@ -231,6 +235,13 @@ func (f *XMLFlattener) addContextLabels(path, name string, labels map[string]str
 				case "Servlet Session Manager":
 					labels["session_app"] = part
 					labels["instance"] = part
+				case "Security":
+					// For Security, the next part is the type (Authentication, Authorization)
+					if i+1 < len(pathParts) {
+						securityType := pathParts[i+1]
+						labels["security_type"] = strings.ToLower(strings.ReplaceAll(securityType, " ", "_"))
+						labels["instance"] = strings.ToLower(strings.ReplaceAll(securityType, " ", "_"))
+					}
 				default:
 					// For nested resources like "SIB JMS Resource Adapter/jms/built-in-jms-connectionfactory"
 					if i > 1 && (prevPart == "SIB JMS Resource Adapter" || 
@@ -453,6 +464,12 @@ func (f *XMLFlattener) extractObjectName(objectSpec string) string {
 		return name
 	}
 	return objectSpec
+}
+
+// normalizeForLabel converts a string to a valid label value
+func (f *XMLFlattener) normalizeForLabel(s string) string {
+	// Only replace / with _ to prevent UI from making submenus
+	return strings.ReplaceAll(s, "/", "_")
 }
 
 // copyLabels creates a deep copy of a label map
