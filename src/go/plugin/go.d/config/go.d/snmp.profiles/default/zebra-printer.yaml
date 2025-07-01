@@ -1,11 +1,16 @@
 extends:
   - _system-base.yaml
 
+sysobjectid:
+  - 1.3.6.1.4.1.10642.1.1  # ZT410-203dpi ZPL
+
 metadata:
   device:
     fields:
       vendor:
         value: "zebra"
+      type:
+        value: "printer"
       version:
         symbol:
           MIB: ZEBRA-MIB
@@ -21,60 +26,29 @@ metadata:
           MIB: ZEBRA-MIB
           OID: 1.3.6.1.4.1.10642.1.18.0
           name: zbrGeneralLINKOSVersion
-      type:
-        value: "printer"
 
-sysobjectid:
-  - 1.3.6.1.4.1.10642.1.1  # ZT410-203dpi ZPL
 metrics:
   - MIB: ZEBRA-MIB
     table:
       name: zbrTrackedAlertsTable
       OID: 1.3.6.1.4.1.10642.10.31
     symbols:
-      - name: zbrTrackedAlerts
-        constant_value_one: true
-        description: "Number of tracked alerts"
-        unit: "{alert}"
-    # TODO: Check out metric_tags with symbols having mappings and/or expressing states/statuses. Need to convert to metrics.
-    metric_tags:
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.2
-          name: zbrTrackedAlertsSeverity
-        tag: zbr_tracked_alerts_severity
+      - OID: 1.3.6.1.4.1.10642.10.31.1.2
+        name: zbrTrackedAlertsSeverity
+        chart_meta:
+          description: The severity level of tracked alerts
+          family: Alert/Severity/Status
+          unit: "{status}"
         mapping:
           1: other
           3: critical
           4: warning
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.3
-          name: zbrTrackedAlertsTrainingLevel
-        tag: zbr_tracked_alerts_training_level
-        mapping:
-          1: other
-          2: unknown
-          3: untrained
-          4: trained
-          5: field_service
-          6: management
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.4
-          name: zbrTrackedAlertsGroup
-        tag: zbr_tracked_alerts_group
-        mapping:
-          1: system
-          2: media
-          3: ribbon
-          4: printhead
-          5: rewinder
-          6: cutter
-          7: zbi
-          8: battery
-          9: rfid
-      - symbol:
-          OID: 1.3.6.1.4.1.10642.10.31.1.5
-          name: zbrTrackedAlertsCode
-        tag: zbr_tracked_alerts_code
+      - OID: 1.3.6.1.4.1.10642.10.31.1.5
+        name: zbrTrackedAlertsCode
+        chart_meta:
+          description: The code associated with tracked alerts
+          family: Alert/Code/Status
+          unit: "{status}"
         mapping:
           1: paper-out
           2: ribbon-out
@@ -95,3 +69,31 @@ metrics:
           17: rfid-error
           18: cold-start
           19: ribbon-auth-error
+    metric_tags:
+      - tag: zbr_alert_index
+        index: 1
+      - tag: zbr_tracked_alerts_training_level
+        symbol:
+          OID: 1.3.6.1.4.1.10642.10.31.1.3
+          name: zbrTrackedAlertsTrainingLevel
+        mapping:
+          1: other
+          2: unknown
+          3: untrained
+          4: trained
+          5: field_service
+          6: management
+      - tag: zbr_tracked_alerts_group
+        symbol:
+          OID: 1.3.6.1.4.1.10642.10.31.1.4
+          name: zbrTrackedAlertsGroup
+        mapping:
+          1: system
+          2: media
+          3: ribbon
+          4: printhead
+          5: rewinder
+          6: cutter
+          7: zbi
+          8: battery
+          9: rfid
