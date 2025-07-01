@@ -1585,8 +1585,14 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
         return 0;
     }
 
-    pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
-                                 journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
+    pgc_open_cache_to_journal_v2(
+        open_cache,
+        (Word_t)ctx,
+        (int)datafile->fileno,
+        ctx->config.page_type,
+        journalfile_migrate_to_v2_callback,
+        (void *)datafile->journalfile,
+        true);
 
     if (is_last_file)
         ctx->loading.create_new_datafile_pair = true;
