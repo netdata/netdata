@@ -21,15 +21,6 @@ import (
 // PCF constants that may not be available in all MQ versions
 // These constants are defined here to avoid CGO compilation errors
 const (
-	// PCF command constants for name discovery
-	MQCMD_INQUIRE_Q_NAMES       = C.MQLONG(18) // Queue name discovery command
-	MQCMD_INQUIRE_CHANNEL_NAMES = C.MQLONG(20) // Channel name discovery command
-	
-	// PCF parameter constants for name queries
-	MQCACF_Q_NAMES              = C.MQLONG(2065) // Queue names parameter
-	MQCACF_CHANNEL_NAMES        = C.MQLONG(2066) // Channel names parameter
-	MQCACF_SENDER_CHANNEL_NAMES = C.MQLONG(3019) // Sender channel names parameter
-	MQCACF_SERVER_CHANNEL_NAMES = C.MQLONG(3020) // Server channel names parameter
 	
 	// PCF attribute selector constants
 	MQIACF_Q_ATTRS              = C.MQLONG(1002) // Queue attributes selector
