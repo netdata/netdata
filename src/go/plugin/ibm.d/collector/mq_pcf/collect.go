@@ -397,10 +397,8 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 		return nil, err
 	}
 	
-	// Debug: log connection handle value and reply queue details
+	// Increment command count for debugging
 	c.pcfCommandCount++
-	c.Debugf("PCF command #%d: Connection handle: %v, admin queue: %v, reply queue: %v", 
-		c.pcfCommandCount, c.mqConn.hConn, c.mqConn.hObj, c.mqConn.hReplyObj)
 	
 	var compCode C.MQLONG
 	var reason C.MQLONG
@@ -426,7 +424,7 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 	cfh.Control = C.MQCFC_LAST
 	cfh.ParameterCount = C.MQLONG(len(parameters))
 	
-	c.Debugf("Sending PCF command %d with %d parameters, message size %d", command, len(parameters), msgSize)
+	// c.Debugf("Sending PCF command %d with %d parameters, message size %d", command, len(parameters), msgSize)
 	
 	// Add parameters
 	offset := int(C.sizeof_MQCFH)
@@ -545,11 +543,6 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 		
 		// Check the PCF header
 		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
-		// Only log details for error messages
-		if cfh.CompCode != C.MQCC_OK {
-			c.Debugf("getPCFResponse: Error response - Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
-				cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
-		}
 		
 		// Append this response to our collection
 		allResponses = append(allResponses, buffer[:bufferLength]...)
@@ -625,16 +618,59 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 }
 
 func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64) error {
-	// Get list of queues
-	queues, err := c.getQueueList(ctx)
+	// Skip if queue collection has been disabled (by user config or previous auth failure)
+	if c.CollectQueues != nil && !*c.CollectQueues {
+		return nil
+	}
+	
+	// Get queue list with error details
+	result, err := c.getQueueList(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get queue list: %w", err)
 	}
 	
-	c.Debugf("Found %d queues", len(queues))
+	// Calculate total queues attempted
+	totalQueues := len(result.Queues)
+	// Use error counts instead of queue lists since error responses may not include queue names
+	for _, count := range result.ErrorCounts {
+		totalQueues += count
+	}
 	
+	// Log error summary if there were errors
+	if len(result.ErrorCounts) > 0 {
+		// Build error summary
+		errorSummary := fmt.Sprintf("Queue collection errors: ")
+		first := true
+		for code, count := range result.ErrorCounts {
+			if !first {
+				errorSummary += ", "
+			}
+			errorSummary += fmt.Sprintf("%s (%d queues)", mqErrorString(code), count)
+			first = false
+		}
+		c.Warningf(errorSummary)
+		
+		// Special handling for model queue errors (2085 = MQRC_UNKNOWN_OBJECT_NAME)
+		if modelQueueErrors := result.ErrorCounts[2085]; modelQueueErrors > 0 {
+			c.Debugf("Note: %d model queues don't have status (this is expected)", modelQueueErrors)
+		}
+	}
+	
+	// Check if ALL queues failed with authorization errors
+	authErrors := result.ErrorCounts[2035] // MQRC_NOT_AUTHORIZED
+	if authErrors > 0 && authErrors == totalQueues {
+		c.Warningf("All %d queues returned NOT_AUTHORIZED - disabling queue collection", totalQueues)
+		// Disable queue collection for future runs
+		disableQueues := false
+		c.CollectQueues = &disableQueues
+		return nil // Don't fail entire collection
+	}
+	
+	c.Debugf("Found %d successful queues out of %d total", len(result.Queues), totalQueues)
+	
+	// Process successful queues
 	collected := 0
-	for _, queueName := range queues {
+	for _, queueName := range result.Queues {
 		if !c.shouldCollectQueue(queueName) {
 			continue
 		}
@@ -656,17 +692,16 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 		
 		// Collect queue metrics
 		if err := c.collectSingleQueueMetrics(ctx, queueName, cleanName, mx); err != nil {
-			// Check if this is a model queue error (2085 = MQRC_UNKNOWN_OBJECT_NAME)
-			// Model queues don't have status, so this is expected
-			if !strings.Contains(err.Error(), "2085") {
-				c.Warningf("failed to collect metrics for queue %s: %v", queueName, err)
-			} else {
+			// Don't warn for expected model queue errors
+			if strings.Contains(err.Error(), "2085") || strings.Contains(err.Error(), "MQRC_UNKNOWN_OBJECT_NAME") {
 				c.Debugf("Skipping status collection for model queue %s", queueName)
+			} else {
+				c.Debugf("Failed to collect metrics for queue %s: %v", queueName, err)
 			}
 		}
 	}
 	
-	c.Debugf("Monitoring %d out of %d queues", collected, len(queues))
+	c.Debugf("Monitoring %d out of %d successful queues", collected, len(result.Queues))
 	return nil
 }
 
@@ -684,8 +719,9 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 	
 	// Calculate total channels attempted
 	totalChannels := len(result.Channels)
-	for _, channels := range result.ErrorChannels {
-		totalChannels += len(channels)
+	// Use error counts instead of channel lists since error responses may not include channel names
+	for _, count := range result.ErrorCounts {
+		totalChannels += count
 	}
 	
 	// Log error summary if there were errors
@@ -792,7 +828,7 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 	return nil
 }
 
-func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
+func (c *Collector) getQueueList(ctx context.Context) (*QueueParseResult, error) {
 	// Primary approach: Use MQCMD_INQUIRE_Q with wildcard queue name
 	// Note: Adding Q_TYPE filter can limit results in some MQ versions
 	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_NAME='*'")
@@ -822,14 +858,9 @@ func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
 		}
 	}
 	
-	// Parse response using the existing parseQueueListResponse function
-	queues, err := c.parseQueueListResponse(response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse queue list response: %w", err)
-	}
-	
-	c.Debugf("Found %d queues: %v", len(queues), queues)
-	return queues, nil
+	// Parse response and return structured result
+	result := c.parseQueueListResponse(response)
+	return result, nil
 }
 
 func (c *Collector) getChannelList(ctx context.Context) (*ChannelParseResult, error) {
