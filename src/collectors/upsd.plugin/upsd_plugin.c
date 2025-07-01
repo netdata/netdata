@@ -315,12 +315,12 @@ void print_version()
 }
 
 void print_help() {
-    fputs("usage: " PLUGIN_UPSD_NAME " [-d] COLLECTION_FREQUENCY\n"
+    fputs("usage: " PLUGIN_UPSD_NAME " [-d] [COLLECTION_FREQUENCY]\n"
           "       " PLUGIN_UPSD_NAME " -v\n"
           "       " PLUGIN_UPSD_NAME " -h\n"
           "\n"
           "options:\n"
-          "  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
+          "  COLLECTION_FREQUENCY    data collection frequency in seconds (default: 1)\n"
           "  -d                      enable verbose output (default: disabled)\n"
           "  -v                      print version and exit\n"
           "  -h                      print this message and exit\n",
@@ -351,15 +351,18 @@ void parse_command_line(int argc, char *argv[]) {
         }
     }
 
-    if (optind == argc || !isdigit(*argv[optind])) {
-        print_help();
-        exit(EXIT_FAILURE);
-    }
-
-    netdata_update_every = str2i(argv[optind]);
-    if (netdata_update_every <= 0 || netdata_update_every >= 86400) {
-        fputs("COLLECTION_FREQUENCY argument must be between [1,86400)", stderr);
-        exit(EXIT_FAILURE);
+    if (optind == argc)
+        netdata_update_every = 1;
+    else {
+        if (!isdigit(*argv[optind])) {
+            print_help();
+            exit(EXIT_FAILURE);
+        }
+        netdata_update_every = str2i(argv[optind]);
+        if (netdata_update_every <= 0 || netdata_update_every >= 86400) {
+            fputs("COLLECTION_FREQUENCY argument must be between [1,86400)", stderr);
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
