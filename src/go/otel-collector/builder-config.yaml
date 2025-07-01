@@ -7,16 +7,16 @@ dist:
   debug_compilation: false
 
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.128.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.128.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.128.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.128.0
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.129.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.129.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.129.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.129.0
 
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.128.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.128.0
-  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.128.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.128.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.129.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.129.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.129.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.129.0
   - gomod: github.com/netdata/netdata/otel-collector/exporter/journaldexporter v0.0.0
   - gomod: github.com/netdata/netdata/otel-collector/exporter/netdataexporter v0.0.0
 
