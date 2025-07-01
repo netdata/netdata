@@ -333,7 +333,7 @@ metrics:
         OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.4
         description: Fan speed in revolutions per minute
         family: Fan/Speed
-        unit: "{revolutions}/min"
+        unit: "{revolution}/min"
     metric_tags:
       - tag: ala_chas_ent_phys_fan_status
         symbol:

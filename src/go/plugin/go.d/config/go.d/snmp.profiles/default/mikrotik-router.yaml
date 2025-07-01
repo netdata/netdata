@@ -186,15 +186,15 @@ metrics:
         transform: |
           {{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
           {{- $config := get (dict 
-              "1" (dict "name" "temperature" "unit" "celsius" "family" "Sensor/Temperature/Value" 
+              "1" (dict "name" "temperature" "unit" "Cel" "family" "Sensor/Temperature/Value" 
                    "desc" "Temperature reading")
-              "2" (dict "name" "fan_speed" "unit" "rpm" "family" "Sensor/FanSpeed/Value" 
+              "2" (dict "name" "fan_speed" "unit" "{revolution}/min" "family" "Sensor/FanSpeed/Value" 
                    "desc" "Fan rotation speed")
-              "3" (dict "name" "voltage" "unit" "volts" "family" "Sensor/Voltage/Value" "divisor" 10.0 
+              "3" (dict "name" "voltage" "unit" "V" "family" "Sensor/Voltage/Value" "divisor" 10.0 
                    "desc" "Voltage measurement")
-              "4" (dict "name" "current" "unit" "amperes" "family" "Sensor/Current/Value" "divisor" 10.0 
+              "4" (dict "name" "current" "unit" "A" "family" "Sensor/Current/Value" "divisor" 10.0 
                    "desc" "Current draw")
-              "5" (dict "name" "power" "unit" "watts" "family" "Sensor/Power/Value" "divisor" 10.0 
+              "5" (dict "name" "power" "unit" "W" "family" "Sensor/Power/Value" "divisor" 10.0 
                    "desc" "Power consumption")
               "6" (dict "name" "sensor_status" "family" "Sensor/Presence/Status" 
                    "mapping" (i64map 0 "absent_or_faulty" 1 "present_and_ok")
@@ -202,7 +202,7 @@ metrics:
               "7" (dict "name" "sensor_state" "family" "Sensor/State/Value" 
                    "mapping" (i64map 0 "false" 1 "true")
                    "desc" "Boolean sensor state")
-              "8" (dict "name" "usage_percentage" "unit" "percentage" "family" "Sensor/Usage/Value" 
+              "8" (dict "name" "usage_percentage" "unit" "%" "family" "Sensor/Usage/Value" 
                    "desc" "Resource utilization percentage")
           ) $sensorType -}}
 
