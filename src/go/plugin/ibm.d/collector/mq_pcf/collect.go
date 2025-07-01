@@ -543,19 +543,19 @@ func (c *Collector) getPCFResponse(requestMd *C.MQMD, hReplyObj C.MQHOBJ) ([]byt
 			break
 		}
 		
-		// Check the PCF header before appending
+		// Check the PCF header
 		cfh := (*C.MQCFH)(unsafe.Pointer(&buffer[0]))
 		c.Debugf("getPCFResponse: Received message, Control=%d, CompCode=%d, Reason=%d, ParameterCount=%d", 
 			cfh.Control, cfh.CompCode, cfh.Reason, cfh.ParameterCount)
 		
-		// If this is an error response (CompCode != 0), don't collect more messages
-		// Just return this single error response for proper error handling
-		if cfh.CompCode != C.MQCC_OK {
-			return buffer[:bufferLength], nil
-		}
-		
 		// Append this response to our collection
 		allResponses = append(allResponses, buffer[:bufferLength]...)
+		
+		// If this is an error response (CompCode != 0) AND it's the last/only message,
+		// we've collected the error - no need to wait for more
+		if cfh.CompCode != C.MQCC_OK && cfh.Control == C.MQCFC_LAST {
+			break
+		}
 		
 		// Check if this is the last message in the sequence
 		if cfh.Control == C.MQCFC_LAST {
@@ -747,9 +747,9 @@ func (c *Collector) collectTopicMetrics(ctx context.Context, mx map[string]int64
 }
 
 func (c *Collector) getQueueList(ctx context.Context) ([]string, error) {
-	// Primary approach: Use MQCMD_INQUIRE_Q with wildcard queue name and local queue type
-	// Based on IBM documentation and testing, both parameters are needed
-	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_NAME='*' and Q_TYPE=MQQT_LOCAL")
+	// Primary approach: Use MQCMD_INQUIRE_Q with wildcard queue name
+	// Note: Adding Q_TYPE filter can limit results in some MQ versions
+	c.Debugf("Sending MQCMD_INQUIRE_Q with Q_NAME='*'")
 	params := []pcfParameter{
 		newStringParameter(C.MQCA_Q_NAME, "*"),
 	}
