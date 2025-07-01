@@ -18,9 +18,10 @@ metrics:
     symbols:
       - name: cefcFRUPowerAdminStatus
         OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.1
-        description: Administratively desired FRU power state
-        family: FRU/Power/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: Administratively desired FRU power state
+          family: FRU/Power/Admin/Status
+          unit: "{status}"
         mapping:
           1: on
           2: off
@@ -29,9 +30,10 @@ metrics:
           5: power_cycle
       - name: cefcFRUPowerOperStatus
         OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.2
-        description: Operational FRU power state
-        family: FRU/Power/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Operational FRU power state
+          family: FRU/Power/Operational/Status
+          unit: "{status}"
         mapping:
           1: off_env_other
           2: on
@@ -47,9 +49,10 @@ metrics:
           12: on_but_inline_power_fail
       - OID: 1.3.6.1.4.1.9.9.117.1.1.2.1.3
         name: cefcFRUCurrent
-        description: Current supplied by the FRU or current required to operate the FRU
-        family: FRU/Power/Current
-        unit: "A"
+        chart_meta:
+          description: Current supplied by the FRU or current required to operate the FRU
+          family: FRU/Power/Current
+          unit: "A"
     metric_tags:
       - tag: fru_index
         index: 1
@@ -60,24 +63,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.10
         name: cpmCPUTotalMonIntervalValue
-        description: Overall CPU busy percentage in the last monitoring interval
-        family: CPU/Usage
-        unit: "%"
+        chart_meta:
+          description: Overall CPU busy percentage in the last monitoring interval
+          family: CPU/Usage
+          unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.7
         name: cpmCPUTotal1minRev
-        description: Overall CPU busy percentage in the last 1 minute period
-        family: CPU/Usage
-        unit: "%"
+        chart_meta:
+          description: Overall CPU busy percentage in the last 1 minute period
+          family: CPU/Usage
+          unit: "%"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.12
         name: cpmCPUMemoryUsed
-        description: Overall CPU wide system memory which is currently under use
-        family: CPU/Memory/Used
-        unit: "By"
+        chart_meta:
+          description: Overall CPU wide system memory which is currently under use
+          family: CPU/Memory/Used
+          unit: "By"
       - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.13
         name: cpmCPUMemoryFree
-        description: Overall CPU wide system memory which is currently free
-        family: CPU/Memory/Free
-        unit: "By"
+        chart_meta:
+          description: Overall CPU wide system memory which is currently free
+          family: CPU/Memory/Free
+          unit: "By"
     metric_tags:
       - tag: cpu_index
         index: 1
@@ -89,9 +96,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.276.1.1.2.1.1
         name: cieIfResetCount
-        description: Number of times the interface was internally reset and brought up
-        family: Interfaces/Reset/Count
-        unit: "{reset}/s"
+        chart_meta:
+          description: Number of times the interface was internally reset and brought up
+          family: Interfaces/Reset/Count
+          unit: "{reset}/s"
     metric_tags:
       - tag: interface
         table: ifXTable
@@ -106,14 +114,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.3
         name: ciscoEnvMonTemperatureStatusValue
-        description: Current measurement of the testpoint
-        family: Environment/Temperature/Value
-        unit: "Cel"
+        chart_meta:
+          description: Current measurement of the testpoint
+          family: Environment/Temperature/Value
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.9.9.13.1.3.1.6
         name: ciscoEnvMonTemperatureState
-        description: Current state of the testpoint
-        family: Environment/Temperature/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current state of the testpoint
+          family: Environment/Temperature/Status
+          unit: "{status}"
         mapping:
           1: normal
           2: warning
@@ -136,9 +146,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.5.1.3
         name: ciscoEnvMonSupplyState
-        description: Current state of the power supply
-        family: Environment/PowerSupply/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current state of the power supply
+          family: Environment/PowerSupply/Status
+          unit: "{status}"
         mapping:
           1: normal
           2: warning
@@ -171,9 +182,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.13.1.4.1.3
         name: ciscoEnvMonFanState
-        description: Current state of the fan
-        family: Environment/Fan/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current state of the fan
+          family: Environment/Fan/Status
+          unit: "{status}"
         mapping:
           1: normal
           2: warning
@@ -197,9 +209,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.2.1.1
         name: cswStackPortOperStatus
-        description: State of the stackport
-        family: StackWise/Port/Status
-        unit: "{status}"
+        chart_meta:
+          description: State of the stackport
+          family: StackWise/Port/Status
+          unit: "{status}"
         mapping:
           1: up
           2: down
@@ -220,9 +233,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.6
         name: cswSwitchState
-        description: Current state of a switch
-        family: StackWise/Switch/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current state of a switch
+          family: StackWise/Switch/Status
+          unit: "{status}"
         mapping:
           1: waiting
           2: progressing
@@ -255,9 +269,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.117.1.4.1.1.1
         name: cefcFanTrayOperStatus
-        description: Operational state of the fan or fan tray
-        family: Environment/FanTray/Status
-        unit: "{status}"
+        chart_meta:
+          description: Operational state of the fan or fan tray
+          family: Environment/FanTray/Status
+          unit: "{status}"
         tag: cefc_fan_tray_oper_status
         mapping:
           1: unknown
@@ -283,19 +298,22 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5
         name: ciscoMemoryPoolUsed
-        description: Number of bytes from the memory pool currently in use
-        family: MemoryPool/Used
-        unit: "By"
+        chart_meta:
+          description: Number of bytes from the memory pool currently in use
+          family: MemoryPool/Used
+          unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.6
         name: ciscoMemoryPoolFree
-        description: Number of bytes from the memory pool currently unused
-        family: MemoryPool/Free
-        unit: "By"
+        chart_meta:
+          description: Number of bytes from the memory pool currently unused
+          family: MemoryPool/Free
+          unit: "By"
       - OID: 1.3.6.1.4.1.9.9.48.1.1.1.7
         name: ciscoMemoryPoolLargestFree
-        description: Largest number of contiguous bytes from the memory pool currently unused
-        family: MemoryPool/LargestFree
-        unit: "By"
+        chart_meta:
+          description: Largest number of contiguous bytes from the memory pool currently unused
+          family: MemoryPool/LargestFree
+          unit: "By"
     metric_tags:
       - tag: mem_pool_index
         index: 1
@@ -311,9 +329,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.4
         name: cfwConnectionStatCount
-        description: Integer that contains the value of the resource statistic.
-        family: Firewall/Connection/Count
-        unit: "1"
+        chart_meta:
+          description: Integer that contains the value of the resource statistic.
+          family: Firewall/Connection/Count
+          unit: "1"
     metric_tags:
       - tag: conn_stat_id
         symbol:
@@ -369,9 +388,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.147.1.2.1.1.1.3
         name: cfwHardwareStatusValue
-        description: Current status of the resource
-        family: Firewall/Hardware/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current status of the resource
+          family: Firewall/Hardware/Status
+          unit: "{status}"
         mapping:
           1: other
           2: up
@@ -398,9 +418,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.388.1.2.2.1.3
         name: cvsChassisUpTime
-        description: Up time for the chassis since last re-initialization
-        family: VirtualSwitch/Chassis/Uptime
-        unit: "cs"
+        chart_meta:
+          description: Up time for the chassis since last re-initialization
+          family: VirtualSwitch/Chassis/Uptime
+          unit: "cs"
     metric_tags:
       - tag: chassis_switch_id
         symbol:
@@ -420,9 +441,10 @@ metrics:
       #   unit: "us"
       - OID: 1.3.6.1.4.1.9.9.42.1.2.10.1.2
         name: rttMonLatestRttOperSense
-        description: Sense code for the completion status of the latest RTT operation
-        family: RTT/Operation/Sense
-        unit: "{status}"
+        chart_meta:
+          description: Sense code for the completion status of the latest RTT operation
+          family: RTT/Operation/Sense
+          unit: "{status}"
         mapping:
           0: other
           1: ok
@@ -494,9 +516,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.10
         name: rttMonCtrlOperState
-        description: Used to manage the state of the probe that is implementing conceptual RTT control row.
-        family: RTT/Control/State
-        unit: "{status}"
+        chart_meta:
+          description: Used to manage the state of the probe that is implementing conceptual RTT control row.
+          family: RTT/Control/State
+          unit: "{status}"
         mapping:
           1: reset
           2: orderly_stop
@@ -507,25 +530,28 @@ metrics:
           7: restart
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.6
         name: rttMonCtrlOperTimeoutOccurred
-        description: Indicates if a timeout occurred for the RTT operation
-        family: RTT/Control/Timeout
-        unit: "{status}"
+        chart_meta:
+          description: Indicates if a timeout occurred for the RTT operation
+          family: RTT/Control/Timeout
+          unit: "{status}"
         mapping:
           1: timeout_occurred
           2: ok
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.5
         name: rttMonCtrlOperConnectionLostOccurred
-        description: Indicates if a connection lost occurred for the RTT operation
-        family: RTT/Control/ConnectionLost
-        unit: "{status}"
+        chart_meta:
+          description: Indicates if a connection lost occurred for the RTT operation
+          family: RTT/Control/ConnectionLost
+          unit: "{status}"
         mapping:
           1: connection_lost_occurred
           2: ok
       - OID: 1.3.6.1.4.1.9.9.42.1.2.9.1.7
         name: rttMonCtrlOperOverThresholdOccurred
-        description: Indicates if the latest RTT operation exceeded its configured threshold value
-        family: RTT/Control/OverThreshold
-        unit: "{status}"
+        chart_meta:
+          description: Indicates if the latest RTT operation exceeded its configured threshold value
+          family: RTT/Control/OverThreshold
+          unit: "{status}"
         mapping:
           1: over_threshold_occurred
           2: ok

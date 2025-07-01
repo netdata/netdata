@@ -26,9 +26,10 @@ metrics:
     symbol:
       name: avocent.acsPowerSupplyStatePw1
       OID: 1.3.6.1.4.1.10418.26.2.1.8.2.0
-      description: State of the first power supply
-      family: PowerSupply/1/Status
-      unit: "{status}"
+      chart_meta:
+        description: State of the first power supply
+        family: PowerSupply/1/Status
+        unit: "{status}"
       mapping:
         statePowerOn: 1
         statePowerOff: 2
@@ -37,9 +38,10 @@ metrics:
     symbol:
       name: avocent.acsPowerSupplyStatePw2
       OID: 1.3.6.1.4.1.10418.26.2.1.8.3.0
-      description: State of the second power supply
-      family: PowerSupply/2/Status
-      unit: "{status}"
+      chart_meta:
+        description: State of the second power supply
+        family: PowerSupply/2/Status
+        unit: "{status}"
       mapping:
         statePowerOn: 1
         statePowerOff: 2
@@ -48,9 +50,10 @@ metrics:
     symbol:
       name: avocent.acsActiveSessionsNumberOfSession
       OID: 1.3.6.1.4.1.10418.26.2.2.1.0
-      description: Number of active sessions
-      family: Session/Active
-      unit: "{session}"
+      chart_meta:
+        description: Number of active sessions
+        family: Session/Active
+        unit: "{session}"
   - MIB: ACS8000-MIB
     table:
       OID: 1.3.6.1.4.1.10418.26.2.3.2
@@ -58,9 +61,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.10418.26.2.3.2.1.3
         name: avocent.acsSerialPortTableStatus
-        description: The status of the serial port
-        family: SerialPort/Status
-        unit: "{status}"
+        chart_meta:
+          description: The status of the serial port
+          family: SerialPort/Status
+          unit: "{status}"
         mapping:
           1: disabled
           2: idle

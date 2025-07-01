@@ -82,58 +82,66 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.1.0
       name: panSessionUtilization
-      description: Session table utilization percentage
-      family: Session/Utilization
-      unit: "%"
+      chart_meta:
+        description: Session table utilization percentage
+        family: Session/Utilization
+        unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.2.0
       name: panSessionMax
-      description: Total number of sessions supported
-      family: Session/Maximum
-      unit: "{session}"
+      chart_meta:
+        description: Total number of sessions supported
+        family: Session/Maximum
+        unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.3.0
       name: panSessionActive
-      description: Total number of active sessions
-      family: Session/Active/Total
-      unit: "{session}"
+      chart_meta:
+        description: Total number of active sessions
+        family: Session/Active/Total
+        unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.4.0
       name: panSessionActiveTcp
-      description: Total number of active TCP sessions
-      family: Session/Active/TCP
-      unit: "{session}"
+      chart_meta:
+        description: Total number of active TCP sessions
+        family: Session/Active/TCP
+        unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.5.0
       name: panSessionActiveUdp
-      description: Total number of active UDP sessions
-      family: Session/Active/UDP
-      unit: "{session}"
+      chart_meta:
+        description: Total number of active UDP sessions
+        family: Session/Active/UDP
+        unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.6.0
       name: panSessionActiveICMP
-      description: Total number of active ICMP sessions
-      family: Session/Active/ICMP
-      unit: "{session}"
+      chart_meta:
+        description: Total number of active ICMP sessions
+        family: Session/Active/ICMP
+        unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.7.0
       name: panSessionActiveSslProxy
-      description: Total number of active SSL proxy sessions
-      family: Session/SSLProxy/Active
-      unit: "{session}"
+      chart_meta:
+        description: Total number of active SSL proxy sessions
+        family: Session/SSLProxy/Active
+        unit: "{session}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.3.8.0
       name: panSessionSslProxyUtilization
-      description: SSL proxy session utilization percentage
-      family: Session/SSLProxy/Utilization
-      unit: "%"
+      chart_meta:
+        description: SSL proxy session utilization percentage
+        family: Session/SSLProxy/Utilization
+        unit: "%"
 
   #
   # GlobalProtect gateway utilization
@@ -142,37 +150,42 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.1.0
       name: panGPGWUtilizationPct
-      description: GlobalProtect Gateway utilization percentage
-      family: GlobalProtect/Gateway/Utilization
-      unit: "%"
+      chart_meta:
+        description: GlobalProtect Gateway utilization percentage
+        family: GlobalProtect/Gateway/Utilization
+        unit: "%"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.2.0
       name: panGPGWUtilizationMaxTunnels
-      description: Max tunnels allowed
-      family: GlobalProtect/Gateway/Tunnel/Maximum
-      unit: "{tunnel}"
+      chart_meta:
+        description: Max tunnels allowed
+        family: GlobalProtect/Gateway/Tunnel/Maximum
+        unit: "{tunnel}"
   - MIB: PAN-COMMON-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.2.1.2.5.1.3.0
       name: panGPGWUtilizationActiveTunnels
-      description: Number of active tunnels
-      family: GlobalProtect/Gateway/Tunnel/Active
-      unit: "{tunnel}"
+      chart_meta:
+        description: Number of active tunnels
+        family: GlobalProtect/Gateway/Tunnel/Active
+        unit: "{tunnel}"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.1.2.0
       name: panEntityTotalPowerUsed
-      description: Total power used on the system in watts
-      family: System/Power/Used
-      unit: "W"
+      chart_meta:
+        description: Total power used on the system in watts
+        family: System/Power/Used
+        unit: "W"
   - MIB: PAN-ENTITY-EXT-MIB
     symbol:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.1.1.0
       name: panEntityTotalPowerAvail
-      description: Total power available on the system in watts
-      family: System/Power/Available
-      unit: "W"
+      chart_meta:
+        description: Total power available on the system in watts
+        family: System/Power/Available
+        unit: "W"
   - MIB: PAN-ENTITY-EXT-MIB
     table:
       OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1
@@ -180,14 +193,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.1
         name: panEntryFRUModulePowerUsed
-        description: Power used by the FRU Module in watts
-        family: FRU/Module/Power
-        unit: "W"
+        chart_meta:
+          description: Power used by the FRU Module in watts
+          family: FRU/Module/Power
+          unit: "W"
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.2.1.1.2
         name: panEntryFRUModuleNumPorts
-        description: Number of ports on the FRU Module
-        family: FRU/Module/Port/Count
-        unit: "{port}"
+        chart_meta:
+          description: Number of ports on the FRU Module
+          family: FRU/Module/Port/Count
+          unit: "{port}"
     metric_tags:
       - MIB: ENTITY-MIB
         symbol:
@@ -203,9 +218,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.25461.1.1.7.1.3.1.1.1
         name: panEntryFanTrayPowerUsed
-        description: Power used by the Fan Tray in watts
-        family: FRU/FanTray/Power
-        unit: "W"
+        chart_meta:
+          description: Power used by the Fan Tray in watts
+          family: FRU/FanTray/Power
+          unit: "W"
     metric_tags:
       - MIB: ENTITY-MIB
         symbol:

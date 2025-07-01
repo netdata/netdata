@@ -20,9 +20,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.10704.1.0.1.2
         name: boxServiceState
-        description: "Box service state"
-        family: Service/Status
-        unit: "{status}"
+        chart_meta:
+          description: "Box service state"
+          family: Service/Status
+          unit: "{status}"
         mapping:
           -1: unknown
           0: stopped
@@ -38,9 +39,10 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.10704.1.11.0
       name: phion.vpnUsers
-      description: "Number of VPN users"
-      family: VPN/User/Count
-      unit: "{user}"
+      chart_meta:
+        description: "Number of VPN users"
+        family: VPN/User/Count
+        unit: "{user}"
   - MIB: PHION-MIB
     table:
       OID: 1.3.6.1.4.1.10704.1.12
@@ -48,15 +50,17 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.10704.1.12.1.2
         name: phion.trafficShape.rate
-        description: Traffic shape rate
-        family: TrafficShaping/Rate
-        unit: "bit/s"
+        chart_meta:
+          description: Traffic shape rate
+          family: TrafficShaping/Rate
+          unit: "bit/s"
         scale_factor: 1000
       - OID: 1.3.6.1.4.1.10704.1.12.1.3
         name: phion.trafficShape.sessions
-        description: "Number of sessions"
-        family: TrafficShaping/Session/Count
-        unit: "{session}/a"
+        chart_meta:
+          description: "Number of sessions"
+          family: TrafficShaping/Session/Count
+          unit: "{session}/a"
       - OID: 1.3.6.1.4.1.10704.1.12.1.4
         name: phion.trafficShape.class1Total
         description: "Total bytes for class1"
@@ -65,14 +69,16 @@ metrics:
         unit: "bit/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.5
         name: phion.trafficShape.class1Packets
-        description: "Total packets for class1"
-        family: TrafficShaping/Class1/Packet/Total
-        unit: "{packet}/s"
+        chart_meta:
+          description: "Total packets for class1"
+          family: TrafficShaping/Class1/Packet/Total
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.6
         name: phion.trafficShape.class1Drop
-        description: "Dropped packets for class1"
-        family: TrafficShaping/Class1/Packet/Dropped
-        unit: "{drop}/s"
+        chart_meta:
+          description: "Dropped packets for class1"
+          family: TrafficShaping/Class1/Packet/Dropped
+          unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.7
         name: phion.trafficShape.class2Total
         description: "Total bytes for class2"
@@ -81,14 +87,16 @@ metrics:
         unit: "bit/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.8
         name: phion.trafficShape.class2Pakets
-        description: "Total packets for class2"
-        family: TrafficShaping/Class2/Packet/Total
-        unit: "{packet}/s"
+        chart_meta:
+          description: "Total packets for class2"
+          family: TrafficShaping/Class2/Packet/Total
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.9
         name: phion.trafficShape.class2Drop
-        description: "Dropped packets for class2"
-        family: TrafficShaping/Class2/Packet/Dropped
-        unit: "{drop}/s"
+        chart_meta:
+          description: "Dropped packets for class2"
+          family: TrafficShaping/Class2/Packet/Dropped
+          unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.10
         name: phion.trafficShape.class3Total
         description: "Total bytes for class3"
@@ -97,14 +105,16 @@ metrics:
         unit: "bit/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.11
         name: phion.trafficShape.class3Pakets
-        description: "Total packets for class3"
-        family: TrafficShaping/Class3/Packet/Total
-        unit: "{packet}/s"
+        chart_meta:
+          description: "Total packets for class3"
+          family: TrafficShaping/Class3/Packet/Total
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.12
         name: phion.trafficShape.class3Drop
-        description: "Dropped packets for class3"
-        family: TrafficShaping/Class3/Packet/Dropped
-        unit: "{drop}/s"
+        chart_meta:
+          description: "Dropped packets for class3"
+          family: TrafficShaping/Class3/Packet/Dropped
+          unit: "{drop}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.13
         name: phion.trafficShape.noDelayTotal
         description: "Total bytes for no delay"
@@ -113,14 +123,16 @@ metrics:
         unit: "bit/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.14
         name: phion.trafficShape.noDelayPakets
-        description: "Total packets for no delay"
-        family: TrafficShaping/NoDelay/Packet/Total
-        unit: "{packet}/s"
+        chart_meta:
+          description: "Total packets for no delay"
+          family: TrafficShaping/NoDelay/Packet/Total
+          unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.10704.1.12.1.15
         name: phion.trafficShape.noDelayDrop
-        description: "Dropped packets for no delay"
-        family: TrafficShaping/NoDelay/Packet/Dropped
-        unit: "{drop}/s"
+        chart_meta:
+          description: "Dropped packets for no delay"
+          family: TrafficShaping/NoDelay/Packet/Dropped
+          unit: "{drop}/s"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.10704.1.12.1.1
@@ -162,9 +174,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.10704.1.6.1.2
         name: vpnState
-        description: VPN state
-        family: VPN/Tunnel/Status
-        unit: "{status}"
+        chart_meta:
+          description: VPN state
+          family: VPN/Tunnel/Status
+          unit: "{status}"
         mapping:
           -1: down
           0: down-disabled

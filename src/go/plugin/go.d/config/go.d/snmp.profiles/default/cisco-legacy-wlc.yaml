@@ -42,20 +42,23 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.14179.1.1.5.1 # agentCurrentCPUUtilization
       name: cpu.usage
-      description: Current CPU load of the switch
-      family: CPU/Load
-      unit: "%"
+      chart_meta:
+        description: Current CPU load of the switch
+        family: CPU/Load
+        unit: "%"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
       OID: 1.3.6.1.4.1.14179.1.1.5.3 # agentFreeMemory
       name: memory.free
-      description: Free RAM of the switch
-      family: Memory/RAM/Free
-      unit: "By"
+      chart_meta:
+        description: Free RAM of the switch
+        family: Memory/RAM/Free
+        unit: "By"
   - MIB: AIRESPACE-SWITCHING-MIB
     symbol:
       OID: 1.3.6.1.4.1.14179.1.1.5.2 # agentTotalMemory
       name: memory.total
-      description: Total RAM of the switch
-      family: Memory/RAM/Total
-      unit: "By"
+      chart_meta:
+        description: Total RAM of the switch
+        family: Memory/RAM/Total
+        unit: "By"

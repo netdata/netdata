@@ -6,19 +6,22 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.87.1.3.1.6
         name: rtpSessionSenderJoins
-        description: The number of senders that have been observed to have joined the session since this conceptual row was created
-        family: RTP/Session/Join/Sender/Count
-        unit: "{sender}"
+        chart_meta:
+          description: The number of senders that have been observed to have joined the session since this conceptual row was created
+          family: RTP/Session/Join/Sender/Count
+          unit: "{sender}"
       - OID: 1.3.6.1.2.1.87.1.3.1.7
         name: rtpSessionReceiverJoins
-        description: The number of receivers that have been been observed to have joined this session since this conceptual row was created
-        family: RTP/Session/Join/Receiver/Count
-        unit: "{receiver}"
+        chart_meta:
+          description: The number of receivers that have been been observed to have joined this session since this conceptual row was created
+          family: RTP/Session/Join/Receiver/Count
+          unit: "{receiver}"
       - OID: 1.3.6.1.2.1.87.1.3.1.8
         name: rtpSessionByes
-        description: "A count of RTCP BYE messages received by this entity"
-        family: RTP/Session/Message/Bye/In
-        unit: "{message}"
+        chart_meta:
+          description: "A count of RTCP BYE messages received by this entity"
+          family: RTP/Session/Message/Bye/In
+          unit: "{message}"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -37,14 +40,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.87.1.5.1.4
         name: rtpSenderPackets
-        description: Count of RTP packets sent by this sender, or observed by an RTP monitor, since rtpSenderStartTime
-        family: RTP/Sender/Packet/Out
-        unit: "{packet}"
+        chart_meta:
+          description: Count of RTP packets sent by this sender, or observed by an RTP monitor, since rtpSenderStartTime
+          family: RTP/Sender/Packet/Out
+          unit: "{packet}"
       - OID: 1.3.6.1.2.1.87.1.5.1.5
         name: rtpSenderOctets
-        description: Count of non-header RTP octets sent by this sender, or observed by an RTP monitor, since rtpSenderStartTime
-        family: RTP/Sender/Traffic/Out
-        unit: "By"
+        chart_meta:
+          description: Count of non-header RTP octets sent by this sender, or observed by an RTP monitor, since rtpSenderStartTime
+          family: RTP/Sender/Traffic/Out
+          unit: "By"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex
@@ -57,24 +62,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.87.1.7.1.13
         name: rtpRcvrOctets
-        description: Count of non-header RTP octets received by this receiving RTP host since rtpRcvrStartTime
-        family: RTP/Receiver/Traffic/In
-        unit: "By"
+        chart_meta:
+          description: Count of non-header RTP octets received by this receiving RTP host since rtpRcvrStartTime
+          family: RTP/Receiver/Traffic/In
+          unit: "By"
       - OID: 1.3.6.1.2.1.87.1.7.1.12
         name: rtpRcvrPackets
-        description: Count of RTP packets received by this RTP host receiver since rtpRcvrStartTime
-        family: RTP/Receiver/Packet/In
-        unit: "{packet}"
+        chart_meta:
+          description: Count of RTP packets received by this RTP host receiver since rtpRcvrStartTime
+          family: RTP/Receiver/Packet/In
+          unit: "{packet}"
       - OID: 1.3.6.1.2.1.87.1.7.1.7
         name: rtpRcvrJitter
-        description: An estimate of delay variation as observed by this receiver
-        family: RTP/Receiver/Jitter/Value
-        unit: "ms"
+        chart_meta:
+          description: An estimate of delay variation as observed by this receiver
+          family: RTP/Receiver/Jitter/Value
+          unit: "ms"
       - OID: 1.3.6.1.2.1.87.1.7.1.6
         name: rtpRcvrLostPackets
-        description: A count of RTP packets lost as observed by this receiver since rtpRcvrStartTime
-        family: RTP/Receiver/Packet/Lost/Count
-        unit: "{packet}"
+        chart_meta:
+          description: A count of RTP packets lost as observed by this receiver since rtpRcvrStartTime
+          family: RTP/Receiver/Packet/Lost/Count
+          unit: "{packet}"
     metric_tags:
       - index: 1
         tag: rtpSessionIndex

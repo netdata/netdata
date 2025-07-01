@@ -29,9 +29,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.9.9.91.1.1.1.1.4
         name: entSensorValue # Do not change this name — required by transformEntitySensorValue for matching and renaming logic
-        description: Most recent measurement obtained by the agent for this sensor
-        family: Sensor/Value
-        unit: "1"
+        chart_meta:
+          description: Most recent measurement obtained by the agent for this sensor
+          family: Sensor/Value
+          unit: "1"
         transform: |
           {{- transformEntitySensorValue .Metric -}}
     metric_tags:
@@ -64,15 +65,17 @@ metrics:
       - OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.7
         # core check only
         name: memory.used
-        description: Number of bytes from the memory pool that are currently in use by applications on the physical entity
-        family: Memory/Pool/Used
-        unit: "By"
+        chart_meta:
+          description: Number of bytes from the memory pool that are currently in use by applications on the physical entity
+          family: Memory/Pool/Used
+          unit: "By"
       - OID: 1.3.6.1.4.1.9.9.221.1.1.1.1.8
         # core check only
         name: memory.free
-        description: Number of bytes from the memory pool that are currently unused on the physical entity
-        family: Memory/Pool/Free
-        unit: "By"
+        chart_meta:
+          description: Number of bytes from the memory pool that are currently unused on the physical entity
+          family: Memory/Pool/Free
+          unit: "By"
     metric_tags:
       - tag: mem
         index: 1

@@ -15,23 +15,26 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.1.1.0
       name: roomalert.32s.internal_tempf
-      description: Internal temperature
-      family: Sensor/Internal/Temperature/Value
-      unit: "degF"
+      chart_meta:
+        description: Internal temperature
+        family: Sensor/Internal/Temperature/Value
+        unit: "degF"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.1.2.0
       name: roomalert.32s.internal_tempc
-      description: Internal temperature
-      family: Sensor/Internal/Temperature/Value
-      unit: "Cel"
+      chart_meta:
+        description: Internal temperature
+        family: Sensor/Internal/Temperature/Value
+        unit: "Cel"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.2.1.0
       name: roomalert.32s.internal_humidity
-      description: Internal relative humidity percentage
-      family: Sensor/Internal/Humidity/Value
-      unit: "%"
+      chart_meta:
+        description: Internal relative humidity percentage
+        family: Sensor/Internal/Humidity/Value
+        unit: "%"
   #  - MIB: ROOMALERT32S-MIB
   #    symbol:
   #      OID: 1.3.6.1.4.1.20916.1.11.1.1.3.1.0
@@ -44,16 +47,18 @@ metrics:
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.4.1.0
       name: roomalert.32s.internal_heat_index
-      description: Internal heat index
-      family: Sensor/Internal/HeatIndex/Value
-      unit: "degF"
+      chart_meta:
+        description: Internal heat index
+        family: Sensor/Internal/HeatIndex/Value
+        unit: "degF"
   - MIB: ROOMALERT32S-MIB
     symbol:
       OID: 1.3.6.1.4.1.20916.1.11.1.1.4.2.0
       name: roomalert.32s.internal_heat_indexC
-      description: Internal heat index
-      family: Sensor/Internal/HeatIndex/Value
-      unit: "Cel"
+      chart_meta:
+        description: Internal heat index
+        family: Sensor/Internal/HeatIndex/Value
+        unit: "Cel"
   # TODO, can't find MIB, so can't fill in descriptions and know what each metric is
   # - MIB: ROOMALERT32S-MIB
   #   symbol:

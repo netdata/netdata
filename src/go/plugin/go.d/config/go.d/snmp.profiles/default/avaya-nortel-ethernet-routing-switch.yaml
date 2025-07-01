@@ -17,32 +17,36 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.5.3.10.0 # s5ChasUtilCPUUsageLast1Minute.3.10.0
-      description: Percentage of time the CPU has been busy over the last 1 minute
-      family: CPU/Usage
-      unit: "%"
+      chart_meta:
+        description: Percentage of time the CPU has been busy over the last 1 minute
+        family: CPU/Usage
+        unit: "%"
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: memory.total
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.12.3.10.0 # s5ChasUtilMemoryTotalMB.3.10.0
-      description: Total RAM of unit
-      family: Memory/Total
-      unit: "By"
+      chart_meta:
+        description: Total RAM of unit
+        family: Memory/Total
+        unit: "By"
       scale_factor: 104857
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: memory.free
       OID: 1.3.6.1.4.1.45.1.6.3.8.1.1.13.3.10.0 # s5ChasUtilMemoryAvailableMB.3.10.0
-      description: Available RAM of unit
-      family: Memory/Free
-      unit: "By"
+      chart_meta:
+        description: Available RAM of unit
+        family: Memory/Free
+        unit: "By"
       scale_factor: 104857
   - MIB: S5-CHASSIS-MIB
     symbol:
       name: avaya.s5ChasTmpSnrTmpValue
       OID: 1.3.6.1.4.1.45.1.6.3.7.1.1.5.5.10.0 # s5ChasTmpSnrTmpValue.5.10.0
-      description: Current temperature value of the temperature sensor measured in units of a half degree centigrade
-      family: Environment/Temperature/Value
-      unit: "Cel"
+      chart_meta:
+        description: Current temperature value of the temperature sensor measured in units of a half degree centigrade
+        family: Environment/Temperature/Value
+        unit: "Cel"
       scale_factor: 0.5
   - MIB: S5-CHASSIS-MIB
     table:
@@ -51,9 +55,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.9
         name: avaya.s5ChasComAdminState
-        description: Desired state of the component or sub-component
-        family: Hardware/Chassis/Component/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: Desired state of the component or sub-component
+          family: Hardware/Chassis/Component/Admin/Status
+          unit: "{status}"
         mapping:
           1: other
           2: not_avail
@@ -63,9 +68,10 @@ metrics:
           6: test
       - OID: 1.3.6.1.4.1.45.1.6.3.3.1.1.10
         name: avaya.s5ChasComOperState
-        description: Current operational state of the component or sub-component
-        family: Hardware/Chassis/Component/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Current operational state of the component or sub-component
+          family: Hardware/Chassis/Component/Operational/Status
+          unit: "{status}"
         mapping:
           1: other
           2: not_avail

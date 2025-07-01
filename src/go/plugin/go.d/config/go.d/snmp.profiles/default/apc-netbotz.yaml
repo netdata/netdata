@@ -20,18 +20,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.2.1.1.2
         name: enclosureStatus
-        description: The status of the enclosure
-        family: Enclosure/Connection/Status
-        unit: "{status}"
+        chart_meta:
+          description: The status of the enclosure
+          family: Enclosure/Connection/Status
+          unit: "{status}"
         mapping:
           0: disconnected
           1: error
           2: normal
       - OID: 1.3.6.1.4.1.5528.100.2.1.1.3
         name: enclosureErrorStatus
-        description: The error status of the enclosure
-        family: Enclosure/Error/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the enclosure
+          family: Enclosure/Error/Status
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -60,9 +62,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.3.1.1.2
         name: dinPortStatus
-        description: The error status of the sensor
-        family: Port/DIN/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Port/DIN/Status
+          unit: "{status}"
         mapping:
           0: disconnected
           1: error
@@ -83,9 +86,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.3.10.1.2
         name: otherPortStatus
-        description: The error status of the sensor
-        family: Port/Other/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Port/Other/Status
+          unit: "{status}"
         mapping:
           0: disconnected
           1: error
@@ -114,19 +118,22 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.8
         name: tempSensorValueInt
-        description: The temperature measured by the sensor
-        family: Sensor/Temperature/Value
-        unit: "Cel"
+        chart_meta:
+          description: The temperature measured by the sensor
+          family: Sensor/Temperature/Value
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.9
         name: tempSensorValueIntF
-        description: The temperature measured by the sensor
-        family: Sensor/Temperature/Value
-        unit: "degF"
+        chart_meta:
+          description: The temperature measured by the sensor
+          family: Sensor/Temperature/Value
+          unit: "degF"
       - OID: 1.3.6.1.4.1.5528.100.4.1.1.1.3
         name: tempSensorErrorStatus
-        description: The error status of the sensor
-        family: Sensor/Temperature/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Sensor/Temperature/Status
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -158,14 +165,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.2.1.8
         name: humiSensorValueInt
-        description: The relative humidity measured by the sensor
-        family: Sensor/Humidity/Value
-        unit: "%"
+        chart_meta:
+          description: The relative humidity measured by the sensor
+          family: Sensor/Humidity/Value
+          unit: "%"
       - OID: 1.3.6.1.4.1.5528.100.4.1.2.1.3
         name: humiSensorErrorStatus
-        description: The error status of the sensor
-        family: Sensor/Humidity/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Sensor/Humidity/Status
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -197,19 +206,22 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.8
         name: dewPointSensorValueInt
-        description: The dew point measured by the sensor
-        family: Sensor/DewPoint/Value
-        unit: "Cel"
+        chart_meta:
+          description: The dew point measured by the sensor
+          family: Sensor/DewPoint/Value
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.9
         name: dewPointSensorValueIntF
-        description: The dew point measured by the sensor
-        family: Sensor/DewPoint/Value
-        unit: "degF"
+        chart_meta:
+          description: The dew point measured by the sensor
+          family: Sensor/DewPoint/Value
+          unit: "degF"
       - OID: 1.3.6.1.4.1.5528.100.4.1.3.1.3
         name: dewPointSensorErrorStatus
-        description: The error status of the sensor
-        family: Sensor/DewPoint/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Sensor/DewPoint/Status
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -294,18 +306,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.2.2.1.2
         name: doorSwitchSensorValue
-        description: Whether the door is open or closed
-        family: Sensor/DoorSwitch/Position
-        unit: "{status}"
+        chart_meta:
+          description: Whether the door is open or closed
+          family: Sensor/DoorSwitch/Position
+          unit: "{status}"
         mapping:
           -1: "null"
           0: open
           1: closed
       - OID: 1.3.6.1.4.1.5528.100.4.2.2.1.3
         name: doorSwitchSensorErrorStatus
-        description: The error status of the sensor
-        family: Sensor/DoorSwitch/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Sensor/DoorSwitch/Status
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -341,9 +355,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.4.2.10.1.3
         name: otherStateSensorErrorStatus
-        description: The error status of the sensor
-        family: Sensor/OtherState/Status
-        unit: "{status}"
+        chart_meta:
+          description: The error status of the sensor
+          family: Sensor/OtherState/Status
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -375,9 +390,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.5528.100.5.1.1.2
         name: errorCondSeverity
-        description: The relative severity of the error condition
-        family: Error/Severity
-        unit: "{status}"
+        chart_meta:
+          description: The relative severity of the error condition
+          family: Error/Severity
+          unit: "{status}"
         mapping:
           0: normal
           1: info
@@ -387,9 +403,10 @@ metrics:
           5: failure
       - OID: 1.3.6.1.4.1.5528.100.5.1.1.6
         name: errorCondResolved
-        description: Whether the error condition was resolved
-        family: Error/Resolution/Status
-        unit: "{status}"
+        chart_meta:
+          description: Whether the error condition was resolved
+          family: Error/Resolution/Status
+          unit: "{status}"
         mapping:
           0: no
           1: yes

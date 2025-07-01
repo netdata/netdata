@@ -7,14 +7,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.3
         name: jnxUserFwLDAPTotalQuery
-        description: Total LDAP query number
-        family: Juniper/LDAP/Queries/Total
-        unit: "{query}"
+        chart_meta:
+          description: Total LDAP query number
+          family: Juniper/LDAP/Queries/Total
+          unit: "{query}"
       - OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.4
         name: jnxUserFwLDAPFailedQuery
-        description: LDAP failed query number
-        family: Juniper/LDAP/Queries/Failed
-        unit: "{fail}"
+        chart_meta:
+          description: LDAP failed query number
+          family: Juniper/LDAP/Queries/Failed
+          unit: "{fail}"
     metric_tags:
       - symbol:
           OID: 1.3.6.1.4.1.2636.3.89.1.1.3.1.1

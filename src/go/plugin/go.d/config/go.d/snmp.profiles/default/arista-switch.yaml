@@ -182,9 +182,10 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.2.1.25.3.3.1.2.1
-      description: The average, over the last minute, of the percentage of time that this processor was not idle
-      family: CPU/Usage
-      unit: "%"
+      chart_meta:
+        description: The average, over the last minute, of the percentage of time that this processor was not idle
+        family: CPU/Usage
+        unit: "%"
   - MIB: ARISTA-BGP4V2-MIB
     table:
       name: aristaBgp4V2PeerTable
@@ -192,17 +193,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
         name: aristaBgp4V2PeerAdminStatus
-        description: BGP FSM Status
-        family: BPG/Peer/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: BGP FSM Status
+          family: BPG/Peer/Admin/Status
+          unit: "{status}"
         mapping:
           1: halted
           2: running
       - OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
         name: aristaBgp4V2PeerState
-        description: BGP peer connection state
-        family: BGP/Peer/Connection/Status
-        unit: "{status}"
+        chart_meta:
+          description: BGP peer connection state
+          family: BGP/Peer/Connection/Status
+          unit: "{status}"
         mapping:
           1: idle
           2: connect

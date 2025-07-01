@@ -17,6 +17,7 @@ metrics:
     symbol:
       name: cpu.usage
       OID: 1.3.6.1.4.1.9.6.1.101.1.8
-      description: Cpu usage percentage
-      family: CPU/Usage
-      unit: "%"
+      chart_meta:
+        description: Cpu usage percentage
+        family: CPU/Usage
+        unit: "%"

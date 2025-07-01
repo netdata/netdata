@@ -6,9 +6,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.1.1.1.2
         name: sipCommonCfgServiceOperStatus
-        description: Current operational state of the SIP application
-        family: SIP/Status
-        unit: "{state}"
+        chart_meta:
+          description: Current operational state of the SIP application
+          family: SIP/Status
+          unit: "{state}"
         mapping:
           1: unknown
           7: testing
@@ -27,29 +28,34 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.3.1.1.1
         name: sipCommonSummaryInRequests
-        description: Total number of SIP request messages received including retransmissions
-        family: SIP/Requests
-        unit: "{request}"
+        chart_meta:
+          description: Total number of SIP request messages received including retransmissions
+          family: SIP/Requests
+          unit: "{request}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.2
         name: sipCommonSummaryOutRequests
-        description: Total number of SIP request messages sent including retransmissions
-        family: SIP/Requests
-        unit: "{request}"
+        chart_meta:
+          description: Total number of SIP request messages sent including retransmissions
+          family: SIP/Requests
+          unit: "{request}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.3
         name: sipCommonSummaryInResponses
-        description: Total number of SIP response messages received including retransmissions
-        family: SIP/Responses
-        unit: "{response}"
+        chart_meta:
+          description: Total number of SIP response messages received including retransmissions
+          family: SIP/Responses
+          unit: "{response}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.4
         name: sipCommonSummaryOutResponses
-        description: Total number of SIP response messages sent including retransmissions
-        family: SIP/Responses
-        unit: "{response}"
+        chart_meta:
+          description: Total number of SIP response messages sent including retransmissions
+          family: SIP/Responses
+          unit: "{response}"
       - OID: 1.3.6.1.2.1.149.1.3.1.1.5
         name: sipCommonSummaryTotalTransactions
-        description: Count of transactions in progress and terminated transactions
-        family: SIP/Transactions
-        unit: "{transaction}"
+        chart_meta:
+          description: Count of transactions in progress and terminated transactions
+          family: SIP/Transactions
+          unit: "{transaction}"
     metric_tags:
       - index: 1
         tag: applIndex
@@ -60,14 +66,16 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.5.1.1.3
         name: sipCommonStatusCodeIns
-        description: Total number of response messages received with the specified status code (sipCommonStatusCodeValue)
-        family: SIP/Responses
-        unit: "{response}"
+        chart_meta:
+          description: Total number of response messages received with the specified status code (sipCommonStatusCodeValue)
+          family: SIP/Responses
+          unit: "{response}"
       - OID: 1.3.6.1.2.1.149.1.5.1.1.4
         name: sipCommonStatusCodeOuts
-        description: Total number of response messages sent with the specified status code (sipCommonStatusCodeValue)
-        family: SIP/Responses
-        unit: "{response}"
+        chart_meta:
+          description: Total number of response messages sent with the specified status code (sipCommonStatusCodeValue)
+          family: SIP/Responses
+          unit: "{response}"
     metric_tags:
       - index: 1
         tag: applIndex
@@ -82,9 +90,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.2.1.149.1.6.1.1.1
         name: sipCommonTransCurrentactions
-        description: Number of transactions awaiting definitive response
-        family: SIP/Transactions
-        unit: "{transaction}"
+        chart_meta:
+          description: Number of transactions awaiting definitive response
+          family: SIP/Transactions
+          unit: "{transaction}"
     metric_tags:
       - index: 1
         tag: applIndex

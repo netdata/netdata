@@ -14,18 +14,20 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.1.1.6
         name: bsnAPOperationStatus
-        description: Operation State of the AP
-        family: AccessPoint/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Operation State of the AP
+          family: AccessPoint/Operational/Status
+          unit: "{status}"
         mapping:
           1: associated
           2: disassociating
           3: downloading
       - OID: 1.3.6.1.4.1.14179.2.2.1.1.37
         name: bsnAPAdminStatus
-        description: Admin State of the AP
-        family: AccessPoint/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: Admin State of the AP
+          family: AccessPoint/Admin/Status
+          unit: "{status}"
         mapping:
           1: enable
           2: disable
@@ -56,17 +58,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.12
         name: bsnAPIfOperStatus
-        description: Operational status of the interface
-        family: AccessPoint/Interface/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Operational status of the interface
+          family: AccessPoint/Interface/Operational/Status
+          unit: "{status}"
         mapping:
           1: down
           2: up
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.34
         name: bsnAPIfAdminStatus
-        description: Admin status of the interface
-        family: AccessPoint/Interface/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: Admin status of the interface
+          family: AccessPoint/Interface/Admin/Status
+          unit: "{status}"
         mapping:
           1: enable
           2: disable
@@ -116,9 +120,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.2.1.15
         name: bsnApIfNoOfUsers
-        description: "Number of users associated with this radio"
-        family: AccessPoint/Interface/User/Count
-        unit: "{user}"
+        chart_meta:
+          description: "Number of users associated with this radio"
+          family: AccessPoint/Interface/User/Count
+          unit: "{user}"
     metric_tags:
       - tag: ap_if_slot_id
         symbol:
@@ -166,24 +171,28 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.1
         name: bsnAPIfLoadRxUtilization
-        description: "Percentage of time the Airespace AP receiver is busy operating on packets"
-        family: AccessPoint/Radio/Receiver/Utilization
-        unit: "%"
+        chart_meta:
+          description: "Percentage of time the Airespace AP receiver is busy operating on packets"
+          family: AccessPoint/Radio/Receiver/Utilization
+          unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.2
         name: bsnAPIfLoadTxUtilization
-        description: "Percentage of time the Airespace AP transmitter is busy operating on packets"
-        family: AccessPoint/Radio/Transmitter/Utilization
-        unit: "%"
+        chart_meta:
+          description: "Percentage of time the Airespace AP transmitter is busy operating on packets"
+          family: AccessPoint/Radio/Transmitter/Utilization
+          unit: "%"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.24
         name: bsnAPIfPoorSNRClients
-        description: "Number of clients with poor SNR attached to this Airespace AP at the last measurement interval"
-        family: AccessPoint/Client/PoorSNR
-        unit: "{client}"
+        chart_meta:
+          description: "Number of clients with poor SNR attached to this Airespace AP at the last measurement interval"
+          family: AccessPoint/Client/PoorSNR
+          unit: "{client}"
       - OID: 1.3.6.1.4.1.14179.2.2.13.1.3
         name: bsnAPIfLoadChannelUtilization
-        description: "Channel utilization"
-        family: AccessPoint/Radio/Channel/Utilization
-        unit: "%"
+        chart_meta:
+          description: "Channel utilization"
+          family: AccessPoint/Radio/Channel/Utilization
+          unit: "%"
     metric_tags:
       - tag: ap_if_slot_id
         table: bsnAPIfTable
@@ -232,17 +241,19 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.6
         name: bsnDot11EssAdminStatus
-        description: Administrative Status of ESS(WLAN)
-        family: WLAN/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: Administrative Status of ESS(WLAN)
+          family: WLAN/Admin/Status
+          unit: "{status}"
         mapping:
           0: disable
           1: enable
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.60
         name: bsnDot11EssRowStatus
-        description: Row status type for the bsnDot11EssEntry
-        family: WLAN/Row/Status
-        unit: "{status}"
+        chart_meta:
+          description: Row status type for the bsnDot11EssEntry
+          family: WLAN/Row/Status
+          unit: "{status}"
         mapping:
           1: active
           2: notInService
@@ -252,9 +263,10 @@ metrics:
           6: destroy
       - OID: 1.3.6.1.4.1.14179.2.1.1.1.38
         name: bsnDot11EssNumberOfMobileStations
-        description: Number of mobile stations currently associated with the WLAN
-        family: WLAN/Station/Count
-        unit: "{station}"
+        chart_meta:
+          description: Number of mobile stations currently associated with the WLAN
+          family: WLAN/Station/Count
+          unit: "{station}"
     metric_tags:
       - tag: wlan_index
         symbol:

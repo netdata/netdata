@@ -19,9 +19,10 @@ metrics:
     symbols:
       - name: healthModuleCpuLatest
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.11
-        description: Cpu usage percentage
-        family: CPU/Usage
-        unit: "%"
+        chart_meta:
+          description: Cpu usage percentage
+          family: CPU/Usage
+          unit: "%"
     metric_tags:
       - tag: cpu_index
         index: 1
@@ -37,9 +38,10 @@ metrics:
     symbols:
       - name: healthModuleMemoryLatest
         OID: 1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.8
-        description: Memory usage percentage
-        family: Memory/Usage
-        unit: "%"
+        chart_meta:
+          description: Memory usage percentage
+          family: Memory/Usage
+          unit: "%"
     metric_tags:
       - tag: mem_index
         index: 1
@@ -55,9 +57,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.1
         name: chasEntPhysAdminStatus
-        description: The administrative status of the physical entity
-        family: Hardware/Admin/Status
-        unit: "{status}"
+        chart_meta:
+          description: The administrative status of the physical entity
+          family: Hardware/Admin/Status
+          unit: "{status}"
         mapping:
           1: unknown
           2: power_off
@@ -72,9 +75,10 @@ metrics:
           11: reset_vc_all
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.2
         name: chasEntPhysOperStatus
-        description: The operational status of the physical entity
-        family: Hardware/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: The operational status of the physical entity
+          family: Hardware/Operational/Status
+          unit: "{status}"
         mapping:
           1: up
           2: down
@@ -88,9 +92,10 @@ metrics:
           10: pwrsave
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.6
         name: chasEntPhysLedStatusOk1
-        description: Physical entity ok1 LED status
-        family: Hardware/LED/OK1/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity ok1 LED status
+          family: Hardware/LED/OK1/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -100,9 +105,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.7
         name: chasEntPhysLedStatusOk2
-        description: Physical entity ok2 LED status
-        family: Hardware/LED/OK2/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity ok2 LED status
+          family: Hardware/LED/OK2/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -112,9 +118,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.8
         name: chasEntPhysLedStatusPrimaryCMM
-        description: Physical entity primary CMM LED status
-        family: Hardware/LED/CMMPrimary/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity primary CMM LED status
+          family: Hardware/LED/CMMPrimary/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -124,9 +131,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.9
         name: chasEntPhysLedStatusSecondaryCMM
-        description: Physical entity secondary CMM LED status
-        family: Hardware/LED/CMMSecondary/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity secondary CMM LED status
+          family: Hardware/LED/CMMSecondary/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -136,9 +144,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.10
         name: chasEntPhysLedStatusTemperature
-        description: Physical entity temperature LED status
-        family: Hardware/LED/Temperature/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity temperature LED status
+          family: Hardware/LED/Temperature/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -148,9 +157,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.11
         name: chasEntPhysLedStatusFan
-        description: Physical entity fan LED status
-        family: Hardware/LED/Fan/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity fan LED status
+          family: Hardware/LED/Fan/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -160,9 +170,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.12
         name: chasEntPhysLedStatusBackupPS
-        description: Physical entity backup power supply LED status
-        family: Hardware/LED/PSUBackup/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity backup power supply LED status
+          family: Hardware/LED/PSUBackup/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -172,9 +183,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.13
         name: chasEntPhysLedStatusInternalPS
-        description: Physical entity internal power supply LED status
-        family: Hardware/LED/PSUInternal/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity internal power supply LED status
+          family: Hardware/LED/PSUInternal/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -184,9 +196,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.16
         name: chasEntPhysLedStatusPS
-        description: Physical entity power supply LED status
-        family: Hardware/LED/PSU/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity power supply LED status
+          family: Hardware/LED/PSU/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -196,9 +209,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.14
         name: chasEntPhysLedStatusControl
-        description: Physical entity control LED status
-        family: Hardware/LED/Control/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity control LED status
+          family: Hardware/LED/Control/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -208,9 +222,10 @@ metrics:
           5: amber_blink
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.1.1.15
         name: chasEntPhysLedStatusFabric
-        description: Physical entity fabric LED status
-        family: Hardware/LED/Fabric/Status
-        unit: "{status}"
+        chart_meta:
+          description: Physical entity fabric LED status
+          family: Hardware/LED/Fabric/Status
+          unit: "{status}"
         mapping:
           0: not_applicable
           1: off
@@ -267,14 +282,16 @@ metrics:
     symbols:
       - name: chasEntTempCurrent
         OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.1
-        description: Current temperature of the physical entity
-        family: Hardware/Temperature/Value
-        unit: "Cel"
+        chart_meta:
+          description: Current temperature of the physical entity
+          family: Hardware/Temperature/Value
+          unit: "Cel"
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.1.1.2.1.4
         name: chasEntTempStatus
-        description: Status of the temperature sensor
-        family: Hardware/Temperature/Status
-        unit: "{status}"
+        chart_meta:
+          description: Status of the temperature sensor
+          family: Hardware/Temperature/Status
+          unit: "{status}"
         mapping:
           1: unknown
           2: not_present
@@ -331,9 +348,10 @@ metrics:
     symbols:
       - name: alaChasEntPhysFanSpeed
         OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.11.1.4
-        description: Fan speed in revolutions per minute
-        family: Fan/Speed
-        unit: "{revolution}/min"
+        chart_meta:
+          description: Fan speed in revolutions per minute
+          family: Fan/Speed
+          unit: "{revolution}/min"
     metric_tags:
       - tag: ala_chas_ent_phys_fan_status
         symbol:
@@ -350,9 +368,10 @@ metrics:
     symbols:
       - OID: 1.3.6.1.4.1.6486.801.1.1.1.3.1.1.14.4.1.10
         name: alaChasBpsPowerSupplyOperStatus
-        description: Operational status of the power supply
-        family: PowerSupply/Operational/Status
-        unit: "{status}"
+        chart_meta:
+          description: Operational status of the power supply
+          family: PowerSupply/Operational/Status
+          unit: "{status}"
         mapping:
           1: up
           2: down
