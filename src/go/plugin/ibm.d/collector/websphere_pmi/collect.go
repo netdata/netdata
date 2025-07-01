@@ -17,19 +17,19 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 		// Debug: Log what statistics are available
 		w.Debugf("JVM Runtime stat has: %d BoundedRangeStatistics, %d CountStatistics, %d DoubleStatistics",
 			len(stat.BoundedRangeStatistics), len(stat.CountStatistics), len(stat.DoubleStatistics))
-		
+
 		// Process BoundedRangeStatistics
 		for _, brs := range stat.BoundedRangeStatistics {
-			w.Debugf("BoundedRangeStatistic: name=%s, current=%s, upperBound=%s, lowerBound=%s", 
+			w.Debugf("BoundedRangeStatistic: name=%s, current=%s, upperBound=%s, lowerBound=%s",
 				brs.Name, brs.Current, brs.UpperBound, brs.LowerBound)
-			
+
 			if brs.Name == "HeapSize" {
 				// HeapSize is in KILOBYTES, convert to bytes
 				if brs.Current == "" {
 					w.Debugf("HeapSize current value is empty")
 					continue
 				}
-				
+
 				if v, err := strconv.ParseInt(brs.Current, 10, 64); err == nil {
 					mx["jvm_heap_used"] = v * 1024 // Current value is the used memory
 					w.Debugf("HeapSize parsed successfully: %d KB", v)
@@ -123,7 +123,7 @@ func (w *WebSpherePMI) processJVMStat(stat *pmiStat, mx map[string]int64) {
 		if stat.BoundedRangeStatistic != nil {
 			w.Debugf("BoundedRangeStatistic for HeapSize: current=%s, upperBound=%s, lowerBound=%s",
 				stat.BoundedRangeStatistic.Current, stat.BoundedRangeStatistic.UpperBound, stat.BoundedRangeStatistic.LowerBound)
-			
+
 			// HeapSize is in KILOBYTES, convert to bytes
 			if stat.BoundedRangeStatistic.Current == "" {
 				w.Debugf("HeapSize current value is empty")

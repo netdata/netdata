@@ -67,7 +67,6 @@ const (
 	prioJDBCConnectionReuse
 )
 
-
 var baseCharts = module.Charts{
 	// JVM Heap Memory Usage - Additive dimensions (used + free = total)
 	{
@@ -109,7 +108,6 @@ var baseCharts = module.Charts{
 		},
 	},
 
-
 	// JVM GC
 	{
 		ID:       "jvm_gc_count",
@@ -134,7 +132,6 @@ var baseCharts = module.Charts{
 			{ID: "jvm_gc_time", Name: "time", Algo: module.Incremental},
 		},
 	},
-
 
 	// JVM Classes - Current loaded count
 	{

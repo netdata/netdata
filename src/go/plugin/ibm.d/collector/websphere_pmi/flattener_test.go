@@ -152,11 +152,11 @@ func TestXMLFlattener_MetricTypes(t *testing.T) {
 	// Count different metric types
 	typeCounts := make(map[string]int)
 	unitCounts := make(map[string]int)
-	
+
 	for _, metric := range result.Metrics {
 		typeCounts[metric.Type]++
 		unitCounts[metric.Unit]++
-		
+
 		// Verify metric values are reasonable
 		assert.GreaterOrEqual(t, metric.Value, int64(0), "Metric values should be non-negative")
 	}
@@ -192,11 +192,11 @@ func TestXMLFlattener_PathGeneration(t *testing.T) {
 	for _, metric := range result.Metrics {
 		depth := len(strings.Split(metric.Path, "/"))
 		pathDepths[depth]++
-		
+
 		// Paths should be reasonable length (WebSphere can have very deep hierarchies)
 		assert.LessOrEqual(t, depth, 15, "Path depth should be reasonable: %s", metric.Path)
 		assert.GreaterOrEqual(t, depth, 2, "Path should have minimum depth: %s", metric.Path)
-		
+
 		// Paths should not be empty or have empty components
 		assert.NotEmpty(t, metric.Path, "Path should not be empty")
 		parts := strings.Split(metric.Path, "/")
@@ -275,7 +275,7 @@ func TestXMLFlattener_EdgeCases(t *testing.T) {
 
 	result = flattener.FlattenPMIStats(singleStat)
 	assert.Len(t, result.Metrics, 1, "Single stat should produce one metric")
-	
+
 	metric := result.Metrics[0]
 	assert.Equal(t, "TestStat/TestCount", metric.Path)
 	assert.Equal(t, "TestNode", metric.Labels["node"])

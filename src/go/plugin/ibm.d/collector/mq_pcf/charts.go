@@ -15,21 +15,21 @@ const (
 	prioQueueManagerCPU
 	prioQueueManagerMemory
 	prioQueueManagerLog
-	
+
 	// Overview charts priority (higher priority = shown first)
 	prioQueuesOverview
 	prioChannelsOverview
-	
+
 	prioQueueDepth
 	prioQueueMessages
 	prioQueueAge
 	prioQueueConnections
-	
+
 	prioChannelStatus
 	prioChannelMessages
 	prioChannelBytes
 	prioChannelBatches
-	
+
 	prioTopicPublishers
 	prioTopicSubscribers
 	prioTopicMessages
@@ -133,7 +133,7 @@ var queueChartsTmpl = module.Charts{
 		ID:       "queue_%s_config",
 		Title:    "Queue Configuration Limits",
 		Units:    "messages",
-		Fam:      "queues", 
+		Fam:      "queues",
 		Ctx:      "mq_pcf.queue_config",
 		Priority: prioQueueDepth + 1,
 		Dims: module.Dims{
@@ -147,7 +147,7 @@ var queueChartsTmpl = module.Charts{
 		Title:    "Queue Inhibit Status",
 		Units:    "status",
 		Fam:      "queues",
-		Ctx:      "mq_pcf.queue_inhibit", 
+		Ctx:      "mq_pcf.queue_inhibit",
 		Priority: prioQueueDepth + 2,
 		Dims: module.Dims{
 			{ID: "queue_%s_inhibit_get", Name: "inhibit_get"},
@@ -171,7 +171,7 @@ var queueChartsTmpl = module.Charts{
 		Title:    "Queue Activity Metrics",
 		Units:    "connections",
 		Fam:      "queues",
-		Ctx:      "mq_pcf.queue_activity", 
+		Ctx:      "mq_pcf.queue_activity",
 		Priority: prioQueueDepth + 4,
 		Dims: module.Dims{
 			{ID: "queue_%s_open_input_count", Name: "open_for_input"},
@@ -243,11 +243,11 @@ var channelChartsTmpl = module.Charts{
 		},
 	},
 	{
-		ID:       "channel_%s_timeouts",
+		ID:       "channel_%s_timeouts_config",
 		Title:    "Channel Timeout Settings",
 		Units:    "seconds",
 		Fam:      "channels",
-		Ctx:      "mq_pcf.channel_timeouts",
+		Ctx:      "mq_pcf.channel_timeouts_config",
 		Priority: prioChannelStatus + 2,
 		Dims: module.Dims{
 			{ID: "channel_%s_disc_interval", Name: "disconnect_interval", Div: precision},
@@ -270,11 +270,11 @@ var channelChartsTmpl = module.Charts{
 		},
 	},
 	{
-		ID:       "channel_%s_limits",
+		ID:       "channel_%s_limits_config",
 		Title:    "Channel Limits",
 		Units:    "value",
 		Fam:      "channels",
-		Ctx:      "mq_pcf.channel_limits",
+		Ctx:      "mq_pcf.channel_limits_config",
 		Priority: prioChannelStatus + 4,
 		Dims: module.Dims{
 			{ID: "channel_%s_max_msg_length", Name: "max_message_length"},
@@ -362,26 +362,26 @@ var topicChartsTmpl = module.Charts{
 func (c *Collector) newInstanceCharts(tmpl module.Charts, instanceName, labelKey string) *module.Charts {
 	charts := tmpl.Copy()
 	cleanName := c.cleanName(instanceName)
-	
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanName)
 		chart.Labels = []module.Label{
 			{Key: labelKey, Value: instanceName},
 		}
-		
+
 		// Add version labels if available
 		if c.version != "" && c.edition != "" {
-			chart.Labels = append(chart.Labels, 
+			chart.Labels = append(chart.Labels,
 				module.Label{Key: "mq_version", Value: c.version},
 				module.Label{Key: "mq_edition", Value: c.edition},
 			)
 		}
-		
+
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, cleanName)
 		}
 	}
-	
+
 	return charts
 }
 

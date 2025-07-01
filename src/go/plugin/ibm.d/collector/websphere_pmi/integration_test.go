@@ -19,14 +19,14 @@ import (
 
 // ChartOutput represents the expected output for a chart
 type ChartOutput struct {
-	ID       string            `json:"id"`
-	Title    string            `json:"title"`
-	Units    string            `json:"units"`
-	Family   string            `json:"family"`
-	Context  string            `json:"context"`
-	Type     string            `json:"type"`
-	Priority int               `json:"priority"`
-	Labels   map[string]string `json:"labels"`
+	ID         string            `json:"id"`
+	Title      string            `json:"title"`
+	Units      string            `json:"units"`
+	Family     string            `json:"family"`
+	Context    string            `json:"context"`
+	Type       string            `json:"type"`
+	Priority   int               `json:"priority"`
+	Labels     map[string]string `json:"labels"`
 	Dimensions []DimensionOutput `json:"dimensions"`
 }
 
@@ -37,9 +37,9 @@ type DimensionOutput struct {
 	Mul    int    `json:"mul,omitempty"`
 	Div    int    `json:"div,omitempty"`
 	Hidden bool   `json:"hidden,omitempty"`
-	
+
 	// Include the actual value from the source data
-	Value  int64  `json:"value"`
+	Value int64 `json:"value"`
 	// Include source path for traceability
 	SourcePath string `json:"source_path"`
 }
@@ -50,7 +50,7 @@ type IntegrationTestOutput struct {
 	TotalCharts        int           `json:"total_charts"`
 	TotalDimensions    int           `json:"total_dimensions"`
 	Charts             []ChartOutput `json:"charts"`
-	
+
 	// Validation results
 	ValidationErrors []string `json:"validation_errors,omitempty"`
 }
@@ -142,16 +142,16 @@ func buildTestOutput(flatResult *FlattenerResult, candidates []ChartCandidate, c
 	totalDims := 0
 	for i, chart := range *charts {
 		candidate := candidates[i]
-		
+
 		chartOut := ChartOutput{
-			ID:       chart.ID,
-			Title:    chart.Title,
-			Units:    chart.Units,
-			Family:   chart.Fam,
-			Context:  chart.Ctx,
-			Type:     string(chart.Type),
-			Priority: chart.Priority,
-			Labels:   make(map[string]string),
+			ID:         chart.ID,
+			Title:      chart.Title,
+			Units:      chart.Units,
+			Family:     chart.Fam,
+			Context:    chart.Ctx,
+			Type:       string(chart.Type),
+			Priority:   chart.Priority,
+			Labels:     make(map[string]string),
 			Dimensions: make([]DimensionOutput, 0, len(chart.Dims)),
 		}
 
@@ -329,7 +329,7 @@ func compareOutputs(t *testing.T, expected, actual IntegrationTestOutput) {
 		assert.Equal(t, expectedChart.Labels, actualChart.Labels, "Chart labels mismatch for %s", expectedChart.ID)
 
 		// Compare dimensions
-		assert.Equal(t, len(expectedChart.Dimensions), len(actualChart.Dimensions), 
+		assert.Equal(t, len(expectedChart.Dimensions), len(actualChart.Dimensions),
 			"Dimension count mismatch for chart %s", expectedChart.ID)
 
 		for j, expectedDim := range expectedChart.Dimensions {
@@ -449,7 +449,7 @@ func TestChartHierarchyAndLabels(t *testing.T) {
 	for _, chart := range *netdataCharts {
 		// All charts should have basic labels
 		assert.NotNil(t, chart.Labels, "Chart %s should have labels", chart.ID)
-		
+
 		// Check for instance-specific charts
 		hasInstance := false
 		for _, label := range chart.Labels {

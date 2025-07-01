@@ -45,12 +45,12 @@ func TestCorrelationEngine_CorrelateMetrics(t *testing.T) {
 		if len(chart.Dimensions) > 1 {
 			firstUnit := chart.Dimensions[0].Metric.Unit
 			for _, dim := range chart.Dimensions {
-				assert.Equal(t, firstUnit, dim.Metric.Unit, 
+				assert.Equal(t, firstUnit, dim.Metric.Unit,
 					"All dimensions in chart should have same unit: %s", chart.Context)
 			}
 		}
 
-		t.Logf("Chart: %s (%s) - %d dimensions, unit: %s", 
+		t.Logf("Chart: %s (%s) - %d dimensions, unit: %s",
 			chart.Context, chart.Title, len(chart.Dimensions), chart.Units)
 	}
 }
@@ -102,8 +102,8 @@ func TestCorrelationEngine_CorrelationKeys(t *testing.T) {
 	correlator := NewCorrelationEngine()
 
 	testCases := []struct {
-		metric   MetricTuple
-		expected string
+		metric      MetricTuple
+		expected    string
 		description string
 	}{
 		{
@@ -143,30 +143,30 @@ func TestCorrelationEngine_MetricCompatibility(t *testing.T) {
 
 	// Incompatible metrics - different pools without instance labels
 	metric1 := MetricTuple{
-		Path: "server/Thread Pools/WebContainer/ActiveCount",
+		Path:   "server/Thread Pools/WebContainer/ActiveCount",
 		Labels: map[string]string{"pool": "WebContainer"},
-		Unit: "requests", Type: "count",
+		Unit:   "requests", Type: "count",
 	}
 	metric2 := MetricTuple{
-		Path: "server/Thread Pools/Default/ActiveCount",
+		Path:   "server/Thread Pools/Default/ActiveCount",
 		Labels: map[string]string{"pool": "Default"},
-		Unit: "requests", Type: "count",
+		Unit:   "requests", Type: "count",
 	}
 
 	// Without instance labels, metrics from different paths should not be compatible
-	assert.False(t, correlator.areMetricsCompatible(metric1, metric2), 
+	assert.False(t, correlator.areMetricsCompatible(metric1, metric2),
 		"Metrics from different paths without instance labels should NOT be compatible")
 
 	// Compatible metrics from same instance
 	metric1Same := MetricTuple{
-		Path: "server/Thread Pools/WebContainer/ActiveCount",
+		Path:   "server/Thread Pools/WebContainer/ActiveCount",
 		Labels: map[string]string{"pool": "WebContainer", "instance": "WebContainer"},
-		Unit: "requests", Type: "count",
+		Unit:   "requests", Type: "count",
 	}
 	metric2Same := MetricTuple{
-		Path: "server/Thread Pools/WebContainer/CreateCount",
+		Path:   "server/Thread Pools/WebContainer/CreateCount",
 		Labels: map[string]string{"pool": "WebContainer", "instance": "WebContainer"},
-		Unit: "requests", Type: "count",
+		Unit:   "requests", Type: "count",
 	}
 	assert.True(t, correlator.areMetricsCompatible(metric1Same, metric2Same),
 		"Metrics from same instance with same unit should be compatible")
@@ -212,8 +212,8 @@ func TestCorrelationEngine_ChartGeneration(t *testing.T) {
 		BaseContext:    "websphere_pmi.thread_pools.active_connections",
 		CommonLabels:   map[string]string{"node": "node1", "server": "server1"},
 		Metrics:        metrics,
-		Unit:          "requests",
-		Type:          "line",
+		Unit:           "requests",
+		Type:           "line",
 	}
 
 	chart := correlator.createChartFromGroup(group, 70000)
@@ -257,8 +257,8 @@ func TestCorrelationEngine_LargeGroupSplitting(t *testing.T) {
 		CorrelationKey: "test.large.group",
 		BaseContext:    "test.large.group",
 		Metrics:        metrics,
-		Unit:          "requests",
-		Type:          "line",
+		Unit:           "requests",
+		Type:           "line",
 	}
 
 	subGroups := correlator.splitLargeGroup(group)
@@ -343,18 +343,18 @@ func TestCorrelationEngine_RealDataIntegration(t *testing.T) {
 	// Verify chart diversity (should have different categories)
 	families := make(map[string]int)
 	contexts := make(map[string]bool)
-	
+
 	for _, chart := range *netdataCharts {
 		families[chart.Fam]++
 		contexts[chart.Ctx] = true
-		
+
 		// Verify chart structure
 		assert.NotEmpty(t, chart.ID, "Chart should have ID")
 		assert.NotEmpty(t, chart.Title, "Chart should have title")
 		assert.NotEmpty(t, chart.Units, "Chart should have units")
 		assert.NotEmpty(t, chart.Ctx, "Chart should have context")
 		assert.NotEmpty(t, chart.Dims, "Chart should have dimensions")
-		
+
 		// Each dimension should have ID and name
 		for _, dim := range chart.Dims {
 			assert.NotEmpty(t, dim.ID, "Dimension should have ID")
@@ -378,8 +378,8 @@ func TestCorrelationEngine_MetricFamilyExtraction(t *testing.T) {
 	correlator := NewCorrelationEngine()
 
 	testCases := []struct {
-		metricName string
-		expected   string
+		metricName  string
+		expected    string
 		description string
 	}{
 		{"ActiveCount", "active_connections", "Active count should be active connections"},
@@ -401,8 +401,8 @@ func TestCorrelationEngine_MetricFamilyExtraction(t *testing.T) {
 func TestCorrelationEngine_DimensionIDSanitization(t *testing.T) {
 	// Test the sanitizeDimensionID function
 	testCases := []struct {
-		input    string
-		expected string
+		input       string
+		expected    string
 		description string
 	}{
 		{"Message Listener", "message_listener", "Spaces should be replaced with underscores"},
@@ -477,14 +477,14 @@ func TestCorrelationEngine_InstanceSeparation(t *testing.T) {
 	for _, chart := range charts {
 		assert.Equal(t, 1, len(chart.Dimensions), "Each instance chart should have only one dimension")
 		assert.NotEmpty(t, chart.Labels["instance"], "Chart should have instance label")
-		
+
 		// Verify dimension ID is sanitized
 		dimID := chart.Dimensions[0].ID
 		assert.NotContains(t, dimID, "#", "Dimension ID should not contain hash")
 		assert.NotContains(t, dimID, ".", "Dimension ID should not contain dots")
 		assert.NotContains(t, dimID, " ", "Dimension ID should not contain spaces")
-		
-		t.Logf("Chart: %s, Instance: %s, Dimension ID: %s", 
+
+		t.Logf("Chart: %s, Instance: %s, Dimension ID: %s",
 			chart.Title, chart.Labels["instance"], dimID)
 	}
 
