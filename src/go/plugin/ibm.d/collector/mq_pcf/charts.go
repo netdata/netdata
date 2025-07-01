@@ -166,31 +166,55 @@ var queueChartsTmpl = module.Charts{
 			{ID: "queue_%s_def_persistence", Name: "persistence"},
 		},
 	},
-	// TODO: Enable these charts when we implement INQUIRE_Q based collection
-	// {
-	// 	ID:       "queue_%s_messages",
-	// 	Title:    "Queue Message Rate",
-	// 	Units:    "messages/s",
-	// 	Fam:      "queues",
-	// 	Ctx:      "mq_pcf.queue_messages",
-	// 	Priority: prioQueueMessages,
-	// 	Type:     module.Line,
-	// 	Dims: module.Dims{
-	// 		{ID: "queue_%s_enqueued", Name: "enqueued", Algo: module.Incremental},
-	// 		{ID: "queue_%s_dequeued", Name: "dequeued", Algo: module.Incremental},
-	// 	},
-	// },
-	// {
-	// 	ID:       "queue_%s_oldest_message_age",
-	// 	Title:    "Queue Oldest Message Age",
-	// 	Units:    "seconds",
-	// 	Fam:      "queues",
-	// 	Ctx:      "mq_pcf.queue_oldest_message_age",
-	// 	Priority: prioQueueAge,
-	// 	Dims: module.Dims{
-	// 		{ID: "queue_%s_oldest_message_age", Name: "age"},
-	// 	},
-	// },
+	{
+		ID:       "queue_%s_activity",
+		Title:    "Queue Activity Metrics",
+		Units:    "connections",
+		Fam:      "queues",
+		Ctx:      "mq_pcf.queue_activity", 
+		Priority: prioQueueDepth + 4,
+		Dims: module.Dims{
+			{ID: "queue_%s_open_input_count", Name: "open_for_input"},
+			{ID: "queue_%s_open_output_count", Name: "open_for_output"},
+		},
+	},
+	{
+		ID:       "queue_%s_messages",
+		Title:    "Queue Message Counters",
+		Units:    "messages",
+		Fam:      "queues",
+		Ctx:      "mq_pcf.queue_messages",
+		Priority: prioQueueMessages,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "queue_%s_enqueued", Name: "enqueued", Algo: module.Incremental},
+			{ID: "queue_%s_dequeued", Name: "dequeued", Algo: module.Incremental},
+		},
+	},
+	{
+		ID:       "queue_%s_oldest_message_age",
+		Title:    "Queue Oldest Message Age",
+		Units:    "seconds",
+		Fam:      "queues",
+		Ctx:      "mq_pcf.queue_oldest_message_age",
+		Priority: prioQueueAge,
+		Dims: module.Dims{
+			{ID: "queue_%s_oldest_message_age", Name: "age"},
+		},
+	},
+	{
+		ID:       "queue_%s_depth_events",
+		Title:    "Queue Depth Event Thresholds",
+		Units:    "messages",
+		Fam:      "queues",
+		Ctx:      "mq_pcf.queue_depth_events",
+		Priority: prioQueueDepth + 5,
+		Dims: module.Dims{
+			{ID: "queue_%s_depth_high_limit", Name: "high_limit"},
+			{ID: "queue_%s_depth_low_limit", Name: "low_limit"},
+			{ID: "queue_%s_high_q_depth", Name: "peak_depth"},
+		},
+	},
 }
 
 // Template charts for channel instances

@@ -85,10 +85,169 @@ type mqConnection struct {
 	connected  bool
 }
 
+
+// PCF command tracking for detailed success/failure analysis
+type pcfTracker struct {
+	// Global header tracking (all commands - single and array responses)
+	requests    map[string]map[string]int  // command -> CompCode -> count
+	reasons     map[string]map[int32]int   // command -> Reason -> count
+	
+	// Array item tracking (only for array-returning commands)
+	itemReasons map[string]map[int32]int   // command -> MQIACF_REASON_CODE -> count  
+	itemCodes   map[string]map[string]int  // command -> MQIACF_COMP_CODE -> count
+}
+
+func newPCFTracker() *pcfTracker {
+	return &pcfTracker{
+		requests:    make(map[string]map[string]int),
+		reasons:     make(map[string]map[int32]int),
+		itemReasons: make(map[string]map[int32]int),
+		itemCodes:   make(map[string]map[string]int),
+	}
+}
+
+func (p *pcfTracker) trackGlobalHeader(command string, compCode int32, reason int32) {
+	// Track global CompCode
+	if p.requests[command] == nil {
+		p.requests[command] = make(map[string]int)
+	}
+	compCodeStr := p.compCodeToString(compCode)
+	p.requests[command][compCodeStr]++
+	
+	// Track global Reason
+	if p.reasons[command] == nil {
+		p.reasons[command] = make(map[int32]int)
+	}
+	p.reasons[command][reason]++
+}
+
+func (p *pcfTracker) trackArrayItem(command string, itemCompCode int32, itemReason int32) {
+	// Track item MQIACF_COMP_CODE
+	if p.itemCodes[command] == nil {
+		p.itemCodes[command] = make(map[string]int)
+	}
+	itemCompCodeStr := p.compCodeToString(itemCompCode)
+	p.itemCodes[command][itemCompCodeStr]++
+	
+	// Track item MQIACF_REASON_CODE
+	if p.itemReasons[command] == nil {
+		p.itemReasons[command] = make(map[int32]int)
+	}
+	p.itemReasons[command][itemReason]++
+}
+
+// trackRequest is a convenience method that calls trackGlobalHeader
+func (p *pcfTracker) trackRequest(command string, compCode int32, reason int32) {
+	p.trackGlobalHeader(command, compCode, reason)
+}
+
+func (p *pcfTracker) compCodeToString(compCode int32) string {
+	switch compCode {
+	case 0: return "MQCC_OK"
+	case 1: return "MQCC_WARNING" 
+	case 2: return "MQCC_FAILED"
+	default: return fmt.Sprintf("UNKNOWN_%d", compCode)
+	}
+}
+
+func (p *pcfTracker) reasonCodeToString(reason int32) string {
+	switch reason {
+	case 0: return "MQRC_NONE"
+	case 2035: return "MQRC_NOT_AUTHORIZED"
+	case 2085: return "MQRC_UNKNOWN_OBJECT_NAME"
+	case 2033: return "MQRC_NO_MSG_AVAILABLE"
+	case 2067: return "MQRC_OBJECT_OPEN_ERROR"
+	default: return fmt.Sprintf("MQRC_%d", reason)
+	}
+}
+
+// logCollectionSummary logs what was actually collected and detailed PCF command analysis
+func (c *Collector) logCollectionSummary(mx map[string]int64, totalDuration time.Duration) {
+	// Count what we collected
+	queueManagerMetrics := 0
+	if _, exists := mx["qmgr_status"]; exists {
+		queueManagerMetrics = 1
+	}
+	
+	// Count queues monitored
+	queuesMonitored := int(mx["queues_monitored"])
+	queuesExcluded := int(mx["queues_excluded"]) 
+	queuesModel := int(mx["queues_model"])
+	queuesUnauthorized := int(mx["queues_unauthorized"])
+	queuesFailed := int(mx["queues_failed"])
+	totalQueuesAttempted := queuesMonitored + queuesModel + queuesUnauthorized + queuesFailed
+	
+	// Count channels monitored
+	channelsMonitored := int(mx["channels_monitored"])
+	channelsExcluded := int(mx["channels_excluded"])
+	channelsUnauthorized := int(mx["channels_unauthorized"])
+	channelsFailed := int(mx["channels_failed"])
+	totalChannelsAttempted := channelsMonitored + channelsUnauthorized + channelsFailed
+	
+	// Estimate PCF commands executed
+	// Rule of thumb: 1 discovery + 2-3 per successful queue/channel (status + config + optional statistics)
+	estimatedPCFCommands := queueManagerMetrics // MQCMD_INQUIRE_Q_MGR
+	
+	if totalQueuesAttempted > 0 {
+		estimatedPCFCommands += 1 // MQCMD_INQUIRE_Q (discovery)
+		estimatedPCFCommands += queuesMonitored * 3 // MQCMD_INQUIRE_Q (config + status + statistics per queue)
+	}
+	
+	if totalChannelsAttempted > 0 {
+		estimatedPCFCommands += 1 // MQCMD_INQUIRE_CHANNEL (discovery)
+		estimatedPCFCommands += channelsMonitored * 3 // MQCMD_INQUIRE_CHANNEL (config + status + statistics per channel)
+	}
+	
+	// Log collection summary
+	c.Debugf("Collection summary (%v): QMgr=%d, Queues=%d/%d successful (%d excluded, %d model, %d auth, %d failed), Channels=%d/%d successful (%d excluded, %d auth, %d failed), Est. PCF commands=~%d", 
+		totalDuration,
+		queueManagerMetrics,
+		queuesMonitored, totalQueuesAttempted, queuesExcluded, queuesModel, queuesUnauthorized, queuesFailed,
+		channelsMonitored, totalChannelsAttempted, channelsExcluded, channelsUnauthorized, channelsFailed,
+		estimatedPCFCommands)
+	
+	// Log detailed PCF command tracking
+	c.logPCFTracking()
+}
+
+// logPCFTracking logs detailed PCF command success/failure breakdown
+func (c *Collector) logPCFTracking() {
+	// Log global request tracking (CompCode counts)
+	for command, compCodes := range c.pcfTracker.requests {
+		c.Debugf("%s REQUESTS: %v", command, compCodes)
+	}
+	
+	// Log global reason tracking
+	for command, reasons := range c.pcfTracker.reasons {
+		reasonStrs := make(map[string]int)
+		for reason, count := range reasons {
+			reasonStrs[c.pcfTracker.reasonCodeToString(reason)] = count
+		}
+		c.Debugf("%s REASONS: %v", command, reasonStrs)
+	}
+	
+	// Log array item reason tracking (only for array responses)
+	for command, itemReasons := range c.pcfTracker.itemReasons {
+		reasonStrs := make(map[string]int)
+		for reason, count := range itemReasons {
+			reasonStrs[c.pcfTracker.reasonCodeToString(reason)] = count
+		}
+		c.Debugf("%s ITEMS REASONS: %v", command, reasonStrs)
+	}
+	
+	// Log array item CompCode tracking (only for array responses)
+	for command, itemCodes := range c.pcfTracker.itemCodes {
+		c.Debugf("%s ITEMS CODES: %v", command, itemCodes)
+	}
+}
+
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	collectStart := time.Now()
 	c.Debugf("collect() called - connection status: %v", c.mqConn != nil && c.mqConn.connected)
 	mx := make(map[string]int64)
+	
+	// Reset PCF tracking for this collection cycle
+	c.pcfTracker = newPCFTracker()
 	
 	// Reset seen map for this collection cycle
 	c.seen = make(map[string]bool)
@@ -148,6 +307,9 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	
 	// Clean up obsolete charts for instances that no longer exist
 	c.markObsoleteCharts()
+	
+	// Log comprehensive collection summary including PCF command tracking
+	c.logCollectionSummary(mx, time.Since(collectStart))
 	
 	totalDuration := time.Since(collectStart)
 	c.Debugf("collect() finished in %v - connection still valid: %v", totalDuration, c.mqConn != nil && c.mqConn.connected)
@@ -391,6 +553,32 @@ func (c *Collector) validateConnection() error {
 	return nil
 }
 
+// mqcmdToString returns a human-readable name for MQCMD command constants
+func mqcmdToString(command C.MQLONG) string {
+	switch command {
+	case C.MQCMD_INQUIRE_Q_MGR:
+		return "MQCMD_INQUIRE_Q_MGR"
+	case C.MQCMD_INQUIRE_Q:
+		return "MQCMD_INQUIRE_Q"
+	case C.MQCMD_INQUIRE_Q_STATUS:
+		return "MQCMD_INQUIRE_Q_STATUS"
+	case C.MQCMD_INQUIRE_CHANNEL:
+		return "MQCMD_INQUIRE_CHANNEL"
+	case C.MQCMD_INQUIRE_CHANNEL_STATUS:
+		return "MQCMD_INQUIRE_CHANNEL_STATUS"
+	case C.MQCMD_INQUIRE_TOPIC:
+		return "MQCMD_INQUIRE_TOPIC"
+	case C.MQCMD_INQUIRE_TOPIC_STATUS:
+		return "MQCMD_INQUIRE_TOPIC_STATUS"
+	case MQCMD_INQUIRE_Q_NAMES:
+		return "MQCMD_INQUIRE_Q_NAMES"
+	case MQCMD_INQUIRE_CHANNEL_NAMES:
+		return "MQCMD_INQUIRE_CHANNEL_NAMES"
+	default:
+		return fmt.Sprintf("MQCMD_%d", command)
+	}
+}
+
 func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) ([]byte, error) {
 	// Validate connection before sending command
 	if err := c.validateConnection(); err != nil {
@@ -463,9 +651,9 @@ func (c *Collector) sendPCFCommand(command C.MQLONG, parameters []pcfParameter) 
 		// If connection handle error, mark connection as failed
 		if reason == C.MQRC_HCONN_ERROR {
 			c.mqConn.connected = false
-			c.Errorf("MQPUT failed with HCONN_ERROR - connection handle is now invalid")
+			c.Errorf("MQPUT failed with HCONN_ERROR for %s - connection handle is now invalid", mqcmdToString(command))
 		}
-		return nil, fmt.Errorf("MQPUT failed: completion code %d, reason code %d", compCode, reason)
+		return nil, fmt.Errorf("MQPUT failed for %s: completion code %d, reason code %d", mqcmdToString(command), compCode, reason)
 	}
 	
 	// Get response from persistent reply queue
@@ -570,26 +758,17 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	// For now, try a simple MQCMD_INQUIRE_Q_MGR to get basic status
 	// Note: CPU, memory, and log usage metrics might not be available through PCF
 	// in all MQ versions - they might require resource statistics monitoring
-	start := time.Now()
-	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
-	sendDuration := time.Since(start)
-	c.Debugf("PCF command MQCMD_INQUIRE_Q_MGR took %v", sendDuration)
+	var attrs map[C.MQLONG]interface{}
 	
-	if err != nil {
-		// Don't set status to 0 - leave it unset (null) to indicate we couldn't collect it
-		// Return error but don't fail the whole collection
-		c.Debugf("Queue manager inquiry failed: %v", err)
-		return nil
+	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
+	if err == nil {
+		attrs, err = c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_MGR")
 	}
 	
-	// Parse response with timing
-	parseStart := time.Now()
-	attrs, err := c.parsePCFResponse(response)
-	parseDuration := time.Since(parseStart)
-	c.Debugf("PCF response parsing took %v", parseDuration)
-	
+	// Command tracking is now handled automatically in parsePCFResponse
 	if err != nil {
-		return fmt.Errorf("failed to parse queue manager status response: %w", err)
+		c.Debugf("Queue manager inquiry failed: %v", err)
+		return nil
 	}
 	
 	// Extract metrics - set basic status (1 = running, 0 = unknown)
@@ -597,17 +776,17 @@ func (c *Collector) collectQueueManagerMetrics(ctx context.Context, mx map[strin
 	
 	// Try different attribute IDs that might contain the metrics
 	// Extract CPU usage if available (percentage * precision)
-	if cpuLoad, ok := attrs[MQIACF_Q_MGR_CPU_LOAD]; ok {
+	if cpuLoad, ok := attrs[C.MQLONG(MQIACF_Q_MGR_CPU_LOAD)]; ok {
 		mx["qmgr_cpu_usage"] = int64(cpuLoad.(int32)) * precision / 100
 	}
 	
 	// Extract memory usage if available (bytes)
-	if memUsage, ok := attrs[MQIACF_Q_MGR_MEMORY_USAGE]; ok {
+	if memUsage, ok := attrs[C.MQLONG(MQIACF_Q_MGR_MEMORY_USAGE)]; ok {
 		mx["qmgr_memory_usage"] = int64(memUsage.(int32))
 	}
 	
 	// Extract log usage if available (percentage * precision)
-	if logUsage, ok := attrs[MQIACF_Q_MGR_LOG_USAGE]; ok {
+	if logUsage, ok := attrs[C.MQLONG(MQIACF_Q_MGR_LOG_USAGE)]; ok {
 		mx["qmgr_log_usage"] = int64(logUsage.(int32)) * precision / 100
 	}
 	
@@ -634,8 +813,11 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 	// Get queue list with error details
 	result, err := c.getQueueList(ctx)
 	if err != nil {
+		// Command tracking is now handled automatically in parseQueueListResponse
 		return fmt.Errorf("failed to get queue list: %w", err)
 	}
+	
+	// Command tracking is now handled automatically in parseQueueListResponse
 	
 	// Calculate total queues attempted
 	totalQueues := len(result.Queues)
@@ -720,14 +902,14 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, mx map[string]int64
 			if strings.Contains(err.Error(), "2085") || strings.Contains(err.Error(), "MQRC_UNKNOWN_OBJECT_NAME") {
 				c.Debugf("Skipping status collection for model queue %s", queueName)
 			} else {
-				c.Debugf("Failed to collect metrics for queue %s: %v", queueName, err)
+				c.Debugf("Failed to collect metrics for queue %s (MQCMD_INQUIRE_Q_STATUS): %v", queueName, err)
 			}
 		}
 		
 		// Collect queue configuration metrics (always available for real queues)
 		if err := c.collectQueueConfigMetrics(ctx, queueName, cleanName, mx); err != nil {
 			// Model queues should still have configuration, so log this as debug
-			c.Debugf("Failed to collect config for queue %s: %v", queueName, err)
+			c.Debugf("Failed to collect config for queue %s (MQCMD_INQUIRE_Q): %v", queueName, err)
 		}
 	}
 	
@@ -753,16 +935,19 @@ func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cl
 			C.MQIA_INHIBIT_PUT,         // Whether put operations are inhibited
 			C.MQIA_DEF_PRIORITY,        // Default message priority
 			C.MQIA_DEF_PERSISTENCE,     // Default message persistence
+			C.MQIA_Q_DEPTH_HIGH_LIMIT,  // Queue depth high event limit
+			C.MQIA_Q_DEPTH_LOW_LIMIT,   // Queue depth low event limit
+			C.MQIA_HIGH_Q_DEPTH,        // High water mark for queue depth
 		}),
 	}
 	
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q, params)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_Q for %s: %w", queueName, err)
+		return fmt.Errorf("failed to send MQCMD_INQUIRE_Q for %s: %w", queueName, err)
 	}
 	
 	// Parse response
-	attrs, err := c.parsePCFResponse(response)
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_Q")
 	if err != nil {
 		return fmt.Errorf("failed to parse queue config response for %s: %w", queueName, err)
 	}
@@ -770,7 +955,7 @@ func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cl
 	// Check for MQ errors in the response
 	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
 		if reason, ok := reasonCode.(int32); ok && reason != 0 {
-			return fmt.Errorf("MQ error: reason code %d", reason)
+			return fmt.Errorf("MQ error in MQCMD_INQUIRE_Q: reason code %d", reason)
 		}
 	}
 	
@@ -801,6 +986,19 @@ func (c *Collector) collectQueueConfigMetrics(ctx context.Context, queueName, cl
 	
 	if defPersistence, ok := attrs[C.MQIA_DEF_PERSISTENCE]; ok {
 		mx[fmt.Sprintf("queue_%s_def_persistence", cleanName)] = int64(defPersistence.(int32))
+	}
+	
+	// Extract depth event thresholds and peak metrics
+	if depthHighLimit, ok := attrs[C.MQIA_Q_DEPTH_HIGH_LIMIT]; ok {
+		mx[fmt.Sprintf("queue_%s_depth_high_limit", cleanName)] = int64(depthHighLimit.(int32))
+	}
+	
+	if depthLowLimit, ok := attrs[C.MQIA_Q_DEPTH_LOW_LIMIT]; ok {
+		mx[fmt.Sprintf("queue_%s_depth_low_limit", cleanName)] = int64(depthLowLimit.(int32))
+	}
+	
+	if highQDepth, ok := attrs[C.MQIA_HIGH_Q_DEPTH]; ok {
+		mx[fmt.Sprintf("queue_%s_high_q_depth", cleanName)] = int64(highQDepth.(int32))
 	}
 	
 	return nil
@@ -905,7 +1103,7 @@ func (c *Collector) collectChannelMetrics(ctx context.Context, mx map[string]int
 		
 		// Collect channel configuration metrics (always available)
 		if err := c.collectChannelConfigMetrics(ctx, channelName, cleanName, mx); err != nil {
-			c.Debugf("Failed to collect config for channel %s: %v", channelName, err)
+			c.Debugf("Failed to collect config for channel %s (MQCMD_INQUIRE_CHANNEL): %v", channelName, err)
 		}
 	}
 	
@@ -988,7 +1186,7 @@ func (c *Collector) getQueueList(ctx context.Context) (*QueueParseResult, error)
 	}
 	
 	// Parse response and return structured result
-	result := c.parseQueueListResponse(response)
+	result := c.parseQueueListResponse(response, "MQCMD_INQUIRE_Q")
 	return result, nil
 }
 
@@ -1020,7 +1218,7 @@ func (c *Collector) getChannelList(ctx context.Context) (*ChannelParseResult, er
 	}
 	
 	// Parse response and return structured result
-	result := c.parseChannelListResponse(response)
+	result := c.parseChannelListResponse(response, "MQCMD_INQUIRE_CHANNEL")
 	return result, nil
 }
 
@@ -1076,11 +1274,11 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 	
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_STATUS, params)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_Q_STATUS for %s: %w", queueName, err)
+		return fmt.Errorf("failed to send MQCMD_INQUIRE_Q_STATUS for %s: %w", queueName, err)
 	}
 	
 	// Parse response
-	attrs, err := c.parsePCFResponse(response)
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_STATUS")
 	if err != nil {
 		return fmt.Errorf("failed to parse queue status response for %s: %w", queueName, err)
 	}
@@ -1095,7 +1293,7 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 			case 2035: // MQRC_NOT_AUTHORIZED
 				return fmt.Errorf("not authorized to query queue (MQRC_NOT_AUTHORIZED)")
 			default:
-				return fmt.Errorf("MQ error: reason code %d", reason)
+				return fmt.Errorf("MQ error in MQCMD_INQUIRE_Q_STATUS: reason code %d", reason)
 			}
 		}
 	}
@@ -1126,6 +1324,15 @@ func (c *Collector) collectSingleQueueMetrics(ctx context.Context, queueName, cl
 		mx[fmt.Sprintf("queue_%s_oldest_message_age", cleanName)] = int64(oldestAge.(int32))
 	}
 	
+	// Extract runtime activity metrics that are available from INQUIRE_Q_STATUS
+	if openInputCount, ok := attrs[C.MQIA_OPEN_INPUT_COUNT]; ok {
+		mx[fmt.Sprintf("queue_%s_open_input_count", cleanName)] = int64(openInputCount.(int32))
+	}
+	
+	if openOutputCount, ok := attrs[C.MQIA_OPEN_OUTPUT_COUNT]; ok {
+		mx[fmt.Sprintf("queue_%s_open_output_count", cleanName)] = int64(openOutputCount.(int32))
+	}
+	
 	return nil
 }
 
@@ -1137,11 +1344,11 @@ func (c *Collector) collectSingleChannelMetrics(ctx context.Context, channelName
 	
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL_STATUS, params)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_CHANNEL_STATUS for %s: %w", channelName, err)
+		return fmt.Errorf("failed to send MQCMD_INQUIRE_CHANNEL_STATUS for %s: %w", channelName, err)
 	}
 	
 	// Parse response
-	attrs, err := c.parsePCFResponse(response)
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_CHANNEL_STATUS")
 	if err != nil {
 		return fmt.Errorf("failed to parse channel status response for %s: %w", channelName, err)
 	}
@@ -1190,11 +1397,11 @@ func (c *Collector) collectChannelConfigMetrics(ctx context.Context, channelName
 	
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_CHANNEL, params)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_CHANNEL for %s: %w", channelName, err)
+		return fmt.Errorf("failed to send MQCMD_INQUIRE_CHANNEL for %s: %w", channelName, err)
 	}
 	
 	// Parse response
-	attrs, err := c.parsePCFResponse(response)
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_CHANNEL")
 	if err != nil {
 		return fmt.Errorf("failed to parse channel config response for %s: %w", channelName, err)
 	}
@@ -1202,7 +1409,7 @@ func (c *Collector) collectChannelConfigMetrics(ctx context.Context, channelName
 	// Check for MQ errors in the response
 	if reasonCode, ok := attrs[C.MQIACF_REASON_CODE]; ok {
 		if reason, ok := reasonCode.(int32); ok && reason != 0 {
-			return fmt.Errorf("MQ error: reason code %d", reason)
+			return fmt.Errorf("MQ error in MQCMD_INQUIRE_CHANNEL: reason code %d", reason)
 		}
 	}
 	
@@ -1266,11 +1473,11 @@ func (c *Collector) getTopicList(ctx context.Context) ([]string, error) {
 	
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_TOPIC, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send INQUIRE_TOPIC: %w", err)
+		return nil, fmt.Errorf("failed to send MQCMD_INQUIRE_TOPIC: %w", err)
 	}
 	
 	// Parse topic names from response
-	topics, err := c.parseTopicListResponse(response)
+	topics, err := c.parseTopicListResponse(response, "MQCMD_INQUIRE_TOPIC")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse topic list response: %w", err)
 	}
@@ -1297,11 +1504,11 @@ func (c *Collector) collectSingleTopicMetrics(ctx context.Context, topicName, cl
 	
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_TOPIC_STATUS, params)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_TOPIC_STATUS for %s: %w", topicName, err)
+		return fmt.Errorf("failed to send MQCMD_INQUIRE_TOPIC_STATUS for %s: %w", topicName, err)
 	}
 	
 	// Parse response
-	attrs, err := c.parsePCFResponse(response)
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_TOPIC_STATUS")
 	if err != nil {
 		return fmt.Errorf("failed to parse topic status response for %s: %w", topicName, err)
 	}
@@ -1326,11 +1533,11 @@ func (c *Collector) detectVersion(ctx context.Context) error {
 	// Send PCF command to inquire queue manager
 	response, err := c.sendPCFCommand(C.MQCMD_INQUIRE_Q_MGR, nil)
 	if err != nil {
-		return fmt.Errorf("failed to send INQUIRE_Q_MGR: %w", err)
+		return fmt.Errorf("failed to send MQCMD_INQUIRE_Q_MGR: %w", err)
 	}
 	
 	// Parse response
-	attrs, err := c.parsePCFResponse(response)
+	attrs, err := c.parsePCFResponse(response, "MQCMD_INQUIRE_Q_MGR")
 	if err != nil {
 		return fmt.Errorf("failed to parse queue manager response: %w", err)
 	}
